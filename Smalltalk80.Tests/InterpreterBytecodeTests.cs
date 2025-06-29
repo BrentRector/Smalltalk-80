@@ -462,7 +462,7 @@ public class InterpreterBytecodeTests
                 (byte)Bytecode.PushActiveContext,
                 (byte)Bytecode.PushZero,
                 130,
-                (byte)Bytecode.JumpLong, 0, 3,
+                (byte)Bytecode.JumpLong, 0, 2,
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.ReturnTopFromBlock,
                 131,
