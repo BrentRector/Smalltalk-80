@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 public class BytecodeAssembler {
     public static byte[] Assemble(string[] lines) {
         var list = new List<byte>();

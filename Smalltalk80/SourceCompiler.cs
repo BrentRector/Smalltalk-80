@@ -1,3 +1,5 @@
+using System;
+
 public static class SourceCompiler {
     public static CompiledMethod Compile(string source) {
         var tokenizer = new SmalltalkTokenizer(source);
