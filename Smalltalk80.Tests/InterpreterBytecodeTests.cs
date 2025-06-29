@@ -155,6 +155,30 @@ public class InterpreterBytecodeTests
         Assert.Null(result);
     }
 
+    [Theory]
+    [InlineData(Bytecode.PushThree, 3)]
+    [InlineData(Bytecode.PushFour, 4)]
+    [InlineData(Bytecode.PushFive, 5)]
+    [InlineData(Bytecode.PushSix, 6)]
+    [InlineData(Bytecode.PushSeven, 7)]
+    [InlineData(Bytecode.PushEight, 8)]
+    [InlineData(Bytecode.PushNine, 9)]
+    [InlineData(Bytecode.PushTen, 10)]
+    public void PushSmallIntegerConstants_ReturnExpectedValue(Bytecode code, int expected)
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)code, (byte)Bytecode.ReturnTopFromMethod },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void ReturnTrueBytecode_ReturnsTrue()
     {
