@@ -179,6 +179,30 @@ public enum Bytecode : byte
     DuplicateTop = 136,
     /// <summary>Push the active context.</summary>
     PushActiveContext = 137,
+
+    // 138-141
+    /// <summary>
+    ///     Unconditional branch with an 8-bit signed offset relative to the
+    ///     instruction following the offset byte.
+    /// </summary>
+    JumpShort = 138,
+    /// <summary>
+    ///     Unconditional branch with a 16-bit signed offset relative to the
+    ///     instruction following the offset bytes.
+    /// </summary>
+    JumpLong,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>false</c>. The
+    ///     branch distance is an 8-bit signed offset relative to the instruction
+    ///     following the offset byte.
+    /// </summary>
+    JumpIfFalseShort,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>false</c>. The
+    ///     branch distance is a 16-bit signed offset relative to the instruction
+    ///     following the offset bytes.
+    /// </summary>
+    JumpIfFalseLong,
 }
 
 #pragma warning restore CS1591

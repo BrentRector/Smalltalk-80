@@ -156,6 +156,28 @@ public class Interpreter
             currentContext.Stack.Push(top);
         } else if (bytecode == Bytecode.PushActiveContext) {
             currentContext.Stack.Push(currentContext);
+        } else if (bytecode == Bytecode.JumpShort) {
+            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
+            currentContext.PC += offset;
+        } else if (bytecode == Bytecode.JumpLong) {
+            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
+            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
+            short offset = (short)((high << 8) | low);
+            currentContext.PC += offset;
+        } else if (bytecode == Bytecode.JumpIfFalseShort) {
+            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && !b) {
+                currentContext.PC += offset;
+            }
+        } else if (bytecode == Bytecode.JumpIfFalseLong) {
+            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
+            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
+            short offset = (short)((high << 8) | low);
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && !b) {
+                currentContext.PC += offset;
+            }
         } else if ((byte)bytecode >= 128) {
             SendSelector((byte)bytecode);
         } else {
