@@ -78,7 +78,10 @@ public class Interpreter
         } else if (bytecode <= 63) {
             currentContext.Stack.Push(currentContext.Method.Literals[bytecode - 32]);
         } else if (bytecode == 124) {
-            HandleReturn(currentContext.Receiver);
+            var returnValue = currentContext.Stack.Count > 0
+                ? currentContext.Stack.Pop()
+                : currentContext.Receiver;
+            HandleReturn(returnValue!);
         } else if (bytecode >= 128) {
             SendSelector(bytecode);
         } else {
@@ -132,14 +135,39 @@ public class Interpreter
     {
         int selectorIndex = bytecode - 128;
         var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-        int argCount = (bytecode - 128) % 16;
 
-        if (currentContext.Method.HasPrimitive &&
-            Primitives.Execute(currentContext.Method.PrimitiveIndex, currentContext)) {
+        object? argument = currentContext.Stack.Pop();
+        object? receiver = currentContext.Stack.Pop();
+
+        if (receiver is int li && argument is int ri && selector.Name == "+") {
+            currentContext.Stack.Push(li + ri);
             return;
         }
 
-        var newContext = Context.CreateFor(selector, argCount, currentContext);
-        currentContext = newContext;
+        if (receiver is SmalltalkObject recvObj) {
+            var cls = recvObj.ClassPointer ??
+                      throw new InvalidOperationException("Receiver has no class pointer");
+            var method = cls.Lookup(selector) ??
+                         throw new InvalidOperationException($"Method {selector} not found");
+
+            if (method.HasPrimitive &&
+                Primitives.Execute(method.PrimitiveIndex, currentContext)) {
+                return;
+            }
+
+            var newContext = new Context {
+                Sender = currentContext,
+                Method = method,
+                Receiver = recvObj,
+                Arguments = new[] { argument },
+                Temporaries = new object[method.TemporariesCount],
+                Stack = new Stack<object?>(),
+                PC = 0
+            };
+            currentContext = newContext;
+            return;
+        }
+
+        throw new InvalidOperationException($"Cannot send {selector} to {receiver}");
     }
 }
