@@ -7,6 +7,7 @@ namespace Smalltalk80;
 ///     intentionally simplified but demonstrates how each bytecode could be
 ///     decoded and executed.
 /// </summary>
+// Blue Book - Chapter 28: The Interpreter
 public sealed class BytecodeInterpreter
 {
     /// <summary>

@@ -5,6 +5,7 @@ namespace Smalltalk80;
 ///     evaluation stack it stores the receiver, temporary variables and literal
 ///     frame required when interpreting bytecodes.
 /// </summary>
+// Blue Book - Chapter 29: Context Objects
 public sealed class ExecutionContext
 {
     /// <summary>
