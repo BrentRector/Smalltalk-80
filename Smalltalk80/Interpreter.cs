@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 /// <summary>
 ///     Executes Smalltalk bytecodes and maintains runtime state.
@@ -275,30 +276,56 @@ public class Interpreter
         int selectorIndex = bytecode - 128;
         var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
 
-        object? argument = currentContext.Stack.Pop();
+        int argCount = GetArgumentCount(selector);
+        var arguments = new object?[argCount];
+        for (int i = argCount - 1; i >= 0; i--)
+        {
+            arguments[i] = currentContext.Stack.Pop();
+        }
+
         object? receiver = currentContext.Stack.Pop();
 
-        if (receiver is int li && argument is int ri && selector.Name == "+") {
+        if (receiver is int li &&
+            argCount == 1 &&
+            arguments[0] is int ri &&
+            selector.Name == "+")
+        {
             currentContext.Stack.Push(li + ri);
             return;
         }
 
-        if (receiver is SmalltalkObject recvObj) {
+        if (receiver is SmalltalkObject recvObj)
+        {
             var cls = recvObj.ClassPointer ??
                       throw new InvalidOperationException("Receiver has no class pointer");
             var method = cls.Lookup(selector) ??
                          throw new InvalidOperationException($"Method {selector} not found");
 
-            if (method.HasPrimitive &&
-                Primitives.Execute(method.PrimitiveIndex, currentContext)) {
-                return;
+            if (method.HasPrimitive)
+            {
+                currentContext.Stack.Push(receiver);
+                foreach (var arg in arguments)
+                {
+                    currentContext.Stack.Push(arg);
+                }
+
+                if (Primitives.Execute(method.PrimitiveIndex, currentContext))
+                {
+                    return;
+                }
+
+                for (int i = 0; i <= argCount; i++)
+                {
+                    _ = currentContext.Stack.Pop();
+                }
             }
 
-            var newContext = new Context {
+            var newContext = new Context
+            {
                 Sender = currentContext,
                 Method = method,
                 Receiver = recvObj,
-                Arguments = new[] { argument },
+                Arguments = arguments,
                 Temporaries = new object[method.TemporariesCount],
                 Stack = new Stack<object?>(),
                 PC = 0
@@ -308,5 +335,21 @@ public class Interpreter
         }
 
         throw new InvalidOperationException($"Cannot send {selector} to {receiver}");
+    }
+
+    /// <summary>
+    ///     Determines the number of arguments expected by the specified selector.
+    /// </summary>
+    /// <param name="selector">The selector being sent.</param>
+    /// <returns>The number of argument values that should be popped from the stack.</returns>
+    private static int GetArgumentCount(Symbol selector)
+    {
+        var name = selector.Name;
+        if (name.Contains(':'))
+        {
+            return name.Count(c => c == ':');
+        }
+
+        return name.All(char.IsLetterOrDigit) ? 0 : 1;
     }
 }
