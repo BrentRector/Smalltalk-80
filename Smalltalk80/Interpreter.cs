@@ -156,37 +156,26 @@ public class Interpreter
             currentContext.Stack.Push(top);
         } else if (bytecode == Bytecode.PushActiveContext) {
             currentContext.Stack.Push(currentContext);
-        } else if (bytecode >= Bytecode.JumpShort0 && bytecode <= Bytecode.JumpShort7) {
-            int offset = ((int)bytecode - (int)Bytecode.JumpShort0) + 1;
+        } else if (bytecode == Bytecode.JumpShort) {
+            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
             currentContext.PC += offset;
-        } else if (bytecode >= Bytecode.PopJumpFalseShort0 && bytecode <= Bytecode.PopJumpFalseShort7) {
-            int offset = ((int)bytecode - (int)Bytecode.PopJumpFalseShort0) + 1;
+        } else if (bytecode == Bytecode.JumpLong) {
+            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
+            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
+            short offset = (short)((high << 8) | low);
+            currentContext.PC += offset;
+        } else if (bytecode == Bytecode.JumpIfFalseShort) {
+            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
             var condObj = currentContext.Stack.Pop();
             if (condObj is bool b && !b) {
                 currentContext.PC += offset;
             }
-        } else if (bytecode >= Bytecode.JumpLong0 && bytecode <= Bytecode.JumpLong7) {
-            int high = (int)bytecode - (int)Bytecode.JumpLong0;
+        } else if (bytecode == Bytecode.JumpIfFalseLong) {
+            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
             byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int offset = (high << 8) | low;
-            if ((offset & 0x400) != 0) {
-                offset -= 0x800;
-            }
-            currentContext.PC += offset;
-        } else if (bytecode >= Bytecode.PopJumpFalseLong0 && bytecode <= Bytecode.PopJumpFalseLong3) {
-            int high = (int)bytecode - (int)Bytecode.PopJumpFalseLong0;
-            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int offset = (high << 8) | low;
+            short offset = (short)((high << 8) | low);
             var condObj = currentContext.Stack.Pop();
             if (condObj is bool b && !b) {
-                currentContext.PC += offset;
-            }
-        } else if (bytecode >= Bytecode.PopJumpTrueLong0 && bytecode <= Bytecode.PopJumpTrueLong3) {
-            int high = (int)bytecode - (int)Bytecode.PopJumpTrueLong0;
-            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int offset = (high << 8) | low;
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b) {
                 currentContext.PC += offset;
             }
         } else if ((byte)bytecode >= 128) {

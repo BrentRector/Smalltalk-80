@@ -223,7 +223,7 @@ public class InterpreterBytecodeTests
             Bytecodes = new byte[]
             {
                 (byte)Bytecode.PushLiteralConstant0,
-                (byte)Bytecode.JumpShort0,
+                (byte)Bytecode.JumpShort, 1,
                 (byte)Bytecode.PushLiteralConstant1,
                 (byte)Bytecode.ReturnTopFromMethod
             },
@@ -246,30 +246,6 @@ public class InterpreterBytecodeTests
             {
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.PushFalse,
-                (byte)Bytecode.PopJumpFalseShort0,
-                (byte)Bytecode.PushLiteralConstant1,
-                (byte)Bytecode.ReturnTopFromMethod
-            },
-            Literals = new object[] { 1, 2 },
-            TemporariesCount = 0
-        };
-        var interpreter = new Interpreter { ExitOnReturn = false };
-        var result = interpreter.Evaluate(method, receiver);
-        Assert.Equal(1, result);
-    }
-
-    [Fact]
-    public void JumpIfFalseLong_ForwardSkipsInstruction()
-    {
-        var cls = new SmalltalkClass();
-        var receiver = new SmalltalkObject(cls, 0);
-        var method = new CompiledMethod
-        {
-            Bytecodes = new byte[]
-            {
-                (byte)Bytecode.PushLiteralConstant0,
-                (byte)Bytecode.PushFalse,
-                (byte)Bytecode.PopJumpFalseLong0, 1,
                 (byte)Bytecode.PushLiteralConstant1,
                 (byte)Bytecode.ReturnTopFromMethod
             },

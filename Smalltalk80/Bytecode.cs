@@ -180,60 +180,29 @@ public enum Bytecode : byte
     /// <summary>Push the active context.</summary>
     PushActiveContext = 137,
 
-    // 138-143 unused
-    Unused138,
-    Unused139,
-    Unused140,
-    Unused141,
-    Unused142,
-    Unused143,
-
-    // 144-151
-    /// <summary>Short unconditional jump forward by 1 to 8 bytecodes.</summary>
-    JumpShort0 = 144,
-    JumpShort1,
-    JumpShort2,
-    JumpShort3,
-    JumpShort4,
-    JumpShort5,
-    JumpShort6,
-    JumpShort7,
-
-    // 152-159
-    /// <summary>Short conditional jump forward if the stack top is false.</summary>
-    PopJumpFalseShort0 = 152,
-    PopJumpFalseShort1,
-    PopJumpFalseShort2,
-    PopJumpFalseShort3,
-    PopJumpFalseShort4,
-    PopJumpFalseShort5,
-    PopJumpFalseShort6,
-    PopJumpFalseShort7,
-
-    // 160-167
-    /// <summary>Long unconditional jump with an 11-bit signed offset.</summary>
-    JumpLong0 = 160,
-    JumpLong1,
-    JumpLong2,
-    JumpLong3,
-    JumpLong4,
-    JumpLong5,
-    JumpLong6,
-    JumpLong7,
-
-    // 168-171
-    /// <summary>Long conditional jump taken when the stack top is true.</summary>
-    PopJumpTrueLong0 = 168,
-    PopJumpTrueLong1,
-    PopJumpTrueLong2,
-    PopJumpTrueLong3,
-
-    // 172-175
-    /// <summary>Long conditional jump taken when the stack top is false.</summary>
-    PopJumpFalseLong0 = 172,
-    PopJumpFalseLong1,
-    PopJumpFalseLong2,
-    PopJumpFalseLong3,
+    // 138-141
+    /// <summary>
+    ///     Unconditional branch with an 8-bit signed offset relative to the
+    ///     instruction following the offset byte.
+    /// </summary>
+    JumpShort = 138,
+    /// <summary>
+    ///     Unconditional branch with a 16-bit signed offset relative to the
+    ///     instruction following the offset bytes.
+    /// </summary>
+    JumpLong,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>false</c>. The
+    ///     branch distance is an 8-bit signed offset relative to the instruction
+    ///     following the offset byte.
+    /// </summary>
+    JumpIfFalseShort,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>false</c>. The
+    ///     branch distance is a 16-bit signed offset relative to the instruction
+    ///     following the offset bytes.
+    /// </summary>
+    JumpIfFalseLong,
 }
 
 #pragma warning restore CS1591
