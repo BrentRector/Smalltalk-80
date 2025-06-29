@@ -46,16 +46,34 @@ public class Interpreter
     /// <param name="receiver">The receiver for the method.</param>
     /// <returns>The value returned by the method.</returns>
     public object? Evaluate(CompiledMethod method, SmalltalkObject receiver)
+        => Evaluate(method, receiver, null);
+
+    /// <summary>
+    ///     Executes a compiled method with explicit temporary variable values
+    ///     and returns the result without exiting the process.
+    /// </summary>
+    /// <param name="method">The compiled method to run.</param>
+    /// <param name="receiver">The receiver for the method.</param>
+    /// <param name="temporaries">
+    ///     Optional array of initial temporary values. If <c>null</c> a new array
+    ///     of the required size is created.
+    /// </param>
+    /// <returns>The value returned by the method.</returns>
+    public object? Evaluate(
+        CompiledMethod method,
+        SmalltalkObject receiver,
+        object?[]? temporaries)
     {
         var previousExit = ExitOnReturn;
         ExitOnReturn = false;
         LastResult = null;
-        currentContext = new Context {
+        currentContext = new Context
+        {
             Sender = null!,
             Method = method,
             Receiver = receiver,
             Arguments = Array.Empty<object?>(),
-            Temporaries = new object[method.TemporariesCount],
+            Temporaries = temporaries ?? new object[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };
