@@ -249,7 +249,7 @@ public class Interpreter
                 currentContext.Receiver.Fields[index] = value;
                 break;
             case 1:
-                currentContext.Temporaries[index] = value;
+                currentContext.Temporaries[index] = value!;
                 break;
             case 2:
                 throw new InvalidOperationException("Cannot store into a literal constant");
@@ -265,6 +265,67 @@ public class Interpreter
         {
             _ = currentContext.Stack.Pop();
         }
+    }
+
+    /// <summary>
+    ///     Handles messages sent to a <see cref="BlockContext"/> instance.
+    /// </summary>
+    /// <param name="block">The block context receiving the message.</param>
+    /// <param name="selector">The selector being sent.</param>
+    /// <param name="arguments">The argument values.</param>
+    private void HandleBlockMessage(BlockContext block, Symbol selector, object?[] arguments)
+    {
+        if (selector.Name.StartsWith("value"))
+        {
+            if (arguments.Length != block.ArgumentCount)
+            {
+                throw new InvalidOperationException("Incorrect number of block arguments");
+            }
+
+            var newContext = BlockContext.Create(
+                block.HomeContext,
+                block.StartPC,
+                block.ArgumentCount,
+                arguments,
+                currentContext);
+
+            currentContext = newContext;
+            return;
+        }
+
+        throw new InvalidOperationException($"BlockContext does not understand {selector}");
+    }
+
+    /// <summary>
+    ///     Handles messages sent to a <see cref="Context"/> instance.
+    /// </summary>
+    /// <param name="ctx">The context receiving the message.</param>
+    /// <param name="selector">The selector being sent.</param>
+    /// <param name="arguments">The argument values.</param>
+    private void HandleContextMessage(Context ctx, Symbol selector, object?[] arguments)
+    {
+        if (selector.Name == "blockCopy:" && arguments.Length == 1 && arguments[0] is int argCount)
+        {
+            int startPc = currentContext.PC + 3;
+            var block = new BlockContext
+            {
+                HomeContext = ctx,
+                StartPC = startPc,
+                Sender = null,
+                Method = ctx.Method,
+                Receiver = ctx.Receiver,
+                Arguments = Array.Empty<object?>(),
+                ArgumentCount = argCount,
+                Temporaries = ctx.Temporaries,
+                Stack = new Stack<object?>(),
+                PC = startPc
+            };
+
+            currentContext.Stack.Push(block);
+            return;
+        }
+
+        throw new InvalidOperationException($"Context does not understand {selector}");
     }
 
     /// <summary>
@@ -291,6 +352,18 @@ public class Interpreter
             selector.Name == "+")
         {
             currentContext.Stack.Push(li + ri);
+            return;
+        }
+
+        if (receiver is BlockContext blk)
+        {
+            HandleBlockMessage(blk, selector, arguments);
+            return;
+        }
+
+        if (receiver is Context ctx)
+        {
+            HandleContextMessage(ctx, selector, arguments);
             return;
         }
 
