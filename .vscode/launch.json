@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Launch",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/Smalltalk80/bin/Debug/net9.0/Smalltalk80.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/Smalltalk80",
+            "stopAtEntry": false
+        }
+    ]
+}
