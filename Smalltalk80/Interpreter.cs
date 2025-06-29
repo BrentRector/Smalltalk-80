@@ -90,16 +90,59 @@ public class Interpreter
     {
         Tracer.Log($"Dispatching bytecode: {bytecode} at PC: {currentContext.PC - 1}");
         if (bytecode <= 15) {
+            // push instance variable
             currentContext.Stack.Push(currentContext.Receiver.Fields[bytecode]);
         } else if (bytecode <= 31) {
+            // push temporary variable
             currentContext.Stack.Push(currentContext.Temporaries[bytecode - 16]);
         } else if (bytecode <= 63) {
+            // push literal constant
             currentContext.Stack.Push(currentContext.Method.Literals[bytecode - 32]);
-        } else if (bytecode == 124) {
+        } else if (bytecode >= 96 && bytecode <= 103) {
+            // pop and store into receiver variable
+            int index = bytecode - 96;
+            currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
+        } else if (bytecode >= 104 && bytecode <= 111) {
+            // pop and store into temporary variable
+            int index = bytecode - 104;
+            currentContext.Temporaries[index] = currentContext.Stack.Pop();
+        } else if (bytecode >= 112 && bytecode <= 119) {
+            // push constant
+            switch (bytecode) {
+                case 112: currentContext.Stack.Push(currentContext.Receiver); break;
+                case 113: currentContext.Stack.Push(true); break;
+                case 114: currentContext.Stack.Push(false); break;
+                case 115: currentContext.Stack.Push(null); break;
+                case 116: currentContext.Stack.Push(-1); break;
+                case 117: currentContext.Stack.Push(0); break;
+                case 118: currentContext.Stack.Push(1); break;
+                case 119: currentContext.Stack.Push(2); break;
+            }
+        } else if (bytecode >= 120 && bytecode <= 123) {
+            // return constant
+            object? value = bytecode switch {
+                120 => currentContext.Receiver,
+                121 => true,
+                122 => false,
+                123 => null,
+                _ => null
+            };
+            HandleReturn(value!);
+        } else if (bytecode == 124 || bytecode == 125) {
             var returnValue = currentContext.Stack.Count > 0
                 ? currentContext.Stack.Pop()
                 : currentContext.Receiver;
             HandleReturn(returnValue!);
+        } else if (bytecode == 135) {
+            // pop stack top
+            _ = currentContext.Stack.Pop();
+        } else if (bytecode == 136) {
+            // duplicate top of stack
+            var top = currentContext.Stack.Peek();
+            currentContext.Stack.Push(top);
+        } else if (bytecode == 137) {
+            // push active context
+            currentContext.Stack.Push(currentContext);
         } else if (bytecode >= 128) {
             SendSelector(bytecode);
         } else {

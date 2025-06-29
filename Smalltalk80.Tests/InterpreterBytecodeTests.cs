@@ -85,4 +85,71 @@ public class InterpreterBytecodeTests
         var result = interpreter.Evaluate(method, receiver);
         Assert.Equal(5, result);
     }
+
+    [Fact]
+    public void StoreReceiverVariable_UpdatesField()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 1);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { 118, 96, 0, 124 },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, receiver.Fields[0]);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void StoreTemporaryVariable_UpdatesArray()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var temps = new object?[] { null };
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { 118, 104, 16, 124 },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 1
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver, temps);
+        Assert.Equal(1, temps[0]);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void PushConstantNil_ReturnsNull()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { 115, 124 },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ReturnTrueBytecode_ReturnsTrue()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { 121 },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(true, result);
+    }
 }
