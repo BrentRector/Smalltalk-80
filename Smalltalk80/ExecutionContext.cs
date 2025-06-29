@@ -62,13 +62,30 @@ public sealed class ExecutionContext
         int instanceVariableCount = 0,
         int temporaryCount = 0,
         int literalCount = 0,
-        ExecutionContext? sender = null)
+        ExecutionContext? sender = null,
+        ExecutionContext? homeContext = null,
+        Type? methodClass = null)
     {
         Stack = new object[stackSize];
         InstanceVariables = new object[instanceVariableCount];
         Temporaries = new object[temporaryCount];
         Literals = new object[literalCount];
         Sender = sender;
+        HomeContext = homeContext ?? this;
+        MethodClass = methodClass;
     }
+
+    /// <summary>
+    ///     Gets the home context for block execution. For a method context this
+    ///     is the context itself; for a block context it references the method
+    ///     context in which the block was defined.
+    /// </summary>
+    public ExecutionContext HomeContext { get; }
+
+    /// <summary>
+    ///     Gets or sets the class in whose message dictionary the active method
+    ///     was found. This is required to correctly perform <c>super</c> sends.
+    /// </summary>
+    public Type? MethodClass { get; set; }
 }
 

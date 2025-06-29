@@ -3,7 +3,7 @@ using Smalltalk80;
 using ExecutionContext = Smalltalk80.ExecutionContext;
 
 var interpreter = new BytecodeInterpreter();
-var context = new ExecutionContext(instanceVariableCount: 0, temporaryCount: 2);
+var context = new ExecutionContext(instanceVariableCount: 0, temporaryCount: 2, methodClass: typeof(Program));
 context.Temporaries[0] = 1;
 context.Temporaries[1] = 1;
 

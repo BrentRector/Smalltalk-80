@@ -110,10 +110,10 @@ public sealed class BytecodeInterpreter
                     HandleDoubleExtendedSend(code, context);
                     break;
                 case Bytecode.SingleExtendedSuper:
-                    HandleSingleExtendedSend(code, context); // simplified
+                    HandleSingleExtendedSend(code, context, true);
                     break;
                 case Bytecode.DoubleExtendedSuper:
-                    HandleDoubleExtendedSend(code, context); // simplified
+                    HandleDoubleExtendedSend(code, context, true);
                     break;
                 case Bytecode.PopStackTop:
                     Pop(context);
@@ -294,26 +294,29 @@ public sealed class BytecodeInterpreter
         }
     }
 
-    private static void HandleSingleExtendedSend(byte[] code, ExecutionContext ctx)
+    private static void HandleSingleExtendedSend(byte[] code, ExecutionContext ctx, bool toSuper = false)
     {
         var descriptor = code[ctx.ProgramCounter++];
         int argCount = (descriptor >> 5) & 0x07;
         int selectorIndex = descriptor & 0x1F;
-        SendLiteralSelector(ctx, selectorIndex, argCount);
+        SendLiteralSelector(ctx, selectorIndex, argCount, toSuper);
     }
 
-    private static void HandleDoubleExtendedSend(byte[] code, ExecutionContext ctx)
+    private static void HandleDoubleExtendedSend(byte[] code, ExecutionContext ctx, bool toSuper = false)
     {
         int argCount = code[ctx.ProgramCounter++];
         int selectorIndex = code[ctx.ProgramCounter++];
-        SendLiteralSelector(ctx, selectorIndex, argCount);
+        SendLiteralSelector(ctx, selectorIndex, argCount, toSuper);
     }
 
-    private static void SendLiteralSelector(ExecutionContext ctx, int selectorIndex, int argCount)
+    private static void SendLiteralSelector(ExecutionContext ctx, int selectorIndex, int argCount, bool toSuper = false)
     {
         var selectorObj = ctx.Literals[selectorIndex];
         var selector = selectorObj?.ToString() ?? throw new InvalidOperationException("Selector must be a string");
-        InvokeSend(ctx, selector, argCount);
+        if (toSuper)
+            InvokeSendSuper(ctx, selector, argCount);
+        else
+            InvokeSend(ctx, selector, argCount);
     }
 
     private static readonly string[] SpecialSelectors =
@@ -339,6 +342,45 @@ public sealed class BytecodeInterpreter
 
         var receiver = Pop(ctx);
         var result = InvokeSelector(receiver, selector, args);
+        Push(ctx, result);
+    }
+
+    private static void InvokeSendSuper(ExecutionContext ctx, string selector, int argCount)
+    {
+        object?[] args = new object?[argCount];
+        for (var i = argCount - 1; i >= 0; i--)
+            args[i] = Pop(ctx);
+
+        var receiver = Pop(ctx);
+
+        var methodClass = ctx.MethodClass;
+        if (methodClass is null)
+        {
+            Push(ctx, InvokeSelector(receiver, selector, args));
+            return;
+        }
+
+        var targetType = methodClass.BaseType;
+        object? result = null;
+        while (targetType is not null)
+        {
+            var method = targetType.GetMethod(selector,
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic);
+            if (method is not null)
+            {
+                result = method.Invoke(receiver, args);
+                break;
+            }
+            targetType = targetType.BaseType;
+        }
+
+        if (targetType is null && result is null)
+        {
+            result = InvokeSelector(receiver, selector, args);
+        }
+
         Push(ctx, result);
     }
 
