@@ -111,7 +111,8 @@ public class Interpreter
         } else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7) {
             int index = (int)bytecode - (int)Bytecode.StoreAndPopTemporaryVariable0;
             currentContext.Temporaries[index] = currentContext.Stack.Pop()!;
-        } else if (bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) {
+        } else if ((bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) ||
+                   (bytecode >= Bytecode.PushThree && bytecode <= Bytecode.PushTen)) {
             object? constant = bytecode switch
             {
                 Bytecode.PushSelf => currentContext.Receiver,
@@ -122,6 +123,14 @@ public class Interpreter
                 Bytecode.PushZero => 0,
                 Bytecode.PushOne => 1,
                 Bytecode.PushTwo => 2,
+                Bytecode.PushThree => 3,
+                Bytecode.PushFour => 4,
+                Bytecode.PushFive => 5,
+                Bytecode.PushSix => 6,
+                Bytecode.PushSeven => 7,
+                Bytecode.PushEight => 8,
+                Bytecode.PushNine => 9,
+                Bytecode.PushTen => 10,
                 _ => null
             };
             currentContext.Stack.Push(constant);

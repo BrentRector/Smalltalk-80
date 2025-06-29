@@ -260,6 +260,7 @@ public enum Bytecode : byte
     /// <inheritdoc cref="PushSelf" />
     PushTwo,
 
+
     // 120-123
     /// <summary>Return constant object.</summary>
     ReturnSelf = 120,
@@ -361,6 +362,24 @@ public enum Bytecode : byte
     ///     following the offset bytes.
     /// </summary>
     JumpIfTrueLong,
+
+    // 144-151
+    /// <summary>Push the small integer constant 3.</summary>
+    PushThree = 144,
+    /// <summary>Push the small integer constant 4.</summary>
+    PushFour,
+    /// <summary>Push the small integer constant 5.</summary>
+    PushFive,
+    /// <summary>Push the small integer constant 6.</summary>
+    PushSix,
+    /// <summary>Push the small integer constant 7.</summary>
+    PushSeven,
+    /// <summary>Push the small integer constant 8.</summary>
+    PushEight,
+    /// <summary>Push the small integer constant 9.</summary>
+    PushNine,
+    /// <summary>Push the small integer constant 10.</summary>
+    PushTen,
 }
 
 
