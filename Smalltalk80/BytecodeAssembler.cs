@@ -1,8 +1,19 @@
 using System;
 using System.Collections.Generic;
 
-public class BytecodeAssembler {
-    public static byte[] Assemble(string[] lines) {
+/// <summary>
+///     Simple assembler used for generating bytecode arrays from a textual
+///     representation.
+/// </summary>
+public static class BytecodeAssembler
+{
+    /// <summary>
+    ///     Converts mnemonic instructions into their bytecode form.
+    /// </summary>
+    /// <param name="lines">The lines containing assembly instructions.</param>
+    /// <returns>The assembled bytecode.</returns>
+    public static byte[] Assemble(string[] lines)
+    {
         var list = new List<byte>();
         foreach (var line in lines) {
             switch (line.Trim()) {

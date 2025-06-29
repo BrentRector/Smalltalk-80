@@ -2,8 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-public static class LegacyImageLoader {
-    public static List<SmalltalkObject> LoadImage(string path) {
+/// <summary>
+///     Provides the ability to load an old-style Smalltalk image file.
+/// </summary>
+public static class LegacyImageLoader
+{
+    /// <summary>
+    ///     Loads the image located at the specified path.
+    /// </summary>
+    /// <param name="path">The image file to read.</param>
+    /// <returns>A list of deserialized <see cref="SmalltalkObject"/> instances.</returns>
+    public static List<SmalltalkObject> LoadImage(string path)
+    {
         var bytes = File.ReadAllBytes(path);
         var stream = new MemoryStream(bytes);
         var reader = new BinaryReader(stream);
@@ -42,7 +52,14 @@ public static class LegacyImageLoader {
         return objectTable;
     }
 
-    private static object DecodePointer(int raw, List<SmalltalkObject> objectTable) {
+    /// <summary>
+    ///     Resolves a raw pointer value from the image into an object reference.
+    /// </summary>
+    /// <param name="raw">The encoded pointer.</param>
+    /// <param name="objectTable">The table of objects being decoded.</param>
+    /// <returns>The referenced object or <c>null</c> if the pointer is nil.</returns>
+    private static object? DecodePointer(int raw, List<SmalltalkObject> objectTable)
+    {
         if ((raw & 1) == 1) return raw >> 1;
         if (raw == 0) return null;
         int index = raw >> 1;
