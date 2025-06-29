@@ -656,5 +656,146 @@ public class InterpreterBytecodeTests
         Assert.Equal(12, ctx.Stack.Pop());
     }
 
+    [Fact]
+    public void PopStack_RemovesTopValue()
+    {
+        Trace(nameof(PopStack_RemovesTopValue));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.PopStack,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Same(receiver, result);
+    }
+
+    [Fact]
+    public void DuplicateTop_DuplicatesTopValue()
+    {
+        Trace(nameof(DuplicateTop_DuplicatesTopValue));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.DuplicateTop,
+                (byte)Bytecode.SingleExtendedSend, 32,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("+") },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void PushActiveContext_PushesCurrentContext()
+    {
+        Trace(nameof(PushActiveContext_PushesCurrentContext));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushActiveContext,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.IsType<Context>(result);
+    }
+
+    [Fact]
+    public void ReturnSelf_ReturnsReceiver()
+    {
+        Trace(nameof(ReturnSelf_ReturnsReceiver));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.ReturnSelf },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Same(receiver, result);
+    }
+
+    [Fact]
+    public void ReturnFalseBytecode_ReturnsFalse()
+    {
+        Trace(nameof(ReturnFalseBytecode_ReturnsFalse));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.ReturnFalse },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.False((bool)result!);
+    }
+
+    [Fact]
+    public void ReturnNilBytecode_ReturnsNull()
+    {
+        Trace(nameof(ReturnNilBytecode_ReturnsNull));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.ReturnNil },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void JumpIfFalseLong_ForwardSkipsInstruction()
+    {
+        Trace(nameof(JumpIfFalseLong_ForwardSkipsInstruction));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.PushFalse,
+                (byte)Bytecode.JumpIfFalseLong, 0, 1,
+                (byte)Bytecode.PushLiteralConstant1,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 1, 2 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, result);
+    }
+
 }
 
