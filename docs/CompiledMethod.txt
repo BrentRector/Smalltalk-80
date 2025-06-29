@@ -1,0 +1,134 @@
+Compiled Methods
+
+The compiler creates an instance of CompiledMethod to hold the
+bytecode translation of a source method. In addition to the bytecodes
+themselves, a CompiledMethod contains a set of objects called its literal
+frame. The literal frame contains any objects that could not be referred
+to directly by bytecodes. All of the objects in Rectangle center and Rec-
+tangle extent: were referred to directly by bytecodes, so the
+CompiledMethods for these methods do not need literal frames. As an
+example of a CompiledMethod with a literal frame, consider the method
+for Rectangle intersects:. The intersects: message inquires whether one
+Rectangle (the receiver) overlaps another Rectangle (the argument).
+
+	intersects: aRectangle
+	   T(origin max: aRectangle origin) < (corner min: aRectangle corner)
+
+The four message selectors, max:, origin, min:, and corner are not in the
+set that can be directly referenced by bytecodes. These selectors are in-
+cluded in the CompiledMethod’s literal frame and the send bytecodes
+refer to the selectors by their position in the literal frame. A
+CompiledMethod’s literal frame will be shown after its bytecodes.
+
+Rectangle intersects:
+	0	push the value of the receiver's first instance variable (origin) onto the stack
+	16	push the argument (aRectangle)
+	209	send a unary message with the selector in the second literal frame location (origin)
+	224	send a single argument message with the selector in the first literal frame location (max:)
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	16	push the argument (aRectangle) onto the stack
+	211	send a unary message with the selector in the fourth literal frame location (corner)
+	226	send a single argument message with the selector in the third literal frame location (min:)
+	178	send a binary message with the selector <
+	124	return the object on top of the stack as the value of the message (intersects:)
+
+	literal frame
+		max:
+		#forigin
+		min:
+		#corner
+
+The categories of objects that can be referred to directly by bytecodes are:
+	* the receiver and arguments of the invoking message
+	* the values of the receiver’s instance variables
+	* the values of any temporary variables required by the method
+	* seven special constants (true, false, nil, —1, 0, 1, and 2)
+	* 32 special message selectors
+
+The 32 special message selectors are listed below.
+
+	+		—		<	>
+	<=		>=		=	~=
+	*		/		\	@
+	bitShift: 	\\ 		bitAnd:	bitOr:
+	(at:)		(at:put:)	(size)	(next)
+	(nextPut:)	(atEnd)		==	class
+	blockCopy:	value		value:	(do:)
+	(new)		(new:)		(x)	(y)
+
+The selectors in parentheses may be replaced with other selectors by
+modifying the compiler and recompiling all methods in the system. The
+other selectors are built into the virtual machine.
+
+Any objects referred to in a CompiledMethod’s bytecodes that do not
+fall into one of the categories above must appear in its literal frame.
+The objects ordinarily contained in a literal frame are
+
+	* shared variables (global, class, and pool)
+	* most literal constants (numbers, characters, strings, arrays, and symbols)
+	* most message selectors (those that are not special)
+
+Objects of these three types may be intermixed in the literal frame. If
+an object in the literal frame is referenced twice in the same method, it
+need only appear in the literal frame once. The two bytecodes that refer
+to the object will refer to the same location in the literal frame.
+
+Two types of object that were referred to above, temporary variables
+and shared variables, have not been used in the example methods. The
+following example method for Rectangle merge: uses both types. The
+merge: message is used to find a Rectangle that includes the areas in
+both the receiver and the argument.
+
+	merge: aRectangle
+	 | minPoint maxPoint |
+	 minPoint — origin min: aRectangle origin.
+	 maxPoint — corner max: aRectangle corner.
+	 tRectangle origin: minPoint
+	            corner: maxPoint
+
+When a CompiledMethod uses temporary variables (maxPoint and
+minPoint in this example), the number required is specified in the first
+line of its printed form. When a CompiledMethod uses a shared variable
+(Rectangle in this example) an instance of Association is included in its
+literal frame. All CompiledMethods that refer to a particular shared
+variable’s name include the same Association in their literal frames.
+
+Rectangle merge: requires 2 temporary variables
+	0	push the value of the receiver's first instance variable (origin) onto the stack
+	16	push the contents of the first temporary frame location (the argument aRectangle) onto the stack
+	209	send a unary message with the selector in the second literal frame location (origin)
+	224	send the single argument message with the selector in the first literal frame location (min:)
+	105	pop the top object off of the stack and store in the second temporary frame location (minPoint)
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	16	push the contents of the first temporary frame location (the argument aRectangle) onto the stack
+	211	send a unary message with the selector in the fourth literal frame location (corner)
+	226	send a single argument message with the selector in the third literal frame location (max:)
+	106	pop the top object off of the stack and store it in the third temporary frame location (maxPoint)
+	69	push the value of the shared variable in the sixth literal frame location (Rectangle) onto the stack
+	17	push the contents of the second temporary frame location (minPoint) onto the stack
+	18	push the contents of the third temporary frame location (maxPoint) onto the stack
+	244	send the two argument message with the selector in the fifth literal frame location (origin:corner:)
+	124	return the object on top of the stack as the value of the message (merge:)
+
+literal frame
+	#min:
+	#origin
+	#max:
+	#corner
+	#origin:corner:
+	Association: #Rectangle —>Rectangle
+
+Temporary Variables
+
+Temporary variables are created for a particular execution of a CompiledMethod and cease to exist when the execution is complete. The CompiledMethod indicates to the interpreter how many temporary variables will be required. The arguments of the invoking message and the values of the temporary variables are stored together in the temporary frame. The arguments are stored first and the temporary variable values immediately after. They are accessed by the same type of bytecode (whose comments refer to a temporary frame location). Since merge: takes a single argument, its two temporary variables use the second and third locations in the temporary frame. The compiler enforces the fact that the values of the argument names cannot be changed by never issuing a store bytecode referring to the part f the temporary frame inhabited by the arguments.
+
+Shared Variables
+
+Shared variables are found in dictionaries.
+	* global variables in a dictionary whose names can appear in any method
+	* class variables in a dictionary whose names can only appear in the methods of a single class and its subclasses
+	* pool variables in a dictionary whose names can appear in the methods of several classes
+
+Shared variables are the individual associations that make up these dictionaries. The system represents associations in general, and shared variables in particular, with instances of Association. When the compiler encounters the name of a shared variable in a source method, the Association with the same name is included in the CompiledMethod’s literal frame. The bytecodes that access shared variables indicate the location of an Association in the literal frame. The actual value of the variable is stored in an instance variable of the Association. In the CompiledMethod for Rectangle merge: shown above, class Rectangle is referenced by including the Association from the global dictionary whose name is the symbol #Rectangle and whose value is the class
+Rectangle.
+
