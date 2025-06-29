@@ -380,6 +380,7 @@ public enum Bytecode : byte
     PushNine,
     /// <summary>Push the small integer constant 10.</summary>
     PushTen,
+
 }
 
 

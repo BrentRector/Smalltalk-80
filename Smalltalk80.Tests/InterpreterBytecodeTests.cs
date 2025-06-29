@@ -81,7 +81,7 @@ public class InterpreterBytecodeTests
             {
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.PushLiteralConstant1,
-                130,
+                (byte)Bytecode.SingleExtendedSend, 34,
                 (byte)Bytecode.ReturnTopFromMethod
             },
             Literals = new object[] { 2, 3, new Symbol("+") },
@@ -460,7 +460,7 @@ public class InterpreterBytecodeTests
                 (byte)Bytecode.PushSelf,
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.PushLiteralConstant1,
-                130,
+                (byte)Bytecode.SingleExtendedSend, 66,
                 (byte)Bytecode.ReturnTopFromMethod
             },
             Literals = new object[] { 1, 2, new Symbol("bar:with:") },
@@ -558,7 +558,7 @@ public class InterpreterBytecodeTests
             {
                 (byte)Bytecode.PushActiveContext,
                 (byte)Bytecode.PushZero,
-                130,
+                (byte)Bytecode.SingleExtendedSend, 34,
                 (byte)Bytecode.JumpLong, 0, 2,
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.ReturnTopFromBlock,
@@ -580,4 +580,53 @@ public class InterpreterBytecodeTests
 
         Assert.Equal(42, result);
     }
+
+    [Fact]
+    public void ExtendedStoreAndPop_StoresValueAndPops()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 1);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.ExtendedStoreAndPop, 0,
+                (byte)Bytecode.PushReceiverVariable0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, receiver.Fields[0]);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void PrimitiveMultiply_MultipliesIntegers()
+    {
+        var ctx = new Context
+        {
+            Sender = null,
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>(),
+                TemporariesCount = 0
+            },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>(),
+            PC = 0
+        };
+        ctx.Stack.Push(3);
+        ctx.Stack.Push(4);
+        Assert.True(Primitives.Execute(3, ctx));
+        Assert.Equal(12, ctx.Stack.Pop());
+    }
+
 }
+
