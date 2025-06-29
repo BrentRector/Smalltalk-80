@@ -375,4 +375,78 @@ public class InterpreterBytecodeTests
         Assert.Equal(1, result);
     }
 
+    [Fact]
+    public void SendSelector_UnaryMethod_InvokesMethod()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 7 },
+            TemporariesCount = 0
+        };
+        cls.MethodDictionary[new Symbol("foo")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SendLiteralSelector,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo") },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(7, result);
+    }
+
+    [Fact]
+    public void SendSelector_KeywordMessageWithTwoArgs_InvokesMethod()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var keywordMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 42 },
+            TemporariesCount = 0
+        };
+        cls.MethodDictionary[new Symbol("bar:with:")] = keywordMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.PushLiteralConstant1,
+                130,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 1, 2, new Symbol("bar:with:") },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(42, result);
+    }
+
 }
