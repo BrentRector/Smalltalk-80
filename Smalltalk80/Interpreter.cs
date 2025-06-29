@@ -171,6 +171,20 @@ public class Interpreter
             if (condObj is bool b && !b) {
                 currentContext.PC += offset;
             }
+        } else if (bytecode == Bytecode.JumpIfTrueShort) {
+            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && b) {
+                currentContext.PC += offset;
+            }
+        } else if (bytecode == Bytecode.JumpIfTrueLong) {
+            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
+            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
+            short offset = (short)((high << 8) | low);
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && b) {
+                currentContext.PC += offset;
+            }
         } else if ((byte)bytecode >= 128) {
             SendSelector((byte)bytecode);
         } else {

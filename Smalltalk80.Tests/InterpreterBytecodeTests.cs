@@ -308,4 +308,50 @@ public class InterpreterBytecodeTests
         Assert.Equal(1, result);
     }
 
+    [Fact]
+    public void JumpIfTrueShort_ForwardSkipsInstruction()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.PushTrue,
+                (byte)Bytecode.JumpIfTrueShort, 1,
+                (byte)Bytecode.PushLiteralConstant1,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 1, 2 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void JumpIfTrueLong_ForwardSkipsInstruction()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.PushTrue,
+                (byte)Bytecode.JumpIfTrueLong, 0, 1,
+                (byte)Bytecode.PushLiteralConstant1,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 1, 2 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, result);
+    }
+
 }
