@@ -9,8 +9,10 @@ namespace Smalltalk80;
 /// </summary>
 public sealed class BytecodeInterpreter
 {
-    /// <summary>Executes the provided bytecode sequence.</summary>
-    /// <param name="code">The bytecode array to interpret.</param>
+    /// <summary>
+    ///     Executes a sequence of bytecodes in the given <paramref name="context" />.
+    /// </summary>
+    /// <param name="code">The bytecode stream to interpret.</param>
     /// <param name="context">Execution context providing stack and variables.</param>
     /// <returns>The value produced by the executed code.</returns>
     public object? Execute(byte[] code, ExecutionContext context)
@@ -102,12 +104,17 @@ public sealed class BytecodeInterpreter
                     HandleExtendedStore(code, context, pop: true);
                     break;
                 case Bytecode.SingleExtendedSend:
+                    HandleSingleExtendedSend(code, context);
+                    break;
                 case Bytecode.DoubleExtendedSend:
+                    HandleDoubleExtendedSend(code, context);
+                    break;
                 case Bytecode.SingleExtendedSuper:
+                    HandleSingleExtendedSend(code, context); // simplified
+                    break;
                 case Bytecode.DoubleExtendedSuper:
-                    // Message sending is highly implementation specific. This
-                    // prototype simply throws to indicate the bytecode was seen.
-                    throw new NotImplementedException($"Send bytecode '{opcode}' not implemented.");
+                    HandleDoubleExtendedSend(code, context); // simplified
+                    break;
                 case Bytecode.PopStackTop:
                     Pop(context);
                     break;
@@ -144,9 +151,25 @@ public sealed class BytecodeInterpreter
                         context.ProgramCounter++;
                     break;
 
-                // Arithmetic messages (partial implementation)
+                // Arithmetic messages
                 case >= Bytecode.SendArithmeticMessage0 and <= Bytecode.SendArithmeticMessage15:
                     PerformArithmetic(opcode, context);
+                    break;
+
+                // Special selectors
+                case >= Bytecode.SendSpecialMessage0 and <= Bytecode.SendSpecialMessage15:
+                    SendSpecialSelector(context, (int)opcode - 0xC0);
+                    break;
+
+                // Literal selector sends
+                case >= Bytecode.SendLiteralSelectorNoArgs0 and <= Bytecode.SendLiteralSelectorNoArgs15:
+                    SendLiteralSelector(context, (int)opcode - 0xD0, 0);
+                    break;
+                case >= Bytecode.SendLiteralSelectorOneArg0 and <= Bytecode.SendLiteralSelectorOneArg15:
+                    SendLiteralSelector(context, (int)opcode - 0xE0, 1);
+                    break;
+                case >= Bytecode.SendLiteralSelectorTwoArgs0 and <= Bytecode.SendLiteralSelectorTwoArgs15:
+                    SendLiteralSelector(context, (int)opcode - 0xF0, 2);
                     break;
 
                 default:
@@ -245,11 +268,23 @@ public sealed class BytecodeInterpreter
         {
             object result = index switch
             {
-                0 => ai + bi,
-                1 => ai - bi,
-                8 => ai * bi,
-                9 => ai / bi,
-                _ => throw new NotImplementedException($"Arithmetic message {index} not implemented.")
+                0  => ai + bi,
+                1  => ai - bi,
+                2  => ai < bi,
+                3  => ai > bi,
+                4  => ai <= bi,
+                5  => ai >= bi,
+                6  => ai == bi,
+                7  => ai != bi,
+                8  => ai * bi,
+                9  => ai / bi,
+                10 => ai & bi,
+                11 => ai | bi,
+                12 => ai ^ bi,
+                13 => ai << bi,
+                14 => ai >> bi,
+                15 => ai % bi,
+                _  => throw new InvalidOperationException()
             };
             Push(ctx, result);
         }
@@ -257,5 +292,84 @@ public sealed class BytecodeInterpreter
         {
             throw new InvalidOperationException("Arithmetic operations expect integers in this prototype.");
         }
+    }
+
+    private static void HandleSingleExtendedSend(byte[] code, ExecutionContext ctx)
+    {
+        var descriptor = code[ctx.ProgramCounter++];
+        int argCount = (descriptor >> 5) & 0x07;
+        int selectorIndex = descriptor & 0x1F;
+        SendLiteralSelector(ctx, selectorIndex, argCount);
+    }
+
+    private static void HandleDoubleExtendedSend(byte[] code, ExecutionContext ctx)
+    {
+        int argCount = code[ctx.ProgramCounter++];
+        int selectorIndex = code[ctx.ProgramCounter++];
+        SendLiteralSelector(ctx, selectorIndex, argCount);
+    }
+
+    private static void SendLiteralSelector(ExecutionContext ctx, int selectorIndex, int argCount)
+    {
+        var selectorObj = ctx.Literals[selectorIndex];
+        var selector = selectorObj?.ToString() ?? throw new InvalidOperationException("Selector must be a string");
+        InvokeSend(ctx, selector, argCount);
+    }
+
+    private static readonly string[] SpecialSelectors =
+    [
+        "at:", "at:put:", "size", "next", "nextPut:", "atEnd", "class",
+        "blockCopy:", "value", "value:", "do:", "new", "new:", "x", "y", "valueWithArguments:"
+    ];
+
+    private static readonly int[] SpecialSelectorArgCounts =
+    [
+        1, 2, 0, 0, 1, 0, 0,
+        1, 0, 1, 1, 0, 1, 0, 0, 1
+    ];
+
+    private static void SendSpecialSelector(ExecutionContext ctx, int index)
+        => InvokeSend(ctx, SpecialSelectors[index], SpecialSelectorArgCounts[index]);
+
+    private static void InvokeSend(ExecutionContext ctx, string selector, int argCount)
+    {
+        object?[] args = new object?[argCount];
+        for (var i = argCount - 1; i >= 0; i--)
+            args[i] = Pop(ctx);
+
+        var receiver = Pop(ctx);
+        var result = InvokeSelector(receiver, selector, args);
+        Push(ctx, result);
+    }
+
+    private static object? InvokeSelector(object? receiver, string selector, object?[] args)
+    {
+        if (receiver is null)
+            throw new NullReferenceException();
+
+        return selector switch
+        {
+            "class" => receiver.GetType(),
+            "new" when receiver is Type t => Activator.CreateInstance(t),
+            "new:" when receiver is Type t => Activator.CreateInstance(t, args),
+            "size" => receiver switch
+            {
+                Array a => a.Length,
+                System.Collections.ICollection c => c.Count,
+                _ => receiver.GetType().GetProperty("Length")?.GetValue(receiver)
+                     ?? receiver.GetType().GetProperty("Count")?.GetValue(receiver)
+            },
+            "at:" => (receiver as System.Collections.IList)?[(int)args[0]!]!,
+            "at:put:" =>
+            receiver is System.Collections.IList list
+                ? list[(int)args[0]!] = args[1]
+                : throw new NotImplementedException(),
+            "value" when receiver is Delegate d => d.DynamicInvoke(),
+            "value:" when receiver is Delegate d => d.DynamicInvoke(args),
+            "valueWithArguments:" when receiver is Delegate d => d.DynamicInvoke((object[]?)args[0] ?? Array.Empty<object?>()),
+            _ =>
+            receiver.GetType().GetMethod(selector)?.Invoke(receiver, args)
+                ?? throw new NotImplementedException($"Selector '{selector}' not understood by {receiver.GetType()}")
+        };
     }
 }
