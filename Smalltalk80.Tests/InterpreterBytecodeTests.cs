@@ -246,6 +246,7 @@ public class InterpreterBytecodeTests
             {
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.PushFalse,
+                (byte)Bytecode.JumpIfFalseShort, 1,
                 (byte)Bytecode.PushLiteralConstant1,
                 (byte)Bytecode.ReturnTopFromMethod
             },
