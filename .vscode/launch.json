@@ -10,6 +10,16 @@
             "args": [],
             "cwd": "${workspaceFolder}/Smalltalk80",
             "stopAtEntry": false
+        },
+        {
+            "name": "Smalltalk REPL",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/Smalltalk80/bin/Debug/net9.0/Smalltalk80.dll",
+            "args": ["--repl"],
+            "cwd": "${workspaceFolder}/Smalltalk80",
+            "stopAtEntry": false
         }
     ]
 }

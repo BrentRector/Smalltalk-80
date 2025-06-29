@@ -10,6 +10,8 @@ public class Program {
 
         if (args.Contains("--gui")) {
             Console.WriteLine("GUI mode is not supported in this build.");
+        } else if (args.Contains("--repl")) {
+            Repl.Run();
         }
     }
 }
