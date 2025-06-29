@@ -148,6 +148,28 @@ public class Interpreter
         } else if (bytecode == Bytecode.ExtendedStore) {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             HandleExtendedStore(descriptor, false);
+        } else if (bytecode == Bytecode.SingleExtendedSend) {
+            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
+            int argCount = descriptor >> 5;
+            int selectorIndex = descriptor & 0x1F;
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, argCount, false);
+        } else if (bytecode == Bytecode.DoubleExtendedSend) {
+            int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
+            int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, argCount, false);
+        } else if (bytecode == Bytecode.SingleExtendedSuper) {
+            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
+            int argCount = descriptor >> 5;
+            int selectorIndex = descriptor & 0x1F;
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, argCount, true);
+        } else if (bytecode == Bytecode.DoubleExtendedSuper) {
+            int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
+            int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, argCount, true);
         } else if (bytecode == Bytecode.PopStack) {
             _ = currentContext.Stack.Pop();
         } else if (bytecode == Bytecode.DuplicateTop) {
@@ -378,6 +400,17 @@ public class Interpreter
         var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
 
         int argCount = GetArgumentCount(selector);
+        PerformSend(selector, argCount, false);
+    }
+
+    /// <summary>
+    ///     Sends a message with the provided selector and argument count.
+    /// </summary>
+    /// <param name="selector">The selector being invoked.</param>
+    /// <param name="argCount">The number of arguments supplied.</param>
+    /// <param name="superSend">Whether lookup should start in the superclass of the method class.</param>
+    private void PerformSend(Symbol selector, int argCount, bool superSend)
+    {
         var arguments = new object?[argCount];
         for (int i = argCount - 1; i >= 0; i--)
         {
@@ -409,8 +442,26 @@ public class Interpreter
 
         if (receiver is SmalltalkObject recvObj)
         {
-            var cls = recvObj.ClassPointer ??
+            SmalltalkClass? startClass;
+            if (superSend)
+            {
+                if (currentContext.Method.Literals.Length == 0 ||
+                    currentContext.Method.Literals[^1] is not SmalltalkClass methodClass)
+                {
+                    throw new InvalidOperationException("Super send missing method class literal");
+                }
+
+                startClass = methodClass.Superclass ??
+                             throw new InvalidOperationException("Method class has no superclass");
+            }
+            else
+            {
+                startClass = recvObj.ClassPointer;
+            }
+
+            var cls = startClass ??
                       throw new InvalidOperationException("Receiver has no class pointer");
+
             var method = cls.Lookup(selector) ??
                          throw new InvalidOperationException($"Method {selector} not found");
 

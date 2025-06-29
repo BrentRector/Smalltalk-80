@@ -450,6 +450,79 @@ public class InterpreterBytecodeTests
     }
 
     [Fact]
+    public void SingleExtendedSend_InvokesMethod()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 7 },
+            TemporariesCount = 0
+        };
+        cls.MethodDictionary[new Symbol("foo")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SingleExtendedSend, 0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo") },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(7, result);
+    }
+
+    [Fact]
+    public void SingleExtendedSuper_InvokesSuperclassMethod()
+    {
+        var superCls = new SmalltalkClass();
+        var subCls = new SmalltalkClass { Superclass = superCls };
+        var receiver = new SmalltalkObject(subCls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 3 },
+            TemporariesCount = 0
+        };
+        superCls.MethodDictionary[new Symbol("foo")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SingleExtendedSuper, 0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo"), subCls },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(3, result);
+    }
+
+    [Fact]
     public void BlockClosure_Value_ExecutesBlock()
     {
         var cls = new SmalltalkClass();
@@ -465,7 +538,7 @@ public class InterpreterBytecodeTests
                 (byte)Bytecode.JumpLong, 0, 2,
                 (byte)Bytecode.PushLiteralConstant0,
                 (byte)Bytecode.ReturnTopFromBlock,
-                131,
+                (byte)Bytecode.SingleExtendedSend, 3,
                 (byte)Bytecode.ReturnTopFromMethod
             },
             Literals = new object[]
