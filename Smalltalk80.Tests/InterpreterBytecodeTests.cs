@@ -262,6 +262,27 @@ public class InterpreterBytecodeTests
         Assert.Equal(1, result);
     }
 
+    [Fact]
+    public void ExtendedStore_LiteralConstant_Throws()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.ExtendedStore,
+                0b10000000,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 1 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        Assert.Throws<InvalidOperationException>(() => interpreter.Evaluate(method, receiver));
+    }
+
 
     [Fact]
     public void JumpShort_ForwardSkipsInstruction()
