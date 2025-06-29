@@ -61,17 +61,27 @@ public sealed class SmalltalkParser
     private void ParseExpression()
     {
         var left = tokenizer.Next()!;
-        int leftIndex = temporaryVariables.ContainsKey(left) ? temporaryVariables[left] : -1;
-        if (leftIndex >= 0) bytecodes.Add((byte)(16 + leftIndex));
+        EmitOperand(left);
 
         if (tokenizer.HasNext && tokenizer.Peek() == "+") {
             tokenizer.Next();
             var right = tokenizer.Next()!;
-            int rightIndex = temporaryVariables.ContainsKey(right) ? temporaryVariables[right] : -1;
-            if (rightIndex >= 0) bytecodes.Add((byte)(16 + rightIndex));
+            EmitOperand(right);
 
             int litIndex = AddLiteral(new Symbol("+"));
             bytecodes.Add((byte)(128 + litIndex));
+        }
+    }
+
+    private void EmitOperand(string token)
+    {
+        if (temporaryVariables.TryGetValue(token, out int index)) {
+            bytecodes.Add((byte)(16 + index));
+        } else if (int.TryParse(token, out int value)) {
+            int litIndex = AddLiteral(value);
+            bytecodes.Add((byte)(32 + litIndex));
+        } else {
+            throw new Exception($"Unrecognized token '{token}'");
         }
     }
 
