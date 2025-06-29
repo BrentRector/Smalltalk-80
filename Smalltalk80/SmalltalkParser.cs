@@ -22,13 +22,13 @@ public class SmalltalkParser {
 
     private void ParseTemporaries() {
         if (tokenizer.Peek() == "|") {
-            tokenizer.Next(); // consume |
+            tokenizer.Next();
             while (tokenizer.HasNext && tokenizer.Peek() != "|") {
                 var name = tokenizer.Next();
                 if (!temporaryVariables.ContainsKey(name))
                     temporaryVariables[name] = tempIndex++;
             }
-            tokenizer.Next(); // consume |
+            tokenizer.Next();
         }
     }
 
