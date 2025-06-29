@@ -302,7 +302,7 @@ public enum Bytecode : byte
     /// <summary>Push the active context.</summary>
     PushActiveContext = 137,
 
-    // 138-141
+    // 138-143
     /// <summary>
     ///     Unconditional branch with an 8-bit signed offset relative to the
     ///     instruction following the offset byte.
@@ -325,6 +325,18 @@ public enum Bytecode : byte
     ///     following the offset bytes.
     /// </summary>
     JumpIfFalseLong,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>true</c>. The
+    ///     branch distance is an 8-bit signed offset relative to the instruction
+    ///     following the offset byte.
+    /// </summary>
+    JumpIfTrueShort,
+    /// <summary>
+    ///     Conditional branch taken when the stack top is <c>true</c>. The
+    ///     branch distance is a 16-bit signed offset relative to the instruction
+    ///     following the offset bytes.
+    /// </summary>
+    JumpIfTrueLong,
 }
 
 
