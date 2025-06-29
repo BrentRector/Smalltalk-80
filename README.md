@@ -12,6 +12,16 @@ dotnet build Smalltalk80.sln
 
 Running the console app executes a small bytecode sequence and prints the result.
 
+## REPL
+
+Launch the interactive Smalltalk-80 REPL with:
+
+```bash
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --repl
+```
+
+You can also start it directly from VS Code using the **Smalltalk REPL** launch configuration or the **repl** task.
+
 ## VS Code Setup
 
 The repository contains a `.vscode` folder with build and debug tasks. After
