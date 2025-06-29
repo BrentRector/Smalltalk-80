@@ -3,11 +3,12 @@ using System;
 /// <summary>
 ///     Executes Smalltalk bytecodes and maintains runtime state.
 /// </summary>
-public class Interpreter {
+public class Interpreter
+{
     /// <summary>
     ///     The currently active execution <see cref="Context"/>.
     /// </summary>
-    public Context currentContext;
+    private Context currentContext = null!;
 
     /// <summary>
     ///     Indicates whether the interpreter should exit the process when the
@@ -26,7 +27,11 @@ public class Interpreter {
     /// </summary>
     public object? LastResult { get; private set; }
 
-    public void Execute() {
+    /// <summary>
+    ///     Continuously executes bytecodes starting from the current context.
+    /// </summary>
+    public void Execute()
+    {
         IsRunning = true;
         while (IsRunning) {
             byte bytecode = currentContext.Method.Bytecodes[currentContext.PC++];
@@ -40,7 +45,8 @@ public class Interpreter {
     /// <param name="method">The compiled method to run.</param>
     /// <param name="receiver">The receiver for the method.</param>
     /// <returns>The value returned by the method.</returns>
-    public object? Evaluate(CompiledMethod method, SmalltalkObject receiver) {
+    public object? Evaluate(CompiledMethod method, SmalltalkObject receiver)
+    {
         var previousExit = ExitOnReturn;
         ExitOnReturn = false;
         LastResult = null;
@@ -48,9 +54,9 @@ public class Interpreter {
             Sender = null!,
             Method = method,
             Receiver = receiver,
-            Arguments = Array.Empty<object>(),
+            Arguments = Array.Empty<object?>(),
             Temporaries = new object[method.TemporariesCount],
-            Stack = new Stack<object>(),
+            Stack = new Stack<object?>(),
             PC = 0
         };
         Execute();
@@ -58,7 +64,12 @@ public class Interpreter {
         return LastResult;
     }
 
-    public void Dispatch(byte bytecode) {
+    /// <summary>
+    ///     Handles the given bytecode in the context of the running method.
+    /// </summary>
+    /// <param name="bytecode">The bytecode to execute.</param>
+    public void Dispatch(byte bytecode)
+    {
         Tracer.Log($"Dispatching bytecode: {bytecode} at PC: {currentContext.PC - 1}");
         if (bytecode <= 15) {
             currentContext.Stack.Push(currentContext.Receiver.Fields[bytecode]);
@@ -75,7 +86,12 @@ public class Interpreter {
         }
     }
 
-    public void ReturnFrom(Object returnValue) {
+    /// <summary>
+    ///     Returns from the current context with the specified value.
+    /// </summary>
+    /// <param name="returnValue">The return value.</param>
+    public void ReturnFrom(object returnValue)
+    {
         if (currentContext.Sender == null) {
             LastResult = returnValue;
             if (ExitOnReturn) {
@@ -89,12 +105,17 @@ public class Interpreter {
         }
     }
 
-    public void HandleReturn(Object returnValue) {
+    /// <summary>
+    ///     Handles both local and non-local returns.
+    /// </summary>
+    /// <param name="returnValue">The value to return.</param>
+    public void HandleReturn(object returnValue)
+    {
         try {
             ReturnFrom(returnValue);
         } catch (NonLocalReturnException ex) {
             while (currentContext != null && currentContext != ex.TargetContext) {
-                currentContext = currentContext.Sender;
+                currentContext = currentContext.Sender!;
             }
             if (currentContext == null) {
                 throw new Exception("Non-local return failed: target context not found");
@@ -103,9 +124,14 @@ public class Interpreter {
         }
     }
 
-    public void SendSelector(byte bytecode) {
+    /// <summary>
+    ///     Performs the message send indicated by the specified bytecode.
+    /// </summary>
+    /// <param name="bytecode">The send bytecode.</param>
+    public void SendSelector(byte bytecode)
+    {
         int selectorIndex = bytecode - 128;
-        Symbol selector = currentContext.Method.Literals[selectorIndex] as Symbol;
+        var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
         int argCount = (bytecode - 128) % 16;
 
         if (currentContext.Method.HasPrimitive &&
@@ -113,7 +139,7 @@ public class Interpreter {
             return;
         }
 
-        Context newContext = Context.CreateFor(selector, argCount, currentContext);
+        var newContext = Context.CreateFor(selector, argCount, currentContext);
         currentContext = newContext;
     }
 }

@@ -1,18 +1,32 @@
 using System;
 using System.Collections.Generic;
 
-public class SmalltalkParser {
+/// <summary>
+///     Parses a subset of Smalltalk source code into bytecode.
+/// </summary>
+public sealed class SmalltalkParser
+{
     private readonly SmalltalkTokenizer tokenizer;
-    private List<byte> bytecodes = new();
-    private List<object> literals = new();
-    private Dictionary<string, int> temporaryVariables = new();
+    private readonly List<byte> bytecodes = new();
+    private readonly List<object> literals = new();
+    private readonly Dictionary<string, int> temporaryVariables = new();
     private int tempIndex = 0;
 
-    public SmalltalkParser(SmalltalkTokenizer tokenizer) {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SmalltalkParser"/> class.
+    /// </summary>
+    /// <param name="tokenizer">The tokenizer providing the source tokens.</param>
+    public SmalltalkParser(SmalltalkTokenizer tokenizer)
+    {
         this.tokenizer = tokenizer;
     }
 
-    public CompiledMethod ParseMethod() {
+    /// <summary>
+    ///     Parses the tokens into a <see cref="CompiledMethod"/> representing a method.
+    /// </summary>
+    /// <returns>The compiled method.</returns>
+    public CompiledMethod ParseMethod()
+    {
         ParseTemporaries();
         ParseStatements();
         bytecodes.Add(124); // return
@@ -23,11 +37,12 @@ public class SmalltalkParser {
         };
     }
 
-    private void ParseTemporaries() {
+    private void ParseTemporaries()
+    {
         if (tokenizer.Peek() == "|") {
             tokenizer.Next();
             while (tokenizer.HasNext && tokenizer.Peek() != "|") {
-                var name = tokenizer.Next();
+                var name = tokenizer.Next()!;
                 if (!temporaryVariables.ContainsKey(name))
                     temporaryVariables[name] = tempIndex++;
             }
@@ -35,21 +50,23 @@ public class SmalltalkParser {
         }
     }
 
-    private void ParseStatements() {
+    private void ParseStatements()
+    {
         while (tokenizer.HasNext) {
             ParseExpression();
             if (tokenizer.Peek() == ".") tokenizer.Next();
         }
     }
 
-    private void ParseExpression() {
-        var left = tokenizer.Next();
+    private void ParseExpression()
+    {
+        var left = tokenizer.Next()!;
         int leftIndex = temporaryVariables.ContainsKey(left) ? temporaryVariables[left] : -1;
         if (leftIndex >= 0) bytecodes.Add((byte)(16 + leftIndex));
 
         if (tokenizer.HasNext && tokenizer.Peek() == "+") {
             tokenizer.Next();
-            var right = tokenizer.Next();
+            var right = tokenizer.Next()!;
             int rightIndex = temporaryVariables.ContainsKey(right) ? temporaryVariables[right] : -1;
             if (rightIndex >= 0) bytecodes.Add((byte)(16 + rightIndex));
 
@@ -58,7 +75,8 @@ public class SmalltalkParser {
         }
     }
 
-    private int AddLiteral(object lit) {
+    private int AddLiteral(object lit)
+    {
         int index = literals.IndexOf(lit);
         if (index == -1) {
             literals.Add(lit);
