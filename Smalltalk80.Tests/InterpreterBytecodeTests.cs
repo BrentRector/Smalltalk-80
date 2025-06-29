@@ -214,6 +214,56 @@ public class InterpreterBytecodeTests
     }
 
     [Fact]
+    public void ExtendedStore_ReceiverVariable_WritesFieldWithoutPopping()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 10);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.ExtendedStore,
+                9,
+                (byte)Bytecode.PushReceiverVariable9,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(1, receiver.Fields[9]);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void ExtendedStore_TemporaryVariable_WritesArrayWithoutPopping()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var temps = new object?[10];
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.ExtendedStore,
+                0b01001001,
+                (byte)Bytecode.PushTemporaryVariable9,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 10
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver, temps);
+        Assert.Equal(1, temps[9]);
+        Assert.Equal(1, result);
+    }
+
+
+    [Fact]
     public void JumpShort_ForwardSkipsInstruction()
     {
         var cls = new SmalltalkClass();
