@@ -1,16 +1,14 @@
+using System;
+
 public class SmalltalkObject {
     public SmalltalkClass ClassPointer;
-    public Object[] Fields;
+    public object[] Fields;
 
     public SmalltalkObject(SmalltalkClass cls, int fieldCount) {
         ClassPointer = cls;
-        Fields = new Object[fieldCount];
+        Fields = new object[fieldCount];
     }
 
-    public Object GetField(int index) => Fields[index];
-    public void SetField(int index, Object value) => Fields[index] = value;
-
-    public static bool IsSmallInteger(Object obj) => obj is int;
-    public static int GetSmallIntegerValue(Object obj) => (int)obj;
-    public static Object EncodeSmallInteger(int value) => value;
+    public object GetField(int index) => Fields[index];
+    public void SetField(int index, object value) => Fields[index] = value;
 }

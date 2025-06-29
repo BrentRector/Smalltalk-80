@@ -1,9 +1,10 @@
 using System;
+using System.Linq;
 using System.Windows.Forms;
 
-class Program {
+public class Program {
     [STAThread]
-    static void Main(string[] args) {
+    public static void Main(string[] args) {
         Console.WriteLine("Smalltalk-80 System Boot");
         StandardLibrary.Initialize();
 
