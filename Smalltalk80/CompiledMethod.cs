@@ -1,3 +1,5 @@
+using System;
+
 public class CompiledMethod {
     public byte[] Bytecodes;
     public Object[] Literals;

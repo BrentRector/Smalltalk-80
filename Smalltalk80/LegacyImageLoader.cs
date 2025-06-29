@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
 public static class LegacyImageLoader {
     public static List<SmalltalkObject> LoadImage(string path) {
         var bytes = File.ReadAllBytes(path);
@@ -30,7 +34,8 @@ public static class LegacyImageLoader {
         for (int i = 0; i < objectTable.Count; i++) {
             int classRefIndex = forwardPointers[i];
             if (classRefIndex >= 0 && classRefIndex < objectTable.Count) {
-                if (objectTable[classRefIndex] is SmalltalkClass sc) objectTable[i].ClassPointer = sc;
+                var candidate = objectTable[classRefIndex] as SmalltalkClass;
+                if (candidate != null) objectTable[i].ClassPointer = candidate;
             }
         }
 

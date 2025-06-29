@@ -1,22 +1,8 @@
-using System.Windows.Forms;
+// Stub implementation to allow cross-platform build without Windows Forms
+using System;
 
 public static class WidgetFactory {
-    public static Form CreateButtonForm(string label) {
-        var form = new Form {
-            Width = 300,
-            Height = 200,
-            Text = "Smalltalk Widget"
-        };
-
-        var button = new Button {
-            Text = label,
-            Top = 50,
-            Left = 100,
-            Width = 100
-        };
-        button.Click += (s, e) => MessageBox.Show("Button clicked!");
-
-        form.Controls.Add(button);
-        return form;
+    public static void CreateButtonForm(string label) {
+        Console.WriteLine($"WidgetFactory: GUI not available. Requested button '{label}'.");
     }
 }

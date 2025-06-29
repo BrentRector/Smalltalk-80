@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using System.Windows.Forms;
+// GUI functionality removed for cross-platform build
 
 public class Program {
     [STAThread]
@@ -9,11 +9,7 @@ public class Program {
         StandardLibrary.Initialize();
 
         if (args.Contains("--gui")) {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(WidgetFactory.CreateButtonForm("Click Me"));
-        } else {
-            Console.WriteLine("Use --gui to launch GUI.");
+            Console.WriteLine("GUI mode is not supported in this build.");
         }
     }
 }

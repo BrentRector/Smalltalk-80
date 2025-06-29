@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 public class SmalltalkParser {
     private readonly SmalltalkTokenizer tokenizer;
     private List<byte> bytecodes = new();
