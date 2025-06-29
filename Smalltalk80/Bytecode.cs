@@ -293,6 +293,30 @@ public enum Bytecode : byte
     /// <summary>Extended store and pop.</summary>
     ExtendedStoreAndPop = 130,
 
+    /// <summary>
+    ///     Send a message using a descriptor byte where the high-order three
+    ///     bits encode the argument count and the low-order five bits encode the
+    ///     selector index.
+    /// </summary>
+    SingleExtendedSend = 131,
+    /// <summary>
+    ///     Send a message using two extension bytes. The first byte specifies
+    ///     the argument count while the second gives the selector index in the
+    ///     literal frame.
+    /// </summary>
+    DoubleExtendedSend = 132,
+    /// <summary>
+    ///     Perform a <c>super</c> send using a single descriptor byte. Lookup of
+    ///     the message begins in the superclass of the defining class stored as
+    ///     the last literal of the method.
+    /// </summary>
+    SingleExtendedSuper = 133,
+    /// <summary>
+    ///     Perform a <c>super</c> send using two extension bytes that specify
+    ///     the argument count and selector index respectively.
+    /// </summary>
+    DoubleExtendedSuper = 134,
+
     // send bytecodes with literal indices are above; enumeration continues
 
     /// <summary>Pop the stack top.</summary>
