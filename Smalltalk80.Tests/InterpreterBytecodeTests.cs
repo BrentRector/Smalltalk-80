@@ -5,9 +5,12 @@ namespace Smalltalk80.Tests;
 
 public class InterpreterBytecodeTests
 {
+    private static void Trace(string testName) =>
+        Console.WriteLine($"[TRACE] {testName}");
     [Fact]
     public void InstanceVariablePush_ReturnsFieldValue()
     {
+        Trace(nameof(InstanceVariablePush_ReturnsFieldValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 1);
         receiver.Fields[0] = 42;
@@ -25,6 +28,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void TemporaryVariablePush_ReturnsTemporaryValue()
     {
+        Trace(nameof(TemporaryVariablePush_ReturnsTemporaryValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -41,6 +45,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void LiteralPush_ReturnsLiteral()
     {
+        Trace(nameof(LiteralPush_ReturnsLiteral));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -57,6 +62,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ReturnBytecode_WithEmptyStack_ReturnsReceiver()
     {
+        Trace(nameof(ReturnBytecode_WithEmptyStack_ReturnsReceiver));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -73,6 +79,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void SendSelector_AddsIntegers()
     {
+        Trace(nameof(SendSelector_AddsIntegers));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -95,6 +102,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void StoreReceiverVariable_UpdatesField()
     {
+        Trace(nameof(StoreReceiverVariable_UpdatesField));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 1);
         var method = new CompiledMethod
@@ -118,6 +126,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void StoreTemporaryVariable_UpdatesArray()
     {
+        Trace(nameof(StoreTemporaryVariable_UpdatesArray));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var temps = new object?[] { null };
@@ -142,6 +151,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void PushConstantNil_ReturnsNull()
     {
+        Trace(nameof(PushConstantNil_ReturnsNull));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -166,6 +176,7 @@ public class InterpreterBytecodeTests
     [InlineData(Bytecode.PushTen, 10)]
     public void PushSmallIntegerConstants_ReturnExpectedValue(Bytecode code, int expected)
     {
+        Trace(nameof(PushSmallIntegerConstants_ReturnExpectedValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -182,6 +193,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ReturnTrueBytecode_ReturnsTrue()
     {
+        Trace(nameof(ReturnTrueBytecode_ReturnsTrue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -198,6 +210,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void PushLiteralVariable_ReturnsAssociationValue()
     {
+        Trace(nameof(PushLiteralVariable_ReturnsAssociationValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var assoc = new Association(new Symbol("X"), 42);
@@ -215,6 +228,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void StoreLiteralVariable_UpdatesAssociation()
     {
+        Trace(nameof(StoreLiteralVariable_UpdatesAssociation));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var assoc = new Association(new Symbol("G"), 1);
@@ -240,6 +254,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ExtendedStore_ReceiverVariable_WritesFieldWithoutPopping()
     {
+        Trace(nameof(ExtendedStore_ReceiverVariable_WritesFieldWithoutPopping));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 10);
         var method = new CompiledMethod
@@ -264,6 +279,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ExtendedStore_TemporaryVariable_WritesArrayWithoutPopping()
     {
+        Trace(nameof(ExtendedStore_TemporaryVariable_WritesArrayWithoutPopping));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var temps = new object?[10];
@@ -289,6 +305,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ExtendedStore_LiteralConstant_Throws()
     {
+        Trace(nameof(ExtendedStore_LiteralConstant_Throws));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -311,6 +328,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void JumpShort_ForwardSkipsInstruction()
     {
+        Trace(nameof(JumpShort_ForwardSkipsInstruction));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -333,6 +351,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void JumpIfFalseShort_ForwardSkipsInstruction()
     {
+        Trace(nameof(JumpIfFalseShort_ForwardSkipsInstruction));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -356,6 +375,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void JumpIfTrueShort_ForwardSkipsInstruction()
     {
+        Trace(nameof(JumpIfTrueShort_ForwardSkipsInstruction));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -379,6 +399,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void JumpIfTrueLong_ForwardSkipsInstruction()
     {
+        Trace(nameof(JumpIfTrueLong_ForwardSkipsInstruction));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
@@ -402,6 +423,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void SendSelector_UnaryMethod_InvokesMethod()
     {
+        Trace(nameof(SendSelector_UnaryMethod_InvokesMethod));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
 
@@ -438,6 +460,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void SendSelector_KeywordMessageWithTwoArgs_InvokesMethod()
     {
+        Trace(nameof(SendSelector_KeywordMessageWithTwoArgs_InvokesMethod));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
 
@@ -476,6 +499,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void SingleExtendedSend_InvokesMethod()
     {
+        Trace(nameof(SingleExtendedSend_InvokesMethod));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
 
@@ -512,6 +536,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void SingleExtendedSuper_InvokesSuperclassMethod()
     {
+        Trace(nameof(SingleExtendedSuper_InvokesSuperclassMethod));
         var superCls = new SmalltalkClass();
         var subCls = new SmalltalkClass { Superclass = superCls };
         var receiver = new SmalltalkObject(subCls, 0);
@@ -549,6 +574,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void BlockClosure_Value_ExecutesBlock()
     {
+        Trace(nameof(BlockClosure_Value_ExecutesBlock));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
 
@@ -584,6 +610,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void ExtendedStoreAndPop_StoresValueAndPops()
     {
+        Trace(nameof(ExtendedStoreAndPop_StoresValueAndPops));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 1);
         var method = new CompiledMethod
@@ -607,6 +634,7 @@ public class InterpreterBytecodeTests
     [Fact]
     public void PrimitiveMultiply_MultipliesIntegers()
     {
+        Trace(nameof(PrimitiveMultiply_MultipliesIntegers));
         var ctx = new Context
         {
             Sender = null,
