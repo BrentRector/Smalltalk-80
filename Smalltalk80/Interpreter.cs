@@ -157,6 +157,9 @@ public class Interpreter
         } else if (bytecode == Bytecode.ExtendedStore) {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             HandleExtendedStore(descriptor, false);
+        } else if (bytecode == Bytecode.ExtendedStoreAndPop) {
+            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
+            HandleExtendedStore(descriptor, true);
         } else if (bytecode == Bytecode.SingleExtendedSend) {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             int argCount = descriptor >> 5;
