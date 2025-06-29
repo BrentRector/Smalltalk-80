@@ -141,14 +141,7 @@ public class Interpreter
             HandleReturn(returnValue!);
         } else if (bytecode == Bytecode.ExtendedStore) {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
-            int type = descriptor >> 6;
-            int index = descriptor & 0x3F;
-            if (type == 3) {
-                var assoc = (Association)currentContext.Method.Literals[index]!;
-                assoc.Value = currentContext.Stack.Peek();
-            } else {
-                throw new NotImplementedException($"Extended store type {type} not supported");
-            }
+            HandleExtendedStore(descriptor, false);
         } else if (bytecode == Bytecode.PopStack) {
             _ = currentContext.Stack.Pop();
         } else if (bytecode == Bytecode.DuplicateTop) {
@@ -220,6 +213,42 @@ public class Interpreter
                 throw new Exception("Non-local return failed: target context not found");
             }
             currentContext.Stack.Push(ex.ReturnValue);
+        }
+    }
+
+    /// <summary>
+    ///     Stores the stack top into a variable described by the extended
+    ///     store descriptor.
+    /// </summary>
+    /// <param name="descriptor">The descriptor byte.</param>
+    /// <param name="popAfter">Whether to pop the value after storing.</param>
+    private void HandleExtendedStore(byte descriptor, bool popAfter)
+    {
+        int type = descriptor >> 6;
+        int index = descriptor & 0x3F;
+        object? value = currentContext.Stack.Peek();
+
+        switch (type)
+        {
+            case 0:
+                currentContext.Receiver.Fields[index] = value;
+                break;
+            case 1:
+                currentContext.Temporaries[index] = value;
+                break;
+            case 2:
+                throw new InvalidOperationException("Cannot store into a literal constant");
+            case 3:
+                var assoc = (Association)currentContext.Method.Literals[index]!;
+                assoc.Value = value;
+                break;
+            default:
+                throw new InvalidOperationException($"Invalid extended store type {type}");
+        }
+
+        if (popAfter)
+        {
+            _ = currentContext.Stack.Pop();
         }
     }
 
