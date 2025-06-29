@@ -5,7 +5,7 @@ public class SmalltalkTokenizer {
     private int position = 0;
 
     public SmalltalkTokenizer(string source) {
-        tokens = Regex.Split(source, "(\s+|:|\\.|\\(|\\))").Where(t => !string.IsNullOrWhiteSpace(t)).ToArray();
+        tokens = Regex.Split(source, "(\\\s+|:|\\\\.|\\\\(|\\\\))").Where(t => !string.IsNullOrWhiteSpace(t)).ToArray();
     }
 
     public string Peek() => position < tokens.Length ? tokens[position] : null;
