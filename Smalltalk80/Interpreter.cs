@@ -135,11 +135,16 @@ public class Interpreter
                 _ => null
             };
             HandleReturn(value!);
-        } else if (bytecode == Bytecode.ReturnTopFromMethod || bytecode == Bytecode.ReturnTopFromBlock) {
+        } else if (bytecode == Bytecode.ReturnTopFromMethod) {
             var returnValue = currentContext.Stack.Count > 0
                 ? currentContext.Stack.Pop()
                 : currentContext.Receiver;
             HandleReturn(returnValue!);
+        } else if (bytecode == Bytecode.ReturnTopFromBlock) {
+            var returnValue = currentContext.Stack.Count > 0
+                ? currentContext.Stack.Pop()
+                : currentContext.Receiver;
+            HandleBlockReturn(returnValue!);
         } else if (bytecode == Bytecode.ExtendedStore) {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             HandleExtendedStore(descriptor, false);
@@ -221,6 +226,17 @@ public class Interpreter
         try {
             ReturnFrom(returnValue);
         } catch (NonLocalReturnException ex) {
+            if (ex.TargetContext == null)
+            {
+                LastResult = ex.ReturnValue;
+                IsRunning = false;
+                if (ExitOnReturn)
+                {
+                    Console.WriteLine($"Returned: {ex.ReturnValue}");
+                    Environment.Exit(0);
+                }
+                return;
+            }
             while (currentContext != null && currentContext != ex.TargetContext) {
                 currentContext = currentContext.Sender!;
             }
@@ -228,6 +244,30 @@ public class Interpreter
                 throw new Exception("Non-local return failed: target context not found");
             }
             currentContext.Stack.Push(ex.ReturnValue);
+        }
+    }
+
+    /// <summary>
+    ///     Handles returns from a <see cref="BlockContext"/>. Non-local
+    ///     returns unwind to the block's home context sender.
+    /// </summary>
+    /// <param name="returnValue">The value being returned.</param>
+    private void HandleBlockReturn(object returnValue)
+    {
+        if (currentContext is BlockContext block)
+        {
+            if (block.Sender == block.HomeContext)
+            {
+                HandleReturn(returnValue);
+            }
+            else
+            {
+                throw new NonLocalReturnException(returnValue, block.HomeContext.Sender);
+            }
+        }
+        else
+        {
+            HandleReturn(returnValue);
         }
     }
 

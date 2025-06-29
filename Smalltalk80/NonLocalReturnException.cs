@@ -13,14 +13,17 @@ public sealed class NonLocalReturnException : Exception
     /// <summary>
     ///     Gets the context that should receive the return value.
     /// </summary>
-    public Context TargetContext { get; }
+    public Context? TargetContext { get; }
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="NonLocalReturnException"/> class.
     /// </summary>
     /// <param name="value">The return value.</param>
-    /// <param name="target">The target context.</param>
-    public NonLocalReturnException(object value, Context target)
+    /// <param name="target">
+    ///     The context that should receive the return value, or
+    ///     <c>null</c> when returning from the top-level method.
+    /// </param>
+    public NonLocalReturnException(object value, Context? target)
     {
         ReturnValue = value;
         TargetContext = target;
