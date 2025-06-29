@@ -449,4 +449,38 @@ public class InterpreterBytecodeTests
         Assert.Equal(42, result);
     }
 
+    [Fact]
+    public void BlockClosure_Value_ExecutesBlock()
+    {
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushActiveContext,
+                (byte)Bytecode.PushZero,
+                130,
+                (byte)Bytecode.JumpLong, 0, 3,
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromBlock,
+                131,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[]
+            {
+                42,
+                0,
+                new Symbol("blockCopy:"),
+                new Symbol("value")
+            },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+
+        Assert.Equal(42, result);
+    }
 }
