@@ -1,19 +1,21 @@
 using Smalltalk80;
+
 using ExecutionContext = Smalltalk80.ExecutionContext;
 
 var interpreter = new BytecodeInterpreter();
-var context = new ExecutionContext();
+var context = new ExecutionContext(instanceVariableCount: 0, temporaryCount: 2);
+context.Temporaries[0] = 1;
+context.Temporaries[1] = 1;
 
-// Sample bytecode: push 1, push 1, add, return
-byte[] code = new byte[]
-{
-    (byte)Bytecode.PushConstantOne,
-    (byte)Bytecode.PushConstantOne,
-    (byte)Bytecode.Add,
-    (byte)Bytecode.ReturnTop
-};
+// Sample bytecode: push temp0, push temp1, send arithmetic +, return
+byte[] code =
+[
+    (byte)Bytecode.PushTemporary0,
+    (byte)Bytecode.PushTemporary1,
+    (byte)Bytecode.SendArithmeticMessage0, // +
+    (byte)Bytecode.ReturnTopFromMessage
+];
 
-interpreter.Execute(code, context);
+var result = interpreter.Execute(code, context);
 
-// After execution, the result is on the stack
-Console.WriteLine($"Result: {context.Stack[context.StackPointer - 1]}");
+Console.WriteLine($"Result: {result}");
