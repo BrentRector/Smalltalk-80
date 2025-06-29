@@ -34,8 +34,8 @@ public class Interpreter
     {
         IsRunning = true;
         while (IsRunning) {
-            byte bytecode = currentContext.Method.Bytecodes[currentContext.PC++];
-            Dispatch(bytecode);
+            var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
+            Dispatch(opcode);
         }
     }
 
@@ -73,7 +73,9 @@ public class Interpreter
             Method = method,
             Receiver = receiver,
             Arguments = Array.Empty<object?>(),
+#pragma warning disable CS8619
             Temporaries = temporaries ?? new object[method.TemporariesCount],
+#pragma warning restore CS8619
             Stack = new Stack<object?>(),
             PC = 0
         };
@@ -86,65 +88,76 @@ public class Interpreter
     ///     Handles the given bytecode in the context of the running method.
     /// </summary>
     /// <param name="bytecode">The bytecode to execute.</param>
-    public void Dispatch(byte bytecode)
+    public void Dispatch(Bytecode bytecode)
     {
         Tracer.Log($"Dispatching bytecode: {bytecode} at PC: {currentContext.PC - 1}");
-        if (bytecode <= 15) {
-            // push instance variable
-            currentContext.Stack.Push(currentContext.Receiver.Fields[bytecode]);
-        } else if (bytecode <= 31) {
-            // push temporary variable
-            currentContext.Stack.Push(currentContext.Temporaries[bytecode - 16]);
-        } else if (bytecode <= 63) {
-            // push literal constant
-            currentContext.Stack.Push(currentContext.Method.Literals[bytecode - 32]);
-        } else if (bytecode >= 96 && bytecode <= 103) {
-            // pop and store into receiver variable
-            int index = bytecode - 96;
+        if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15) {
+            int index = (int)bytecode - (int)Bytecode.PushReceiverVariable0;
+            currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
+        } else if (bytecode >= Bytecode.PushTemporaryVariable0 && bytecode <= Bytecode.PushTemporaryVariable15) {
+            int index = (int)bytecode - (int)Bytecode.PushTemporaryVariable0;
+            currentContext.Stack.Push(currentContext.Temporaries[index]);
+        } else if (bytecode >= Bytecode.PushLiteralConstant0 && bytecode <= Bytecode.PushLiteralConstant31) {
+            int index = (int)bytecode - (int)Bytecode.PushLiteralConstant0;
+            currentContext.Stack.Push(currentContext.Method.Literals[index]);
+        } else if (bytecode >= Bytecode.PushLiteralVariable0 && bytecode <= Bytecode.PushLiteralVariable31) {
+            int index = (int)bytecode - (int)Bytecode.PushLiteralVariable0;
+            var assoc = (Association)currentContext.Method.Literals[index]!;
+            currentContext.Stack.Push(assoc.Value);
+        } else if (bytecode >= Bytecode.StoreAndPopReceiverVariable0 && bytecode <= Bytecode.StoreAndPopReceiverVariable7) {
+            int index = (int)bytecode - (int)Bytecode.StoreAndPopReceiverVariable0;
             currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
-        } else if (bytecode >= 104 && bytecode <= 111) {
-            // pop and store into temporary variable
-            int index = bytecode - 104;
-            currentContext.Temporaries[index] = currentContext.Stack.Pop();
-        } else if (bytecode >= 112 && bytecode <= 119) {
-            // push constant
-            switch (bytecode) {
-                case 112: currentContext.Stack.Push(currentContext.Receiver); break;
-                case 113: currentContext.Stack.Push(true); break;
-                case 114: currentContext.Stack.Push(false); break;
-                case 115: currentContext.Stack.Push(null); break;
-                case 116: currentContext.Stack.Push(-1); break;
-                case 117: currentContext.Stack.Push(0); break;
-                case 118: currentContext.Stack.Push(1); break;
-                case 119: currentContext.Stack.Push(2); break;
-            }
-        } else if (bytecode >= 120 && bytecode <= 123) {
-            // return constant
-            object? value = bytecode switch {
-                120 => currentContext.Receiver,
-                121 => true,
-                122 => false,
-                123 => null,
+        } else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7) {
+            int index = (int)bytecode - (int)Bytecode.StoreAndPopTemporaryVariable0;
+            currentContext.Temporaries[index] = currentContext.Stack.Pop()!;
+        } else if (bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) {
+            object? constant = bytecode switch
+            {
+                Bytecode.PushSelf => currentContext.Receiver,
+                Bytecode.PushTrue => true,
+                Bytecode.PushFalse => false,
+                Bytecode.PushNil => null,
+                Bytecode.PushMinusOne => -1,
+                Bytecode.PushZero => 0,
+                Bytecode.PushOne => 1,
+                Bytecode.PushTwo => 2,
+                _ => null
+            };
+            currentContext.Stack.Push(constant);
+        } else if (bytecode >= Bytecode.ReturnSelf && bytecode <= Bytecode.ReturnNil) {
+            object? value = bytecode switch
+            {
+                Bytecode.ReturnSelf => currentContext.Receiver,
+                Bytecode.ReturnTrue => true,
+                Bytecode.ReturnFalse => false,
+                Bytecode.ReturnNil => null,
                 _ => null
             };
             HandleReturn(value!);
-        } else if (bytecode == 124 || bytecode == 125) {
+        } else if (bytecode == Bytecode.ReturnTopFromMethod || bytecode == Bytecode.ReturnTopFromBlock) {
             var returnValue = currentContext.Stack.Count > 0
                 ? currentContext.Stack.Pop()
                 : currentContext.Receiver;
             HandleReturn(returnValue!);
-        } else if (bytecode == 135) {
-            // pop stack top
+        } else if (bytecode == Bytecode.ExtendedStore) {
+            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
+            int type = descriptor >> 6;
+            int index = descriptor & 0x3F;
+            if (type == 3) {
+                var assoc = (Association)currentContext.Method.Literals[index]!;
+                assoc.Value = currentContext.Stack.Peek();
+            } else {
+                throw new NotImplementedException($"Extended store type {type} not supported");
+            }
+        } else if (bytecode == Bytecode.PopStack) {
             _ = currentContext.Stack.Pop();
-        } else if (bytecode == 136) {
-            // duplicate top of stack
+        } else if (bytecode == Bytecode.DuplicateTop) {
             var top = currentContext.Stack.Peek();
             currentContext.Stack.Push(top);
-        } else if (bytecode == 137) {
-            // push active context
+        } else if (bytecode == Bytecode.PushActiveContext) {
             currentContext.Stack.Push(currentContext);
-        } else if (bytecode >= 128) {
-            SendSelector(bytecode);
+        } else if ((byte)bytecode >= 128) {
+            SendSelector((byte)bytecode);
         } else {
             throw new NotImplementedException($"Unhandled bytecode: {bytecode}");
         }
