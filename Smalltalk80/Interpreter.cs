@@ -29,6 +29,57 @@ public class Interpreter
     public object? LastResult { get; private set; }
 
     /// <summary>
+    ///     Table of special selector symbols used by arithmetic and
+    ///     special message send bytecodes.
+    /// </summary>
+    private static readonly Symbol[] SpecialSelectors =
+    [
+        // Arithmetic selectors 0-15
+        new Symbol("+"),
+        new Symbol("-"),
+        new Symbol("<"),
+        new Symbol(">"),
+        new Symbol("<="),
+        new Symbol(">="),
+        new Symbol("="),
+        new Symbol("~="),
+        new Symbol("*"),
+        new Symbol("/"),
+        new Symbol("\\"),
+        new Symbol("@"),
+        new Symbol("bitShift:"),
+        new Symbol("//"),
+        new Symbol("bitAnd:"),
+        new Symbol("bitOr:"),
+        // Special selectors 16-31
+        new Symbol("at:"),
+        new Symbol("at:put:"),
+        new Symbol("size"),
+        new Symbol("next"),
+        new Symbol("nextPut:"),
+        new Symbol("atEnd"),
+        new Symbol("=="),
+        new Symbol("class"),
+        new Symbol("blockCopy:"),
+        new Symbol("value"),
+        new Symbol("value:"),
+        new Symbol("do:"),
+        new Symbol("new"),
+        new Symbol("new:"),
+        new Symbol("x"),
+        new Symbol("y")
+    ];
+
+    /// <summary>
+    ///     Argument counts corresponding to <see cref="SpecialSelectors"/>.
+    /// </summary>
+    private static readonly int[] SpecialSelectorArgCounts =
+    [
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+        1,2,0,0,1,0,1,0,1,0,1,1,0,1,0,0
+    ];
+
+    /// <summary>
     ///     Continuously executes bytecodes starting from the current context.
     /// </summary>
     public void Execute()
@@ -225,6 +276,58 @@ public class Interpreter
             if (condObj is bool b && b) {
                 currentContext.PC += offset;
             }
+        } else if (bytecode >= Bytecode.PopJumpFalseShort1 && bytecode <= Bytecode.PopJumpFalseShort8) {
+            int offset = (int)bytecode - (int)Bytecode.PopJumpFalseShort1 + 1;
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && !b) {
+                currentContext.PC += offset;
+            }
+        } else if (bytecode >= Bytecode.LongJump0 && bytecode <= Bytecode.LongJump7) {
+            int high = ((int)bytecode - (int)Bytecode.LongJump0) << 8;
+            int low = currentContext.Method.Bytecodes[currentContext.PC++];
+            int raw = high | low;
+            if ((raw & 0x400) != 0) {
+                raw |= unchecked((int)0xFFFFF800);
+            }
+            currentContext.PC += raw;
+        } else if (bytecode >= Bytecode.PopJumpTrueLong0 && bytecode <= Bytecode.PopJumpTrueLong3) {
+            int high = ((int)bytecode - (int)Bytecode.PopJumpTrueLong0) << 8;
+            int low = currentContext.Method.Bytecodes[currentContext.PC++];
+            int offset = high | low;
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && b) {
+                currentContext.PC += offset;
+            }
+        } else if (bytecode >= Bytecode.PopJumpFalseLong0 && bytecode <= Bytecode.PopJumpFalseLong3) {
+            int high = ((int)bytecode - (int)Bytecode.PopJumpFalseLong0) << 8;
+            int low = currentContext.Method.Bytecodes[currentContext.PC++];
+            int offset = high | low;
+            var condObj = currentContext.Stack.Pop();
+            if (condObj is bool b && !b) {
+                currentContext.PC += offset;
+            }
+        } else if (bytecode >= Bytecode.SendArithmeticSelector0 && bytecode <= Bytecode.SendArithmeticSelector15) {
+            int index = (int)bytecode - (int)Bytecode.SendArithmeticSelector0;
+            var selector = SpecialSelectors[index];
+            int argCount = SpecialSelectorArgCounts[index];
+            PerformSend(selector, argCount, false);
+        } else if (bytecode >= Bytecode.SendSpecialSelector0 && bytecode <= Bytecode.SendSpecialSelector15) {
+            int index = (int)bytecode - (int)Bytecode.SendSpecialSelector0 + 16;
+            var selector = SpecialSelectors[index];
+            int argCount = SpecialSelectorArgCounts[index];
+            PerformSend(selector, argCount, false);
+        } else if (bytecode >= Bytecode.SendLiteral0Args0 && bytecode <= Bytecode.SendLiteral0Args15) {
+            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral0Args0;
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, 0, false);
+        } else if (bytecode >= Bytecode.SendLiteral1Arg0 && bytecode <= Bytecode.SendLiteral1Arg15) {
+            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral1Arg0;
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, 1, false);
+        } else if (bytecode >= Bytecode.SendLiteral2Args0 && bytecode <= Bytecode.SendLiteral2Args15) {
+            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral2Args0;
+            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
+            PerformSend(selector, 2, false);
         } else if ((byte)bytecode >= 128) {
             SendSelector((byte)bytecode);
         } else {
