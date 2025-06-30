@@ -381,6 +381,264 @@ public enum Bytecode : byte
     /// <summary>Push the small integer constant 10.</summary>
     PushTen,
 
+    // 152-159
+    /// <summary>
+    ///     Pop the stack top and jump forward by 1–8 bytecodes if the
+    ///     popped value is <c>false</c>.
+    /// </summary>
+    PopJumpFalseShort1 = 152,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort2,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort3,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort4,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort5,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort6,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort7,
+    /// <inheritdoc cref="PopJumpFalseShort1" />
+    PopJumpFalseShort8,
+
+    // 160-167
+    /// <summary>
+    ///     Unconditional long jump. The low-order 8 bits of the offset
+    ///     follow the opcode while the high-order bits are encoded in the
+    ///     opcode itself.
+    /// </summary>
+    LongJump0 = 160,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump1,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump2,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump3,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump4,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump5,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump6,
+    /// <inheritdoc cref="LongJump0" />
+    LongJump7,
+
+    // 168-171
+    /// <summary>
+    ///     Pop the stack top and perform a long jump if the value is
+    ///     <c>true</c>. The low-order 8 bits of the offset follow the
+    ///     opcode while the high-order bits are encoded in the opcode.
+    /// </summary>
+    PopJumpTrueLong0 = 168,
+    /// <inheritdoc cref="PopJumpTrueLong0" />
+    PopJumpTrueLong1,
+    /// <inheritdoc cref="PopJumpTrueLong0" />
+    PopJumpTrueLong2,
+    /// <inheritdoc cref="PopJumpTrueLong0" />
+    PopJumpTrueLong3,
+
+    // 172-175
+    /// <summary>
+    ///     Pop the stack top and perform a long jump if the value is
+    ///     <c>false</c>. The low-order 8 bits of the offset follow the
+    ///     opcode while the high-order bits are encoded in the opcode.
+    /// </summary>
+    PopJumpFalseLong0 = 172,
+    /// <inheritdoc cref="PopJumpFalseLong0" />
+    PopJumpFalseLong1,
+    /// <inheritdoc cref="PopJumpFalseLong0" />
+    PopJumpFalseLong2,
+    /// <inheritdoc cref="PopJumpFalseLong0" />
+    PopJumpFalseLong3,
+
+    // 176-191
+    /// <summary>
+    ///     Send one of the arithmetic selectors defined in the special
+    ///     selectors table. These opcodes do not reference the literal
+    ///     frame.
+    /// </summary>
+    SendArithmeticSelector0 = 176,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector1,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector2,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector3,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector4,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector5,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector6,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector7,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector8,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector9,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector10,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector11,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector12,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector13,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector14,
+    /// <inheritdoc cref="SendArithmeticSelector0" />
+    SendArithmeticSelector15,
+
+    // 192-207
+    /// <summary>
+    ///     Send one of the special selectors defined in the special
+    ///     selectors table. These opcodes do not reference the literal
+    ///     frame.
+    /// </summary>
+    SendSpecialSelector0 = 192,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector1,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector2,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector3,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector4,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector5,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector6,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector7,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector8,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector9,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector10,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector11,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector12,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector13,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector14,
+    /// <inheritdoc cref="SendSpecialSelector0" />
+    SendSpecialSelector15,
+
+    // 208-223
+    /// <summary>
+    ///     Send a selector from the literal frame with no arguments. The
+    ///     selector index is encoded in the opcode.
+    /// </summary>
+    SendLiteral0Args0 = 208,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args1,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args2,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args3,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args4,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args5,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args6,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args7,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args8,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args9,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args10,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args11,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args12,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args13,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args14,
+    /// <inheritdoc cref="SendLiteral0Args0" />
+    SendLiteral0Args15,
+
+    // 224-239
+    /// <summary>
+    ///     Send a selector from the literal frame with one argument. The
+    ///     selector index is encoded in the opcode.
+    /// </summary>
+    SendLiteral1Arg0 = 224,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg1,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg2,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg3,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg4,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg5,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg6,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg7,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg8,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg9,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg10,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg11,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg12,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg13,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg14,
+    /// <inheritdoc cref="SendLiteral1Arg0" />
+    SendLiteral1Arg15,
+
+    // 240-255
+    /// <summary>
+    ///     Send a selector from the literal frame with two arguments. The
+    ///     selector index is encoded in the opcode.
+    /// </summary>
+    SendLiteral2Args0 = 240,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args1,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args2,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args3,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args4,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args5,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args6,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args7,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args8,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args9,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args10,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args11,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args12,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args13,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args14,
+    /// <inheritdoc cref="SendLiteral2Args0" />
+    SendLiteral2Args15,
+
 }
 
 

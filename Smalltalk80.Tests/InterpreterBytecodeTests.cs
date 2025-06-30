@@ -797,5 +797,228 @@ public class InterpreterBytecodeTests
         Assert.Equal(1, result);
     }
 
+    [Fact]
+    public void PopJumpFalseShort_JumpsWhenFalse()
+    {
+        Trace(nameof(PopJumpFalseShort_JumpsWhenFalse));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushFalse,
+                (byte)Bytecode.PopJumpFalseShort1,
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.PushTwo,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void LongJump_SkipsInstruction()
+    {
+        Trace(nameof(LongJump_SkipsInstruction));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.LongJump0, 1,
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.PushTwo,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void PopJumpTrueLong_JumpsWhenTrue()
+    {
+        Trace(nameof(PopJumpTrueLong_JumpsWhenTrue));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushTrue,
+                (byte)Bytecode.PopJumpTrueLong0, 1,
+                (byte)Bytecode.PushOne,
+                (byte)Bytecode.PushTwo,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void SendArithmeticSelector_AddsIntegers()
+    {
+        Trace(nameof(SendArithmeticSelector_AddsIntegers));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.PushLiteralConstant1,
+                (byte)Bytecode.SendArithmeticSelector0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 2, 3 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(5, result);
+    }
+
+    [Fact]
+    public void SendSpecialSelector_BlockOperations()
+    {
+        Trace(nameof(SendSpecialSelector_BlockOperations));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushActiveContext,
+                (byte)Bytecode.PushZero,
+                (byte)Bytecode.SendSpecialSelector8,
+                (byte)Bytecode.JumpLong, 0, 2,
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromBlock,
+                (byte)Bytecode.SendSpecialSelector9,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 42 },
+            TemporariesCount = 0
+        };
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(method, receiver);
+        Assert.Equal(42, result);
+    }
+
+    [Fact]
+    public void SendLiteralSelector_NoArgs_InvokesMethod()
+    {
+        Trace(nameof(SendLiteralSelector_NoArgs_InvokesMethod));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.PushLiteralConstant0, (byte)Bytecode.ReturnTopFromMethod },
+            Literals = new object[] { 7 },
+            TemporariesCount = 0
+        };
+        cls.MethodDictionary[new Symbol("foo")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SendLiteral0Args0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo") },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(7, result);
+    }
+
+    [Fact]
+    public void SendLiteralSelector_OneArg_InvokesMethod()
+    {
+        Trace(nameof(SendLiteralSelector_OneArg_InvokesMethod));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.PushLiteralConstant0, (byte)Bytecode.ReturnTopFromMethod },
+            Literals = new object[] { 99 },
+            TemporariesCount = 0
+        };
+        cls.MethodDictionary[new Symbol("foo:")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.SendLiteral1Arg0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo:"), 99 },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(99, result);
+    }
+
+    [Fact]
+    public void SendLiteralSelector_TwoArgs_InvokesMethod()
+    {
+        Trace(nameof(SendLiteralSelector_TwoArgs_InvokesMethod));
+        var cls = new SmalltalkClass();
+        var receiver = new SmalltalkObject(cls, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[] { (byte)Bytecode.PushLiteralConstant0, (byte)Bytecode.ReturnTopFromMethod },
+            Literals = new object[] { 42 },
+            TemporariesCount = 2
+        };
+        cls.MethodDictionary[new Symbol("bar:with:")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.PushLiteralConstant1,
+                (byte)Bytecode.PushLiteralConstant2,
+                (byte)Bytecode.SendLiteral2Args0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("bar:with:"), 1, 2 },
+            TemporariesCount = 0
+        };
+
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(callMethod, receiver);
+
+        Assert.Equal(42, result);
+    }
+
 }
 
