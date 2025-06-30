@@ -2,26 +2,91 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "generate-antlr",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "\"& '${workspaceFolder}/scripts/GenerateIfNewer.ps1'\""
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
             "label": "build",
             "command": "dotnet",
-            "args": ["build", "${workspaceFolder}/Smalltalk80.sln"],
+            "args": [
+                "build",
+                "${workspaceFolder}/Smalltalk80.sln"
+            ],
             "type": "process",
             "problemMatcher": "$msCompile",
-            "group": {"kind": "build", "isDefault": true}
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "generate-antlr"
+            ]
         },
         {
             "label": "run",
             "command": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/Smalltalk80/Smalltalk80.csproj"],
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/Smalltalk80/Smalltalk80.csproj"
+            ],
             "type": "process",
-            "group": {"kind": "test", "isDefault": true}
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
         },
         {
             "label": "repl",
             "command": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/Smalltalk80/Smalltalk80.csproj", "--", "--repl"],
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/Smalltalk80/Smalltalk80.csproj",
+                "--",
+                "--repl"
+            ],
             "type": "process",
-            "group": {"kind": "test", "isDefault": false}
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "label": "generate-build-run",
+            "dependsOn": [
+                "generate-antlr",
+                "build",
+                "run"
+            ],
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "generate-build-repl",
+            "dependsOn": [
+                "generate-antlr",
+                "build",
+                "repl"
+            ],
+            "dependsOrder": "sequence"
         }
     ]
 }

@@ -1,0 +1,100 @@
+Folder PATH listing for volume Data
+Volume serial number is 08C2-9910
+D:.
+¦   .gitignore
+¦   AGENTS.md
+¦   CompiledMethod.txt
+¦   LICENSE
+¦   README.md
+¦   Smalltalk-80 - The Implementation.pdf
+¦   Smalltalk-80 - The Implementation.txt
+¦   Smalltalk-80 Bytecodes.md
+¦   Smalltalk-80.zip
+¦   Smalltalk80.sln
+¦   TASKS.md
+¦   tree.txt
+¦   
++---.vscode
+¦       extensions.json
+¦       launch.json
+¦       tasks.json
+¦       
++---docs
+¦   ¦   BlockContext.txt
+¦   ¦   Bytecodes.txt
+¦   ¦   CompiledMethod.txt
+¦   ¦   Interpreter.txt
+¦   ¦   Messages.txt
+¦   ¦   MethodContext.txt
+¦   ¦   PrimitiveMethods - Formal Specification.txt
+¦   ¦   PrimitiveMethods.txt
+¦   ¦   Primitives - Array and Stream.txt
+¦   ¦   Primitives - Control.txt
+¦   ¦   Primitives - Output.txt
+¦   ¦   Primitives - Storage Management.txt
+¦   ¦   Primitives - System.txt
+¦   ¦   
+¦   +---Primitives - Input
++---Smalltalk80
+¦   ¦   Association.cs
+¦   ¦   BlockContext.cs
+¦   ¦   Bytecode.cs
+¦   ¦   BytecodeAssembler.cs
+¦   ¦   CompiledMethod.cs
+¦   ¦   Context.cs
+¦   ¦   Interpreter.cs
+¦   ¦   LegacyImageLoader.cs
+¦   ¦   NonLocalReturnException.cs
+¦   ¦   ObjectImage.cs
+¦   ¦   Primitives.cs
+¦   ¦   Program.cs
+¦   ¦   Repl.cs
+¦   ¦   Smalltalk80.csproj
+¦   ¦   SmalltalkClass.cs
+¦   ¦   SmalltalkObject.cs
+¦   ¦   SmalltalkParser.cs
+¦   ¦   SmalltalkTokenizer.cs
+¦   ¦   SourceCompiler.cs
+¦   ¦   StandardLibrary.cs
+¦   ¦   Symbol.cs
+¦   ¦   Tracer.cs
+¦   ¦   WidgetFactory.cs
+¦   ¦   
+¦   +---ANTLR4
+¦   ¦   ¦   antlr-4.13.2-complete.jar
+¦   ¦   ¦   build.cmd
+¦   ¦   ¦   
+¦   ¦   +---.antlr
+¦   ¦           Smalltalk80.tokens
+¦   ¦           Smalltalk80Parser.java
+¦   ¦           
+¦   +---Generated
+¦   ¦       Smalltalk80.interp
+¦   ¦       Smalltalk80.tokens
+¦   ¦       Smalltalk80BaseVisitor.cs
+¦   ¦       Smalltalk80Lexer.cs
+¦   ¦       Smalltalk80Lexer.interp
+¦   ¦       Smalltalk80Lexer.tokens
+¦   ¦       Smalltalk80Parser.cs
+¦   ¦       Smalltalk80Visitor.cs
+¦   ¦       
+¦   +---Grammar
+¦   ¦   ¦   Smalltalk80.g4
+¦   ¦   ¦   
+¦   ¦   +---.antlr
+¦   ¦           Smalltalk80.interp
+¦   ¦           Smalltalk80.tokens
+¦   ¦           Smalltalk80Lexer.interp
+¦   ¦           Smalltalk80Lexer.java
+¦   ¦           Smalltalk80Lexer.tokens
+¦   ¦           Smalltalk80Parser.java
+¦   ¦           
+¦   +---Parser
+¦   +---scripts
+¦           antlrgen.ps1
+¦           GenerateIfNewer.ps1
+¦           
++---Smalltalk80.Tests
+        InterpreterBytecodeTests.cs
+        Smalltalk80.Tests.csproj
+        
