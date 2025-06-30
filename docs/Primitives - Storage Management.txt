@@ -1,0 +1,217 @@
+The storage management primitive routines manipulate the representa-
+tion of objects. They include primitives for manipulating object point-
+ers, accessing fields, creating new instances of a class, and enumerating
+the instances of a class.
+
+	dispatchStorageManagementPrimitives
+	   primitivelndex = 68 ifTrue: [↑self primitiveObjectAt].
+	   primitiveindex = 69 ifTrue: [↑self primitiveObjectAtPut].
+	   primitiveindex = 70 ifTrue: [↑self primitiveNew].
+	   primitiveindex = 71 ifTrue: [↑self primitiveNewWithArg].
+	   primitiveindex = 72 ifTrue: [↑self primitiveBecome].
+	   primitivelndex = 73 ifTrue: [↑self primitivelnstVarAt].
+	   primitivelndex = 74 ifTrue: [↑self primitivelnstVarAtPut].
+	   primitivelndex = 75 ifTrue: [↑self primitiveAsOop].
+	   primitivelndex = 76 ifTrue: [↑self primitiveAsObject].
+	   primitivelndex = 77 ifTrue: [↑self primitiveSomelnstance].
+	   primitivelndex = 78 ifTrue: [↑self primitiveNextlnstance].
+	   primitivelndex = 79 ifTrue: [↑self primitiveNewMethcd]
+
+The primitiveObjectAt and primitiveObjectAtPut routines are associated
+with the objectAt: and objectAtput: messages in CompiledMethod. They
+provide access to the object pointer fields of the receiver (the method
+header and the literals) from Smalltalk. The header is accessed with an
+index of 1 and the literals are accessed with indices 2 through the num-
+ber of literals plus 1. These messages are used primarily by the compil-
+er.
+
+	primitiveObjectAt
+	   | thisReceiver index |
+	   index ← self popinteger.
+	   thisReceiver ← self popStack.
+	   self success: index > 0.
+	   self success: index < =(self objectPointerCountOf: thisReceiver).
+	   self success
+	      ifTrue: [self push: (memory fetchPointer: index - 1
+	                                  ofObject: thisReceiver)]
+	      ifFalse: [self unPop: 2]
+
+	primitiveObjectAtPut
+	   | thisReceiver index newValue |
+	   newValue ← self popStack.
+	   index ← self popinteger.
+	   thisReceiver ← self popStack.
+	   self success: index > 0.
+	   self success: index < =(self cbjectPointerCountOf: thisReceiver).
+	   self success
+	      ifTrue: [memory storePointer: index - 1
+	                      ofObject: thisReceiver
+	                      withValue: newValue.
+	               self push: newValue]
+	      ifFalse: [self unPop: 3]
+
+The primitiveNew routine creates a new instance of the receiver (a class)
+without indexable fields. The primitive fails if the class is indexable.
+
+	primitiveNew
+	   | class size |
+	   class ← self popStack.
+	   size ← self fixedFieldsCf: class.
+	   self success: (self isindexable: class) == false.
+	   self success
+	      ifTrue: [(self isPointers: class)
+	                     ifTrue: [self push: {memory instantiateClass: class
+	                                                 withPointers: size)]
+	                     ifFalse: [self push: (memory instantiateClass: class
+	                                                  withWords: size)]]
+	      ifFalse: [self unPop: 1]
+
+The primitiveNewWithArg routine creates a new instance of the receiver
+(a class) with the number of indexable fields specified by the integer argument. The primitive fails if the class is not indexable.
+
+	primitiveNewWithArg
+	   | size class |
+	   size ← self positive 16BitValueOf: self popStack.
+	   class ← self popStack.
+	   self success: (self isindexable: class).
+	   self success
+	      ifTrue: [size ← size + (self fixedFieldsOf: class).
+	               (self isPointers: class)
+	                     ifTrue: [self push: (memory instantiateClass: class
+	                                                 withPointers: size)]
+	                     ifFalse: [(self isWords: class)
+	                                ifTrue: [self push: (memory instantiateClass:
+	                                                                     class
+	                                                            withWords: size)]
+	                                ifFalse: [self push: (memory instantiateClass:
+	                                                                      class
+	                                                             withBytes: size)}]]
+	      ifFalse: [self unPop: 2]
+
+The primitiveBecome routine swaps the instance pointers of the receiver
+and argument. This means that all objects that used to point to the re-
+ceiver now point to the argument and vice versa.
+
+	primitiveBecome
+	   | thisReceiver otherPointer |
+	   otherPointer ← self popStack.
+	   thisReceiver ← self popStack.
+	   self success: (memory islntegerObject: otherPointer) not.
+	   self success: (memory islntegerObject: thisReceiver) not.
+	   self success
+	      ifTrue: [Memory swapPointersOf: thisReceiver and: otherPointer.
+	               self push: thisReceiver]
+	      ifFalse: [self unpop: 2]
+
+The primitivelnstVarAt and primitivelnstVarAtPut routines are associated
+with the instVarAt: and instVarAt:put: messages in Object. They are simi-
+lar to primitiveAt and primitiveAtPut except that the numbering of fields
+starts with the fixed fields (corresponding to named instance variables)
+instead of with the indexable fields. The indexable fields are numbered
+starting with one more than the number of fixed fields. These routines
+need a different routine to check the bounds of the subscript.
+
+	checkinstanceVariableBoundsOf: index in: object
+	   | class |
+	   class ← memory fetchClassOf: object.
+	   self success: index >= 1.
+	   self success: index <= (self lengthOf: object)
+
+	primitiveInstVarAt
+	   | thisRecejver index value |
+	   index ← self popinteger.
+	   thisReceiver ← self popStack.
+	   self checklnstanceVariableBoundsOf: index
+	        in: thisReceiver.
+	   self success
+	      ifTrue: [value ← self subscript: thisReceiver
+	                            with: index].
+	   self success
+	      ifTrue: [self push: value]
+	      ifFalse: [self unPop: 2]
+
+	primitiveInstVarAtPut
+	   | thisReceiver index newValue realValue |
+	   newValue ← self popStack.
+	   index ← self popinteger.
+	   thisReceiver ← self popStack.
+	   self checkInstanceVariableBoundsOf: index
+	        in: thisReceiver.
+	   self success
+	     ifTrue: [self subscript: thisReceiver
+	                   with: index
+	                   storing: newValue].
+	   self success
+	      ifTrue: [self push: newValue]
+	      ifFalse: [self unPop: 3]
+
+The primitiveAsOop routine produces a Smallinteger whose value is half
+of the receiver’s object pointer (interpreting object pointers as 16-bit
+signed quantities). The primitive only works for non-Smalllnteger receiv-
+ers. Since non-Smallinteger object pointers are even, no information in
+the object pointer is lost. Because of the encoding of Smallintegers, the
+halving operation can be performed by setting the least significant bit
+of the receiver’s object pointer.
+
+	primitiveAsOop
+	   | thisReceiver |
+	   thisReceiver ← self popStack.
+	   self success: (memory isIntegerObject: thisReceiver) == false.
+	   self success
+	      ifTrue: [self push: (thisReceiver bitOr: 1)]
+	      ifFalse: [self unPop: 1]
+
+The primitiveAsObject routine performs the inverse operation of
+primitiveAsOop. It only works for Smallinteger receivers (it is associated
+with the asObject message in Smalilnteger). It produces the object point-
+er that is twice the receiver’s value. The primitive fails if there is no
+object for that pointer.
+
+	primitiveAsObject
+	   | thisReceiver newOop |
+	   thisReceiver ← self popStack.
+	   newOop + thisReceiver bitAnd: 16rFFFE.
+	   self success: (memory hasObject: newOop).
+	   self success
+	      ifTrue: [self push: newOop]
+	      ifFalse: [self unPop: 1]
+
+The primitiveSomelnstance and primitiveNextInstance routines allow for
+the enumeration of the instances of a class. They rely on the ability of
+the object memory to define an ordering on object pointers, to find the
+first instance of a class in that ordering, and, given an object pointer, to
+find the next instance of the same class.
+
+	primitiveSomeIinstance
+	   | class |
+	   class ← self popStack.
+	   (memory instancesOf: class)
+	      ifTrue: [self push: (memory initiallnstanceOf: class)]
+	      ifFalse: [self primitiveFail]
+
+	primitiveNextinstance
+	   | object |
+	   object ← self popStack.
+	   (memory isLastInstance: object)
+	      ifTrue: [self primitiveFail]
+	      ifFalse: [self push: (memory instanceAfier: object)]
+
+The  primitiveNewMethod routine is associated with the
+newMethod:header: message in CompiledMethod class. Instances of
+CompiledMethod are created with a special message. Since the part of a
+CompiledMethod that contains pointers instead of bytes is indicated in
+the header, all CompiledMethods must have a valid header. Therefore,
+CompiiedMethods are created with a message (newMethod:header:) that
+takes the number of bytes as the first argument and the header as the
+second argument. The header, in turn, indicates the number of pointer
+fields.
+
+	primitiveNewMethod
+	   | header bytecodeCount class size |
+	   header ← self popStack.
+	   bytecodeCount ← self popinteger.
+	   class ← seif popStack.
+	   size ← (self literaiCountOfHeader: header) + 1 * 2 + bytecodeCount.
+	   self push: (memory instantiateCiass: class
+	                      withBytes: size)
+

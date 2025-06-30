@@ -1,0 +1,149 @@
+The Smalltalk-80 interpreter executes the bytecode instructions found
+in CompiledMethods. The interpreter uses five pieces of information and
+repeatedly performs a three-step cycle.
+
+The State of the Interpreter
+1. The CompiledMethod whose bytecodes are being executed.
+2. The location of the next bytecode to be executed in that CompiledMethod. This is the interpreter’s instruction pointer.
+3. The receiver and arguments of the message that invoked the CompiledMethod.
+4, Any temporary variables needed by the CompiledMethod.
+5. A stack.
+
+The execution of most bytecodes involves the interpreter’s stack. Push
+bytecodes tell where to find objects to add to the stack. Store bytecodes
+tell where to put objects found on the stack. Send bytecodes remove the
+receiver and arguments of messages from the stack. When the result of
+a message is computed, it is pushed onto the stack.
+
+The Cycle of the Interpreter
+
+1. Fetch the bytecode from the CompiledMethod indicated by the instruction pointer.
+2. Increment the instruction pointer.
+3. Perform the function specified by the bytecode.
+
+As an example of the interpreter’s function, we will trace its execution
+of the CompiledMethod for Rectangle center. The state of the interpret-
+er will be displayed after each of its cycles. The instruction pointer will
+be indicated by an arrow pointing at the next bytecode in the
+CompiledMethod to be executed.
+
+	0	push the value of the receiver’s first instance variable (origin) onto the stack
+
+The receiver, arguments, temporary variables, and objects on the stack
+will be shown as normally printed (their responses to printString). For
+example, if a message is sent to a Rectangle, the receiver will be shown
+as
+
+	Receiver	100@100 corner: 200@ 200
+
+At the start of execution, the stack is empty and the instruction
+pointer indicates the first bytecode in the CompiledMethod. This
+CompiledMethod does not require temporaries and the invoking mes-
+sage did not have arguments, so these two categories are also empty.
+
+Method for Rectangle center
+	0	push the value of the receiver’s first instance variable (origin) onto the stack
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smallinteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver		100 @ 100 corner: 200@200
+	Arguments
+	Temporary Variables
+	Stack
+
+Following one cycle of the interpreter, the instruction pointer has been
+advanced and the value of the receiver’s first instance variable has
+been copied onto the stack.
+
+Method for Rectangle center
+	0	push the value of the receiver’s first instance variable (origin) onto the stack
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smallinteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver		100 @ 100 corner: 200@200
+	Arguments
+	Temporary Variables
+	Stack 			100@ 100
+
+The interpreter’s second cycle has an effect similar to the first. The
+top of the stack is shown toward the bottom of the page. This corresponds to the commonly used convention that memory locations are
+shown with addresses increasing toward the bottom of the page.
+
+Method for Rectangle center
+	O	push the value of the receiver's first instance variable (origin) onto the stack
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smallinteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver 		100 @ 100 corner: 200@ 200
+	Arguments
+	Temporary Variables
+	Stack 			100@100
+				200@ 200
+
+The interpreter’s third cycle encounters a send bytecode. It removes two
+objects from the stack and uses them as the receiver and argument of a
+message with selector + . The procedure for sending the message will
+not be described in detail here. For the moment, it is only necessary to
+know that eventually the result of the + message will be pushed onto
+the stack. Sending messages will be described in later sections.
+
+Method for Rectangle center
+	0	push the value of the receiver's first instance variable (origin) onto the stack
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smallinteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver		100 @100 corner: 200@ 200
+	Arguments
+	Temporary Variables
+	Stack			300@300
+
+The interpreter’s next cycle pushes the constant 2 onto the stack.
+
+Method for Rectangle center
+	0	push the value of the receiver's first instance variable (origin) onto the stack
+	1	push the value of the receiver's second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smallinteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver		100@ 100 corner: 200@ 200
+	Arguments
+	Temporary Variables
+	Stack			300@300
+				2
+
+The interpreter’s next cycle sends another message whose result replaces its receiver and arguments on the stack.
+
+Method for Rectangle center
+
+	0	push the value of the receiver's first instance variable (origin) onto the stack
+	1	push the value of the receiver’s second instance variable (corner) onto the stack
+	176	send a binary message with the selector +
+	119	push the Smalllnteger 2 onto the stack
+	185	send a binary message with the selector /
+	124	return the object on top of the stack as the value of the message (center)
+
+	Receiver		100@ 100 corner: 200@ 200
+	Arguments
+	Temporary Variables
+	Stack			150@150
+
+The final bytecode returns a result to the center message. The result is
+found on the stack (150@150). It is clear by this point that a return
+bytecode must involve pushing the result onto another stack. The de-
+tails of returning a value to a message will be described after the de-
+scription of sending a message.
+

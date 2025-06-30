@@ -1,0 +1,35 @@
+The seven final primitives are grouped together as system primitives.
+
+        dispatchSystemPrimitives
+            primitiveindex = 110 ifTrue: [↑self primitiveEquivalent]
+            primitiveIndex = 111 ifTrue: [↑self primitiveClass]
+            primitivelndex = 112 ifTrue: [↑self primitiveCoreLeft]
+            primitivelndex = 113 ifTrue: [↑self primitiveQuit]
+            primitiveindex = 114 ifTrue: [↑self primitiveExitToDebugger]
+            primitivelndex = 115 ifTrue: [↑self primitiveOopsLeft]
+            primitiveindex = 116 ifTrue: [↑self primitiveSignalAtCopsLettWordsLeft]
+
+The primitiveEquivalent routine is associated with the == message in
+Object. It returns true if the receiver and argument are the same object
+(have the same object pointer) and false otherwise.
+
+        primitiveEquivaient
+            | thisObject otherObject |
+            otherObject ← self popStack.
+            thisObject ← self popStack.
+            thisObject = otherObject
+                iffrue: [self push: TruePointer}
+                ifFalse: [self push: FalsePointer]
+
+The primitiveClass routine is associated with the class message in Object.
+It returns the object pointer of the receiver's class.
+
+        primitiveClass
+            | instance |
+            instance ← self popStack.
+            self push: (memory fetchCiassOf: instance)
+
+The primitiveCoreLeft routine returns the number of unallocated words
+in the object space. The primitiveQuit routine exits to another operating
+system for the host machine, if one exists. The primitiveExitToDebugger
+routine calls the machine language debugger, if one exists.
