@@ -1,149 +1,102 @@
-The Smalltalk-80 interpreter executes the bytecode instructions found
-in CompiledMethods. The interpreter uses five pieces of information and
-repeatedly performs a three-step cycle.
+The main loop of the Smalltalk-80 interpreter fetches bytecodes from a CompiledMethod sequentially and dispatches to routines that perform the operations the bytecodes indicate. The fetchByte routine fetches the byte indicated by the active context’s instruction pointer and increments the instruction pointer.
 
-The State of the Interpreter
-1. The CompiledMethod whose bytecodes are being executed.
-2. The location of the next bytecode to be executed in that CompiledMethod. This is the interpreter’s instruction pointer.
-3. The receiver and arguments of the message that invoked the CompiledMethod.
-4, Any temporary variables needed by the CompiledMethod.
-5. A stack.
+fetchByte
+  | byte |
+  byte ← memory fetchByte: instructionPointer
+    ofObject: method.
+  instructionPointer ← instructionPointer + 1.
+  ↑byte
 
-The execution of most bytecodes involves the interpreter’s stack. Push
-bytecodes tell where to find objects to add to the stack. Store bytecodes
-tell where to put objects found on the stack. Send bytecodes remove the
-receiver and arguments of messages from the stack. When the result of
-a message is computed, it is pushed onto the stack.
+Since process switches are only allowed between bytecodes, the first action in the interpreter’s main loop is to call a routine that switches processes if necessary. The checkProcessSwitch routine will be described with the process scheduling primitive routines in the next chapter. After checking for a process switch, a bytecode is fetched (perhaps from a new process), and a dispatch is made to the appropriate routine.
 
-The Cycle of the Interpreter
+interpret
+  [true] whileTrue: [self cycle]
 
-1. Fetch the bytecode from the CompiledMethod indicated by the instruction pointer.
-2. Increment the instruction pointer.
-3. Perform the function specified by the bytecode.
+cycle
+  self checkProcessSwitch.
+  currentBytecode ← self fetchByte.
+  self dispatchOnThisBytecode
 
-As an example of the interpreter’s function, we will trace its execution
-of the CompiledMethod for Rectangle center. The state of the interpret-
-er will be displayed after each of its cycles. The instruction pointer will
-be indicated by an arrow pointing at the next bytecode in the
-CompiledMethod to be executed.
+The table on page 595 lists the Smalltalk-80 bytecodes. The bytecodes are listed in ranges that have similar function. For example, the first range includes the bytecodes from 0 through 15 and its entry is shown below.
 
-	0	push the value of the receiver’s first instance variable (origin) onto the stack
+0–15      0000 iiii      Push Receiver Variable #iiii
 
-The receiver, arguments, temporary variables, and objects on the stack
-will be shown as normally printed (their responses to printString). For
-example, if a message is sent to a Rectangle, the receiver will be shown
-as
+Each range of bytecodes is listed with a bit pattern and a comment about the function of the bytecodes. The bit pattern shows the binary representation of the bytecodes in the range. 0s and 1s are used in bit locations that have the same value for all bytecodes in the range. Since all numbers from 0 through 15 have four zeros in their high order bits, these bits are shown as 0000. Lower case letters are used in bit locations whose values vary within the range. The value of each letter can be either 0 or 1. The letters used in the pattern can be included in the comment to refer to the value of those bits in a specific bytecode in the range. The comment for the first range of bytecodes indicates that the low-order four bits of the bytecode specify the index of one of the receiver’s variables to be pushed on the stack.
 
-	Receiver	100@100 corner: 200@ 200
+The variable bits in a bit pattern are also sometimes used as a zero-relative index into a list included in the comment. For example, the entry
 
-At the start of execution, the stack is empty and the instruction
-pointer indicates the first bytecode in the CompiledMethod. This
-CompiledMethod does not require temporaries and the invoking mes-
-sage did not have arguments, so these two categories are also empty.
+120–123   011110ii     Return (receiver, true, false, nil) [ii] From Message
 
-Method for Rectangle center
-	0	push the value of the receiver’s first instance variable (origin) onto the stack
-	1	push the value of the receiver’s second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smallinteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
+specifies that the bytecode 120 returns the receiver, bytecode 121 returns true, bytecode 122 returns false and bytecode 123 returns nil.
 
-	Receiver		100 @ 100 corner: 200@200
-	Arguments
-	Temporary Variables
-	Stack
+The entries for bytecodes that take extensions will include more than one bit pattern. For example,
 
-Following one cycle of the interpreter, the instruction pointer has been
-advanced and the value of the receiver’s first instance variable has
-been copied onto the stack.
+131     10000011    Send Literal Selector #kkkkk With jjj Arguments
+         jjjkkkkk
 
-Method for Rectangle center
-	0	push the value of the receiver’s first instance variable (origin) onto the stack
-	1	push the value of the receiver’s second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smallinteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
+There are four basic types of bytecode.
 
-	Receiver		100 @ 100 corner: 200@200
-	Arguments
-	Temporary Variables
-	Stack 			100@ 100
+• stack bytecodes move object pointers between the object memory and the active context’s evaluation stack. These include both the push bytecodes and store bytecodes described in Chapter 26.
 
-The interpreter’s second cycle has an effect similar to the first. The
-top of the stack is shown toward the bottom of the page. This corresponds to the commonly used convention that memory locations are
-shown with addresses increasing toward the bottom of the page.
+• jump bytecodes change the instruction pointer of the active context.
 
-Method for Rectangle center
-	O	push the value of the receiver's first instance variable (origin) onto the stack
-	1	push the value of the receiver’s second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smallinteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
+• send bytecodes invoke CompiledMethods or primitive routines.
 
-	Receiver 		100 @ 100 corner: 200@ 200
-	Arguments
-	Temporary Variables
-	Stack 			100@100
-				200@ 200
+• return bytecodes terminate the execution of CompiledMethods.
 
-The interpreter’s third cycle encounters a send bytecode. It removes two
-objects from the stack and uses them as the receiver and argument of a
-message with selector + . The procedure for sending the message will
-not be described in detail here. For the moment, it is only necessary to
-know that eventually the result of the + message will be pushed onto
-the stack. Sending messages will be described in later sections.
+Not all of the bytecodes of one type are contiguous, so the main dispatch has seven branches each of which calls one of four routines (stackBytecode, jumpBytecode, sendBytecode, or returnBytecode). These four routines will be described in the next four subsections.
 
-Method for Rectangle center
-	0	push the value of the receiver's first instance variable (origin) onto the stack
-	1	push the value of the receiver’s second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smallinteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
+dispatchOnThisBytecode
+  (currentBytecode between: 0 and: 119) ifTrue: [↑self stackBytecode].
+  (currentBytecode between: 120 and: 127) ifTrue: [↑self returnBytecode].
+  (currentBytecode between: 128 and: 130) ifTrue: [↑self stackBytecode].
+  (currentBytecode between: 131 and: 134) ifTrue: [↑self sendBytecode].
+  (currentBytecode between: 135 and: 137) ifTrue: [↑self stackBytecode].
+  (currentBytecode between: 144 and: 175) ifTrue: [↑self jumpBytecode].
+  (currentBytecode between: 176 and: 255) ifTrue: [↑self sendBytecode]
 
-	Receiver		100 @100 corner: 200@ 200
-	Arguments
-	Temporary Variables
-	Stack			300@300
+The bytecodes 176–191 refer to Arithmetic Messages. These are:
 
-The interpreter’s next cycle pushes the constant 2 onto the stack.
++, −, <, >, <=, >=, =, ~=, *, /, \, @, bitShift:, //, bitAnd:, bitOr:
 
-Method for Rectangle center
-	0	push the value of the receiver's first instance variable (origin) onto the stack
-	1	push the value of the receiver's second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smallinteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
+The bytecodes 192–207 refer to Special Messages. These are:
 
-	Receiver		100@ 100 corner: 200@ 200
-	Arguments
-	Temporary Variables
-	Stack			300@300
-				2
+at:*, at:put:*, size*, next*, nextPut:*, atEnd*, = =, class, blockCopy:, value, value:, do:*, new*, new:*, x*, y*
 
-The interpreter’s next cycle sends another message whose result replaces its receiver and arguments on the stack.
+Selectors indicated with an asterisk (*) can be changed by compiler modification.
 
-Method for Rectangle center
+### The Smalltalk-80 Bytecodes
 
-	0	push the value of the receiver's first instance variable (origin) onto the stack
-	1	push the value of the receiver’s second instance variable (corner) onto the stack
-	176	send a binary message with the selector +
-	119	push the Smalllnteger 2 onto the stack
-	185	send a binary message with the selector /
-	124	return the object on top of the stack as the value of the message (center)
-
-	Receiver		100@ 100 corner: 200@ 200
-	Arguments
-	Temporary Variables
-	Stack			150@150
-
-The final bytecode returns a result to the center message. The result is
-found on the stack (150@150). It is clear by this point that a return
-bytecode must involve pushing the result onto another stack. The de-
-tails of returning a value to a message will be described after the de-
-scription of sending a message.
-
+| Range     | Bits         | Function                                                                 |
+|-----------|--------------|--------------------------------------------------------------------------|
+| 0–15      | 0000iiii      | Push Receiver Variable `#iiii`                                          |
+| 16–31     | 0001iiii      | Push Temporary Location `#iiii`                                         |
+| 32–63     | 0010iiii      | Push Literal Constant `#iiii`                                           |
+| 64–95     | 0100iiii      | Push Literal Variable `#iiii`                                           |
+| 96–103    | 011000ii      | Pop and Store Receiver Variable `#iii`                                  |
+| 104–111   | 011001ii      | Pop and Store Temporary Location `#iii`                                 |
+| 112–119   | 011010ii      | Push (receiver, true, false, nil, -1, 0, 1, 2) `[ii]`                    |
+| 120–123   | 011110ii      | Return (receiver, true, false, nil) `[ii]` From Message                 |
+| 124–125   | 0111110i      | Return Stack Top From (Message, Block) `[i]`                            |
+| 126–127   | 0111111i      | unused                                                                  |
+| 128       | 10000000      | Push (Receiver Variable, Temporary Location, Literal Constant, Literal Variable) `[jj] #kkkkkk` |
+| 129       | 10000001      | Store (Receiver Variable, Temporary Location, Illegal, Literal Variable) `[jj] #kkkkkk` |
+| 130       | 10000010      | Pop and Store (Receiver Variable, Temporary Location, Illegal, Literal Variable) `[jj] #kkkkkk` |
+| 131       | 10000011      | Send Literal Selector `#kkkkk` With `jjj` Arguments                     |
+| 132       | 10000100      | Send Literal Selector `#kkkkkkk` With `jjjjjjjj` Arguments              |
+| 133       | 10000101      | Send Literal Selector `#kkkkk` To Superclass With `jjj` Arguments       |
+| 134       | 10000110      | Send Literal Selector `#kkkkkkkk` To Superclass With `jjjjjjjj` Arguments |
+| 135       | 10000111      | Pop Stack Top                                                           |
+| 136       | 10001000      | Duplicate Stack Top                                                     |
+| 137       | 10001001      | Push Active Context                                                     |
+| 138–143   | —             | unused                                                                  |
+| 144–151   | 10010iii      | Jump `iii+1` (i.e., 1 through 8)                                        |
+| 152–159   | 10011iii      | Pop and Jump On False `iii+1` (i.e., 1 through 8)                       |
+| 160–167   | 101000ii      | Jump `(ii+4)*256 + jjjjjjjj`                                            |
+| 168–171   | 101001ii      | Pop and Jump On True `ii*256 + jjjjjjjj`                                |
+| 172–175   | 101011ii      | Pop and Jump On False `ii*256 + jjjjjjjj`                               |
+| 176–191   | 1011iiii      | Send Arithmetic Message `#iiii`                                         |
+| 192–207   | 1100iiii      | Send Special Message `#iiii`                                            |
+| 208–223   | 1101iiii      | Send Literal Selector `#iiii` With No Arguments                         |
+| 224–239   | 1110iiii      | Send Literal Selector `#iiii` With 1 Argument                           |
+| 240–255   | 1111iiii      | Send Literal Selector `#iiii` With 2 Arguments                          |
