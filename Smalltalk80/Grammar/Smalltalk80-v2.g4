@@ -2,175 +2,105 @@ grammar Smalltalk;
 
 //----------------- Parser rules -----------------
 
-method
-    : messagePattern ( temporaries statements )? EOF
-    ;
+// A complete method: a messagePattern header plus optional temporaries/statements
+method: messagePattern ( temporaries? statements)? EOF;
 
-// A method header can be:
-//   • unarySelector
-//   • binarySelector variableName
-//   • one-or-more IDENTIFIER:variableName segments
-messagePattern
-    : unarySelector
-    | binarySelector variableName
-    | ( IDENTIFIER ':' variableName )+
-    ;
+// Method header: unary, binary(name), or keyword:name segments
+messagePattern:
+	unarySelector
+	| binarySelector variableName
+	| ( IDENTIFIER ':' variableName)+;
 
-expression
-    : variableName ':=' expression               // assignment
-    | primary ( messageExpression | cascadedMessageExpression )?
-    ;
+expression: (variableName ASSIGN_ARROW)* (
+		primary
+		| messageExpression
+		| cascadedMessageExpression
+	);
 
-messageExpression
-    : unaryObjectDescription
-      ( unarySelector
-      | binarySelector unaryObjectDescription
-      | keyword unaryObjectDescription
-      )*
-    ;
+messageExpression:
+	unaryObjectDescription (
+		unarySelector
+		| binarySelector unaryObjectDescription
+		| keyword unaryObjectDescription
+	)*;
 
-cascadedMessageExpression
-    : messageExpression
-      ( '.' (
-          unarySelector
-        | binarySelector unaryObjectDescription
-        | keyword binaryObjectDescription
-        )
-      )+
-    ;
+cascadedMessageExpression:
+	messageExpression (
+		'.' (
+			unarySelector
+			| binarySelector unaryObjectDescription
+			| keyword binaryObjectDescription
+		)
+	)+;
 
-primary
-    : variableName
-    | literal
-    | block
-    | '(' expression ')'
-    ;
+primary: variableName | literal | block | '(' expression ')';
 
-unaryObjectDescription
-    : primary
-    | unaryObjectDescription unarySelector
-    ;
+unaryObjectDescription:
+	primary
+	| unaryObjectDescription unarySelector;
 
-binaryObjectDescription
-    : unaryObjectDescription
-    | binaryObjectDescription binarySelector unaryObjectDescription
-    ;
+binaryObjectDescription:
+	unaryObjectDescription
+	| binaryObjectDescription binarySelector unaryObjectDescription;
 
-keywordExpression
-    : binaryObjectDescription ( keyword binaryObjectDescription )*
-    ;
+keywordExpression:
+	binaryObjectDescription (keyword binaryObjectDescription)*;
 
-statements
-    : statement ( '.' statement )*
-    ;
-statement
-    : '!'? expression
-    ;
+statements: statement ( '.' statement)*;
+statement: '!'? expression;
 
-block
-    : '[' ( ':' variableName )* ( '|' variableName+ '|' )? statements ']'
-    ;
+block:
+	'[' (':' variableName)* ('|' variableName* '|')? statements ']';
 
-temporaries
-    : '|' variableName+ '|'
-    ;
+temporaries: '|' variableName* '|';
 
-literal
-    : number
-    | symbolConstant
-    | characterConstant
-    | STRING
-    | arrayConstant
-    ;
+literal:
+	number
+	| symbolConstant
+	| characterConstant
+	| STRING
+	| arrayConstant;
 
-array
-    : '(' ( number
-          | symbol
-          | STRING
-          | characterConstant
-          | array
-          )* ')'
-    ;
-arrayConstant
-    : '#' array
-    ;
+array:
+	'(' (number | symbol | STRING | characterConstant | array)* ')';
+arrayConstant: '#' array;
 
 //----------------- Lexer rules -----------------
 
-// Fundamental fragments
-fragment DIGIT   : [0-9] ;
-fragment LETTER  : [A-Za-z] ;
+ASSIGN_ARROW: '<-' | '←';
 
-// Exactly these 12 special characters (no minus)
-fragment SPECIAL : [+\/*~<>=@%|&?!] ;
+IDENTIFIER: LETTER ( LETTER | DIGIT)*;
+variableName: IDENTIFIER;
+unarySelector: IDENTIFIER;
 
-// “character” = any digit, letter, special, or these exact symbols:
-//   [ ] { } ( )  –  ;  $  !  #  :
-fragment CHARACTER
-    : DIGIT
-    | LETTER
-    | SPECIAL
-    | [\[\]\{\}\(\)\-\;\$\!\#\:]
-    ;
+binarySelector: '-' | SPECIAL | SPECIAL SPECIAL;
 
-// Identifiers & variable names
-IDENTIFIER
-    : LETTER ( LETTER | DIGIT )*
-    ;
-variableName
-    : IDENTIFIER
-    ;
+keyword: ( IDENTIFIER ':')+;
 
-// Selectors & keywords
-unarySelector
-    : IDENTIFIER
-    ;
+symbol: IDENTIFIER | binarySelector | keyword;
+symbolConstant: '#' symbol;
 
-binarySelector
-    : '-'                // a single minus
-    | SPECIAL            // exactly one special character
-    | SPECIAL SPECIAL    // exactly two special characters
-    ;
+number: (DIGIT+ 'r')? '-'? DIGIT+ ('.' DIGIT+)? ('e' '-'? DIGIT+)?;
 
-keyword
-    : ( IDENTIFIER ':' )+  // one or more identifier: segments
-    ;
+characterConstant: '$' ( CHARACTER | '\'' | '"');
 
-// Symbols (for array elements, etc.)
-symbol
-    : IDENTIFIER
-    | binarySelector
-    | keyword
-    ;
-symbolConstant
-    : '#' symbol
-    ;
+STRING: '\'' ( CHARACTER | '\'\'')* '\'';
 
-// Character constants begin with $
-characterConstant
-    : '$' ( CHARACTER | '\'' | '"' )
-    ;
+COMMENT: '"' ( CHARACTER | '""' | '\'')* '"' -> skip;
 
-// Number literals: digits [r[-]digits] [ .digits ] [ e[-]digits ]
-number
-    : DIGIT+ ( 'r' '-'? DIGIT+ )? ( '.' DIGIT+ )? ( 'e' '-'? DIGIT+ )?
-    ;
+WS: [ \t\r\n]+ -> skip;
 
-// String literals use '…' with '' for embedded quote
-STRING
-    : '\'' ( CHARACTER | '\'\'' )* '\''
-    ;
+// fragments
 
-// Comments use "…" with "" for embedded double-quote and ' for an embedded single-quote
-COMMENT
-    : '"' ( CHARACTER    // any digit/letter/special
-           | '""'        // embedded double-quote
-           | '\''        // embedded single-quote
-           )* '"'
-    -> skip
-    ;
-
-// Whitespace
-WS
-    : [ \t\r\n]+ -> skip
-    ;
+fragment DIGIT: [0-9];
+fragment LETTER: [A-Za-z];
+fragment SPECIAL: [+/\\*~<>=@%|&?!];
+fragment LEFT_ARROW: '\u2190'; // ← LEFTWARDS ARROW
+fragment UP_ARROW: '\u2191'; // ↑ UPWARDS ARROW
+fragment CHARACTER:
+	DIGIT
+	| LETTER
+	| SPECIAL
+	| [\[\]{}(),;\$\#\:]
+	| LEFT_ARROW
+	| UP_ARROW;
