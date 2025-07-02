@@ -124,7 +124,7 @@ public class Interpreter
         var previousExit = ExitOnReturn;
         ExitOnReturn = false;
         LastResult = null;
-        currentContext = new Context
+        currentContext = new MethodContext
         {
             Sender = null!,
             Method = method,
@@ -555,6 +555,29 @@ public class Interpreter
 
         object? receiver = currentContext.Stack.Pop();
 
+        var message = new Message
+        {
+            Selector = selector,
+            Receiver = receiver,
+            Arguments = arguments,
+            SuperSend = superSend
+        };
+
+        PerformSend(message);
+    }
+
+    /// <summary>
+    ///     Sends the specified message object to its receiver.
+    /// </summary>
+    /// <param name="message">The message to execute.</param>
+    private void PerformSend(Message message)
+    {
+        var selector = message.Selector;
+        var arguments = message.Arguments;
+        object? receiver = message.Receiver;
+        bool superSend = message.SuperSend;
+        int argCount = arguments.Length;
+
         if (receiver is int li &&
             argCount == 1 &&
             arguments[0] is int ri &&
@@ -620,7 +643,7 @@ public class Interpreter
                 }
             }
 
-            var newContext = new Context
+            var newContext = new MethodContext
             {
                 Sender = currentContext,
                 Method = method,
