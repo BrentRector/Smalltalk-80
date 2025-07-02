@@ -9,6 +9,7 @@ namespace Smalltalk80.Tests;
 /// <summary>
 /// Provides high level completeness checks for the interpreter's opcode and primitive tables.
 /// </summary>
+[TestCaseOrderer("Smalltalk80.Tests.PrimitiveIndexOrderer", "Smalltalk80.Tests")]
 public class CompletenessTests
 {
     /// <summary>
@@ -53,10 +54,14 @@ public class CompletenessTests
     [MemberData(nameof(PrimitiveIndices))]
     public void PrimitiveDispatcher_DefinesHandler(int index)
     {
-        Trace($"{nameof(PrimitiveDispatcher_DefinesHandler)}_{index}");
         var field = typeof(Primitives).GetField("Handlers", BindingFlags.NonPublic | BindingFlags.Static)! 
                    ?? throw new InvalidOperationException("Handlers field not found");
         var handlers = (System.Collections.IDictionary)field.GetValue(null)!;
+        var handler = handlers[index] as Delegate;
+        var methodName = handler?.Method is { DeclaringType: var type } method
+            ? $"{type.Name}.{method.Name}"
+            : "unknown";
+        Trace($"{nameof(PrimitiveDispatcher_DefinesHandler)}_{index}_{methodName}");
         Assert.True(handlers.Contains(index));
     }
 }
