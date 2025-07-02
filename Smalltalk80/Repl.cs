@@ -6,35 +6,11 @@ using System;
 public static class Repl
 {
     /// <summary>
-    /// Starts the interactive session.
+    /// Starts the interactive session using a fresh <see cref="VirtualMachine"/>.
     /// </summary>
     public static void Run()
     {
-        Console.WriteLine("Smalltalk-80 REPL. Type 'exit' to quit.");
-        var interpreter = new Interpreter { ExitOnReturn = false };
-        while (true)
-        {
-            Console.Write("st> ");
-            var line = Console.ReadLine();
-            if (line is null)
-                break;
-
-            line = line.Trim();
-            if (line.Length == 0)
-                continue;
-            if (string.Equals(line, "exit", StringComparison.OrdinalIgnoreCase))
-                break;
-
-            try
-            {
-                var method = SourceCompiler.Compile(line);
-                var result = interpreter.Evaluate(method, StandardLibrary.Get("Object"));
-                Console.WriteLine($"=> {result}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"! {ex.Message}");
-            }
-        }
+        var vm = new VirtualMachine();
+        vm.RunRepl();
     }
 }
