@@ -31,7 +31,7 @@ public sealed class ExtendedStoreOperation : IBytecodeOperation
                 ctx.Receiver.Fields[index] = value;
                 break;
             case 1:
-                ctx.Temporaries[index] = value;
+                ctx.Temporaries[index] = value!;
                 break;
             case 2:
                 throw new InvalidOperationException("Cannot store into a literal constant");
