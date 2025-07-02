@@ -12,6 +12,11 @@ public class SmalltalkObject
     public SmalltalkClass? ClassPointer { get; set; }
 
     /// <summary>
+    ///     Gets the encoded object pointer assigned by <see cref="ObjectMemory"/>.
+    /// </summary>
+    public int Oop { get; internal set; }
+
+    /// <summary>
     ///     Gets the raw field values stored in the object.
     /// </summary>
     public object?[] Fields { get; }
@@ -25,6 +30,7 @@ public class SmalltalkObject
     {
         ClassPointer = cls;
         Fields = new object?[fieldCount];
+        ObjectMemory.Register(this);
     }
 
     /// <summary>
