@@ -7,7 +7,17 @@
     <LangVersion>preview</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-    <ItemGroup>
+  <PropertyGroup>
+    <AntlrGrammar>$(MSBuildProjectDirectory)/Grammar/Smalltalk80.g4</AntlrGrammar>
+    <AntlrOutputDir>$(MSBuildProjectDirectory)/Generated</AntlrOutputDir>
+    <AntlrJar>$(MSBuildProjectDirectory)/ANTLR4/antlr-4.13.2-complete.jar</AntlrJar>
+  </PropertyGroup>
+  <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
   </ItemGroup>
+
+  <Target Name="GenerateAntlr" Inputs="$(AntlrGrammar)" Outputs="$(AntlrOutputDir)/Smalltalk80Parser.cs" BeforeTargets="BeforeCompile">
+    <Message Importance="high" Text="Running ANTLR on $(AntlrGrammar)" />
+    <Exec Command="java -jar &quot;$(AntlrJar)&quot; -Dlanguage=CSharp -no-listener -visitor -package Smalltalk80.Generated -o &quot;$(AntlrOutputDir)&quot; &quot;$(AntlrGrammar)&quot;" />
+  </Target>
 </Project>

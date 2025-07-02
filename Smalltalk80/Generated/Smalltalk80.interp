@@ -103,7 +103,7 @@ hex_
 stInteger
 stFloat
 pseudoVariable
-string
+stringLiteral
 symbol
 primitive
 bareSymbol
