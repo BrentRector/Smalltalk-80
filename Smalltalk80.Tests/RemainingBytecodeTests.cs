@@ -9,9 +9,22 @@ namespace Smalltalk80.Tests;
 /// </summary>
 public class RemainingBytecodeTests
 {
+    /// <summary>
+    ///     Outputs the provided test name to the console so that bytecode
+    ///     dispatch can be correlated with individual test execution.
+    /// </summary>
+    /// <param name="testName">The name of the running test.</param>
+    private static void Trace(string testName) =>
+        Console.WriteLine($"[TRACE] {testName}");
+
+    /// <summary>
+    ///     Verifies that the <see cref="Bytecode"/> instructions for pushing
+    ///     receiver variables correctly push each field value onto the stack.
+    /// </summary>
     [Fact]
     public void PushReceiverVariable_AllIndices_PushesFieldValue()
     {
+        Trace(nameof(PushReceiverVariable_AllIndices_PushesFieldValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 16);
         for (int i = 0; i < 16; i++)
@@ -29,9 +42,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Validates that temporary variable push bytecodes correctly push each
+    ///     temporary value onto the stack.
+    /// </summary>
     [Fact]
     public void PushTemporaryVariable_AllIndices_PushesTempValue()
     {
+        Trace(nameof(PushTemporaryVariable_AllIndices_PushesTempValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var temps = new object?[16];
@@ -50,9 +68,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Ensures that literal constant push instructions retrieve the
+    ///     appropriate literal value for every valid index.
+    /// </summary>
     [Fact]
     public void PushLiteralConstant_AllIndices_PushesLiteralValue()
     {
+        Trace(nameof(PushLiteralConstant_AllIndices_PushesLiteralValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var literals = new object[32];
@@ -71,9 +94,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Confirms that pushing literal variables retrieves values from each
+    ///     <see cref="Association"/> stored in the literal frame.
+    /// </summary>
     [Fact]
     public void PushLiteralVariable_AllIndices_PushesAssociationValue()
     {
+        Trace(nameof(PushLiteralVariable_AllIndices_PushesAssociationValue));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var literals = new object[32];
@@ -92,9 +120,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Checks that the store-and-pop receiver variable bytecodes update the
+    ///     correct field and remove the value from the stack for each index.
+    /// </summary>
     [Fact]
     public void StoreAndPopReceiverVariable_AllIndices_StoresFieldAndPops()
     {
+        Trace(nameof(StoreAndPopReceiverVariable_AllIndices_StoresFieldAndPops));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 8);
         for (int i = 0; i < 8; i++)
@@ -118,9 +151,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Verifies that each store-and-pop temporary variable bytecode writes
+    ///     to the correct temporary slot and removes the value from the stack.
+    /// </summary>
     [Fact]
     public void StoreAndPopTemporaryVariable_AllIndices_StoresTempAndPops()
     {
+        Trace(nameof(StoreAndPopTemporaryVariable_AllIndices_StoresTempAndPops));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var temps = new object?[8];
@@ -145,9 +183,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Validates that constant push bytecodes place the expected literal
+    ///     values on the stack.
+    /// </summary>
     [Fact]
     public void PushConstantBytecodes_PushExpectedConstants()
     {
+        Trace(nameof(PushConstantBytecodes_PushExpectedConstants));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var expected = new (Bytecode code, object? value)[]
@@ -175,9 +218,14 @@ public class RemainingBytecodeTests
         }
     }
 
+    /// <summary>
+    ///     Ensures that unimplemented bytecodes result in an exception,
+    ///     highlighting missing interpreter functionality.
+    /// </summary>
     [Fact]
     public void UnusedBytecodes_DoNothing()
     {
+        Trace(nameof(UnusedBytecodes_DoNothing));
         var cls = new SmalltalkClass();
         var receiver = new SmalltalkObject(cls, 0);
         var method = new CompiledMethod
