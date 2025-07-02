@@ -652,7 +652,7 @@ public class InterpreterBytecodeTests
         };
         ctx.Stack.Push(3);
         ctx.Stack.Push(4);
-        Assert.True(Primitives.Execute(3, ctx));
+        Assert.True(Primitives.Execute(9, ctx));
         Assert.Equal(12, ctx.Stack.Pop());
     }
 
@@ -1171,7 +1171,7 @@ public class InterpreterBytecodeTests
         ctx.Stack.Push(3);
         ctx.Stack.Push(5);
 
-        var executed = Primitives.Execute(6, ctx);
+        var executed = Primitives.Execute(3, ctx);
 
         Assert.True(executed);
         Assert.True((bool)ctx.Stack.Pop()!);
@@ -1196,5 +1196,88 @@ public class InterpreterBytecodeTests
 
         Assert.True(executed);
         Assert.Equal(2, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveDiv_RoundsDown()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(7);
+        ctx.Stack.Push(3);
+
+        var executed = Primitives.Execute(12, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(2, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveAsFloat_ConvertsInteger()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(5);
+
+        var executed = Primitives.Execute(40, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(5.0, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveFloatMultiply_MultipliesValues()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(2.0);
+        ctx.Stack.Push(3.0);
+
+        var executed = Primitives.Execute(49, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(6.0, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveLargeIntegerAdd_AddsBigIntegers()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(new System.Numerics.BigInteger(10000000000));
+        ctx.Stack.Push(new System.Numerics.BigInteger(1));
+
+        var executed = Primitives.Execute(21, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(new System.Numerics.BigInteger(10000000001), ctx.Stack.Pop());
     }
 }
