@@ -36,3 +36,15 @@ This file lists missing features and potential improvements for the Smalltalk-80
 5. **Comprehensive Test Coverage**
    - Add tests for the unimplemented bytecodes and primitives once they are available to prevent regressions.
 
+
+## Parser and REPL Integration
+
+1. **Store Compiled Methods**
+   - Implement object memory support for persisting methods created by `SmalltalkParser` so that subsequent message sends can locate them.
+   - Spec reference: `Virtual Machine - Object Memory Interface.md` lines 1–34 describe storing pointers and words in objects.
+2. **Header Generation**
+   - When compiling source, build method headers and literal frames exactly as outlined in `Virtual Machine - Compiled Methods.md` lines 1–24 and 44–66.
+3. **VirtualMachine APIs**
+   - Add routines for compiling source into a `CompiledMethod`, storing it on the appropriate class, and executing it.
+4. **REPL Pipeline**
+   - Update `Repl.Run` to feed user input through the new VirtualMachine APIs so each snippet is compiled, saved, and executed.
