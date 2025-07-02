@@ -1280,4 +1280,122 @@ public class InterpreterBytecodeTests
         Assert.True(executed);
         Assert.Equal(new System.Numerics.BigInteger(10000000001), ctx.Stack.Pop());
     }
+
+    [Fact]
+    public void PrimitiveStringAt_ReadsCharacter()
+    {
+        var chars = new[] { 'a', 'b', 'c' };
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(chars);
+        ctx.Stack.Push(2);
+
+        var executed = Primitives.Execute(63, ctx);
+
+        Assert.True(executed);
+        Assert.Equal('b', ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveStringAtPut_WritesCharacter()
+    {
+        var chars = new[] { 'a', 'b', 'c' };
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(chars);
+        ctx.Stack.Push(1);
+        ctx.Stack.Push('z');
+
+        var executed = Primitives.Execute(64, ctx);
+
+        Assert.True(executed);
+        Assert.Equal('z', chars[0]);
+        Assert.Equal('z', ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveNext_ReadsSequentialValues()
+    {
+        var array = new SmalltalkObject(new SmalltalkClass(), 2);
+        array.Fields[0] = 1;
+        array.Fields[1] = 2;
+        var stream = new StreamObject(null, array, 2, 2);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(stream);
+
+        var executed = Primitives.Execute(65, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(1, ctx.Stack.Pop());
+        Assert.Equal(1, stream.Index);
+    }
+
+    [Fact]
+    public void PrimitiveNextPut_WritesSequentialValues()
+    {
+        var array = new SmalltalkObject(new SmalltalkClass(), 2);
+        var stream = new StreamObject(null, array, 2, 2);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(stream);
+        ctx.Stack.Push(42);
+
+        var executed = Primitives.Execute(66, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(42, array.Fields[0]);
+        Assert.Equal(42, ctx.Stack.Pop());
+        Assert.Equal(1, stream.Index);
+    }
+
+    [Fact]
+    public void PrimitiveAtEnd_ReturnsTrueWhenPastLimit()
+    {
+        var array = new SmalltalkObject(new SmalltalkClass(), 1);
+        var stream = new StreamObject(null, array, 1, 1) { Index = 1 };
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(stream);
+
+        var executed = Primitives.Execute(67, ctx);
+
+        Assert.True(executed);
+        Assert.True((bool)ctx.Stack.Pop()!);
+    }
 }
