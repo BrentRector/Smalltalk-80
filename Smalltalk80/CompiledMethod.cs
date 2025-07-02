@@ -6,6 +6,11 @@ using System;
 public sealed class CompiledMethod
 {
     /// <summary>
+    ///     Gets or sets the raw header information describing this method.
+    /// </summary>
+    public MethodHeader Header { get; init; }
+
+    /// <summary>
     ///     Gets the bytecodes that make up the body of the method.
     /// </summary>
     public required byte[] Bytecodes { get; init; } = Array.Empty<byte>();

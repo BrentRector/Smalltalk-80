@@ -61,7 +61,7 @@ public class Context
             args[i] = sender.Stack.Pop();
         }
 
-        return new Context {
+        return new MethodContext {
             Sender = sender,
             Method = method,
             Receiver = sender.Receiver,
