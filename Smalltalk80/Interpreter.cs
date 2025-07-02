@@ -142,6 +142,22 @@ public class Interpreter
     }
 
     /// <summary>
+    ///     Executes the provided <see cref="Context"/> until it returns.
+    /// </summary>
+    /// <param name="context">The context to execute.</param>
+    /// <returns>The value returned by the context.</returns>
+    public object? Evaluate(Context context)
+    {
+        var previousExit = ExitOnReturn;
+        ExitOnReturn = false;
+        LastResult = null;
+        currentContext = context;
+        Execute();
+        ExitOnReturn = previousExit;
+        return LastResult;
+    }
+
+    /// <summary>
     ///     Handles the given bytecode in the context of the running method.
     /// </summary>
     /// <param name="bytecode">The bytecode to execute.</param>
