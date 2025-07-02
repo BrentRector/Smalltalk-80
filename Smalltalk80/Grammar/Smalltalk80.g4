@@ -1,124 +1,356 @@
+/*
+  Converted to ANTLR 4 by James Ladd (Redline Smalltalk Project http://redline.st).
+  Adapted from the Amber Smalltalk grammar parser.pegjs
+  
+  2015/01/18 James Ladd (object@redline.st)
+*/
+
 grammar Smalltalk80;
 
-//----------------- Parser rules ----------------- fragments
+script
+    : sequence EOF
+    ;
 
-fragment DIGIT: [0-9];
-fragment DIGITS: [0-9]+;
-fragment LETTER: [A-Za-z];
-fragment QUOTE: '\'';
-fragment LEFT_ARROW: '\u2190'; // ← LEFTWARDS ARROW
-fragment UP_ARROW: '\u2191'; // ↑ UPWARDS ARROW
+sequence
+    : temps ws? statements?
+    | ws? statements
+    ;
 
-SPECIALCHARACTER: [+/\\*~<>=@%|&?!];
-CHARACTER:
-	DIGIT
-	| LETTER
-	| SPECIALCHARACTER
-	| '['
-	| ']'
-	| '{'
-	| '}'
-	| '('
-	| ')'
-	| LEFT_ARROW
-	| UP_ARROW
-	| ','
-	| ';'
-	| '$'
-	| '!'
-	| '#'
-	| ':';
+ws
+    : (SEPARATOR | COMMENT)+
+    ;
 
-identifier: IDENTIFIER;
-string: STRING;
+temps
+    : PIPE (ws? IDENTIFIER)+ ws? PIPE
+    ;
 
-symbol: identifier | binarySelector | keyword+;
-symbolConstant: '#' symbol;
-characterConstant: '$' ( CHARACTER | '\'' | '"');
+statements
+    : answer ws?                        # StatementAnswer
+    | expressions ws? PERIOD ws? answer # StatementExpressionsAnswer
+    | expressions PERIOD? ws?           # StatementExpressions
+    ;
 
-array:
-	'(' (NUMBER | symbol | string | characterConstant | array)* ')';
-arrayConstant: '#' array;
+answer
+    : CARROT ws? expression ws? PERIOD?
+    ;
 
-literal:
-	NUMBER
-	| symbolConstant
-	| characterConstant
-	| string
-	| arrayConstant;
+expression
+    : assignment
+    | cascade
+    | keywordSend
+    | binarySend
+    | primitive
+    ;
 
-variableName: IDENTIFIER;
-unarySelector: IDENTIFIER;
+expressions
+    : expression expressionList*
+    ;
 
-binarySelector: '-' | SPECIALCHARACTER SPECIALCHARACTER?;
+expressionList
+    : PERIOD ws? expression
+    ;
 
-keyword: IDENTIFIER ':';
+cascade
+    : (keywordSend | binarySend) (ws? SEMI_COLON ws? message)+
+    ;
 
-primary: variableName | literal | block | '(' expression ')';
+message
+    : binaryMessage
+    | unaryMessage
+    | keywordMessage
+    ;
 
-unaryObjectDescription:
-	primary
-	| unaryObjectDescription unarySelector;
+assignment
+    : variable ws? ASSIGNMENT ws? expression
+    ;
 
-binaryObjectDescription:
-	unaryObjectDescription
-	| binaryObjectDescription binarySelector unaryObjectDescription;
+variable
+    : IDENTIFIER
+    ;
 
-keywordExpression:
-	binaryObjectDescription (keyword binaryObjectDescription)+;
+binarySend
+    : unarySend binaryTail?
+    ;
 
-messageExpression:
-	unaryObjectDescription unarySelector
-	| binaryObjectDescription binarySelector unaryObjectDescription
-	| keywordExpression;
+unarySend
+    : operand ws? unaryTail?
+    ;
 
-cascadedMessageExpression:
-	messageExpression (
-		'.' (
-			unarySelector
-			| binarySelector unaryObjectDescription
-			| (keyword binaryObjectDescription)+
-		)
-	)+;
+keywordSend
+    : binarySend keywordMessage
+    ;
 
-expression: (variableName ASSIGN_ARROW)* (
-		primary
-		| messageExpression
-		| cascadedMessageExpression
-	);
+keywordMessage
+    : ws? (keywordPair ws?)+
+    ;
 
-// Zero or more statements, each either "! expression" or "expression", separated by '.'
-statements: ( statement ( '.' statement)*)?;
+keywordPair
+    : KEYWORD ws? binarySend ws?
+    ;
 
-statement: '!' expression | expression;
+operand
+    : literal
+    | reference
+    | subexpression
+    ;
 
-block:
-	'[' statements? ']'
-	| '[' (':' variableName)+ '|' statements ']';
+subexpression
+    : OPEN_PAREN ws? expression ws? CLOSE_PAREN
+    ;
 
-temporaries: '|' variableName* '|';
+literal
+    : runtimeLiteral
+    | parsetimeLiteral
+    ;
 
-// A complete method: a messagePattern header plus optional temporaries/statements
-method:
-	messagePattern
-	| messagePattern temporaries statements
-	| messagePattern statements;
+runtimeLiteral
+    : dynamicDictionary
+    | dynamicArray
+    | block
+    ;
 
-// Method header: unary, binary(name), or keyword:name segments
-messagePattern:
-	unarySelector
-	| binarySelector variableName
-	| (keyword variableName)+;
+block
+    : BLOCK_START blockParamList? ws? sequence? BLOCK_END
+    ;
 
-//----------------- Lexer rules -----------------
+blockParamList
+    : (ws? BLOCK_PARAM)+
+    ;
 
-ASSIGN_ARROW: '<-' | '←';
+dynamicDictionary
+    : DYNDICT_START ws? expressions? ws? DYNARR_END
+    ;
 
-NUMBER: (DIGITS 'r')? '-'? DIGITS ('.' DIGITS)? ('e' '-'? DIGITS)?;
-IDENTIFIER: LETTER ( LETTER | DIGIT)*;
+dynamicArray
+    : DYNARR_START ws? expressions? ws? DYNARR_END
+    ;
 
-STRING: '\'' ( CHARACTER | '\'\'') '\'';
+parsetimeLiteral
+    : pseudoVariable
+    | number
+    | charConstant
+    | literalArray
+    | string
+    | symbol
+    ;
 
-COMMENT: '"' ( CHARACTER | '""' | '\'')* '"' -> skip;
+number
+    : numberExp
+    | hex_
+    | stFloat
+    | stInteger
+    ;
 
-WS: [ \t\r\n]+ -> skip;
+numberExp
+    : (stFloat | stInteger) EXP stInteger
+    ;
+
+charConstant
+    : CHARACTER_CONSTANT
+    ;
+
+hex_
+    : MINUS? HEX HEXDIGIT+
+    ;
+
+stInteger
+    : MINUS? DIGIT+
+    ;
+
+stFloat
+    : MINUS? DIGIT+ PERIOD DIGIT+
+    ;
+
+pseudoVariable
+    : RESERVED_WORD
+    ;
+
+string
+    : STRING
+    ;
+
+symbol
+    : HASH bareSymbol
+    ;
+
+primitive
+    : LT ws? KEYWORD ws? DIGIT+ ws? GT
+    ;
+
+bareSymbol
+    : (IDENTIFIER | BINARY_SELECTOR)
+    | KEYWORD+
+    | string
+    ;
+
+literalArray
+    : LITARR_START literalArrayRest
+    ;
+
+literalArrayRest
+    : ws? ((parsetimeLiteral | bareLiteralArray | bareSymbol) ws?)* CLOSE_PAREN
+    ;
+
+bareLiteralArray
+    : OPEN_PAREN literalArrayRest
+    ;
+
+unaryTail
+    : unaryMessage ws? unaryTail? ws?
+    ;
+
+unaryMessage
+    : ws? unarySelector
+    ;
+
+unarySelector
+    : IDENTIFIER
+    ;
+
+keywords
+    : KEYWORD+
+    ;
+
+reference
+    : variable
+    ;
+
+binaryTail
+    : binaryMessage binaryTail?
+    ;
+
+binaryMessage
+    : ws? BINARY_SELECTOR ws? (unarySend | operand)
+    ;
+
+SEPARATOR
+    : [ \t\r\n]
+    ;
+
+STRING
+    : '\'' (.)*? '\''
+    ;
+
+COMMENT
+    : '"' (.)*? '"'
+    ;
+
+BLOCK_START
+    : '['
+    ;
+
+BLOCK_END
+    : ']'
+    ;
+
+CLOSE_PAREN
+    : ')'
+    ;
+
+OPEN_PAREN
+    : '('
+    ;
+
+PIPE
+    : '|'
+    ;
+
+PERIOD
+    : '.'
+    ;
+
+SEMI_COLON
+    : ';'
+    ;
+
+BINARY_SELECTOR
+    : ('\\' | '+' | '*' | '/' | '=' | '>' | '<' | ',' | '@' | '%' | '~' | PIPE | '&' | '-' | '?')+
+    ;
+
+LT
+    : '<'
+    ;
+
+GT
+    : '>'
+    ;
+
+MINUS
+    : '-'
+    ;
+
+RESERVED_WORD
+    : 'nil'
+    | 'true'
+    | 'false'
+    | 'self'
+    | 'super'
+    ;
+
+IDENTIFIER
+    : [a-zA-Z]+ [a-zA-Z0-9_]*
+    ;
+
+CARROT
+    : '^'
+    ;
+
+COLON
+    : ':'
+    ;
+
+ASSIGNMENT
+    : ':='
+    ;
+
+HASH
+    : '#'
+    ;
+
+DOLLAR
+    : '$'
+    ;
+
+EXP
+    : 'e'
+    ;
+
+HEX
+    : '16r'
+    ;
+
+LITARR_START
+    : '#('
+    ;
+
+DYNDICT_START
+    : '#{'
+    ;
+
+DYNARR_END
+    : '}'
+    ;
+
+DYNARR_START
+    : '{'
+    ;
+
+DIGIT
+    : [0-9]
+    ;
+
+HEXDIGIT
+    : [0-9a-fA-F]
+    ;
+
+KEYWORD
+    : IDENTIFIER COLON
+    ;
+
+BLOCK_PARAM
+    : COLON IDENTIFIER
+    ;
+
+CHARACTER_CONSTANT
+    : DOLLAR (HEXDIGIT | DOLLAR)
+    ;
