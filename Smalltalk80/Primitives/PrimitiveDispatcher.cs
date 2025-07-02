@@ -75,6 +75,11 @@ public static class Primitives
         [60] = ObjectPrimitives.At,
         [61] = ObjectPrimitives.AtPut,
         [62] = ObjectPrimitives.Size,
+        [63] = ArrayPrimitives.StringAt,
+        [64] = ArrayPrimitives.StringAtPut,
+        [65] = ArrayPrimitives.Next,
+        [66] = ArrayPrimitives.NextPut,
+        [67] = ArrayPrimitives.AtEnd,
 
         // System primitives
         [110] = ObjectPrimitives.Equivalent,
