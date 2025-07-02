@@ -93,6 +93,18 @@ public static class Primitives
         [78] = StorageManagementPrimitives.NextInstance,
         [79] = StorageManagementPrimitives.NewMethod,
 
+        // Control primitives
+        [80] = ControlPrimitives.BlockCopy,
+        [81] = ControlPrimitives.Value,
+        [82] = ControlPrimitives.ValueWithArgs,
+        [83] = ControlPrimitives.Perform,
+        [84] = ControlPrimitives.PerformWithArgs,
+        [85] = ControlPrimitives.Signal,
+        [86] = ControlPrimitives.Wait,
+        [87] = ControlPrimitives.Resume,
+        [88] = ControlPrimitives.Suspend,
+        [89] = ControlPrimitives.FlushCache,
+
         // System primitives
         [110] = ObjectPrimitives.Equivalent,
         [111] = ObjectPrimitives.Class,
