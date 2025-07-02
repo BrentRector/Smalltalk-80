@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from /workspace/Smalltalk-80/Smalltalk80/Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -52,18 +52,18 @@ public partial class Smalltalk80Parser : Parser {
 		RULE_runtimeLiteral = 21, RULE_block = 22, RULE_blockParamList = 23, RULE_dynamicDictionary = 24, 
 		RULE_dynamicArray = 25, RULE_parsetimeLiteral = 26, RULE_number = 27, 
 		RULE_numberExp = 28, RULE_charConstant = 29, RULE_hex_ = 30, RULE_stInteger = 31, 
-		RULE_stFloat = 32, RULE_pseudoVariable = 33, RULE_string = 34, RULE_symbol = 35, 
-		RULE_primitive = 36, RULE_bareSymbol = 37, RULE_literalArray = 38, RULE_literalArrayRest = 39, 
-		RULE_bareLiteralArray = 40, RULE_unaryTail = 41, RULE_unaryMessage = 42, 
-		RULE_unarySelector = 43, RULE_keywords = 44, RULE_reference = 45, RULE_binaryTail = 46, 
-		RULE_binaryMessage = 47;
+		RULE_stFloat = 32, RULE_pseudoVariable = 33, RULE_stringLiteral = 34, 
+		RULE_symbol = 35, RULE_primitive = 36, RULE_bareSymbol = 37, RULE_literalArray = 38, 
+		RULE_literalArrayRest = 39, RULE_bareLiteralArray = 40, RULE_unaryTail = 41, 
+		RULE_unaryMessage = 42, RULE_unarySelector = 43, RULE_keywords = 44, RULE_reference = 45, 
+		RULE_binaryTail = 46, RULE_binaryMessage = 47;
 	public static readonly string[] ruleNames = {
 		"script", "sequence", "ws", "temps", "statements", "answer", "expression", 
 		"expressions", "expressionList", "cascade", "message", "assignment", "variable", 
 		"binarySend", "unarySend", "keywordSend", "keywordMessage", "keywordPair", 
 		"operand", "subexpression", "literal", "runtimeLiteral", "block", "blockParamList", 
 		"dynamicDictionary", "dynamicArray", "parsetimeLiteral", "number", "numberExp", 
-		"charConstant", "hex_", "stInteger", "stFloat", "pseudoVariable", "string", 
+		"charConstant", "hex_", "stInteger", "stFloat", "pseudoVariable", "stringLiteral", 
 		"symbol", "primitive", "bareSymbol", "literalArray", "literalArrayRest", 
 		"bareLiteralArray", "unaryTail", "unaryMessage", "unarySelector", "keywords", 
 		"reference", "binaryTail", "binaryMessage"
@@ -2090,8 +2090,8 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public LiteralArrayContext literalArray() {
 			return GetRuleContext<LiteralArrayContext>(0);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public StringContext @string() {
-			return GetRuleContext<StringContext>(0);
+		[System.Diagnostics.DebuggerNonUserCode] public StringLiteralContext stringLiteral() {
+			return GetRuleContext<StringLiteralContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public SymbolContext symbol() {
 			return GetRuleContext<SymbolContext>(0);
@@ -2151,7 +2151,7 @@ public partial class Smalltalk80Parser : Parser {
 				EnterOuterAlt(_localctx, 5);
 				{
 				State = 323;
-				@string();
+				stringLiteral();
 				}
 				break;
 			case HASH:
@@ -2615,25 +2615,25 @@ public partial class Smalltalk80Parser : Parser {
 		return _localctx;
 	}
 
-	public partial class StringContext : ParserRuleContext {
+	public partial class StringLiteralContext : ParserRuleContext {
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode STRING() { return GetToken(Smalltalk80Parser.STRING, 0); }
-		public StringContext(ParserRuleContext parent, int invokingState)
+		public StringLiteralContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
 		{
 		}
-		public override int RuleIndex { get { return RULE_string; } }
+		public override int RuleIndex { get { return RULE_stringLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitString(this);
+			if (typedVisitor != null) return typedVisitor.VisitStringLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
 	}
 
 	[RuleVersion(0)]
-	public StringContext @string() {
-		StringContext _localctx = new StringContext(Context, State);
-		EnterRule(_localctx, 68, RULE_string);
+	public StringLiteralContext stringLiteral() {
+		StringLiteralContext _localctx = new StringLiteralContext(Context, State);
+		EnterRule(_localctx, 68, RULE_stringLiteral);
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
@@ -2799,8 +2799,8 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode KEYWORD(int i) {
 			return GetToken(Smalltalk80Parser.KEYWORD, i);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public StringContext @string() {
-			return GetRuleContext<StringContext>(0);
+		[System.Diagnostics.DebuggerNonUserCode] public StringLiteralContext stringLiteral() {
+			return GetRuleContext<StringLiteralContext>(0);
 		}
 		public BareSymbolContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -2869,7 +2869,7 @@ public partial class Smalltalk80Parser : Parser {
 				EnterOuterAlt(_localctx, 3);
 				{
 				State = 404;
-				@string();
+				stringLiteral();
 				}
 				break;
 			default:

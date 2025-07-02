@@ -130,7 +130,7 @@ parsetimeLiteral
     | number
     | charConstant
     | literalArray
-    | string
+    | stringLiteral
     | symbol
     ;
 
@@ -165,7 +165,7 @@ pseudoVariable
     : RESERVED_WORD
     ;
 
-string
+stringLiteral
     : STRING
     ;
 
@@ -180,7 +180,7 @@ primitive
 bareSymbol
     : (IDENTIFIER | BINARY_SELECTOR)
     | KEYWORD+
-    | string
+    | stringLiteral
     ;
 
 literalArray
