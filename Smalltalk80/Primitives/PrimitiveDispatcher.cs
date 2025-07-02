@@ -19,13 +19,20 @@ public static class Primitives
         [2] = IntegerPrimitives.Subtract,
         [3] = IntegerPrimitives.Multiply,
         [4] = IntegerPrimitives.Divide,
-        [5] = IntegerPrimitives.Equals
+        [5] = IntegerPrimitives.Equals,
+        // Array and stream primitives
+        [60] = ObjectPrimitives.At,
+        [61] = ObjectPrimitives.AtPut,
+        [62] = ObjectPrimitives.Size,
+        // System primitives
+        [110] = ObjectPrimitives.Equivalent,
+        [111] = ObjectPrimitives.Class,
     };
 
     static Primitives()
     {
         // Fill remaining required primitive slots with stubs returning false
-        for (var i = 6; i <= 100; i++)
+        for (var i = 6; i <= 116; i++)
         {
             if (!Handlers.ContainsKey(i))
             {

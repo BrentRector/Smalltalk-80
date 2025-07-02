@@ -1020,5 +1020,140 @@ public class InterpreterBytecodeTests
         Assert.Equal(42, result);
     }
 
+    [Fact]
+    public void PrimitiveEquivalent_TrueWhenSameObject()
+    {
+        var obj = new SmalltalkObject(new SmalltalkClass(), 0);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>()
+            },
+            Receiver = obj,
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(obj);
+        ctx.Stack.Push(obj);
+
+        var executed = Primitives.Execute(110, ctx);
+
+        Assert.True(executed);
+        Assert.True((bool)ctx.Stack.Pop()!);
+    }
+
+    [Fact]
+    public void PrimitiveClass_PushesClassPointer()
+    {
+        var cls = new SmalltalkClass();
+        var obj = new SmalltalkObject(cls, 0);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>()
+            },
+            Receiver = obj,
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(obj);
+
+        var executed = Primitives.Execute(111, ctx);
+
+        Assert.True(executed);
+        Assert.Same(cls, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveAt_ReadsIndexedField()
+    {
+        var cls = new SmalltalkClass();
+        var obj = new SmalltalkObject(cls, 1);
+        obj.Fields[0] = 7;
+        var ctx = new Context
+        {
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>()
+            },
+            Receiver = obj,
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(obj);
+        ctx.Stack.Push(1);
+
+        var executed = Primitives.Execute(60, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(7, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveAtPut_WritesIndexedField()
+    {
+        var cls = new SmalltalkClass();
+        var obj = new SmalltalkObject(cls, 1);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>()
+            },
+            Receiver = obj,
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(obj);
+        ctx.Stack.Push(1);
+        ctx.Stack.Push(99);
+
+        var executed = Primitives.Execute(61, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(99, obj.Fields[0]);
+        Assert.Equal(99, ctx.Stack.Pop());
+    }
+
+    [Fact]
+    public void PrimitiveSize_ReturnsFieldCount()
+    {
+        var cls = new SmalltalkClass();
+        var obj = new SmalltalkObject(cls, 3);
+        var ctx = new Context
+        {
+            Method = new CompiledMethod
+            {
+                Bytecodes = Array.Empty<byte>(),
+                Literals = Array.Empty<object>()
+            },
+            Receiver = obj,
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(obj);
+
+        var executed = Primitives.Execute(62, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(3, ctx.Stack.Pop());
+    }
+
 }
 
