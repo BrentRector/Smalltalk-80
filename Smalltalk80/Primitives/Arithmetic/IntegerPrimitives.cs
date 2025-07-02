@@ -48,14 +48,21 @@ public static class IntegerPrimitives
     }
 
     /// <summary>
-    /// Divides the first integer on the stack by the second.
+    /// Divides the first integer on the stack by the second. The primitive
+    /// succeeds only when the division is exact.
     /// </summary>
     /// <param name="ctx">The execution context.</param>
+    /// <returns><c>true</c> if the result is an exact integer.</returns>
     public static bool Divide(Context ctx)
     {
         object? b = ctx.Stack.Pop();
         object? a = ctx.Stack.Pop();
-        if (a is not int ai || b is not int bi || bi == 0) return false;
+        if (a is not int ai || b is not int bi || bi == 0)
+            return false;
+
+        if (ai % bi != 0)
+            return false;
+
         ctx.Stack.Push(ai / bi);
         return true;
     }
@@ -149,6 +156,37 @@ public static class IntegerPrimitives
     }
 
     /// <summary>
+    /// Performs rounding division of two integers, rounding toward negative
+    /// infinity.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    /// <returns><c>true</c> if the operation succeeded.</returns>
+    public static bool Div(Context ctx)
+    {
+        object? b = ctx.Stack.Pop();
+        object? a = ctx.Stack.Pop();
+        if (a is not int ai || b is not int bi || bi == 0)
+            return false;
+        ctx.Stack.Push((int)Math.Floor((double)ai / bi));
+        return true;
+    }
+
+    /// <summary>
+    /// Performs truncated division of two integers, rounding toward zero.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    /// <returns><c>true</c> if the operation succeeded.</returns>
+    public static bool Quo(Context ctx)
+    {
+        object? b = ctx.Stack.Pop();
+        object? a = ctx.Stack.Pop();
+        if (a is not int ai || b is not int bi || bi == 0)
+            return false;
+        ctx.Stack.Push(ai / bi);
+        return true;
+    }
+
+    /// <summary>
     /// Performs a bitwise AND of two integers.
     /// </summary>
     /// <param name="ctx">The execution context.</param>
@@ -198,6 +236,22 @@ public static class IntegerPrimitives
         object? a = ctx.Stack.Pop();
         if (a is not int ai || b is not int bi) return false;
         ctx.Stack.Push(bi >= 0 ? ai << bi : ai >> -bi);
+        return true;
+    }
+
+    /// <summary>
+    /// Constructs a simple point-like object from two numeric values.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    /// <returns><c>true</c> if the point was created.</returns>
+    public static bool MakePoint(Context ctx)
+    {
+        object? y = ctx.Stack.Pop();
+        object? x = ctx.Stack.Pop();
+        var point = new SmalltalkObject(null, 2);
+        point.Fields[0] = x;
+        point.Fields[1] = y;
+        ctx.Stack.Push(point);
         return true;
     }
 }
