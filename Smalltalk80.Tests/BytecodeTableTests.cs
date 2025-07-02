@@ -8,6 +8,7 @@ namespace Smalltalk80.Tests;
 /// <summary>
 /// Tests for <see cref="ByteCodes.BytecodeTable"/> ensuring every bytecode is mapped.
 /// </summary>
+[TestCaseOrderer("Smalltalk80.Tests.BytecodeIndexOrderer", "Smalltalk80.Tests")]
 public class BytecodeTableTests
 {
     /// <summary>

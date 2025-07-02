@@ -9,6 +9,7 @@ namespace Smalltalk80.Tests;
 /// Additional opcode coverage tests exercising groups not explicitly validated
 /// elsewhere.
 /// </summary>
+[TestCaseOrderer("Smalltalk80.Tests.BytecodeIndexOrderer", "Smalltalk80.Tests")]
 public class RemainingBytecodeTests
 {
     /// <summary>
