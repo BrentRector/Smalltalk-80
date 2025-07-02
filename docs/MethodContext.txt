@@ -7,7 +7,7 @@ CompiledMethod in response to this new message. The interpreter’s old
 state must be remembered because the bytecodes after the send must
 be executed after the value of the message is returned.
 
-The interpreter saves its state in objects called contexts. The contexts described here are represented n the system by instances
+The interpreter saves its state in objects called contexts. The contexts described here are represented in the system by instances
 of MethodContext. A MethodContext represents the execution of a CompiledMethod in response to a message.
 
 There will be many contexts in the system at any one time. The context that rep-
