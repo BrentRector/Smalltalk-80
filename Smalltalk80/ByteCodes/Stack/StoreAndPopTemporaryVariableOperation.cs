@@ -21,6 +21,6 @@ public sealed class StoreAndPopTemporaryVariableOperation : IBytecodeOperation
     public void Execute(Interpreter interpreter, byte opcode)
     {
         var ctx = interpreter.CurrentContext;
-        ctx.Temporaries[index] = ctx.Stack.Pop();
+        ctx.Temporaries[index] = ctx.Stack.Pop()!;
     }
 }

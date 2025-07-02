@@ -25,7 +25,7 @@ public sealed class ReturnTopOperation : IBytecodeOperation
             // Non-local return unwinds to the block's caller.
             if (ctx is global::BlockContext blk && blk.Sender != blk.HomeContext)
             {
-                throw new global::NonLocalReturnException(value, blk.HomeContext.Sender);
+                throw new global::NonLocalReturnException(value!, blk.HomeContext.Sender);
             }
         }
 

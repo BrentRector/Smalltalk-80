@@ -3,7 +3,7 @@ using System;
 namespace Smalltalk80;
 
 /// <summary>
-/// Provides arithmetic primitive implementations for <see cref="SmallInteger"/> operations.
+/// Provides arithmetic primitive implementations for <c>SmallInteger</c> operations.
 /// </summary>
 public static class IntegerPrimitives
 {
