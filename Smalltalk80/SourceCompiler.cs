@@ -12,8 +12,7 @@ public static class SourceCompiler
     /// <returns>The compiled method.</returns>
     public static CompiledMethod Compile(string source)
     {
-        var tokenizer = new SmalltalkTokenizer(source);
-        var parser = new SmalltalkParser(tokenizer);
+        var parser = new SmalltalkParser(source);
         return parser.ParseMethod();
     }
 }

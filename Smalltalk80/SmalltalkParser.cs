@@ -1,97 +1,197 @@
 using System;
 using System.Collections.Generic;
+using Antlr4.Runtime;
+using Smalltalk80.Generated;
+using Smalltalk80.Parser;
 
 /// <summary>
-///     Parses a subset of Smalltalk source code into bytecode.
+/// Provides a parser that converts Smalltalk source code into
+/// <see cref="CompiledMethod"/> instances.
 /// </summary>
 public sealed class SmalltalkParser
 {
-    private readonly SmalltalkTokenizer tokenizer;
+    private readonly string source;
     private readonly List<byte> bytecodes = new();
     private readonly List<object> literals = new();
-    private readonly Dictionary<string, int> temporaryVariables = new();
-    private int tempIndex = 0;
+    private readonly Dictionary<string, int> temporaries = new();
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SmalltalkParser"/> class.
+    /// Initializes a new instance of the <see cref="SmalltalkParser"/> class.
     /// </summary>
-    /// <param name="tokenizer">The tokenizer providing the source tokens.</param>
-    public SmalltalkParser(SmalltalkTokenizer tokenizer)
-    {
-        this.tokenizer = tokenizer;
-    }
+    /// <param name="source">The Smalltalk source code to parse.</param>
+    public SmalltalkParser(string source) => this.source = source;
 
     /// <summary>
-    ///     Parses the tokens into a <see cref="CompiledMethod"/> representing a method.
+    /// Parses the source into a <see cref="CompiledMethod"/>.
     /// </summary>
     /// <returns>The compiled method.</returns>
     public CompiledMethod ParseMethod()
     {
-        ParseTemporaries();
-        ParseStatements();
-        bytecodes.Add(124); // return
-        return new CompiledMethod {
+        var ast = BuildAst();
+        foreach (var temp in ast.Sequence.Temporaries)
+        {
+            temporaries[temp] = temporaries.Count;
+        }
+
+        for (var i = 0; i < ast.Sequence.Statements.Count; i++)
+        {
+            var isLast = i == ast.Sequence.Statements.Count - 1;
+            CompileStatement(ast.Sequence.Statements[i], isLast);
+        }
+
+        var header = BuildHeader();
+        return new CompiledMethod
+        {
+            Header = header,
             Bytecodes = bytecodes.ToArray(),
             Literals = literals.ToArray(),
-            TemporariesCount = temporaryVariables.Count
+            TemporariesCount = temporaries.Count,
+            HasPrimitive = false,
+            PrimitiveIndex = 0
         };
     }
 
-    private void ParseTemporaries()
+    private ScriptNode BuildAst()
     {
-        if (tokenizer.Peek() == "|") {
-            tokenizer.Next();
-            while (tokenizer.HasNext && tokenizer.Peek() != "|") {
-                var name = tokenizer.Next()!;
-                if (!temporaryVariables.ContainsKey(name))
-                    temporaryVariables[name] = tempIndex++;
-            }
-            tokenizer.Next();
+        var input = new AntlrInputStream(source);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        var tree = parser.script();
+        var visitor = new AstBuildingVisitor();
+        return (ScriptNode)visitor.Visit(tree)!;
+    }
+
+    private void CompileStatement(StatementNode statement, bool isLast)
+    {
+        switch (statement)
+        {
+            case ExpressionStatement es:
+                CompileExpression(es.Expression);
+                if (!isLast)
+                {
+                    bytecodes.Add((byte)Bytecode.PopStack);
+                }
+                else
+                {
+                    bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
+                }
+                break;
+            case AnswerStatement ans:
+                CompileExpression(ans.Expression);
+                bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
+                break;
         }
     }
 
-    private void ParseStatements()
+    private void CompileExpression(ExpressionNode expression)
     {
-        while (tokenizer.HasNext) {
-            ParseExpression();
-            if (tokenizer.Peek() == ".") tokenizer.Next();
+        switch (expression)
+        {
+            case LiteralExpression lit:
+                EmitLiteral(lit.Value);
+                break;
+            case VariableExpression var:
+                EmitVariable(var.Name);
+                break;
+            case AssignmentExpression assign:
+                CompileExpression(assign.Value);
+                bytecodes.Add((byte)Bytecode.DuplicateTop);
+                StoreVariable(assign.Variable);
+                break;
+            case BinarySendExpression bin:
+                CompileExpression(bin.Receiver);
+                CompileExpression(bin.Argument);
+                EmitSend(bin.Selector, 1);
+                break;
+            default:
+                throw new NotSupportedException($"Unsupported expression node {expression.GetType().Name}");
         }
     }
 
-    private void ParseExpression()
+    private void EmitLiteral(object value)
     {
-        var left = tokenizer.Next()!;
-        EmitOperand(left);
-
-        if (tokenizer.HasNext && tokenizer.Peek() == "+") {
-            tokenizer.Next();
-            var right = tokenizer.Next()!;
-            EmitOperand(right);
-
-            int litIndex = AddLiteral(new Symbol("+"));
-            bytecodes.Add((byte)(128 + litIndex));
+        var index = AddLiteral(value);
+        if (index < 32)
+        {
+            bytecodes.Add((byte)((int)Bytecode.PushLiteralConstant0 + index));
+        }
+        else
+        {
+            throw new NotSupportedException("Only up to 32 literals are supported.");
         }
     }
 
-    private void EmitOperand(string token)
+    private void EmitVariable(string name)
     {
-        if (temporaryVariables.TryGetValue(token, out int index)) {
-            bytecodes.Add((byte)(16 + index));
-        } else if (int.TryParse(token, out int value)) {
-            int litIndex = AddLiteral(value);
-            bytecodes.Add((byte)(32 + litIndex));
-        } else {
-            throw new Exception($"Unrecognized token '{token}'");
+        if (!temporaries.TryGetValue(name, out var index))
+        {
+            throw new InvalidOperationException($"Unknown variable '{name}'");
+        }
+
+        if (index < 16)
+        {
+            bytecodes.Add((byte)((int)Bytecode.PushTemporaryVariable0 + index));
+        }
+        else
+        {
+            throw new NotSupportedException("Only up to 16 temporaries are supported.");
         }
     }
 
-    private int AddLiteral(object lit)
+    private void StoreVariable(string name)
     {
-        int index = literals.IndexOf(lit);
-        if (index == -1) {
-            literals.Add(lit);
-            return literals.Count - 1;
+        if (!temporaries.TryGetValue(name, out var index))
+        {
+            throw new InvalidOperationException($"Unknown variable '{name}'");
         }
-        return index;
+
+        if (index < 8)
+        {
+            bytecodes.Add((byte)((int)Bytecode.StoreAndPopTemporaryVariable0 + index));
+        }
+        else
+        {
+            bytecodes.Add((byte)Bytecode.ExtendedStoreAndPop);
+            byte descriptor = (byte)((1 << 6) | index);
+            bytecodes.Add(descriptor);
+        }
+    }
+
+    private void EmitSend(string selector, int argCount)
+    {
+        var symbol = new Symbol(selector);
+        var index = AddLiteral(symbol);
+        if (index < 32 && argCount < 8)
+        {
+            bytecodes.Add((byte)Bytecode.SingleExtendedSend);
+            byte descriptor = (byte)((argCount << 5) | index);
+            bytecodes.Add(descriptor);
+        }
+        else
+        {
+            bytecodes.Add((byte)Bytecode.DoubleExtendedSend);
+            bytecodes.Add((byte)argCount);
+            bytecodes.Add((byte)index);
+        }
+    }
+
+    private int AddLiteral(object value)
+    {
+        var existing = literals.IndexOf(value);
+        if (existing >= 0)
+            return existing;
+        literals.Add(value);
+        return literals.Count - 1;
+    }
+
+    private MethodHeader BuildHeader()
+    {
+        int flagValue = 0; // no primitive, zero args
+        int temporaryCount = temporaries.Count;
+        bool largeContext = temporaryCount > 12;
+        int literalCount = literals.Count;
+        int raw = flagValue | (temporaryCount << 3) | ((largeContext ? 1 : 0) << 8) | (literalCount << 9);
+        return new MethodHeader(raw, 0);
     }
 }

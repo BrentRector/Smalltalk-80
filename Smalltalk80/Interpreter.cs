@@ -363,6 +363,19 @@ public class Interpreter
     public void ReturnFrom(object returnValue)
     {
         if (currentContext.Sender == null) {
+            if (returnValue is MethodContext mc)
+            {
+                returnValue = new Context
+                {
+                    Sender = mc.Sender,
+                    Method = mc.Method,
+                    Receiver = mc.Receiver,
+                    Arguments = mc.Arguments,
+                    Temporaries = mc.Temporaries,
+                    Stack = mc.Stack,
+                    PC = mc.PC
+                };
+            }
             LastResult = returnValue;
             if (ExitOnReturn) {
                 Console.WriteLine($"Returned: {returnValue}");
