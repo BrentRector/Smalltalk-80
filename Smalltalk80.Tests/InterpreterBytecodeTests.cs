@@ -1155,5 +1155,46 @@ public class InterpreterBytecodeTests
         Assert.Equal(3, ctx.Stack.Pop());
     }
 
-}
 
+    [Fact]
+    public void PrimitiveLessThan_ReturnsTrueWhenFirstIsSmaller()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(3);
+        ctx.Stack.Push(5);
+
+        var executed = Primitives.Execute(6, ctx);
+
+        Assert.True(executed);
+        Assert.True((bool)ctx.Stack.Pop()!);
+    }
+
+    [Fact]
+    public void PrimitiveBitAnd_ComputesBitwiseAnd()
+    {
+        var ctx = new Context
+        {
+            Method = new CompiledMethod { Bytecodes = Array.Empty<byte>(), Literals = Array.Empty<object>() },
+            Receiver = new SmalltalkObject(new SmalltalkClass(), 0),
+            Arguments = Array.Empty<object?>(),
+            Temporaries = Array.Empty<object>(),
+            Stack = new Stack<object?>()
+        };
+
+        ctx.Stack.Push(6);
+        ctx.Stack.Push(3);
+
+        var executed = Primitives.Execute(14, ctx);
+
+        Assert.True(executed);
+        Assert.Equal(2, ctx.Stack.Pop());
+    }
+}
