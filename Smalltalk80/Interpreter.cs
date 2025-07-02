@@ -12,6 +12,11 @@ public class Interpreter
     private Context currentContext = null!;
 
     /// <summary>
+    ///     Gets the context currently being executed by the interpreter.
+    /// </summary>
+    internal Context CurrentContext => currentContext;
+
+    /// <summary>
     ///     Indicates whether the interpreter should exit the process when the
     ///     top-level context returns.
     /// </summary>
