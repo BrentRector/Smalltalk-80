@@ -105,9 +105,32 @@ public static class Primitives
         [88] = ControlPrimitives.Suspend,
         [89] = ControlPrimitives.FlushCache,
 
+        // Input/output primitives
+        [90]  = InputOutputPrimitives.MousePoint,
+        [91]  = InputOutputPrimitives.CursorLocPut,
+        [92]  = InputOutputPrimitives.CursorLink,
+        [93]  = InputOutputPrimitives.InputSemaphore,
+        [94]  = InputOutputPrimitives.SampleInterval,
+        [95]  = InputOutputPrimitives.InputWord,
+        [96]  = InputOutputPrimitives.CopyBits,
+        [97]  = InputOutputPrimitives.Snapshot,
+        [98]  = InputOutputPrimitives.TimeWordsInto,
+        [99]  = InputOutputPrimitives.TickWordsInto,
+        [100] = InputOutputPrimitives.SignalAtTick,
+        [101] = InputOutputPrimitives.BeCursor,
+        [102] = InputOutputPrimitives.BeDisplay,
+        [103] = InputOutputPrimitives.ScanCharacters,
+        [104] = InputOutputPrimitives.DrawLoop,
+        [105] = InputOutputPrimitives.StringReplace,
+
         // System primitives
         [110] = ObjectPrimitives.Equivalent,
         [111] = ObjectPrimitives.Class,
+        [112] = SystemPrimitives.CoreLeft,
+        [113] = SystemPrimitives.Quit,
+        [114] = SystemPrimitives.ExitToDebugger,
+        [115] = SystemPrimitives.OopsLeft,
+        [116] = SystemPrimitives.SignalAtOopsLeftWordsLeft,
     };
 
     static Primitives()
