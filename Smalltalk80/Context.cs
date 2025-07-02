@@ -20,7 +20,7 @@ public class Context
     /// <summary>
     ///     Gets the receiver object for the method.
     /// </summary>
-    public required SmalltalkObject Receiver { get; init; }
+    public SmalltalkObject Receiver { get; set; } = null!;
 
     /// <summary>
     ///     Gets the array of argument values passed to the method.

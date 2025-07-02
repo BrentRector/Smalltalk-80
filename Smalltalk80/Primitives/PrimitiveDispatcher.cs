@@ -80,6 +80,18 @@ public static class Primitives
         [65] = ArrayPrimitives.Next,
         [66] = ArrayPrimitives.NextPut,
         [67] = ArrayPrimitives.AtEnd,
+        [68] = StorageManagementPrimitives.ObjectAt,
+        [69] = StorageManagementPrimitives.ObjectAtPut,
+        [70] = StorageManagementPrimitives.New,
+        [71] = StorageManagementPrimitives.NewWithArg,
+        [72] = StorageManagementPrimitives.Become,
+        [73] = StorageManagementPrimitives.InstVarAt,
+        [74] = StorageManagementPrimitives.InstVarAtPut,
+        [75] = StorageManagementPrimitives.AsOop,
+        [76] = StorageManagementPrimitives.AsObject,
+        [77] = StorageManagementPrimitives.SomeInstance,
+        [78] = StorageManagementPrimitives.NextInstance,
+        [79] = StorageManagementPrimitives.NewMethod,
 
         // System primitives
         [110] = ObjectPrimitives.Equivalent,
