@@ -163,7 +163,7 @@ public class Interpreter
     /// <param name="bytecode">The bytecode to execute.</param>
     public void Dispatch(Bytecode bytecode)
     {
-        Tracer.Log($"Dispatching bytecode: {bytecode} at PC: {currentContext.PC - 1}");
+        Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
         if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15) {
             int index = (int)bytecode - (int)Bytecode.PushReceiverVariable0;
             currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
