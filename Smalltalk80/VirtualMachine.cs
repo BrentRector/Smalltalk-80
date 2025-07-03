@@ -49,6 +49,13 @@ public sealed class VirtualMachine
     }
 
     /// <summary>
+    /// Loads a traditional Smalltalk file-in source containing multiple class
+    /// and method definitions.
+    /// </summary>
+    /// <param name="path">The path to the file-in source.</param>
+    public void LoadSystemFile(string path) => FileInLoader.Load(path);
+
+    /// <summary>
     /// Compiles the provided source code and evaluates the resulting method in
     /// the context of the global <c>Object</c> receiver.
     /// </summary>
