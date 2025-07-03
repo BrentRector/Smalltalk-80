@@ -12,9 +12,10 @@ public static class AstMethodCompiler
     /// Compiles a method body represented as an AST sequence.
     /// </summary>
     /// <param name="sequence">The method body sequence.</param>
+    /// <param name="comment">Optional source comment attached to the method.</param>
     /// <returns>The compiled method.</returns>
-    public static CompiledMethod CompileMethod(SequenceNode sequence)
-        => new Compiler().Compile(sequence);
+    public static CompiledMethod CompileMethod(SequenceNode sequence, string? comment = null)
+        => new Compiler().Compile(sequence, comment);
 
     private sealed class Compiler
     {
@@ -22,7 +23,7 @@ public static class AstMethodCompiler
         private readonly List<object> literals = new();
         private readonly Dictionary<string, int> temporaries = new();
 
-        public CompiledMethod Compile(SequenceNode sequence)
+        public CompiledMethod Compile(SequenceNode sequence, string? comment)
         {
             foreach (var temp in sequence.Temporaries)
                 temporaries[temp] = temporaries.Count;
@@ -40,7 +41,8 @@ public static class AstMethodCompiler
                 Literals = literals.ToArray(),
                 TemporariesCount = temporaries.Count,
                 HasPrimitive = false,
-                PrimitiveIndex = 0
+                PrimitiveIndex = 0,
+                Comment = comment
             };
         }
 

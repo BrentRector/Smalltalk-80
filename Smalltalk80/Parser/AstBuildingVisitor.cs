@@ -207,9 +207,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodChunk(Smalltalk80Parser.MethodChunkContext context)
     {
-        var header = (MethodHeaderNode)Visit(context.methodHeader())!;
+        _ = (MethodHeaderNode)Visit(context.methodHeader())!;
         var body = (SequenceNode)Visit(context.sequence())!;
-        return new MethodDefinitionNode(string.Empty, body);
+        return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
 
