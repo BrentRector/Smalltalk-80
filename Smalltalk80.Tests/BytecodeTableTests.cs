@@ -32,6 +32,7 @@ public class BytecodeTableTests
 
         var missing = Enum.GetValues<Bytecode>()
                           .Where(bc => operations[(byte)bc] is null)
+                          .Select(static bc => bc.ToString())
                           .ToArray();
 
         if (missing.Length == 0)
