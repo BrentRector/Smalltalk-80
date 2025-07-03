@@ -20,53 +20,19 @@ public static class FileInLoader
     /// <param name="path">Path to the Smalltalk source file.</param>
     public static void Load(string path)
     {
-        using var reader = new StreamReader(path);
+        var source = File.ReadAllText(path);
+        var input = new AntlrInputStream(source);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        var fileCtx = parser.fileIn();
+
         MethodHeaderNode? currentHeader = null;
-        var sb = new StringBuilder();
-        int ch;
-        while ((ch = reader.Read()) != -1)
+        foreach (var chunk in fileCtx.chunk())
         {
-            if (ch == '!')
-            {
-                int next = reader.Peek();
-                if (next == '!')
-                {
-                    reader.Read();
-                    sb.Append('!');
-                    continue;
-                }
-
-                if (next == '\n' || next == '\r' || next == -1)
-                {
-                    var chunk = sb.ToString();
-                    sb.Clear();
-                    if (next == '\r')
-                    {
-                        reader.Read();
-                        if (reader.Peek() == '\n') reader.Read();
-                    }
-                    else if (next == '\n')
-                    {
-                        reader.Read();
-                    }
-
-                    if (chunk.Length > 0)
-                    {
-                        ProcessChunk(chunk, ref currentHeader);
-                    }
-                    continue;
-                }
-
-                sb.Append('!');
-                continue;
-            }
-
-            sb.Append((char)ch);
-        }
-
-        if (sb.Length > 0)
-        {
-            ProcessChunk(sb.ToString(), ref currentHeader);
+            var text = source.Substring(chunk.Start.StartIndex,
+                chunk.Stop.StopIndex - chunk.Start.StartIndex + 1);
+            ProcessChunk(text.Trim(), ref currentHeader);
         }
     }
 
@@ -92,13 +58,9 @@ public static class FileInLoader
         parser.Reset();
         try
         {
-            var headerInput = new AntlrInputStream(chunk + "!");
-            var headerLexer = new Smalltalk80Lexer(headerInput);
-            var headerTokens = new CommonTokenStream(headerLexer);
-            var headerParser = new Smalltalk80Parser(headerTokens);
-            var headerCtx = headerParser.methodHeader();
-            if (headerParser.NumberOfSyntaxErrors == 0)
-                return visitor.Visit(headerCtx)!;
+            var catCtx = parser.methodCategoryHeader();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(catCtx)!;
         }
         catch
         {

@@ -101,17 +101,22 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return ProcessBinaryTail(left, context.binaryTail());
     }
 
-    private ExpressionNode ProcessBinaryTail(ExpressionNode left, Smalltalk80Parser.BinaryTailContext? tail)
-    {
-        if (tail is null) return left;
-        var msg = tail.binaryMessage();
-        var selector = msg.BINARY_SELECTOR().GetText();
-        var right = msg.unarySend() is not null
-            ? (ExpressionNode)Visit(msg.unarySend())!
-            : (ExpressionNode)Visit(msg.operand())!;
-        var expr = new BinarySendExpression(left, selector, right);
-        return ProcessBinaryTail(expr, tail.binaryTail());
-    }
+        private ExpressionNode ProcessBinaryTail(ExpressionNode left, Smalltalk80Parser.BinaryTailContext? tail)
+        {
+            if (tail is null) return left;
+            var msg = tail.binaryMessage();
+            if (msg is null) return left;
+            var selector = msg.BINARY_SELECTOR()?.GetText() ?? string.Empty;
+            ExpressionNode right;
+            if (msg.unarySend() is { } us)
+                right = (ExpressionNode)Visit(us)!;
+            else if (msg.operand() is { } op)
+                right = (ExpressionNode)Visit(op)!;
+            else
+                return left;
+            var expr = new BinarySendExpression(left, selector, right);
+            return ProcessBinaryTail(expr, tail.binaryTail());
+        }
 
     /// <inheritdoc/>
     public override AstNode VisitUnarySend(Smalltalk80Parser.UnarySendContext context)
@@ -158,7 +163,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <inheritdoc/>
-    public override AstNode VisitFile(Smalltalk80Parser.FileContext context)
+    public override AstNode VisitFileIn(Smalltalk80Parser.FileInContext context)
     {
         var chunks = new List<AstNode>();
         foreach (var chunk in context.chunk())
@@ -174,8 +179,15 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitChunk(Smalltalk80Parser.ChunkContext context)
     {
-        if (context.classDefinition() is { } cls) return Visit(cls);
-        if (context.methodChunk() is { } mc) return Visit(mc);
+        if (context.classDefinition() is { } cls)
+            return Visit(cls);
+
+        if (context.methodCategoryHeader() is { } header)
+            return Visit(header);
+
+        if (context.sequence() is { } seq)
+            return new ScriptNode((SequenceNode)Visit(seq)!);
+
         return new ScriptNode(new SequenceNode(Array.Empty<string>(), Array.Empty<StatementNode>()));
     }
 
@@ -187,27 +199,31 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         var options = new Dictionary<string, string>();
         foreach (var opt in context.classOption())
         {
-            var key = opt.KEYWORD().GetText()[..^1];
-            var value = opt.stringLiteral().GetText().Trim('\'');
-            options[key] = value;
+            var optionText = opt.GetText();
+            var parts = optionText.Split("'", 2);
+            if (parts.Length == 2)
+            {
+                var key = parts[0].Trim().TrimEnd(':');
+                var value = parts[1].TrimEnd('\'');
+                options[key] = value;
+            }
         }
 
         return new ClassDefinitionNode(superclass, className, options);
     }
 
     /// <inheritdoc/>
-    public override AstNode VisitMethodHeader(Smalltalk80Parser.MethodHeaderContext context)
+    public override AstNode VisitMethodCategoryHeader(Smalltalk80Parser.MethodCategoryHeaderContext context)
     {
-        var className = context.IDENTIFIER(0).GetText();
-        var isClassSide = context.IDENTIFIER().Length == 2 && context.IDENTIFIER(1).GetText() == "class";
-        var category = context.stringLiteral(0).GetText().Trim('\'');
+        var className = context.IDENTIFIER().GetText();
+        var isClassSide = false; // grammar lacks explicit class-side indicator
+        var category = context.stringLiteral().GetText().Trim('\'');
         return new MethodHeaderNode(className, isClassSide, category);
     }
 
     /// <inheritdoc/>
-    public override AstNode VisitMethodChunk(Smalltalk80Parser.MethodChunkContext context)
+    public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
-        _ = (MethodHeaderNode)Visit(context.methodHeader())!;
         var body = (SequenceNode)Visit(context.sequence())!;
         return new MethodDefinitionNode(string.Empty, body, null);
     }
