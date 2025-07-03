@@ -6,11 +6,13 @@ using System;
 public static class Repl
 {
     /// <summary>
-    /// Starts the interactive session using a fresh <see cref="VirtualMachine"/>.
+    /// Starts the interactive session using the provided
+    /// <see cref="VirtualMachine"/> instance or a new one if <c>null</c>.
     /// </summary>
-    public static void Run()
+    /// <param name="vm">Optional virtual machine to host the session.</param>
+    public static void Run(VirtualMachine? vm = null)
     {
-        var vm = new VirtualMachine();
+        vm ??= new VirtualMachine();
         vm.RunRepl();
     }
 }
