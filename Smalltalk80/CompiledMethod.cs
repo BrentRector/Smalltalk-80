@@ -35,4 +35,9 @@ public sealed class CompiledMethod
     ///     the primitive routine to invoke.
     /// </summary>
     public int PrimitiveIndex { get; init; }
+
+    /// <summary>
+    ///     Optional comment describing the method's purpose.
+    /// </summary>
+    public string? Comment { get; init; }
 }

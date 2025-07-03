@@ -94,5 +94,6 @@ public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string
 /// </summary>
 /// <param name="Selector">The method selector.</param>
 /// <param name="Body">The method body.</param>
-public sealed record MethodDefinitionNode(string Selector, SequenceNode Body) : AstNode;
+/// <param name="Comment">Optional method comment text.</param>
+public sealed record MethodDefinitionNode(string Selector, SequenceNode Body, string? Comment) : AstNode;
 
