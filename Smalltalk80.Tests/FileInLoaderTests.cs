@@ -41,4 +41,60 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Ensures that temporary variables within loaded methods are
+    /// compiled correctly by the ANTLR-based loader.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_MethodWithTemporaries_ExecutesCorrectly()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #TempExample!",
+                "!TempExample methodsFor: 'testing'!",
+                "foo",
+                "| x y |",
+                "    x := 2.",
+                "    y := 3.",
+                "    ^x + y",
+                "!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("TempExample");
+            Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("foo")));
+
+            var instance = new SmalltalkObject(cls, 0);
+            var callMethod = new CompiledMethod
+            {
+                Bytecodes = new byte[]
+                {
+                    (byte)Bytecode.PushSelf,
+                    (byte)Bytecode.SingleExtendedSend, 0,
+                    (byte)Bytecode.ReturnTopFromMethod
+                },
+                Literals = new object[] { new Symbol("foo") },
+                TemporariesCount = 0
+            };
+
+            var result = vm.Interpreter.Evaluate(callMethod, instance);
+            Assert.Equal(5, result);
+
+            var loaded = cls.MethodDictionary[new Symbol("foo")];
+            Assert.Contains((byte)Bytecode.StoreAndPopTemporaryVariable0, loaded.Bytecodes);
+            Assert.Contains((byte)Bytecode.StoreAndPopTemporaryVariable1, loaded.Bytecodes);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }
