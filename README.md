@@ -30,3 +30,10 @@ extension, open this folder in VS Code and press <kbd>F5</kbd> to build and
 debug. The *Build* task compiles `Smalltalk80.sln`, and the default launch
 configuration runs the console application.
 
+## Loading Source Files
+
+Use the `--load` option to compile a single method file where the first line takes the form `ClassName>>selector` followed by the method body. For classic Smalltalk file-in sources that contain multiple class and method definitions, use the `--filein` option instead:
+
+```bash
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --filein "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st"
+```
