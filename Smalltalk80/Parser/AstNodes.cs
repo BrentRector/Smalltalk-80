@@ -66,3 +66,33 @@ public sealed record AssignmentExpression(string Variable, ExpressionNode Value)
 /// <param name="Selector">The binary selector.</param>
 /// <param name="Argument">The argument expression.</param>
 public sealed record BinarySendExpression(ExpressionNode Receiver, string Selector, ExpressionNode Argument) : ExpressionNode;
+
+/// <summary>
+/// Root node representing a file-in consisting of multiple chunks.
+/// </summary>
+/// <param name="Chunks">The ordered chunks in the file.</param>
+public sealed record FileNode(IReadOnlyList<AstNode> Chunks) : AstNode;
+
+/// <summary>
+/// Node representing a class definition chunk.
+/// </summary>
+/// <param name="Superclass">The superclass name.</param>
+/// <param name="ClassName">The class being defined.</param>
+/// <param name="Options">Additional class options such as variable declarations.</param>
+public sealed record ClassDefinitionNode(string Superclass, string ClassName, IReadOnlyDictionary<string, string> Options) : AstNode;
+
+/// <summary>
+/// Node representing a method category header chunk.
+/// </summary>
+/// <param name="ClassName">The class to which subsequent methods belong.</param>
+/// <param name="IsClassSide">Whether the methods belong to the metaclass.</param>
+/// <param name="Category">The category name.</param>
+public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string Category) : AstNode;
+
+/// <summary>
+/// Node representing a method definition.
+/// </summary>
+/// <param name="Selector">The method selector.</param>
+/// <param name="Body">The method body.</param>
+public sealed record MethodDefinitionNode(string Selector, SequenceNode Body) : AstNode;
+

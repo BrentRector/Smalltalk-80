@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Smalltalk80.Generated;
@@ -154,6 +155,61 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         var value = int.Parse(context.GetText());
         return new LiteralExpression(value);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitFile(Smalltalk80Parser.FileContext context)
+    {
+        var chunks = new List<AstNode>();
+        foreach (var chunk in context.chunk())
+        {
+            var node = Visit(chunk);
+            if (node is not null)
+                chunks.Add(node);
+        }
+
+        return new FileNode(chunks);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitChunk(Smalltalk80Parser.ChunkContext context)
+    {
+        if (context.classDefinition() is { } cls) return Visit(cls);
+        if (context.methodChunk() is { } mc) return Visit(mc);
+        return new ScriptNode(new SequenceNode(Array.Empty<string>(), Array.Empty<StatementNode>()));
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
+    {
+        var superclass = context.IDENTIFIER(0).GetText();
+        var className = context.IDENTIFIER(1).GetText();
+        var options = new Dictionary<string, string>();
+        foreach (var opt in context.classOption())
+        {
+            var key = opt.KEYWORD().GetText()[..^1];
+            var value = opt.stringLiteral().GetText().Trim('\'');
+            options[key] = value;
+        }
+
+        return new ClassDefinitionNode(superclass, className, options);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitMethodHeader(Smalltalk80Parser.MethodHeaderContext context)
+    {
+        var className = context.IDENTIFIER(0).GetText();
+        var isClassSide = context.IDENTIFIER().Length == 2 && context.IDENTIFIER(1).GetText() == "class";
+        var category = context.stringLiteral(0).GetText().Trim('\'');
+        return new MethodHeaderNode(className, isClassSide, category);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitMethodChunk(Smalltalk80Parser.MethodChunkContext context)
+    {
+        var header = (MethodHeaderNode)Visit(context.methodHeader())!;
+        var body = (SequenceNode)Visit(context.sequence())!;
+        return new MethodDefinitionNode(string.Empty, body);
     }
 }
 
