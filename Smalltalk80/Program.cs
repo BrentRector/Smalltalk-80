@@ -16,6 +16,7 @@ public static class Program
     ///     <list type="bullet">
     ///         <item><description><c>--repl</c> – start an interactive REPL.</description></item>
     ///         <item><description><c>--load &lt;file&gt;</c> – load a Smalltalk source file.</description></item>
+    ///         <item><description><c>--filein &lt;file&gt;</c> – load a classic Smalltalk file-in.</description></item>
     ///     </list>
     /// </param>
     [STAThread]
@@ -37,6 +38,22 @@ public static class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to load source file: {ex.Message}");
+                return;
+            }
+        }
+
+        var fileInIndex = Array.IndexOf(args, "--filein");
+        if (fileInIndex >= 0 && fileInIndex < args.Length - 1)
+        {
+            var path = args[fileInIndex + 1];
+            try
+            {
+                vm.LoadSystemFile(path);
+                Console.WriteLine($"Filed in '{Path.GetFileName(path)}'.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to file in source: {ex.Message}");
                 return;
             }
         }
