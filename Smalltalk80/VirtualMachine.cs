@@ -25,7 +25,8 @@ public sealed class VirtualMachine
     /// <returns>The result of evaluating the method.</returns>
     public object? EvaluateSource(string source)
     {
-        var method = SourceCompiler.Compile(source);
+        var parser = new SmalltalkParser(source);
+        var method = parser.ParseMethod();
         var receiver = StandardLibrary.Get("Object");
         return Interpreter.Evaluate(method, receiver);
     }

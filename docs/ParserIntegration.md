@@ -6,7 +6,7 @@ This document summarizes the current interpreter design and outlines how the Sma
 
 The interpreter executes bytecodes stored in `CompiledMethod` objects. Its main loop mirrors the specification in `docs/Interpreter.txt`, lines 1–24, by repeatedly fetching a bytecode, incrementing the instruction pointer and dispatching to an operation.
 
-The `VirtualMachine` class provides a simple wrapper around `Interpreter` and the `StandardLibrary`. It compiles a snippet using `SourceCompiler` and evaluates it with the global `Object` instance. At present the VM does not persist compiled methods or integrate with an object memory.
+The `VirtualMachine` class provides a simple wrapper around `Interpreter` and the `StandardLibrary`. It compiles a snippet using `SmalltalkParser` and evaluates it with the global `Object` instance. At present the VM does not persist compiled methods or integrate with an object memory.
 
 ## Integration Strategy
 
