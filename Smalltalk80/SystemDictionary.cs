@@ -1,0 +1,42 @@
+using System;
+using System.Collections.Generic;
+
+/// <summary>
+///     Global repository mapping class names to <see cref="SmalltalkClass"/> instances.
+/// </summary>
+public static class SystemDictionary
+{
+    private static readonly Dictionary<string, SmalltalkClass> classes = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Registers a new class object under the specified name. If a class with the
+    ///     name already exists it is returned instead.
+    /// </summary>
+    /// <param name="name">The class name.</param>
+    /// <param name="superclass">The optional superclass reference.</param>
+    /// <returns>The created or existing <see cref="SmalltalkClass"/>.</returns>
+    public static SmalltalkClass DefineClass(string name, SmalltalkClass? superclass = null)
+    {
+        if (classes.TryGetValue(name, out var existing))
+            return existing;
+
+        var cls = new SmalltalkClass { Superclass = superclass };
+        classes[name] = cls;
+        return cls;
+    }
+
+    /// <summary>
+    ///     Gets the class object registered under the provided name.
+    /// </summary>
+    /// <param name="name">The class name.</param>
+    /// <returns>The <see cref="SmalltalkClass"/> instance.</returns>
+    public static SmalltalkClass GetClass(string name) => classes[name];
+
+    /// <summary>
+    ///     Attempts to retrieve a class with the given name.
+    /// </summary>
+    /// <param name="name">The class name.</param>
+    /// <param name="cls">When this method returns, contains the class object if found.</param>
+    /// <returns><c>true</c> if the class exists; otherwise <c>false</c>.</returns>
+    public static bool TryGetClass(string name, out SmalltalkClass cls) => classes.TryGetValue(name, out cls!);
+}

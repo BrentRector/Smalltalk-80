@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 /// <summary>
 /// Provides a high level interface combining the interpreter and object memory
@@ -16,6 +17,36 @@ public sealed class VirtualMachine
     /// loads the standard library objects.
     /// </summary>
     public VirtualMachine() => StandardLibrary.Initialize();
+
+    /// <summary>
+    /// Loads a Smalltalk source file containing a single method definition and
+    /// installs it on the specified class. The first line of the file must be
+    /// of the form <c>ClassName&gt;&gt;selector</c> with the remaining lines
+    /// representing the method body.
+    /// </summary>
+    /// <param name="path">Path to the source file.</param>
+    public void LoadSourceFile(string path)
+    {
+        var lines = System.IO.File.ReadAllLines(path);
+        if (lines.Length == 0)
+            throw new InvalidOperationException("Source file is empty.");
+
+        var header = lines[0];
+        var parts = header.Split(new[] { ">>" }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+            throw new InvalidOperationException("First line must be 'ClassName>>selector'.");
+
+        var className = parts[0].Trim();
+        var selectorName = parts[1].Trim();
+        var body = string.Join(Environment.NewLine, lines[1..]);
+
+        var parser = new SmalltalkParser(body);
+        var method = parser.ParseMethod();
+
+        var superclass = SystemDictionary.TryGetClass("Object", out var objCls) ? objCls : null;
+        var cls = SystemDictionary.DefineClass(className, superclass);
+        cls.MethodDictionary[new Symbol(selectorName)] = method;
+    }
 
     /// <summary>
     /// Compiles the provided source code and evaluates the resulting method in

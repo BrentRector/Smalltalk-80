@@ -13,7 +13,7 @@ public static class StandardLibrary
     /// </summary>
     public static void Initialize()
     {
-        var objectClass = new SmalltalkClass();
+        var objectClass = SystemDictionary.DefineClass("Object");
         globals["Object"] = new SmalltalkObject(objectClass, 0);
     }
 
