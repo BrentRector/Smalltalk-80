@@ -23,11 +23,9 @@ This file lists missing features and potential improvements for the Smalltalk-80
    - Replace the long chain of `if`/`else` statements in `Interpreter.Dispatch` with a modern `switch` expression for clarity and potential performance gain.
 2. **Context Allocation**
    - Use struct-based contexts or object pooling to reduce allocations when creating new contexts for sends and blocks.
-3. **Parser and Compiler**
-   - Expand the `SmalltalkParser` to support the full Smalltalk syntax, including unary, binary and keyword messages, and control structures.
-4. **Garbage Collection Integration**
+3. **Garbage Collection Integration**
    - Implement either reference counting or a mark/sweep collector and integrate it with the interpreter per the specification.
-5. **Comprehensive Test Coverage**
+4. **Comprehensive Test Coverage**
    - Expand tests to cover all interpreter features and primitives to prevent regressions.
 
 
