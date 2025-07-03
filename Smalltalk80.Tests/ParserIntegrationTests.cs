@@ -4,10 +4,10 @@ namespace Smalltalk80.Tests;
 
 /// <summary>
 /// Integration tests verifying that Smalltalk source is compiled
-/// and executed correctly via <see cref="SourceCompiler"/> and
+/// and executed correctly via <see cref="SmalltalkParser"/> and
 /// <see cref="VirtualMachine"/>.
 /// </summary>
-public class SourceCompilerIntegrationTests
+public class ParserIntegrationTests
 {
     /// <summary>
     /// Confirms that a simple arithmetic expression is compiled and
@@ -40,7 +40,7 @@ public class SourceCompilerIntegrationTests
     [Fact]
     public void Compile_UnknownVariable_ThrowsException()
     {
-        Assert.Throws<InvalidOperationException>(() => SourceCompiler.Compile("x"));
+        Assert.Throws<InvalidOperationException>(() => new SmalltalkParser("x").ParseMethod());
     }
 
     /// <summary>

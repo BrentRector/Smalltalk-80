@@ -29,7 +29,8 @@ public sealed class VirtualMachine
 
     public object? EvaluateSource(string source)
     {
-        var method = SourceCompiler.Compile(source);
+        var parser = new SmalltalkParser(source);
+        var method = parser.ParseMethod();
         var receiver = StandardLibrary.Get("Object");
         return Interpreter.Evaluate(method, receiver);
     }
@@ -64,20 +65,7 @@ public sealed class VirtualMachine
 
 ### Parsing and Compilation
 
-When `EvaluateSource` is called, it uses `SourceCompiler` to compile the snippet. `SourceCompiler` in turn instantiates a `SmalltalkParser`, which uses ANTLR-generated classes to build an AST and then emit bytecodes:
-
-```
-public static class SourceCompiler
-{
-    /// Compiles a snippet of Smalltalk source code into a CompiledMethod.
-    public static CompiledMethod Compile(string source)
-    {
-        var parser = new SmalltalkParser(source);
-        return parser.ParseMethod();
-    }
-}
-```
-
+When `EvaluateSource` is called, it instantiates a `SmalltalkParser` to compile the snippet. The parser builds an AST using ANTLR-generated classes and then emits bytecodes:
 
 The `SmalltalkParser` converts the textual input into bytecode using an `AstBuildingVisitor` to create an AST. It then walks the AST and emits bytecodes and literal references:
 
@@ -188,7 +176,8 @@ Although the current VM only loads a single `Object` instance, this object memor
 Once a method is compiled, `VirtualMachine.EvaluateSource` executes it using the interpreter:
 
 ```
-var method = SourceCompiler.Compile(source);
+var parser = new SmalltalkParser(source);
+var method = parser.ParseMethod();
 var receiver = StandardLibrary.Get("Object");
 return Interpreter.Evaluate(method, receiver);
 ```
@@ -287,7 +276,7 @@ This architecture aligns with the detailed design notes in `docs/ParserIntegrati
 
 ```
 The interpreter executes bytecodes stored in `CompiledMethod` objects. Its main loop mirrors the specification in `docs/Interpreter.txt`...
-The `VirtualMachine` class provides a simple wrapper around `Interpreter` and the `StandardLibrary`. It compiles a snippet using `SourceCompiler` and evaluates it with the global `Object` instance.
+The `VirtualMachine` class provides a simple wrapper around `Interpreter` and the `StandardLibrary`. It compiles a snippet using `SmalltalkParser` and evaluates it with the global `Object` instance.
 ```
 
 
