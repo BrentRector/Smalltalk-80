@@ -39,4 +39,10 @@ public static class SystemDictionary
     /// <param name="cls">When this method returns, contains the class object if found.</param>
     /// <returns><c>true</c> if the class exists; otherwise <c>false</c>.</returns>
     public static bool TryGetClass(string name, out SmalltalkClass cls) => classes.TryGetValue(name, out cls!);
+
+    /// <summary>
+    ///     Gets a read-only view of all classes currently registered in the
+    ///     system dictionary.
+    /// </summary>
+    public static IReadOnlyDictionary<string, SmalltalkClass> AllClasses => classes;
 }
