@@ -7,6 +7,10 @@
 
 grammar Smalltalk80;
 
+file
+    : (chunk ws? BANG ws?)* EOF
+    ;
+
 script
     : sequence EOF
     ;
@@ -18,6 +22,28 @@ sequence
 
 ws
     : (SEPARATOR | COMMENT)+
+    ;
+
+chunk
+    : classDefinition
+    | methodChunk
+    |
+    ;
+
+methodChunk
+    : methodHeader ws? sequence
+    ;
+
+methodHeader
+    : BANG IDENTIFIER (ws? IDENTIFIER)? ws? KEYWORD ws? stringLiteral (ws? KEYWORD ws? stringLiteral)? BANG
+    ;
+
+classDefinition
+    : IDENTIFIER ws? KEYWORD ws? HASH IDENTIFIER (ws? classOption)*
+    ;
+
+classOption
+    : KEYWORD ws? stringLiteral
     ;
 
 temps
@@ -261,6 +287,10 @@ PERIOD
 
 SEMI_COLON
     : ';'
+    ;
+
+BANG
+    : '!'
     ;
 
 BINARY_SELECTOR
