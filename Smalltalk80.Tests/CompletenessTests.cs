@@ -58,7 +58,8 @@ public class CompletenessTests
                    ?? throw new InvalidOperationException("Handlers field not found");
         var handlers = (System.Collections.IDictionary)field.GetValue(null)!;
         var handler = handlers[index] as Delegate;
-        var methodName = handler?.Method is { DeclaringType: var type } method
+        var method = handler?.Method;
+        string methodName = method?.DeclaringType is { } type
             ? $"{type.Name}.{method.Name}"
             : "unknown";
         Trace($"{nameof(PrimitiveDispatcher_DefinesHandler)}_{index}_{methodName}");
