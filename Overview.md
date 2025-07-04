@@ -77,7 +77,10 @@ public sealed class SmalltalkParser
     private readonly List<object> literals = new();
     private readonly Dictionary<string, int> temporaries = new();
 
-    public CompiledMethod ParseMethod()
+    public CompiledMethod ParseMethod(
+        IReadOnlyList<string>? argumentNames = null,
+        IReadOnlyList<string>? instanceVariables = null,
+        string? methodName = null)
     {
         var ast = BuildAst();
         foreach (var temp in ast.Sequence.Temporaries)
