@@ -100,7 +100,7 @@ public static class FileInLoader
             return;
 
         var headerLine = lines[0].Trim();
-        if (headerLine == "!!")
+        if (headerLine == "!!" || headerLine == "!")
             return;
 
         // Some sources place the terminating '!' for an empty category on the
@@ -115,7 +115,7 @@ public static class FileInLoader
 
         var node = ParseChunk(headerLine);
         if (node is not MethodHeaderNode headerNode)
-            throw new InvalidOperationException($"Invalid method category header: '{headerLine}'");
+            return;
         currentHeader = headerNode;
 
         var methodLines = new List<string>();
