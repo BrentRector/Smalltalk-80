@@ -17,8 +17,8 @@ classDefinition:
 	)*;
 
 classComment
-    : className ('class')? 'comment:' stringLiteral
-    ;
+    : className ('class')? 'comment:' stringLiteral BANG ws?;
+
 
 className: IDENTIFIER;
 
@@ -171,9 +171,9 @@ binaryMessage: ws? BINARY_SELECTOR ws? (unarySend | operand);
 
 SEPARATOR: [ \t\r\n]+;
 
-STRING: '\'' ( ~[\r\n'] | '\'\'')* '\'';
+STRING  : '\'' ( ~['] | '\'\'' )* '\'';
+COMMENT : '"' ( ~["] | '""' )* '"';
 
-COMMENT: '"' ( ~[\r\n"] | '""')* '"';
 
 BLOCK_START: '[';
 BLOCK_END: ']';
