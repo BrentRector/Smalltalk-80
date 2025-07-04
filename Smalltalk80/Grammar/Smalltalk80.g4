@@ -15,13 +15,15 @@ commentChunk: ws? COMMENT BANG ws?;
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
 classDefinition:
-    IDENTIFIER ws? ( 'subclass:' | 'variableSubclass:' 
-                   | 'variableByteSubclass:' | 'variableWordSubclass:' )
-    ws? HASH IDENTIFIER (ws? classOption)*;
-
+	IDENTIFIER ws? (
+		'subclass:'
+		| 'variableSubclass:'
+		| 'variableByteSubclass:'
+		| 'variableWordSubclass:'
+	) ws? HASH IDENTIFIER (ws? classOption)*;
 
 classComment:
-        className ws? ('class' ws?)? 'comment:' ws? stringLiteral BANG ws?;
+	className ws? ('class' ws?)? 'comment:' ws? stringLiteral BANG ws?;
 
 className: IDENTIFIER;
 
@@ -163,11 +165,12 @@ reference: variable;
 
 binaryTail: binaryMessage binaryTail?;
 
-binaryMessage: ws? (BINARY_SELECTOR | MINUS) ws? (unarySend | operand);
+binaryMessage:
+	ws? (BINARY_SELECTOR | MINUS) ws? (unarySend | operand);
 
 // —————————————————————————————————————————— Lexer Rules ——————————————————————————————————————————
 
-SEPARATOR: [ \t\r\n]+;
+SEPARATOR: [ \t\r\n\u000C]+;
 
 STRING: '\'' ( ~['] | '\'\'')* '\'';
 COMMENT: '"' ( ~["] | '""')* '"';
@@ -196,7 +199,6 @@ BINARY_SELECTOR: (
 		| '~'
 		| '|'
 		| '&'
-
 		| '?'
 	)+;
 
