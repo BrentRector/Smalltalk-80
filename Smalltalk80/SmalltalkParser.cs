@@ -37,6 +37,25 @@ public sealed class SmalltalkParser
         return AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
     }
 
+    /// <summary>
+    /// Parses the source into a <see cref="CompiledMethod"/> using instance
+    /// variables defined on the specified class.
+    /// </summary>
+    /// <param name="className">Name of the class owning the method.</param>
+    /// <param name="argumentNames">Method argument names in order.</param>
+    /// <param name="methodName">Optional selector for debug tracing.</param>
+    /// <returns>The compiled method.</returns>
+    public CompiledMethod ParseMethod(
+        string className,
+        IReadOnlyList<string>? argumentNames = null,
+        string? methodName = null)
+    {
+        if (!SystemDictionary.TryGetClass(className, out var cls))
+            throw new InvalidOperationException($"Class '{className}' is not defined.");
+
+        return ParseMethod(argumentNames, cls.InstanceVariables, methodName);
+    }
+
     private ScriptNode BuildAst(string? methodName)
     {
         var input = new AntlrInputStream(source);
