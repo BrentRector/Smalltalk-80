@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Antlr4.Runtime;
 using Smalltalk80.Generated;
 using Smalltalk80.Parser;
@@ -18,13 +19,20 @@ public sealed class SmalltalkParser
     public SmalltalkParser(string source) => this.source = source;
 
     /// <summary>
-    /// Parses the source into a <see cref="CompiledMethod"/>.
+    /// Parses the source into a <see cref="CompiledMethod"/> using the provided
+    /// argument and instance variable names.
     /// </summary>
+    /// <param name="argumentNames">Method argument names in order.</param>
+    /// <param name="instanceVariables">Instance variables available in the method.</param>
     /// <returns>The compiled method.</returns>
-    public CompiledMethod ParseMethod()
+    public CompiledMethod ParseMethod(
+        IReadOnlyList<string>? argumentNames = null,
+        IReadOnlyList<string>? instanceVariables = null)
     {
+        argumentNames ??= Array.Empty<string>();
+        instanceVariables ??= Array.Empty<string>();
         var ast = BuildAst();
-        return AstMethodCompiler.CompileMethod(ast.Sequence, Array.Empty<string>(), Array.Empty<string>());
+        return AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
     }
 
     private ScriptNode BuildAst()

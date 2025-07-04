@@ -30,10 +30,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
     /// </summary>
     /// <param name="methodName">Optional selector of the method being parsed.</param>
-    public AstBuildingVisitor(string? methodName = null)
-    {
-        currentMethodName = methodName;
-    }
+    public AstBuildingVisitor(string? methodName = null) => currentMethodName = methodName;
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
@@ -41,7 +38,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitSequence(Smalltalk80Parser.SequenceContext context)
     {
-        Console.WriteLine($"[DEBUG] Push scope: {++scopeDepth}");
+        var scopeName = scopeDepth == 0
+            ? (currentMethodName ?? "(unknown)")
+            : $"block {scopeDepth}";
+        Tracer.Log($"Push scope {scopeName}: {scopeDepth + 1}");
+        scopeDepth++;
 
         var temps = new List<string>();
         if (context.temps() is not null)
@@ -60,8 +61,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         scopeStack.Push(current);
 
         if (temps.Count > 0)
-            Console.WriteLine($"Temps: {string.Join(", ", temps)}");
-        Console.WriteLine($"Variables in scope: {string.Join(", ", current)}");
+            Tracer.Log($"Temps: {string.Join(", ", temps)}");
+        Tracer.Log($"Variables in scope: {string.Join(", ", current)}");
 
         var statements = new List<StatementNode>();
         if (context.statements() is { } stmts)
@@ -72,7 +73,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         var node = new SequenceNode(temps, statements);
         scopeStack.Pop();
-        Console.WriteLine($"[DEBUG] Pop scope: {scopeDepth--}");
+        scopeDepth--;
+        Tracer.Log($"Pop scope {scopeName}: {scopeDepth}");
         return node;
     }
 
@@ -282,6 +284,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
     {
+        Tracer.Log($"Parsing class definition: {context.IDENTIFIER(1).GetText()}");
         var superclass = context.IDENTIFIER(0).GetText();
         var className = context.IDENTIFIER(1).GetText();
         var options = new Dictionary<string, string>();
@@ -321,14 +324,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
         var methodName = currentMethodName ?? "(unknown)";
-        Console.WriteLine($"Method: {methodName}");
-        Console.WriteLine($"[DEBUG] Entering method: {methodName}");
+        Tracer.Log($"Parsing method: {methodName}");
+        Tracer.Log($"Entering method: {methodName}");
 
         scopeStack.Clear();
         var body = (SequenceNode)Visit(context.sequence())!;
         scopeStack.Clear();
 
-        Console.WriteLine($"[DEBUG] Exiting method: {methodName}");
+        Tracer.Log($"Exiting method: {methodName}");
         return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
