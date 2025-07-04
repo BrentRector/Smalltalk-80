@@ -180,7 +180,7 @@ public static class FileInLoader
                 bodyText = bodyText.TrimEnd();
                 while (bodyText.EndsWith("!"))
                     bodyText = bodyText[..^1].TrimEnd();
-                var bodyAst = ParseScript(bodyText);
+                var bodyAst = ParseScript(bodyText, selector);
                 var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
                 var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, args, cls.InstanceVariables, comment);
                 cls.MethodDictionary[new Symbol(selector)] = method;
@@ -188,7 +188,13 @@ public static class FileInLoader
         }
     }
 
-    private static ScriptNode ParseScript(string source)
+    /// <summary>
+    /// Parses a block of Smalltalk code into an AST script node.
+    /// </summary>
+    /// <param name="source">The source text to parse.</param>
+    /// <param name="methodName">Optional method selector for debug logging.</param>
+    /// <returns>The parsed <see cref="ScriptNode"/>.</returns>
+    private static ScriptNode ParseScript(string source, string? methodName = null)
     {
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
@@ -196,7 +202,7 @@ public static class FileInLoader
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
         var ctx = parser.script();
-        return (ScriptNode)new AstBuildingVisitor().Visit(ctx)!;
+        return (ScriptNode)new AstBuildingVisitor(methodName).Visit(ctx)!;
     }
 
     private static (string Selector, List<string> Arguments) ParseSelector(string line)

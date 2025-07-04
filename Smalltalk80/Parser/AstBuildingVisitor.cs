@@ -11,6 +11,24 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 {
+    /// <summary>
+    /// Tracks the current scope depth while visiting sequences.
+    /// </summary>
+    private int scopeDepth;
+
+    /// <summary>
+    /// Gets the name of the method currently being visited, if any.
+    /// </summary>
+    private readonly string? currentMethodName;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
+    /// </summary>
+    /// <param name="methodName">Optional selector of the method being parsed.</param>
+    public AstBuildingVisitor(string? methodName = null)
+    {
+        currentMethodName = methodName;
+    }
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
@@ -18,6 +36,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitSequence(Smalltalk80Parser.SequenceContext context)
     {
+        Console.WriteLine($"[DEBUG] Push scope: {++scopeDepth}");
+
         var temps = new List<string>();
         if (context.temps() is not null)
         {
@@ -25,6 +45,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                 context.temps()
                     .IDENTIFIER()
                     .Select(id => id.GetText().Trim()));
+            Console.WriteLine($"[DEBUG] Temps: {string.Join(", ", temps)}");
         }
 
         var statements = new List<StatementNode>();
@@ -34,7 +55,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                 statements.AddRange(sn.Statements);
         }
 
-        return new SequenceNode(temps, statements);
+        var node = new SequenceNode(temps, statements);
+        Console.WriteLine($"[DEBUG] Pop scope: {scopeDepth--}");
+        return node;
     }
 
     /// <inheritdoc/>
@@ -281,7 +304,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
+        var nameMsg = currentMethodName is null
+            ? "method definition" : $"method: {currentMethodName}";
+        Console.WriteLine($"[DEBUG] Entering {nameMsg}");
         var body = (SequenceNode)Visit(context.sequence())!;
+        Console.WriteLine($"[DEBUG] Exiting {nameMsg}");
         return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
