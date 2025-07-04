@@ -11,6 +11,10 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 {
+    /// <summary>
+    /// Tracks the current scope depth while visiting sequences.
+    /// </summary>
+    private int scopeDepth;
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
@@ -18,6 +22,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitSequence(Smalltalk80Parser.SequenceContext context)
     {
+        Console.WriteLine($"[DEBUG] Push scope: {++scopeDepth}");
+
         var temps = new List<string>();
         if (context.temps() is not null)
         {
@@ -25,6 +31,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                 context.temps()
                     .IDENTIFIER()
                     .Select(id => id.GetText().Trim()));
+            Console.WriteLine($"[DEBUG] Temps: {string.Join(", ", temps)}");
         }
 
         var statements = new List<StatementNode>();
@@ -34,7 +41,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                 statements.AddRange(sn.Statements);
         }
 
-        return new SequenceNode(temps, statements);
+        var node = new SequenceNode(temps, statements);
+        Console.WriteLine($"[DEBUG] Pop scope: {scopeDepth--}");
+        return node;
     }
 
     /// <inheritdoc/>
@@ -281,7 +290,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
+        Console.WriteLine("[DEBUG] Entering method definition");
         var body = (SequenceNode)Visit(context.sequence())!;
+        Console.WriteLine("[DEBUG] Exiting method definition");
         return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
