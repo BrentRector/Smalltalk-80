@@ -22,7 +22,19 @@ public static class SystemDictionary
         IReadOnlyList<string>? instanceVariables = null)
     {
         if (classes.TryGetValue(name, out var existing))
+        {
+            if (superclass is not null && existing.Superclass is null)
+                existing.Superclass = superclass;
+            if (instanceVariables is not null)
+            {
+                foreach (var ivar in instanceVariables)
+                {
+                    if (!existing.InstanceVariables.Contains(ivar))
+                        existing.InstanceVariables.Add(ivar);
+                }
+            }
             return existing;
+        }
 
         var cls = new SmalltalkClass { Superclass = superclass };
         if (instanceVariables is not null)
