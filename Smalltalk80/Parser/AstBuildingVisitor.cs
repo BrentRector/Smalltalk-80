@@ -17,6 +17,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     private int scopeDepth;
 
     /// <summary>
+    /// Maintains the stack of variable scopes for debugging output.
+    /// </summary>
+    private readonly Stack<HashSet<string>> scopeStack = new();
+
+    /// <summary>
     /// Gets the name of the method currently being visited, if any.
     /// </summary>
     private readonly string? currentMethodName;
@@ -45,8 +50,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                 context.temps()
                     .IDENTIFIER()
                     .Select(id => id.GetText().Trim()));
-            Console.WriteLine($"[DEBUG] Temps: {string.Join(", ", temps)}");
         }
+
+        var current = scopeStack.Count > 0
+            ? new HashSet<string>(scopeStack.Peek())
+            : new HashSet<string>();
+        foreach (var t in temps)
+            current.Add(t);
+        scopeStack.Push(current);
+
+        if (temps.Count > 0)
+            Console.WriteLine($"Temps: {string.Join(", ", temps)}");
+        Console.WriteLine($"Variables in scope: {string.Join(", ", current)}");
 
         var statements = new List<StatementNode>();
         if (context.statements() is { } stmts)
@@ -56,6 +71,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         }
 
         var node = new SequenceNode(temps, statements);
+        scopeStack.Pop();
         Console.WriteLine($"[DEBUG] Pop scope: {scopeDepth--}");
         return node;
     }
@@ -304,11 +320,15 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
-        var nameMsg = currentMethodName is null
-            ? "method definition" : $"method: {currentMethodName}";
-        Console.WriteLine($"[DEBUG] Entering {nameMsg}");
+        var methodName = currentMethodName ?? "(unknown)";
+        Console.WriteLine($"Method: {methodName}");
+        Console.WriteLine($"[DEBUG] Entering method: {methodName}");
+
+        scopeStack.Clear();
         var body = (SequenceNode)Visit(context.sequence())!;
-        Console.WriteLine($"[DEBUG] Exiting {nameMsg}");
+        scopeStack.Clear();
+
+        Console.WriteLine($"[DEBUG] Exiting method: {methodName}");
         return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
