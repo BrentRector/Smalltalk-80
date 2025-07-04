@@ -29,7 +29,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         var statements = new List<StatementNode>();
         if (context.statements() is { } stmts)
-            statements.AddRange(((StatementsNode)Visit(stmts)!).Statements);
+        {
+            if (Visit(stmts) is StatementsNode sn)
+                statements.AddRange(sn.Statements);
+        }
 
         return new SequenceNode(temps, statements);
     }
