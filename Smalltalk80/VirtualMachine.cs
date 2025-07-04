@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 /// <summary>
@@ -37,14 +38,14 @@ public sealed class VirtualMachine
             throw new InvalidOperationException("First line must be 'ClassName>>selector'.");
 
         var className = parts[0].Trim();
-        var selectorName = parts[1].Trim();
+        var headerPart = parts[1].Trim();
+        var (selectorName, args) = ParseSelector(headerPart);
         var body = string.Join(Environment.NewLine, lines[1..]);
 
         var parser = new SmalltalkParser(body);
-        var method = parser.ParseMethod();
-
         var superclass = SystemDictionary.TryGetClass("Object", out var objCls) ? objCls : null;
         var cls = SystemDictionary.DefineClass(className, superclass);
+        var method = parser.ParseMethod(args, cls.InstanceVariables);
         cls.MethodDictionary[new Symbol(selectorName)] = method;
     }
 
@@ -100,5 +101,36 @@ public sealed class VirtualMachine
                 Console.WriteLine($"! {ex.Message}");
             }
         }
+    }
+
+    private static (string Selector, List<string> Arguments) ParseSelector(string line)
+    {
+        var tokens = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var selectorParts = new List<string>();
+        var args = new List<string>();
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            var tok = tokens[i];
+            if (tok.EndsWith(':'))
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else if (selectorParts.Count == 0)
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else
+            {
+                selectorParts.Add(tok);
+            }
+        }
+
+        var selector = string.Concat(selectorParts);
+        return (selector, args);
     }
 }
