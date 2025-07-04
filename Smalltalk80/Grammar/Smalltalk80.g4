@@ -5,10 +5,10 @@ fileIn: chunk* EOF;
 
 // A chunk is a class definition, a method category with methods, or arbitrary code
 chunk:
-	classDefinition BANG ws?
-	| methodCategoryHeader methodDefinition*
-    | classComment
-	| sequence BANG ws?;
+    classDefinition BANG ws?
+  | methodCategoryHeader methodDefinition* BANG+ ws?
+  | classComment
+  | sequence BANG ws?;
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
 classDefinition:
