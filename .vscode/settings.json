@@ -1,4 +1,5 @@
 // .vscode/settings.json or in your user settings
 {
-    "antlr4.generation": { "mode": "none" }
+"antlr4.generation": { "mode": "none" },
+    "csharp.debug.logging.exceptions": false
 }

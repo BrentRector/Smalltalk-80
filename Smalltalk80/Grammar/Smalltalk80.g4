@@ -6,9 +6,9 @@ fileIn: chunk* EOF;
 // A chunk is a class definition, a method category with methods, or arbitrary code
 chunk:
 	classDefinition BANG ws?
-	| methodCategoryHeader methodDefinition* BANG+ ws?
+	| methodCategoryHeader methodDefinition+
 	| classComment
-	| commentChunk // new alternative
+	| commentChunk
 	| sequence BANG ws?;
 
 commentChunk: ws? COMMENT BANG ws?;
@@ -39,19 +39,17 @@ methodCategoryHeader:
 	'methodsFor:' ws? stringLiteral BANG ws?;
 
 // A single method under the current category, terminated by '!'
-methodDefinition: sequence BANG ws?;
+methodDefinition: sequence METHOD_END ws?;
 
 // Optional standalone script entry point
 script: sequence EOF;
 
 // Sequence of temporaries and statements
-sequence: temps ws? statements? | ws? statements;
+sequence: temps? ws? statements?;
+temps: PIPE IDENTIFIER+ PIPE;
 
 // Whitespace and comments
 ws: (SEPARATOR | COMMENT)+;
-
-// Temporary variable declarations: | x y z |
-temps: PIPE (ws? IDENTIFIER)+ ws? PIPE;
 
 // Statements: answer or expressions, possibly with trailing period
 statements:
@@ -212,6 +210,7 @@ LITARR_START: '#(';
 DYNDICT_START: '#{';
 DYNARR_END: '}';
 DYNARR_START: '{';
+METHOD_END: '!!';
 
 RESERVED_WORD: 'nil' | 'true' | 'false' | 'self' | 'super';
 

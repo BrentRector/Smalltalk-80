@@ -7,7 +7,10 @@
       "request": "launch",
       "preLaunchTask": "generate-antlr",
       "program": "${workspaceFolder}/Smalltalk80/bin/Debug/net9.0/Smalltalk80.dll",
-      "args": ["--filein", "Smalltalk-80 Source/Smalltalk-80.st" ],
+      "args": [
+        "--filein",
+        "Smalltalk-80 Source/Smalltalk-80.st"
+      ],
       "cwd": "${workspaceFolder}/Smalltalk80",
       "stopAtEntry": false
     },
@@ -17,7 +20,9 @@
       "request": "launch",
       "preLaunchTask": "generate-antlr",
       "program": "${workspaceFolder}/Smalltalk80/bin/Debug/net9.0/Smalltalk80.dll",
-      "args": ["--repl"],
+      "args": [
+        "--repl"
+      ],
       "cwd": "${workspaceFolder}/Smalltalk80",
       "stopAtEntry": false
     }

@@ -99,17 +99,17 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitSequence([NotNull] Smalltalk80Parser.SequenceContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.ws"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitWs([NotNull] Smalltalk80Parser.WsContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.temps"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitTemps([NotNull] Smalltalk80Parser.TempsContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.ws"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitWs([NotNull] Smalltalk80Parser.WsContext context);
 	/// <summary>
 	/// Visit a parse tree produced by the <c>StatementAnswer</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.statements"/>.
