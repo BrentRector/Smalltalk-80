@@ -15,6 +15,20 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// Tracks the current scope depth while visiting sequences.
     /// </summary>
     private int scopeDepth;
+
+    /// <summary>
+    /// Gets the name of the method currently being visited, if any.
+    /// </summary>
+    private readonly string? currentMethodName;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
+    /// </summary>
+    /// <param name="methodName">Optional selector of the method being parsed.</param>
+    public AstBuildingVisitor(string? methodName = null)
+    {
+        currentMethodName = methodName;
+    }
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
@@ -290,9 +304,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
-        Console.WriteLine("[DEBUG] Entering method definition");
+        var nameMsg = currentMethodName is null
+            ? "method definition" : $"method: {currentMethodName}";
+        Console.WriteLine($"[DEBUG] Entering {nameMsg}");
         var body = (SequenceNode)Visit(context.sequence())!;
-        Console.WriteLine("[DEBUG] Exiting method definition");
+        Console.WriteLine($"[DEBUG] Exiting {nameMsg}");
         return new MethodDefinitionNode(string.Empty, body, null);
     }
 }
