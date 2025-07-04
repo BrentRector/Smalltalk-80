@@ -5,15 +5,13 @@ fileIn: chunk* EOF;
 
 // A chunk is a class definition, a method category with methods, or arbitrary code
 chunk:
-    classDefinition BANG ws?
-  | methodCategoryHeader methodDefinition* BANG+ ws?
-  | classComment
-  | commentChunk                  // new alternative
-  | sequence BANG ws?;
+	classDefinition BANG ws?
+	| methodCategoryHeader methodDefinition* BANG+ ws?
+	| classComment
+	| commentChunk // new alternative
+	| sequence BANG ws?;
 
-commentChunk
-    : ws? COMMENT BANG ws?;
-
+commentChunk: ws? COMMENT BANG ws?;
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
 classDefinition:
@@ -21,9 +19,8 @@ classDefinition:
 		ws? classOption
 	)*;
 
-classComment
-    : className ('class')? 'comment:' stringLiteral BANG ws?;
-
+classComment:
+	className ('class')? 'comment:' stringLiteral BANG ws?;
 
 className: IDENTIFIER;
 
@@ -34,14 +31,9 @@ classOption:
 	| 'category:' ws? stringLiteral;
 
 // Method-category header: !MyClass methodsFor: 'accessing'!
-methodCategoryHeader
-    : BANG ws?
-      IDENTIFIER ws?
-      ('class' ws?)?                // optional literal class
-      'methodsFor:' ws?
-      stringLiteral
-      BANG ws?
-    ;
+methodCategoryHeader:
+	BANG ws? IDENTIFIER ws? ('class' ws?)? // optional literal class
+	'methodsFor:' ws? stringLiteral BANG ws?;
 
 // A single method under the current category, terminated by '!'
 methodDefinition: sequence BANG ws?;
@@ -129,7 +121,7 @@ parsetimeLiteral:
 	| stringLiteral
 	| symbol;
 
-number: numberExp | hex_ | stFloat | stInteger;
+number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
 
 numberExp: (stFloat | stInteger) EXP stInteger;
 
@@ -176,9 +168,8 @@ binaryMessage: ws? BINARY_SELECTOR ws? (unarySend | operand);
 
 SEPARATOR: [ \t\r\n]+;
 
-STRING  : '\'' ( ~['] | '\'\'' )* '\'';
-COMMENT : '"' ( ~["] | '""' )* '"';
-
+STRING: '\'' ( ~['] | '\'\'')* '\'';
+COMMENT: '"' ( ~["] | '""')* '"';
 
 BLOCK_START: '[';
 BLOCK_END: ']';
@@ -223,11 +214,12 @@ RESERVED_WORD: 'nil' | 'true' | 'false' | 'self' | 'super';
 
 IDENTIFIER: [a-zA-Z]+ [a-zA-Z0-9_]*;
 
-CHARACTER_CONSTANT: DOLLAR (HEXDIGIT | DOLLAR);
+CHARACTER_CONSTANT: '$' ~[\r\n];
 
 DIGIT: [0-9];
 
 HEXDIGIT: [0-9a-fA-F];
+RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 
 KEYWORD: IDENTIFIER COLON;
 
@@ -236,9 +228,6 @@ BLOCK_PARAM: COLON IDENTIFIER;
 COLON: ':';
 
 // after
-ASSIGNMENT
-    : ':='
-    | '_'
-    ;
+ASSIGNMENT: ':=' | '_';
 
 DOLLAR: '$';
