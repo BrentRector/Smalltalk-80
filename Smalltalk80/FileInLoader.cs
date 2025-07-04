@@ -32,7 +32,14 @@ public static class FileInLoader
         {
             var text = source.Substring(chunk.Start.StartIndex,
                 chunk.Stop.StopIndex - chunk.Start.StartIndex + 1);
-            ProcessChunk(text.Trim(), ref currentHeader);
+            if (text.TrimStart().StartsWith("!"))
+            {
+                ProcessCategoryChunk(text.Trim(), ref currentHeader);
+            }
+            else
+            {
+                ProcessChunk(text.Trim(), ref currentHeader);
+            }
         }
     }
 
@@ -73,6 +80,33 @@ public static class FileInLoader
         return scriptCtx;
     }
 
+    private static void ProcessCategoryChunk(string chunk, ref MethodHeaderNode? currentHeader)
+    {
+        var lines = chunk.Split('\n');
+        if (lines.Length == 0)
+            return;
+
+        var headerLine = lines[0].Trim();
+        var headerNode = (MethodHeaderNode)ParseChunk(headerLine);
+        currentHeader = headerNode;
+
+        var methodLines = new List<string>();
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (line.Trim() == "!!")
+                break;
+
+            methodLines.Add(line);
+            if (line.Trim() == "!")
+            {
+                var methodChunk = string.Join('\n', methodLines);
+                ProcessChunk(methodChunk, ref currentHeader);
+                methodLines.Clear();
+            }
+        }
+    }
+
     private static void ProcessChunk(string chunk, ref MethodHeaderNode? currentHeader)
     {
         var node = ParseChunk(chunk);
@@ -89,6 +123,8 @@ public static class FileInLoader
                 var lines = chunk.Split('\n');
                 if (lines.Length == 0) return;
                 var selector = lines[0].Trim();
+                if (selector.StartsWith("--"))
+                    break;
                 int index = 1;
                 string? comment = null;
                 var bodyLines = new List<string>();
@@ -100,6 +136,8 @@ public static class FileInLoader
                 }
                 if (index < lines.Length)
                     bodyLines.AddRange(lines[index..]);
+                while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
+                    bodyLines.RemoveAt(bodyLines.Count - 1);
                 var bodyText = bodyLines.Count > 0 ? string.Join("\n", bodyLines) : string.Empty;
                 var bodyAst = ParseScript(bodyText);
                 var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, comment);
