@@ -656,13 +656,17 @@ public class Interpreter
                 }
             }
 
+            var temps = new object[method.TemporariesCount];
+            for (int i = 0; i < arguments.Length && i < temps.Length; i++)
+                temps[i] = arguments[i];
+
             var newContext = new MethodContext
             {
                 Sender = currentContext,
                 Method = method,
                 Receiver = recvObj,
                 Arguments = arguments,
-                Temporaries = new object[method.TemporariesCount],
+                Temporaries = temps,
                 Stack = new Stack<object?>(),
                 PC = 0
             };

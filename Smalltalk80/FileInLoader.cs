@@ -25,6 +25,7 @@ public static class FileInLoader
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
         var fileCtx = parser.fileIn();
 
         MethodHeaderNode? currentHeader = null;
@@ -50,6 +51,7 @@ public static class FileInLoader
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor();
 
         try
@@ -126,7 +128,9 @@ public static class FileInLoader
         {
             case ClassDefinitionNode cdef:
                 var super = SystemDictionary.TryGetClass(cdef.Superclass, out var sup) ? sup : null;
-                SystemDictionary.DefineClass(cdef.ClassName, super);
+                cdef.Options.TryGetValue("instanceVariableNames", out var ivars);
+                var varList = ivars is not null ? ivars.Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
+                SystemDictionary.DefineClass(cdef.ClassName, super, varList);
                 break;
             case MethodHeaderNode header:
                 currentHeader = header;
@@ -137,9 +141,10 @@ public static class FileInLoader
             case ScriptNode script when currentHeader is not null:
                 var lines = chunk.Split('\n');
                 if (lines.Length == 0) return;
-                var selector = lines[0].Trim();
-                if (selector.StartsWith("--"))
+                var headerLine = lines[0].Trim();
+                if (headerLine.StartsWith("--"))
                     break;
+                var (selector, args) = ParseSelector(headerLine);
                 int index = 1;
                 string? comment = null;
                 var bodyLines = new List<string>();
@@ -158,8 +163,8 @@ public static class FileInLoader
                 if (bodyText.EndsWith("!"))
                     bodyText = bodyText.TrimEnd().TrimEnd('!');
                 var bodyAst = ParseScript(bodyText);
-                var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, comment);
                 var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
+                var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, args, cls.InstanceVariables, comment);
                 cls.MethodDictionary[new Symbol(selector)] = method;
                 break;
         }
@@ -171,7 +176,39 @@ public static class FileInLoader
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
         var ctx = parser.script();
         return (ScriptNode)new AstBuildingVisitor().Visit(ctx)!;
+    }
+
+    private static (string Selector, List<string> Arguments) ParseSelector(string line)
+    {
+        var tokens = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var selectorParts = new List<string>();
+        var args = new List<string>();
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            var tok = tokens[i];
+            if (tok.EndsWith(":"))
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else if (selectorParts.Count == 0)
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else
+            {
+                selectorParts.Add(tok);
+            }
+        }
+
+        var selector = string.Join(" ", selectorParts);
+        return (selector, args);
     }
 }
