@@ -120,7 +120,43 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
     /// <inheritdoc/>
     public override AstNode VisitUnarySend(Smalltalk80Parser.UnarySendContext context)
-        => Visit(context.operand());
+    {
+        var receiver = (ExpressionNode)Visit(context.operand())!;
+        if (context.unaryTail() is { } tail)
+            return ProcessUnaryTail(receiver, tail);
+        return receiver;
+    }
+
+    private ExpressionNode ProcessUnaryTail(ExpressionNode receiver, Smalltalk80Parser.UnaryTailContext tail)
+    {
+        var selector = tail.unaryMessage().unarySelector().GetText();
+        var expr = new UnarySendExpression(receiver, selector);
+        return tail.unaryTail() is { } next ? ProcessUnaryTail(expr, next) : expr;
+    }
+
+    public override AstNode VisitKeywordSend(Smalltalk80Parser.KeywordSendContext context)
+    {
+        var recv = (ExpressionNode)Visit(context.binarySend())!;
+        var parts = new List<string>();
+        var args = new List<ExpressionNode>();
+        foreach (var pair in context.keywordMessage().keywordPair())
+        {
+            parts.Add(pair.KEYWORD().GetText());
+            args.Add((ExpressionNode)Visit(pair.binarySend())!);
+        }
+        return new KeywordSendExpression(recv, parts, args);
+    }
+
+    public override AstNode VisitCascade(Smalltalk80Parser.CascadeContext context)
+    {
+        ExpressionNode receiver = context.keywordSend() is { } ks
+            ? (ExpressionNode)Visit(ks)!
+            : (ExpressionNode)Visit(context.binarySend())!;
+        var messages = new List<ExpressionNode>();
+        foreach (var msg in context.message())
+            messages.Add((ExpressionNode)Visit(msg)!);
+        return new CascadeExpression(receiver, messages);
+    }
 
     /// <inheritdoc/>
     public override AstNode VisitOperand(Smalltalk80Parser.OperandContext context)
@@ -148,6 +184,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         if (context.stringLiteral() is not null) return new LiteralExpression(context.stringLiteral().GetText().Trim('\''));
         if (context.symbol() is not null) return new LiteralExpression(context.symbol().GetText());
         if (context.charConstant() is not null) return new LiteralExpression(context.charConstant().GetText());
+        if (context.pseudoVariable() is { } pv)
+            return new PseudoVariableExpression(pv.GetText());
         return base.VisitParsetimeLiteral(context);
     }
 

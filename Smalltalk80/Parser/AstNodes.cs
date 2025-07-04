@@ -68,6 +68,37 @@ public sealed record AssignmentExpression(string Variable, ExpressionNode Value)
 public sealed record BinarySendExpression(ExpressionNode Receiver, string Selector, ExpressionNode Argument) : ExpressionNode;
 
 /// <summary>
+/// A keyword message send such as <c>a at: 1</c>.
+/// </summary>
+/// <param name="Receiver">The receiver expression.</param>
+/// <param name="SelectorParts">The individual keyword parts including trailing colons.</param>
+/// <param name="Arguments">The argument expressions corresponding to <paramref name="SelectorParts"/>.</param>
+public sealed record KeywordSendExpression(
+    ExpressionNode Receiver,
+    IReadOnlyList<string> SelectorParts,
+    IReadOnlyList<ExpressionNode> Arguments) : ExpressionNode;
+
+/// <summary>
+/// A unary message send such as <c>a size</c>.
+/// </summary>
+/// <param name="Receiver">The receiver expression.</param>
+/// <param name="Selector">The unary selector.</param>
+public sealed record UnarySendExpression(ExpressionNode Receiver, string Selector) : ExpressionNode;
+
+/// <summary>
+/// A cascade of messages sent to the same receiver.
+/// </summary>
+/// <param name="Receiver">The common receiver expression.</param>
+/// <param name="Messages">The messages sent in order.</param>
+public sealed record CascadeExpression(ExpressionNode Receiver, IReadOnlyList<ExpressionNode> Messages) : ExpressionNode;
+
+/// <summary>
+/// Represents one of the Smalltalk pseudo variables such as <c>self</c> or <c>nil</c>.
+/// </summary>
+/// <param name="Name">The pseudo variable name.</param>
+public sealed record PseudoVariableExpression(string Name) : ExpressionNode;
+
+/// <summary>
 /// Root node representing a file-in consisting of multiple chunks.
 /// </summary>
 /// <param name="Chunks">The ordered chunks in the file.</param>
