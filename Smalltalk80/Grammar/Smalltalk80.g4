@@ -7,6 +7,7 @@ fileIn: chunk* EOF;
 chunk:
 	classDefinition BANG ws?
 	| methodCategoryHeader methodDefinition*
+    | classComment
 	| sequence BANG ws?;
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
@@ -14,6 +15,12 @@ classDefinition:
 	IDENTIFIER ws? 'subclass:' ws? HASH IDENTIFIER (
 		ws? classOption
 	)*;
+
+classComment
+    : className ('class')? 'comment:' stringLiteral
+    ;
+
+className: IDENTIFIER;
 
 classOption:
 	'instanceVariableNames:' ws? stringLiteral
