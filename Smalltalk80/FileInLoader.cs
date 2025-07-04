@@ -174,9 +174,12 @@ public static class FileInLoader
                 while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
                     bodyLines.RemoveAt(bodyLines.Count - 1);
 
-                var bodyText = bodyLines.Count > 0 ? string.Join("\n", bodyLines) : string.Empty;
-                if (bodyText.EndsWith("!"))
-                    bodyText = bodyText.TrimEnd().TrimEnd('!');
+                var bodyText = bodyLines.Count > 0
+                    ? string.Join("\n", bodyLines)
+                    : string.Empty;
+                bodyText = bodyText.TrimEnd();
+                while (bodyText.EndsWith("!"))
+                    bodyText = bodyText[..^1].TrimEnd();
                 var bodyAst = ParseScript(bodyText);
                 var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
                 var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, args, cls.InstanceVariables, comment);
