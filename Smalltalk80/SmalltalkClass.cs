@@ -11,6 +11,11 @@ public class SmalltalkClass : SmalltalkObject
     public Dictionary<Symbol, CompiledMethod> MethodDictionary { get; } = new();
 
     /// <summary>
+    ///     Gets the list of instance variable names defined on this class.
+    /// </summary>
+    public List<string> InstanceVariables { get; } = new();
+
+    /// <summary>
     ///     Gets or sets the superclass of this class.
     /// </summary>
     public SmalltalkClass? Superclass { get; set; }

@@ -82,6 +82,13 @@ public sealed record FileNode(IReadOnlyList<AstNode> Chunks) : AstNode;
 public sealed record ClassDefinitionNode(string Superclass, string ClassName, IReadOnlyDictionary<string, string> Options) : AstNode;
 
 /// <summary>
+/// Node representing a class comment chunk.
+/// </summary>
+/// <param name="ClassName">The class being documented.</param>
+/// <param name="Comment">The text of the comment.</param>
+public sealed record ClassCommentNode(string ClassName, string Comment) : AstNode;
+
+/// <summary>
 /// Node representing a method category header chunk.
 /// </summary>
 /// <param name="ClassName">The class to which subsequent methods belong.</param>

@@ -14,13 +14,19 @@ public static class SystemDictionary
     /// </summary>
     /// <param name="name">The class name.</param>
     /// <param name="superclass">The optional superclass reference.</param>
+    /// <param name="instanceVariables">Names of instance variables for the class.</param>
     /// <returns>The created or existing <see cref="SmalltalkClass"/>.</returns>
-    public static SmalltalkClass DefineClass(string name, SmalltalkClass? superclass = null)
+    public static SmalltalkClass DefineClass(
+        string name,
+        SmalltalkClass? superclass = null,
+        IReadOnlyList<string>? instanceVariables = null)
     {
         if (classes.TryGetValue(name, out var existing))
             return existing;
 
         var cls = new SmalltalkClass { Superclass = superclass };
+        if (instanceVariables is not null)
+            cls.InstanceVariables.AddRange(instanceVariables);
         classes[name] = cls;
         return cls;
     }

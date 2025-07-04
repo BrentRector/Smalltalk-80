@@ -12,19 +12,36 @@ public static class AstMethodCompiler
     /// Compiles a method body represented as an AST sequence.
     /// </summary>
     /// <param name="sequence">The method body sequence.</param>
+    /// <param name="argumentNames">Names of the method parameters in order.</param>
+    /// <param name="instanceVariables">Names of instance variables on the method's class.</param>
     /// <param name="comment">Optional source comment attached to the method.</param>
     /// <returns>The compiled method.</returns>
-    public static CompiledMethod CompileMethod(SequenceNode sequence, string? comment = null)
-        => new Compiler().Compile(sequence, comment);
+    public static CompiledMethod CompileMethod(
+        SequenceNode sequence,
+        IReadOnlyList<string> argumentNames,
+        IReadOnlyList<string> instanceVariables,
+        string? comment = null)
+        => new Compiler(argumentNames, instanceVariables).Compile(sequence, comment);
 
     private sealed class Compiler
     {
+        private readonly IReadOnlyList<string> arguments;
+        private readonly IReadOnlyList<string> instanceVariables;
         private readonly List<byte> bytecodes = new();
         private readonly List<object> literals = new();
         private readonly Dictionary<string, int> temporaries = new();
 
+        public Compiler(IReadOnlyList<string> arguments, IReadOnlyList<string> instanceVariables)
+        {
+            this.arguments = arguments;
+            this.instanceVariables = instanceVariables;
+        }
+
         public CompiledMethod Compile(SequenceNode sequence, string? comment)
         {
+            foreach (var arg in arguments)
+                temporaries[arg] = temporaries.Count;
+
             foreach (var temp in sequence.Temporaries)
                 temporaries[temp] = temporaries.Count;
 
@@ -101,34 +118,70 @@ public static class AstMethodCompiler
 
         private void EmitVariable(string name)
         {
-            if (!temporaries.TryGetValue(name, out var index))
-                throw new InvalidOperationException($"Unknown variable '{name}'");
+            if (temporaries.TryGetValue(name, out var index))
+            {
+                if (index < 16)
+                {
+                    bytecodes.Add((byte)((int)Bytecode.PushTemporaryVariable0 + index));
+                }
+                else
+                {
+                    throw new NotSupportedException("Only up to 16 temporaries are supported.");
+                }
+                return;
+            }
 
-            if (index < 16)
+            int ivIndex = -1;
+            for (int i = 0; i < instanceVariables.Count; i++)
             {
-                bytecodes.Add((byte)((int)Bytecode.PushTemporaryVariable0 + index));
+                if (instanceVariables[i] == name)
+                {
+                    ivIndex = i;
+                    break;
+                }
             }
-            else
+            if (ivIndex >= 0 && ivIndex < 16)
             {
-                throw new NotSupportedException("Only up to 16 temporaries are supported.");
+                bytecodes.Add((byte)((int)Bytecode.PushReceiverVariable0 + ivIndex));
+                return;
             }
+
+            throw new InvalidOperationException($"Unknown variable '{name}'");
         }
 
         private void StoreVariable(string name)
         {
-            if (!temporaries.TryGetValue(name, out var index))
-                throw new InvalidOperationException($"Unknown variable '{name}'");
+            if (temporaries.TryGetValue(name, out var index))
+            {
+                if (index < 8)
+                {
+                    bytecodes.Add((byte)((int)Bytecode.StoreAndPopTemporaryVariable0 + index));
+                }
+                else
+                {
+                    bytecodes.Add((byte)Bytecode.ExtendedStoreAndPop);
+                    byte descriptor = (byte)((1 << 6) | index);
+                    bytecodes.Add(descriptor);
+                }
+                return;
+            }
 
-            if (index < 8)
+            int ivIndex = -1;
+            for (int i = 0; i < instanceVariables.Count; i++)
             {
-                bytecodes.Add((byte)((int)Bytecode.StoreAndPopTemporaryVariable0 + index));
+                if (instanceVariables[i] == name)
+                {
+                    ivIndex = i;
+                    break;
+                }
             }
-            else
+            if (ivIndex >= 0 && ivIndex < 8)
             {
-                bytecodes.Add((byte)Bytecode.ExtendedStoreAndPop);
-                byte descriptor = (byte)((1 << 6) | index);
-                bytecodes.Add(descriptor);
+                bytecodes.Add((byte)((int)Bytecode.StoreAndPopReceiverVariable0 + ivIndex));
+                return;
             }
+
+            throw new InvalidOperationException($"Unknown variable '{name}'");
         }
 
         private void EmitSend(string selector, int argCount)
@@ -159,12 +212,14 @@ public static class AstMethodCompiler
 
         private MethodHeader BuildHeader()
         {
-            int flagValue = 0;
+            int argCount = arguments.Count;
+            int flagValue = argCount >= 5 ? 7 : argCount;
             int temporaryCount = temporaries.Count;
             bool largeContext = temporaryCount > 12;
             int literalCount = literals.Count;
             int raw = flagValue | (temporaryCount << 3) | ((largeContext ? 1 : 0) << 8) | (literalCount << 9);
-            return new MethodHeader(raw, 0);
+            int ext = argCount >= 5 ? (argCount << 10) : 0;
+            return new MethodHeader(raw, ext);
         }
     }
 }
