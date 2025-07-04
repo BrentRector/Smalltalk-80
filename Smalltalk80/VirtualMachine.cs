@@ -45,7 +45,7 @@ public sealed class VirtualMachine
         var parser = new SmalltalkParser(body);
         var superclass = SystemDictionary.TryGetClass("Object", out var objCls) ? objCls : null;
         var cls = SystemDictionary.DefineClass(className, superclass);
-        var method = parser.ParseMethod(args, cls.InstanceVariables);
+        var method = parser.ParseMethod(args, cls.InstanceVariables, selectorName);
         cls.MethodDictionary[new Symbol(selectorName)] = method;
     }
 

@@ -24,25 +24,27 @@ public sealed class SmalltalkParser
     /// </summary>
     /// <param name="argumentNames">Method argument names in order.</param>
     /// <param name="instanceVariables">Instance variables available in the method.</param>
+    /// <param name="methodName">Optional selector for debug tracing.</param>
     /// <returns>The compiled method.</returns>
     public CompiledMethod ParseMethod(
         IReadOnlyList<string>? argumentNames = null,
-        IReadOnlyList<string>? instanceVariables = null)
+        IReadOnlyList<string>? instanceVariables = null,
+        string? methodName = null)
     {
         argumentNames ??= Array.Empty<string>();
         instanceVariables ??= Array.Empty<string>();
-        var ast = BuildAst();
+        var ast = BuildAst(methodName);
         return AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
     }
 
-    private ScriptNode BuildAst()
+    private ScriptNode BuildAst(string? methodName)
     {
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
         var tree = parser.script();
-        var visitor = new AstBuildingVisitor();
+        var visitor = new AstBuildingVisitor(methodName);
         return (ScriptNode)visitor.Visit(tree)!;
     }
 

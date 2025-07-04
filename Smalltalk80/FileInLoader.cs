@@ -13,6 +13,7 @@ using Smalltalk80.Parser;
 /// </summary>
 public static class FileInLoader
 {
+    private static List<string>? partialMethod;
     /// <summary>
     /// Reads the specified file and installs the classes and methods it defines
     /// into the <see cref="SystemDictionary"/>.
@@ -118,26 +119,44 @@ public static class FileInLoader
             return;
         currentHeader = headerNode;
 
-        var methodLines = new List<string>();
+        partialMethod ??= new List<string>();
         for (int i = 1; i < lines.Length; i++)
         {
             var line = lines[i];
             if (line.Trim() == "!!")
                 break;
 
-            methodLines.Add(line);
+            partialMethod.Add(line);
 
             if (line.TrimEnd().EndsWith("!"))
             {
-                var methodChunk = string.Join('\n', methodLines);
+                var methodChunk = string.Join('\n', partialMethod);
+                partialMethod = null;
                 ProcessChunk(methodChunk, ref currentHeader);
-                methodLines.Clear();
             }
         }
     }
 
     private static void ProcessChunk(string chunk, ref MethodHeaderNode? currentHeader)
     {
+        if (currentHeader is not null && partialMethod is not null)
+        {
+            var lines = chunk.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.Trim() == "!!")
+                    continue;
+                partialMethod.Add(line);
+                if (line.TrimEnd().EndsWith("!"))
+                {
+                    var methodChunk = string.Join('\n', partialMethod);
+                    partialMethod = null;
+                    ProcessChunk(methodChunk, ref currentHeader);
+                    return;
+                }
+            }
+            return;
+        }
         var node = ParseChunk(chunk);
         switch (node)
         {
@@ -180,9 +199,9 @@ public static class FileInLoader
                 bodyText = bodyText.TrimEnd();
                 while (bodyText.EndsWith("!"))
                     bodyText = bodyText[..^1].TrimEnd();
-                var bodyAst = ParseScript(bodyText, selector);
                 var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
-                var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, args, cls.InstanceVariables, comment);
+                var parser = new SmalltalkParser(bodyText);
+                var method = parser.ParseMethod(args, cls.InstanceVariables, selector);
                 cls.MethodDictionary[new Symbol(selector)] = method;
                 break;
         }
