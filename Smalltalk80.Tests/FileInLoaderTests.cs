@@ -137,4 +137,33 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Verifies that method category headers with a trailing exclamation mark on
+    /// the same line are parsed correctly.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_HeaderWithTrailingBang_ParsesCorrectly()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #Example!",
+                "!Example methodsFor: 'empty'! !",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            Assert.NotNull(SystemDictionary.GetClass("Example"));
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }
