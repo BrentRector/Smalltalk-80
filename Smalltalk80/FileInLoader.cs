@@ -21,27 +21,30 @@ public static class FileInLoader
     /// <param name="path">Path to the Smalltalk source file.</param>
     public static void Load(string path)
     {
-        var source = File.ReadAllText(path);
-        var input = new AntlrInputStream(source);
-        var lexer = new Smalltalk80Lexer(input);
-        var tokens = new CommonTokenStream(lexer);
-        var parser = new Smalltalk80Parser(tokens);
-        parser.RemoveErrorListeners();
-        var fileCtx = parser.fileIn();
-
+        var lines = File.ReadAllLines(path);
+        var builder = new StringBuilder();
         MethodHeaderNode? currentHeader = null;
-        foreach (var chunk in fileCtx.chunk())
+
+        foreach (var rawLine in lines)
         {
-            var text = source.Substring(chunk.Start.StartIndex,
-                chunk.Stop.StopIndex - chunk.Start.StartIndex + 1);
-            if (text.TrimStart().StartsWith("!"))
-            {
-                ProcessCategoryChunk(text.Trim(), ref currentHeader);
-            }
+            var line = rawLine;
+
+            // Skip standalone comment lines that do not terminate a chunk.
+            if (line.TrimStart().StartsWith("\"") && !line.TrimEnd().EndsWith("!"))
+                continue;
+
+            builder.AppendLine(line);
+
+            if (!line.TrimEnd().EndsWith("!"))
+                continue;
+
+            var chunk = builder.ToString().Trim();
+            builder.Clear();
+
+            if (chunk.StartsWith("!", StringComparison.Ordinal))
+                ProcessCategoryChunk(chunk, ref currentHeader);
             else
-            {
-                ProcessChunk(text.Trim(), ref currentHeader);
-            }
+                ProcessChunk(chunk, ref currentHeader);
         }
     }
 
