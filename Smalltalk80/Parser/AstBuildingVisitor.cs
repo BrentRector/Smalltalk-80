@@ -216,7 +216,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitMethodCategoryHeader(Smalltalk80Parser.MethodCategoryHeaderContext context)
     {
         var className = context.IDENTIFIER().GetText();
-        var isClassSide = false; // grammar lacks explicit class-side indicator
+        var isClassSide = context.GetToken(Smalltalk80Parser.T__4, 0) is not null;
         var category = context.stringLiteral().GetText().Trim('\'');
         return new MethodHeaderNode(className, isClassSide, category);
     }
