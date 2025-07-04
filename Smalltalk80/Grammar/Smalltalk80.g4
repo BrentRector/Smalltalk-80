@@ -8,7 +8,12 @@ chunk:
     classDefinition BANG ws?
   | methodCategoryHeader methodDefinition* BANG+ ws?
   | classComment
+  | commentChunk                  // new alternative
   | sequence BANG ws?;
+
+commentChunk
+    : ws? COMMENT BANG ws?;
+
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
 classDefinition:
