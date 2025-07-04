@@ -130,9 +130,7 @@ public class Interpreter
             Method = method,
             Receiver = receiver,
             Arguments = Array.Empty<object?>(),
-#pragma warning disable CS8619
-            Temporaries = temporaries ?? new object[method.TemporariesCount],
-#pragma warning restore CS8619
+            Temporaries = temporaries ?? new object?[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };
@@ -656,7 +654,7 @@ public class Interpreter
                 }
             }
 
-            var temps = new object[method.TemporariesCount];
+            var temps = new object?[method.TemporariesCount];
             for (int i = 0; i < arguments.Length && i < temps.Length; i++)
                 temps[i] = arguments[i];
 

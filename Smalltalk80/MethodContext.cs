@@ -32,7 +32,7 @@ public sealed class MethodContext : Context
             Method = method,
             Receiver = receiver,
             Arguments = arguments,
-            Temporaries = new object[method.TemporariesCount],
+            Temporaries = new object?[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };
