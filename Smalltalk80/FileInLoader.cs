@@ -113,7 +113,9 @@ public static class FileInLoader
 
         headerLine = headerLine.Replace("! !", "!");
 
-        var headerNode = (MethodHeaderNode)ParseChunk(headerLine);
+        var node = ParseChunk(headerLine);
+        if (node is not MethodHeaderNode headerNode)
+            throw new InvalidOperationException($"Invalid method category header: '{headerLine}'");
         currentHeader = headerNode;
 
         var methodLines = new List<string>();

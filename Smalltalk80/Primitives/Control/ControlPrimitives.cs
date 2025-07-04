@@ -122,7 +122,7 @@ public static class ControlPrimitives
             Method = method,
             Receiver = receiver,
             Arguments = args.ToArray(),
-            Temporaries = new object[method.TemporariesCount],
+            Temporaries = new object?[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };
@@ -154,7 +154,7 @@ public static class ControlPrimitives
             Method = method,
             Receiver = receiver,
             Arguments = argArray,
-            Temporaries = new object[method.TemporariesCount],
+            Temporaries = new object?[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };

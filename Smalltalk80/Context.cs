@@ -30,7 +30,7 @@ public class Context
     /// <summary>
     ///     Gets the storage for temporary variables defined by the method.
     /// </summary>
-    public required object[] Temporaries { get; init; }
+    public required object?[] Temporaries { get; init; }
 
     /// <summary>
     ///     Gets the evaluation stack used while executing the method.
@@ -66,7 +66,7 @@ public class Context
             Method = method,
             Receiver = sender.Receiver,
             Arguments = args,
-            Temporaries = new object[method.TemporariesCount],
+            Temporaries = new object?[method.TemporariesCount],
             Stack = new Stack<object?>(),
             PC = 0
         };

@@ -134,6 +134,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return tail.unaryTail() is { } next ? ProcessUnaryTail(expr, next) : expr;
     }
 
+    /// <inheritdoc/>
     public override AstNode VisitKeywordSend(Smalltalk80Parser.KeywordSendContext context)
     {
         var recv = (ExpressionNode)Visit(context.binarySend())!;
@@ -147,6 +148,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new KeywordSendExpression(recv, parts, args);
     }
 
+    /// <inheritdoc/>
     public override AstNode VisitCascade(Smalltalk80Parser.CascadeContext context)
     {
         ExpressionNode receiver = context.keywordSend() is { } ks
