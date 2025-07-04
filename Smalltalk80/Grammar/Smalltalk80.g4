@@ -46,7 +46,9 @@ script: sequence EOF;
 
 // Sequence of temporaries and statements
 sequence: temps? ws? statements?;
-temps: PIPE IDENTIFIER+ PIPE;
+// Temporaries can be surrounded by whitespace to match typical Smalltalk
+// formatting such as "| x y |" or "|x y|".
+temps: PIPE ws? IDENTIFIER (ws? IDENTIFIER)* ws? PIPE;
 
 // Whitespace and comments
 ws: (SEPARATOR | COMMENT)+;

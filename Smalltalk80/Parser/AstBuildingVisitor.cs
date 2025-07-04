@@ -21,7 +21,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         var temps = new List<string>();
         if (context.temps() is not null)
         {
-            temps.AddRange(context.temps().IDENTIFIER().Select(id => id.GetText()));
+            temps.AddRange(
+                context.temps()
+                    .IDENTIFIER()
+                    .Select(id => id.GetText().Trim()));
         }
 
         var statements = new List<StatementNode>();
