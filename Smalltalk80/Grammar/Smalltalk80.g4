@@ -21,7 +21,7 @@ classDefinition:
 
 
 classComment:
-	className ('class')? 'comment:' stringLiteral BANG ws?;
+        className ws? ('class' ws?)? 'comment:' ws? stringLiteral BANG ws?;
 
 className: IDENTIFIER;
 

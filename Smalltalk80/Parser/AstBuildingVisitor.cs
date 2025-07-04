@@ -185,6 +185,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         if (context.methodCategoryHeader() is { } header)
             return Visit(header);
 
+        if (context.classComment() is { } cmt)
+            return Visit(cmt);
+
         if (context.sequence() is { } seq)
             return new ScriptNode((SequenceNode)Visit(seq)!);
 
@@ -219,6 +222,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         var isClassSide = context.GetToken(Smalltalk80Parser.T__4, 0) is not null;
         var category = context.stringLiteral().GetText().Trim('\'');
         return new MethodHeaderNode(className, isClassSide, category);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitClassComment(Smalltalk80Parser.ClassCommentContext context)
+    {
+        var className = context.className().GetText();
+        var comment = context.stringLiteral().GetText().Trim('\'');
+        return new ClassCommentNode(className, comment);
     }
 
     /// <inheritdoc/>

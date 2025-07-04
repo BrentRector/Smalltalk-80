@@ -74,6 +74,17 @@ public static class FileInLoader
         }
 
         parser.Reset();
+        try
+        {
+            var commentCtx = parser.classComment();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(commentCtx)!;
+        }
+        catch
+        {
+        }
+
+        parser.Reset();
         var lines = chunk.Split('\n');
         var body = lines.Length > 1 ? string.Join("\n", lines[1..]) : string.Empty;
         var scriptCtx = ParseScript(body);
@@ -98,7 +109,8 @@ public static class FileInLoader
                 break;
 
             methodLines.Add(line);
-            if (line.Trim() == "!")
+
+            if (line.TrimEnd().EndsWith("!"))
             {
                 var methodChunk = string.Join('\n', methodLines);
                 ProcessChunk(methodChunk, ref currentHeader);
@@ -119,6 +131,9 @@ public static class FileInLoader
             case MethodHeaderNode header:
                 currentHeader = header;
                 break;
+            case ClassCommentNode:
+                // Comment chunks do not affect loading state.
+                break;
             case ScriptNode script when currentHeader is not null:
                 var lines = chunk.Split('\n');
                 if (lines.Length == 0) return;
@@ -138,7 +153,10 @@ public static class FileInLoader
                     bodyLines.AddRange(lines[index..]);
                 while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
                     bodyLines.RemoveAt(bodyLines.Count - 1);
+
                 var bodyText = bodyLines.Count > 0 ? string.Join("\n", bodyLines) : string.Empty;
+                if (bodyText.EndsWith("!"))
+                    bodyText = bodyText.TrimEnd().TrimEnd('!');
                 var bodyAst = ParseScript(bodyText);
                 var method = AstMethodCompiler.CompileMethod(bodyAst.Sequence, comment);
                 var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
