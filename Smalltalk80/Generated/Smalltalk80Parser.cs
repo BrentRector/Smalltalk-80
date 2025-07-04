@@ -80,8 +80,7 @@ public partial class Smalltalk80Parser : Parser {
 		"'classVariableNames:'", "'poolDictionaries:'", "'category:'", "'methodsFor:'", 
 		null, null, null, "'['", "']'", "'('", "')'", "'|'", "'.'", "';'", "'!'", 
 		null, "'<'", "'>'", "'-'", "'^'", "'#'", "'e'", "'16r'", "'#('", "'#{'", 
-		"'}'", "'{'", null, null, null, null, null, null, null, "':'", "':='", 
-		"'$'"
+		"'}'", "'{'", null, null, null, null, null, null, null, "':'", null, "'$'"
 	};
 	private static readonly string[] _SymbolicNames = {
 		null, null, null, null, null, null, null, null, null, "SEPARATOR", "STRING", 

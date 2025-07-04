@@ -224,6 +224,10 @@ BLOCK_PARAM: COLON IDENTIFIER;
 
 COLON: ':';
 
-ASSIGNMENT: ':=';
+// after
+ASSIGNMENT
+    : ':='
+    | '_'
+    ;
 
 DOLLAR: '$';
