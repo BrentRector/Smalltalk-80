@@ -29,8 +29,14 @@ classOption:
 	| 'category:' ws? stringLiteral;
 
 // Method-category header: !MyClass methodsFor: 'accessing'!
-methodCategoryHeader:
-	BANG ws? IDENTIFIER ws? 'methodsFor:' ws? stringLiteral BANG ws?;
+methodCategoryHeader
+    : BANG ws?
+      IDENTIFIER ws?
+      ('class' ws?)?                // optional literal class
+      'methodsFor:' ws?
+      stringLiteral
+      BANG ws?
+    ;
 
 // A single method under the current category, terminated by '!'
 methodDefinition: sequence BANG ws?;
