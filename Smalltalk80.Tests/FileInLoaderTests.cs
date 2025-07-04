@@ -97,4 +97,44 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Confirms that keyword message sends are parsed and executed correctly.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_KeywordSendMethod_ExecutesCorrectly()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #KeywordExample instanceVariableNames: ''!",
+                "!KeywordExample methodsFor: 'testing'!",
+                "add: x to: y",
+                "    ^x + y",
+                "!",
+                "call",
+                "    ^self add: 3 to: 4",
+                "!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("KeywordExample");
+            var instance = new SmalltalkObject(cls, 0);
+            var call = cls.MethodDictionary[new Symbol("call")];
+
+            var result = vm.Interpreter.Evaluate(call, instance);
+
+            Assert.Equal(7, result);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }

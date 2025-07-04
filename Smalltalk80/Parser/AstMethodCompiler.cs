@@ -93,6 +93,20 @@ public static class AstMethodCompiler
                     bytecodes.Add((byte)Bytecode.DuplicateTop);
                     StoreVariable(assign.Variable);
                     break;
+                case UnarySendExpression unary:
+                    CompileExpression(unary.Receiver);
+                    EmitSend(unary.Selector, 0);
+                    break;
+                case KeywordSendExpression kw:
+                    CompileExpression(kw.Receiver);
+                    foreach (var arg in kw.Arguments)
+                        CompileExpression(arg);
+                    var selector = string.Concat(kw.SelectorParts);
+                    EmitSend(selector, kw.Arguments.Count);
+                    break;
+                case PseudoVariableExpression pv:
+                    EmitPseudoVariable(pv.Name);
+                    break;
                 case BinarySendExpression bin:
                     CompileExpression(bin.Receiver);
                     CompileExpression(bin.Argument);
@@ -199,6 +213,27 @@ public static class AstMethodCompiler
                 bytecodes.Add((byte)Bytecode.DoubleExtendedSend);
                 bytecodes.Add((byte)argCount);
                 bytecodes.Add((byte)index);
+            }
+        }
+
+        private void EmitPseudoVariable(string name)
+        {
+            switch (name)
+            {
+                case "self":
+                    bytecodes.Add((byte)Bytecode.PushSelf);
+                    break;
+                case "nil":
+                    bytecodes.Add((byte)Bytecode.PushNil);
+                    break;
+                case "true":
+                    bytecodes.Add((byte)Bytecode.PushTrue);
+                    break;
+                case "false":
+                    bytecodes.Add((byte)Bytecode.PushFalse);
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown pseudo variable '{name}'");
             }
         }
 
