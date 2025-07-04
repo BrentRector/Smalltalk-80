@@ -100,6 +100,19 @@ public static class FileInLoader
             return;
 
         var headerLine = lines[0].Trim();
+        if (headerLine == "!!")
+            return;
+
+        // Some sources place the terminating '!' for an empty category on the
+        // same line as the header (e.g. "!Class methodsFor: 'cat'! !"). Trim any
+        // characters after the first closing bang so the parser sees a
+        // well-formed header.
+        int closeIndex = headerLine.IndexOf("'!");
+        if (closeIndex >= 0)
+            headerLine = headerLine.Substring(0, closeIndex + 2);
+
+        headerLine = headerLine.Replace("! !", "!");
+
         var headerNode = (MethodHeaderNode)ParseChunk(headerLine);
         currentHeader = headerNode;
 
