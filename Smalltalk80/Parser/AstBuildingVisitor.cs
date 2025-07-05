@@ -83,10 +83,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
 
         var statements = new List<StatementNode>();
-        if (context.statements() is { } stmts)
+        foreach (var stmtCtx in context.statement())
         {
-            if (Visit(stmts) is StatementsNode sn)
-                statements.AddRange(sn.Statements);
+            if (Visit(stmtCtx) is StatementNode stmt)
+                statements.Add(stmt);
         }
 
         var node = new SequenceNode(temps, statements);
@@ -97,28 +97,15 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <inheritdoc/>
-    public override AstNode VisitStatementAnswer(Smalltalk80Parser.StatementAnswerContext context)
+    public override AstNode VisitStatement(Smalltalk80Parser.StatementContext context)
     {
-        var expr = (ExpressionNode)Visit(context.answer().expression())!;
-        return new StatementsNode(new[] { new AnswerStatement(expr) });
-    }
+        if (context.answer() is { } answer)
+        {
+            var expr = (ExpressionNode)Visit(answer.expression())!;
+            return new AnswerStatement(expr);
+        }
 
-    /// <inheritdoc/>
-    public override AstNode VisitStatementExpressions(Smalltalk80Parser.StatementExpressionsContext context)
-    {
-        var exprs = (ExpressionsNode)Visit(context.expressions())!;
-        var list = exprs.Expressions.Select(e => (StatementNode)new ExpressionStatement(e)).ToList();
-        return new StatementsNode(list);
-    }
-
-    /// <inheritdoc/>
-    public override AstNode VisitStatementExpressionsAnswer(Smalltalk80Parser.StatementExpressionsAnswerContext context)
-    {
-        var exprs = (ExpressionsNode)Visit(context.expressions())!;
-        var statements = exprs.Expressions.Select(e => (StatementNode)new ExpressionStatement(e)).ToList();
-        var answerExpr = (ExpressionNode)Visit(context.answer().expression())!;
-        statements.Add(new AnswerStatement(answerExpr));
-        return new StatementsNode(statements);
+        return new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
     }
 
     /// <inheritdoc/>
