@@ -56,6 +56,27 @@ public sealed class SmalltalkParser
         return ParseMethod(argumentNames, cls.InstanceVariables, methodName);
     }
 
+    /// <summary>
+    /// Parses the source into a <see cref="CompiledMethod"/> using variables defined on the specified class.
+    /// </summary>
+    /// <param name="className">The owning class name.</param>
+    /// <param name="isClassSide">If <c>true</c>, class variables are used instead of instance variables.</param>
+    /// <param name="argumentNames">Method argument names.</param>
+    /// <param name="methodName">Optional selector for tracing.</param>
+    /// <returns>The compiled method.</returns>
+    public CompiledMethod ParseMethod(
+        string className,
+        bool isClassSide,
+        IReadOnlyList<string>? argumentNames = null,
+        string? methodName = null)
+    {
+        if (!SystemDictionary.TryGetClass(className, out var cls))
+            throw new InvalidOperationException($"Class '{className}' is not defined.");
+
+        var vars = isClassSide ? cls.ClassVariables : cls.InstanceVariables;
+        return ParseMethod(argumentNames, vars, methodName);
+    }
+
     private ScriptNode BuildAst(string? methodName, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
     {
         var input = new AntlrInputStream(source);

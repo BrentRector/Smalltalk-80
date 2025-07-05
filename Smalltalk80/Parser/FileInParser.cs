@@ -91,6 +91,17 @@ public static class FileInParser
         }
 
         parser.Reset();
+        try
+        {
+            var methodCtx = parser.methodDefinition();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(methodCtx)!;
+        }
+        catch
+        {
+        }
+
+        parser.Reset();
         var lines = chunk.Split('\n');
         var body = lines.Length > 1 ? string.Join('\n', lines[1..]) : string.Empty;
         var script = ParseScript(body);
@@ -168,45 +179,16 @@ public static class FileInParser
 
         if (currentHeader is not null && partialMethod is null)
         {
-            var lines = chunk.Split('\n');
-            if (lines.Length == 0)
-                return;
-            var headerLine = lines[0].Trim();
-            if (headerLine.StartsWith("--"))
-                return;
-
-            var (selector, args) = ParseSelector(headerLine);
-            int index = 1;
-            string? comment = null;
-            var bodyLines = new List<string>();
-            while (index < lines.Length && lines[index].TrimStart().StartsWith("\""))
-            {
-                var line = lines[index].Trim();
-                comment = comment is null ? line : string.Join('\n', comment, line);
-                index++;
-            }
-            if (index < lines.Length)
-                bodyLines.AddRange(lines[index..]);
-            while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
-                bodyLines.RemoveAt(bodyLines.Count - 1);
-
-            var bodyText = bodyLines.Count > 0
-                ? string.Join('\n', bodyLines)
-                : string.Empty;
-            bodyText = bodyText.TrimEnd();
-            while (bodyText.EndsWith("!"))
-                bodyText = bodyText[..^1].TrimEnd();
-
-            var script = ParseScript(bodyText, selector);
-            output.Add(new MethodDefinitionNode(selector, args, script.Sequence, comment));
+            var node = ParseChunk(chunk);
+            output.Add(node);
             return;
         }
 
-        var node = ParseChunk(chunk);
-        output.Add(node);
+        var parsed = ParseChunk(chunk);
+        output.Add(parsed);
     }
 
-    private static ScriptNode ParseScript(string source, string? methodName = null)
+    private static ScriptNode ParseScript(string source)
     {
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
@@ -214,37 +196,7 @@ public static class FileInParser
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
         var ctx = parser.script();
-        return (ScriptNode)new AstBuildingVisitor(methodName).Visit(ctx)!;
+        return (ScriptNode)new AstBuildingVisitor().Visit(ctx)!;
     }
 
-    private static (string Selector, List<string> Arguments) ParseSelector(string line)
-    {
-        var tokens = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-        var selectorParts = new List<string>();
-        var args = new List<string>();
-
-        for (int i = 0; i < tokens.Length; i++)
-        {
-            var tok = tokens[i];
-            if (tok.EndsWith(":"))
-            {
-                selectorParts.Add(tok);
-                if (i + 1 < tokens.Length)
-                    args.Add(tokens[++i]);
-            }
-            else if (selectorParts.Count == 0)
-            {
-                selectorParts.Add(tok);
-                if (i + 1 < tokens.Length)
-                    args.Add(tokens[++i]);
-            }
-            else
-            {
-                selectorParts.Add(tok);
-            }
-        }
-
-        var selector = string.Join(string.Empty, selectorParts);
-        return (selector, args);
-    }
 }
