@@ -15,11 +15,13 @@ public static class SystemDictionary
     /// <param name="name">The class name.</param>
     /// <param name="superclass">The optional superclass reference.</param>
     /// <param name="instanceVariables">Names of instance variables for the class.</param>
+    /// <param name="classVariables">Names of class variables shared across all instances.</param>
     /// <returns>The created or existing <see cref="SmalltalkClass"/>.</returns>
     public static SmalltalkClass DefineClass(
         string name,
         SmalltalkClass? superclass = null,
-        IReadOnlyList<string>? instanceVariables = null)
+        IReadOnlyList<string>? instanceVariables = null,
+        IReadOnlyList<string>? classVariables = null)
     {
         if (classes.TryGetValue(name, out var existing))
         {
@@ -33,12 +35,22 @@ public static class SystemDictionary
                         existing.InstanceVariables.Add(ivar);
                 }
             }
+            if (classVariables is not null)
+            {
+                foreach (var cvar in classVariables)
+                {
+                    if (!existing.ClassVariables.Contains(cvar))
+                        existing.ClassVariables.Add(cvar);
+                }
+            }
             return existing;
         }
 
         var cls = new SmalltalkClass { Superclass = superclass };
         if (instanceVariables is not null)
             cls.InstanceVariables.AddRange(instanceVariables);
+        if (classVariables is not null)
+            cls.ClassVariables.AddRange(classVariables);
         classes[name] = cls;
         return cls;
     }

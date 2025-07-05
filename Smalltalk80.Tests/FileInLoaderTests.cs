@@ -199,4 +199,37 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Ensures that class variables declared in a class definition are recorded.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_ClassDefinitionWithClassVars_DefinesClassVariables()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #ClassVarTest",
+                "    instanceVariableNames: ''",
+                "    classVariableNames: 'Foo Bar'",
+                "    poolDictionaries: ''",
+                "    category: 'Tests'!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("ClassVarTest");
+            Assert.Contains("Foo", cls.ClassVariables);
+            Assert.Contains("Bar", cls.ClassVariables);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }
