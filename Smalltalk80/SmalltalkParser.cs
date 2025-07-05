@@ -33,8 +33,19 @@ public sealed class SmalltalkParser
     {
         argumentNames ??= Array.Empty<string>();
         instanceVariables ??= Array.Empty<string>();
+        if (methodName is not null)
+        {
+            Tracer.Log($"Parsing method: {methodName}");
+            Tracer.Log($"Entering method: {methodName}");
+        }
+
         var ast = BuildAst(methodName, argumentNames, instanceVariables);
-        return AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
+        var compiled = AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
+
+        if (methodName is not null)
+            Tracer.Log($"Exiting method: {methodName}");
+
+        return compiled;
     }
 
     /// <summary>

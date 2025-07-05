@@ -19,6 +19,14 @@ public static class FileInReader
     public static FileNode Parse(string path)
     {
         var source = File.ReadAllText(path);
+        var lines = source.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (line.StartsWith("\"") && !line.EndsWith("!"))
+                lines[i] = line + "!";
+        }
+        source = string.Join('\n', lines);
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
