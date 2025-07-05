@@ -306,17 +306,38 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Parsing class definition: {className}");
 
         var superclass = context.IDENTIFIER(0).GetText();
-        var options = new Dictionary<string, string>(StringComparer.Ordinal);
+        var instanceVars = new List<string>();
+        var classVars = new List<string>();
+        var pools = new List<string>();
+        string? category = null;
 
         foreach (var opt in context.classOption())
         {
-            var keyword = opt.GetChild(0).GetText().Trim().TrimEnd(':');
-            var value = opt.stringLiteral().GetText().Trim('\'');
-            options[keyword] = value;
+            var text = opt.GetChild(0).GetText();
+            var value = opt.stringLiteral().GetText();
+            if (text.StartsWith("instanceVariableNames:", StringComparison.Ordinal))
+            {
+                instanceVars.AddRange(ExtractIdentifiersFromString(value));
+            }
+            else if (text.StartsWith("classVariableNames:", StringComparison.Ordinal))
+            {
+                classVars.AddRange(ExtractIdentifiersFromString(value));
+            }
+            else if (text.StartsWith("poolDictionaries:", StringComparison.Ordinal))
+            {
+                pools.AddRange(ExtractIdentifiersFromString(value));
+            }
+            else if (text.StartsWith("category:", StringComparison.Ordinal))
+            {
+                category = value.Trim('\'');
+            }
         }
 
-        return new ClassDefinitionNode(superclass, className, options);
+        return new ClassDefinitionNode(superclass, className, instanceVars, classVars, pools, category);
     }
+
+    private static IReadOnlyList<string> ExtractIdentifiersFromString(string value)
+        => value.Trim('\'').Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
     /// <inheritdoc/>
     public override AstNode VisitMethodCategoryHeader(Smalltalk80Parser.MethodCategoryHeaderContext context)
