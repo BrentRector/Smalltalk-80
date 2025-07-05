@@ -109,8 +109,17 @@ public sealed record FileNode(IReadOnlyList<AstNode> Chunks) : AstNode;
 /// </summary>
 /// <param name="Superclass">The superclass name.</param>
 /// <param name="ClassName">The class being defined.</param>
-/// <param name="Options">Additional class options such as variable declarations.</param>
-public sealed record ClassDefinitionNode(string Superclass, string ClassName, IReadOnlyDictionary<string, string> Options) : AstNode;
+/// <param name="InstanceVariables">Declared instance variables for the class.</param>
+/// <param name="ClassVariables">Declared class variables shared by all instances.</param>
+/// <param name="PoolDictionaries">Names of any pool dictionaries referenced by the class.</param>
+/// <param name="Category">Organizational category for the class.</param>
+public sealed record ClassDefinitionNode(
+    string Superclass,
+    string ClassName,
+    IReadOnlyList<string> InstanceVariables,
+    IReadOnlyList<string> ClassVariables,
+    IReadOnlyList<string> PoolDictionaries,
+    string? Category) : AstNode;
 
 /// <summary>
 /// Node representing a class comment chunk.

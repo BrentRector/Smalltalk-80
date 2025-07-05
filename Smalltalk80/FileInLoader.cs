@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Smalltalk80.Parser;
 
 /// <summary>
@@ -24,14 +23,13 @@ public static class FileInLoader
             {
                 case ClassDefinitionNode cdef:
                     var super = SystemDictionary.TryGetClass(cdef.Superclass, out var sup) ? sup : null;
-                    cdef.Options.TryGetValue("instanceVariableNames", out var ivars);
-                    cdef.Options.TryGetValue("classVariableNames", out var cvars);
-                    cdef.Options.TryGetValue("poolDictionaries", out var pools);
-                    cdef.Options.TryGetValue("category", out var category);
-                    var varList = ivars is not null ? ExtractIdentifiersFromString(ivars) : Array.Empty<string>();
-                    var classList = cvars is not null ? ExtractIdentifiersFromString(cvars) : Array.Empty<string>();
-                    var poolList = pools is not null ? ExtractIdentifiersFromString(pools) : Array.Empty<string>();
-                    SystemDictionary.DefineClass(cdef.ClassName, super, varList, classList, poolList, category);
+                    SystemDictionary.DefineClass(
+                        cdef.ClassName,
+                        super,
+                        cdef.InstanceVariables,
+                        cdef.ClassVariables,
+                        cdef.PoolDictionaries,
+                        cdef.Category);
                     break;
 
                 case MethodHeaderNode header:
@@ -56,7 +54,4 @@ public static class FileInLoader
             }
         }
     }
-
-    private static IReadOnlyList<string> ExtractIdentifiersFromString(string value)
-        => value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 }
