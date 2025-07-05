@@ -15,21 +15,22 @@ replUnit:
 
 //////////////////////////////////////////////////////////////////////////
 // File-Out Chunks ////////////////////////////////////////////////////////////////////////
-chunk:
-	// a “file-out” class definition chunk
-	BANG ws? classDefinition ws? BANG ws?           # ClassChunk
+chunk
+  // class‐def chunk (the initial “!” is now optional)
+  : (BANG ws?)? classDefinition ws? BANG ws?          #ClassChunk
 
-	// a methods-for category chunk: header already eats !…!
-	| methodCategoryHeader methodDefinition+        # MethodCategoryChunk
+  // methods‐for category still needs its own leading “!” in the header:
+  | methodCategoryHeader methodDefinition+           #MethodCategoryChunk
 
-	// a class comment chunk
-	| BANG ws? classComment ws? BANG ws?            # ClassCommentChunk
+  // class comment chunk, leading “!” optional:
+  | (BANG ws?)? classComment ws? BANG ws?             #ClassCommentChunk
 
-	// an arbitrary standalone comment
-	| BANG ws? COMMENT ws? BANG ws?                 # StandaloneCommentChunk
+  // arbitrary standalone comment:
+  | (BANG ws?)? COMMENT ws? BANG ws?                  #StandaloneCommentChunk
 
-	// a script chunk (e.g. initialize code)
-	| BANG ws? sequence ws? BANG ws?                # ScriptChunk;
+  // init scripts, leading “!” optional:
+  | (BANG ws?)? sequence ws? BANG ws?                 #ScriptChunk
+  ;
 
 //////////////////////////////////////////////////////////////////////////
 // Comments & Whitespace ////////////////////////////////////////////////////////////////////////
