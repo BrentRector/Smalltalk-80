@@ -329,16 +329,42 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {
-        var methodName = currentMethodName ?? "(unknown)";
-        Tracer.Log($"Parsing method: {methodName}");
-        Tracer.Log($"Entering method: {methodName}");
+        var (selector, args) = ParseMethodSelector(context.methodSelector());
+        Tracer.Log($"Parsing method: {selector}");
+        Tracer.Log($"Entering method: {selector}");
 
         scopeStack.Clear();
-        var body = (SequenceNode)Visit(context.sequence())!;
+        var methodVisitor = new AstBuildingVisitor(selector, args, initialVariables);
+        var body = (SequenceNode)methodVisitor.Visit(context.sequence())!;
         scopeStack.Clear();
 
-        Tracer.Log($"Exiting method: {methodName}");
-        return new MethodDefinitionNode(string.Empty, Array.Empty<string>(), body, null);
+        Tracer.Log($"Exiting method: {selector}");
+        return new MethodDefinitionNode(selector, args, body, null);
+    }
+
+    private static (string Selector, List<string> Args) ParseMethodSelector(Smalltalk80Parser.MethodSelectorContext context)
+    {
+        if (context.unarySelector() is { } u)
+        {
+            return (u.IDENTIFIER().GetText(), new List<string>());
+        }
+
+        if (context.binarySelector() is { } b)
+        {
+            var selector = b.GetText();
+            var arg = context.IDENTIFIER().GetText();
+            return (selector, new List<string> { arg });
+        }
+
+        var selectorParts = new List<string>();
+        var args = new List<string>();
+        foreach (var part in context.keywordSelector().keywordPart())
+        {
+            selectorParts.Add(part.KEYWORD().GetText());
+            args.Add(part.IDENTIFIER().GetText());
+        }
+
+        return (string.Join(string.Empty, selectorParts), args);
     }
 }
 

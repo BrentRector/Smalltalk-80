@@ -270,4 +270,39 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Ensures that class-side methods are compiled and installed on the class.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_ClassMethod_CompilesAndExecutes()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #Counter!",
+                "!Counter class methodsFor: 'testing'!",
+                "fortyTwo",
+                "    ^42!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("Counter");
+            Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("fortyTwo")));
+
+            var method = cls.MethodDictionary[new Symbol("fortyTwo")];
+            var result = vm.Interpreter.Evaluate(method, cls);
+            Assert.Equal(42, result);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }

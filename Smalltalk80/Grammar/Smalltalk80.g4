@@ -5,11 +5,11 @@ fileIn: chunk* EOF;
 
 // A chunk is a class definition, a method category with methods, or arbitrary code
 chunk:
-	classDefinition BANG ws?
-	| methodCategoryHeader methodDefinition+
-	| classComment
-	| commentChunk
-	| sequence BANG ws?;
+        classDefinition BANG ws?
+        | methodCategoryHeader methodDefinition+
+        | classComment
+        | commentChunk
+        | sequence BANG ws?;
 
 commentChunk: ws? COMMENT BANG ws?;
 
@@ -38,8 +38,19 @@ methodCategoryHeader:
 	BANG ws? IDENTIFIER ws? ('class' ws?)? // optional literal class
 	'methodsFor:' ws? stringLiteral BANG ws?;
 
-// A single method under the current category, terminated by '!'
-methodDefinition: sequence METHOD_END ws?;
+// A single method under the current category with full selector
+methodDefinition:
+        methodSelector ws? sequence BANG ws?;
+
+methodSelector:
+        unarySelector
+        | binarySelector ws? IDENTIFIER
+        | keywordSelector;
+
+keywordSelector: keywordPart (ws? keywordPart)*;
+keywordPart: KEYWORD ws? IDENTIFIER;
+
+binarySelector: BINARY_SELECTOR | MINUS;
 
 // Optional standalone script entry point
 script: sequence EOF;
