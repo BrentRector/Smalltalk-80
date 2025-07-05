@@ -51,6 +51,12 @@ public static class FileInParser
 
     private static AstNode ParseChunk(string chunk)
     {
+        // Some file-in sources place two exclamation marks at the end of
+        // a method. Strip the trailing separator so the parser sees a
+        // single bang terminator.
+        if (chunk.EndsWith("!!", StringComparison.Ordinal))
+            chunk = chunk.Substring(0, chunk.Length - 1);
+
         var input = new AntlrInputStream(chunk);
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
@@ -180,11 +186,25 @@ public static class FileInParser
         if (currentHeader is not null && partialMethod is null)
         {
             var node = ParseChunk(chunk);
+            if (node is MethodDefinitionNode m)
+            {
+                var lines = chunk.Split('\n');
+                var body = lines.Length > 1 ? string.Join('\n', lines[1..]) : string.Empty;
+                body = body.TrimEnd('!');
+                node = new MethodDefinitionNode(m.Selector, m.Arguments, m.Body, m.Comment, body);
+            }
             output.Add(node);
             return;
         }
 
         var parsed = ParseChunk(chunk);
+        if (parsed is MethodDefinitionNode m2)
+        {
+            var lines = chunk.Split('\n');
+            var body = lines.Length > 1 ? string.Join('\n', lines[1..]) : string.Empty;
+            body = body.TrimEnd('!');
+            parsed = new MethodDefinitionNode(m2.Selector, m2.Arguments, m2.Body, m2.Comment, body);
+        }
         output.Add(parsed);
     }
 

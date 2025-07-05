@@ -41,7 +41,11 @@ public static class FileInLoader
                 case MethodDefinitionNode method when currentHeader is not null:
                     var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
                     var vars = currentHeader.IsClassSide ? cls.ClassVariables : cls.InstanceVariables;
-                    var compiled = AstMethodCompiler.CompileMethod(method.Body, method.Arguments, vars, method.Comment);
+
+                    // Reparse the method body with variable information so tracing
+                    // accurately reflects the available names during compilation.
+                    var parser = new SmalltalkParser(method.Source);
+                    var compiled = parser.ParseMethod(method.Arguments, vars, method.Selector);
                     cls.MethodDictionary[new Symbol(method.Selector)] = compiled;
                     break;
 
