@@ -254,7 +254,7 @@ public static class FileInLoader
             }
         }
 
-        var selector = string.Concat(selectorParts);
+        var selector = string.Join(string.Empty, selectorParts);
         return (selector, args);
     }
 }
