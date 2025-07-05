@@ -338,7 +338,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         scopeStack.Clear();
 
         Tracer.Log($"Exiting method: {methodName}");
-        return new MethodDefinitionNode(string.Empty, body, null);
+        return new MethodDefinitionNode(string.Empty, Array.Empty<string>(), body, null);
     }
 }
 

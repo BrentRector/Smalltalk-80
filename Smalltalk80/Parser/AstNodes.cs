@@ -131,7 +131,12 @@ public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string
 /// Node representing a method definition.
 /// </summary>
 /// <param name="Selector">The method selector.</param>
+/// <param name="Arguments">Names of the method parameters in declaration order.</param>
 /// <param name="Body">The method body.</param>
 /// <param name="Comment">Optional method comment text.</param>
-public sealed record MethodDefinitionNode(string Selector, SequenceNode Body, string? Comment) : AstNode;
+public sealed record MethodDefinitionNode(
+    string Selector,
+    IReadOnlyList<string> Arguments,
+    SequenceNode Body,
+    string? Comment) : AstNode;
 
