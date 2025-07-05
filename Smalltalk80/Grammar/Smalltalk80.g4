@@ -193,7 +193,6 @@ CLOSE_PAREN: ')';
 PIPE: '|';
 PERIOD: '.';
 SEMI_COLON: ';';
-METHOD_END: '!!';
 BANG: '!';
 MINUS: '-';
 
