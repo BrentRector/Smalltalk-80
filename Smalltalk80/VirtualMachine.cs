@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
+using Smalltalk80.Generated;
+using Smalltalk80.Parser;
 
 /// <summary>
 /// Provides a high level interface combining the interpreter and object memory
@@ -80,26 +85,56 @@ public sealed class VirtualMachine
     public void RunRepl()
     {
         Console.WriteLine("Smalltalk-80 REPL. Type 'exit' to quit.");
+
+        var buffer = new StringBuilder();
         while (true)
         {
-            Console.Write("st> ");
+            Console.Write(buffer.Length > 0 ? "... " : "st> ");
             var line = Console.ReadLine();
             if (line is null)
                 break;
-            line = line.Trim();
-            if (line.Length == 0)
-                continue;
-            if (string.Equals(line, "exit", StringComparison.OrdinalIgnoreCase))
+
+            if (buffer.Length == 0 && line.Trim().Equals("exit", StringComparison.OrdinalIgnoreCase))
                 break;
+
+            buffer.AppendLine(line);
+
+            var source = buffer.ToString();
             try
             {
-                var result = EvaluateSource(line);
+                if (!IsCompleteReplUnit(source))
+                    continue;
+
+                var result = EvaluateSource(source);
                 Console.WriteLine($"=> {result}");
+                buffer.Clear();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"! {ex.Message}");
+                buffer.Clear();
             }
+        }
+    }
+
+    private static bool IsCompleteReplUnit(string source)
+    {
+        var input = new AntlrInputStream(source);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens)
+        {
+            ErrorHandler = new BailErrorStrategy()
+        };
+        parser.RemoveErrorListeners();
+        try
+        {
+            parser.replUnit();
+            return true;
+        }
+        catch (ParseCanceledException ex) when (ex.InnerException is InputMismatchException { OffendingToken.Type: TokenConstants.EOF })
+        {
+            return false;
         }
     }
 
