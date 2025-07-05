@@ -62,6 +62,7 @@ public sealed class SmalltalkParser
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
         var tree = parser.script();
         var visitor = new AstBuildingVisitor(methodName);
         return (ScriptNode)visitor.Visit(tree)!;
