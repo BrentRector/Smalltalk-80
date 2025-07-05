@@ -16,12 +16,16 @@ public static class SystemDictionary
     /// <param name="superclass">The optional superclass reference.</param>
     /// <param name="instanceVariables">Names of instance variables for the class.</param>
     /// <param name="classVariables">Names of class variables shared across all instances.</param>
+    /// <param name="poolDictionaries">Names of shared pool dictionaries referenced by the class.</param>
+    /// <param name="category">Organizational category of the class.</param>
     /// <returns>The created or existing <see cref="SmalltalkClass"/>.</returns>
     public static SmalltalkClass DefineClass(
         string name,
         SmalltalkClass? superclass = null,
         IReadOnlyList<string>? instanceVariables = null,
-        IReadOnlyList<string>? classVariables = null)
+        IReadOnlyList<string>? classVariables = null,
+        IReadOnlyList<string>? poolDictionaries = null,
+        string? category = null)
     {
         if (classes.TryGetValue(name, out var existing))
         {
@@ -43,6 +47,16 @@ public static class SystemDictionary
                         existing.ClassVariables.Add(cvar);
                 }
             }
+            if (poolDictionaries is not null)
+            {
+                foreach (var pool in poolDictionaries)
+                {
+                    if (!existing.PoolDictionaries.Contains(pool))
+                        existing.PoolDictionaries.Add(pool);
+                }
+            }
+            if (category is not null)
+                existing.Category = category;
             return existing;
         }
 
@@ -51,6 +65,10 @@ public static class SystemDictionary
             cls.InstanceVariables.AddRange(instanceVariables);
         if (classVariables is not null)
             cls.ClassVariables.AddRange(classVariables);
+        if (poolDictionaries is not null)
+            cls.PoolDictionaries.AddRange(poolDictionaries);
+        if (category is not null)
+            cls.Category = category;
         classes[name] = cls;
         return cls;
     }

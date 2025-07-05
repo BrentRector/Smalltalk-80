@@ -21,6 +21,16 @@ public class SmalltalkClass : SmalltalkObject
     public List<string> ClassVariables { get; } = new();
 
     /// <summary>
+    ///     Gets the names of any shared variable pools used by this class.
+    /// </summary>
+    public List<string> PoolDictionaries { get; } = new();
+
+    /// <summary>
+    ///     Gets or sets the organizational category this class belongs to.
+    /// </summary>
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>
     ///     Gets or sets the superclass of this class.
     /// </summary>
     public SmalltalkClass? Superclass { get; set; }

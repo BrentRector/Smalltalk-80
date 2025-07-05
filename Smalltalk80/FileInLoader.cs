@@ -207,9 +207,12 @@ public static class FileInLoader
                 var super = SystemDictionary.TryGetClass(cdef.Superclass, out var sup) ? sup : null;
                 cdef.Options.TryGetValue("instanceVariableNames", out var ivars);
                 cdef.Options.TryGetValue("classVariableNames", out var cvars);
-                var varList = ivars is not null ? ivars.Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
-                var classList = cvars is not null ? cvars.Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
-                SystemDictionary.DefineClass(cdef.ClassName, super, varList, classList);
+                cdef.Options.TryGetValue("poolDictionaries", out var pools);
+                cdef.Options.TryGetValue("category", out var category);
+                var varList = ivars is not null ? ExtractIdentifiersFromString(ivars) : Array.Empty<string>();
+                var classList = cvars is not null ? ExtractIdentifiersFromString(cvars) : Array.Empty<string>();
+                var poolList = pools is not null ? ExtractIdentifiersFromString(pools) : Array.Empty<string>();
+                SystemDictionary.DefineClass(cdef.ClassName, super, varList, classList, poolList, category);
                 break;
             case MethodHeaderNode header:
                 currentHeader = header;
@@ -270,4 +273,12 @@ public static class FileInLoader
         var selector = string.Join(string.Empty, selectorParts);
         return (selector, args);
     }
+
+    /// <summary>
+    /// Extracts a list of identifiers from a Smalltalk string literal.
+    /// </summary>
+    /// <param name="value">The raw string literal contents.</param>
+    /// <returns>A list of identifiers contained in the string.</returns>
+    private static IReadOnlyList<string> ExtractIdentifiersFromString(string value)
+        => value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 }

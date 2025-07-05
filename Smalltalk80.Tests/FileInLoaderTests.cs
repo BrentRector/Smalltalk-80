@@ -193,6 +193,8 @@ public class FileInLoaderTests
 
             var cls = SystemDictionary.GetClass("OptionTest");
             Assert.Contains("selectors", cls.InstanceVariables);
+            Assert.Empty(cls.PoolDictionaries);
+            Assert.Equal("Menus", cls.Category);
         }
         finally
         {
@@ -226,6 +228,42 @@ public class FileInLoaderTests
             var cls = SystemDictionary.GetClass("ClassVarTest");
             Assert.Contains("Foo", cls.ClassVariables);
             Assert.Contains("Bar", cls.ClassVariables);
+            Assert.Empty(cls.PoolDictionaries);
+            Assert.Equal("Tests", cls.Category);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that pool dictionary names are parsed and stored on the class.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_ClassDefinitionWithPools_RecordsPools()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #PoolTest",
+                "    instanceVariableNames: ''",
+                "    classVariableNames: ''",
+                "    poolDictionaries: 'TextConstants OtherPool'",
+                "    category: 'Tests'!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("PoolTest");
+            Assert.Contains("TextConstants", cls.PoolDictionaries);
+            Assert.Contains("OtherPool", cls.PoolDictionaries);
+            Assert.Equal("Tests", cls.Category);
         }
         finally
         {
