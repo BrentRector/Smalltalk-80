@@ -11,27 +11,31 @@ replUnit:
 	classDefinition BANG ws? EOF					# ReplClassDef
 	| methodCategoryHeader methodDefinition+ EOF	# ReplMethodsForCategory
 	| classComment EOF								# ReplClassComment
-	| standaloneCommentChunk EOF					# ReplStandaloneComment
 	| sequence EOF									# ReplSequence;
 
 //////////////////////////////////////////////////////////////////////////
 // File-Out Chunks ////////////////////////////////////////////////////////////////////////
-
 chunk:
-	classDefinition BANG ws?					# ClassChunk
-	| methodCategoryHeader methodDefinition+	# MethodCategoryChunk
-	| classComment								# ClassCommentChunk
-	| standaloneCommentChunk					# StandaloneCommentBlock
-	| sequence BANG ws?							# ScriptChunk;
+	// a “file-out” class definition chunk
+	BANG ws? classDefinition ws? BANG ws?           # ClassChunk
+
+	// a methods-for category chunk: header already eats !…!
+	| methodCategoryHeader methodDefinition+        # MethodCategoryChunk
+
+	// a class comment chunk
+	| BANG ws? classComment ws? BANG ws?            # ClassCommentChunk
+
+	// an arbitrary standalone comment
+	| BANG ws? COMMENT ws? BANG ws?                 # StandaloneCommentChunk
+
+	// a script chunk (e.g. initialize code)
+	| BANG ws? sequence ws? BANG ws?                # ScriptChunk;
 
 //////////////////////////////////////////////////////////////////////////
 // Comments & Whitespace ////////////////////////////////////////////////////////////////////////
 
 // “ws” is reused everywhere to allow interleaved whitespace/comments
 ws: (SEPARATOR | COMMENT)+;
-
-// a standalone comment chunk in file-out
-standaloneCommentChunk: ws? COMMENT (BANG ws?)?;
 
 //////////////////////////////////////////////////////////////////////////
 // Class Definitions & Comments
@@ -46,7 +50,7 @@ classDefinition:
 	) ws? HASH IDENTIFIER (ws? classOption)*;
 
 classComment:
-	className ws? ('class' ws?)? 'comment:' ws? stringLiteral BANG ws?;
+	className ws? ('class' ws?)? 'comment:' ws? stringLiteral;
 
 className: IDENTIFIER;
 
@@ -63,8 +67,7 @@ classOption:
 methodCategoryHeader:
 	BANG ws? IDENTIFIER ws? ('class' ws?)? 'methodsFor:' ws? stringLiteral BANG ws?;
 
-methodDefinition:
-	methodSelector ws? sequence (METHOD_END | BANG) ws?;
+methodDefinition: methodSelector ws? sequence BANG ws?;
 
 methodSelector:
 	unarySelector
@@ -149,16 +152,13 @@ literal: runtimeLiteral | parsetimeLiteral;
 
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
-block
-  : BLOCK_START BLOCK_END                        // the empty-block case
-  | BLOCK_START nonEmptyBlockBody BLOCK_END      // the non-empty case
-  ;
+block:
+	BLOCK_START BLOCK_END // the empty-block case
+	| BLOCK_START nonEmptyBlockBody BLOCK_END; // the non-empty case
 
-nonEmptyBlockBody
-  : blockParamList ( ws sequence )?              // [:p| …] or just [:p|]
-  | temps ws? statements                         // e.g. [|t1 t2| …] or [expr]
-  ;
-
+nonEmptyBlockBody:
+	blockParamList (ws sequence)? // [:p| …] or just [:p|]
+	| temps ws? statements; // e.g. [|t1 t2| …] or [expr]
 
 blockParamList: ( ws? BLOCK_PARAM)+;
 

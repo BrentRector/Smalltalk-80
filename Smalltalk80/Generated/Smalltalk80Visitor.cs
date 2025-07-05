@@ -60,13 +60,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitReplClassComment([NotNull] Smalltalk80Parser.ReplClassCommentContext context);
 	/// <summary>
-	/// Visit a parse tree produced by the <c>ReplStandaloneComment</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.replUnit"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitReplStandaloneComment([NotNull] Smalltalk80Parser.ReplStandaloneCommentContext context);
-	/// <summary>
 	/// Visit a parse tree produced by the <c>ReplSequence</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.replUnit"/>.
 	/// </summary>
@@ -95,12 +88,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context);
 	/// <summary>
-	/// Visit a parse tree produced by the <c>StandaloneCommentBlock</c>
+	/// Visit a parse tree produced by the <c>StandaloneCommentChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitStandaloneCommentBlock([NotNull] Smalltalk80Parser.StandaloneCommentBlockContext context);
+	Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context);
 	/// <summary>
 	/// Visit a parse tree produced by the <c>ScriptChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
@@ -114,12 +107,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitWs([NotNull] Smalltalk80Parser.WsContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.standaloneCommentChunk"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classDefinition"/>.
 	/// </summary>
