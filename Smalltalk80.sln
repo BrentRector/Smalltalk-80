@@ -5,7 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80", "Smalltalk80\Smalltalk80.csproj", "{919C18EA-AC4D-4FE4-B779-E2090C0F15CC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Tests", "Smalltalk80.Tests\\Smalltalk80.Tests.csproj", "{9B4AB123-B79E-4FE0-9426-786FE39665FE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Tests", "Smalltalk80.Tests\Smalltalk80.Tests.csproj", "{9B4AB123-B79E-4FE0-9426-786FE39665FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestSmalltalkGrammar", "TestSmalltalkGrammar\TestSmalltalkGrammar.csproj", "{E5702173-3F21-4DE6-956F-57C35FD5B537}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +21,14 @@ Global
 		{919C18EA-AC4D-4FE4-B779-E2090C0F15CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{919C18EA-AC4D-4FE4-B779-E2090C0F15CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{919C18EA-AC4D-4FE4-B779-E2090C0F15CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-                {919C18EA-AC4D-4FE4-B779-E2090C0F15CC}.Release|Any CPU.Build.0 = Release|Any CPU
-                {9B4AB123-B79E-4FE0-9426-786FE39665FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-                {9B4AB123-B79E-4FE0-9426-786FE39665FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-                {9B4AB123-B79E-4FE0-9426-786FE39665FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-                {9B4AB123-B79E-4FE0-9426-786FE39665FE}.Release|Any CPU.Build.0 = Release|Any CPU
-        EndGlobalSection
+		{919C18EA-AC4D-4FE4-B779-E2090C0F15CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B4AB123-B79E-4FE0-9426-786FE39665FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B4AB123-B79E-4FE0-9426-786FE39665FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B4AB123-B79E-4FE0-9426-786FE39665FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B4AB123-B79E-4FE0-9426-786FE39665FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5702173-3F21-4DE6-956F-57C35FD5B537}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5702173-3F21-4DE6-956F-57C35FD5B537}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5702173-3F21-4DE6-956F-57C35FD5B537}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5702173-3F21-4DE6-956F-57C35FD5B537}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 EndGlobal
