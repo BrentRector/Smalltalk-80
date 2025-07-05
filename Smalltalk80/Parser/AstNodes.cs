@@ -134,9 +134,11 @@ public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string
 /// <param name="Arguments">Names of the method parameters in declaration order.</param>
 /// <param name="Body">The method body.</param>
 /// <param name="Comment">Optional method comment text.</param>
+/// <param name="Source">The raw Smalltalk source for the method body.</param>
 public sealed record MethodDefinitionNode(
     string Selector,
     IReadOnlyList<string> Arguments,
     SequenceNode Body,
-    string? Comment) : AstNode;
+    string? Comment,
+    string Source = "") : AstNode;
 
