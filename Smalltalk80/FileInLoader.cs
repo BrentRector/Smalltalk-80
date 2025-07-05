@@ -15,7 +15,11 @@ public static class FileInLoader
     /// <param name="path">Path to the Smalltalk source file.</param>
     public static void Load(string path)
     {
-        var fileAst = FileInReader.Parse(path);
+        FileNode fileAst;
+        using (Tracer.ScopedDisable())
+        {
+            fileAst = FileInReader.Parse(path);
+        }
         MethodHeaderNode? currentHeader = null;
 
         foreach (var chunk in fileAst.Chunks)

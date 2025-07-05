@@ -240,7 +240,10 @@ public partial class Smalltalk80Parser : Parser {
 				State = 128;
 				classDefinition();
 				State = 129;
-				Match(BANG);
+                        if (TokenStream.LA(1) == METHOD_END)
+                            Match(METHOD_END);
+                        else
+                            Match(BANG);
 				State = 131;
 				ErrorHandler.Sync(this);
 				switch ( Interpreter.AdaptivePredict(TokenStream,1,Context) ) {
@@ -366,9 +369,10 @@ public partial class Smalltalk80Parser : Parser {
 				break;
 			}
 			State = 151;
-			Match(COMMENT);
-			State = 152;
-			Match(BANG);
+                        Match(COMMENT);
+                        State = 152;
+                        if (TokenStream.LA(1) == BANG)
+                            Match(BANG);
 			State = 154;
 			ErrorHandler.Sync(this);
 			switch ( Interpreter.AdaptivePredict(TokenStream,6,Context) ) {
