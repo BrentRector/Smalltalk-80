@@ -19,14 +19,6 @@ public static class FileInReader
     public static FileNode Parse(string path)
     {
         var source = File.ReadAllText(path);
-        var lines = source.Split('\n');
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].TrimEnd('\r');
-            if (line.StartsWith("\"") && !line.EndsWith("!"))
-                lines[i] = line + "!";
-        }
-        source = string.Join('\n', lines);
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
@@ -52,7 +44,7 @@ public static class FileInReader
                         var method = (MethodDefinitionNode)visitor.Visit(methodCtx)!;
                         var start = methodCtx.sequence().Start.StartIndex;
                         var end = methodCtx.sequence().Stop.StopIndex;
-                        var bodyText = source.Substring(start, end - start + 1).TrimEnd('!');
+                        var bodyText = source.Substring(start, end - start + 1);
                         method = method with { Source = bodyText };
                         chunks.Add(method);
                     }
@@ -67,8 +59,8 @@ public static class FileInReader
                     chunks.Add(new ScriptNode(seq));
                     break;
 
-                case Smalltalk80Parser.StandaloneCommentBlockContext standalone:
-                    chunks.Add((AstNode)visitor.Visit(standalone.standaloneCommentChunk())!);
+                case Smalltalk80Parser.StandaloneCommentChunkContext standalone:
+                    chunks.Add((AstNode)visitor.Visit(standalone)!);
                     break;
             }
         }
