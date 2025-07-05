@@ -1,0 +1,250 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using Antlr4.Runtime;
+using Smalltalk80.Generated;
+
+namespace Smalltalk80.Parser;
+
+/// <summary>
+/// Provides functionality to parse classic Smalltalk file-in sources
+/// into an abstract syntax tree.
+/// </summary>
+public static class FileInParser
+{
+    /// <summary>
+    /// Parses the specified file and returns the resulting <see cref="FileNode"/>.
+    /// </summary>
+    /// <param name="path">Path to the Smalltalk file-in source.</param>
+    /// <returns>The parsed <see cref="FileNode"/>.</returns>
+    public static FileNode Parse(string path)
+    {
+        var lines = File.ReadAllLines(path);
+        var builder = new StringBuilder();
+        var chunks = new List<AstNode>();
+        MethodHeaderNode? currentHeader = null;
+        List<string>? partialMethod = null;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine;
+            if (line.TrimStart().StartsWith("\"") && !line.TrimEnd().EndsWith("!"))
+                continue;
+
+            builder.AppendLine(line);
+
+            if (!line.TrimEnd().EndsWith("!"))
+                continue;
+
+            var chunk = builder.ToString().Trim();
+            builder.Clear();
+
+            if (chunk.StartsWith("!", StringComparison.Ordinal))
+                ProcessCategoryChunk(chunk, ref currentHeader, ref partialMethod, chunks);
+            else
+                ProcessChunk(chunk, ref currentHeader, ref partialMethod, chunks);
+        }
+
+        return new FileNode(chunks);
+    }
+
+    private static AstNode ParseChunk(string chunk)
+    {
+        var input = new AntlrInputStream(chunk);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
+        var visitor = new AstBuildingVisitor();
+
+        try
+        {
+            var classCtx = parser.classDefinition();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(classCtx)!;
+        }
+        catch
+        {
+        }
+
+        parser.Reset();
+        try
+        {
+            var catCtx = parser.methodCategoryHeader();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(catCtx)!;
+        }
+        catch
+        {
+        }
+
+        parser.Reset();
+        try
+        {
+            var commentCtx = parser.classComment();
+            if (parser.NumberOfSyntaxErrors == 0)
+                return visitor.Visit(commentCtx)!;
+        }
+        catch
+        {
+        }
+
+        parser.Reset();
+        var lines = chunk.Split('\n');
+        var body = lines.Length > 1 ? string.Join('\n', lines[1..]) : string.Empty;
+        var script = ParseScript(body);
+        return script;
+    }
+
+    private static void ProcessCategoryChunk(
+        string chunk,
+        ref MethodHeaderNode? currentHeader,
+        ref List<string>? partialMethod,
+        List<AstNode> output)
+    {
+        var lines = chunk.Split('\n');
+        if (lines.Length == 0)
+            return;
+
+        var headerLine = lines[0].Trim();
+        if (headerLine == "!!" || headerLine == "!")
+            return;
+
+        int closeIndex = headerLine.IndexOf("'!");
+        if (closeIndex >= 0)
+            headerLine = headerLine.Substring(0, closeIndex + 2);
+
+        headerLine = headerLine.Replace("! !", "!");
+
+        var node = ParseChunk(headerLine);
+        if (node is not MethodHeaderNode headerNode)
+            return;
+        currentHeader = headerNode;
+        output.Add(headerNode);
+
+        partialMethod ??= new List<string>();
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (line.Trim() == "!!")
+                break;
+
+            partialMethod!.Add(line);
+
+            if (line.TrimEnd().EndsWith("!"))
+            {
+                var methodChunk = string.Join('\n', partialMethod);
+                partialMethod = null;
+                ProcessChunk(methodChunk, ref currentHeader, ref partialMethod, output);
+            }
+        }
+    }
+
+    private static void ProcessChunk(
+        string chunk,
+        ref MethodHeaderNode? currentHeader,
+        ref List<string>? partialMethod,
+        List<AstNode> output)
+    {
+        if (currentHeader is not null && partialMethod is not null)
+        {
+            var lines = chunk.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.Trim() == "!!")
+                    continue;
+                partialMethod.Add(line);
+                if (line.TrimEnd().EndsWith("!"))
+                {
+                    var methodChunk = string.Join('\n', partialMethod);
+                    partialMethod = null;
+                    ProcessChunk(methodChunk, ref currentHeader, ref partialMethod, output);
+                    return;
+                }
+            }
+            return;
+        }
+
+        if (currentHeader is not null && partialMethod is null)
+        {
+            var lines = chunk.Split('\n');
+            if (lines.Length == 0)
+                return;
+            var headerLine = lines[0].Trim();
+            if (headerLine.StartsWith("--"))
+                return;
+
+            var (selector, args) = ParseSelector(headerLine);
+            int index = 1;
+            string? comment = null;
+            var bodyLines = new List<string>();
+            while (index < lines.Length && lines[index].TrimStart().StartsWith("\""))
+            {
+                var line = lines[index].Trim();
+                comment = comment is null ? line : string.Join('\n', comment, line);
+                index++;
+            }
+            if (index < lines.Length)
+                bodyLines.AddRange(lines[index..]);
+            while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
+                bodyLines.RemoveAt(bodyLines.Count - 1);
+
+            var bodyText = bodyLines.Count > 0
+                ? string.Join('\n', bodyLines)
+                : string.Empty;
+            bodyText = bodyText.TrimEnd();
+            while (bodyText.EndsWith("!"))
+                bodyText = bodyText[..^1].TrimEnd();
+
+            var script = ParseScript(bodyText, selector);
+            output.Add(new MethodDefinitionNode(selector, args, script.Sequence, comment));
+            return;
+        }
+
+        var node = ParseChunk(chunk);
+        output.Add(node);
+    }
+
+    private static ScriptNode ParseScript(string source, string? methodName = null)
+    {
+        var input = new AntlrInputStream(source);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
+        var ctx = parser.script();
+        return (ScriptNode)new AstBuildingVisitor(methodName).Visit(ctx)!;
+    }
+
+    private static (string Selector, List<string> Arguments) ParseSelector(string line)
+    {
+        var tokens = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var selectorParts = new List<string>();
+        var args = new List<string>();
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            var tok = tokens[i];
+            if (tok.EndsWith(":"))
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else if (selectorParts.Count == 0)
+            {
+                selectorParts.Add(tok);
+                if (i + 1 < tokens.Length)
+                    args.Add(tokens[++i]);
+            }
+            else
+            {
+                selectorParts.Add(tok);
+            }
+        }
+
+        var selector = string.Join(string.Empty, selectorParts);
+        return (selector, args);
+    }
+}
