@@ -27,6 +27,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     private readonly string? currentMethodName;
     private readonly IReadOnlyList<string> argumentNames;
     private readonly IReadOnlyList<string> initialVariables;
+    private readonly HashSet<string> instanceVariableSet;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
@@ -39,6 +40,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         currentMethodName = methodName;
         argumentNames = arguments ?? Array.Empty<string>();
         initialVariables = variables ?? Array.Empty<string>();
+        instanceVariableSet = variables is not null
+            ? new HashSet<string>(variables)
+            : new HashSet<string>();
     }
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
@@ -71,7 +75,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         if (temps.Count > 0)
             Tracer.Log($"Temps: {string.Join(", ", temps)}");
-        Tracer.Log($"Variables in scope: {string.Join(", ", current)}");
+
+        if (instanceVariableSet.Count > 0)
+            Tracer.Log($"Instance variables in scope: {string.Join(", ", instanceVariableSet)}");
+
+        var locals = current.Where(v => !instanceVariableSet.Contains(v));
+        Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
 
         var statements = new List<StatementNode>();
         if (context.statements() is { } stmts)
