@@ -180,32 +180,17 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitSequence([NotNull] Smalltalk80Parser.SequenceContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statement"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitStatement([NotNull] Smalltalk80Parser.StatementContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.temps"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitTemps([NotNull] Smalltalk80Parser.TempsContext context);
-	/// <summary>
-	/// Visit a parse tree produced by the <c>StatementAnswer</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.statements"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStatementAnswer([NotNull] Smalltalk80Parser.StatementAnswerContext context);
-	/// <summary>
-	/// Visit a parse tree produced by the <c>StatementExpressionsAnswer</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.statements"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStatementExpressionsAnswer([NotNull] Smalltalk80Parser.StatementExpressionsAnswerContext context);
-	/// <summary>
-	/// Visit a parse tree produced by the <c>StatementExpressions</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.statements"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStatementExpressions([NotNull] Smalltalk80Parser.StatementExpressionsContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.answer"/>.
 	/// </summary>
