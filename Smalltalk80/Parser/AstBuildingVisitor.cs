@@ -284,20 +284,17 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
     {
-        Tracer.Log($"Parsing class definition: {context.IDENTIFIER(1).GetText()}");
-        var superclass = context.IDENTIFIER(0).GetText();
         var className = context.IDENTIFIER(1).GetText();
-        var options = new Dictionary<string, string>();
+        Tracer.Log($"Parsing class definition: {className}");
+
+        var superclass = context.IDENTIFIER(0).GetText();
+        var options = new Dictionary<string, string>(StringComparer.Ordinal);
+
         foreach (var opt in context.classOption())
         {
-            var optionText = opt.GetText();
-            var parts = optionText.Split("'", 2);
-            if (parts.Length == 2)
-            {
-                var key = parts[0].Trim().TrimEnd(':');
-                var value = parts[1].TrimEnd('\'');
-                options[key] = value;
-            }
+            var keyword = opt.GetChild(0).GetText().Trim().TrimEnd(':');
+            var value = opt.stringLiteral().GetText().Trim('\'');
+            options[keyword] = value;
         }
 
         return new ClassDefinitionNode(superclass, className, options);

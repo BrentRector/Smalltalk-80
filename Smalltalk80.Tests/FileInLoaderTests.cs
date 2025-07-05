@@ -166,4 +166,37 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Ensures that class definition options are parsed without entering a new scope
+    /// and that instance variables are recorded correctly.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_ClassDefinitionWithOptions_DefinesVariables()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #OptionTest",
+                "    instanceVariableNames: 'selectors'",
+                "    classVariableNames: ''",
+                "    poolDictionaries: ''",
+                "    category: 'Menus'!",
+                "!!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("OptionTest");
+            Assert.Contains("selectors", cls.InstanceVariables);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }
