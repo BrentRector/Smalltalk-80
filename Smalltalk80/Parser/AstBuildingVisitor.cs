@@ -45,7 +45,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             : new HashSet<string>();
     }
     /// <inheritdoc/>
-    public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
+    public override AstNode VisitScriptChunk(Smalltalk80Parser.ScriptChunkContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
 
     /// <inheritdoc/>
@@ -124,17 +124,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitExpressions(Smalltalk80Parser.ExpressionsContext context)
     {
-        var expressions = new List<ExpressionNode> { (ExpressionNode)Visit(context.expression())! };
-        foreach (var list in context.expressionList())
+        var expressions = new List<ExpressionNode>();
+        foreach (var exprCtx in context.expression())
         {
-            expressions.Add((ExpressionNode)Visit(list.expression())!);
+            expressions.Add((ExpressionNode)Visit(exprCtx)!);
         }
         return new ExpressionsNode(expressions);
     }
-
-    /// <inheritdoc/>
-    public override AstNode VisitExpressionList(Smalltalk80Parser.ExpressionListContext context)
-        => Visit(context.expression());
 
     /// <inheritdoc/>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
@@ -281,23 +277,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new FileNode(chunks);
     }
 
-    /// <inheritdoc/>
-    public override AstNode VisitChunk(Smalltalk80Parser.ChunkContext context)
-    {
-        if (context.classDefinition() is { } cls)
-            return Visit(cls);
-
-        if (context.methodCategoryHeader() is { } header)
-            return Visit(header);
-
-        if (context.classComment() is { } cmt)
-            return Visit(cmt);
-
-        if (context.sequence() is { } seq)
-            return new ScriptNode((SequenceNode)Visit(seq)!);
-
-        return new ScriptNode(new SequenceNode(Array.Empty<string>(), Array.Empty<StatementNode>()));
-    }
 
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)

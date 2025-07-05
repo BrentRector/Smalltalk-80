@@ -38,38 +38,38 @@ public static class FileInReader
 
         foreach (var chunk in fileCtx.chunk())
         {
-            if (chunk.classDefinition() is { } cdef)
+            switch (chunk)
             {
-                chunks.Add((AstNode)visitor.Visit(cdef)!);
-                continue;
-            }
+                case Smalltalk80Parser.ClassChunkContext classChunk:
+                    chunks.Add((AstNode)visitor.Visit(classChunk.classDefinition())!);
+                    break;
 
-            if (chunk.methodCategoryHeader() is { } headerCtx)
-            {
-                var header = (MethodHeaderNode)visitor.Visit(headerCtx)!;
-                chunks.Add(header);
-                foreach (var methodCtx in chunk.methodDefinition())
-                {
-                    var method = (MethodDefinitionNode)visitor.Visit(methodCtx)!;
-                    var start = methodCtx.sequence().Start.StartIndex;
-                    var end = methodCtx.sequence().Stop.StopIndex;
-                    var bodyText = source.Substring(start, end - start + 1).TrimEnd('!');
-                    method = method with { Source = bodyText };
-                    chunks.Add(method);
-                }
-                continue;
-            }
+                case Smalltalk80Parser.MethodCategoryChunkContext methodChunk:
+                    var header = (MethodHeaderNode)visitor.Visit(methodChunk.methodCategoryHeader())!;
+                    chunks.Add(header);
+                    foreach (var methodCtx in methodChunk.methodDefinition())
+                    {
+                        var method = (MethodDefinitionNode)visitor.Visit(methodCtx)!;
+                        var start = methodCtx.sequence().Start.StartIndex;
+                        var end = methodCtx.sequence().Stop.StopIndex;
+                        var bodyText = source.Substring(start, end - start + 1).TrimEnd('!');
+                        method = method with { Source = bodyText };
+                        chunks.Add(method);
+                    }
+                    break;
 
-            if (chunk.classComment() is { } commentCtx)
-            {
-                chunks.Add((AstNode)visitor.Visit(commentCtx)!);
-                continue;
-            }
+                case Smalltalk80Parser.ClassCommentChunkContext commentChunk:
+                    chunks.Add((AstNode)visitor.Visit(commentChunk.classComment())!);
+                    break;
 
-            if (chunk.sequence() is { } seqCtx)
-            {
-                var seq = (SequenceNode)visitor.Visit(seqCtx)!;
-                chunks.Add(new ScriptNode(seq));
+                case Smalltalk80Parser.ScriptChunkContext scriptChunk:
+                    var seq = (SequenceNode)visitor.Visit(scriptChunk.sequence())!;
+                    chunks.Add(new ScriptNode(seq));
+                    break;
+
+                case Smalltalk80Parser.StandaloneCommentBlockContext standalone:
+                    chunks.Add((AstNode)visitor.Visit(standalone.standaloneCommentChunk())!);
+                    break;
             }
         }
 

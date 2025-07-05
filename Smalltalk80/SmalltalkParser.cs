@@ -95,9 +95,13 @@ public sealed class SmalltalkParser
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
-        var tree = parser.script();
+        var unit = parser.replUnit();
         var visitor = new AstBuildingVisitor(methodName, arguments, variables);
-        return (ScriptNode)visitor.Visit(tree)!;
+
+        if (unit is Smalltalk80Parser.ReplSequenceContext seqCtx)
+            return new ScriptNode((SequenceNode)visitor.Visit(seqCtx.sequence())!);
+
+        return (ScriptNode)visitor.Visit(unit)!;
     }
 
 }
