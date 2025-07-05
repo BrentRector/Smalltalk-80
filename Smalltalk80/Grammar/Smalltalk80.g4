@@ -193,6 +193,7 @@ CLOSE_PAREN: ')';
 PIPE: '|';
 PERIOD: '.';
 SEMI_COLON: ';';
+METHOD_END: '!!';
 BANG: '!';
 MINUS: '-';
 
@@ -223,8 +224,6 @@ LITARR_START: '#(';
 DYNDICT_START: '#{';
 DYNARR_END: '}';
 DYNARR_START: '{';
-METHOD_END: '!!';
-
 RESERVED_WORD: 'nil' | 'true' | 'false' | 'self' | 'super';
 
 IDENTIFIER: [a-zA-Z]+ [a-zA-Z0-9_]*;
