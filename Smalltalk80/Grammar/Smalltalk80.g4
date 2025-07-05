@@ -11,7 +11,7 @@ chunk:
         | commentChunk
         | sequence BANG ws?;
 
-commentChunk: ws? COMMENT BANG ws?;
+commentChunk: ws? COMMENT (BANG ws?)?;
 
 // Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
 classDefinition:
@@ -40,7 +40,7 @@ methodCategoryHeader:
 
 // A single method under the current category with full selector
 methodDefinition:
-        methodSelector ws? sequence BANG ws?;
+        methodSelector ws? sequence (METHOD_END | BANG) ws?;
 
 methodSelector:
         unarySelector
@@ -193,6 +193,7 @@ CLOSE_PAREN: ')';
 PIPE: '|';
 PERIOD: '.';
 SEMI_COLON: ';';
+METHOD_END: '!!';
 BANG: '!';
 MINUS: '-';
 
