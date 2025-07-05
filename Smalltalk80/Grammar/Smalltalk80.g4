@@ -1,19 +1,42 @@
 grammar Smalltalk80;
 
-// Parser Entry Point: a sequence of file-out chunks, each ending with '!'
+//////////////////////////////////////////////////////////////////////////
+// Parser Entry Points ////////////////////////////////////////////////////////////////////////
+
+// Batch mode: zero or more file-out chunks, then EOF
 fileIn: chunk* EOF;
 
-// A chunk is a class definition, a method category with methods, or arbitrary code
+// REPL mode: exactly one unit, then EOF
+replUnit:
+	classDefinition BANG ws? EOF					# ReplClassDef
+	| methodCategoryHeader methodDefinition+ EOF	# ReplMethodsForCategory
+	| classComment EOF								# ReplClassComment
+	| standaloneCommentChunk EOF					# ReplStandaloneComment
+	| sequence EOF									# ReplSequence;
+
+//////////////////////////////////////////////////////////////////////////
+// File-Out Chunks ////////////////////////////////////////////////////////////////////////
+
 chunk:
-        classDefinition BANG ws?
-        | methodCategoryHeader methodDefinition+
-        | classComment
-        | commentChunk
-        | sequence BANG ws?;
+	classDefinition BANG ws?					# ClassChunk
+	| methodCategoryHeader methodDefinition+	# MethodCategoryChunk
+	| classComment								# ClassCommentChunk
+	| standaloneCommentChunk					# StandaloneCommentBlock
+	| sequence BANG ws?							# ScriptChunk;
 
-commentChunk: ws? COMMENT (BANG ws?)?;
+//////////////////////////////////////////////////////////////////////////
+// Comments & Whitespace ////////////////////////////////////////////////////////////////////////
 
-// Class definition chunk: Object subclass: #MyClass … category: 'Cat' !
+// “ws” is reused everywhere to allow interleaved whitespace/comments
+ws: (SEPARATOR | COMMENT)+;
+
+// a standalone comment chunk in file-out
+standaloneCommentChunk: ws? COMMENT (BANG ws?)?;
+
+//////////////////////////////////////////////////////////////////////////
+// Class Definitions & Comments
+// ////////////////////////////////////////////////////////////////////////
+
 classDefinition:
 	IDENTIFIER ws? (
 		'subclass:'
@@ -33,52 +56,49 @@ classOption:
 	| 'poolDictionaries:' ws? stringLiteral
 	| 'category:' ws? stringLiteral;
 
-// Method-category header: !MyClass methodsFor: 'accessing'!
-methodCategoryHeader:
-	BANG ws? IDENTIFIER ws? ('class' ws?)? // optional literal class
-	'methodsFor:' ws? stringLiteral BANG ws?;
+//////////////////////////////////////////////////////////////////////////
+// Method Categories & Definitions
+// ////////////////////////////////////////////////////////////////////////
 
-// A single method under the current category with full selector
+methodCategoryHeader:
+	BANG ws? IDENTIFIER ws? ('class' ws?)? 'methodsFor:' ws? stringLiteral BANG ws?;
+
 methodDefinition:
-        methodSelector ws? sequence (METHOD_END | BANG) ws?;
+	methodSelector ws? sequence (METHOD_END | BANG) ws?;
 
 methodSelector:
-        unarySelector
-        | binarySelector ws? IDENTIFIER
-        | keywordSelector;
+	unarySelector
+	| binarySelector ws? IDENTIFIER
+	| keywordSelector;
 
-keywordSelector: keywordPart (ws? keywordPart)*;
-keywordPart: KEYWORD ws? IDENTIFIER;
+// must come before it's referenced in methodSelector
+unarySelector: IDENTIFIER;
 
 binarySelector: BINARY_SELECTOR | MINUS;
 
-// Optional standalone script entry point
-script: sequence EOF;
+keywordSelector: keywordPart ( ws? keywordPart)*;
 
-// Sequence of temporaries and statements
+keywordPart: KEYWORD ws? IDENTIFIER;
+
+//////////////////////////////////////////////////////////////////////////
+// REPL / Script Sequences ////////////////////////////////////////////////////////////////////////
+
 sequence: temps? ws? statements?;
-// Temporaries can be surrounded by whitespace to match typical Smalltalk
-// formatting such as "| x y |" or "|x y|".
-temps: PIPE ws? IDENTIFIER (ws? IDENTIFIER)* ws? PIPE;
 
-// Whitespace and comments
-ws: (SEPARATOR | COMMENT)+;
+temps: PIPE ws? IDENTIFIER ( ws? IDENTIFIER)* ws? PIPE;
 
-// Statements: answer or expressions, possibly with trailing period
+//////////////////////////////////////////////////////////////////////////
+// Statements & Expressions ////////////////////////////////////////////////////////////////////////
+
 statements:
 	answer ws?							# StatementAnswer
 	| expressions ws? PERIOD ws? answer	# StatementExpressionsAnswer
 	| expressions PERIOD? ws?			# StatementExpressions;
 
-// Return: ^expr
 answer: CARROT ws? expression ws? PERIOD?;
 
-// One or more expressions
-expressions: expression expressionList*;
+expressions: expression ( PERIOD ws? expression)*;
 
-expressionList: PERIOD ws? expression;
-
-// Core expression forms
 expression:
 	assignment
 	| cascade
@@ -86,18 +106,18 @@ expression:
 	| binarySend
 	| primitive;
 
-// Cascaded messages: obj msg1; msg2; ...
 cascade: (keywordSend | binarySend) (ws? SEMI_COLON ws? message)+;
 
-// Assignment: var := expr
 assignment: variable ws? ASSIGNMENT ws? expression;
 
-variable: IDENTIFIER;
+message: binaryMessage | unaryMessage | keywordMessage;
 
-// Message sends
+//////////////////////////////////////////////////////////////////////////
+// Message Sends ////////////////////////////////////////////////////////////////////////
+
 keywordSend: binarySend keywordMessage;
 
-keywordMessage: ws? (keywordPair ws?)+;
+keywordMessage: ws? ( keywordPair ws?)+;
 
 keywordPair: KEYWORD ws? binarySend ws?;
 
@@ -105,22 +125,42 @@ binarySend: unarySend binaryTail?;
 
 unarySend: operand ws? unaryTail?;
 
-// Combine all message forms
-message: binaryMessage | unaryMessage | keywordMessage;
+unaryMessage: ws? unarySelector;
 
-// Operands: literals, variables, parenthesized expressions
+binaryMessage:
+	ws? (BINARY_SELECTOR | MINUS) ws? (unarySend | operand);
+
+unaryTail: unaryMessage ws? unaryTail? ws?;
+
+binaryTail: binaryMessage binaryTail?;
+
+//////////////////////////////////////////////////////////////////////////
+// Operands & Literals ////////////////////////////////////////////////////////////////////////
+
 operand: literal | reference | subexpression;
 
 subexpression: OPEN_PAREN ws? expression ws? CLOSE_PAREN;
 
-// Literals: runtime or parse-time
+variable: IDENTIFIER;
+
+reference: variable;
+
 literal: runtimeLiteral | parsetimeLiteral;
 
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
-block: BLOCK_START blockParamList? ws? sequence? BLOCK_END;
+block
+  : BLOCK_START BLOCK_END                        // the empty-block case
+  | BLOCK_START nonEmptyBlockBody BLOCK_END      // the non-empty case
+  ;
 
-blockParamList: (ws? BLOCK_PARAM)+;
+nonEmptyBlockBody
+  : blockParamList ( ws sequence )?              // [:p| …] or just [:p|]
+  | temps ws? statements                         // e.g. [|t1 t2| …] or [expr]
+  ;
+
+
+blockParamList: ( ws? BLOCK_PARAM)+;
 
 dynamicDictionary:
 	DYNDICT_START ws? expressions? ws? DYNARR_END;
@@ -137,7 +177,7 @@ parsetimeLiteral:
 
 number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
 
-numberExp: (stFloat | stInteger) EXP stInteger;
+numberExp: ( stFloat | stInteger) EXP stInteger;
 
 charConstant: CHARACTER_CONSTANT;
 
@@ -153,8 +193,6 @@ stringLiteral: STRING;
 
 symbol: HASH bareSymbol;
 
-primitive: LT ws? KEYWORD ws? DIGIT+ ws? GT;
-
 bareSymbol: (IDENTIFIER | BINARY_SELECTOR)
 	| KEYWORD+
 	| stringLiteral;
@@ -162,30 +200,18 @@ bareSymbol: (IDENTIFIER | BINARY_SELECTOR)
 literalArray: LITARR_START literalArrayRest;
 
 literalArrayRest:
-	ws? ((parsetimeLiteral | bareLiteralArray | bareSymbol) ws?)* CLOSE_PAREN;
+	ws? (( parsetimeLiteral | bareLiteralArray | bareSymbol) ws?)* CLOSE_PAREN;
 
 bareLiteralArray: OPEN_PAREN literalArrayRest;
 
-unaryTail: unaryMessage ws? unaryTail? ws?;
+primitive: LT ws? KEYWORD ws? DIGIT+ ws? GT;
 
-unaryMessage: ws? unarySelector;
-
-unarySelector: IDENTIFIER;
-
-reference: variable;
-
-binaryTail: binaryMessage binaryTail?;
-
-binaryMessage:
-	ws? (BINARY_SELECTOR | MINUS) ws? (unarySend | operand);
-
-// —————————————————————————————————————————— Lexer Rules ——————————————————————————————————————————
+//////////////////////////////////////////////////////////////////////////
+// Lexer Rules ////////////////////////////////////////////////////////////////////////
 
 SEPARATOR: [ \t\r\n\u000C]+;
-
 STRING: '\'' ( ~['] | '\'\'')* '\'';
 COMMENT: '"' ( ~["] | '""')* '"';
-
 BLOCK_START: '[';
 BLOCK_END: ']';
 OPEN_PAREN: '(';
@@ -196,7 +222,6 @@ SEMI_COLON: ';';
 METHOD_END: '!!';
 BANG: '!';
 MINUS: '-';
-
 BINARY_SELECTOR: (
 		'\\'
 		| '+'
@@ -213,7 +238,6 @@ BINARY_SELECTOR: (
 		| '&'
 		| '?'
 	)+;
-
 LT: '<';
 GT: '>';
 CARROT: '^';
@@ -225,23 +249,13 @@ DYNDICT_START: '#{';
 DYNARR_END: '}';
 DYNARR_START: '{';
 RESERVED_WORD: 'nil' | 'true' | 'false' | 'self' | 'super';
-
-IDENTIFIER: [a-zA-Z]+ [a-zA-Z0-9_]*;
-
+IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
 CHARACTER_CONSTANT: '$' ~[\r\n];
-
 DIGIT: [0-9];
-
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
-
 KEYWORD: IDENTIFIER COLON;
-
 BLOCK_PARAM: COLON IDENTIFIER;
-
 COLON: ':';
-
-// after
 ASSIGNMENT: ':=' | '_';
-
 DOLLAR: '$';
