@@ -8,7 +8,7 @@ namespace Smalltalk80.Parser;
 /// <summary>
 /// Provides parsing utilities for classic Smalltalk file-in sources.
 /// </summary>
-public static class FileInParser
+public static class FileInReader
 {
     /// <summary>
     /// Parses a file-in source into an abstract syntax tree using the ANTLR
