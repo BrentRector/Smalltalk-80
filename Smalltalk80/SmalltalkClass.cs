@@ -16,6 +16,11 @@ public class SmalltalkClass : SmalltalkObject
     public List<string> InstanceVariables { get; } = new();
 
     /// <summary>
+    ///     Gets the list of class variable names shared by all instances of this class.
+    /// </summary>
+    public List<string> ClassVariables { get; } = new();
+
+    /// <summary>
     ///     Gets or sets the superclass of this class.
     /// </summary>
     public SmalltalkClass? Superclass { get; set; }

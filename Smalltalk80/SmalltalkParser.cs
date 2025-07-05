@@ -33,7 +33,7 @@ public sealed class SmalltalkParser
     {
         argumentNames ??= Array.Empty<string>();
         instanceVariables ??= Array.Empty<string>();
-        var ast = BuildAst(methodName);
+        var ast = BuildAst(methodName, argumentNames, instanceVariables);
         return AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
     }
 
@@ -56,7 +56,7 @@ public sealed class SmalltalkParser
         return ParseMethod(argumentNames, cls.InstanceVariables, methodName);
     }
 
-    private ScriptNode BuildAst(string? methodName)
+    private ScriptNode BuildAst(string? methodName, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
     {
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
@@ -64,7 +64,7 @@ public sealed class SmalltalkParser
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
         var tree = parser.script();
-        var visitor = new AstBuildingVisitor(methodName);
+        var visitor = new AstBuildingVisitor(methodName, arguments, variables);
         return (ScriptNode)visitor.Visit(tree)!;
     }
 

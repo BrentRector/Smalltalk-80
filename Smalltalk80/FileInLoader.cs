@@ -129,7 +129,7 @@ public static class FileInLoader
             if (line.Trim() == "!!")
                 break;
 
-            partialMethod.Add(line);
+            partialMethod!.Add(line);
 
             if (line.TrimEnd().EndsWith("!"))
             {
@@ -160,14 +160,56 @@ public static class FileInLoader
             }
             return;
         }
+
+        if (currentHeader is not null && partialMethod is null)
+        {
+            var lines = chunk.Split('\n');
+            if (lines.Length == 0)
+                return;
+            var headerLine = lines[0].Trim();
+            if (headerLine.StartsWith("--"))
+                return;
+
+            var (selector, args) = ParseSelector(headerLine);
+            int index = 1;
+            string? comment = null;
+            var bodyLines = new List<string>();
+            while (index < lines.Length && lines[index].TrimStart().StartsWith("\""))
+            {
+                var line = lines[index].Trim();
+                comment = comment is null ? line : string.Join('\n', comment, line);
+                index++;
+            }
+            if (index < lines.Length)
+                bodyLines.AddRange(lines[index..]);
+            while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
+                bodyLines.RemoveAt(bodyLines.Count - 1);
+
+            var bodyText = bodyLines.Count > 0
+                ? string.Join("\n", bodyLines)
+                : string.Empty;
+            bodyText = bodyText.TrimEnd();
+            while (bodyText.EndsWith("!"))
+                bodyText = bodyText[..^1].TrimEnd();
+
+            var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
+            var parser = new SmalltalkParser(bodyText);
+            var vars = currentHeader.IsClassSide ? cls.ClassVariables : cls.InstanceVariables;
+            var method = parser.ParseMethod(args, vars, selector);
+            cls.MethodDictionary[new Symbol(selector)] = method;
+            return;
+        }
+
         var node = ParseChunk(chunk);
         switch (node)
         {
             case ClassDefinitionNode cdef:
                 var super = SystemDictionary.TryGetClass(cdef.Superclass, out var sup) ? sup : null;
                 cdef.Options.TryGetValue("instanceVariableNames", out var ivars);
+                cdef.Options.TryGetValue("classVariableNames", out var cvars);
                 var varList = ivars is not null ? ivars.Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
-                SystemDictionary.DefineClass(cdef.ClassName, super, varList);
+                var classList = cvars is not null ? cvars.Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
+                SystemDictionary.DefineClass(cdef.ClassName, super, varList, classList);
                 break;
             case MethodHeaderNode header:
                 currentHeader = header;
@@ -175,37 +217,8 @@ public static class FileInLoader
             case ClassCommentNode:
                 // Comment chunks do not affect loading state.
                 break;
-            case ScriptNode script when currentHeader is not null:
-                var lines = chunk.Split('\n');
-                if (lines.Length == 0) return;
-                var headerLine = lines[0].Trim();
-                if (headerLine.StartsWith("--"))
-                    break;
-                var (selector, args) = ParseSelector(headerLine);
-                int index = 1;
-                string? comment = null;
-                var bodyLines = new List<string>();
-                while (index < lines.Length && lines[index].TrimStart().StartsWith("\""))
-                {
-                    var line = lines[index].Trim();
-                    comment = comment is null ? line : string.Join('\n', comment, line);
-                    index++;
-                }
-                if (index < lines.Length)
-                    bodyLines.AddRange(lines[index..]);
-                while (bodyLines.Count > 0 && bodyLines[^1].Trim() == "!")
-                    bodyLines.RemoveAt(bodyLines.Count - 1);
-
-                var bodyText = bodyLines.Count > 0
-                    ? string.Join("\n", bodyLines)
-                    : string.Empty;
-                bodyText = bodyText.TrimEnd();
-                while (bodyText.EndsWith("!"))
-                    bodyText = bodyText[..^1].TrimEnd();
-                var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
-                var parser = new SmalltalkParser(bodyText);
-                var method = parser.ParseMethod(args, cls.InstanceVariables, selector);
-                cls.MethodDictionary[new Symbol(selector)] = method;
+            case ScriptNode:
+                // Script nodes outside a method context are ignored.
                 break;
         }
     }

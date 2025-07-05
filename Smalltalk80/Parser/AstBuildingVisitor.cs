@@ -25,12 +25,21 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// Gets the name of the method currently being visited, if any.
     /// </summary>
     private readonly string? currentMethodName;
+    private readonly IReadOnlyList<string> argumentNames;
+    private readonly IReadOnlyList<string> initialVariables;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
     /// </summary>
     /// <param name="methodName">Optional selector of the method being parsed.</param>
-    public AstBuildingVisitor(string? methodName = null) => currentMethodName = methodName;
+    /// <param name="arguments">Method argument names available in the outer scope.</param>
+    /// <param name="variables">Instance or class variables available in the outer scope.</param>
+    public AstBuildingVisitor(string? methodName = null, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
+    {
+        currentMethodName = methodName;
+        argumentNames = arguments ?? Array.Empty<string>();
+        initialVariables = variables ?? Array.Empty<string>();
+    }
     /// <inheritdoc/>
     public override AstNode VisitScript(Smalltalk80Parser.ScriptContext context)
         => new ScriptNode((SequenceNode)Visit(context.sequence())!);
@@ -55,7 +64,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         var current = scopeStack.Count > 0
             ? new HashSet<string>(scopeStack.Peek())
-            : new HashSet<string>();
+            : new HashSet<string>(scopeDepth == 1 ? argumentNames.Concat(initialVariables) : Array.Empty<string>());
         foreach (var t in temps)
             current.Add(t);
         scopeStack.Push(current);
