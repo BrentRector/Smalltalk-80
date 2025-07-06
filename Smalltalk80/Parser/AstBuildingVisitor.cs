@@ -186,7 +186,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
     /// <inheritdoc/>
     public override AstNode VisitVariable(Smalltalk80Parser.VariableContext context)
-        => new VariableExpression(context.IDENTIFIER().GetText());
+        => new VariableExpression(context.UNARY_SELECTOR().GetText());
 
 
 
@@ -405,7 +405,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         if (context.unarySelector() is { } u)
         {
-            return (u.IDENTIFIER().GetText(), new List<string>());
+            return (u.UNARY_SELECTOR().GetText(), new List<string>());
         }
 
         if (context.binarySelector() is { } b)
