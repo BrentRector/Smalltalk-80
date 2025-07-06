@@ -32,6 +32,10 @@ public static class FileInReader
                 lines[i] = line[1..];
             }
         }
+        while (lines.Length > 0 && lines[^1].Trim() == "!")
+        {
+            Array.Resize(ref lines, lines.Length - 1);
+        }
         var source = string.Join('\n', lines);
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
@@ -53,12 +57,16 @@ public static class FileInReader
                 case Smalltalk80Parser.MethodCategoryChunkContext methodChunk:
                     var header = (MethodHeaderNode)visitor.Visit(methodChunk.methodCategoryHeader())!;
                     chunks.Add(header);
-                    foreach (var methodCtx in methodChunk.methodDefinition())
+                    foreach (var methodWithBang in methodChunk.methodDefinitionWithBang())
                     {
-                        var method = (MethodDefinitionNode)visitor.Visit(methodCtx)!;
-                        var start = methodCtx.sequence().Start.StartIndex;
-                        var end = methodCtx.sequence().Stop.StopIndex;
-                        var bodyText = source.Substring(start, end - start + 1);
+                        var innerMethod = methodWithBang.methodDefinition();
+                        var method = (MethodDefinitionNode)visitor.Visit(innerMethod)!;
+                        var seqCtx = innerMethod.sequence();
+                        var start = seqCtx.Start.StartIndex;
+                        var end = seqCtx.Stop.StopIndex;
+                        var bodyText = end < start
+                            ? string.Empty
+                            : source.Substring(start, end - start + 1);
                         method = method with { Source = bodyText };
                         chunks.Add(method);
                     }
