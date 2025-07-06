@@ -19,24 +19,7 @@ public static class FileInReader
     /// <returns>A <see cref="FileNode"/> representing the file contents.</returns>
     public static FileNode Parse(string path)
     {
-        var lines = File.ReadAllLines(path);
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-            if (line.StartsWith("!") && line.Length > 1 && line.Trim() != "!" &&
-                (line.Contains("subclass:", StringComparison.OrdinalIgnoreCase) ||
-                 line.Contains("variableSubclass:", StringComparison.OrdinalIgnoreCase) ||
-                 line.Contains("variableByteSubclass:", StringComparison.OrdinalIgnoreCase) ||
-                 line.Contains("variableWordSubclass:", StringComparison.OrdinalIgnoreCase)))
-            {
-                lines[i] = line[1..];
-            }
-        }
-        while (lines.Length > 0 && lines[^1].Trim() == "!")
-        {
-            Array.Resize(ref lines, lines.Length - 1);
-        }
-        var source = string.Join('\n', lines);
+        var source = File.ReadAllText(path);
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);

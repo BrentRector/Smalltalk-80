@@ -19,7 +19,7 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #Sample!",
+                "Object subclass: #Sample!",
                 "!Sample methodsFor: 'testing'!",
                 "foo",
                 "    ^1",
@@ -56,7 +56,7 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #TempExample!",
+                "Object subclass: #TempExample!",
                 "!TempExample methodsFor: 'testing'!",
                 "foo",
                 "| x y |",
@@ -111,7 +111,7 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #KeywordExample instanceVariableNames: ''!",
+                "Object subclass: #KeywordExample instanceVariableNames: ''!",
                 "!KeywordExample methodsFor: 'testing'!",
                 "add: x to: y",
                 "    ^x + y",
@@ -152,7 +152,7 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #Example!",
+                "Object subclass: #Example!",
                 "!Example methodsFor: 'empty'!",
                 "dummy",
                 "!",
@@ -183,12 +183,11 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #OptionTest",
+                "Object subclass: #OptionTest",
                 "    instanceVariableNames: 'selectors'",
                 "    classVariableNames: ''",
                 "    poolDictionaries: ''",
-                "    category: 'Menus'!",
-                "!"
+                "    category: 'Menus'!"
             });
 
             vm.LoadSystemFile(tempPath);
@@ -217,12 +216,11 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #ClassVarTest",
+                "Object subclass: #ClassVarTest",
                 "    instanceVariableNames: ''",
                 "    classVariableNames: 'Foo Bar'",
                 "    poolDictionaries: ''",
-                "    category: 'Tests'!",
-                "!"
+                "    category: 'Tests'!"
             });
 
             vm.LoadSystemFile(tempPath);
@@ -252,12 +250,11 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #PoolTest",
+                "Object subclass: #PoolTest",
                 "    instanceVariableNames: ''",
                 "    classVariableNames: ''",
                 "    poolDictionaries: 'TextConstants OtherPool'",
-                "    category: 'Tests'!",
-                "!"
+                "    category: 'Tests'!"
             });
 
             vm.LoadSystemFile(tempPath);
@@ -286,7 +283,7 @@ public class FileInLoaderTests
         {
             File.WriteAllLines(tempPath, new[]
             {
-                "!Object subclass: #Counter!",
+                "Object subclass: #Counter!",
                 "!Counter class methodsFor: 'testing'!",
                 "fortyTwo",
                 "    ^42!",
