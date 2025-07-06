@@ -54,4 +54,44 @@ public class ParserIntegrationTests
         var result = vm.EvaluateSource("1 + 2 + 3");
         Assert.Equal(6, result);
     }
+
+    /// <summary>
+    /// Validates that unary cascades are folded onto the receiver.
+    /// </summary>
+    [Fact]
+    public void ParseMethod_UnaryCascade_DoesNotThrow()
+    {
+        var parser = new SmalltalkParser("1 doThis; doThat");
+        parser.ParseMethod();
+    }
+
+    /// <summary>
+    /// Validates folding cascades following a binary message.
+    /// </summary>
+    [Fact]
+    public void ParseMethod_BinaryCascade_DoesNotThrow()
+    {
+        var parser = new SmalltalkParser("1 + 1; doThat");
+        parser.ParseMethod();
+    }
+
+    /// <summary>
+    /// Ensures cascades work with keyword messages.
+    /// </summary>
+    [Fact]
+    public void ParseMethod_KeywordCascade_DoesNotThrow()
+    {
+        var parser = new SmalltalkParser("1 doThat: 42; doSomethingElse");
+        parser.ParseMethod();
+    }
+
+    /// <summary>
+    /// Confirms cascades are folded correctly after mixed message sends.
+    /// </summary>
+    [Fact]
+    public void ParseMethod_MixedCascade_DoesNotThrow()
+    {
+        var parser = new SmalltalkParser("1 + 1 doThat: 42; doSomethingElse");
+        parser.ParseMethod();
+    }
 }
