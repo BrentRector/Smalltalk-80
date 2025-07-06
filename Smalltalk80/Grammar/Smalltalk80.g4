@@ -82,7 +82,8 @@ keywordPart: KEYWORD IDENTIFIER;
 // Sequences (REPL & Scripts)
 // ////////////////////////////////////////////////////////////////////////
 
-sequence: temps? statement (PERIOD statement)*;
+sequence
+    : temps? expressions;
 
 statement: answer | expression;
 
@@ -95,7 +96,8 @@ answer: CARROT expression PERIOD?;
 
 expressions: expression (PERIOD expression)*;
 
-expression: primaryExpression (messageTail)*;
+expression
+    : primaryExpression (messageTail)* (SEMI_COLON message)*;
 
 primaryExpression: assignment | primitive | operand;
 
