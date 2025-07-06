@@ -70,7 +70,7 @@ methodSelector:
 	| binarySelector IDENTIFIER
 	| keywordSelector;
 
-unarySelector: IDENTIFIER;
+unarySelector: UNARY_SELECTOR;
 
 binarySelector: BINARY_SELECTOR | MINUS;
 
@@ -122,7 +122,7 @@ operand: literal | reference | subexpression;
 
 subexpression: OPEN_PAREN expression CLOSE_PAREN;
 
-variable: IDENTIFIER;
+variable: UNARY_SELECTOR;
 
 reference: variable;
 
@@ -192,8 +192,11 @@ INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
 CLASS_VARIABLE_NAMES: 'classVariableNames:';
 POOL_DICTIONARIES: 'poolDictionaries:';
 CATEGORY: 'category:';
-UNARY_SELECTOR: [a-zA-Z] [a-zA-Z0-9_]*;
+
+// KEYWORD must appear before UNARY_SELECTOR so that ifTrue: is matched as a KEYWORD, not a UNARY_SELECTOR.
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
+UNARY_SELECTOR: [a-zA-Z] [a-zA-Z0-9_]*;
+
 
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
 COMMENT: '"' ( ~["] | '""')* '"';
