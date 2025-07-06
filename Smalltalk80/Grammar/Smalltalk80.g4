@@ -21,7 +21,7 @@ replUnit
 
 chunk
   : classDefinition ws? BANG ws?                     #ClassChunk
-  | methodCategoryHeader methodDefinition+ ws? BANG ws? #MethodCategoryChunk
+  | methodCategoryHeader methodDefinition+ ws? BANG ws? BANG ws? #MethodCategoryChunk
   | classComment ws? BANG ws?                        #ClassCommentChunk
   | COMMENT ws? BANG ws?                             #StandaloneCommentChunk
   | sequence ws? BANG ws?                            #ScriptChunk
@@ -47,6 +47,7 @@ classDefinition
     | 'variableWordSubclass:' )
     ws? HASH IDENTIFIER
     ( ws? classOption )*
+    ws? BANG
   ;
 
 classComment
@@ -73,8 +74,9 @@ methodCategoryHeader
   ;
 
 methodDefinition
-  : methodSelector ws? sequence ws? BANG ws?
+  : methodSelector ws? sequence ws? METHOD_END ws?
   ;
+
 
 methodSelector
   : unarySelector
