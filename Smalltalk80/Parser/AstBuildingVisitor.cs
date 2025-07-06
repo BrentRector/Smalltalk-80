@@ -170,18 +170,23 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             return FlattenKeywordSends(expr);
         }
 
-        if (context.message() is { } msg)
+        if (context.message().Length > 0)
         {
-            var left = (ExpressionNode)Visit(context.expression())!;
-            var messageExpr = ProcessMessage(left, msg);
-            if (left is CascadeExpression cascade)
+            var receiver = (ExpressionNode)Visit(context.expression())!;
+            var messages = new List<ExpressionNode>();
+
+            if (receiver is CascadeExpression existing)
             {
-                var combined = cascade.Messages.ToList();
-                combined.Add(messageExpr);
-                return new CascadeExpression(cascade.Receiver, combined);
+                receiver = existing.Receiver;
+                messages.AddRange(existing.Messages);
             }
 
-            return new CascadeExpression(left, new List<ExpressionNode> { messageExpr });
+            foreach (var msgCtx in context.message())
+            {
+                messages.Add(ProcessMessage(receiver, msgCtx));
+            }
+
+            return new CascadeExpression(receiver, messages);
         }
 
         return base.VisitExpression(context);
