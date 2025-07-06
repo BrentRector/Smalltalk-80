@@ -133,20 +133,23 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
         ExpressionNode receiver = (ExpressionNode)Visit(context.primaryExpression())!;
+        receiver = ApplyMessageSends(receiver, context.messageSend());
 
-        foreach (var postfix in context.postfixExpression())
+        foreach (var cascade in context.cascade())
         {
-            if (postfix.unaryMessage() is { } unary)
-            {
-                receiver = new UnarySendExpression(receiver, unary.unarySelector().GetText());
-            }
-            else if (postfix.binaryMessage() is { } binary)
-            {
-                var arg = (ExpressionNode)Visit(binary.expression())!;
-                var selector = binary.BINARY_SELECTOR()?.GetText() ?? binary.MINUS()?.GetText() ?? string.Empty;
-                receiver = new BinarySendExpression(receiver, selector, arg);
-            }
-            else if (postfix.keywordMessage() is { } keyword)
+            receiver = ApplyMessageSends(receiver, cascade.messageSend());
+        }
+
+        return receiver;
+    }
+
+    private ExpressionNode ApplyMessageSends(
+        ExpressionNode receiver,
+        IEnumerable<Smalltalk80Parser.MessageSendContext> sends)
+    {
+        foreach (var send in sends)
+        {
+            if (send.keywordMessage() is { } keyword)
             {
                 var parts = new List<string>();
                 var args = new List<ExpressionNode>();
@@ -156,6 +159,17 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                     args.Add((ExpressionNode)Visit(pair.expression())!);
                 }
                 receiver = FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
+            }
+            else if (send.binaryMessage() is { } binary)
+            {
+                var arg = (ExpressionNode)Visit(binary.expression())!;
+                var selector = binary.BINARY_SELECTOR()?.GetText() ??
+                               binary.MINUS()?.GetText() ?? string.Empty;
+                receiver = new BinarySendExpression(receiver, selector, arg);
+            }
+            else if (send.IDENTIFIER() is { } ident)
+            {
+                receiver = new UnarySendExpression(receiver, ident.GetText());
             }
         }
 
