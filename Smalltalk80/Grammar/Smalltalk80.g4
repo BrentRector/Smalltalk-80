@@ -82,8 +82,7 @@ keywordPart: KEYWORD IDENTIFIER;
 // Sequences (REPL & Scripts)
 // ////////////////////////////////////////////////////////////////////////
 
-sequence
-    : temps? expressions;
+sequence: temps? expressions;
 
 statement: answer | expression;
 
@@ -96,15 +95,14 @@ answer: CARROT expression PERIOD?;
 
 expressions: expression (PERIOD expression)*;
 
-expression
-    : expression unaryMessage
-    | expression binaryMessage
-    | expression keywordMessage
-    | expression SEMI_COLON message     // cascades
-    | assignment
-    | primitive
-    | operand;
-
+expression:
+	expression SEMI_COLON message (SEMI_COLON message)* // multiple cascades
+	| expression unaryMessage
+	| expression binaryMessage
+	| expression keywordMessage
+	| assignment
+	| primitive
+	| operand;
 
 unaryMessage: unarySelector;
 
