@@ -89,14 +89,11 @@ statement: answer | expression;
 temps: PIPE IDENTIFIER (IDENTIFIER)* PIPE;
 
 //////////////////////////////////////////////////////////////////////////
-// Statements & Expressions 
-//////////////////////////////////////////////////////////////////////
+// Statements & Expressions ////////////////////////////////////////////////////////////////////
 
 answer: CARROT expression PERIOD?;
 
-cascade:
-    SEMI_COLON messageSend+
-    ;
+cascade: SEMI_COLON messageSend+;
 
 expressions: expression (PERIOD expression)*;
 
@@ -108,7 +105,7 @@ messageSend:
 	keywordMessage
 	| binaryMessage
 	// // unary message (only if not followed by a keyword message)
-	| IDENTIFIER { this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD }?;
+	| UNARY_SELECTOR;
 
 binaryMessage: (BINARY_SELECTOR | MINUS) expression;
 
@@ -195,6 +192,7 @@ INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
 CLASS_VARIABLE_NAMES: 'classVariableNames:';
 POOL_DICTIONARIES: 'poolDictionaries:';
 CATEGORY: 'category:';
+UNARY_SELECTOR: [a-zA-Z] [a-zA-Z0-9_]*;
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
