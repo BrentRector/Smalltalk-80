@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -81,13 +81,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassChunk([NotNull] Smalltalk80Parser.ClassChunkContext context);
 	/// <summary>
-	/// Visit a parse tree produced by the <c>MethodCategoryChunk</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitMethodCategoryChunk([NotNull] Smalltalk80Parser.MethodCategoryChunkContext context);
-	/// <summary>
 	/// Visit a parse tree produced by the <c>ClassCommentChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// </summary>
@@ -95,12 +88,26 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context);
 	/// <summary>
+	/// Visit a parse tree produced by the <c>MetaClassChunk</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMetaClassChunk([NotNull] Smalltalk80Parser.MetaClassChunkContext context);
+	/// <summary>
 	/// Visit a parse tree produced by the <c>ScriptChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitScriptChunk([NotNull] Smalltalk80Parser.ScriptChunkContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>MethodCategoryChunk</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMethodCategoryChunk([NotNull] Smalltalk80Parser.MethodCategoryChunkContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodDefinitionWithBang"/>.
 	/// </summary>
@@ -131,6 +138,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitClassOption([NotNull] Smalltalk80Parser.ClassOptionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassDefinition"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMetaclassDefinition([NotNull] Smalltalk80Parser.MetaclassDefinitionContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodCategoryHeader"/>.
 	/// </summary>

@@ -32,7 +32,20 @@ namespace Smalltalk80.Tools
             var input = CharStreams.fromString(source);
             var lexer = new Smalltalk80Lexer(input);
             var tokens = new CommonTokenStream(lexer);
+
+            // Dump tokens for debugging
+            tokens.Fill(); // Load all tokens
+
+            Console.WriteLine("🔍 Token Stream:");
+            foreach (var token in tokens.GetTokens())
+            {
+                var tokenName = lexer.Vocabulary.GetSymbolicName(token.Type);
+                //Console.WriteLine($"  [{token.Line}:{token.Column}] {tokenName} → '{token.Text}'");
+            }
+            Console.WriteLine();
+
             var parser = new Smalltalk80Parser(tokens);
+            parser.Trace = true;
 
             // 3) Hook up a listener to catch any lex/parse errors
             parser.RemoveErrorListeners();
@@ -78,6 +91,7 @@ namespace Smalltalk80.Tools
             {
                 ErrorCount++;
                 Console.Error.WriteLine($"Syntax Error @ line {line}:{charPositionInLine} – {msg}");
+                Environment.Exit(1); // Immediately stop the program
             }
         }
     }

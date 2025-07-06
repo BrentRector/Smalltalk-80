@@ -15,11 +15,19 @@ replUnit:
 // File-Out Chunks ////////////////////////////////////////////////////////////////////////
 
 chunk:
-	COMMENT													# StandaloneCommentChunk
-	| classDefinition BANG									# ClassChunk
-	| methodCategoryHeader methodDefinitionWithBang+ BANG	# MethodCategoryChunk
-	| classComment BANG										# ClassCommentChunk
-	| sequence BANG											# ScriptChunk;
+	COMMENT BANG				# StandaloneCommentChunk
+	| classDefinition BANG		# ClassChunk
+	| classComment BANG			# ClassCommentChunk
+	| metaclassDefinition BANG	# MetaClassChunk
+	| sequence BANG				# ScriptChunk
+	| {
+        InputStream.LA(2) == Smalltalk80Parser.IDENTIFIER &&
+        (
+            InputStream.LA(3) == Smalltalk80Parser.METHODS_FOR ||
+            (InputStream.LA(3) == Smalltalk80Parser.CLASS &&
+             InputStream.LA(4) == Smalltalk80Parser.METHODS_FOR)
+        )
+    }? methodCategoryHeader methodDefinitionWithBang+ BANG # MethodCategoryChunk;
 
 methodDefinitionWithBang: methodDefinition BANG;
 
@@ -35,24 +43,27 @@ classDefinition:
 		| 'variableWordSubclass:'
 	) HASH IDENTIFIER (classOption)*;
 
-classComment: className ('class')? 'comment:' stringLiteral;
+classComment: className CLASS? 'comment:' stringLiteral;
 
 className: IDENTIFIER;
 
 classOption:
-	'instanceVariableNames:' stringLiteral
-	| 'classVariableNames:' stringLiteral
-	| 'poolDictionaries:' stringLiteral
-	| 'category:' stringLiteral;
+	INSTANCE_VARIABLE_NAMES stringLiteral
+	| CLASS_VARIABLE_NAMES stringLiteral
+	| POOL_DICTIONARIES stringLiteral
+	| CATEGORY stringLiteral;
+
+metaclassDefinition:
+	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
 
 //////////////////////////////////////////////////////////////////////////
 // Method Categories & Definitions
 // ////////////////////////////////////////////////////////////////////////
 
 methodCategoryHeader:
-	BANG IDENTIFIER ('class')? 'methodsFor:' stringLiteral BANG;
+	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
 
-methodDefinition: methodSelector sequence;
+methodDefinition: methodSelector COMMENT* sequence;
 
 methodSelector:
 	unarySelector
@@ -104,7 +115,7 @@ keywordSend: binarySend keywordMessage;
 
 keywordMessage: keywordPair+;
 
-keywordPair: KEYWORD binarySend;
+keywordPair: KEYWORD expression;
 
 binarySend: unarySend binaryTail?;
 
@@ -112,7 +123,7 @@ unarySend: operand unaryTail?;
 
 unaryMessage: unarySelector;
 
-binaryMessage: (BINARY_SELECTOR | MINUS) (unarySend | operand);
+binaryMessage: (BINARY_SELECTOR | MINUS) expression;
 
 unaryTail: unaryMessage unaryTail?;
 
@@ -189,8 +200,16 @@ primitive: LT KEYWORD DIGIT+ GT;
 //////////////////////////////////////////////////////////////////////////
 // Lexer Rules ////////////////////////////////////////////////////////////////////////
 
+CLASS: 'class';
+METHODS_FOR: 'methodsFor:';
+INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
+CLASS_VARIABLE_NAMES: 'classVariableNames:';
+POOL_DICTIONARIES: 'poolDictionaries:';
+CATEGORY: 'category:';
+KEYWORD: IDENTIFIER COLON;
+
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
-COMMENT: '"' ( ~["] | '""')* '"' -> skip;
+COMMENT: '"' ( ~["] | '""')* '"';
 
 STRING: '\'' ( ~['] | '\'\'')* '\'';
 
@@ -226,6 +245,7 @@ CARROT: '^';
 HASH: '#';
 EXP: 'e';
 HEX: '16r';
+
 LITARR_START: '#(';
 DYNDICT_START: '#{';
 DYNARR_END: '}';
@@ -236,7 +256,7 @@ CHARACTER_CONSTANT: '$' ~[\r\n];
 DIGIT: [0-9];
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
-KEYWORD: IDENTIFIER COLON;
+
 BLOCK_PARAM: COLON IDENTIFIER;
 COLON: ':';
 ASSIGNMENT: ':=' | '_';
