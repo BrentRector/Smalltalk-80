@@ -6,7 +6,7 @@ This document summarizes the structure and semantics of the Smalltalk-80 file-ou
 
 ## 📦 Overview
 
-A file-out is a textual representation of Smalltalk source code, used to export classes, methods, and comments from an image. It consists of **chunks**, each terminated by one or more exclamation marks (`!`).
+A file-out is a textual representation of Smalltalk source code, used to export classes, methods, and comments from an image. It consists of **chunks**, each terminated by one or more exclamation marks (`!`) , depending on the chunk type.
 
 ---
 
@@ -30,11 +30,14 @@ SuperclassName subclass: #NewClass
 ### 2. Class Comment
 
 ```smalltalk
-ClassName comment: 'A long comment...'!
+ClassName comment: 'A long comment
+that may span multiple lines.'!
 ```
 
 - Associates a comment string with a class
 - Ends with a single `!`
+- Stringliterals may span multiple lines
+
 
 ---
 
@@ -50,9 +53,9 @@ method2
 ! !
 ```
 
-- Begins with a line starting with `!`
-- Each method ends with `!` or `!!`
-- The block ends with `! !`
+- Begins with a line starting with `!`ClassName methodsFor: 'category'`!`
+- Each method ends with a single `!`
+- The final `!` (immediately following the last method’s `!`, often on the same line) terminates the method category block
 
 ---
 
@@ -64,7 +67,7 @@ method2
 ! !
 ```
 
-- Same structure as instance-side, but includes the `class` keyword
+- Same structure as instance-side, but includes the `class` keyword after the claSS name
 
 ---
 
@@ -72,9 +75,7 @@ method2
 
 | Symbol     | Meaning                                                                 |
 |------------|-------------------------------------------------------------------------|
-| `!`        | Terminates a chunk (class, method, comment, etc.)                       |
-| `!!`       | Separates methods within a category (equivalent to two `!`)            |
-| `! !`      | Terminates a method category block                                      |
+| `!`        | Terminates a method, class definition, comment, or method category block                      |
 | `!` (lead) | Begins a method category header                                         |
 
 ---
