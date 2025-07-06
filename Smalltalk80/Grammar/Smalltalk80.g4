@@ -95,19 +95,19 @@ answer: CARROT expression PERIOD?;
 
 expressions: expression (PERIOD expression)*;
 
-expression
-    : primaryExpression (messageTail)*;
+expression: primaryExpression (messageTail)*;
 
-primaryExpression
-    : assignment
-    | primitive
-    | operand;
+primaryExpression: assignment | primitive | operand;
 
-messageTail
-    : unaryMessage
-    | binaryMessage
-    | keywordMessage;
+messageTail: unaryMessage | binaryMessage | keywordMessage;
 
+unaryMessage: unarySelector;
+
+binaryMessage: (BINARY_SELECTOR | MINUS) expression;
+
+keywordMessage: keywordPair+;
+
+keywordPair: KEYWORD expression;
 
 cascade: (keywordSend | binarySend) (SEMI_COLON message)+;
 
@@ -120,17 +120,9 @@ message: binaryMessage | unaryMessage | keywordMessage;
 
 keywordSend: binarySend keywordMessage;
 
-keywordMessage: keywordPair+;
-
-keywordPair: KEYWORD expression;
-
 binarySend: unarySend binaryTail?;
 
 unarySend: operand unaryTail?;
-
-unaryMessage: unarySelector;
-
-binaryMessage: (BINARY_SELECTOR | MINUS) expression;
 
 unaryTail: unaryMessage unaryTail?;
 
