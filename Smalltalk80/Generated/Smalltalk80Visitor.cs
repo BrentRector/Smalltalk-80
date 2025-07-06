@@ -211,6 +211,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitAnswer([NotNull] Smalltalk80Parser.AnswerContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.cascade"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitCascade([NotNull] Smalltalk80Parser.CascadeContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressions"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -229,11 +235,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitPrimaryExpression([NotNull] Smalltalk80Parser.PrimaryExpressionContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.postfixExpression"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageSend"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitPostfixExpression([NotNull] Smalltalk80Parser.PostfixExpressionContext context);
+	Result VisitMessageSend([NotNull] Smalltalk80Parser.MessageSendContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryMessage"/>.
 	/// </summary>
