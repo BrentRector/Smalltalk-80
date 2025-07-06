@@ -155,13 +155,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             var msg = tail.binaryMessage();
             if (msg is null) return left;
             var selector = msg.BINARY_SELECTOR()?.GetText() ?? string.Empty;
-            ExpressionNode right;
-            if (msg.unarySend() is { } us)
-                right = (ExpressionNode)Visit(us)!;
-            else if (msg.operand() is { } op)
-                right = (ExpressionNode)Visit(op)!;
-            else
-                return left;
+            var right = (ExpressionNode)Visit(msg.expression())!;
             var expr = new BinarySendExpression(left, selector, right);
             return ProcessBinaryTail(expr, tail.binaryTail());
         }
@@ -191,7 +185,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         foreach (var pair in context.keywordMessage().keywordPair())
         {
             parts.Add(pair.KEYWORD().GetText());
-            args.Add((ExpressionNode)Visit(pair.binarySend())!);
+            args.Add((ExpressionNode)Visit(pair.expression())!);
         }
         return new KeywordSendExpression(recv, parts, args);
     }
@@ -264,6 +258,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new FileNode(chunks);
     }
 
+    /// <inheritdoc/>
+    public override AstNode VisitStandaloneCommentChunk(Smalltalk80Parser.StandaloneCommentChunkContext context)
+        => null!;
+
 
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
@@ -332,10 +330,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         scopeStack.Clear();
         var methodVisitor = new AstBuildingVisitor(selector, args, initialVariables);
         var body = (SequenceNode)methodVisitor.Visit(context.sequence())!;
+        string? comment = null;
+        var commentTokens = context.COMMENT();
+        if (commentTokens.Length > 0)
+            comment = string.Join("\n", commentTokens.Select(c => c.GetText().Trim('"')));
         scopeStack.Clear();
 
         Tracer.Log($"Exiting method: {selector}");
-        return new MethodDefinitionNode(selector, args, body, null);
+        return new MethodDefinitionNode(selector, args, body, comment);
     }
 
     private static (string Selector, List<string> Args) ParseMethodSelector(Smalltalk80Parser.MethodSelectorContext context)
