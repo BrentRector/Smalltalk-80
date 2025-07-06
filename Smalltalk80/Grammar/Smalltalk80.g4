@@ -106,7 +106,11 @@ messageChain
 expression
     : messageChain (SEMI_COLON message)*;
 
-unaryMessage: unarySelector;
+unaryMessage
+    : {this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD}? unarySelector
+    ;
+
+
 
 binaryMessage: (BINARY_SELECTOR | MINUS) expression;
 
@@ -195,7 +199,7 @@ INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
 CLASS_VARIABLE_NAMES: 'classVariableNames:';
 POOL_DICTIONARIES: 'poolDictionaries:';
 CATEGORY: 'category:';
-KEYWORD: IDENTIFIER COLON;
+KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
 COMMENT: '"' ( ~["] | '""')* '"';

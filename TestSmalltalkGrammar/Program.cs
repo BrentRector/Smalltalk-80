@@ -40,7 +40,7 @@ namespace Smalltalk80.Tools
             foreach (var token in tokens.GetTokens())
             {
                 var tokenName = lexer.Vocabulary.GetSymbolicName(token.Type);
-                //Console.WriteLine($"  [{token.Line}:{token.Column}] {tokenName} → '{token.Text}'");
+                Console.WriteLine($"  [{token.Line}:{token.Column}] {tokenName} → '{token.Text}'");
             }
             Console.WriteLine();
 
