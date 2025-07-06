@@ -95,14 +95,16 @@ answer: CARROT expression PERIOD?;
 
 expressions: expression (PERIOD expression)*;
 
-expression:
-	expression keywordMessage // highest precedence
-	| expression binaryMessage
-	| expression unaryMessage
-	| expression SEMI_COLON message
-	| assignment
-	| primitive
-	| operand;
+messageChain
+    : messageChain keywordMessage
+    | messageChain binaryMessage
+    | messageChain unaryMessage
+    | assignment
+    | primitive
+    | operand;
+
+expression
+    : messageChain (SEMI_COLON message)*;
 
 unaryMessage: unarySelector;
 
