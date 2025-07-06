@@ -122,12 +122,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
-        if (context.assignment() is not null) return Visit(context.assignment());
-        if (context.cascade() is not null) return Visit(context.cascade());
-        if (context.keywordSend() is not null) return Visit(context.keywordSend());
-        if (context.binarySend() is not null) return Visit(context.binarySend());
-        if (context.primitive() is not null) return Visit(context.primitive());
-        return base.VisitExpression(context);
+        var expr = (ExpressionNode)Visit(context.primaryExpression())!;
+        foreach (var tail in context.messageTail())
+        {
+            expr = ProcessMessageTail(expr, tail);
+        }
+
+        return FlattenKeywordSends(expr);
     }
 
     /// <inheritdoc/>
@@ -174,6 +175,52 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         var selector = tail.unaryMessage().unarySelector().GetText();
         var expr = new UnarySendExpression(receiver, selector);
         return tail.unaryTail() is { } next ? ProcessUnaryTail(expr, next) : expr;
+    }
+
+    private ExpressionNode ProcessMessageTail(ExpressionNode receiver, Smalltalk80Parser.MessageTailContext tail)
+    {
+        if (tail.unaryMessage() is { } unary)
+        {
+            var selector = unary.unarySelector().GetText();
+            return new UnarySendExpression(receiver, selector);
+        }
+
+        if (tail.binaryMessage() is { } binary)
+        {
+            var selector = binary.BINARY_SELECTOR()?.GetText() ?? binary.MINUS()?.GetText() ?? string.Empty;
+            var right = (ExpressionNode)Visit(binary.expression())!;
+            return new BinarySendExpression(receiver, selector, right);
+        }
+
+        if (tail.keywordMessage() is { } keyword)
+        {
+            var parts = new List<string>();
+            var args = new List<ExpressionNode>();
+            foreach (var pair in keyword.keywordPair())
+            {
+                parts.Add(pair.KEYWORD().GetText());
+                args.Add((ExpressionNode)Visit(pair.expression())!);
+            }
+
+            return new KeywordSendExpression(receiver, parts, args);
+        }
+
+        return receiver;
+    }
+
+    private static ExpressionNode FlattenKeywordSends(ExpressionNode node)
+    {
+        while (node is KeywordSendExpression outer &&
+               outer.Arguments.Count == 1 &&
+               outer.Arguments[0] is KeywordSendExpression inner)
+        {
+            var parts = outer.SelectorParts.Concat(inner.SelectorParts).ToList();
+            var args = new List<ExpressionNode> { inner.Receiver };
+            args.AddRange(inner.Arguments);
+            node = new KeywordSendExpression(outer.Receiver, parts, args);
+        }
+
+        return node;
     }
 
     /// <inheritdoc/>
@@ -329,7 +376,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         scopeStack.Clear();
         var methodVisitor = new AstBuildingVisitor(selector, args, initialVariables);
-        var body = (SequenceNode)methodVisitor.Visit(context.sequence())!;
+        var bodyCtx = context.sequence();
+        SequenceNode body = bodyCtx is not null
+            ? (SequenceNode)methodVisitor.Visit(bodyCtx)!
+            : new SequenceNode(new List<string>(), new List<StatementNode>());
         string? comment = null;
         var commentTokens = context.COMMENT();
         if (commentTokens.Length > 0)
