@@ -106,10 +106,7 @@ primaryExpression
 postfixExpression
     : keywordMessage
     | binaryMessage
-    | unaryMessage;
-
-unaryMessage
-    : {this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD}? unarySelector;
+    | IDENTIFIER { this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD }?;  // unaryMessage
 
 
 binaryMessage: (BINARY_SELECTOR | MINUS) expression;
@@ -120,7 +117,7 @@ keywordPair: KEYWORD expression;
 
 assignment: variable ASSIGNMENT expression;
 
-message: binaryMessage | unaryMessage | keywordMessage;
+//message: binaryMessage | unaryMessage | keywordMessage;
 
 //////////////////////////////////////////////////////////////////////////
 // Operands & Literals ////////////////////////////////////////////////////////////////////////
