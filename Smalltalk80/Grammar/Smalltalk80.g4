@@ -95,21 +95,21 @@ answer: CARROT expression PERIOD?;
 
 expressions: expression (PERIOD expression)*;
 
-messageChain
-    : messageChain keywordMessage
-    | messageChain binaryMessage
-    | messageChain unaryMessage
-    | assignment
+expression
+    : primaryExpression postfixExpression*;
+
+primaryExpression
+    : assignment
     | primitive
     | operand;
 
-expression
-    : messageChain (SEMI_COLON message)*;
+postfixExpression
+    : keywordMessage
+    | binaryMessage
+    | unaryMessage;
 
 unaryMessage
-    : {this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD}? unarySelector
-    ;
-
+    : {this.InputStream.LA(1) != Smalltalk80Parser.KEYWORD}? unarySelector;
 
 
 binaryMessage: (BINARY_SELECTOR | MINUS) expression;

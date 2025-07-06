@@ -217,17 +217,23 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitExpressions([NotNull] Smalltalk80Parser.ExpressionsContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageChain"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitMessageChain([NotNull] Smalltalk80Parser.MessageChainContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitExpression([NotNull] Smalltalk80Parser.ExpressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primaryExpression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrimaryExpression([NotNull] Smalltalk80Parser.PrimaryExpressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.postfixExpression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPostfixExpression([NotNull] Smalltalk80Parser.PostfixExpressionContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryMessage"/>.
 	/// </summary>
