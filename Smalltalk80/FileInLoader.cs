@@ -42,6 +42,9 @@ public static class FileInLoader
 
                     // Reparse the method body with variable information so tracing
                     // accurately reflects the available names during compilation.
+                    if (string.IsNullOrWhiteSpace(method.Source))
+                        break;
+
                     var parser = new SmalltalkParser(method.Source);
                     var compiled = parser.ParseMethod(method.Arguments, vars, method.Selector);
                     cls.MethodDictionary[new Symbol(method.Selector)] = compiled;

@@ -95,13 +95,26 @@ public sealed class SmalltalkParser
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
-        var unit = parser.replUnit();
         var visitor = new AstBuildingVisitor(methodName, arguments, variables);
 
-        if (unit is Smalltalk80Parser.ReplSequenceContext seqCtx)
-            return new ScriptNode((SequenceNode)visitor.Visit(seqCtx.sequence())!);
+        var unit = parser.replUnit();
+        if (parser.NumberOfSyntaxErrors == 0)
+        {
+            if (unit is Smalltalk80Parser.ReplSequenceContext seqCtx)
+                return new ScriptNode((SequenceNode)visitor.Visit(seqCtx.sequence())!);
 
-        return (ScriptNode)visitor.Visit(unit)!;
+            return (ScriptNode)visitor.Visit(unit)!;
+        }
+
+        tokens.Seek(0);
+        parser = new Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
+        var methodDef = parser.methodDefinition();
+        if (parser.NumberOfSyntaxErrors > 0)
+            throw new InvalidOperationException("Invalid Smalltalk source.");
+
+        var methodNode = (MethodDefinitionNode)visitor.Visit(methodDef)!;
+        return new ScriptNode(methodNode.Body);
     }
 
 }
