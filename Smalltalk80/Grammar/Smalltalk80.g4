@@ -36,16 +36,16 @@ methodDefinitionWithBang: methodDefinition BANG;
 // ////////////////////////////////////////////////////////////////////////
 
 classDefinition:
-	IDENTIFIER (
+	UNARY_SELECTOR (
 		'subclass:'
 		| 'variableSubclass:'
 		| 'variableByteSubclass:'
 		| 'variableWordSubclass:'
-	) HASH IDENTIFIER (classOption)*;
+	) HASH UNARY_SELECTOR (classOption)*;
 
 classComment: className CLASS? 'comment:' stringLiteral;
 
-className: IDENTIFIER;
+className: UNARY_SELECTOR;
 
 classOption:
 	INSTANCE_VARIABLE_NAMES stringLiteral
@@ -54,14 +54,14 @@ classOption:
 	| CATEGORY stringLiteral;
 
 metaclassDefinition:
-	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
+	UNARY_SELECTOR CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
 
 //////////////////////////////////////////////////////////////////////////
 // Method Categories & Definitions
 // ////////////////////////////////////////////////////////////////////////
 
 methodCategoryHeader:
-	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
+	BANG UNARY_SELECTOR CLASS? METHODS_FOR stringLiteral BANG;
 
 methodDefinition: methodSelector COMMENT* sequence;
 
@@ -76,7 +76,7 @@ binarySelector: BINARY_SELECTOR | MINUS;
 
 keywordSelector: keywordPart+;
 
-keywordPart: KEYWORD IDENTIFIER;
+keywordPart: KEYWORD UNARY_SELECTOR;
 
 //////////////////////////////////////////////////////////////////////////
 // Sequences (REPL & Scripts)
@@ -86,7 +86,7 @@ sequence: temps? expressions;
 
 statement: answer | expression;
 
-temps: PIPE IDENTIFIER (IDENTIFIER)* PIPE;
+temps: PIPE UNARY_SELECTOR (IDENTIFIER)* PIPE;
 
 //////////////////////////////////////////////////////////////////////////
 // Statements & Expressions ////////////////////////////////////////////////////////////////////
@@ -101,10 +101,7 @@ expression: primaryExpression messageSend* cascade*;
 
 primaryExpression: assignment | primitive | operand;
 
-messageSend:
-        keywordMessage
-        | binaryMessage
-        | unaryMessage;
+messageSend: keywordMessage | binaryMessage | unaryMessage;
 
 unaryMessage: UNARY_SELECTOR;
 
@@ -197,7 +194,6 @@ CATEGORY: 'category:';
 // KEYWORD must appear before UNARY_SELECTOR so that ifTrue: is matched as a KEYWORD, not a UNARY_SELECTOR.
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 UNARY_SELECTOR: [a-zA-Z] [a-zA-Z0-9_]*;
-
 
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
 COMMENT: '"' ( ~["] | '""')* '"';
