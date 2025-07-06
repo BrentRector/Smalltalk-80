@@ -1,25 +1,18 @@
-"Define the ActionMenu class with instance variable 'selectors'"
 PopUpMenu subclass: #ActionMenu
-    instanceVariableNames: 'selectors'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'Menus'!
+	instanceVariableNames: 'selectors '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Interface-Menus'!
+ActionMenu comment:
+'ActionMenus carry an array of selectors which correspond to the listed menu items.  This allows a menu to stand alone in parameterizing a controller, since the controller just sends the selector to its model.
 
-"Define instance methods for ActionMenu"
+ActionMenus allow the pluggable views experiment (TextView, SelectionInListView) to
+handle menus much easier than having pairs of variables for the menu and its associated
+selectors.  Obviously these menus eagerly await a proper objectification of protocol.'!
+
+
 !ActionMenu methodsFor: 'action symbols'!
 selectorAt: index
-    ^ selectors at: index!!
+	^ selectors at: index!
 setSelectors: selArray
-    selectors _ selArray!!
-! !
-
-"Define class-side methods for ActionMenu"
-!ActionMenu class methodsFor: 'instance creation'!
-labels: aString lines: anArray selectors: selArray
-    | aMenu |
-    aMenu _ self labels: aString lines: anArray.
-    aMenu setSelectors: selArray.
-    ^ aMenu!!
-labels: aString selectors: selArray
-    ^ self labels: aString lines: nil selectors: selArray!!
-! !
+	selectors _ selArray! !

@@ -67,6 +67,13 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitReplSequence([NotNull] Smalltalk80Parser.ReplSequenceContext context);
 	/// <summary>
+	/// Visit a parse tree produced by the <c>StandaloneCommentChunk</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context);
+	/// <summary>
 	/// Visit a parse tree produced by the <c>ClassChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// </summary>
@@ -88,13 +95,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context);
 	/// <summary>
-	/// Visit a parse tree produced by the <c>StandaloneCommentChunk</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context);
-	/// <summary>
 	/// Visit a parse tree produced by the <c>ScriptChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// </summary>
@@ -102,11 +102,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitScriptChunk([NotNull] Smalltalk80Parser.ScriptChunkContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.ws"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodDefinitionWithBang"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitWs([NotNull] Smalltalk80Parser.WsContext context);
+	Result VisitMethodDefinitionWithBang([NotNull] Smalltalk80Parser.MethodDefinitionWithBangContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classDefinition"/>.
 	/// </summary>

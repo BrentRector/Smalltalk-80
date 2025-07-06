@@ -90,6 +90,17 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <return>The visitor result.</return>
 	public virtual Result VisitReplSequence([NotNull] Smalltalk80Parser.ReplSequenceContext context) { return VisitChildren(context); }
 	/// <summary>
+	/// Visit a parse tree produced by the <c>StandaloneCommentChunk</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context) { return VisitChildren(context); }
+	/// <summary>
 	/// Visit a parse tree produced by the <c>ClassChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// <para>
@@ -123,17 +134,6 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <return>The visitor result.</return>
 	public virtual Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context) { return VisitChildren(context); }
 	/// <summary>
-	/// Visit a parse tree produced by the <c>StandaloneCommentChunk</c>
-	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
-	/// <para>
-	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
-	/// on <paramref name="context"/>.
-	/// </para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	public virtual Result VisitStandaloneCommentChunk([NotNull] Smalltalk80Parser.StandaloneCommentChunkContext context) { return VisitChildren(context); }
-	/// <summary>
 	/// Visit a parse tree produced by the <c>ScriptChunk</c>
 	/// labeled alternative in <see cref="Smalltalk80Parser.chunk"/>.
 	/// <para>
@@ -145,7 +145,7 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <return>The visitor result.</return>
 	public virtual Result VisitScriptChunk([NotNull] Smalltalk80Parser.ScriptChunkContext context) { return VisitChildren(context); }
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.ws"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodDefinitionWithBang"/>.
 	/// <para>
 	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
 	/// on <paramref name="context"/>.
@@ -153,7 +153,7 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	public virtual Result VisitWs([NotNull] Smalltalk80Parser.WsContext context) { return VisitChildren(context); }
+	public virtual Result VisitMethodDefinitionWithBang([NotNull] Smalltalk80Parser.MethodDefinitionWithBangContext context) { return VisitChildren(context); }
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classDefinition"/>.
 	/// <para>
