@@ -19,7 +19,7 @@ public class TracerTests
             using var writer = new StringWriter();
             Console.SetOut(writer);
             Tracer.Enabled = true;
-            var parser = new SmalltalkParser("selectorAt: index ^selectors at: index");
+            var parser = new SmalltalkParser("selectorAt: index selectors at: index");
             parser.ParseMethod(new[] { "index" }, new[] { "selectors" }, "selectorAt:");
             var output = writer.ToString();
             Assert.Contains("Instance variables in scope: selectors", output);

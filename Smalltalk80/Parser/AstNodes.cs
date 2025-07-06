@@ -151,3 +151,22 @@ public sealed record MethodDefinitionNode(
     string? Comment,
     string Source = "") : AstNode;
 
+/// <summary>
+/// Expression representing a block literal.
+/// </summary>
+/// <param name="Parameters">Names of the block parameters in declaration order.</param>
+/// <param name="Body">The sequence executed when the block is evaluated.</param>
+public sealed record BlockExpression(IReadOnlyList<string> Parameters, SequenceNode Body) : ExpressionNode;
+
+/// <summary>
+/// Expression representing a dynamic array literal evaluated at runtime.
+/// </summary>
+/// <param name="Elements">The element expressions comprising the array.</param>
+public sealed record DynamicArrayExpression(IReadOnlyList<ExpressionNode> Elements) : ExpressionNode;
+
+/// <summary>
+/// Expression representing a dynamic dictionary literal evaluated at runtime.
+/// </summary>
+/// <param name="Elements">The expressions contained within the dictionary literal.</param>
+public sealed record DynamicDictionaryExpression(IReadOnlyList<ExpressionNode> Elements) : ExpressionNode;
+
