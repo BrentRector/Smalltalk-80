@@ -167,9 +167,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
                                binary.MINUS()?.GetText() ?? string.Empty;
                 receiver = new BinarySendExpression(receiver, selector, arg);
             }
-            else if (send.IDENTIFIER() is { } ident)
+            else if (send.unaryMessage() is { } unary)
             {
-                receiver = new UnarySendExpression(receiver, ident.GetText());
+                receiver = new UnarySendExpression(receiver, unary.UNARY_SELECTOR().GetText());
             }
         }
 

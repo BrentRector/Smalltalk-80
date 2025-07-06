@@ -102,10 +102,11 @@ expression: primaryExpression messageSend* cascade*;
 primaryExpression: assignment | primitive | operand;
 
 messageSend:
-	keywordMessage
-	| binaryMessage
-	// // unary message (only if not followed by a keyword message)
-	| UNARY_SELECTOR;
+        keywordMessage
+        | binaryMessage
+        | unaryMessage;
+
+unaryMessage: UNARY_SELECTOR;
 
 binaryMessage: (BINARY_SELECTOR | MINUS) expression;
 
