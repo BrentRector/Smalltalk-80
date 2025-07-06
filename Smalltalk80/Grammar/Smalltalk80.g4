@@ -21,7 +21,7 @@ chunk:
 	| metaclassDefinition BANG	# MetaClassChunk
 	| sequence BANG				# ScriptChunk
 	| {
-        InputStream.LA(2) == Smalltalk80Parser.IDENTIFIER &&
+        InputStream.LA(2) == Smalltalk80Parser.UNARY_SELECTOR &&
         (
             InputStream.LA(3) == Smalltalk80Parser.METHODS_FOR ||
             (InputStream.LA(3) == Smalltalk80Parser.CLASS &&
@@ -66,9 +66,9 @@ methodCategoryHeader:
 methodDefinition: methodSelector COMMENT* sequence;
 
 methodSelector:
-	unarySelector
-	| binarySelector IDENTIFIER
-	| keywordSelector;
+        unarySelector
+        | binarySelector UNARY_SELECTOR
+        | keywordSelector;
 
 unarySelector: UNARY_SELECTOR;
 
@@ -86,7 +86,7 @@ sequence: temps? expressions;
 
 statement: answer | expression;
 
-temps: PIPE UNARY_SELECTOR (IDENTIFIER)* PIPE;
+temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
 //////////////////////////////////////////////////////////////////////////
 // Statements & Expressions ////////////////////////////////////////////////////////////////////
@@ -167,10 +167,10 @@ stringLiteral: STRING;
 symbol: HASH bareSymbol;
 
 bareSymbol:
-	IDENTIFIER
-	| BINARY_SELECTOR
-	| KEYWORD+
-	| stringLiteral;
+        UNARY_SELECTOR
+        | BINARY_SELECTOR
+        | KEYWORD+
+        | stringLiteral;
 
 literalArray: LITARR_START literalArrayRest;
 
