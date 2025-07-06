@@ -132,6 +132,29 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
+        var expr = (ExpressionNode)Visit(context.messageChain())!;
+
+        if (context.message().Length == 0)
+            return expr;
+
+        var receiver = expr;
+        var messages = new List<ExpressionNode>();
+
+        if (receiver is CascadeExpression existing)
+        {
+            receiver = existing.Receiver;
+            messages.AddRange(existing.Messages);
+        }
+
+        foreach (var msgCtx in context.message())
+            messages.Add(ProcessMessage(receiver, msgCtx));
+
+        return new CascadeExpression(receiver, messages);
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitMessageChain(Smalltalk80Parser.MessageChainContext context)
+    {
         if (context.assignment() is { } assignment)
             return Visit(assignment);
 
@@ -141,16 +164,16 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         if (context.operand() is { } operand)
             return Visit(operand);
 
+        var recv = (ExpressionNode)Visit(context.messageChain())!;
+
         if (context.unaryMessage() is { } unary)
         {
-            var recv = (ExpressionNode)Visit(context.expression())!;
             var selector = unary.unarySelector().GetText();
             return new UnarySendExpression(recv, selector);
         }
 
         if (context.binaryMessage() is { } binary)
         {
-            var recv = (ExpressionNode)Visit(context.expression())!;
             var selector = binary.BINARY_SELECTOR()?.GetText() ?? binary.MINUS()?.GetText() ?? string.Empty;
             var arg = (ExpressionNode)Visit(binary.expression())!;
             return new BinarySendExpression(recv, selector, arg);
@@ -158,7 +181,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         if (context.keywordMessage() is { } keyword)
         {
-            var recv = (ExpressionNode)Visit(context.expression())!;
             var parts = new List<string>();
             var args = new List<ExpressionNode>();
             foreach (var pair in keyword.keywordPair())
@@ -170,26 +192,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             return FlattenKeywordSends(expr);
         }
 
-        if (context.message().Length > 0)
-        {
-            var receiver = (ExpressionNode)Visit(context.expression())!;
-            var messages = new List<ExpressionNode>();
-
-            if (receiver is CascadeExpression existing)
-            {
-                receiver = existing.Receiver;
-                messages.AddRange(existing.Messages);
-            }
-
-            foreach (var msgCtx in context.message())
-            {
-                messages.Add(ProcessMessage(receiver, msgCtx));
-            }
-
-            return new CascadeExpression(receiver, messages);
-        }
-
-        return base.VisitExpression(context);
+        return recv;
     }
 
     /// <inheritdoc/>
