@@ -35,6 +35,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <summary>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
     /// </summary>
+    /// <param name="tokens">The token stream produced by the lexer.</param>
     /// <param name="methodName">Optional selector of the method being parsed.</param>
     /// <param name="arguments">Method argument names available in the outer scope.</param>
     /// <param name="variables">Instance or class variables available in the outer scope.</param>

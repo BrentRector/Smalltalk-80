@@ -125,8 +125,76 @@ public static class AstMethodCompiler
                     CompileExpression(bin.Argument);
                     EmitSend(bin.Selector, 1);
                     break;
+                case BlockExpression block:
+                    CompileBlock(block);
+                    break;
                 default:
                     throw new NotSupportedException($"Unsupported expression node {expression.GetType().Name}");
+            }
+        }
+
+        private void CompileBlock(BlockExpression block)
+        {
+            bytecodes.Add((byte)Bytecode.PushActiveContext);
+            EmitSmallInteger(block.Parameters.Count);
+            EmitSend("blockCopy:", 1);
+
+            int jumpIndex = bytecodes.Count;
+            bytecodes.Add((byte)Bytecode.JumpLong);
+            bytecodes.Add(0); // high
+            bytecodes.Add(0); // low
+
+            foreach (var param in block.Parameters)
+                temporaries[param] = temporaries.Count;
+
+            foreach (var temp in block.Body.Temporaries)
+                temporaries[temp] = temporaries.Count;
+
+            int bodyStart = bytecodes.Count;
+            for (int i = 0; i < block.Body.Statements.Count; i++)
+            {
+                var stmt = block.Body.Statements[i];
+                bool isLast = i == block.Body.Statements.Count - 1;
+                if (stmt is AnswerStatement ans)
+                {
+                    CompileExpression(ans.Expression);
+                    bytecodes.Add((byte)Bytecode.ReturnTopFromBlock);
+                }
+                else if (stmt is ExpressionStatement es)
+                {
+                    CompileExpression(es.Expression);
+                    if (!isLast)
+                        bytecodes.Add((byte)Bytecode.PopStack);
+                }
+            }
+
+            if (block.Body.Statements.Count == 0 || block.Body.Statements[^1] is not AnswerStatement)
+                bytecodes.Add((byte)Bytecode.ReturnTopFromBlock);
+
+            short offset = (short)(bytecodes.Count - bodyStart);
+            bytecodes[jumpIndex + 1] = (byte)(offset >> 8);
+            bytecodes[jumpIndex + 2] = (byte)(offset & 0xFF);
+        }
+
+        private void EmitSmallInteger(int value)
+        {
+            switch (value)
+            {
+                case -1:
+                    bytecodes.Add((byte)Bytecode.PushMinusOne);
+                    break;
+                case 0:
+                    bytecodes.Add((byte)Bytecode.PushZero);
+                    break;
+                case 1:
+                    bytecodes.Add((byte)Bytecode.PushOne);
+                    break;
+                case 2:
+                    bytecodes.Add((byte)Bytecode.PushTwo);
+                    break;
+                default:
+                    EmitLiteral(value);
+                    break;
             }
         }
 
