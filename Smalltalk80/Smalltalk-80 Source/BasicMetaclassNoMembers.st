@@ -5,4 +5,4 @@ Object subclass: #MetaNoMembers
     category: 'Parser-Tests'!
 
 !MetaNoMembers class methodsFor: 'testing'!
-! !
+
