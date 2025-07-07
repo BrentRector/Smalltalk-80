@@ -338,7 +338,6 @@ CLOSE_PAREN             : ')' ;
 PIPE                    : '|' ;
 PERIOD                  : '.' ;
 SEMI_COLON              : ';' ;
-METHOD_END              : '!!' ;
 BANG                    : '!' ;
 fragment SP             : (' ' | '\t')+ ;
 PRIMITIVE               : '<primitive:' SP? DIGIT+ '>' ;
