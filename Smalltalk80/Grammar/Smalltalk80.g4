@@ -97,7 +97,13 @@ cascade: SEMI_COLON messageSend+;
 
 expressions: expression (PERIOD expression)*;
 
-expression: primaryExpression messageSend* cascade*;
+expression: keywordExpr cascade*;
+
+keywordExpr: binaryExpr (keywordMessage)*;
+
+binaryExpr: unaryExpr (binaryMessage)*;
+
+unaryExpr: primaryExpression (unaryMessage)*;
 
 primaryExpression: assignment | primitive | operand;
 
@@ -105,7 +111,7 @@ messageSend: keywordMessage | binaryMessage | unaryMessage;
 
 unaryMessage: UNARY_SELECTOR;
 
-binaryMessage: (BINARY_SELECTOR | MINUS) expression;
+binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
 
 keywordMessage: keywordPair+;
 
