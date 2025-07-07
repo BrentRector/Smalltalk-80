@@ -20,17 +20,17 @@ replUnit
 //////////////////////////////////////////////////////////////////////////
 
 chunk
-    : COMMENT BANG                                     # StandaloneCommentChunk
-    | classDefinition BANG                             # ClassChunk
-    | classComment BANG                                # ClassCommentChunk
-    | metaclassDefinition BANG                         # MetaClassChunk
-    | sequence BANG                                    # ScriptChunk
+    : COMMENT_BANG                                      # StandaloneCommentChunk
+    | classDefinition BANG                              # ClassChunk
+    | classComment BANG                                 # ClassCommentChunk
+    | metaclassDefinition BANG                          # MetaClassChunk
+    | sequence BANG                                     # ScriptChunk
     | {
-          InputStream.LA(2)==Smalltalk80Parser.IDENTIFIER &&
+          _input.LA(2)==Smalltalk80Parser.IDENTIFIER &&
           (
-            InputStream.LA(3)==Smalltalk80Parser.METHODS_FOR ||
-            (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
-             InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
+            _input.LA(3)==Smalltalk80Parser.METHODS_FOR ||
+            (_input.LA(3)==Smalltalk80Parser.CLASS &&
+             _input.LA(4)==Smalltalk80Parser.METHODS_FOR)
           )
       }? methodCategoryHeader (methodDefinitionWithBang+ BANG)?  # MethodCategoryChunk
     ;
@@ -62,9 +62,9 @@ className
 
 classOption
     : INSTANCE_VARIABLE_NAMES stringLiteral
-    | CLASS_VARIABLE_NAMES stringLiteral
-    | POOL_DICTIONARIES stringLiteral
-    | CATEGORY stringLiteral
+    | CLASS_VARIABLE_NAMES    stringLiteral
+    | POOL_DICTIONARIES       stringLiteral
+    | CATEGORY                stringLiteral
     ;
 
 metaclassDefinition
@@ -80,7 +80,7 @@ methodCategoryHeader
     ;
 
 methodDefinition
-    : methodSelector COMMENT* primitive? sequence?
+    : methodSelector primitive? sequence?
     ;
 
 methodSelector
@@ -115,13 +115,12 @@ sequence
     ;
 
 statements
-    : COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*
+    : statement (PERIOD statement)* PERIOD?
     ;
 
 statement
-    : COMMENT
-    | answer COMMENT*
-    | expression COMMENT*
+    : answer
+    | expression
     ;
 
 temps
@@ -324,12 +323,24 @@ CLASS_VARIABLE_NAMES    : 'classVariableNames:' ;
 POOL_DICTIONARIES       : 'poolDictionaries:' ;
 CATEGORY                : 'category:' ;
 
-// KEYWORD must appear before IDENTIFIER so that 'ifTrue:' is matched as KEYWORD, not IDENTIFIER.
+// KEYWORD must appear before IDENTIFIER so that ifTrue: → KEYWORD
 KEYWORD                 : [a-zA-Z] [a-zA-Z0-9_]* COLON ;
 IDENTIFIER              : [a-zA-Z] [a-zA-Z0-9_]* ;
 
-SEPARATOR               : [ \t\r\n\u000C]+ -> skip ;
-COMMENT                 : '"' ( ~["] | '""')* '"' ;
+// whitespace
+SEPARATOR               : [ \t\r\n\u000C]+    -> skip ;
+
+// our one “visible” comment token to drive StandaloneCommentChunk:
+COMMENT_BANG
+    : '"' ( ~["] | '""' )* '"' '!'
+    ;
+
+// all other inline comments vanish into HIDDEN:
+COMMENT
+    : '"' ( ~["] | '""' )* '"'
+    -> channel(HIDDEN)
+    ;
+
 STRING                  : '\'' ( ~['] | '\'\'')* '\'' ;
 BLOCK_START             : '[' ;
 BLOCK_END               : ']' ;
@@ -343,20 +354,8 @@ fragment SP             : (' ' | '\t')+ ;
 PRIMITIVE               : '<primitive:' SP? DIGIT+ '>' ;
 MINUS                   : '-' ;
 BINARY_SELECTOR         : (
-                              '\\'
-                            | '+'
-                            | '*'
-                            | '/'
-                            | '='
-                            | '>'
-                            | '<'
-                            | ','
-                            | '@'
-                            | '%'
-                            | '~'
-                            | '|'
-                            | '&'
-                            | '?'
+                              '\\' | '+' | '*' | '/' | '=' | '>' | '<'
+                            | ',' | '@' | '%' | '~' | '|' | '&' | '?'
                           )+ ;
 LT                      : '<' ;
 GT                      : '>' ;
@@ -368,12 +367,9 @@ LITARR_START            : '#(' ;
 DYNDICT_START           : '#{' ;
 DYNARR_END              : '}' ;
 DYNARR_START            : '{' ;
-RESERVED_WORD           : 'nil'
-                         | 'true'
-                         | 'false'
-                         | 'self'
-                         | 'super'
-                         ;
+RESERVED_WORD           
+    : 'nil' | 'true' | 'false' | 'self' | 'super'
+    ;
 CHARACTER_CONSTANT      : '$' ~[\r\n] ;
 DIGIT                   : [0-9] ;
 HEXDIGIT                : [0-9a-fA-F] ;
