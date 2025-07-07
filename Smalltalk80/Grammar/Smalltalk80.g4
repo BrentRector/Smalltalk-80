@@ -195,7 +195,7 @@ literalArrayRest:
 
 bareLiteralArray: OPEN_PAREN literalArrayRest;
 
-primitive: LT KEYWORD DIGIT+ GT;
+primitive: PRIMITIVE;
 
 //////////////////////////////////////////////////////////////////////////
 // Lexer Rules //////////////////////////////////////////////////////////////////////
@@ -225,6 +225,8 @@ PERIOD: '.';
 SEMI_COLON: ';';
 METHOD_END: '!!';
 BANG: '!';
+fragment SP: (' ' | '\t')+;
+PRIMITIVE: '<primitive:' SP? DIGIT+ '>';
 MINUS: '-';
 BINARY_SELECTOR: (
 		'\\'

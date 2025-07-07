@@ -325,4 +325,41 @@ public class FileInLoaderTests
             File.Delete(tempPath);
         }
     }
+
+    /// <summary>
+    /// Ensures that methods consisting solely of a primitive declaration are
+    /// compiled and retain the primitive metadata.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_PrimitiveOnlyMethod_LoadsWithPrimitiveInfo()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "Object subclass: #PrimOnly!",
+                "!PrimOnly methodsFor: 'prims'!",
+                "primitiveSize",
+                "    <primitive: 62>",
+                "!",
+                "!"
+            });
+
+            vm.LoadSystemFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("PrimOnly");
+            var method = cls.MethodDictionary[new Symbol("primitiveSize")];
+
+            Assert.True(method.HasPrimitive);
+            Assert.Equal(62, method.PrimitiveIndex);
+            Assert.Empty(method.Bytecodes);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }
