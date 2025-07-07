@@ -144,12 +144,16 @@ public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string
 /// <param name="Body">The method body.</param>
 /// <param name="Comment">Optional method comment text.</param>
 /// <param name="Source">The raw Smalltalk source for the method body.</param>
+/// <param name="HasPrimitive">Whether the method invokes a primitive.</param>
+/// <param name="PrimitiveIndex">The primitive index if <paramref name="HasPrimitive"/> is <c>true</c>.</param>
 public sealed record MethodDefinitionNode(
     string Selector,
     IReadOnlyList<string> Arguments,
     SequenceNode Body,
     string? Comment,
-    string Source = "") : AstNode;
+    string Source = "",
+    bool HasPrimitive = false,
+    int PrimitiveIndex = 0) : AstNode;
 
 /// <summary>
 /// Expression representing a block literal.
