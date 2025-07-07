@@ -142,9 +142,14 @@ block:
 	BLOCK_START BLOCK_END
 	| BLOCK_START nonEmptyBlockBody BLOCK_END;
 
-// A block may contain just a sequence, a parameter list and optional sequence, or local temporary
-// declarations followed by a sequence.
-nonEmptyBlockBody: blockParamList? temps? statements;
+// A block may contain: - just a sequence - a parameter list followed by a PIPE and a sequence -
+// optional temporary declarations followed by a sequence - a parameter list, a PIPE, optional
+// temps, and a sequence
+nonEmptyBlockBody
+    : blockParamList PIPE temps? statements
+	| blockParamList PIPE statements
+	| temps? statements
+    ;
 
 blockParamList: BLOCK_PARAM+;
 
