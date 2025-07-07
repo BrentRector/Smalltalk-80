@@ -26,11 +26,11 @@ chunk
     | metaclassDefinition BANG                          # MetaClassChunk
     | sequence BANG                                     # ScriptChunk
     | {
-          _input.LA(2)==Smalltalk80Parser.IDENTIFIER &&
+          InputStream.LA(2)==Smalltalk80Parser.IDENTIFIER &&
           (
-            _input.LA(3)==Smalltalk80Parser.METHODS_FOR ||
-            (_input.LA(3)==Smalltalk80Parser.CLASS &&
-             _input.LA(4)==Smalltalk80Parser.METHODS_FOR)
+            InputStream.LA(3)==Smalltalk80Parser.METHODS_FOR ||
+            (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
+             InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
           )
       }? methodCategoryHeader (methodDefinitionWithBang+ BANG)?  # MethodCategoryChunk
     ;
