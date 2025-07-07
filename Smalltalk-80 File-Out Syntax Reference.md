@@ -55,7 +55,7 @@ method2
 
 - Begins with a line starting with `!`ClassName methodsFor: 'category'`!`
 - Each method ends with a single `!`
-- The final `!` (immediately following the last method’s `!`, often on the same line) terminates the method category block
+- If the category contains methods, a final `!` immediately follows the last method's `!` to terminate the block. When no methods appear, the header's closing `!` is also the end of the category.
 
 ---
 
