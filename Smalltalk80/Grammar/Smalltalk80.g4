@@ -63,7 +63,7 @@ metaclassDefinition:
 methodCategoryHeader:
 	BANG UNARY_SELECTOR CLASS? METHODS_FOR stringLiteral BANG;
 
-methodDefinition: methodSelector COMMENT* sequence;
+methodDefinition: methodSelector COMMENT* primitive? sequence?;
 
 methodSelector:
 	unarySelector
@@ -89,11 +89,7 @@ sequence: temps? statements;
 statements:
 	COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*;
 
-statement
-    : COMMENT
-    | answer COMMENT*
-    | expression COMMENT*
-    ;
+statement: COMMENT | answer COMMENT* | expression COMMENT*;
 
 temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
@@ -149,11 +145,10 @@ block:
 // A block may contain: - just a sequence - a parameter list followed by a PIPE and a sequence -
 // optional temporary declarations followed by a sequence - a parameter list, a PIPE, optional
 // temps, and a sequence
-nonEmptyBlockBody
-    : blockParamList PIPE temps? statements
+nonEmptyBlockBody:
+	blockParamList PIPE temps? statements
 	| blockParamList PIPE statements
-	| temps? statements
-    ;
+	| temps? statements;
 
 blockParamList: BLOCK_PARAM+;
 
