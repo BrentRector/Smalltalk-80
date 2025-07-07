@@ -331,12 +331,7 @@ IDENTIFIER              : [a-zA-Z] [a-zA-Z0-9_]* ;
 // whitespace
 SEPARATOR               : [ \t\r\n\u000C]+    -> skip ;
 
-// our one “visible” comment token to drive StandaloneCommentChunk:
-COMMENT_BANG
-    : '"' ( ~["] | '""' )* '"' '!'
-    ;
-
-// all other inline comments vanish into HIDDEN:
+// all inline comments vanish into HIDDEN:
 COMMENT
     : '"' ( ~["] | '""' )* '"'
     -> channel(HIDDEN)
