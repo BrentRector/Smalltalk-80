@@ -104,7 +104,7 @@ expressions: expression (PERIOD expression)*;
 
 expression: keywordExpr cascade*;
 
-keywordExpr: binaryExpr (keywordMessage)*;
+keywordExpr: binaryExpr (KEYWORD expression)+;
 
 binaryExpr: unaryExpr (binaryMessage)*;
 
@@ -112,13 +112,14 @@ unaryExpr: primaryExpression (unaryMessage)*;
 
 primaryExpression: assignment | primitive | operand;
 
-messageSend: keywordMessage | binaryMessage | unaryMessage;
+messageSend:
+	unaryMessage
+	| binaryMessage
+	| (KEYWORD expression)+;
 
 unaryMessage: UNARY_SELECTOR;
 
 binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
-
-keywordMessage: KEYWORD expression  (KEYWORD expression )*;
 
 assignment: variable ASSIGNMENT expression;
 
