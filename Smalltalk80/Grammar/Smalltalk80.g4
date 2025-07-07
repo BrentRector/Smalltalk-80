@@ -113,9 +113,7 @@ unaryMessage: UNARY_SELECTOR;
 
 binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
 
-keywordMessage: keywordPair+;
-
-keywordPair: KEYWORD expression;
+keywordMessage: KEYWORD binaryExpr (KEYWORD binaryExpr)*;
 
 assignment: variable ASSIGNMENT expression;
 

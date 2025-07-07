@@ -204,10 +204,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         var parts = new List<string>();
         var args = new List<ExpressionNode>();
-        foreach (var pair in keyword.keywordPair())
+
+        var keywords = keyword.KEYWORD();
+        var binaries = keyword.binaryExpr();
+
+        for (var i = 0; i < keywords.Length; i++)
         {
-            parts.Add(pair.KEYWORD().GetText());
-            args.Add((ExpressionNode)Visit(pair.expression())!);
+            parts.Add(keywords[i].GetText());
+            args.Add((ExpressionNode)Visit(binaries[i])!);
         }
 
         return FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
@@ -223,10 +227,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             {
                 var parts = new List<string>();
                 var args = new List<ExpressionNode>();
-                foreach (var pair in keyword.keywordPair())
+                var kws = keyword.KEYWORD();
+                var bins = keyword.binaryExpr();
+                for (var i = 0; i < kws.Length; i++)
                 {
-                    parts.Add(pair.KEYWORD().GetText());
-                    args.Add((ExpressionNode)Visit(pair.expression())!);
+                    parts.Add(kws[i].GetText());
+                    args.Add((ExpressionNode)Visit(bins[i])!);
                 }
                 receiver = FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
             }
