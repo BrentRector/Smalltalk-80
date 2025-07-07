@@ -82,7 +82,12 @@ keywordPart: KEYWORD UNARY_SELECTOR;
 // Sequences (REPL & Scripts)
 // ////////////////////////////////////////////////////////////////////////
 
-sequence: temps? expressions;
+// A sequence of statements optionally preceded by temporary variable
+// declarations. The final period after the last statement is optional to match
+// typical Smalltalk syntax.
+sequence: temps? statements?;
+
+statements: statement (PERIOD statement)* PERIOD?;
 
 statement: answer | expression;
 
@@ -136,7 +141,12 @@ block:
 	BLOCK_START BLOCK_END
 	| BLOCK_START nonEmptyBlockBody BLOCK_END;
 
-nonEmptyBlockBody: blockParamList sequence? | temps sequence;
+// A block may contain just a sequence, a parameter list and optional sequence,
+// or local temporary declarations followed by a sequence.
+nonEmptyBlockBody:
+        sequence
+        | blockParamList sequence?
+        | temps sequence;
 
 blockParamList: BLOCK_PARAM+;
 

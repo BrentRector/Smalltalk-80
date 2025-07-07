@@ -92,10 +92,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
 
         var statements = new List<StatementNode>();
-        if (context.expressions() is { } exCtx)
+        if (context.statements() is { } stmtsCtx)
         {
-            var exprs = ((ExpressionsNode)Visit(exCtx)!).Expressions;
-            statements.AddRange(exprs.Select(e => (StatementNode)new ExpressionStatement(e)));
+            foreach (var stmtCtx in stmtsCtx.statement())
+                statements.Add((StatementNode)Visit(stmtCtx)!);
         }
 
         var node = new SequenceNode(temps, statements);
