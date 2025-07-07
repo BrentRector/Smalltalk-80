@@ -20,7 +20,7 @@ replUnit
 //////////////////////////////////////////////////////////////////////////
 
 chunk
-    : /* COMMENT */ BANG                           		# StandaloneCommentChunk //COMMENT goes to hidden channel
+    : BANG                                              # StandaloneCommentChunk
     | classDefinition BANG                              # ClassChunk
     | classComment BANG                                 # ClassCommentChunk
     | metaclassDefinition BANG                          # MetaClassChunk
