@@ -66,9 +66,9 @@ methodCategoryHeader:
 methodDefinition: methodSelector COMMENT* sequence;
 
 methodSelector:
-        unarySelector
-        | binarySelector UNARY_SELECTOR
-        | keywordSelector;
+	unarySelector
+	| binarySelector UNARY_SELECTOR
+	| keywordSelector;
 
 unarySelector: UNARY_SELECTOR;
 
@@ -80,29 +80,21 @@ keywordPart: KEYWORD UNARY_SELECTOR;
 
 //////////////////////////////////////////////////////////////////////////
 // Sequences (REPL & Scripts)
-//////////////////////////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////
 
-// A sequence of statements optionally preceded by temporary variable
-// declarations. The final period after the last statement is optional to match
-// typical Smalltalk syntax.
+// A sequence of statements optionally preceded by temporary variable declarations. The final period
+// after the last statement is optional to match typical Smalltalk syntax.
 sequence: temps? statements;
 
 statements:
-        COMMENT* statement
-        (PERIOD COMMENT* statement)*
-        PERIOD?
-        COMMENT*;
+	COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*;
 
-statement:
-        COMMENT
-        | answer
-        | expression;
+statement: COMMENT | answer | expression;
 
 temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
 //////////////////////////////////////////////////////////////////////////
-// Statements & Expressions 
-////////////////////////////////////////////////////////////////////
+// Statements & Expressions //////////////////////////////////////////////////////////////////
 
 answer: CARROT expression PERIOD?;
 
@@ -126,15 +118,14 @@ unaryMessage: UNARY_SELECTOR;
 
 binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
 
-keywordMessage: KEYWORD binaryExpr (KEYWORD binaryExpr)*;
+keywordMessage: KEYWORD expression  (KEYWORD expression )*;
 
 assignment: variable ASSIGNMENT expression;
 
 //////////////////////////////////////////////////////////////////////////
-// Operands & Literals 
-//////////////////////////////////////////////////////////////////////////
+// Operands & Literals ////////////////////////////////////////////////////////////////////////
 
-operand: literal | reference | subexpression;
+operand: literal | reference | subexpression | block;
 
 subexpression: OPEN_PAREN expression CLOSE_PAREN;
 
@@ -150,10 +141,9 @@ block:
 	BLOCK_START BLOCK_END
 	| BLOCK_START nonEmptyBlockBody BLOCK_END;
 
-// A block may contain just a sequence, a parameter list and optional sequence,
-// or local temporary declarations followed by a sequence.
-nonEmptyBlockBody:
-        blockParamList? temps? statements;
+// A block may contain just a sequence, a parameter list and optional sequence, or local temporary
+// declarations followed by a sequence.
+nonEmptyBlockBody: blockParamList? temps? statements;
 
 blockParamList: BLOCK_PARAM+;
 
@@ -188,10 +178,10 @@ stringLiteral: STRING;
 symbol: HASH bareSymbol;
 
 bareSymbol:
-        UNARY_SELECTOR
-        | BINARY_SELECTOR
-        | KEYWORD+
-        | stringLiteral;
+	UNARY_SELECTOR
+	| BINARY_SELECTOR
+	| KEYWORD+
+	| stringLiteral;
 
 literalArray: LITARR_START literalArrayRest;
 
