@@ -85,8 +85,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             temps.AddRange(extraTemps);
         if (tempsCtx is { })
         {
-            // All temporary variable tokens are parsed as UNARY_SELECTOR.
-            temps.AddRange(tempsCtx.UNARY_SELECTOR().Select(n => n.GetText().Trim()));
+            // All temporary variable tokens are parsed as IDENTIFIER.
+            temps.AddRange(tempsCtx.IDENTIFIER().Select(n => n.GetText().Trim()));
         }
 
         var current = scopeStack.Count > 0
@@ -213,7 +213,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         foreach (var unary in context.unaryMessage())
         {
-            receiver = new UnarySendExpression(receiver, unary.UNARY_SELECTOR().GetText());
+            receiver = new UnarySendExpression(receiver, unary.IDENTIFIER().GetText());
         }
 
         return receiver;
@@ -262,7 +262,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             }
             else if (send.unaryMessage() is { } unary)
             {
-                receiver = new UnarySendExpression(receiver, unary.UNARY_SELECTOR().GetText());
+                receiver = new UnarySendExpression(receiver, unary.IDENTIFIER().GetText());
             }
         }
 
@@ -280,7 +280,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitVariable(Smalltalk80Parser.VariableContext context)
     {
-        var name = context.UNARY_SELECTOR().GetText();
+        var name = context.IDENTIFIER().GetText();
         return name switch
         {
             "self" or "true" or "false" or "nil" or "super" => new PseudoVariableExpression(name),
@@ -420,10 +420,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
     {
-        var className = context.UNARY_SELECTOR(1).GetText();
+        var className = context.IDENTIFIER(1).GetText();
         Tracer.Log($"Parsing class definition: {className}");
 
-        var superclass = context.UNARY_SELECTOR(0).GetText();
+        var superclass = context.IDENTIFIER(0).GetText();
         var instanceVars = new List<string>();
         var classVars = new List<string>();
         var pools = new List<string>();
@@ -460,7 +460,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitMethodCategoryHeader(Smalltalk80Parser.MethodCategoryHeaderContext context)
     {
-        var className = context.UNARY_SELECTOR().GetText();
+        var className = context.IDENTIFIER().GetText();
         var isClassSide = context.GetToken(Smalltalk80Parser.T__4, 0) is not null;
         var category = context.stringLiteral().GetText().Trim('\'');
         return new MethodHeaderNode(className, isClassSide, category);
@@ -510,13 +510,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         if (context.unarySelector() is { } u)
         {
-            return (u.UNARY_SELECTOR().GetText(), new List<string>());
+            return (u.IDENTIFIER().GetText(), new List<string>());
         }
 
         if (context.binarySelector() is { } b)
         {
             var selector = b.GetText();
-            var arg = context.UNARY_SELECTOR().GetText();
+            var arg = context.IDENTIFIER().GetText();
             return (selector, new List<string> { arg });
         }
 
@@ -525,7 +525,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         foreach (var part in context.keywordSelector().keywordPart())
         {
             selectorParts.Add(part.KEYWORD().GetText());
-            args.Add(part.UNARY_SELECTOR().GetText());
+            args.Add(part.IDENTIFIER().GetText());
         }
 
         return (string.Join(string.Empty, selectorParts), args);
