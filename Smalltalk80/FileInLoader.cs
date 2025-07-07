@@ -47,7 +47,12 @@ public static class FileInLoader
                     if (string.IsNullOrWhiteSpace(method.Source))
                     {
                         var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
-                        compiled = AstMethodCompiler.CompileMethod(emptyBody, method.Arguments, vars);
+                        compiled = AstMethodCompiler.CompileMethod(
+                            emptyBody,
+                            method.Arguments,
+                            vars,
+                            method.HasPrimitive,
+                            method.PrimitiveIndex);
                     }
                     else
                     {
