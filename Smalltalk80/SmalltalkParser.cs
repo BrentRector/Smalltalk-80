@@ -45,7 +45,12 @@ public sealed class SmalltalkParser
         }
 
         var parsed = BuildAst(methodName, argumentNames, instanceVariables);
-        var compiled = AstMethodCompiler.CompileMethod(parsed.Sequence, argumentNames, instanceVariables);
+        var compiled = AstMethodCompiler.CompileMethod(
+            parsed.Sequence,
+            argumentNames,
+            instanceVariables,
+            parsed.HasPrimitive,
+            parsed.PrimitiveIndex);
 
         if (methodName is not null)
             Tracer.Log($"Exiting method: {methodName}");

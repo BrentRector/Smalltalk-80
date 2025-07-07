@@ -14,27 +14,40 @@ public static class AstMethodCompiler
     /// <param name="sequence">The method body sequence.</param>
     /// <param name="argumentNames">Names of the method parameters in order.</param>
     /// <param name="instanceVariables">Names of instance variables on the method's class.</param>
+    /// <param name="hasPrimitive">Indicates whether the method invokes a primitive.</param>
+    /// <param name="primitiveIndex">The index of the primitive to invoke if <paramref name="hasPrimitive"/> is <c>true</c>.</param>
     /// <param name="comment">Optional source comment attached to the method.</param>
     /// <returns>The compiled method.</returns>
     public static CompiledMethod CompileMethod(
         SequenceNode sequence,
         IReadOnlyList<string> argumentNames,
         IReadOnlyList<string> instanceVariables,
+        bool hasPrimitive = false,
+        int primitiveIndex = 0,
         string? comment = null)
-        => new Compiler(argumentNames, instanceVariables).Compile(sequence, comment);
+        => new Compiler(argumentNames, instanceVariables, hasPrimitive, primitiveIndex)
+            .Compile(sequence, comment);
 
     private sealed class Compiler
     {
         private readonly IReadOnlyList<string> arguments;
         private readonly IReadOnlyList<string> instanceVariables;
+        private readonly bool hasPrimitive;
+        private readonly int primitiveIndex;
         private readonly List<byte> bytecodes = new();
         private readonly List<object> literals = new();
         private readonly Dictionary<string, int> temporaries = new();
 
-        public Compiler(IReadOnlyList<string> arguments, IReadOnlyList<string> instanceVariables)
+        public Compiler(
+            IReadOnlyList<string> arguments,
+            IReadOnlyList<string> instanceVariables,
+            bool hasPrimitive,
+            int primitiveIndex)
         {
             this.arguments = arguments;
             this.instanceVariables = instanceVariables;
+            this.hasPrimitive = hasPrimitive;
+            this.primitiveIndex = primitiveIndex;
         }
 
         public CompiledMethod Compile(SequenceNode sequence, string? comment)
@@ -57,8 +70,8 @@ public static class AstMethodCompiler
                 Bytecodes = bytecodes.ToArray(),
                 Literals = literals.ToArray(),
                 TemporariesCount = temporaries.Count,
-                HasPrimitive = false,
-                PrimitiveIndex = 0,
+                HasPrimitive = hasPrimitive,
+                PrimitiveIndex = primitiveIndex,
                 Comment = comment
             };
         }
@@ -248,12 +261,21 @@ public static class AstMethodCompiler
         private MethodHeader BuildHeader()
         {
             int argCount = arguments.Count;
-            int flagValue = argCount >= 5 ? 7 : argCount;
+            bool useExtension = hasPrimitive || argCount >= 5;
+            int flagValue = useExtension ? 7 : argCount;
             int temporaryCount = temporaries.Count;
             bool largeContext = temporaryCount > 12;
             int literalCount = literals.Count;
-            int raw = flagValue | (temporaryCount << 3) | ((largeContext ? 1 : 0) << 8) | (literalCount << 9);
-            int ext = argCount >= 5 ? (argCount << 10) : 0;
+
+            int raw = flagValue
+                      | (temporaryCount << 3)
+                      | ((largeContext ? 1 : 0) << 8)
+                      | (literalCount << 9);
+
+            int ext = useExtension
+                ? ((argCount & 0x1F) << 10) | (primitiveIndex & 0x3FF)
+                : 0;
+
             return new MethodHeader(raw, ext);
         }
     }
