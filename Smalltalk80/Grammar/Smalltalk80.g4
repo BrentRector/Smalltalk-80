@@ -104,7 +104,7 @@ expressions: expression (PERIOD expression)*;
 
 expression: keywordExpr cascade*;
 
-keywordExpr: binaryExpr (KEYWORD expression)+;
+keywordExpr: binaryExpr (KEYWORD expression)*;
 
 binaryExpr: unaryExpr (binaryMessage)*;
 

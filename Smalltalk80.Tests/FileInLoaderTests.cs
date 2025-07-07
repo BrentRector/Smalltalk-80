@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Smalltalk80.Parser;
 using Xunit;
 
 namespace Smalltalk80.Tests;
@@ -235,6 +236,26 @@ public class FileInLoaderTests
         {
             File.Delete(tempPath);
         }
+    }
+
+    /// <summary>
+    /// Parses the <c>KeywordMessages.st</c> sample file to ensure that
+    /// keyword messages compile without syntax errors.
+    /// </summary>
+    [Fact]
+    public void LoadSystemFile_KeywordMessages_ParsesCorrectly()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+
+        var baseDir = AppContext.BaseDirectory;
+        var path = Path.GetFullPath(Path.Combine(
+            baseDir,
+            "..", "..", "..", "..",
+            "Smalltalk80", "Smalltalk-80 Source", "KeywordMessages.st"));
+
+        var node = FileInReader.Parse(path);
+        Assert.True(node.Chunks.Count > 0);
     }
 
     /// <summary>

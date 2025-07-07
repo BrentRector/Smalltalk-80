@@ -128,7 +128,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             return new AnswerStatement(expr);
         }
 
-        return new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
+        if (context.expression() is { } exprCtx)
+            return new ExpressionStatement((ExpressionNode)Visit(exprCtx)!);
+
+        // Standalone comments produce no executable statement.
+        return new ExpressionStatement(new LiteralExpression(null!));
     }
 
     /// <inheritdoc/>
@@ -163,11 +167,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         ExpressionNode receiver = (ExpressionNode)Visit(context.binaryExpr())!;
 
-        var parts = new List<string>();
-        var args = new List<ExpressionNode>();
-
         var keywords = context.KEYWORD();
+        if (keywords.Length == 0)
+            return receiver;
+
         var expressions = context.expression();
+        var parts = new List<string>(keywords.Length);
+        var args = new List<ExpressionNode>(keywords.Length);
 
         for (var i = 0; i < keywords.Length; i++)
         {
@@ -175,9 +181,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             args.Add((ExpressionNode)Visit(expressions[i])!);
         }
 
-        receiver = FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
-
-        return receiver;
+        return FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
     }
 
     /// <summary>
