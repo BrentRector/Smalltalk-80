@@ -89,7 +89,11 @@ sequence: temps? statements;
 statements:
 	COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*;
 
-statement: COMMENT | answer | expression;
+statement
+    : COMMENT
+    | answer COMMENT*
+    | expression COMMENT*
+    ;
 
 temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
