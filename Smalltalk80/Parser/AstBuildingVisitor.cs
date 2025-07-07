@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Generated;
 
@@ -29,6 +30,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     private readonly IReadOnlyList<string> argumentNames;
     private readonly IReadOnlyList<string> initialVariables;
     private readonly HashSet<string> instanceVariableSet;
+    private readonly CommonTokenStream tokens;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
@@ -36,8 +38,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <param name="methodName">Optional selector of the method being parsed.</param>
     /// <param name="arguments">Method argument names available in the outer scope.</param>
     /// <param name="variables">Instance or class variables available in the outer scope.</param>
-    public AstBuildingVisitor(string? methodName = null, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
+    public AstBuildingVisitor(CommonTokenStream tokens, string? methodName = null, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
     {
+        this.tokens = tokens;
         currentMethodName = methodName;
         argumentNames = arguments ?? Array.Empty<string>();
         initialVariables = variables ?? Array.Empty<string>();
@@ -482,7 +485,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Entering method: {selector}");
 
         scopeStack.Clear();
-        var methodVisitor = new AstBuildingVisitor(selector, args, initialVariables);
+        var methodVisitor = new AstBuildingVisitor(tokens, selector, args, initialVariables);
         var bodyCtx = context.sequence();
         SequenceNode body = bodyCtx is not null
             ? (SequenceNode)methodVisitor.Visit(bodyCtx)!
@@ -497,9 +500,16 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             hasPrimitive = true;
         }
         string? comment = null;
-        var commentTokens = context.COMMENT();
-        if (commentTokens.Length > 0)
-            comment = string.Join("\n", commentTokens.Select(c => c.GetText().Trim('"')));
+        var hidden = tokens.GetHiddenTokensToRight(context.Stop.TokenIndex, TokenConstants.HiddenChannel);
+        if (hidden is { Count: > 0 })
+        {
+            var commentLines = hidden
+                .Where(t => t.Type == Smalltalk80Parser.COMMENT)
+                .Select(t => t.Text.Trim('"'))
+                .ToList();
+            if (commentLines.Count > 0)
+                comment = string.Join("\n", commentLines);
+        }
         scopeStack.Clear();
 
         Tracer.Log($"Exiting method: {selector}");
