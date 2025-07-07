@@ -80,12 +80,12 @@ keywordPart: KEYWORD UNARY_SELECTOR;
 
 //////////////////////////////////////////////////////////////////////////
 // Sequences (REPL & Scripts)
-// ////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
 // A sequence of statements optionally preceded by temporary variable
 // declarations. The final period after the last statement is optional to match
 // typical Smalltalk syntax.
-sequence: temps? statements?;
+sequence: temps? statements;
 
 statements: statement (PERIOD statement)* PERIOD?;
 
@@ -94,7 +94,8 @@ statement: answer | expression;
 temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
 //////////////////////////////////////////////////////////////////////////
-// Statements & Expressions ////////////////////////////////////////////////////////////////////
+// Statements & Expressions 
+////////////////////////////////////////////////////////////////////
 
 answer: CARROT expression PERIOD?;
 
@@ -123,7 +124,8 @@ keywordMessage: KEYWORD binaryExpr (KEYWORD binaryExpr)*;
 assignment: variable ASSIGNMENT expression;
 
 //////////////////////////////////////////////////////////////////////////
-// Operands & Literals //////////////////////////////////////////////////////////////////////
+// Operands & Literals 
+//////////////////////////////////////////////////////////////////////////
 
 operand: literal | reference | subexpression;
 
@@ -144,9 +146,7 @@ block:
 // A block may contain just a sequence, a parameter list and optional sequence,
 // or local temporary declarations followed by a sequence.
 nonEmptyBlockBody:
-        sequence
-        | blockParamList sequence?
-        | temps sequence;
+        blockParamList? temps? statements;
 
 blockParamList: BLOCK_PARAM+;
 
