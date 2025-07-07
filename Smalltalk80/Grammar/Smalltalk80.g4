@@ -87,9 +87,16 @@ keywordPart: KEYWORD UNARY_SELECTOR;
 // typical Smalltalk syntax.
 sequence: temps? statements;
 
-statements: statement (PERIOD statement)* PERIOD?;
+statements:
+        COMMENT* statement
+        (PERIOD COMMENT* statement)*
+        PERIOD?
+        COMMENT*;
 
-statement: answer | expression;
+statement:
+        COMMENT
+        | answer
+        | expression;
 
 temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
 
