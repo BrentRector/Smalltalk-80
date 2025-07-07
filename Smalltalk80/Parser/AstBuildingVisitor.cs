@@ -131,7 +131,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
-        ExpressionNode receiver = (ExpressionNode)Visit(context.keywordExpr())!;
+        ExpressionNode receiver = (ExpressionNode)Visit(context.primaryExpression())!;
+        receiver = ApplyMessageSends(receiver, context.messageSend());
 
         foreach (var cascade in context.cascade())
         {
@@ -139,78 +140,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         }
 
         return receiver;
-    }
-
-    /// <summary>
-    /// Visits a <c>keywordExpr</c> rule consisting of zero or more keyword
-    /// messages sent to a binary expression.
-    /// </summary>
-    public override AstNode VisitKeywordExpr(Smalltalk80Parser.KeywordExprContext context)
-    {
-        ExpressionNode receiver = (ExpressionNode)Visit(context.binaryExpr())!;
-
-        foreach (var keyword in context.keywordMessage())
-        {
-            receiver = ApplyKeywordMessage(receiver, keyword);
-        }
-
-        return receiver;
-    }
-
-    /// <summary>
-    /// Visits a <c>binaryExpr</c> rule consisting of one or more unary
-    /// expressions combined with binary messages.
-    /// </summary>
-    public override AstNode VisitBinaryExpr(Smalltalk80Parser.BinaryExprContext context)
-    {
-        ExpressionNode receiver = (ExpressionNode)Visit(context.unaryExpr())!;
-
-        foreach (var binary in context.binaryMessage())
-        {
-            var arg = (ExpressionNode)Visit(binary.unaryExpr())!;
-            var selector = binary.BINARY_SELECTOR()?.GetText() ??
-                           binary.MINUS()?.GetText() ?? string.Empty;
-            receiver = new BinarySendExpression(receiver, selector, arg);
-        }
-
-        return receiver;
-    }
-
-    /// <summary>
-    /// Visits a <c>unaryExpr</c> rule consisting of a primary expression
-    /// followed by zero or more unary messages.
-    /// </summary>
-    public override AstNode VisitUnaryExpr(Smalltalk80Parser.UnaryExprContext context)
-    {
-        ExpressionNode receiver = (ExpressionNode)Visit(context.primaryExpression())!;
-
-        foreach (var unary in context.unaryMessage())
-        {
-            receiver = new UnarySendExpression(receiver, unary.UNARY_SELECTOR().GetText());
-        }
-
-        return receiver;
-    }
-
-    /// <summary>
-    /// Applies a keyword message to the specified receiver.
-    /// </summary>
-    /// <param name="receiver">The receiver of the message.</param>
-    /// <param name="keyword">The parse context representing the message.</param>
-    /// <returns>The resulting expression node.</returns>
-    private ExpressionNode ApplyKeywordMessage(
-        ExpressionNode receiver,
-        Smalltalk80Parser.KeywordMessageContext keyword)
-    {
-        var parts = new List<string>();
-        var args = new List<ExpressionNode>();
-        foreach (var pair in keyword.keywordPair())
-        {
-            parts.Add(pair.KEYWORD().GetText());
-            args.Add((ExpressionNode)Visit(pair.expression())!);
-        }
-
-        return FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
     }
 
     private ExpressionNode ApplyMessageSends(
@@ -232,7 +161,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             }
             else if (send.binaryMessage() is { } binary)
             {
-                var arg = (ExpressionNode)Visit(binary.unaryExpr())!;
+                var arg = (ExpressionNode)Visit(binary.expression())!;
                 var selector = binary.BINARY_SELECTOR()?.GetText() ??
                                binary.MINUS()?.GetText() ?? string.Empty;
                 receiver = new BinarySendExpression(receiver, selector, arg);
