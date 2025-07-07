@@ -20,7 +20,7 @@ replUnit
 //////////////////////////////////////////////////////////////////////////
 
 chunk
-    : COMMENT_BANG                                      # StandaloneCommentChunk
+    : /* COMMENT */ BANG                           		# StandaloneCommentChunk //COMMENT goes to hidden channel
     | classDefinition BANG                              # ClassChunk
     | classComment BANG                                 # ClassCommentChunk
     | metaclassDefinition BANG                          # MetaClassChunk
@@ -173,6 +173,7 @@ messageSend
 
 unaryMessage
     : IDENTIFIER
+	| CLASS
     ;
 
 binaryMessage

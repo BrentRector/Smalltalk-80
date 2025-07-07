@@ -34,6 +34,4 @@ cascadeExample
 
 characterExample
     ^$a
-!
-
 ! !
