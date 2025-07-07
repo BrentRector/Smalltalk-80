@@ -487,6 +487,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         SequenceNode body = bodyCtx is not null
             ? (SequenceNode)methodVisitor.Visit(bodyCtx)!
             : new SequenceNode(new List<string>(), new List<StatementNode>());
+        bool hasPrimitive = false;
+        int primitiveIndex = 0;
+        if (context.primitive() is { } primitive)
+        {
+            var digits = string.Concat(primitive.DIGIT().Select(d => d.GetText()));
+            primitiveIndex = int.Parse(digits);
+            hasPrimitive = true;
+        }
         string? comment = null;
         var commentTokens = context.COMMENT();
         if (commentTokens.Length > 0)
@@ -494,7 +502,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         scopeStack.Clear();
 
         Tracer.Log($"Exiting method: {selector}");
-        return new MethodDefinitionNode(selector, args, body, comment);
+        return new MethodDefinitionNode(selector, args, body, comment, "", hasPrimitive, primitiveIndex);
     }
 
     private static (string Selector, List<string> Args) ParseMethodSelector(Smalltalk80Parser.MethodSelectorContext context)
