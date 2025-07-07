@@ -217,7 +217,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         foreach (var unary in context.unaryMessage())
         {
-            receiver = new UnarySendExpression(receiver, unary.IDENTIFIER().GetText());
+            var selector = unary.IDENTIFIER()?.GetText() ?? unary.CLASS().GetText();
+            receiver = new UnarySendExpression(receiver, selector);
         }
 
         return receiver;
@@ -266,7 +267,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             }
             else if (send.unaryMessage() is { } unary)
             {
-                receiver = new UnarySendExpression(receiver, unary.IDENTIFIER().GetText());
+                var selector = unary.IDENTIFIER()?.GetText() ?? unary.CLASS().GetText();
+                receiver = new UnarySendExpression(receiver, selector);
             }
         }
 
