@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Antlr4.Runtime.Tree;
 using Smalltalk80.Generated;
 
 namespace Smalltalk80.Parser;
@@ -162,10 +163,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         ExpressionNode receiver = (ExpressionNode)Visit(context.binaryExpr())!;
 
-        foreach (var keyword in context.keywordMessage())
+        var parts = new List<string>();
+        var args = new List<ExpressionNode>();
+
+        var keywords = context.KEYWORD();
+        var expressions = context.expression();
+
+        for (var i = 0; i < keywords.Length; i++)
         {
-            receiver = ApplyKeywordMessage(receiver, keyword);
+            parts.Add(keywords[i].GetText());
+            args.Add((ExpressionNode)Visit(expressions[i])!);
         }
+
+        receiver = FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
 
         return receiver;
     }
@@ -209,19 +219,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// Applies a keyword message to the specified receiver.
     /// </summary>
     /// <param name="receiver">The receiver of the message.</param>
-    /// <param name="keyword">The parse context representing the message.</param>
+    /// <param name="keywords">The keyword selector tokens comprising the message.</param>
+    /// <param name="expressions">The expressions serving as arguments.</param>
     /// <returns>The resulting expression node.</returns>
     private ExpressionNode ApplyKeywordMessage(
         ExpressionNode receiver,
-        Smalltalk80Parser.KeywordMessageContext keyword)
+        IReadOnlyList<ITerminalNode> keywords,
+        IReadOnlyList<Smalltalk80Parser.ExpressionContext> expressions)
     {
         var parts = new List<string>();
         var args = new List<ExpressionNode>();
 
-        var keywords = keyword.KEYWORD();
-        var expressions = keyword.expression();
-
-        for (var i = 0; i < keywords.Length; i++)
+        for (var i = 0; i < keywords.Count; i++)
         {
             parts.Add(keywords[i].GetText());
             args.Add((ExpressionNode)Visit(expressions[i])!);
@@ -236,18 +245,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         foreach (var send in sends)
         {
-            if (send.keywordMessage() is { } keyword)
+            if (send.KEYWORD().Length > 0)
             {
-                var parts = new List<string>();
-                var args = new List<ExpressionNode>();
-                var kws = keyword.KEYWORD();
-                var exprs = keyword.expression();
-                for (var i = 0; i < kws.Length; i++)
-                {
-                    parts.Add(kws[i].GetText());
-                    args.Add((ExpressionNode)Visit(exprs[i])!);
-                }
-                receiver = FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
+                receiver = ApplyKeywordMessage(receiver, send.KEYWORD(), send.expression());
             }
             else if (send.binaryMessage() is { } binary)
             {
