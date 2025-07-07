@@ -13,6 +13,11 @@ public sealed class SmalltalkParser
     private readonly string source;
 
     /// <summary>
+    /// Represents the parsed method information including primitive metadata.
+    /// </summary>
+    private sealed record ParsedMethod(SequenceNode Sequence, bool HasPrimitive, int PrimitiveIndex);
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="SmalltalkParser"/> class.
     /// </summary>
     /// <param name="source">The Smalltalk source code to parse.</param>
@@ -39,13 +44,22 @@ public sealed class SmalltalkParser
             Tracer.Log($"Entering method: {methodName}");
         }
 
-        var ast = BuildAst(methodName, argumentNames, instanceVariables);
-        var compiled = AstMethodCompiler.CompileMethod(ast.Sequence, argumentNames, instanceVariables);
+        var parsed = BuildAst(methodName, argumentNames, instanceVariables);
+        var compiled = AstMethodCompiler.CompileMethod(parsed.Sequence, argumentNames, instanceVariables);
 
         if (methodName is not null)
             Tracer.Log($"Exiting method: {methodName}");
 
-        return compiled;
+        return new CompiledMethod
+        {
+            Header = compiled.Header,
+            Bytecodes = compiled.Bytecodes,
+            Literals = compiled.Literals,
+            TemporariesCount = compiled.TemporariesCount,
+            HasPrimitive = parsed.HasPrimitive,
+            PrimitiveIndex = parsed.PrimitiveIndex,
+            Comment = compiled.Comment
+        };
     }
 
     /// <summary>
@@ -88,7 +102,7 @@ public sealed class SmalltalkParser
         return ParseMethod(argumentNames, vars, methodName);
     }
 
-    private ScriptNode BuildAst(string? methodName, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
+    private ParsedMethod BuildAst(string? methodName, IReadOnlyList<string>? arguments = null, IReadOnlyList<string>? variables = null)
     {
         var input = new AntlrInputStream(source);
         var lexer = new Smalltalk80Lexer(input);
@@ -101,9 +115,10 @@ public sealed class SmalltalkParser
         if (parser.NumberOfSyntaxErrors == 0)
         {
             if (unit is Smalltalk80Parser.ReplSequenceContext seqCtx)
-                return new ScriptNode((SequenceNode)visitor.Visit(seqCtx.sequence())!);
+                return new ParsedMethod((SequenceNode)visitor.Visit(seqCtx.sequence())!, false, 0);
 
-            return (ScriptNode)visitor.Visit(unit)!;
+            var script = (ScriptNode)visitor.Visit(unit)!;
+            return new ParsedMethod(script.Sequence, false, 0);
         }
 
         tokens.Seek(0);
@@ -114,7 +129,7 @@ public sealed class SmalltalkParser
             throw new InvalidOperationException("Invalid Smalltalk source.");
 
         var methodNode = (MethodDefinitionNode)visitor.Visit(methodDef)!;
-        return new ScriptNode(methodNode.Body);
+        return new ParsedMethod(methodNode.Body, methodNode.HasPrimitive, methodNode.PrimitiveIndex);
     }
 
 }

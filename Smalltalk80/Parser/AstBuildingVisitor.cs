@@ -491,7 +491,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         int primitiveIndex = 0;
         if (context.primitive() is { } primitive)
         {
-            var digits = string.Concat(primitive.DIGIT().Select(d => d.GetText()));
+            var text = primitive.PRIMITIVE().GetText();
+            var digits = text.AsSpan("<primitive:".Length, text.Length - "<primitive:".Length - 1);
             primitiveIndex = int.Parse(digits);
             hasPrimitive = true;
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Smalltalk80.Parser;
 
 /// <summary>
@@ -42,11 +43,29 @@ public static class FileInLoader
 
                     // Reparse the method body with variable information so tracing
                     // accurately reflects the available names during compilation.
+                    CompiledMethod compiled;
                     if (string.IsNullOrWhiteSpace(method.Source))
-                        break;
+                    {
+                        var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
+                        compiled = AstMethodCompiler.CompileMethod(emptyBody, method.Arguments, vars);
+                    }
+                    else
+                    {
+                        var parser = new SmalltalkParser(method.Source);
+                        compiled = parser.ParseMethod(method.Arguments, vars, method.Selector);
+                    }
 
-                    var parser = new SmalltalkParser(method.Source);
-                    var compiled = parser.ParseMethod(method.Arguments, vars, method.Selector);
+                    compiled = new CompiledMethod
+                    {
+                        Header = compiled.Header,
+                        Bytecodes = compiled.Bytecodes,
+                        Literals = compiled.Literals,
+                        TemporariesCount = compiled.TemporariesCount,
+                        HasPrimitive = method.HasPrimitive,
+                        PrimitiveIndex = method.PrimitiveIndex,
+                        Comment = compiled.Comment
+                    };
+
                     cls.MethodDictionary[new Symbol(method.Selector)] = compiled;
                     break;
 
