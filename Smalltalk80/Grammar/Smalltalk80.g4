@@ -1,268 +1,385 @@
 grammar Smalltalk80;
 
 //////////////////////////////////////////////////////////////////////////
-// Parser Entry Points //////////////////////////////////////////////////////////////////////
+// Parser Entry Points
+//////////////////////////////////////////////////////////////////////////
 
-fileIn: chunk* EOF;
+fileIn
+    : chunk* EOF
+    ;
 
-replUnit:
-	classDefinition BANG EOF						# ReplClassDef
-	| methodCategoryHeader methodDefinition* EOF	# ReplMethodsForCategory
-	| classComment EOF								# ReplClassComment
-	| sequence EOF									# ReplSequence;
+replUnit
+    : classDefinition BANG EOF                         # ReplClassDef
+    | methodCategoryHeader methodDefinition* EOF       # ReplMethodsForCategory
+    | classComment EOF                                # ReplClassComment
+    | sequence EOF                                    # ReplSequence
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// File-Out Chunks //////////////////////////////////////////////////////////////////////
+// File-In Chunks
+//////////////////////////////////////////////////////////////////////////
 
-chunk:
-	COMMENT BANG				# StandaloneCommentChunk
-	| classDefinition BANG		# ClassChunk
-	| classComment BANG			# ClassCommentChunk
-	| metaclassDefinition BANG	# MetaClassChunk
-	| sequence BANG				# ScriptChunk
-	| {
-        InputStream.LA(2) == Smalltalk80Parser.UNARY_SELECTOR &&
-        (
-            InputStream.LA(3) == Smalltalk80Parser.METHODS_FOR ||
-            (InputStream.LA(3) == Smalltalk80Parser.CLASS &&
-             InputStream.LA(4) == Smalltalk80Parser.METHODS_FOR)
-        )
-    }? methodCategoryHeader (methodDefinitionWithBang+ BANG)? # MethodCategoryChunk;
+chunk
+    : COMMENT BANG                                     # StandaloneCommentChunk
+    | classDefinition BANG                             # ClassChunk
+    | classComment BANG                                # ClassCommentChunk
+    | metaclassDefinition BANG                         # MetaClassChunk
+    | sequence BANG                                    # ScriptChunk
+    | {
+          InputStream.LA(2)==Smalltalk80Parser.IDENTIFIER &&
+          (
+            InputStream.LA(3)==Smalltalk80Parser.METHODS_FOR ||
+            (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
+             InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
+          )
+      }? methodCategoryHeader (methodDefinitionWithBang+ BANG)?  # MethodCategoryChunk
+    ;
 
-methodDefinitionWithBang: methodDefinition BANG;
+methodDefinitionWithBang
+    : methodDefinition BANG
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// Class Definitions & Comments
-// ////////////////////////////////////////////////////////////////////////
+// Class & Metaclass Definitions + Comments
+//////////////////////////////////////////////////////////////////////////
 
-classDefinition:
-	UNARY_SELECTOR (
-		'subclass:'
-		| 'variableSubclass:'
-		| 'variableByteSubclass:'
-		| 'variableWordSubclass:'
-	) HASH UNARY_SELECTOR (classOption)*;
+classDefinition
+    : IDENTIFIER (
+          'subclass:'
+        | 'variableSubclass:'
+        | 'variableByteSubclass:'
+        | 'variableWordSubclass:'
+      ) HASH IDENTIFIER (classOption)*
+    ;
 
-classComment: className CLASS? 'comment:' stringLiteral;
+classComment
+    : className CLASS? 'comment:' stringLiteral
+    ;
 
-className: UNARY_SELECTOR;
+className
+    : IDENTIFIER
+    ;
 
-classOption:
-	INSTANCE_VARIABLE_NAMES stringLiteral
-	| CLASS_VARIABLE_NAMES stringLiteral
-	| POOL_DICTIONARIES stringLiteral
-	| CATEGORY stringLiteral;
+classOption
+    : INSTANCE_VARIABLE_NAMES stringLiteral
+    | CLASS_VARIABLE_NAMES stringLiteral
+    | POOL_DICTIONARIES stringLiteral
+    | CATEGORY stringLiteral
+    ;
 
-metaclassDefinition:
-	UNARY_SELECTOR CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
+metaclassDefinition
+    : IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral
+    ;
 
 //////////////////////////////////////////////////////////////////////////
 // Method Categories & Definitions
-// ////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
-methodCategoryHeader:
-	BANG UNARY_SELECTOR CLASS? METHODS_FOR stringLiteral BANG;
+methodCategoryHeader
+    : BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG
+    ;
 
-methodDefinition: methodSelector COMMENT* primitive? sequence?;
+methodDefinition
+    : methodSelector COMMENT* primitive? sequence?
+    ;
 
-methodSelector:
-	unarySelector
-	| binarySelector UNARY_SELECTOR
-	| keywordSelector;
+methodSelector
+    : unarySelector
+    | binarySelector IDENTIFIER
+    | keywordSelector
+    ;
 
-unarySelector: UNARY_SELECTOR;
+unarySelector
+    : IDENTIFIER
+    ;
 
-binarySelector: BINARY_SELECTOR | MINUS;
+binarySelector
+    : BINARY_SELECTOR
+    | MINUS
+    ;
 
-keywordSelector: keywordPart+;
+keywordSelector
+    : keywordPart+
+    ;
 
-keywordPart: KEYWORD UNARY_SELECTOR;
+keywordPart
+    : KEYWORD IDENTIFIER
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// Sequences (REPL & Scripts)
-// ////////////////////////////////////////////////////////////////////////
+// Sequences (REPL & File-In Scripts)
+//////////////////////////////////////////////////////////////////////////
 
-// A sequence of statements optionally preceded by temporary variable declarations. The final period
-// after the last statement is optional to match typical Smalltalk syntax.
-sequence: temps? statements;
+sequence
+    : temps? statements
+    ;
 
-statements:
-	COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*;
+statements
+    : COMMENT* statement (PERIOD COMMENT* statement)* PERIOD? COMMENT*
+    ;
 
-statement: COMMENT | answer COMMENT* | expression COMMENT*;
+statement
+    : COMMENT
+    | answer COMMENT*
+    | expression COMMENT*
+    ;
 
-temps: PIPE UNARY_SELECTOR (UNARY_SELECTOR)* PIPE;
+temps
+    : PIPE IDENTIFIER+ PIPE
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// Statements & Expressions //////////////////////////////////////////////////////////////////
+// Statements & Expressions
+//////////////////////////////////////////////////////////////////////////
 
-answer: CARROT expression PERIOD?;
+answer
+    : CARROT expression PERIOD?
+    ;
 
-cascade: SEMI_COLON messageSend+;
+cascade
+    : SEMI_COLON messageSend+
+    ;
 
-expressions: expression (PERIOD expression)*;
+expressions
+    : expression (PERIOD expression)*
+    ;
 
-expression: keywordExpr cascade*;
+expression
+    : keywordExpr cascade*
+    ;
 
-keywordExpr: binaryExpr (KEYWORD expression)*;
+keywordExpr
+    : binaryExpr (KEYWORD expression)*
+    ;
 
-binaryExpr: unaryExpr (binaryMessage)*;
+binaryExpr
+    : unaryExpr (binaryMessage)*
+    ;
 
-unaryExpr: primaryExpression (unaryMessage)*;
+unaryExpr
+    : primaryExpression (unaryMessage)*
+    ;
 
-primaryExpression: assignment | primitive | operand;
+primaryExpression
+    : assignment
+    | primitive
+    | operand
+    ;
 
-messageSend:
-	unaryMessage
-	| binaryMessage
-	| (KEYWORD expression)+;
+messageSend
+    : unaryMessage
+    | binaryMessage
+    | (KEYWORD expression)+
+    ;
 
-unaryMessage: UNARY_SELECTOR;
+unaryMessage
+    : IDENTIFIER
+    ;
 
-binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
+binaryMessage
+    : (BINARY_SELECTOR | MINUS) unaryExpr
+    ;
 
-assignment: variable ASSIGNMENT expression;
+assignment
+    : variable ASSIGNMENT expression
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// Operands & Literals ////////////////////////////////////////////////////////////////////////
+// Operands & Literals
+//////////////////////////////////////////////////////////////////////////
 
-operand: literal | reference | subexpression | block;
+operand
+    : literal
+    | reference
+    | subexpression
+    | block
+    ;
 
-subexpression: OPEN_PAREN expression CLOSE_PAREN;
+subexpression
+    : OPEN_PAREN expression CLOSE_PAREN
+    ;
 
-variable: UNARY_SELECTOR;
+variable
+    : IDENTIFIER
+    ;
 
-reference: variable;
+reference
+    : variable
+    ;
 
-literal: runtimeLiteral | parsetimeLiteral;
+literal
+    : runtimeLiteral
+    | parsetimeLiteral
+    ;
 
-runtimeLiteral: dynamicDictionary | dynamicArray | block;
+runtimeLiteral
+    : dynamicDictionary
+    | dynamicArray
+    | block
+    ;
 
-block:
-	BLOCK_START BLOCK_END
-	| BLOCK_START nonEmptyBlockBody BLOCK_END;
+block
+    : BLOCK_START BLOCK_END
+    | BLOCK_START nonEmptyBlockBody BLOCK_END
+    ;
 
-// A block may contain: - just a sequence - a parameter list followed by a PIPE and a sequence -
-// optional temporary declarations followed by a sequence - a parameter list, a PIPE, optional
-// temps, and a sequence
-nonEmptyBlockBody:
-	blockParamList PIPE temps? statements
-	| blockParamList PIPE statements
-	| temps? statements;
+nonEmptyBlockBody
+    : blockParamList PIPE temps? statements
+    | blockParamList PIPE statements
+    | temps? statements
+    ;
 
-blockParamList: BLOCK_PARAM+;
+blockParamList
+    : BLOCK_PARAM+
+    ;
 
-dynamicDictionary: DYNDICT_START expressions? DYNARR_END;
+dynamicDictionary
+    : DYNDICT_START expressions? DYNARR_END
+    ;
 
-dynamicArray: DYNARR_START expressions? DYNARR_END;
+dynamicArray
+    : DYNARR_START expressions? DYNARR_END
+    ;
 
-parsetimeLiteral:
-	pseudoVariable
-	| number
-	| charConstant
-	| literalArray
-	| stringLiteral
-	| symbol;
+parsetimeLiteral
+    : pseudoVariable
+    | number
+    | charConstant
+    | literalArray
+    | stringLiteral
+    | symbol
+    ;
 
-number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
+number
+    : numberExp
+    | hex_
+    | stFloat
+    | stInteger
+    | RADIX_INT
+    ;
 
-numberExp: (stFloat | stInteger) EXP stInteger;
+numberExp
+    : (stFloat | stInteger) EXP stInteger
+    ;
 
-charConstant: CHARACTER_CONSTANT;
+charConstant
+    : CHARACTER_CONSTANT
+    ;
 
-hex_: MINUS? HEX HEXDIGIT+;
+hex_
+    : MINUS? HEX HEXDIGIT+
+    ;
 
-stInteger: MINUS? DIGIT+;
+stInteger
+    : MINUS? DIGIT+
+    ;
 
-stFloat: MINUS? DIGIT+ PERIOD DIGIT+;
+stFloat
+    : MINUS? DIGIT+ PERIOD DIGIT+
+    ;
 
-pseudoVariable: RESERVED_WORD;
+pseudoVariable
+    : RESERVED_WORD
+    ;
 
-stringLiteral: STRING;
+stringLiteral
+    : STRING
+    ;
 
-symbol: HASH bareSymbol;
+symbol
+    : HASH bareSymbol
+    ;
 
-bareSymbol:
-	UNARY_SELECTOR
-	| BINARY_SELECTOR
-	| KEYWORD+
-	| stringLiteral;
+bareSymbol
+    : IDENTIFIER
+    | BINARY_SELECTOR
+    | KEYWORD+
+    | stringLiteral
+    ;
 
-literalArray: LITARR_START literalArrayRest;
+literalArray
+    : LITARR_START literalArrayRest
+    ;
 
-literalArrayRest:
-	(parsetimeLiteral | bareLiteralArray | bareSymbol)* CLOSE_PAREN;
+literalArrayRest
+    : (parsetimeLiteral | bareLiteralArray | bareSymbol)* CLOSE_PAREN
+    ;
 
-bareLiteralArray: OPEN_PAREN literalArrayRest;
+bareLiteralArray
+    : OPEN_PAREN literalArrayRest
+    ;
 
-primitive: PRIMITIVE;
+primitive
+    : PRIMITIVE
+    ;
 
 //////////////////////////////////////////////////////////////////////////
-// Lexer Rules //////////////////////////////////////////////////////////////////////
+// Lexer Rules
+//////////////////////////////////////////////////////////////////////////
 
-CLASS: 'class';
-METHODS_FOR: 'methodsFor:';
-INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
-CLASS_VARIABLE_NAMES: 'classVariableNames:';
-POOL_DICTIONARIES: 'poolDictionaries:';
-CATEGORY: 'category:';
+CLASS                   : 'class' ;
+METHODS_FOR             : 'methodsFor:' ;
+INSTANCE_VARIABLE_NAMES : 'instanceVariableNames:' ;
+CLASS_VARIABLE_NAMES    : 'classVariableNames:' ;
+POOL_DICTIONARIES       : 'poolDictionaries:' ;
+CATEGORY                : 'category:' ;
 
-// KEYWORD must appear before UNARY_SELECTOR so that ifTrue: is matched as a KEYWORD, not a UNARY_SELECTOR.
-KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
-UNARY_SELECTOR: [a-zA-Z] [a-zA-Z0-9_]*;
+// KEYWORD must appear before IDENTIFIER so that 'ifTrue:' is matched as KEYWORD, not IDENTIFIER.
+KEYWORD                 : [a-zA-Z] [a-zA-Z0-9_]* COLON ;
+IDENTIFIER              : [a-zA-Z] [a-zA-Z0-9_]* ;
 
-SEPARATOR: [ \t\r\n\u000C]+ -> skip;
-COMMENT: '"' ( ~["] | '""')* '"';
-
-STRING: '\'' ( ~['] | '\'\'')* '\'';
-
-BLOCK_START: '[';
-BLOCK_END: ']';
-OPEN_PAREN: '(';
-CLOSE_PAREN: ')';
-PIPE: '|';
-PERIOD: '.';
-SEMI_COLON: ';';
-METHOD_END: '!!';
-BANG: '!';
-fragment SP: (' ' | '\t')+;
-PRIMITIVE: '<primitive:' SP? DIGIT+ '>';
-MINUS: '-';
-BINARY_SELECTOR: (
-		'\\'
-		| '+'
-		| '*'
-		| '/'
-		| '='
-		| '>'
-		| '<'
-		| ','
-		| '@'
-		| '%'
-		| '~'
-		| '|'
-		| '&'
-		| '?'
-	)+;
-LT: '<';
-GT: '>';
-CARROT: '^';
-HASH: '#';
-EXP: 'e';
-HEX: '16r';
-
-LITARR_START: '#(';
-DYNDICT_START: '#{';
-DYNARR_END: '}';
-DYNARR_START: '{';
-RESERVED_WORD: 'nil' | 'true' | 'false' | 'self' | 'super';
-IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
-CHARACTER_CONSTANT: '$' ~[\r\n];
-DIGIT: [0-9];
-HEXDIGIT: [0-9a-fA-F];
-RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
-
-BLOCK_PARAM: COLON IDENTIFIER;
-COLON: ':';
-ASSIGNMENT: ':=' | '_';
-DOLLAR: '$';
+SEPARATOR               : [ \t\r\n\u000C]+ -> skip ;
+COMMENT                 : '"' ( ~["] | '""')* '"' ;
+STRING                  : '\'' ( ~['] | '\'\'')* '\'' ;
+BLOCK_START             : '[' ;
+BLOCK_END               : ']' ;
+OPEN_PAREN              : '(' ;
+CLOSE_PAREN             : ')' ;
+PIPE                    : '|' ;
+PERIOD                  : '.' ;
+SEMI_COLON              : ';' ;
+METHOD_END              : '!!' ;
+BANG                    : '!' ;
+fragment SP             : (' ' | '\t')+ ;
+PRIMITIVE               : '<primitive:' SP? DIGIT+ '>' ;
+MINUS                   : '-' ;
+BINARY_SELECTOR         : (
+                              '\\'
+                            | '+'
+                            | '*'
+                            | '/'
+                            | '='
+                            | '>'
+                            | '<'
+                            | ','
+                            | '@'
+                            | '%'
+                            | '~'
+                            | '|'
+                            | '&'
+                            | '?'
+                          )+ ;
+LT                      : '<' ;
+GT                      : '>' ;
+CARROT                  : '^' ;
+HASH                    : '#' ;
+EXP                     : 'e' ;
+HEX                     : '16r' ;
+LITARR_START            : '#(' ;
+DYNDICT_START           : '#{' ;
+DYNARR_END              : '}' ;
+DYNARR_START            : '{' ;
+RESERVED_WORD           : 'nil'
+                         | 'true'
+                         | 'false'
+                         | 'self'
+                         | 'super'
+                         ;
+CHARACTER_CONSTANT      : '$' ~[\r\n] ;
+DIGIT                   : [0-9] ;
+HEXDIGIT                : [0-9a-fA-F] ;
+RADIX_INT               : '-'? DIGIT+ 'r' [0-9A-Za-z]+ ;
+BLOCK_PARAM             : COLON IDENTIFIER ;
+COLON                   : ':' ;
+ASSIGNMENT              : ':=' | '_' ;
+DOLLAR                  : '$' ;
