@@ -59,6 +59,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <param name="extraTemps">Any temporary variable names declared outside the context.</param>
     /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
     private SequenceNode ProcessSequence(Smalltalk80Parser.SequenceContext context, IReadOnlyList<string>? extraTemps = null)
+        => ProcessSequence(context.temps(), context.statements(), extraTemps);
+
+    /// <summary>
+    /// Processes a sequence represented by discrete temporary and statement contexts.
+    /// </summary>
+    /// <param name="tempsCtx">The optional temporary variable declarations.</param>
+    /// <param name="statementsCtx">The statements comprising the sequence.</param>
+    /// <param name="extraTemps">Any additional temporary variables in scope.</param>
+    /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
+    private SequenceNode ProcessSequence(
+        Smalltalk80Parser.TempsContext? tempsCtx,
+        Smalltalk80Parser.StatementsContext? statementsCtx,
+        IReadOnlyList<string>? extraTemps = null)
     {
         var scopeName = scopeDepth == 0
             ? (currentMethodName ?? "(unknown)")
@@ -69,10 +82,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         var temps = new List<string>();
         if (extraTemps is not null)
             temps.AddRange(extraTemps);
-        if (context.temps() is { } tctx)
+        if (tempsCtx is { })
         {
             // All temporary variable tokens are parsed as UNARY_SELECTOR.
-            temps.AddRange(tctx.UNARY_SELECTOR().Select(n => n.GetText().Trim()));
+            temps.AddRange(tempsCtx.UNARY_SELECTOR().Select(n => n.GetText().Trim()));
         }
 
         var current = scopeStack.Count > 0
@@ -92,9 +105,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
 
         var statements = new List<StatementNode>();
-        if (context.statements() is { } stmtsCtx)
+        if (statementsCtx is { })
         {
-            foreach (var stmtCtx in stmtsCtx.statement())
+            foreach (var stmtCtx in statementsCtx.statement())
                 statements.Add((StatementNode)Visit(stmtCtx)!);
         }
 
@@ -367,24 +380,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitBlock(Smalltalk80Parser.BlockContext context)
     {
         if (context.nonEmptyBlockBody() is not { } body)
+        {
             return new BlockExpression(
                 Array.Empty<string>(),
                 new SequenceNode(new List<string>(), new List<StatementNode>()));
-
-        if (body.blockParamList() is { } paramsCtx)
-        {
-            var parameters = paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':')).ToList();
-            var seq = body.sequence() is { } seqCtx
-                ? ProcessSequence(seqCtx)
-                : new SequenceNode(new List<string>(), new List<StatementNode>());
-            return new BlockExpression(parameters, seq);
         }
 
-        var outerTemps = body.temps().UNARY_SELECTOR()
-            .Select(n => n.GetText())
-            .ToList();
-        var innerSeq = ProcessSequence(body.sequence(), outerTemps);
-        return new BlockExpression(Array.Empty<string>(), innerSeq);
+        var parameters = body.blockParamList() is { } paramsCtx
+            ? paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':')).ToList()
+            : new List<string>();
+
+        var seq = ProcessSequence(body.temps(), body.statements());
+        return new BlockExpression(parameters, seq);
     }
 
     /// <inheritdoc/>
