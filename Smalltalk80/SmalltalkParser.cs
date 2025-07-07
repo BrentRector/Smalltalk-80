@@ -114,7 +114,7 @@ public sealed class SmalltalkParser
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
-        var visitor = new AstBuildingVisitor(methodName, arguments, variables);
+        var visitor = new AstBuildingVisitor(tokens, methodName, arguments, variables);
 
         var unit = parser.replUnit();
         if (parser.NumberOfSyntaxErrors == 0)

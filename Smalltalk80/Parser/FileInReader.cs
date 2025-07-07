@@ -26,7 +26,7 @@ public static class FileInReader
         var parser = new Smalltalk80Parser(tokens);
         parser.RemoveErrorListeners();
         var fileCtx = parser.fileIn();
-        var visitor = new AstBuildingVisitor();
+        var visitor = new AstBuildingVisitor(tokens);
         var chunks = new List<AstNode>();
 
         foreach (var chunk in fileCtx.chunk())
