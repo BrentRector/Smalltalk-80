@@ -6,10 +6,10 @@ grammar Smalltalk80;
 fileIn: chunk* EOF;
 
 replUnit:
-	classDefinition EOF										# ReplClassDef
+	classDefinition EOF									# ReplClassDef
 	| methodCategoryHeaderRepl methodDefinition* EOF	# ReplMethodsForCategory
-	| classComment EOF										# ReplClassComment
-	| sequence EOF											# ReplSequence;
+	| classComment EOF									# ReplClassComment
+	| sequence EOF										# ReplSequence;
 
 //////////////////////////////////////////////////////////////////////////
 // File-In Chunks ////////////////////////////////////////////////////////////////////////
@@ -66,22 +66,20 @@ methodCategoryHeaderRepl:
 // The body of a method may consist of an optional primitive declaration, an optional statement
 // sequence, or both. Split the rule into two alternatives so ANTLR does not warn about an empty
 // optional block.
-methodDefinitionFile: methodSelector COMMENT* BANG;
+methodDefinitionFile: methodSelector BANG;
 
-methodDefinitionRepl
-    : methodSelector primitive? sequence
-    | methodSelector primitive
-    | methodSelector
-    ;
+methodDefinitionRepl:
+	methodSelector primitive? sequence
+	| methodSelector primitive
+	| methodSelector;
 
 methodDefinitionWithBang: methodDefinition BANG;
 
-methodDefinition
-    : methodSelector primitive? sequence
-    | methodSelector primitive
-    | methodSelector
-    ;
-  
+methodDefinition:
+	methodSelector primitive? sequence
+	| methodSelector primitive
+	| methodSelector;
+
 methodSelector:
 	unarySelector
 	| binarySelector IDENTIFIER
@@ -129,10 +127,11 @@ binaryExpr: unaryExpr (binaryMessage)*;
 
 unaryExpr: primaryExpression (unaryMessage)*;
 
-primaryExpression: assignment
-        | primitive
-        | operand
-        | returnExpr;
+primaryExpression:
+	assignment
+	| primitive
+	| operand
+	| returnExpr;
 
 messageSend:
 	unaryMessage
@@ -162,12 +161,8 @@ runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 block:
 	BLOCK_START BLOCK_END
-	| BLOCK_START nonEmptyBlockBody BLOCK_END;
-
-nonEmptyBlockBody:
-	blockParamList PIPE temps? statements
-	| blockParamList PIPE statements
-	| temps? statements;
+	| BLOCK_START blockParamList (PIPE temps? statements)? BLOCK_END
+	| BLOCK_START temps? statements BLOCK_END;
 
 blockParamList: BLOCK_PARAM+;
 
@@ -284,4 +279,5 @@ HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
 COLON: ':';
-ASSIGNMENT: ':=' | '_';DOLLAR: '$';
+ASSIGNMENT: ':=' | '_';
+DOLLAR: '$';
