@@ -465,19 +465,21 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         => value.Trim('\'').Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
     /// <inheritdoc/>
-    public override AstNode VisitMethodCategoryHeader(Smalltalk80Parser.MethodCategoryHeaderContext context)
-    {
-        var className = context.IDENTIFIER().GetText();
-        var isClassSide = context.GetToken(Smalltalk80Parser.T__4, 0) is not null;
-        var category = context.stringLiteral().GetText().Trim('\'');
-        return new MethodHeaderNode(className, isClassSide, category);
-    }
+    public override AstNode VisitMethodCategoryHeaderFile(Smalltalk80Parser.MethodCategoryHeaderFileContext context)
+        => CreateMethodHeader(context.IDENTIFIER().GetText(), context.CLASS() is not null, context.stringLiteral().GetText());
+
+    /// <inheritdoc/>
+    public override AstNode VisitMethodCategoryHeaderRepl(Smalltalk80Parser.MethodCategoryHeaderReplContext context)
+        => CreateMethodHeader(context.IDENTIFIER().GetText(), context.CLASS() is not null, context.stringLiteral().GetText());
+
+    private static MethodHeaderNode CreateMethodHeader(string className, bool isClassSide, string categoryLiteral)
+        => new(className, isClassSide, categoryLiteral.Trim('\''));
 
     /// <inheritdoc/>
     public override AstNode VisitReplMethodsForCategory(
         Smalltalk80Parser.ReplMethodsForCategoryContext context)
     {
-        var header = (MethodHeaderNode)Visit(context.methodCategoryHeader())!;
+        var header = (MethodHeaderNode)Visit(context.methodCategoryHeaderRepl())!;
         var chunks = new List<AstNode> { header };
         foreach (var methodCtx in context.methodDefinition())
         {

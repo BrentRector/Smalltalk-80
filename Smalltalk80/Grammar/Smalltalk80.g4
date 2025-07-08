@@ -68,13 +68,19 @@ methodCategoryHeaderRepl:
 // optional block.
 methodDefinitionFile: methodSelector COMMENT* BANG;
 
-methodDefinitionRepl: methodSelector primitive? sequence?;
+methodDefinitionRepl
+    : methodSelector primitive? sequence
+    | methodSelector primitive
+    | methodSelector
+    ;
 
 methodDefinitionWithBang: methodDefinition BANG;
 
 methodDefinition
-  : methodSelector primitive? sequence?
-  ;
+    : methodSelector primitive? sequence
+    | methodSelector primitive
+    | methodSelector
+    ;
   
 methodSelector:
 	unarySelector

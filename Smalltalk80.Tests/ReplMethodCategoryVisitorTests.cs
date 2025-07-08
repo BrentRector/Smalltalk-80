@@ -17,7 +17,7 @@ public class ReplMethodCategoryVisitorTests
     {
         var source = string.Join(Environment.NewLine, new[]
         {
-            "!Example methodsFor: 'testing'!",
+            "Example methodsFor: 'testing'",
             "foo",
             "    ^1",
             string.Empty,
