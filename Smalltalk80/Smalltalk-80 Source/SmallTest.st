@@ -1,20 +1,24 @@
-!Boolean methodsFor: 'logical operations'!
-& aBoolean 
-	"Evaluating conjunction -- Evaluate the argument.  Then answer true if both the
-	receiver and the argument are true."
-	self subclassResponsibility!
-eqv: aBoolean 
-	"Answer true if the receiver is equivalent to aBoolean."
-
-	^self == aBoolean!
-not
-	"Negation-- answer true if the receiver is false, answer false if the receiver is true."
-	self subclassResponsibility!
-xor: aBoolean 
-	"Exclusive OR -- answer true if the receiver is not equivalent to aBoolean."
-
-	^(self == aBoolean) not!
-| aBoolean 
-	"Evaluating disjunction (OR) -- Evaluate the argument.  Then answer true if
-	either the receiver or the argument is true."
-	self subclassResponsibility! !
+!Browser methodsFor: 'category list'!
+category
+	^ category!
+category: selection
+	category _ selection.
+	selection isNil ifTrue: [self textMode: nil].
+	self newClassList: className!
+categoryList
+	^ organization categories!
+categoryMenu
+	"Browser flushMenus"
+	category == nil ifTrue:
+		[^ ActionMenu labels: 'add category\update\edit all' withCRs
+					lines: #(1)
+					selectors: #(addCategory updateCategories editCategories )].
+	CategoryMenu == nil ifTrue:
+		[CategoryMenu _ ActionMenu
+			labels: 'file out\print out\spawn\add category\rename\remove\update\edit all' withCRs
+			lines: #(3 6)
+			selectors: #(fileOutCategory printOutCategory spawnCategory addCategory renameCategory removeCategory updateCategories editCategories)].
+	^ CategoryMenu!
+newCategoryList: initialSelection
+	category _ initialSelection.
+	self changed: #category! !
