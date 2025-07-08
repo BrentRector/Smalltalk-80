@@ -390,18 +390,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitBlock(Smalltalk80Parser.BlockContext context)
     {
-        if (context.nonEmptyBlockBody() is not { } body)
-        {
-            return new BlockExpression(
-                Array.Empty<string>(),
-                new SequenceNode(new List<string>(), new List<StatementNode>()));
-        }
-
-        var parameters = body.blockParamList() is { } paramsCtx
+        var parameters = context.blockParamList() is { } paramsCtx
             ? paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':')).ToList()
             : new List<string>();
 
-        var seq = ProcessSequence(body.temps(), body.statements());
+        var seq = ProcessSequence(context.temps(), context.statements());
         return new BlockExpression(parameters, seq);
     }
 
