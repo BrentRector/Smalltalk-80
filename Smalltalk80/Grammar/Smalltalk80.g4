@@ -1,25 +1,38 @@
 grammar Smalltalk80;
 
 //////////////////////////////////////////////////////////////////////////
-// Parser Entry Points ////////////////////////////////////////////////////////////////////////
+// Parser Entry Points 
+////////////////////////////////////////////////////////////////////////
 
 fileIn: chunk* EOF;
 
-replUnit:
-	classDefinition EOF									# ReplClassDef
-	| methodCategoryHeaderRepl methodDefinition* EOF	# ReplMethodsForCategory
-	| classComment EOF									# ReplClassComment
-	| sequence EOF										# ReplSequence;
+//////////////////////////////////////////////////////////////////////////
+// 1) REPL entry point (no bangs, at least one method after header)  //
+//////////////////////////////////////////////////////////////////////////
+
+// In REPL mode we never use ‘!’ to delimit methods.
+// We require one or more plain `methodDefinition` after the header.
+replUnit
+    : classDefinition EOF                                    # ReplClassDef
+    | methodCategoryHeaderRepl methodDefinition+ EOF         # ReplMethodsForCategory
+    | classComment EOF                                       # ReplClassComment
+    | sequence EOF                                           # ReplSequence
+    ;
+
 
 //////////////////////////////////////////////////////////////////////////
-// File-In Chunks ////////////////////////////////////////////////////////////////////////
+// 2) File-in chunk for a method category (bang-delimited)            //
+//////////////////////////////////////////////////////////////////////////
 
-chunk:
-	BANG						# StandaloneCommentChunk
-	| classDefinition BANG		# ClassChunk
-	| classComment BANG			# ClassCommentChunk
-	| metaclassDefinition BANG	# MetaClassChunk
-	| sequence BANG				# ScriptChunk
+// In file-in (fileOut) mode we open with a header ending in ‘!’,
+// then consume one or more bang-terminated methods, then a final ‘!’.
+
+chunk
+    : BANG                                                    # StandaloneCommentChunk
+    | classDefinition BANG                                    # ClassChunk
+    | classComment BANG                                       # ClassCommentChunk
+    | metaclassDefinition BANG                                # MetaClassChunk
+    | sequence BANG                                           # ScriptChunk
 	| {
           InputStream.LA(2)==Smalltalk80Parser.IDENTIFIER &&
           (
@@ -27,7 +40,13 @@ chunk:
             (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
              InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
           )
-      }? methodCategoryHeaderFile methodDefinitionWithBang+ BANG # MethodCategoryChunk;
+      }? 
+      methodCategoryHeaderFile                                // header: …methodsFor: '…'!
+      methodDefinitionWithBang+                               // one or more methods, each ending in ‘!’
+      BANG                                                    // final ‘!’ closes the entire category
+      # MethodCategoryChunk
+	  ;
+
 
 //////////////////////////////////////////////////////////////////////////
 // Class & Metaclass Definitions + Comments
@@ -68,17 +87,42 @@ methodCategoryHeaderRepl:
 // optional block.
 methodDefinitionFile: methodSelector BANG;
 
-methodDefinitionRepl:
-	methodSelector primitive? sequence
+methodDefinitionRepl
+    : methodSelector primitive? sequence
 	| methodSelector primitive
 	| methodSelector;
 
-methodDefinitionWithBang: methodDefinition BANG;
+//////////////////////////////////////////////////////////////////////////
+// 4) methodDefinitionWithBang for file-in                              //
+//////////////////////////////////////////////////////////////////////////
 
-methodDefinition:
-	methodSelector primitive? sequence
-	| methodSelector primitive
-	| methodSelector;
+// Every file-in method must end in a ‘!’ and
+// must be picked by exactly one unambiguous alternative.
+//
+// 1) selector + primitive + code + !  
+// 2) selector + code only + !  
+// 3) selector + primitive only + !
+methodDefinitionWithBang
+    : methodSelector primitive sequence BANG
+    | methodSelector sequence           BANG
+    | methodSelector primitive          BANG
+    ;
+
+
+//////////////////////////////////////////////////////////////////////////
+// 3) Base methodDefinition for REPL (no bangs)                    //
+//////////////////////////////////////////////////////////////////////////
+
+// A REPL method can be:
+//
+//  • selector + primitive + optional code  
+//  • selector + code only  
+//  • selector + primitive only
+methodDefinition
+    : methodSelector primitive sequence?    // primitive + optional code
+    | methodSelector sequence               // code only
+    | methodSelector primitive              // primitive only
+    ;
 
 methodSelector:
 	unarySelector
@@ -94,17 +138,36 @@ keywordSelector: keywordPart+;
 keywordPart: KEYWORD IDENTIFIER;
 
 //////////////////////////////////////////////////////////////////////////
-// Sequences (REPL & File-In Scripts)
-// ////////////////////////////////////////////////////////////////////////
+// 5) sequence: require at least one real statement                   //
+//////////////////////////////////////////////////////////////////////////
 
-sequence: temps? statements;
+// A “sequence” may start with temporaries, but it must contain
+// at least one statement before it can end.
+sequence
+    : temps? statements
+    ;
 
-// replace your old `statements` rule with this
+//////////////////////////////////////////////////////////////////////////
+// 6) statements: support multiple dots, but force ≥1 stmt           //
+//////////////////////////////////////////////////////////////////////////
 
-statements: (statement? PERIOD+)* // zero or more “[maybe-stmt] .”
-	statement?; // optional final statement
+// We swallow runs of periods as separators, but we
+// always consume at least one statement up front.
+//
+//  • statement                  – first, required  
+//  • ( PERIOD+ statement )*     – zero or more “. stmt”  
+//  • PERIOD*                    – any trailing dots  
+statements
+    : statement
+      ( PERIOD+ statement )*
+      PERIOD*
+    ;
 
-statement: answer | expression;
+
+statement
+	: answer
+	| expression
+	;
 
 temps: PIPE variable+ PIPE;
 
