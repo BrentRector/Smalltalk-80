@@ -123,11 +123,13 @@ keywordSelector: keywordPart+;
 keywordPart: KEYWORD IDENTIFIER;
 
 //////////////////////////////////////////////////////////////////////////
-// 5) sequence: optional primitive and statements //
+// 5) sequence: optional primitive placed before statements //
 // ////////////////////////////////////////////////////////////////////////
 
-// A "sequence" may declare temporaries, and one or more statements.
-sequence: temps? statements;
+// A "sequence" may declare temporaries. If a primitive declaration is present
+// it must appear immediately after the temporaries and before any statements.
+// Statements are optional when a primitive is provided.
+sequence: temps? primitive? statements?;
 
 //////////////////////////////////////////////////////////////////////////
 // 6) statements: support multiple dots, but force ≥1 stmt //
@@ -141,8 +143,7 @@ sequence: temps? statements;
 statements: statement ( PERIOD+ statement)* PERIOD*;
 
 statement
-  : primitive      // <primitive: …>
-  | answer         // ^x
+  : answer         // ^x
   | expression     // variable assignments, cascades, etc.
   ;
 

@@ -70,7 +70,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// Processes a sequence represented by discrete temporary and statement contexts.
     /// </summary>
     /// <param name="tempsCtx">The optional temporary variable declarations.</param>
-    /// <param name="primCtx">Optional primitive declaration.</param>
+    /// <param name="primCtx">The optional primitive declaration appearing before any statements.</param>
     /// <param name="statementsCtx">The statements comprising the sequence.</param>
     /// <param name="extraTemps">Any additional temporary variables in scope.</param>
     /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
@@ -132,9 +132,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitStatement(Smalltalk80Parser.StatementContext context)
     {
-        if (context.primitive() is { } prim)
-            return (PrimitiveStatement)VisitPrimitive(prim)!;
-
         if (context.answer() is { } answer)
         {
             var expr = (ExpressionNode)Visit(answer.returnExpr().expression())!;
