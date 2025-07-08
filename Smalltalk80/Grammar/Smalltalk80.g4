@@ -63,7 +63,13 @@ metaclassDefinition:
 methodCategoryHeader:
 	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
 
-methodDefinition: methodSelector primitive? sequence?;
+// The body of a method may consist of an optional primitive declaration,
+// an optional statement sequence, or both. Split the rule into two
+// alternatives so ANTLR does not warn about an empty optional block.
+methodDefinition
+    : methodSelector primitive? sequence
+    | methodSelector primitive?
+    ;
 
 methodSelector:
 	unarySelector
