@@ -113,7 +113,10 @@ methodSelector:
 
 unarySelector: IDENTIFIER;
 
-binarySelector: BINARY_SELECTOR | MINUS;
+// A binary selector may be comprised of standard binary characters or a single
+// pipe character. The pipe token normally denotes temporary variable lists, but
+// here it also serves as the selector for Boolean disjunction.
+binarySelector: BINARY_SELECTOR | PIPE | MINUS;
 
 keywordSelector: keywordPart+;
 
@@ -172,7 +175,9 @@ messageSend:
 
 unaryMessage: IDENTIFIER | CLASS;
 
-binaryMessage: (BINARY_SELECTOR | MINUS) unaryExpr;
+// Binary messages may use the standard selector characters or the pipe
+// character used for logical disjunction.
+binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) unaryExpr;
 
 assignment: variable ASSIGNMENT expression;
 
@@ -229,10 +234,11 @@ stringLiteral: STRING;
 symbol: HASH bareSymbol;
 
 bareSymbol:
-	IDENTIFIER
-	| BINARY_SELECTOR
-	| KEYWORD+
-	| stringLiteral;
+        IDENTIFIER
+        | BINARY_SELECTOR
+        | PIPE
+        | KEYWORD+
+        | stringLiteral;
 
 literalArray: LITARR_START literalArrayRest;
 
