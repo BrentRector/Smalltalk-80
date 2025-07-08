@@ -113,7 +113,9 @@ temps: PIPE variable+ PIPE;
 //////////////////////////////////////////////////////////////////////////
 // Statements & Expressions ////////////////////////////////////////////////////////////////////////
 
-answer: CARROT expression PERIOD?;
+returnExpr: CARROT expression;
+
+answer: returnExpr PERIOD?;
 
 cascade: SEMI_COLON messageSend+;
 
@@ -127,7 +129,10 @@ binaryExpr: unaryExpr (binaryMessage)*;
 
 unaryExpr: primaryExpression (unaryMessage)*;
 
-primaryExpression: assignment | primitive | operand;
+primaryExpression: assignment
+        | primitive
+        | operand
+        | returnExpr;
 
 messageSend:
 	unaryMessage
@@ -277,7 +282,6 @@ CHARACTER_CONSTANT: '$' ~[\r\n];
 DIGIT: [0-9];
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
-BLOCK_PARAM: COLON IDENTIFIER;
+BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
 COLON: ':';
-ASSIGNMENT: ':=' | '_';
-DOLLAR: '$';
+ASSIGNMENT: ':=' | '_';DOLLAR: '$';
