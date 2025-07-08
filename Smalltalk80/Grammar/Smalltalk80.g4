@@ -296,8 +296,8 @@ BINARY_SELECTOR: (
 		| '&'
 		| '?'
 	)+;
-// The following tokens are defined for completeness but are not referenced in the current parser
-// rules.
+// The following tokens are defined for completeness. Some may not be referenced
+// directly by the current parser rules.
 LT: '<';
 GT: '>';
 CARROT: '^';
@@ -315,5 +315,4 @@ HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
 COLON: ':';
-ASSIGNMENT: ':=' | '_';
-DOLLAR: '$';
+ASSIGNMENT: ':=' | '_';DOLLAR: '$';

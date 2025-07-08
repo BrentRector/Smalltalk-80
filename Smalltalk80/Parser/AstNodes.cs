@@ -36,6 +36,12 @@ public sealed record ExpressionStatement(ExpressionNode Expression) : StatementN
 public sealed record AnswerStatement(ExpressionNode Expression) : StatementNode;
 
 /// <summary>
+/// Statement representing a primitive declaration within a sequence.
+/// </summary>
+/// <param name="PrimitiveIndex">The index of the primitive to invoke.</param>
+public sealed record PrimitiveStatement(int PrimitiveIndex) : StatementNode;
+
+/// <summary>
 /// Base type for expression nodes.
 /// </summary>
 public abstract record ExpressionNode : AstNode;

@@ -127,6 +127,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitStatement(Smalltalk80Parser.StatementContext context)
     {
+        if (context.primitive() is { } prim)
+            return (PrimitiveStatement)VisitPrimitive(prim)!;
+
         if (context.answer() is { } answer)
         {
             var expr = (ExpressionNode)Visit(answer.returnExpr().expression())!;
@@ -370,6 +373,15 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <inheritdoc/>
+    public override AstNode VisitPrimitive(Smalltalk80Parser.PrimitiveContext context)
+    {
+        var text = context.PRIMITIVE().GetText();
+        var digits = text.AsSpan("<primitive:".Length, text.Length - "<primitive:".Length - 1);
+        var index = int.Parse(digits);
+        return new PrimitiveStatement(index);
+    }
+
+    /// <inheritdoc/>
     public override AstNode VisitDynamicArray(Smalltalk80Parser.DynamicArrayContext context)
     {
         var elements = context.expressions() is { } ex
@@ -507,12 +519,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             : new SequenceNode(new List<string>(), new List<StatementNode>());
         bool hasPrimitive = false;
         int primitiveIndex = 0;
-        if (context.primitive() is { } primitive)
+        if (body.Statements.Count > 0 && body.Statements[0] is PrimitiveStatement primStmt)
         {
-            var text = primitive.PRIMITIVE().GetText();
-            var digits = text.AsSpan("<primitive:".Length, text.Length - "<primitive:".Length - 1);
-            primitiveIndex = int.Parse(digits);
             hasPrimitive = true;
+            primitiveIndex = primStmt.PrimitiveIndex;
+            body = new SequenceNode(body.Temporaries, body.Statements.Skip(1).ToList());
         }
         string? comment = null;
         var hidden = tokens.GetHiddenTokensToRight(context.Stop.TokenIndex, TokenConstants.HiddenChannel);
