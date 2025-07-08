@@ -1,24 +1,59 @@
-!Browser methodsFor: 'category list'!
-category
-	^ category!
-category: selection
-	category _ selection.
-	selection isNil ifTrue: [self textMode: nil].
-	self newClassList: className!
-categoryList
-	^ organization categories!
-categoryMenu
-	"Browser flushMenus"
-	category == nil ifTrue:
-		[^ ActionMenu labels: 'add category\update\edit all' withCRs
-					lines: #(1)
-					selectors: #(addCategory updateCategories editCategories )].
-	CategoryMenu == nil ifTrue:
-		[CategoryMenu _ ActionMenu
-			labels: 'file out\print out\spawn\add category\rename\remove\update\edit all' withCRs
-			lines: #(3 6)
-			selectors: #(fileOutCategory printOutCategory spawnCategory addCategory renameCategory removeCategory updateCategories editCategories)].
-	^ CategoryMenu!
-newCategoryList: initialSelection
-	category _ initialSelection.
-	self changed: #category! !
+!Browser methodsFor: 'doIt/accept/explain'!
+acceptText: aText from: aController
+	textMode == #classDefinition ifTrue:
+		[^ self acceptClass: aText from: aController].
+	textMode == #methodDefinition ifTrue:
+		[^ self acceptMethod: aText from: aController].
+	textMode == #categories ifTrue:
+		[organization changeFromString: aText string.
+		self newCategoryList: category.
+		^true].
+	textMode == #protocols ifTrue:
+		[self selectedClass organization changeFromString: aText string.
+		self selectedClass reorganize.
+		self selectedClass logOrganizationChange.
+		self textMode: #protocol; newProtocolList: nil.
+		^ true].
+	textMode == #comment ifTrue:
+		[self selectedClass comment: aText string.
+		self textMode: #comment; newProtocolList: nil.
+		^ true].
+	textMode == #hierarchy ifTrue:
+		[aController flash].
+	^ false!
+doItContext
+	^ nil!
+doItReceiver
+	^ nil!
+doItValue: ignored!
+explainSpecial: string 
+	"Answer with a string explaining the code pane selection if it is 
+	displaying one of the special edit functions."
+
+	| classes whole lits reply |
+	(textMode == #classDefinition)
+		ifTrue: 
+			["Selector parts in class definition"
+			string last == $: ifFalse: [^nil].
+			lits _ Array with: #subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:.
+			(whole _ lits detect: [:each | (each keywords
+					detect: [:frag | frag = string] ifNone: []) ~~ nil]
+						ifNone: []) ~~ nil
+				ifTrue: [reply _ '"' , string , ' is one part of the message selector ' , whole , '.']
+				ifFalse: [^nil].
+			classes _ Smalltalk allClassesImplementing: whole.
+			classes _ 'these classes ' , classes printString.
+			^reply , '  It is defined in ' , classes , '."
+Smalltalk browseAllImplementorsOf: #' , whole].
+
+	textMode == #hierarchy
+		ifTrue: 
+			["Instance variables in subclasses"
+			classes _ self selectedClass allSubclasses.
+			classes _ classes detect: [:each | (each instVarNames
+						detect: [:name | name = string] ifNone: []) ~~ nil]
+					ifNone: [^nil].
+			classes _ classes printString.
+			^'"is an instance variable in class ' , classes , '."
+' , classes , ' browseAllAccessesTo: ''' , string , '''.'].
+	^nil! !
