@@ -126,9 +126,8 @@ keywordPart: KEYWORD IDENTIFIER;
 // 5) sequence: optional primitive and statements //
 // ////////////////////////////////////////////////////////////////////////
 
-// A "sequence" may declare temporaries, an optional primitive, and zero or more
-// statements.
-sequence: temps? primitive? statements?;
+// A "sequence" may declare temporaries, and one or more statements.
+sequence: temps? statements;
 
 //////////////////////////////////////////////////////////////////////////
 // 6) statements: support multiple dots, but force ≥1 stmt //
@@ -136,14 +135,17 @@ sequence: temps? primitive? statements?;
 
 // We swallow runs of periods as separators, but we always consume at least one statement up front.
 // 
-//
-// 
-//
+
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
 statements: statement ( PERIOD+ statement)* PERIOD*;
 
-statement: primitive | answer | expression;
+statement
+  : primitive      // <primitive: …>
+  | answer         // ^x
+  | expression     // variable assignments, cascades, etc.
+  ;
+
 
 temps: PIPE variable+ PIPE;
 
