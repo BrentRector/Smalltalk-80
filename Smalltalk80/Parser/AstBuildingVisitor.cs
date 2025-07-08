@@ -89,8 +89,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             temps.AddRange(extraTemps);
         if (tempsCtx is { })
         {
-            // All temporary variable tokens are parsed as IDENTIFIER.
-            temps.AddRange(tempsCtx.IDENTIFIER().Select(n => n.GetText().Trim()));
+            // Temporary variables are parsed using the <c>variable</c> rule
+            // which may include the <c>class</c> pseudo-variable.
+            temps.AddRange(tempsCtx.variable().Select(v => v.GetText().Trim()));
         }
 
         var current = scopeStack.Count > 0
