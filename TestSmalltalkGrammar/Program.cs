@@ -45,6 +45,7 @@ namespace Smalltalk80.Tools
             Console.WriteLine();
 
             var parser = new Smalltalk80Parser(tokens);
+            parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL_EXACT_AMBIG_DETECTION;
             parser.Trace = true;
 
             // 3) Hook up a listener to catch any lex/parse errors

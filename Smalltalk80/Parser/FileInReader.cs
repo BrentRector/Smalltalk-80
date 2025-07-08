@@ -24,6 +24,7 @@ public static class FileInReader
         var lexer = new Smalltalk80Lexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new Smalltalk80Parser(tokens);
+        parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL_EXACT_AMBIG_DETECTION;
         parser.RemoveErrorListeners();
         var fileCtx = parser.fileIn();
         var visitor = new AstBuildingVisitor(tokens);

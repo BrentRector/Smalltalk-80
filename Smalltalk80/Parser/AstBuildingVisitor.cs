@@ -64,17 +64,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <param name="extraTemps">Any temporary variable names declared outside the context.</param>
     /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
     private SequenceNode ProcessSequence(Smalltalk80Parser.SequenceContext context, IReadOnlyList<string>? extraTemps = null)
-        => ProcessSequence(context.temps(), context.statements(), extraTemps);
+        => ProcessSequence(context.temps(), context.primitive(), context.statements(), extraTemps);
 
     /// <summary>
     /// Processes a sequence represented by discrete temporary and statement contexts.
     /// </summary>
     /// <param name="tempsCtx">The optional temporary variable declarations.</param>
+    /// <param name="primCtx">Optional primitive declaration.</param>
     /// <param name="statementsCtx">The statements comprising the sequence.</param>
     /// <param name="extraTemps">Any additional temporary variables in scope.</param>
     /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
     private SequenceNode ProcessSequence(
         Smalltalk80Parser.TempsContext? tempsCtx,
+        Smalltalk80Parser.PrimitiveContext? primCtx,
         Smalltalk80Parser.StatementsContext? statementsCtx,
         IReadOnlyList<string>? extraTemps = null)
     {
@@ -111,6 +113,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
 
         var statements = new List<StatementNode>();
+        if (primCtx is { })
+            statements.Add((StatementNode)VisitPrimitive(primCtx)!);
+
         if (statementsCtx is { })
         {
             foreach (var stmtCtx in statementsCtx.statement())
@@ -406,7 +411,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             ? paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':')).ToList()
             : new List<string>();
 
-        var seq = ProcessSequence(context.temps(), context.statements());
+        var seq = ProcessSequence(context.temps(), null, context.statements());
         return new BlockExpression(parameters, seq);
     }
 
@@ -519,8 +524,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             : new SequenceNode(new List<string>(), new List<StatementNode>());
         bool hasPrimitive = false;
         int primitiveIndex = 0;
+
         if (body.Statements.Count > 0 && body.Statements[0] is PrimitiveStatement primStmt)
         {
+            // Legacy form where the primitive is included as the first statement.
             hasPrimitive = true;
             primitiveIndex = primStmt.PrimitiveIndex;
             body = new SequenceNode(body.Temporaries, body.Statements.Skip(1).ToList());
