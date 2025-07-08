@@ -94,4 +94,15 @@ public class ParserIntegrationTests
         var parser = new SmalltalkParser("1 + 1 doThat: 42; doSomethingElse");
         parser.ParseMethod();
     }
+
+    /// <summary>
+    /// Verifies that a return expression can be supplied directly as a keyword
+    /// argument without brackets.
+    /// </summary>
+    [Fact]
+    public void ParseMethod_KeywordArgumentWithReturn_DoesNotThrow()
+    {
+        var parser = new SmalltalkParser("| result descr | result := false. result = descr ifFalse: ^1. ^0");
+        parser.ParseMethod();
+    }
 }

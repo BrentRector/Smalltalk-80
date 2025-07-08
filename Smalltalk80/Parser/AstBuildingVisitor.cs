@@ -129,7 +129,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         if (context.answer() is { } answer)
         {
-            var expr = (ExpressionNode)Visit(answer.expression())!;
+            var expr = (ExpressionNode)Visit(answer.returnExpr().expression())!;
             return new AnswerStatement(expr);
         }
 
