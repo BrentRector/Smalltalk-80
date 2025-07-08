@@ -88,6 +88,9 @@ public static class AstMethodCompiler
                     CompileExpression(ans.Expression);
                     bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
                     break;
+                case PrimitiveStatement:
+                    // Primitive declarations inside sequences are metadata only.
+                    break;
             }
         }
 
