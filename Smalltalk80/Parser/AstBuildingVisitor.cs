@@ -491,6 +491,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new ClassCommentNode(className, comment);
     }
 
+
     /// <inheritdoc/>
     public override AstNode VisitMethodDefinition(Smalltalk80Parser.MethodDefinitionContext context)
     {

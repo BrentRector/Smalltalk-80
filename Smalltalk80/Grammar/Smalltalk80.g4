@@ -1,17 +1,24 @@
 grammar Smalltalk80;
 
-//////////////////////////////////////////////////////////////////////////
-// Parser Entry Points 
-////////////////////////////////////////////////////////////////////////
+// Unused parser rules: <c>methodDefinitionFile</c> and
+// <c>methodDefinitionRepl</c> remain for historical reference.
+// Unused lexer tokens: <c>LT</c>, <c>GT</c> and <c>DOLLAR</c>.
 
+//////////////////////////////////////////////////////////////////////////
+// Parser Entry Points
+//////////////////////////////////////////////////////////////////////////
+
+// Top-level rule for parsing classic file-out sources comprised of
+// one or more <c>chunk</c> elements followed by the end of file.
 fileIn: chunk* EOF;
 
 //////////////////////////////////////////////////////////////////////////
-// 1) REPL entry point (no bangs, at least one method after header)  //
+// REPL entry point (no bangs, at least one method after header)
 //////////////////////////////////////////////////////////////////////////
 
-// In REPL mode we never use ‘!’ to delimit methods.
-// We require one or more plain `methodDefinition` after the header.
+// In REPL mode a sequence of definitions is parsed without bang
+// delimiters. At least one <c>methodDefinition</c> is required when
+// parsing a method category.
 replUnit
     : classDefinition EOF                                    # ReplClassDef
     | methodCategoryHeaderRepl methodDefinition+ EOF         # ReplMethodsForCategory
@@ -21,43 +28,68 @@ replUnit
 
 
 //////////////////////////////////////////////////////////////////////////
-// 2) File-in chunk for a method category (bang-delimited)            //
+// File-in Rules //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-// In file-in (fileOut) mode we open with a header ending in ‘!’,
-// then consume one or more bang-terminated methods, then a final ‘!’.
-
+// A <c>chunk</c> represents one logical unit in a classic file-out. Chunks
+// may be standalone comments, class definitions, or sequences of methods
+// terminated by bangs.
 chunk
     : BANG                                                    # StandaloneCommentChunk
     | classDefinition BANG                                    # ClassChunk
     | classComment BANG                                       # ClassCommentChunk
     | metaclassDefinition BANG                                # MetaClassChunk
     | sequence BANG                                           # ScriptChunk
-	| {
-          InputStream.LA(2)==Smalltalk80Parser.IDENTIFIER &&
-          (
-            InputStream.LA(3)==Smalltalk80Parser.METHODS_FOR ||
-            (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
-             InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
-          )
-      }? 
+    | {
+        InputStream.LA(2) == Smalltalk80Parser.IDENTIFIER &&
+        (
+            InputStream.LA(3) == Smalltalk80Parser.METHODS_FOR ||
+            (InputStream.LA(3) == Smalltalk80Parser.CLASS &&
+             InputStream.LA(4) == Smalltalk80Parser.METHODS_FOR)
+        )
+      }?
       methodCategoryHeaderFile                                // header: …methodsFor: '…'!
-      methodDefinitionWithBang+                               // one or more methods, each ending in ‘!’
-      BANG                                                    // final ‘!’ closes the entire category
+      methodDefinitionWithBang+                               // one or more methods, each ending in '!'
+      BANG                                                    // final '!' closes the entire category
       # MethodCategoryChunk
-	  ;
+    ;
 
+// Header for a file-in method category. Delimited by bangs on either side.
+methodCategoryHeaderFile
+    : BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
+
+// Definition of a method that must end in a bang. The actual method
+// body is parsed using <c>methodDefinition</c> to allow optional
+// primitives and statements.
+methodDefinitionWithBang: methodDefinition BANG;
+
+// Unused: legacy form of a method definition terminated by '!'.
+methodDefinitionFile: methodSelector BANG;
+
+//////////////////////////////////////////////////////////////////////////
+// REPL Rules /////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+// Header for a method category entered interactively in the REPL.
+methodCategoryHeaderRepl
+    : IDENTIFIER CLASS? METHODS_FOR stringLiteral;
+
+// Legacy rule - no longer referenced by the grammar.
+methodDefinitionRepl
+    : methodSelector primitive? sequence
+    | methodSelector primitive
+    | methodSelector;
 
 //////////////////////////////////////////////////////////////////////////
 // Class & Metaclass Definitions + Comments
-// ////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
 classDefinition:
-	IDENTIFIER (
-		'subclass:'
-		| 'variableSubclass:'
-		| 'variableByteSubclass:'
-		| 'variableWordSubclass:'
+        IDENTIFIER (
+                'subclass:'
+                | 'variableSubclass:'
+                | 'variableByteSubclass:'
+                | 'variableWordSubclass:'
 	) HASH IDENTIFIER (classOption)*;
 
 classComment: className CLASS? 'comment:' stringLiteral;
@@ -73,55 +105,21 @@ classOption:
 metaclassDefinition:
 	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
 
-//////////////////////////////////////////////////////////////////////////
-// Method Categories & Definitions
-// ////////////////////////////////////////////////////////////////////////
-methodCategoryHeaderFile:
-	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
-
-methodCategoryHeaderRepl:
-	IDENTIFIER CLASS? METHODS_FOR stringLiteral;
-
-// The body of a method may consist of an optional primitive declaration, an optional statement
-// sequence, or both. Split the rule into two alternatives so ANTLR does not warn about an empty
-// optional block.
-methodDefinitionFile: methodSelector BANG;
-
-methodDefinitionRepl
-    : methodSelector primitive? sequence
-	| methodSelector primitive
-	| methodSelector;
-
-//////////////////////////////////////////////////////////////////////////
-// 4) methodDefinitionWithBang for file-in                              //
-//////////////////////////////////////////////////////////////////////////
-
-// Every file-in method must end in a ‘!’ and
-// must be picked by exactly one unambiguous alternative.
-//
-// 1) selector + primitive + code + !  
-// 2) selector + code only + !  
-// 3) selector + primitive only + !
-methodDefinitionWithBang
-    : methodSelector primitive sequence BANG
-    | methodSelector sequence           BANG
-    | methodSelector primitive          BANG
-    ;
 
 
 //////////////////////////////////////////////////////////////////////////
 // 3) Base methodDefinition for REPL (no bangs)                    //
 //////////////////////////////////////////////////////////////////////////
 
-// A REPL method can be:
+// A method can be one of the following forms:
 //
-//  • selector + primitive + optional code  
-//  • selector + code only  
+//  • selector + optional primitive + body
 //  • selector + primitive only
+//  • selector alone
 methodDefinition
-    : methodSelector primitive sequence?    // primitive + optional code
-    | methodSelector sequence               // code only
+    : methodSelector primitive? sequence    // primitive + optional code
     | methodSelector primitive              // primitive only
+    | methodSelector                        // empty body
     ;
 
 methodSelector:
@@ -310,9 +308,9 @@ fragment SP: (' ' | '\t')+;
 PRIMITIVE: '<primitive:' SP? DIGIT+ '>';
 MINUS: '-';
 BINARY_SELECTOR: (
-		'\\'
-		| '+'
-		| '*'
+                '\\'
+                | '+'
+                | '*'
 		| '/'
 		| '='
 		| '>'
@@ -322,9 +320,11 @@ BINARY_SELECTOR: (
 		| '%'
 		| '~'
 		| '|'
-		| '&'
-		| '?'
-	)+;
+                | '&'
+                | '?'
+        )+;
+// The following tokens are defined for completeness but are not
+// referenced in the current parser rules.
 LT: '<';
 GT: '>';
 CARROT: '^';
@@ -342,5 +342,4 @@ HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
 COLON: ':';
-ASSIGNMENT: ':=' | '_';
-DOLLAR: '$';
+ASSIGNMENT: ':=' | '_';DOLLAR: '$';

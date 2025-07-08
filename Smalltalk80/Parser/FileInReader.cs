@@ -42,29 +42,29 @@ public static class FileInReader
                     chunks.Add(header);
                     foreach (var methodWithBang in methodChunk.methodDefinitionWithBang())
                     {
-                    var innerMethod = methodWithBang.methodDefinition();
-                    var method = (MethodDefinitionNode)visitor.Visit(innerMethod)!;
-                    var seqCtx = innerMethod.sequence();
-                    int start;
-                    int end;
-                    string bodyText;
-                    if (seqCtx is not null)
-                    {
-                        start = seqCtx.Start.StartIndex;
-                        end = seqCtx.Stop.StopIndex;
-                        bodyText = end < start
-                            ? string.Empty
-                            : source.Substring(start, end - start + 1);
+                        var innerMethod = methodWithBang.methodDefinition();
+                        var method = (MethodDefinitionNode)visitor.Visit(innerMethod)!;
+                        var seqCtx = innerMethod.sequence();
+                        int start;
+                        int end;
+                        string bodyText;
+                        if (seqCtx is not null)
+                        {
+                            start = seqCtx.Start.StartIndex;
+                            end = seqCtx.Stop.StopIndex;
+                            bodyText = end < start
+                                ? string.Empty
+                                : source.Substring(start, end - start + 1);
+                        }
+                        else
+                        {
+                            start = innerMethod.Start.StartIndex;
+                            end = innerMethod.Stop.StopIndex;
+                            bodyText = string.Empty;
+                        }
+                        method = method with { Source = bodyText };
+                        chunks.Add(method);
                     }
-                    else
-                    {
-                        start = innerMethod.Start.StartIndex;
-                        end = innerMethod.Stop.StopIndex;
-                        bodyText = string.Empty;
-                    }
-                    method = method with { Source = bodyText };
-                    chunks.Add(method);
-                }
                     break;
 
                 case Smalltalk80Parser.ClassCommentChunkContext commentChunk:
