@@ -88,10 +88,10 @@ classComment: className CLASS? 'comment:' stringLiteral;
 className: IDENTIFIER;
 
 classOption:
-	INSTANCE_VARIABLE_NAMES stringLiteral
-	| CLASS_VARIABLE_NAMES stringLiteral
-	| POOL_DICTIONARIES stringLiteral
-	| CATEGORY stringLiteral;
+        INSTANCE_VARIABLE_NAMES stringLiteral
+        | CLASS_VARIABLE_NAMES stringLiteral
+        | POOL_DICTIONARIES stringLiteral
+        | KEYWORD stringLiteral;
 
 metaclassDefinition:
 	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
@@ -111,7 +111,7 @@ methodSelector:
 	| binarySelector IDENTIFIER
 	| keywordSelector;
 
-unarySelector: IDENTIFIER;
+unarySelector: IDENTIFIER | CLASS;
 
 // A binary selector may be comprised of standard binary characters or a single
 // pipe character. The pipe token normally denotes temporary variable lists, but
@@ -260,7 +260,6 @@ METHODS_FOR: 'methodsFor:';
 INSTANCE_VARIABLE_NAMES: 'instanceVariableNames:';
 CLASS_VARIABLE_NAMES: 'classVariableNames:';
 POOL_DICTIONARIES: 'poolDictionaries:';
-CATEGORY: 'category:';
 
 // KEYWORD must appear before IDENTIFIER so that ifTrue: → KEYWORD
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
