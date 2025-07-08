@@ -38,7 +38,7 @@ public static class FileInReader
                     break;
 
                 case Smalltalk80Parser.MethodCategoryChunkContext methodChunk:
-                    var header = (MethodHeaderNode)visitor.Visit(methodChunk.methodCategoryHeader())!;
+                    var header = (MethodHeaderNode)visitor.Visit(methodChunk.methodCategoryHeaderFile())!;
                     chunks.Add(header);
                     foreach (var methodWithBang in methodChunk.methodDefinitionWithBang())
                     {
