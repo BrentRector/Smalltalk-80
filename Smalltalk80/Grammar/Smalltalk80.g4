@@ -102,11 +102,9 @@ metaclassDefinition:
 
 // A method can be one of the following forms:
 // 
-// • selector + optional primitive + body • selector + primitive only • selector alone
 methodDefinition:
-	methodSelector primitive? sequence // primitive + optional code
-	| methodSelector primitive // primitive only
-	| methodSelector; // empty body
+        methodSelector sequence // body and/or primitive
+        | methodSelector; // empty body
 
 methodSelector:
 	unarySelector
@@ -122,12 +120,12 @@ keywordSelector: keywordPart+;
 keywordPart: KEYWORD IDENTIFIER;
 
 //////////////////////////////////////////////////////////////////////////
-// 5) sequence: require at least one real statement //
+// 5) sequence: optional primitive and statements //
 // ////////////////////////////////////////////////////////////////////////
 
-// A “sequence” may start with temporaries, but it must contain at least one statement before it can
-// end.
-sequence: temps? statements;
+// A "sequence" may declare temporaries, an optional primitive, and zero or more
+// statements.
+sequence: temps? primitive? statements?;
 
 //////////////////////////////////////////////////////////////////////////
 // 6) statements: support multiple dots, but force ≥1 stmt //
@@ -314,5 +312,4 @@ DIGIT: [0-9];
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
-COLON: ':';
-ASSIGNMENT: ':=' | '_';DOLLAR: '$';
+COLON: ':';ASSIGNMENT: ':=' | '_';DOLLAR: '$';
