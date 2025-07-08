@@ -6,10 +6,10 @@ grammar Smalltalk80;
 fileIn: chunk* EOF;
 
 replUnit:
-	classDefinition EOF								# ReplClassDef
-	| methodCategoryHeader methodDefinition* EOF	# ReplMethodsForCategory
-	| classComment EOF								# ReplClassComment
-	| sequence EOF									# ReplSequence;
+	classDefinition EOF										# ReplClassDef
+	| methodCategoryHeaderRepl methodDefinition* EOF	# ReplMethodsForCategory
+	| classComment EOF										# ReplClassComment
+	| sequence EOF											# ReplSequence;
 
 //////////////////////////////////////////////////////////////////////////
 // File-In Chunks ////////////////////////////////////////////////////////////////////////
@@ -27,9 +27,7 @@ chunk:
             (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
              InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
           )
-      }? methodCategoryHeader methodDefinitionWithBang+ BANG # MethodCategoryChunk;
-
-methodDefinitionWithBang: methodDefinition BANG;
+      }? methodCategoryHeaderFile methodDefinitionWithBang+ BANG # MethodCategoryChunk;
 
 //////////////////////////////////////////////////////////////////////////
 // Class & Metaclass Definitions + Comments
@@ -59,17 +57,25 @@ metaclassDefinition:
 //////////////////////////////////////////////////////////////////////////
 // Method Categories & Definitions
 // ////////////////////////////////////////////////////////////////////////
-
-methodCategoryHeader:
+methodCategoryHeaderFile:
 	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
+
+methodCategoryHeaderRepl:
+	IDENTIFIER CLASS? METHODS_FOR stringLiteral;
 
 // The body of a method may consist of an optional primitive declaration, an optional statement
 // sequence, or both. Split the rule into two alternatives so ANTLR does not warn about an empty
 // optional block.
-methodDefinition:
-	methodSelector primitive? sequence
-	| methodSelector primitive?;
+methodDefinitionFile: methodSelector COMMENT* BANG;
 
+methodDefinitionRepl: methodSelector primitive? sequence?;
+
+methodDefinitionWithBang: methodDefinition BANG;
+
+methodDefinition
+  : methodSelector primitive? sequence?
+  ;
+  
 methodSelector:
 	unarySelector
 	| binarySelector IDENTIFIER
