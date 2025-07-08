@@ -474,6 +474,21 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <inheritdoc/>
+    public override AstNode VisitReplMethodsForCategory(
+        Smalltalk80Parser.ReplMethodsForCategoryContext context)
+    {
+        var header = (MethodHeaderNode)Visit(context.methodCategoryHeader())!;
+        var chunks = new List<AstNode> { header };
+        foreach (var methodCtx in context.methodDefinition())
+        {
+            var method = (MethodDefinitionNode)Visit(methodCtx)!;
+            chunks.Add(method);
+        }
+
+        return new FileNode(chunks);
+    }
+
+    /// <inheritdoc/>
     public override AstNode VisitClassComment(Smalltalk80Parser.ClassCommentContext context)
     {
         var className = context.className().GetText();
