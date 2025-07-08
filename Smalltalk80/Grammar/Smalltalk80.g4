@@ -63,13 +63,12 @@ metaclassDefinition:
 methodCategoryHeader:
 	BANG IDENTIFIER CLASS? METHODS_FOR stringLiteral BANG;
 
-// The body of a method may consist of an optional primitive declaration,
-// an optional statement sequence, or both. Split the rule into two
-// alternatives so ANTLR does not warn about an empty optional block.
-methodDefinition
-    : methodSelector primitive? sequence
-    | methodSelector primitive?
-    ;
+// The body of a method may consist of an optional primitive declaration, an optional statement
+// sequence, or both. Split the rule into two alternatives so ANTLR does not warn about an empty
+// optional block.
+methodDefinition:
+	methodSelector primitive? sequence
+	| methodSelector primitive?;
 
 methodSelector:
 	unarySelector
@@ -97,7 +96,7 @@ statements: (statement? PERIOD+)* // zero or more “[maybe-stmt] .”
 
 statement: answer | expression;
 
-temps: PIPE IDENTIFIER+ PIPE;
+temps: PIPE variable+ PIPE;
 
 //////////////////////////////////////////////////////////////////////////
 // Statements & Expressions ////////////////////////////////////////////////////////////////////////
@@ -136,7 +135,7 @@ operand: literal | reference | subexpression | block;
 
 subexpression: OPEN_PAREN expression CLOSE_PAREN;
 
-variable: IDENTIFIER;
+variable: IDENTIFIER | CLASS;
 
 reference: variable;
 

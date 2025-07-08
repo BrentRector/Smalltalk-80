@@ -1,48 +1,27 @@
-!AltoFile methodsFor: 'nonhomogeneous accessing'!
-read: page
-	| pn p fp palen oldCursor |
-	pn _ page pageNumber.
-	pageAddresses isNil
-	  ifTrue:
-		[pn = 0 ifTrue: [palen _ 0] ifFalse: [^nil]]
-	  ifFalse:
-		[palen _ pageAddresses size].
+!Behavior methodsFor: 'accessing method dictionary'!
+allSelectors
+	"Answer a set of all the message selectors that instances of the receiver can
+	understand."
+	| aSet |
+	aSet _ Set new.
+	self withAllSuperclasses do: [:each | aSet addAll: each selectors].
+	^aSet
 
-	fp _ palen min: pn.
-	"set address of first page. next addresses are set later"
-	page address: (fp = 0
-					ifTrue: [leader]
-					ifFalse: [pageAddresses at: fp]).
-
-	oldCursor _ Cursor currentCursor.
-	pn-fp > 10 ifTrue: [Cursor wait show]. "this may take a while..."
-
-	fp to: pn do:
-		[:p | "set up page for checking"
-		page pageNumber: p.
-		"set by machine code:
-			page headerWordAt: Nextp put:
-				(p < palen ifTrue: [pageAddresses at: (p+1)] ifFalse: [0]).
-			page headerWordAt: backp put:
-				(p=0 ifTrue: [0] ifFalse: [p=1 ifTrue: [leader]
-					ifFalse: [pageAddresses at: (p-1)]]).
-			page size: (p < palen ifTrue: [page dataSize] ifFalse: [0])."
-
-		page doCommand: CCR error: 'read:'.
-
-		page lastPage
-		  ifTrue:
-			[lastPageNumber _ p.
-			p < pn
-				ifTrue: [oldCursor show. ^nil] 
-				ifFalse: [oldCursor show. ^page]].
-
-		(pageAddresses ~~ nil and: [p >= palen])
-			ifTrue: ["save address of next page if there is a page address table
-				and address not already stored"
-				pageAddresses addLast: (page headerWordAt: Nextp)].
-		p < pn
-			ifTrue: ["set address of next page"
-				page address: (page headerWordAt: Nextp)]].
-	oldCursor show.
-	^page! !
+	"Point allSelectors."!
+checkChangeSelector: selector
+	| descr classes class |
+	"The method for selector has been changed or removed.
+	 Check all copied versions for the method in question."
+	(SelectorsOfCopiedMethods at: selector ifAbsent: [Array new]) do:
+		[:class |
+		(class inheritsFrom: self) ifTrue:
+			[(class checkMethodFor: selector) ifFalse:
+				[Transcript cr; show: 'conflicting methods for ' , selector, ' in ', class name]
+				]].
+	"Remove all versions copied for directed access (eg Point.max) "
+	(SelectorsOfDirectedMethods at: selector ifAbsent: [Array new]) do:
+		[:class |
+		(class inheritsFrom: self) ifTrue:
+			[(class compoundSelectorsMatching: selector) do:
+				[:sel | class removeSelectorUnchecked: sel].
+		self removeClass: class selector: selector in: SelectorsOfDirectedMethods]]!
