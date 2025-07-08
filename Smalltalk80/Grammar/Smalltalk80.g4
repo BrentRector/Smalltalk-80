@@ -27,7 +27,7 @@ chunk:
             (InputStream.LA(3)==Smalltalk80Parser.CLASS &&
              InputStream.LA(4)==Smalltalk80Parser.METHODS_FOR)
           )
-      }? methodCategoryHeader (methodDefinitionWithBang+ BANG)? # MethodCategoryChunk;
+      }? methodCategoryHeader methodDefinitionWithBang+ BANG # MethodCategoryChunk;
 
 methodDefinitionWithBang: methodDefinition BANG;
 
