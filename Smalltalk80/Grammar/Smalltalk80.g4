@@ -83,7 +83,11 @@ classDefinition:
 		| 'variableWordSubclass:'
 	) HASH IDENTIFIER (classOption)*;
 
-classComment: className CLASS? 'comment:' stringLiteral;
+// 'comment:' is a standard keyword, so use KEYWORD here rather than a
+// dedicated literal token. This prevents the lexer from generating a
+// specialized token that would otherwise interfere with keyword message
+// parsing in method bodies.
+classComment: className CLASS? KEYWORD stringLiteral;
 
 className: IDENTIFIER;
 
