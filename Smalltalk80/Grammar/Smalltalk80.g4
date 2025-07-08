@@ -83,19 +83,18 @@ classDefinition:
 		| 'variableWordSubclass:'
 	) HASH IDENTIFIER (classOption)*;
 
-// 'comment:' is a standard keyword, so use KEYWORD here rather than a
-// dedicated literal token. This prevents the lexer from generating a
-// specialized token that would otherwise interfere with keyword message
-// parsing in method bodies.
-classComment: className CLASS? KEYWORD stringLiteral;
+// 'comment:' is a standard keyword, so use KEYWORD here rather than a dedicated literal token. This
+// prevents the lexer from generating a specialized token that would otherwise interfere with
+// keyword message parsing in method bodies.
+classComment: className CLASS? COMMENT_KW stringLiteral;
 
 className: IDENTIFIER;
 
 classOption:
-        INSTANCE_VARIABLE_NAMES stringLiteral
-        | CLASS_VARIABLE_NAMES stringLiteral
-        | POOL_DICTIONARIES stringLiteral
-        | KEYWORD stringLiteral;
+	INSTANCE_VARIABLE_NAMES stringLiteral
+	| CLASS_VARIABLE_NAMES stringLiteral
+	| POOL_DICTIONARIES stringLiteral
+	| KEYWORD stringLiteral;
 
 metaclassDefinition:
 	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
@@ -106,9 +105,10 @@ metaclassDefinition:
 
 // A method can be one of the following forms:
 // 
+//
 methodDefinition:
-        methodSelector sequence // body and/or primitive
-        | methodSelector; // empty body
+	methodSelector sequence // body and/or primitive
+	| methodSelector; // empty body
 
 methodSelector:
 	unarySelector
@@ -117,9 +117,9 @@ methodSelector:
 
 unarySelector: IDENTIFIER | CLASS;
 
-// A binary selector may be comprised of standard binary characters or a single
-// pipe character. The pipe token normally denotes temporary variable lists, but
-// here it also serves as the selector for Boolean disjunction.
+// A binary selector may be comprised of standard binary characters or a single pipe character. The
+// pipe token normally denotes temporary variable lists, but here it also serves as the selector for
+// Boolean disjunction.
 binarySelector: BINARY_SELECTOR | PIPE | MINUS;
 
 keywordSelector: keywordPart+;
@@ -130,9 +130,9 @@ keywordPart: KEYWORD IDENTIFIER;
 // 5) sequence: optional primitive placed before statements //
 // ////////////////////////////////////////////////////////////////////////
 
-// A "sequence" may declare temporaries. If a primitive declaration is present
-// it must appear immediately after the temporaries and before any statements.
-// Statements are optional when a primitive is provided.
+// A "sequence" may declare temporaries. If a primitive declaration is present it must appear
+// immediately after the temporaries and before any statements. Statements are optional when a
+// primitive is provided.
 sequence: temps? primitive? statements?;
 
 //////////////////////////////////////////////////////////////////////////
@@ -141,16 +141,15 @@ sequence: temps? primitive? statements?;
 
 // We swallow runs of periods as separators, but we always consume at least one statement up front.
 // 
+//
 
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
 statements: statement ( PERIOD+ statement)* PERIOD*;
 
-statement
-  : answer         // ^x
-  | expression     // variable assignments, cascades, etc.
-  ;
-
+statement:
+	answer // ^x
+	| expression ; // variable assignments, cascades, etc.
 
 temps: PIPE variable+ PIPE;
 
@@ -182,8 +181,8 @@ messageSend:
 
 unaryMessage: IDENTIFIER | CLASS;
 
-// Binary messages may use the standard selector characters or the pipe
-// character used for logical disjunction.
+// Binary messages may use the standard selector characters or the pipe character used for logical
+// disjunction.
 binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) unaryExpr;
 
 assignment: variable ASSIGNMENT expression;
@@ -241,11 +240,11 @@ stringLiteral: STRING;
 symbol: HASH bareSymbol;
 
 bareSymbol:
-        IDENTIFIER
-        | BINARY_SELECTOR
-        | PIPE
-        | KEYWORD+
-        | stringLiteral;
+	IDENTIFIER
+	| BINARY_SELECTOR
+	| PIPE
+	| KEYWORD+
+	| stringLiteral;
 
 literalArray: LITARR_START literalArrayRest;
 
@@ -261,6 +260,9 @@ primitive: PRIMITIVE;
 
 //////////////////////////////////////////////////////////////////////////
 // Lexer Rules ////////////////////////////////////////////////////////////////////////
+
+// Recognize “comment:” separately so it doesn’t collide with other keywords
+COMMENT_KW: 'comment:';
 
 CLASS: 'class';
 METHODS_FOR: 'methodsFor:';
@@ -306,8 +308,7 @@ BINARY_SELECTOR: (
 		| '&'
 		| '?'
 	)+;
-// The following tokens are defined for completeness. Some may not be referenced
-// directly by the current parser rules.
+
 LT: '<';
 GT: '>';
 CARROT: '^';
@@ -324,4 +325,6 @@ DIGIT: [0-9];
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
 BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
-COLON: ':';ASSIGNMENT: ':=' | '_';DOLLAR: '$';
+COLON: ':';
+ASSIGNMENT: ':=' | '_';
+DOLLAR: '$';
