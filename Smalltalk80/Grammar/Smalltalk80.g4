@@ -120,6 +120,22 @@ metaclassDefinition:
 //
 // 
 //
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
 methodDefinition:
 	methodSelector sequence // body and/or primitive
 	| methodSelector; // empty body
@@ -170,6 +186,22 @@ sequence: temps? primitive? statements?;
 //
 // 
 //
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
 
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
@@ -200,7 +232,8 @@ binaryExpression:
 	)*;
 
 // 3) keyword messages bind tighter than cascades
-keywordExpression: binaryExpression (KEYWORD binaryExpression)*;
+keywordExpression:
+	binaryExpression ((KEYWORD | COMMENT_KW) binaryExpression)*;
 
 // 4) top-level expression allows cascades
 expression: keywordExpression (cascadeMessage)*;
@@ -210,7 +243,7 @@ cascadeMessage:
 	';' (
 		unaryMessage
 		| (BINARY_SELECTOR | PIPE | MINUS) unaryExpression
-		| KEYWORD unaryExpression
+		| (KEYWORD | COMMENT_KW) unaryExpression
 	);
 
 unaryMessage: IDENTIFIER | CLASS;
@@ -235,9 +268,10 @@ literal: runtimeLiteral | parsetimeLiteral;
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 block:
-	BLOCK_START BLOCK_END
-	| BLOCK_START blockParamList (PIPE temps? statements)? BLOCK_END
-	| BLOCK_START temps? statements BLOCK_END;
+	BLOCK_START (blockParamList PIPE)? // optional “[:arg |” header
+	temps? // optional “| t1 t2 |”
+	statements? // zero or more statements
+	BLOCK_END;
 
 blockParamList: BLOCK_PARAM+;
 
