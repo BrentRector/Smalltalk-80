@@ -277,10 +277,11 @@ IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
 // whitespace
 SEPARATOR: [ \t\r\n\u000C]+ -> skip;
 
+// STRING: single-quoted literals (must come before COMMENT)
+STRING: '\'' ( ~['] | '\'\'')* '\'';
 // all inline comments vanish into HIDDEN:
 COMMENT: '"' ( ~["] | '""')* '"' -> channel(HIDDEN);
 
-STRING: '\'' ( ~['] | '\'\'')* '\'';
 BLOCK_START: '[';
 BLOCK_END: ']';
 OPEN_PAREN: '(';
