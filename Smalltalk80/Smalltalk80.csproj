@@ -14,10 +14,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
 
   <Target Name="GenerateAntlr" Inputs="$(AntlrGrammar)" Outputs="$(AntlrOutputDir)/Smalltalk80Parser.cs" BeforeTargets="BeforeCompile">
     <Message Importance="high" Text="Running ANTLR on $(AntlrGrammar)" />
     <Exec Command="java -jar &quot;$(AntlrJar)&quot; -Dlanguage=CSharp -no-listener -visitor -package Smalltalk80.Generated -o &quot;$(AntlrOutputDir)&quot; &quot;$(AntlrGrammar)&quot;" />
-  </Target>
-</Project>
+  </Target></Project>
