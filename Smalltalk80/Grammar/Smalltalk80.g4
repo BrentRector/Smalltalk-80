@@ -83,9 +83,9 @@ classDefinition:
 		| 'variableWordSubclass:'
 	) HASH IDENTIFIER (classOption)*;
 
-// 'comment:' is a standard keyword, so use KEYWORD here rather than a dedicated literal token. This
-// prevents the lexer from generating a specialized token that would otherwise interfere with
-// keyword message parsing in method bodies.
+// 'comment:' is a standard keyword, but we want tO use the dedicated literal token COMMENT_KW. This
+// enables the lexer to generate a specialized token helping the visitor to locate standlone class
+// comments.
 classComment: className CLASS? COMMENT_KW stringLiteral;
 
 className: IDENTIFIER;
@@ -104,6 +104,8 @@ metaclassDefinition:
 // ////////////////////////////////////////////////////////////////////////
 
 // A method can be one of the following forms:
+// 
+//
 // 
 //
 methodDefinition:
@@ -142,6 +144,8 @@ sequence: temps? primitive? statements?;
 // We swallow runs of periods as separators, but we always consume at least one statement up front.
 // 
 //
+// 
+//
 
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
@@ -149,7 +153,7 @@ statements: statement ( PERIOD+ statement)* PERIOD*;
 
 statement:
 	answer // ^x
-	| expression ; // variable assignments, cascades, etc.
+	| expression; // variable assignments, cascades, etc.
 
 temps: PIPE variable+ PIPE;
 
