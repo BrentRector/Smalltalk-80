@@ -200,10 +200,14 @@ literal: runtimeLiteral | parsetimeLiteral;
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 block:
-	BLOCK_START (blockParamList PIPE)? // optional “[:arg |” header
-	temps? // optional “| t1 t2 |”
-	statements? // zero or more statements
-	BLOCK_END;
+        BLOCK_START
+            (
+                // Optional parameter list. The trailing '|' may be omitted
+                // when the block contains no temporaries or statements.
+                blockParamList PIPE? temps? statements?
+                | temps? statements?
+            )?
+        BLOCK_END;
 
 blockParamList: BLOCK_PARAM+;
 
