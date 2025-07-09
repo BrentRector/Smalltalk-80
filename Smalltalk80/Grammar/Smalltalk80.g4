@@ -168,14 +168,15 @@ keywordExpression:
 expression: keywordExpression (cascadeMessage)*;
 
 cascadeMessage:
-	';' (
-		// any full message form:
-		unaryExpression // e.g. foo
-		| unaryExpression (
-			(BINARY_SELECTOR | PIPE | MINUS) unaryExpression
-		) // e.g. + bar
-		| keywordExpression // e.g. add: x to: y
-	);
+        ';' (
+                // any full message form:
+                unaryExpression                              // e.g. foo
+                | unaryExpression (
+                        (BINARY_SELECTOR | PIPE | MINUS) unaryExpression
+                )                                           // e.g. + bar
+                | KEYWORD binaryExpression ((KEYWORD | COMMENT_KW) binaryExpression)* // e.g. show: arg
+                | keywordExpression                          // e.g. add: x to: y
+        );
 
 unaryMessage: IDENTIFIER | CLASS;
 
