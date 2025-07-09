@@ -2,6 +2,7 @@
 
 This project contains a prototype of a Smalltalk-80 interpreter written in C#. When making changes keep the following conventions in mind:
 
+- ** Grammar changes**: Never make any grammar changes that do not support the full Smalltalk-80 language. Do not sacrifice full Smalltalk language support. 
 - **Language version**: Target modern C# (v13 or later) where possible. Prefer features such as pattern matching enhancements, record types, and top-level statements when appropriate.
 - **Documentation**: Every public class, property, method, and enum member must include thorough XML documentation comments describing its purpose and usage.
 - **Testing**: Run `dotnet build --no-restore` and `dotnet test --no-build` before every commit to verify that the code compiles and all tests pass.
