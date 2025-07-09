@@ -268,9 +268,9 @@ literal: runtimeLiteral | parsetimeLiteral;
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 block:
-	BLOCK_START (blockParamList PIPE)? // optional “[:arg |” header
-	temps? // optional “| t1 t2 |”
-	statements? // zero or more statements
+	BLOCK_START (blockParamList PIPE)? 		// optional “[:arg |” header
+	temps? 									// optional “| t1 t2 |”
+	statements? 							// zero or more statements
 	BLOCK_END;
 
 blockParamList: BLOCK_PARAM+;
