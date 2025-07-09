@@ -50,7 +50,7 @@ methodCategoryHeaderFile:
 // Definition of a method that must end in a bang. The actual method body is parsed using
 // <c>methodDefinition</c> to allow optional primitives and statements.
 methodDefinitionWithBang:
-        methodSelector sequence? BANG; // parse optional body followed by '!'
+	methodSelector sequence? BANG; // parse optional body followed by '!'
 
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;
@@ -123,10 +123,13 @@ keywordPart: (KEYWORD | COMMENT_KW) IDENTIFIER;
 // 5) sequence: optional primitive placed before statements //
 // ///////////////////////////////////////////////////////////
 
-// A "sequence" may declare temporaries and optionally include a primitive.
-// At least one of temporaries, primitive, or statements must be present to
-// avoid ambiguity when parsing empty method bodies.
-sequence: temps? primitive? statements?;
+// A "sequence" may declare temporaries and optionally include a primitive. At least one of
+// temporaries, primitive, or statements must be present to avoid ambiguity when parsing empty
+// method bodies.
+sequence:
+	temps primitive? statements? // declares temps, then optional prim/stmts
+	| primitive statements? // a primitive (and optional stmts)
+	| statements; // one or more statements
 
 //////////////////////////////////////////////////////////////////////////
 // 6) statements: support multiple dots, but force ≥1 stmt //
@@ -140,8 +143,6 @@ statements: statement ( PERIOD+ statement)* PERIOD*;
 statement:
 	answer // ^x
 	| expression; // variable assignments, cascades, etc.
-
-temps: PIPE variable+ PIPE;
 
 /////////////////////////////
 // Statements & Expressions ///////////////////////////
@@ -169,15 +170,17 @@ keywordExpression:
 expression: keywordExpression (cascadeMessage)*;
 
 cascadeMessage:
-        ';' (
-                // any full message form:
-                unaryExpression                              // e.g. foo
-                | unaryExpression (
-                        (BINARY_SELECTOR | PIPE | MINUS) unaryExpression
-                )                                           // e.g. + bar
-                | KEYWORD binaryExpression ((KEYWORD | COMMENT_KW) binaryExpression)* // e.g. show: arg
-                | keywordExpression                          // e.g. add: x to: y
-        );
+	';' (
+		// any full message form:
+		unaryExpression // e.g. foo
+		| unaryExpression (
+			(BINARY_SELECTOR | PIPE | MINUS) unaryExpression
+		) // e.g. + bar
+		| KEYWORD binaryExpression (
+			(KEYWORD | COMMENT_KW) binaryExpression
+		)* // e.g. show: arg
+		| keywordExpression // e.g. add: x to: y
+	);
 
 unaryMessage: IDENTIFIER | CLASS;
 
@@ -200,17 +203,41 @@ literal: runtimeLiteral | parsetimeLiteral;
 
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
-block:
-        BLOCK_START
-            (
-                // Optional parameter list. The trailing '|' may be omitted
-                // when the block contains no temporaries or statements.
-                blockParamList PIPE? temps? statements?
-                | temps? statements?
-            )?
-        BLOCK_END;
+// Smalltalk Block Syntax: Parameters and Temporaries In Smalltalk-80 a block can declare both
+// formal parameters and temporary variables. The order is always: Zero or more block parameters,
+// each prefixed by : A single | to close the parameter list Zero or more temporaries, enclosed by
+// |…| The block’s body expressions The closing ]
 
-blockParamList: BLOCK_PARAM+;
+// Example Forms No params, no temps: [ doSomething ]
+// 
+// Only parameters: [ :x :y doSomethingWith: x and: y ]
+// 
+// Only temporaries: [ | a b | a := compute. b := adjust. ^a + b ]
+// 
+// Both params and temps: [ :x :y | temp1 temp2 | temp1 := f(x). temp2 := g(y). ^temp1 + temp2 ]
+
+// Classic Smalltalk lets you omit the closing | of the parameter list when you don’t have any
+// temporaries. In other words, both these are legal: [ :x :y | x + y ] “params + pipe + no temps +
+// body” [ :x :y x + y ] “params + no pipe + body”
+
+// 1) params: “:x :y |” or “:x :y” (pipe optional if no temps follow)
+blockParamList: (COLON IDENTIFIER)+ PIPE?;
+
+// 2) temps: “| a b |”
+temps: PIPE IDENTIFIER+ PIPE;
+
+// 3) body of a block  
+blockStatements: statement ( PERIOD+ statement)* PERIOD?;
+
+// 4) the block itself
+block:
+	BLOCK_START
+	// optional header (params, temps, or both)
+	(
+		blockParamList temps? // params then maybe temps
+		| temps // temps only
+	)? blockStatements? // optional body in any case
+	BLOCK_END;
 
 dynamicArray:
 	DYNARR_START (expression (PERIOD expression)*)? DYNARR_END;
@@ -330,7 +357,6 @@ CHARACTER_CONSTANT: '$' ~[\r\n];
 DIGIT: [0-9];
 HEXDIGIT: [0-9a-fA-F];
 RADIX_INT: '-'? DIGIT+ 'r' [0-9A-Za-z]+;
-BLOCK_PARAM: ':' [ \t\r\n\u000C]* [a-zA-Z] [a-zA-Z0-9_]*;
 COLON: ':';
 ASSIGNMENT: ':=' | '_';
 DOLLAR: '$';
