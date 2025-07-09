@@ -123,9 +123,9 @@ keywordPart: (KEYWORD | COMMENT_KW) IDENTIFIER;
 // 5) sequence: optional primitive placed before statements //
 // ///////////////////////////////////////////////////////////
 
-// A "sequence" may declare temporaries. If a primitive declaration is present it must appear
-// immediately after the temporaries and before any statements. Statements are optional when a
-// primitive is provided.
+// A "sequence" may declare temporaries and optionally include a primitive.
+// At least one of temporaries, primitive, or statements must be present to
+// avoid ambiguity when parsing empty method bodies.
 sequence: temps? primitive? statements?;
 
 //////////////////////////////////////////////////////////////////////////
