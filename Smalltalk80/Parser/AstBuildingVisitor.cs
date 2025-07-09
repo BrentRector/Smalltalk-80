@@ -425,12 +425,17 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new DynamicDictionaryExpression(elements);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Visits a block literal and converts it into a <see cref="BlockExpression"/>
+    /// containing its parameter list and body sequence.
+    /// </summary>
+    /// <param name="context">The parse context representing the block.</param>
+    /// <returns>The constructed <see cref="BlockExpression"/>.</returns>
     public override AstNode VisitBlock(Smalltalk80Parser.BlockContext context)
     {
-        var parameters = context.blockParamList() is { } paramsCtx
-            ? paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':')).ToList()
-            : new List<string>();
+        List<string> parameters = context.blockParamList() is { } paramsCtx
+            ? [..paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':'))]
+            : [];
 
         var seq = ProcessSequence(context.temps(), null, context.statements());
         return new BlockExpression(parameters, seq);
