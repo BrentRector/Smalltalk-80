@@ -248,12 +248,25 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
     }
 
+    /// <summary>
+    /// Applies a unary message send to the specified receiver.
+    /// </summary>
+    /// <param name="receiver">The expression acting as the message receiver.</param>
+    /// <param name="message">The unary message context.</param>
+    /// <returns>The resulting expression after applying the message.</returns>
     private ExpressionNode ApplyUnaryMessage(ExpressionNode receiver, Smalltalk80Parser.UnaryMessageContext message)
     {
         var selector = message.IDENTIFIER()?.GetText() ?? message.CLASS().GetText();
         return new UnarySendExpression(receiver, selector);
     }
 
+    /// <summary>
+    /// Applies a binary message send to the specified receiver.
+    /// </summary>
+    /// <param name="receiver">The expression acting as the receiver.</param>
+    /// <param name="selectorToken">The token representing the binary selector.</param>
+    /// <param name="argument">The unary expression supplying the argument.</param>
+    /// <returns>The resulting expression after applying the message.</returns>
     private ExpressionNode ApplyBinaryMessage(
         ExpressionNode receiver,
         ITerminalNode selectorToken,
@@ -264,6 +277,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new BinarySendExpression(receiver, selector, arg);
     }
 
+    /// <summary>
+    /// Applies a cascade message to the previously evaluated receiver.
+    /// </summary>
+    /// <param name="receiver">The expression that should receive the cascade message.</param>
+    /// <param name="cascade">The cascade message context.</param>
+    /// <returns>The resulting expression after applying the cascade.</returns>
     private ExpressionNode ApplyCascade(ExpressionNode receiver, Smalltalk80Parser.CascadeMessageContext cascade)
     {
         if (cascade.unaryMessage() is { } u)
@@ -271,14 +290,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         if (cascade.unaryExpression() is { } ue)
         {
-            if (cascade.BINARY_SELECTOR() is { Length: > 0 } bs)
-                return ApplyBinaryMessage(receiver, bs[0], ue);
-            if (cascade.PIPE() is { Length: > 0 } p)
-                return ApplyBinaryMessage(receiver, p[0], ue);
-            if (cascade.MINUS() is { Length: > 0 } m)
-                return ApplyBinaryMessage(receiver, m[0], ue);
-            if (cascade.KEYWORD() is { Length: > 0 } kw)
-                return ApplyKeywordMessage(receiver, kw, new List<ParserRuleContext> { ue });
+            if (cascade.BINARY_SELECTOR() is { } bs)
+                return ApplyBinaryMessage(receiver, bs, ue);
+            if (cascade.PIPE() is { } p)
+                return ApplyBinaryMessage(receiver, p, ue);
+            if (cascade.MINUS() is { } m)
+                return ApplyBinaryMessage(receiver, m, ue);
+            if (cascade.KEYWORD() is { } kw)
+                return ApplyKeywordMessage(receiver, new[] { kw }, new ParserRuleContext[] { ue });
         }
 
         return receiver;
@@ -305,6 +324,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
 
 
+    /// <summary>
+    /// Collapses nested keyword sends where the outer send has a single argument
+    /// that is itself a keyword send.
+    /// </summary>
+    /// <param name="node">The expression to inspect.</param>
+    /// <returns>The flattened expression with nested sends merged.</returns>
     private static ExpressionNode FlattenKeywordSends(ExpressionNode node)
     {
         while (node is KeywordSendExpression outer &&
@@ -467,6 +492,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new ClassDefinitionNode(superclass, className, instanceVars, classVars, pools, category);
     }
 
+    /// <summary>
+    /// Splits a quoted space-separated string of identifiers into a list.
+    /// </summary>
+    /// <param name="value">The quoted string containing identifiers.</param>
+    /// <returns>A collection of identifiers extracted from the string.</returns>
     private static IReadOnlyList<string> ExtractIdentifiersFromString(string value)
         => value.Trim('\'').Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
@@ -478,6 +508,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitMethodCategoryHeaderRepl(Smalltalk80Parser.MethodCategoryHeaderReplContext context)
         => CreateMethodHeader(context.IDENTIFIER().GetText(), context.CLASS() is not null, context.stringLiteral().GetText());
 
+    /// <summary>
+    /// Creates a <see cref="MethodHeaderNode"/> from a parsed category header.
+    /// </summary>
+    /// <param name="className">The name of the owning class.</param>
+    /// <param name="isClassSide">Whether the methods belong to the class side.</param>
+    /// <param name="categoryLiteral">The category string literal.</param>
+    /// <returns>The constructed <see cref="MethodHeaderNode"/>.</returns>
     private static MethodHeaderNode CreateMethodHeader(string className, bool isClassSide, string categoryLiteral)
         => new(className, isClassSide, categoryLiteral.Trim('\''));
 
@@ -545,6 +582,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new MethodDefinitionNode(selector, args, body, comment, "", hasPrimitive, primitiveIndex);
     }
 
+    /// <summary>
+    /// Parses a method selector context into its selector string and argument list.
+    /// </summary>
+    /// <param name="context">The parse context describing the selector.</param>
+    /// <returns>The selector string and a list of argument names.</returns>
     private static (string Selector, List<string> Args) ParseMethodSelector(Smalltalk80Parser.MethodSelectorContext context)
     {
         if (context.unarySelector() is { } u)
