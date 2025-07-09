@@ -108,6 +108,10 @@ metaclassDefinition:
 //
 // 
 //
+// 
+//
+// 
+//
 methodDefinition:
 	methodSelector sequence // body and/or primitive
 	| methodSelector; // empty body
@@ -146,6 +150,10 @@ sequence: temps? primitive? statements?;
 //
 // 
 //
+// 
+//
+// 
+//
 
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
@@ -164,35 +172,33 @@ returnExpr: CARROT expression;
 
 answer: returnExpr PERIOD?;
 
-cascade: SEMI_COLON messageSend+;
+expressions: (expression (PERIOD expression)*)?;
 
-expressions: expression (PERIOD expression)*;
+expression: messageChain (cascadeMessage)*;
 
-expression: keywordExpr cascade*;
+messageChain:
+	primaryExpression (
+		unaryMessage
+		| binaryMessage
+		| keywordMessage
+	)*;
 
-keywordExpr: binaryExpr (KEYWORD expression)*;
-
-binaryExpr: unaryExpr (binaryMessage)*;
-
-unaryExpr: primaryExpression (unaryMessage)*;
-
-primaryExpression: assignment | operand | returnExpr;
-
-messageSend:
-	unaryMessage
-	| binaryMessage
-	| (KEYWORD expression)+;
+cascadeMessage:
+	';' (unaryMessage | binaryMessage | keywordMessage);
 
 unaryMessage: IDENTIFIER | CLASS;
 
-// Binary messages may use the standard selector characters or the pipe character used for logical
-// disjunction.
-binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) unaryExpr;
+// Binary messages may use the standard selector characters or the pipe character used for logical disjunction.
+binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) expression;
+
+keywordMessage: (KEYWORD expression)+;
+
+primaryExpression: assignment | operand | returnExpr;
 
 assignment: variable ASSIGNMENT expression;
 
 //////////////////////////////////////////////////////////////////////////
-// Operands & Literals ////////////////////////////////////////////////////////////////////////
+// Operands & Literals //////////////////////////////////////////////////////////////////////
 
 operand: literal | reference | subexpression | block;
 
@@ -213,9 +219,11 @@ block:
 
 blockParamList: BLOCK_PARAM+;
 
-dynamicDictionary: DYNDICT_START expressions? DYNARR_END;
+dynamicArray:
+	DYNARR_START (expression (PERIOD expression)*)? DYNARR_END;
 
-dynamicArray: DYNARR_START expressions? DYNARR_END;
+dynamicDictionary:
+	DYNDICT_START (expression (PERIOD expression)*)? DYNARR_END;
 
 parsetimeLiteral:
 	pseudoVariable
