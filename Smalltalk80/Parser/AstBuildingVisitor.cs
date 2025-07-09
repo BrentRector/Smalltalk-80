@@ -159,7 +159,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
-        ExpressionNode receiver = (ExpressionNode)Visit(context.messageChain())!;
+        ExpressionNode receiver = (ExpressionNode)Visit(context.keywordExpression())!;
 
         foreach (var cascade in context.cascadeMessage())
         {
@@ -170,34 +170,58 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <inheritdoc/>
-    public override AstNode VisitMessageChain(Smalltalk80Parser.MessageChainContext context)
+    public override AstNode VisitUnaryExpression(Smalltalk80Parser.UnaryExpressionContext context)
     {
         ExpressionNode receiver = (ExpressionNode)Visit(context.primaryExpression())!;
 
-        var unary = context.unaryMessage();
-        var binary = context.binaryMessage();
-        var keyword = context.keywordMessage();
-        var u = 0;
-        var b = 0;
-        var k = 0;
-
-        for (var i = 1; i < context.ChildCount; i++)
+        foreach (var unary in context.unaryMessage())
         {
-            switch (context.GetChild(i))
+            receiver = ApplyUnaryMessage(receiver, unary);
+        }
+
+        return receiver;
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitBinaryExpression(Smalltalk80Parser.BinaryExpressionContext context)
+    {
+        var expressions = context.unaryExpression();
+        ExpressionNode receiver = (ExpressionNode)Visit(expressions[0])!;
+
+        ITerminalNode? opToken = null;
+        for (int i = 1; i < context.ChildCount; i++)
+        {
+            var child = context.GetChild(i);
+            switch (child)
             {
-                case Smalltalk80Parser.UnaryMessageContext:
-                    receiver = ApplyUnaryMessage(receiver, unary[u++]);
+                case ITerminalNode t:
+                    opToken = t;
                     break;
-                case Smalltalk80Parser.BinaryMessageContext:
-                    receiver = ApplyBinaryMessage(receiver, binary[b++]);
-                    break;
-                case Smalltalk80Parser.KeywordMessageContext:
-                    receiver = ApplyKeywordMessage(receiver, keyword[k++]);
+                case Smalltalk80Parser.UnaryExpressionContext ue when opToken is not null:
+                    receiver = ApplyBinaryMessage(receiver, opToken, ue);
+                    opToken = null;
                     break;
             }
         }
 
         return receiver;
+    }
+
+    /// <inheritdoc/>
+    public override AstNode VisitKeywordExpression(Smalltalk80Parser.KeywordExpressionContext context)
+    {
+        var binaries = context.binaryExpression();
+        ExpressionNode receiver = (ExpressionNode)Visit(binaries[0])!;
+
+        var keywords = context.KEYWORD();
+        if (keywords.Length == 0)
+            return receiver;
+
+        var args = new List<ParserRuleContext>();
+        for (var i = 1; i < binaries.Length; i++)
+            args.Add(binaries[i]);
+
+        return ApplyKeywordMessage(receiver, keywords, args);
     }
 
     /// <summary>
@@ -210,7 +234,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     private ExpressionNode ApplyKeywordMessage(
         ExpressionNode receiver,
         IReadOnlyList<ITerminalNode> keywords,
-        IReadOnlyList<Smalltalk80Parser.ExpressionContext> expressions)
+        IReadOnlyList<ParserRuleContext> expressions)
     {
         var parts = new List<string>();
         var args = new List<ExpressionNode>();
@@ -224,9 +248,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return FlattenKeywordSends(new KeywordSendExpression(receiver, parts, args));
     }
 
-    private ExpressionNode ApplyKeywordMessage(ExpressionNode receiver, Smalltalk80Parser.KeywordMessageContext message)
-        => ApplyKeywordMessage(receiver, message.KEYWORD(), message.expression());
-
     private ExpressionNode ApplyUnaryMessage(ExpressionNode receiver, Smalltalk80Parser.UnaryMessageContext message)
     {
         var selector = message.IDENTIFIER()?.GetText() ?? message.CLASS().GetText();
@@ -235,12 +256,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
     private ExpressionNode ApplyBinaryMessage(
         ExpressionNode receiver,
-        Smalltalk80Parser.BinaryMessageContext message)
+        ITerminalNode selectorToken,
+        Smalltalk80Parser.UnaryExpressionContext argument)
     {
-        var arg = (ExpressionNode)Visit(message.unaryExpression())!;
-        var selector = message.BINARY_SELECTOR()?.GetText() ??
-                       message.PIPE()?.GetText() ??
-                       message.MINUS()?.GetText() ?? string.Empty;
+        var arg = (ExpressionNode)Visit(argument)!;
+        var selector = selectorToken.GetText();
         return new BinarySendExpression(receiver, selector, arg);
     }
 
@@ -248,10 +268,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     {
         if (cascade.unaryMessage() is { } u)
             return ApplyUnaryMessage(receiver, u);
-        if (cascade.binaryMessage() is { } b)
-            return ApplyBinaryMessage(receiver, b);
-        if (cascade.keywordMessage() is { } k)
-            return ApplyKeywordMessage(receiver, k);
+
+        if (cascade.unaryExpression() is { } ue)
+        {
+            if (cascade.BINARY_SELECTOR() is { Length: > 0 } bs)
+                return ApplyBinaryMessage(receiver, bs[0], ue);
+            if (cascade.PIPE() is { Length: > 0 } p)
+                return ApplyBinaryMessage(receiver, p[0], ue);
+            if (cascade.MINUS() is { Length: > 0 } m)
+                return ApplyBinaryMessage(receiver, m[0], ue);
+            if (cascade.KEYWORD() is { Length: > 0 } kw)
+                return ApplyKeywordMessage(receiver, kw, new List<ParserRuleContext> { ue });
+        }
+
         return receiver;
     }
 
