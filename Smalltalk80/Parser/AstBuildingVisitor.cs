@@ -233,9 +233,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return new UnarySendExpression(receiver, selector);
     }
 
-    private ExpressionNode ApplyBinaryMessage(ExpressionNode receiver, Smalltalk80Parser.BinaryMessageContext message)
+    private ExpressionNode ApplyBinaryMessage(
+        ExpressionNode receiver,
+        Smalltalk80Parser.BinaryMessageContext message)
     {
-        var arg = (ExpressionNode)Visit(message.expression())!;
+        var arg = (ExpressionNode)Visit(message.unaryExpression())!;
         var selector = message.BINARY_SELECTOR()?.GetText() ??
                        message.PIPE()?.GetText() ??
                        message.MINUS()?.GetText() ?? string.Empty;
