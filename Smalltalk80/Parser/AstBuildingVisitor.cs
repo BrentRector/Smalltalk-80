@@ -565,8 +565,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
             ? new List<string>(GetBlockParameterNames(paramsCtx))
             : [];
 
-        // Newer grammars may encapsulate the block body in a <sequence> rule.
-        var seqMethod = context.GetType().GetMethod("sequence");
+        // Newer grammars may encapsulate the block body in a <sequence> or
+        // <blockBody> rule depending on version.
+        var seqMethod = context.GetType().GetMethod("blockBody")
+            ?? context.GetType().GetMethod("sequence");
         SequenceNode seq;
         if (seqMethod?.Invoke(context, null) is Smalltalk80Parser.SequenceContext sc)
         {
@@ -765,15 +767,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         }
 
         string? comment = null;
-        var hidden = tokens.GetHiddenTokensToRight(context.BANG().Symbol.TokenIndex, TokenConstants.HiddenChannel);
-        if (hidden is { Count: > 0 })
+        var bang = context.GetType().GetMethod("BANG")?.Invoke(context, null) as ITerminalNode;
+        if (bang is not null)
         {
-            var commentLines = hidden
-                .Where(t => t.Type == Smalltalk80Parser.COMMENT)
-                .Select(t => t.Text.Trim('"'))
-                .ToList();
-            if (commentLines.Count > 0)
-                comment = string.Join("\n", commentLines);
+            var hidden = tokens.GetHiddenTokensToRight(bang.Symbol.TokenIndex, TokenConstants.HiddenChannel);
+            if (hidden is { Count: > 0 })
+            {
+                var commentLines = hidden
+                    .Where(t => t.Type == Smalltalk80Parser.COMMENT)
+                    .Select(t => t.Text.Trim('"'))
+                    .ToList();
+                if (commentLines.Count > 0)
+                    comment = string.Join("\n", commentLines);
+            }
         }
         scopeStack.Clear();
 
