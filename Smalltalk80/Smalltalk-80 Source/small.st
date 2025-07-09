@@ -1,13 +1,19 @@
-!TestClass methodsFor: 'testing'!
+!PrecedenceTest methodsFor: 'example-tests'!
 
-testKeywordMessage
-    textMode == #comment ifTrue: [^true].
-
-!
-
-testCascade
-    aStream nextPut: $a; nextPut: $b; nextPut: $c.
-
+testFullExpression
+    | aStream data result |
+    data := #(1 2 3) at: 2.
+    aStream := WriteStream on: String new.
+    result := data asString size * 2.
+    (result > 4) ifTrue: [
+        aStream
+            nextPutAll: 'Big';
+            space;
+            nextPutAll: 'Data = ', data asString
+    ] ifFalse: [
+        aStream
+            nextPutAll: 'Small'; cr
+    ].
 !
 
 !

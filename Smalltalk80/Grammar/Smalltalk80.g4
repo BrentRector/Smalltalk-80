@@ -189,7 +189,11 @@ cascadeMessage:
 unaryMessage: IDENTIFIER | CLASS;
 
 // Binary messages may use the standard selector characters or the pipe character used for logical disjunction.
-binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) expression;
+binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) unaryExpression;
+
+unaryExpression
+  : primaryExpression (unaryMessage)*
+  ;
 
 keywordMessage: (KEYWORD expression)+;
 
