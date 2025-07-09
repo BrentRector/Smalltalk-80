@@ -49,7 +49,8 @@ methodCategoryHeaderFile:
 
 // Definition of a method that must end in a bang. The actual method body is parsed using
 // <c>methodDefinition</c> to allow optional primitives and statements.
-methodDefinitionWithBang: methodDefinition BANG;
+methodDefinitionWithBang:
+        methodSelector sequence? BANG; // parse optional body followed by '!'
 
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;

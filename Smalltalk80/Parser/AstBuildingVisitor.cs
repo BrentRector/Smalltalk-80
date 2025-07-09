@@ -632,6 +632,51 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     }
 
     /// <summary>
+    /// Visits a <see cref="Smalltalk80Parser.MethodDefinitionWithBangContext"/> and returns a <see cref="MethodDefinitionNode"/>.
+    /// </summary>
+    /// <param name="context">The parse context to visit.</param>
+    /// <returns>The resulting <see cref="MethodDefinitionNode"/>.</returns>
+    public override AstNode VisitMethodDefinitionWithBang(Smalltalk80Parser.MethodDefinitionWithBangContext context)
+    {
+        var (selector, args) = ParseMethodSelector(context.methodSelector());
+        Tracer.Log($"Parsing method: {selector}");
+        Tracer.Log($"Entering method: {selector}");
+
+        scopeStack.Clear();
+        var methodVisitor = new AstBuildingVisitor(tokens, selector, args, initialVariables);
+        var bodyCtx = context.sequence();
+        SequenceNode body = bodyCtx is not null
+            ? (SequenceNode)methodVisitor.Visit(bodyCtx)!
+            : new SequenceNode(new List<string>(), new List<StatementNode>());
+
+        bool hasPrimitive = false;
+        int primitiveIndex = 0;
+
+        if (body.Statements.Count > 0 && body.Statements[0] is PrimitiveStatement primStmt)
+        {
+            hasPrimitive = true;
+            primitiveIndex = primStmt.PrimitiveIndex;
+            body = new SequenceNode(body.Temporaries, body.Statements.Skip(1).ToList());
+        }
+
+        string? comment = null;
+        var hidden = tokens.GetHiddenTokensToRight(context.BANG().Symbol.TokenIndex, TokenConstants.HiddenChannel);
+        if (hidden is { Count: > 0 })
+        {
+            var commentLines = hidden
+                .Where(t => t.Type == Smalltalk80Parser.COMMENT)
+                .Select(t => t.Text.Trim('"'))
+                .ToList();
+            if (commentLines.Count > 0)
+                comment = string.Join("\n", commentLines);
+        }
+        scopeStack.Clear();
+
+        Tracer.Log($"Exiting method: {selector}");
+        return new MethodDefinitionNode(selector, args, body, comment, "", hasPrimitive, primitiveIndex);
+    }
+
+    /// <summary>
     /// Parses a method selector context into its selector string and argument list.
     /// </summary>
     /// <param name="context">The parse context describing the selector.</param>
