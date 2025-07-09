@@ -285,22 +285,66 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <returns>The resulting expression after applying the cascade.</returns>
     private ExpressionNode ApplyCascade(ExpressionNode receiver, Smalltalk80Parser.CascadeMessageContext cascade)
     {
-        if (cascade.unaryMessage() is { } u)
-            return ApplyUnaryMessage(receiver, u);
-
-        if (cascade.unaryExpression() is { } ue)
+        if (cascade.keywordExpression() is { } kwExpr)
         {
-            if (cascade.BINARY_SELECTOR() is { } bs)
-                return ApplyBinaryMessage(receiver, bs, ue);
-            if (cascade.PIPE() is { } p)
-                return ApplyBinaryMessage(receiver, p, ue);
-            if (cascade.MINUS() is { } m)
-                return ApplyBinaryMessage(receiver, m, ue);
-            if (cascade.KEYWORD() is { } kw)
-                return ApplyKeywordMessage(receiver, new[] { kw }, new ParserRuleContext[] { ue });
+            var keywords = kwExpr.KEYWORD().Concat(kwExpr.COMMENT_KW()).ToArray();
+            var binaries = kwExpr.binaryExpression();
+            var args = new List<ParserRuleContext>();
+            for (var i = 1; i < binaries.Length; i++)
+                args.Add(binaries[i]);
+            return ApplyKeywordMessage(receiver, keywords, args);
+        }
+
+        var unaryExprs = cascade.unaryExpression();
+        if (unaryExprs.Length == 1)
+        {
+            return ApplyUnaryChain(receiver, unaryExprs[0]);
+        }
+
+        if (unaryExprs.Length == 2)
+        {
+            var first = ApplyUnaryChain(receiver, unaryExprs[0]);
+            var op = (ITerminalNode?)cascade.BINARY_SELECTOR() ?? cascade.PIPE() ?? cascade.MINUS();
+            if (op is not null)
+                return ApplyBinaryMessage(first, op, unaryExprs[1]);
         }
 
         return receiver;
+    }
+
+    /// <summary>
+    /// Applies a chain of unary messages represented by a <see cref="Smalltalk80Parser.UnaryExpressionContext"/>.
+    /// </summary>
+    /// <param name="receiver">The expression acting as the receiver.</param>
+    /// <param name="context">The unary expression context containing message tokens.</param>
+    /// <returns>The resulting expression after applying all unary messages.</returns>
+    private ExpressionNode ApplyUnaryChain(ExpressionNode receiver, Smalltalk80Parser.UnaryExpressionContext context)
+    {
+        if (TryGetUnarySelector(context.primaryExpression(), out var selector))
+            receiver = new UnarySendExpression(receiver, selector);
+
+        foreach (var msg in context.unaryMessage())
+            receiver = ApplyUnaryMessage(receiver, msg);
+
+        return receiver;
+    }
+
+    /// <summary>
+    /// Attempts to extract a unary message selector from the given primary expression context.
+    /// </summary>
+    /// <param name="context">The primary expression to analyze.</param>
+    /// <param name="selector">The resulting selector string if successful.</param>
+    /// <returns><see langword="true"/> if a selector was extracted; otherwise <see langword="false"/>.</returns>
+    private static bool TryGetUnarySelector(Smalltalk80Parser.PrimaryExpressionContext context, out string selector)
+    {
+        selector = string.Empty;
+        if (context.operand()?.reference()?.variable() is { } varCtx)
+        {
+            selector = varCtx.IDENTIFIER()?.GetText() ?? varCtx.CLASS()?.GetText() ?? string.Empty;
+            return selector.Length > 0;
+        }
+
+        return false;
     }
 
     /// <inheritdoc/>
