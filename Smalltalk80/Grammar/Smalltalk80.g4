@@ -1,8 +1,5 @@
 grammar Smalltalk80;
 
-// Unused parser rules: <c>methodDefinitionFile</c> and <c>methodDefinitionRepl</c> remain for
-// historical reference. Unused lexer tokens: <c>LT</c>, <c>GT</c> and <c>DOLLAR</c>.
-
 //////////////////////////////////////////////////////////////////////////
 // Parser Entry Points ////////////////////////////////////////////////////////////////////////
 
@@ -57,9 +54,8 @@ methodDefinitionWithBang: methodDefinition BANG;
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;
 
-//////////////////////////////////////////////////////////////////////////
-// REPL Rules /////////////////////////////////////////////////////////////
-// ////////////////////////////////////////////////////////////////////////
+////////////////
+// REPL Rules // /////////////
 
 // Header for a method category entered interactively in the REPL.
 methodCategoryHeaderRepl:
@@ -71,9 +67,8 @@ methodDefinitionRepl:
 	| methodSelector primitive
 	| methodSelector;
 
-//////////////////////////////////////////////////////////////////////////
-// Class & Metaclass Definitions + Comments
-// ////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////
+// Class & Metaclass Definitions + Comments ///////////////////////////////////////////
 
 classDefinition:
 	IDENTIFIER (
@@ -99,43 +94,10 @@ classOption:
 metaclassDefinition:
 	IDENTIFIER CLASS INSTANCE_VARIABLE_NAMES stringLiteral;
 
-//////////////////////////////////////////////////////////////////////////
-// 3) Base methodDefinition for REPL (no bangs) //
-// ////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// 3) Base methodDefinition for REPL (no bangs) // ///////////////////////////////////////////////
 
 // A method can be one of the following forms:
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
 methodDefinition:
 	methodSelector sequence // body and/or primitive
 	| methodSelector; // empty body
@@ -154,11 +116,11 @@ binarySelector: BINARY_SELECTOR | PIPE | MINUS;
 
 keywordSelector: keywordPart+;
 
-keywordPart: KEYWORD IDENTIFIER;
+keywordPart: (KEYWORD | COMMENT_KW) IDENTIFIER;
 
-//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 // 5) sequence: optional primitive placed before statements //
-// ////////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////
 
 // A "sequence" may declare temporaries. If a primitive declaration is present it must appear
 // immediately after the temporaries and before any statements. Statements are optional when a
@@ -170,39 +132,6 @@ sequence: temps? primitive? statements?;
 // ////////////////////////////////////////////////////////////////////////
 
 // We swallow runs of periods as separators, but we always consume at least one statement up front.
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-// 
-//
-
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
 statements: statement ( PERIOD+ statement)* PERIOD*;
@@ -213,8 +142,8 @@ statement:
 
 temps: PIPE variable+ PIPE;
 
-//////////////////////////////////////////////////////////////////////////
-// Statements & Expressions ////////////////////////////////////////////////////////////////////////
+/////////////////////////////
+// Statements & Expressions ///////////////////////////
 
 returnExpr: CARROT expression;
 
@@ -238,12 +167,14 @@ keywordExpression:
 // 4) top-level expression allows cascades
 expression: keywordExpression (cascadeMessage)*;
 
-// cascades re-send to the same receiver
 cascadeMessage:
 	';' (
-		unaryMessage
-		| (BINARY_SELECTOR | PIPE | MINUS) unaryExpression
-		| (KEYWORD | COMMENT_KW) unaryExpression
+		// any full message form:
+		unaryExpression // e.g. foo
+		| unaryExpression (
+			(BINARY_SELECTOR | PIPE | MINUS) unaryExpression
+		) // e.g. + bar
+		| keywordExpression // e.g. add: x to: y
 	);
 
 unaryMessage: IDENTIFIER | CLASS;
@@ -252,8 +183,8 @@ primaryExpression: assignment | operand | returnExpr;
 
 assignment: variable ASSIGNMENT expression;
 
-//////////////////////////////////////////////////////////////////////////
-// Operands & Literals //////////////////////////////////////////////////////////////////////
+/////////////////////////
+// Operands & Literals // ///////////////////////
 
 operand: literal | reference | subexpression | block;
 
@@ -268,9 +199,9 @@ literal: runtimeLiteral | parsetimeLiteral;
 runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 block:
-	BLOCK_START (blockParamList PIPE)? 		// optional “[:arg |” header
-	temps? 									// optional “| t1 t2 |”
-	statements? 							// zero or more statements
+	BLOCK_START (blockParamList PIPE)? // optional “[:arg |” header
+	temps? // optional “| t1 t2 |”
+	statements? // zero or more statements
 	BLOCK_END;
 
 blockParamList: BLOCK_PARAM+;
@@ -326,8 +257,8 @@ bareLiteralArray: OPEN_PAREN literalArrayRest;
 
 primitive: PRIMITIVE;
 
-//////////////////////////////////////////////////////////////////////////
-// Lexer Rules ////////////////////////////////////////////////////////////////////////
+////////////////
+// Lexer Rules //////////////
 
 // Recognize “comment:” separately so it doesn’t collide with other keywords
 COMMENT_KW: 'comment:';
