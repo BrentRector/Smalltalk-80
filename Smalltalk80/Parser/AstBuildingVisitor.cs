@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
+using Microsoft.CSharp.RuntimeBinder;
 using Smalltalk80.Generated;
 
 namespace Smalltalk80.Parser;
@@ -31,6 +32,43 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     private readonly IReadOnlyList<string> initialVariables;
     private readonly HashSet<string> instanceVariableSet;
     private readonly CommonTokenStream tokens;
+
+    /// <summary>
+    /// Extracts temporary variable names from a <see cref="Smalltalk80Parser.TempsContext"/>
+    /// using whichever rule names are available in the generated parser.
+    /// </summary>
+    /// <param name="tempsCtx">The context containing temporary variable declarations.</param>
+    /// <returns>An enumeration of the declared temporary variable names.</returns>
+    private static IEnumerable<string> GetTempNames(Smalltalk80Parser.TempsContext tempsCtx)
+    {
+        var varMethod = tempsCtx.GetType().GetMethod("variable", Type.EmptyTypes);
+        if (varMethod?.Invoke(tempsCtx, null) is IEnumerable<object> vars)
+            return vars.OfType<ParserRuleContext>().Select(v => v.GetText().Trim());
+
+        var idMethod = tempsCtx.GetType().GetMethod("IDENTIFIER", Type.EmptyTypes);
+        if (idMethod?.Invoke(tempsCtx, null) is IEnumerable<ITerminalNode> ids)
+            return ids.Select(id => id.GetText().Trim());
+
+        return Enumerable.Empty<string>();
+    }
+
+    /// <summary>
+    /// Extracts block parameter names from a <see cref="Smalltalk80Parser.BlockParamListContext"/>.
+    /// </summary>
+    /// <param name="ctx">The parameter list context.</param>
+    /// <returns>A list of parameter names in declaration order.</returns>
+    private static IReadOnlyList<string> GetBlockParameterNames(Smalltalk80Parser.BlockParamListContext ctx)
+    {
+        var paramMethod = ctx.GetType().GetMethod("BLOCK_PARAM", Type.EmptyTypes);
+        if (paramMethod?.Invoke(ctx, null) is IEnumerable<ITerminalNode> tokens)
+            return tokens.Select(t => t.GetText().TrimStart(':')).ToList();
+
+        var idMethod = ctx.GetType().GetMethod("IDENTIFIER", Type.EmptyTypes);
+        if (idMethod?.Invoke(ctx, null) is IEnumerable<ITerminalNode> ids)
+            return ids.Select(id => id.GetText()).ToList();
+
+        return Array.Empty<string>();
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
@@ -90,11 +128,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         if (extraTemps is not null)
             temps.AddRange(extraTemps);
         if (tempsCtx is { })
-        {
-            // Temporary variables are parsed using the <c>variable</c> rule
-            // which may include the <c>class</c> pseudo-variable.
-            temps.AddRange(tempsCtx.variable().Select(v => v.GetText().Trim()));
-        }
+            temps.AddRange(GetTempNames(tempsCtx));
 
         var current = scopeStack.Count > 0
             ? new HashSet<string>(scopeStack.Peek())
@@ -478,10 +512,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     public override AstNode VisitBlock(Smalltalk80Parser.BlockContext context)
     {
         List<string> parameters = context.blockParamList() is { } paramsCtx
-            ? [..paramsCtx.BLOCK_PARAM().Select(p => p.GetText().TrimStart(':'))]
+            ? new List<string>(GetBlockParameterNames(paramsCtx))
             : [];
 
-        var seq = ProcessSequence(context.temps(), null, context.statements());
+        // Newer grammars may encapsulate the block body in a <sequence> rule.
+        var seqMethod = context.GetType().GetMethod("sequence");
+        SequenceNode seq = seqMethod?.Invoke(context, null) is Smalltalk80Parser.SequenceContext sc
+            ? ProcessSequence(sc)
+            : ProcessSequence(context.temps(), null, context.statements());
         return new BlockExpression(parameters, seq);
     }
 
