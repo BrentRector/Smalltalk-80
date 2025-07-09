@@ -224,11 +224,11 @@ runtimeLiteral: dynamicDictionary | dynamicArray | block;
 
 // 1) params: “:x :y |” or “:x :y” (pipe optional if no temps follow)
 blockParamList
-    : COLON IDENTIFIER+
+    : (COLON (IDENTIFIER | CLASS))+ 
     ;
 
 // 2) temps: “| a b |”
-temps: PIPE IDENTIFIER+ PIPE;
+temps: PIPE (IDENTIFIER | CLASS)+ PIPE;
 
 // 3) body of a block  
 blockStatements: statement ( PERIOD+ statement)* PERIOD?;
