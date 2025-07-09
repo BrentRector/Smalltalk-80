@@ -112,6 +112,14 @@ metaclassDefinition:
 //
 // 
 //
+// 
+//
+// 
+//
+// 
+//
+// 
+//
 methodDefinition:
 	methodSelector sequence // body and/or primitive
 	| methodSelector; // empty body
@@ -154,6 +162,14 @@ sequence: temps? primitive? statements?;
 //
 // 
 //
+// 
+//
+// 
+//
+// 
+//
+// 
+//
 
 // • statement – first, required • ( PERIOD+ statement )* – zero or more “. stmt” • PERIOD* – any
 // trailing dots
@@ -174,28 +190,30 @@ answer: returnExpr PERIOD?;
 
 expressions: (expression (PERIOD expression)*)?;
 
-expression: messageChain (cascadeMessage)*;
+// 1) group primary + unary messages
+unaryExpression: primaryExpression (unaryMessage)*;
 
-messageChain:
-	primaryExpression (
-		unaryMessage
-		| binaryMessage
-		| keywordMessage
+// 2) binary operators bind tighter than keywords
+binaryExpression:
+	unaryExpression (
+		(BINARY_SELECTOR | PIPE | MINUS) unaryExpression
 	)*;
 
+// 3) keyword messages bind tighter than cascades
+keywordExpression: binaryExpression (KEYWORD binaryExpression)*;
+
+// 4) top-level expression allows cascades
+expression: keywordExpression (cascadeMessage)*;
+
+// cascades re-send to the same receiver
 cascadeMessage:
-	';' (unaryMessage | binaryMessage | keywordMessage);
+	';' (
+		unaryMessage
+		| (BINARY_SELECTOR | PIPE | MINUS) unaryExpression
+		| KEYWORD unaryExpression
+	);
 
 unaryMessage: IDENTIFIER | CLASS;
-
-// Binary messages may use the standard selector characters or the pipe character used for logical disjunction.
-binaryMessage: (BINARY_SELECTOR | PIPE | MINUS) unaryExpression;
-
-unaryExpression
-  : primaryExpression (unaryMessage)*
-  ;
-
-keywordMessage: (KEYWORD expression)+;
 
 primaryExpression: assignment | operand | returnExpr;
 
