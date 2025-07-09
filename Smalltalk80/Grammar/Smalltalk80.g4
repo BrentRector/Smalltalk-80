@@ -49,8 +49,10 @@ methodCategoryHeaderFile:
 
 // Definition of a method that must end in a bang. The actual method body is parsed using
 // <c>methodDefinition</c> to allow optional primitives and statements.
-methodDefinitionWithBang:
-	methodSelector sequence? BANG; // parse optional body followed by '!'
+methodDefinitionWithBang
+    : methodSelector sequence BANG    // non-empty method body + bang
+    | methodSelector BANG             // selector with zero-body + bang
+    ;
 
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;
@@ -221,7 +223,9 @@ runtimeLiteral: dynamicDictionary | dynamicArray | block;
 // body” [ :x :y x + y ] “params + no pipe + body”
 
 // 1) params: “:x :y |” or “:x :y” (pipe optional if no temps follow)
-blockParamList: (COLON IDENTIFIER)+ PIPE?;
+blockParamList
+    : COLON IDENTIFIER+
+    ;
 
 // 2) temps: “| a b |”
 temps: PIPE IDENTIFIER+ PIPE;
@@ -230,14 +234,19 @@ temps: PIPE IDENTIFIER+ PIPE;
 blockStatements: statement ( PERIOD+ statement)* PERIOD?;
 
 // 4) the block itself
-block:
-	BLOCK_START
-	// optional header (params, temps, or both)
-	(
-		blockParamList temps? // params then maybe temps
-		| temps // temps only
-	)? blockStatements? // optional body in any case
-	BLOCK_END;
+block
+    : BLOCK_START
+        (
+            // params (with optional trailing pipe if no temps follow)
+            blockParamList PIPE? temps?
+        |   // temps only
+            temps
+        |   // no header
+            /* ε */
+        )
+        blockStatements?
+      BLOCK_END
+    ;
 
 dynamicArray:
 	DYNARR_START (expression (PERIOD expression)*)? DYNARR_END;
