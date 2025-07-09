@@ -43,9 +43,8 @@ public static class FileInReader
                     chunks.Add(header);
                     foreach (var methodWithBang in methodChunk.methodDefinitionWithBang())
                     {
-                        var innerMethod = methodWithBang.methodDefinition();
-                        var method = (MethodDefinitionNode)visitor.Visit(innerMethod)!;
-                        var seqCtx = innerMethod.sequence();
+                        var method = (MethodDefinitionNode)visitor.Visit(methodWithBang)!;
+                        var seqCtx = methodWithBang.sequence();
                         int start;
                         int end;
                         string bodyText;
@@ -59,8 +58,8 @@ public static class FileInReader
                         }
                         else
                         {
-                            start = innerMethod.Start.StartIndex;
-                            end = innerMethod.Stop.StopIndex;
+                            start = methodWithBang.Start.StartIndex;
+                            end = methodWithBang.Stop.StopIndex;
                             bodyText = string.Empty;
                         }
                         method = method with { Source = bodyText };
