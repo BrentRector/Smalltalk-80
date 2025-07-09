@@ -163,6 +163,56 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         return node;
     }
 
+    /// <summary>
+    /// Processes a block's temporaries and statements to build a <see cref="SequenceNode"/>.
+    /// </summary>
+    /// <param name="tempsCtx">The optional temporary variable declarations.</param>
+    /// <param name="statementsCtx">The optional statements forming the block body.</param>
+    /// <returns>The constructed <see cref="SequenceNode"/>.</returns>
+    private SequenceNode ProcessBlockSequence(
+        Smalltalk80Parser.TempsContext? tempsCtx,
+        Smalltalk80Parser.BlockStatementsContext? statementsCtx)
+    {
+        var scopeName = scopeDepth == 0
+            ? (currentMethodName ?? "(unknown)")
+            : $"block {scopeDepth}";
+        Tracer.Log($"Push scope {scopeName}: {scopeDepth + 1}");
+        scopeDepth++;
+
+        var temps = new List<string>();
+        if (tempsCtx is { })
+            temps.AddRange(GetTempNames(tempsCtx));
+
+        var current = scopeStack.Count > 0
+            ? new HashSet<string>(scopeStack.Peek())
+            : new HashSet<string>(scopeDepth == 1 ? argumentNames.Concat(initialVariables) : Array.Empty<string>());
+        foreach (var t in temps)
+            current.Add(t);
+        scopeStack.Push(current);
+
+        if (temps.Count > 0)
+            Tracer.Log($"Temps: {string.Join(", ", temps)}");
+
+        if (instanceVariableSet.Count > 0)
+            Tracer.Log($"Instance variables in scope: {string.Join(", ", instanceVariableSet)}");
+
+        var locals = current.Where(v => !instanceVariableSet.Contains(v));
+        Tracer.Log($"Local variables in scope: {string.Join(", ", locals)}");
+
+        var statements = new List<StatementNode>();
+        if (statementsCtx is { })
+        {
+            foreach (var stmtCtx in statementsCtx.statement())
+                statements.Add((StatementNode)Visit(stmtCtx)!);
+        }
+
+        var node = new SequenceNode(temps, statements);
+        scopeStack.Pop();
+        scopeDepth--;
+        Tracer.Log($"Pop scope {scopeName}: {scopeDepth}");
+        return node;
+    }
+
     /// <inheritdoc/>
     public override AstNode VisitStatement(Smalltalk80Parser.StatementContext context)
     {
@@ -517,9 +567,26 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
 
         // Newer grammars may encapsulate the block body in a <sequence> rule.
         var seqMethod = context.GetType().GetMethod("sequence");
-        SequenceNode seq = seqMethod?.Invoke(context, null) is Smalltalk80Parser.SequenceContext sc
-            ? ProcessSequence(sc)
-            : ProcessSequence(context.temps(), null, context.statements());
+        SequenceNode seq;
+        if (seqMethod?.Invoke(context, null) is Smalltalk80Parser.SequenceContext sc)
+        {
+            seq = ProcessSequence(sc);
+        }
+        else
+        {
+            var blockMethod = context.GetType().GetMethod("blockStatements");
+            if (blockMethod?.Invoke(context, null) is Smalltalk80Parser.BlockStatementsContext blockStmts)
+            {
+                seq = ProcessBlockSequence(context.temps(), blockStmts);
+            }
+            else
+            {
+                var legacy = context.GetType().GetMethod("statements");
+                seq = legacy?.Invoke(context, null) is Smalltalk80Parser.StatementsContext stmts
+                    ? ProcessSequence(context.temps(), null, stmts)
+                    : ProcessSequence(context.temps(), null, null);
+            }
+        }
         return new BlockExpression(parameters, seq);
     }
 
