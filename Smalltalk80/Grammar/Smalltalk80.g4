@@ -78,7 +78,7 @@ classDefinition:
 		| 'variableSubclass:'
 		| 'variableByteSubclass:'
 		| 'variableWordSubclass:'
-	) HASH IDENTIFIER (classOption)*;
+	) UNQUOTED_SYMBOL_SIMPLE (classOption)*;
 
 // 'comment:' is a standard keyword, but we want tO use the dedicated literal token COMMENT_KW. This
 // enables the lexer to generate a specialized token helping the visitor to locate standlone class
@@ -255,10 +255,12 @@ parsetimeLiteral:
 	| stringLiteral
 	| symbol;
 
-symbol:
-	UNQUOTED_SYMBOL_KEYWORD // #foo:bar:baz:
-	| UNQUOTED_SYMBOL_SIMPLE // #foo
-	| QUOTED_SYMBOL ; // #'some quoted string'
+symbol
+  : UNQUOTED_SYMBOL_KEYWORD   // e.g. #foo:bar:baz:
+  | UNQUOTED_SYMBOL_SIMPLE    // e.g. #foo
+  | HASH STRING               // e.g. #'any text—even with # inside'
+  ;
+
 
 number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
 
@@ -287,20 +289,21 @@ primitive: PRIMITIVE;
 ////////////////
 // Lexer Rules //////////////
 
-// ------- 1a) multi-keyword unquoted symbols e.g. #foo:bar:baz: (at least one “ident:`” piece)
-UNQUOTED_SYMBOL_KEYWORD: '#' ( [a-zA-Z] [a-zA-Z0-9_]* ':')+;
+// 1a) multi‐keyword unquoted symbols, no spaces:  #foo:bar:baz:
+UNQUOTED_SYMBOL_KEYWORD
+  : '#' [A-Za-z][A-Za-z0-9_]* (':' [A-Za-z][A-Za-z0-9_]*)+ 
+  ;
 
-// 1b) simple unquoted symbols e.g. #foo or #HierarchyViolation (just an ident, no colons)
-UNQUOTED_SYMBOL_SIMPLE: '#' [a-zA-Z] [a-zA-Z0-9_]*;
+// 1b) simple unquoted symbols:  #foo or #HierarchyViolation
+UNQUOTED_SYMBOL_SIMPLE
+  : '#' [A-Za-z][A-Za-z0-9_]* 
+  ;
 
-// quoted symbols, with full string‐literal syntax (disallows newlines, allows & doubled quotes):
-QUOTED_SYMBOL:
-	'#' '\'' // the leading #'
-	(
-		// then zero or more of
-		~['\r\n] //   any char except ' or a newline
-		| '\'\'' //   or two single-quotes in a row
-	)* '\'';
+// then your normal STRING rule (which already lets you embed # safely)
+STRING
+  : '\'' (~['] | '\'\'' )* '\''
+  ;
+
 
 //
 // The above must precede the KEYWORD and IDENTIFIER rules.
@@ -320,8 +323,7 @@ POOL_DICTIONARIES: 'poolDictionaries:';
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
 
-// STRING: single-quoted literals (must come before COMMENT and SEPARATOR)
-STRING: '\'' ( ~['] | '\'\'')* '\'';
+
 // all inline comments vanish into HIDDEN:
 COMMENT: '"' ( ~["] | '""')* '"' -> channel(HIDDEN);
 
