@@ -79,64 +79,6 @@ public sealed class VirtualMachine
         return Interpreter.Evaluate(method, receiver);
     }
 
-    /// <summary>
-    /// Starts an interactive REPL session using this virtual machine.
-    /// </summary>
-    public void RunRepl()
-    {
-        Console.WriteLine("Smalltalk-80 REPL. Type 'exit' to quit.");
-
-        var buffer = new StringBuilder();
-        while (true)
-        {
-            Console.Write(buffer.Length > 0 ? "... " : "st> ");
-            var line = Console.ReadLine();
-            if (line is null)
-                break;
-
-            if (buffer.Length == 0 && line.Trim().Equals("exit", StringComparison.OrdinalIgnoreCase))
-                break;
-
-            buffer.AppendLine(line);
-
-            var source = buffer.ToString();
-            try
-            {
-                if (!IsCompleteReplUnit(source))
-                    continue;
-
-                var result = EvaluateSource(source);
-                Console.WriteLine($"=> {result}");
-                buffer.Clear();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"! {ex.Message}");
-                buffer.Clear();
-            }
-        }
-    }
-
-    private static bool IsCompleteReplUnit(string source)
-    {
-        var input = new AntlrInputStream(source);
-        var lexer = new Smalltalk80Lexer(input);
-        var tokens = new CommonTokenStream(lexer);
-        var parser = new Smalltalk80Parser(tokens)
-        {
-            ErrorHandler = new BailErrorStrategy()
-        };
-        parser.RemoveErrorListeners();
-        try
-        {
-            parser.replUnit();
-            return true;
-        }
-        catch (ParseCanceledException ex) when (ex.InnerException is InputMismatchException { OffendingToken.Type: TokenConstants.EOF })
-        {
-            return false;
-        }
-    }
 
     private static (string Selector, List<string> Arguments) ParseSelector(string line)
     {

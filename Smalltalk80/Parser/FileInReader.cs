@@ -32,54 +32,8 @@ public static class FileInReader
 
         foreach (var chunk in fileCtx.chunk())
         {
-            switch (chunk)
-            {
-                case Smalltalk80Parser.ClassChunkContext classChunk:
-                    chunks.Add((AstNode)visitor.Visit(classChunk.classDefinition())!);
-                    break;
-
-                case Smalltalk80Parser.MethodCategoryChunkContext methodChunk:
-                    var header = (MethodHeaderNode)visitor.Visit(methodChunk.methodCategoryHeaderFile())!;
-                    chunks.Add(header);
-                    foreach (var methodWithBang in methodChunk.methodDefinitionWithBang())
-                    {
-                        var method = (MethodDefinitionNode)visitor.Visit(methodWithBang)!;
-                        var seqCtx = methodWithBang.sequence();
-                        int start;
-                        int end;
-                        string bodyText;
-                        if (seqCtx is not null)
-                        {
-                            start = seqCtx.Start.StartIndex;
-                            end = seqCtx.Stop.StopIndex;
-                            bodyText = end < start
-                                ? string.Empty
-                                : source.Substring(start, end - start + 1);
-                        }
-                        else
-                        {
-                            start = methodWithBang.Start.StartIndex;
-                            end = methodWithBang.Stop.StopIndex;
-                            bodyText = string.Empty;
-                        }
-                        method = method with { Source = bodyText };
-                        chunks.Add(method);
-                    }
-                    break;
-
-                case Smalltalk80Parser.ClassCommentChunkContext commentChunk:
-                    chunks.Add((AstNode)visitor.Visit(commentChunk.classComment())!);
-                    break;
-
-                case Smalltalk80Parser.ScriptChunkContext scriptChunk:
-                    var seq = (SequenceNode)visitor.Visit(scriptChunk.sequence())!;
-                    chunks.Add(new ScriptNode(seq));
-                    break;
-
-                case Smalltalk80Parser.StandaloneCommentChunkContext standalone:
-                    chunks.Add((AstNode)visitor.Visit(standalone)!);
-                    break;
-            }
+            if (visitor.Visit(chunk) is AstNode node)
+                chunks.Add(node);
         }
 
         return new FileNode(chunks);

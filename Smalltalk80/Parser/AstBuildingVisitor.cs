@@ -148,7 +148,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 
         if (context.binarySelector() != null)
         {
-            var arg = context.formalArg().GetText();
+            var arg = context.formalArg(0).GetText();
             return new MethodHeaderParts(context.binarySelector().GetText(), [arg]);
         }
 
