@@ -294,16 +294,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitKeywordExpression(Smalltalk80Parser.KeywordExpressionContext context)
     {
-        var binaries = context.binaryExpression();
-        ExpressionNode receiver = (ExpressionNode)Visit(binaries[0])!;
+        ExpressionNode receiver = (ExpressionNode)Visit(context.binaryExpression())!;
 
-        var keywords = context.KEYWORD();
+        var keywords = context.KEYWORD().Concat(context.COMMENT_KW()).ToArray();
         if (keywords.Length == 0)
             return receiver;
 
-        var args = new List<ParserRuleContext>();
-        for (var i = 1; i < binaries.Length; i++)
-            args.Add(binaries[i]);
+        var args = context.expression().Cast<ParserRuleContext>().ToList();
 
         return ApplyKeywordMessage(receiver, keywords, args);
     }
@@ -372,10 +369,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
         if (cascade.keywordExpression() is { } kwExpr)
         {
             var keywords = kwExpr.KEYWORD().Concat(kwExpr.COMMENT_KW()).ToArray();
-            var binaries = kwExpr.binaryExpression();
-            var args = new List<ParserRuleContext>();
-            for (var i = 1; i < binaries.Length; i++)
-                args.Add(binaries[i]);
+            var args = kwExpr.expression().Cast<ParserRuleContext>().ToList();
             return ApplyKeywordMessage(receiver, keywords, args);
         }
 
