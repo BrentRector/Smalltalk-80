@@ -49,10 +49,9 @@ methodCategoryHeaderFile:
 
 // Definition of a method that must end in a bang. The actual method body is parsed using
 // <c>methodDefinition</c> to allow optional primitives and statements.
-methodDefinitionWithBang
-    : methodSelector sequence BANG    // non-empty method body + bang
-    | methodSelector BANG             // selector with zero-body + bang
-    ;
+methodDefinitionWithBang:
+	methodSelector sequence BANG // non-empty method body + bang
+	| methodSelector BANG ; // selector with zero-body + bang
 
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;
@@ -223,9 +222,7 @@ runtimeLiteral: dynamicDictionary | dynamicArray | block;
 // body” [ :x :y x + y ] “params + no pipe + body”
 
 // 1) params: “:x :y |” or “:x :y” (pipe optional if no temps follow)
-blockParamList
-    : (COLON (IDENTIFIER | CLASS))+ 
-    ;
+blockParamList: (COLON (IDENTIFIER | CLASS))+;
 
 // 2) temps: “| a b |”
 temps: PIPE (IDENTIFIER | CLASS)+ PIPE;
@@ -234,19 +231,15 @@ temps: PIPE (IDENTIFIER | CLASS)+ PIPE;
 blockStatements: statement ( PERIOD+ statement)* PERIOD?;
 
 // 4) the block itself
-block
-    : BLOCK_START
-        (
-            // params (with optional trailing pipe if no temps follow)
-            blockParamList PIPE? temps?
-        |   // temps only
-            temps
-        |   // no header
-            /* ε */
-        )
-        blockStatements?
-      BLOCK_END
-    ;
+block:
+	BLOCK_START (
+		// params (with optional trailing pipe if no temps follow)
+		blockParamList PIPE? temps?
+		| // temps only
+		temps
+		| // no header
+		/* ε */
+	) blockStatements? BLOCK_END;
 
 dynamicArray:
 	DYNARR_START (expression (PERIOD expression)*)? DYNARR_END;
@@ -261,6 +254,11 @@ parsetimeLiteral:
 	| literalArray
 	| stringLiteral
 	| symbol;
+
+symbol:
+	UNQUOTED_SYMBOL_KEYWORD // #foo:bar:baz:
+	| UNQUOTED_SYMBOL_SIMPLE // #foo
+	| QUOTED_SYMBOL ; // #'some quoted string'
 
 number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
 
@@ -278,22 +276,9 @@ pseudoVariable: RESERVED_WORD;
 
 stringLiteral: STRING;
 
-symbol: HASH bareSymbol;
-
-bareSymbol:
-	IDENTIFIER
-	| BINARY_SELECTOR
-	| PIPE
-	| KEYWORD+
-	| stringLiteral;
-
 literalArray: LITARR_START literalArrayRest;
 
-literalArrayRest: (
-		parsetimeLiteral
-		| bareLiteralArray
-		| bareSymbol
-	)* CLOSE_PAREN;
+literalArrayRest: (parsetimeLiteral | bareLiteralArray | symbol)* CLOSE_PAREN;
 
 bareLiteralArray: OPEN_PAREN literalArrayRest;
 
@@ -301,6 +286,26 @@ primitive: PRIMITIVE;
 
 ////////////////
 // Lexer Rules //////////////
+
+// ------- 1a) multi-keyword unquoted symbols e.g. #foo:bar:baz: (at least one “ident:`” piece)
+UNQUOTED_SYMBOL_KEYWORD: '#' ( [a-zA-Z] [a-zA-Z0-9_]* ':')+;
+
+// 1b) simple unquoted symbols e.g. #foo or #HierarchyViolation (just an ident, no colons)
+UNQUOTED_SYMBOL_SIMPLE: '#' [a-zA-Z] [a-zA-Z0-9_]*;
+
+// quoted symbols, with full string‐literal syntax (disallows newlines, allows & doubled quotes):
+QUOTED_SYMBOL:
+	'#' '\'' // the leading #'
+	(
+		// then zero or more of
+		~['\r\n] //   any char except ' or a newline
+		| '\'\'' //   or two single-quotes in a row
+	)* '\'';
+
+//
+// The above must precede the KEYWORD and IDENTIFIER rules.
+// 
+//
 
 // Recognize “comment:” separately so it doesn’t collide with other keywords
 COMMENT_KW: 'comment:';
@@ -315,13 +320,13 @@ POOL_DICTIONARIES: 'poolDictionaries:';
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
 
-// whitespace
-SEPARATOR: [ \t\r\n\u000C]+ -> skip;
-
-// STRING: single-quoted literals (must come before COMMENT)
+// STRING: single-quoted literals (must come before COMMENT and SEPARATOR)
 STRING: '\'' ( ~['] | '\'\'')* '\'';
 // all inline comments vanish into HIDDEN:
 COMMENT: '"' ( ~["] | '""')* '"' -> channel(HIDDEN);
+
+// whitespace
+SEPARATOR: [ \t\r\n\u000C]+ -> skip;
 
 BLOCK_START: '[';
 BLOCK_END: ']';
