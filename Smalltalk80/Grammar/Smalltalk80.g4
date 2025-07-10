@@ -153,13 +153,12 @@ arrayLiteral: HASH '(' arrayElement* ')';
 arrayElement: literal | symbolName;
 
 symbolConst:
-	QUOTED_SYMBOL
-	| HASH (
-		'-'
-		| unarySelector
-		| binarySelector
-		| keywordSymbolSelector
-	);
+        QUOTED_SYMBOL
+        | HASH (
+                unarySelector
+                | binarySelector
+                | keywordSymbolSelector
+        );
 
 symbolName:
 	IDENTIFIER
