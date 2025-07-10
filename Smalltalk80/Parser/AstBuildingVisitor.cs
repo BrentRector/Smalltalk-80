@@ -180,18 +180,93 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 
 
     /// <summary>
-    /// Visits a sequence of statements. The skeleton currently returns an empty
-    /// sequence because expression handling has not been implemented.
+    /// Visits a sequence of statements and builds a <see cref="SequenceNode"/>
+    /// containing the evaluated statements. Temporaries are not yet supported.
     /// </summary>
     public override object? VisitStatements(Smalltalk80Parser.StatementsContext context)
-        => new SequenceNode(new List<string>(), new List<StatementNode>());
+    {
+        var statements = new List<StatementNode>();
+        foreach (var stmt in context.statement())
+        {
+            if (Visit(stmt) is StatementNode node)
+                statements.Add(node);
+        }
+
+        return new SequenceNode(new List<string>(), statements);
+    }
 
     /// <summary>
-    /// Visits an individual statement. Expressions are not yet supported, so a
-    /// placeholder <see cref="ExpressionStatement"/> is returned.
+    /// Visits an individual statement and converts it into either an
+    /// <see cref="AnswerStatement"/> or <see cref="ExpressionStatement"/>.
     /// </summary>
     public override object? VisitStatement(Smalltalk80Parser.StatementContext context)
-        => new ExpressionStatement(new LiteralExpression(0));
+        => context.answer() != null
+            ? Visit(context.answer())
+            : new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
+
+    /// <inheritdoc />
+    public override object? VisitAnswer(Smalltalk80Parser.AnswerContext context)
+        => new AnswerStatement((ExpressionNode)Visit(context.returnExpr())!);
+
+    /// <inheritdoc />
+    public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
+        => Visit(context.expression());
+
+    /// <inheritdoc />
+    public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
+    {
+        var variable = context.assignable().variable().IDENTIFIER().GetText();
+        var value = (ExpressionNode)Visit(context.expression())!;
+        return new AssignmentExpression(variable, value);
+    }
+
+    /// <inheritdoc />
+    public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
+        => Visit(context.keywordSend());
+
+    /// <inheritdoc />
+    public override object? VisitKeywordSend(Smalltalk80Parser.KeywordSendContext context)
+    {
+        var receiver = (ExpressionNode)Visit(context.binarySend())!;
+        if (context.keywordMessage().Length == 0)
+            return receiver;
+
+        var parts = new List<string>();
+        var args = new List<ExpressionNode>();
+        foreach (var part in context.keywordMessage(0).keywordPart())
+        {
+            parts.Add(part.IDENTIFIER().GetText() + ":");
+            args.Add((ExpressionNode)Visit(part.expression())!);
+        }
+
+        return new KeywordSendExpression(receiver, parts, args);
+    }
+
+    /// <inheritdoc />
+    public override object? VisitBinarySend(Smalltalk80Parser.BinarySendContext context)
+    {
+        var expr = (ExpressionNode)Visit(context.unarySend())!;
+        foreach (var msg in context.binaryMessage())
+        {
+            var selector = msg.binarySelector().GetText();
+            var arg = (ExpressionNode)Visit(msg.unaryExpression())!;
+            expr = new BinarySendExpression(expr, selector, arg);
+        }
+
+        return expr;
+    }
+
+    /// <inheritdoc />
+    public override object? VisitUnarySend(Smalltalk80Parser.UnarySendContext context)
+    {
+        var expr = (ExpressionNode)Visit(context.primary())!;
+        foreach (var msg in context.unaryMessage())
+        {
+            expr = new UnarySendExpression(expr, msg.unarySelector().GetText());
+        }
+
+        return expr;
+    }
 
     /// <summary>
     /// Visits a primary variable and returns a <see cref="VariableExpression"/>.
