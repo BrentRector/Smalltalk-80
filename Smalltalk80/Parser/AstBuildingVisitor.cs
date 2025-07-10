@@ -614,10 +614,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<AstNode>
     /// <inheritdoc/>
     public override AstNode VisitClassDefinition(Smalltalk80Parser.ClassDefinitionContext context)
     {
-        var className = context.IDENTIFIER(1).GetText();
+        var superclass = context.IDENTIFIER().GetText();
+        var className = context.UNQUOTED_SYMBOL_SIMPLE().GetText().TrimStart('#');
         Tracer.Log($"Parsing class definition: {className}");
 
-        var superclass = context.IDENTIFIER(0).GetText();
         var instanceVars = new List<string>();
         var classVars = new List<string>();
         var pools = new List<string>();

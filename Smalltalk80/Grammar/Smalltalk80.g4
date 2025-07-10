@@ -51,7 +51,7 @@ methodCategoryHeaderFile:
 // <c>methodDefinition</c> to allow optional primitives and statements.
 methodDefinitionWithBang:
 	methodSelector sequence BANG // non-empty method body + bang
-	| methodSelector BANG ; // selector with zero-body + bang
+	| methodSelector BANG; // selector with zero-body + bang
 
 // Unused: legacy form of a method definition terminated by '!'.
 methodDefinitionFile: methodSelector BANG;
@@ -163,9 +163,10 @@ binaryExpression:
 		(BINARY_SELECTOR | PIPE | MINUS) unaryExpression
 	)*;
 
-// 3) keyword messages bind tighter than cascades
+// 3) keyword messages bind tighter than cascades now each KEYWORD can consume a full expression
+// (block, array, another keyword send…)
 keywordExpression:
-	binaryExpression ((KEYWORD | COMMENT_KW) binaryExpression)*;
+	binaryExpression ((KEYWORD | COMMENT_KW) expression)*;
 
 // 4) top-level expression allows cascades
 expression: keywordExpression (cascadeMessage)*;
@@ -255,12 +256,10 @@ parsetimeLiteral:
 	| stringLiteral
 	| symbol;
 
-symbol
-  : UNQUOTED_SYMBOL_KEYWORD   // e.g. #foo:bar:baz:
-  | UNQUOTED_SYMBOL_SIMPLE    // e.g. #foo
-  | HASH STRING               // e.g. #'any text—even with # inside'
-  ;
-
+symbol:
+	UNQUOTED_SYMBOL_KEYWORD // e.g. #foo:bar:baz:
+	| UNQUOTED_SYMBOL_SIMPLE // e.g. #foo
+	| HASH STRING; // e.g. #'any text—even with # inside'
 
 number: numberExp | hex_ | stFloat | stInteger | RADIX_INT;
 
@@ -280,7 +279,11 @@ stringLiteral: STRING;
 
 literalArray: LITARR_START literalArrayRest;
 
-literalArrayRest: (parsetimeLiteral | bareLiteralArray | symbol)* CLOSE_PAREN;
+literalArrayRest: (
+		parsetimeLiteral // covers numbers, chars, nested #(...), stringLiterals, symbolLiterals
+		| bareLiteralArray // covers ( … ) inside a literal array
+		| IDENTIFIER // bare names → symbol constants
+	)* CLOSE_PAREN;
 
 bareLiteralArray: OPEN_PAREN literalArrayRest;
 
@@ -290,23 +293,37 @@ primitive: PRIMITIVE;
 // Lexer Rules //////////////
 
 // 1a) multi‐keyword unquoted symbols, no spaces:  #foo:bar:baz:
-UNQUOTED_SYMBOL_KEYWORD
-  : '#' [A-Za-z][A-Za-z0-9_]* (':' [A-Za-z][A-Za-z0-9_]*)+ 
-  ;
+UNQUOTED_SYMBOL_KEYWORD:
+	'#' [A-Za-z][A-Za-z0-9_]* ':' // at least one trailing colon
+	([A-Za-z][A-Za-z0-9_]* ':')*; // plus zero or more “ident:”
 
-// 1b) simple unquoted symbols:  #foo or #HierarchyViolation
-UNQUOTED_SYMBOL_SIMPLE
-  : '#' [A-Za-z][A-Za-z0-9_]* 
-  ;
+// allow both “#foo” and “#+” or “#<=” etc. as one token before KEYWORD/IDENTIFIER simple unquoted
+// symbols: either #foo-style or #+*-/…-style
+UNQUOTED_SYMBOL_SIMPLE:
+	'#' (
+		[A-Za-z] [A-Za-z0-9_]* // plain-name symbols, e.g. #foo, #Bar2
+		| [+\-*/=><,@%~|&?\\]+ // binary‐char runs, e.g. #+, #<=, #>>|~<<, #\\, etc.
+	);
 
 // then your normal STRING rule (which already lets you embed # safely)
-STRING
-  : '\'' (~['] | '\'\'' )* '\''
-  ;
-
+STRING: '\'' (~['] | '\'\'')* '\'';
 
 //
 // The above must precede the KEYWORD and IDENTIFIER rules.
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
+// 
+//
 // 
 //
 
@@ -322,7 +339,6 @@ POOL_DICTIONARIES: 'poolDictionaries:';
 // KEYWORD must appear before IDENTIFIER so that ifTrue: → KEYWORD
 KEYWORD: [a-zA-Z] [a-zA-Z0-9_]* COLON;
 IDENTIFIER: [a-zA-Z] [a-zA-Z0-9_]*;
-
 
 // all inline comments vanish into HIDDEN:
 COMMENT: '"' ( ~["] | '""')* '"' -> channel(HIDDEN);
