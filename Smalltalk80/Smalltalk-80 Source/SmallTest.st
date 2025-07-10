@@ -1,9 +1,8 @@
-!Browser methodsFor: 'text'!
-textMenu
-	"Browser flushMenus"
-	TextMenu == nil ifTrue:
-		[TextMenu _ ActionMenu
-			labels: 'again\undo\copy\cut\paste\do it\print it\accept\cancel\format\spawn\explain' withCRs
-			lines: #(2 5 7 9)
-			selectors: #(again undo copySelection cut paste doIt printIt accept cancel format spawnEdits:from: explain)].
-	^ TextMenu! !
+!ActionMenu class methodsFor: 'instance creation'!
+labels: aString lines: anArray selectors: selArray
+	| aMenu |
+	aMenu _ self labels: aString lines: anArray.
+	aMenu setSelectors: selArray.
+	^ aMenu!
+labels: aString selectors: selArray
+	^ self labels: aString lines: nil selectors: selArray! !

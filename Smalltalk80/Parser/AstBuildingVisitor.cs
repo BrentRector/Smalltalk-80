@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
 using Smalltalk80.Generated;
 
 namespace Smalltalk80.Parser;
@@ -152,14 +153,32 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             return new MethodHeaderParts(context.binarySelector().GetText(), [arg]);
         }
 
-        if (context.keywordSelector() != null)
+        // Keyword selector case — we now look for IDENTIFIER COLON and formalArg pairs
+        var selector = "";
+        var args = new List<string>();
+
+        // Count how many keyword parts (should equal number of formalArgs)
+        int partCount = context.children.Count / 2; // assuming (IDENTIFIER COLON formalArg)+
+                                                    // Keyword selector case — we now look for IDENTIFIER COLON and formalArg pairs
+        selector = "";
+        args = new List<string>();
+
+        var formals = context.formalArg(); // correctly call method to get FormalArgContext[]
+        for (int i = 0; i < context.ChildCount - 1; i++)
         {
-            var args = context.formalArg().Select(a => a.GetText()).ToList();
-            return new MethodHeaderParts(context.keywordSelector().GetText(), args);
+            if (context.children[i] is ITerminalNode id && id.Symbol.Type == Smalltalk80Parser.IDENTIFIER &&
+                context.children[i + 1] is ITerminalNode colon && colon.Symbol.Type == Smalltalk80Parser.COLON)
+            {
+                selector += id.GetText() + ":";
+                if (formals.Length > args.Count)
+                    args.Add(formals[args.Count].GetText());
+            }
         }
 
-        return null;
+
+        return new MethodHeaderParts(selector, args);
     }
+
 
     /// <summary>
     /// Visits a sequence of statements. The skeleton currently returns an empty

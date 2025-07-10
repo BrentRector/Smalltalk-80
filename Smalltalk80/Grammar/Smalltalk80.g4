@@ -1,235 +1,206 @@
 grammar Smalltalk80;
 
-// ───────────────────────────────────────────
-//  Entry point
-// ───────────────────────────────────────────
-fileIn : chunk* EOF ;
+/*
+───────────────────────────────────────────────────────────
+ Important Contextual Distinction
+───────────────────────────────────────────────────────────
+| Use case                      | Rule used                         |
+|------------------------------|-----------------------------------|
+| Message send (e.g., `a at: i`) | `keywordMessage` with arguments   |
+| Method header (e.g., `at:put:`) | `(IDENTIFIER COLON formalArg)+`  |
+| Symbol (e.g., `#at:put:`)     | `keywordSymbolSelector`           |
+*/
 
-// ───────────────────────────────────────────
-//  Chunks (classic file‑out units)
-// ───────────────────────────────────────────
+// ─────────────────────────────────────────── Entry point
+fileIn: chunk* EOF;
+
+// ─────────────────────────────────────────── Chunks
 chunk
-    : classDefChunk
-    | classCommentChunk
-    | methodCategoryChunk
-    | separatorChunk
-    ;
+  : metaclassCommentChunk
+  | metaclassDefinitionChunk
+  | classCommentChunk
+  | classDefChunk
+  | methodCategoryChunk
+  | separatorChunk
+  | BANG
+  ;
 
-// ── Class definition chunk ────────────────
-classDefChunk : classHeader classBody BANG ;
+// ─────────────────────────────────────────── Class definitions
+classDefChunk: classHeader classBody BANG;
+classHeader: className subclassKind symbolConst;
 
-classHeader : className subclassKind symbolConst ;
+subclassKind:
+    'subclass:'
+  | 'variableSubclass:'
+  | 'variableByteSubclass:'
+  | 'variableWordSubclass:';
 
-subclassKind
-    : 'subclass:'
-    | 'variableSubclass:'
-    | 'variableByteSubclass:'
-    | 'variableWordSubclass:'
-    ;
+classBody: classSlotSpec* categoryDecl;
 
-classBody : classSlotSpec* categoryDecl ;
+classSlotSpec:
+    'instanceVariableNames:' stringConst
+  | 'classVariableNames:' stringConst
+  | 'classInstanceVariableNames:' stringConst
+  | 'poolDictionaries:' stringConst;
 
-classSlotSpec
-    : 'instanceVariableNames:'        stringConst
-    | 'classVariableNames:'           stringConst
-    | 'classInstanceVariableNames:'   stringConst
-    | 'poolDictionaries:'             stringConst
-    ;
+categoryDecl: 'category:' stringConst;
 
-categoryDecl : 'category:' stringConst ;
+// ─────────────────────────────────────────── Class & metaclass comments
+classCommentChunk:
+    className 'comment:' NEW_LINE? stringConst BANG;
 
-// ── Class comment chunk ────────────────────
-classCommentChunk : BANG className 'comment:' NEW_LINE? stringConst BANG ;
+metaclassDefinitionChunk:
+    className 'class' classSlotSpec* BANG;
 
-// ── Method category chunk ──────────────────
-methodCategoryChunk
-    : BANG (className ('class')?) 'methodsFor:' stringConst BANG
-      methodDef*
-      BANG
-    ;
+metaclassCommentChunk:
+    className 'class' 'comment:' NEW_LINE? stringConst BANG;
 
-// ───────────────────────────────────────────
-//  Method definition
-// ───────────────────────────────────────────
-methodDef
-    : methodHeader NEW_LINE?
-      temporaries?
-      primitiveDecl?
-      statements?
-      BANG
-    ;
+// ─────────────────────────────────────────── Method category
+methodCategoryChunk:
+    BANG (className ('class')?) 'methodsFor:' stringConst BANG methodDef* BANG;
 
-methodHeader
-    : unarySelector
-    | binarySelector formalArg
-    | keywordSelector formalArg+
-    ;
+// ─────────────────────────────────────────── Method definition
+methodDef:
+    methodHeader NEW_LINE? temporaries? primitiveDecl? statements? BANG;
 
-formalArg   : IDENTIFIER ;
+methodHeader:
+    unarySelector
+  | binarySelector formalArg
+  | (IDENTIFIER COLON formalArg)+;
 
-temporaries : PIPE IDENTIFIER+ PIPE NEW_LINE? ;
+formalArg: IDENTIFIER;
+temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
+primitiveDecl: PRIMITIVE_DECL;
 
-primitiveDecl : PRIMITIVE_DECL ;
+// ─────────────────────────────────────────── Statements and expressions
+statements: statement (PERIOD statement)* PERIOD?;
+statement: answer | expression;
+answer: returnExpr PERIOD?;
 
-// ───────────────────────────────────────────
-//  Statements and expressions
-// ───────────────────────────────────────────
-answer     : returnExpr PERIOD? ;
-statement  : answer | expression ;
-statements : statement (PERIOD statement)* PERIOD? ;
+expression: assignmentExpression (SEMICOLON cascadeMessage)*;
+returnExpr: CARAT assignmentExpression (SEMICOLON cascadeMessage)*;
 
-expression
-    : assignmentExpression (SEMICOLON cascadeMessage)*
-    ;
+assignmentExpression:
+    variable ASSIGN expression
+  | keywordExpression;
 
-returnExpr
-    : CARAT assignmentExpression (SEMICOLON cascadeMessage)*
-    ;
+keywordExpression: binaryExpression keywordMessage?;
 
-assignmentExpression
-    : variable ASSIGN expression
-    | keywordExpression
-    ;
+cascadeMessage: messageSend;
+messageSend: unaryMessage | binaryMessage | keywordMessage;
 
-cascadeMessage : messageSend ;
+unaryMessage: unarySelector;
+binaryMessage: binarySelector unaryExpression;
+binaryExpression: unaryExpression (binaryMessage)*;
+unaryExpression: primary (unarySelector)*;
 
-messageSend
-    : unaryMessage
-    | binaryMessage
-    | keywordMessage
-    ;
+// ─────────────────────────────────────────── Keyword messages
+keywordMessage: keywordPart+;
+keywordPart: IDENTIFIER COLON expression;
 
-keywordExpression : binaryExpression (keywordMessage)* ;
+// ─────────────────────────────────────────── Primary expressions
+primary:
+    MINUS numberLiteral
+  | literal
+  | variable
+  | block
+  | '(' expression ')';
 
-keywordMessage
-    : keywordSelector binaryExpression (keywordSelector binaryExpression)*
-    ;
+variable: IDENTIFIER;
 
-binaryExpression : unaryExpression (binaryMessage)* ;
+// ─────────────────────────────────────────── Blocks
+block: '[' blockArgs? blockTemps? statements? ']';
+blockArgs: (COLON IDENTIFIER)+ PIPE?;
+blockTemps: PIPE IDENTIFIER+ PIPE;
 
-binaryMessage : binarySelector unaryExpression ;
+// ─────────────────────────────────────────── Literals
+literal:
+    stringConst
+  | numberLiteral
+  | symbolConst
+  | arrayLiteral
+  | byteArrayLiteral
+  | characterLiteral
+  | trueLiteral
+  | falseLiteral
+  | nilLiteral;
 
-unaryExpression : primary (unarySelector)* ;
+numberLiteral: UNSIGNED_NUMBER;
+stringConst: STRING;
+characterLiteral: CHAR_LITERAL;
+trueLiteral: 'true';
+falseLiteral: 'false';
+nilLiteral: 'nil';
 
-unaryMessage : unarySelector ;
+byteArrayLiteral: HASH '[' UNSIGNED_NUMBER* ']';
 
-// ───────────────────────────────────────────
-//  Primary expressions
-// ───────────────────────────────────────────
-primary
-    : MINUS numberLiteral
-    | literal
-    | variable
-    | block
-    | '(' expression ')'
-    ;
+// ─────────────────────────────────────────── Arrays and symbols
+arrayLiteral: HASH '(' arrayElement* ')';
 
-variable : IDENTIFIER ;
+arrayElement:
+    literal
+  | symbolName;
 
-// ───────────────────────────────────────────
-//  Blocks
-// ───────────────────────────────────────────
-block        : '[' blockArgs? blockTemps? statements? ']' ;
-blockArgs    : (COLON IDENTIFIER)+ PIPE? ;
-blockTemps   : PIPE IDENTIFIER+ PIPE ;
+symbolConst:
+    QUOTED_SYMBOL
+  | HASH (
+        MINUS
+      | unarySelector
+      | binarySelector
+      | keywordSymbolSelector
+    );
 
-// ───────────────────────────────────────────
-//  Literals
-// ───────────────────────────────────────────
-literal
-    : stringConst
-    | numberLiteral
-    | symbolConst
-    | arrayLiteral
-    | byteArrayLiteral
-    | characterLiteral
-    | trueLiteral
-    | falseLiteral
-    | nilLiteral
-    ;
+symbolName:
+    IDENTIFIER
+  | unarySelector
+  | binarySelector
+  | keywordSymbolSelector;
 
-numberLiteral : UNSIGNED_NUMBER ;
+keywordSymbolSelector: (IDENTIFIER COLON)+;
 
-byteArrayLiteral : HASH '[' UNSIGNED_NUMBER* ']' ;
+// ─────────────────────────────────────────── Separator
+separatorChunk: '--' (~BANG)* BANG;
 
-symbolConst
-    : QUOTED_SYMBOL
-    | HASH ( MINUS | keywordSelector | unarySelector | binarySelector )
-    ;
+// ─────────────────────────────────────────── Helper rules
+className: IDENTIFIER;
 
-// Localize array elements to literals or bare symbol names
-arrayLiteral
-    : HASH '(' arrayElement* ')'
-    ;
+// ─────────────────────────────────────────── Selectors
+unarySelector: IDENTIFIER;
+binarySelector: MINUS | BINARY_SELECTOR;
 
-arrayElement
-    : literal
-    | symbolName        // bare identifier or selector turned into symbol
-    ;
+// ─────────────────────────────────────────── Lexer rules
+BANG: '!';
+COLON: ':';
+PERIOD: '.';
+ASSIGN: ':=' | '_';
+CARAT: '^';
+PIPE: '|';
+SEMICOLON: ';';
+HASH: '#';
+MINUS: '-';
 
-// symbolName matches Smalltalk symbol tokens without '#'
-symbolName
-    : IDENTIFIER
-    | unarySelector
-    | binarySelector
-    | keywordSelector
-    ;
+PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
 
-characterLiteral : CHAR_LITERAL ;
+UNSIGNED_NUMBER:
+    DIGITS [rR] BASEDIGIT+
+  | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
 
-trueLiteral  : 'true' ;
-falseLiteral : 'false' ;
-nilLiteral   : 'nil'  ;
+STRING: '\'' ( '\'\'' | ~'\'' )* '\'';
+QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'' )* '\'';
+CHAR_LITERAL: '$' ~[\r\n];
 
-// ───────────────────────────────────────────
-//  Separator chunk
-// ───────────────────────────────────────────
-separatorChunk : '--' (~BANG)* BANG ;
+BINARY_SELECTOR: ([+*/%~<>=@|&!?\\,] | '-') (
+        [+*/%~<>=@|&!?\\,]
+      | '-'
+    )*;
 
-// ───────────────────────────────────────────
-//  Helpers & selectors
-// ───────────────────────────────────────────
-className   : IDENTIFIER ;
-stringConst : STRING ;
+IDENTIFIER: LETTER (LETTER | DIGIT)*;
 
-unarySelector   : IDENTIFIER ;
-binarySelector  : MINUS | BINARY_SELECTOR ;
-keywordSelector : (IDENTIFIER COLON)+ ;
+fragment LETTER: [A-Za-z];
+fragment DIGIT: [0-9];
+fragment BASEDIGIT: [0-9A-Za-z];
+DIGITS: DIGIT+;
 
-// ───────────────────────────────────────────
-//  Lexer rules
-// ───────────────────────────────────────────
-BANG      : '!' ;
-COLON     : ':' ;
-PERIOD    : '.' ;
-ASSIGN    : ':=' | '_' ;
-CARAT     : '^' ;
-PIPE      : '|' ;
-SEMICOLON : ';' ;
-HASH      : '#' ;
-MINUS     : '-' ;
-
-PRIMITIVE_DECL : '<' 'primitive:' DIGITS '>' ;
-
-UNSIGNED_NUMBER
-    : DIGITS [rR] BASEDIGIT+
-    | DIGITS ('.' DIGITS)? (('e'|'E') ('+'|'-')? DIGITS)?
-    ;
-
-STRING        : '\'' ( '\'\'' | ~'\'' )* '\'' ;
-QUOTED_SYMBOL : HASH '\'' ( '\'\'' | ~'\'' )* '\'' ;
-CHAR_LITERAL  : '$' ~[\r\n] ;
-
-BINARY_SELECTOR
-    : ([+*/%~<>=@|&!?\\,]|'-') ([+*/%~<>=@|&!?\\,]|'-')*
-    ;
-
-IDENTIFIER     : LETTER (LETTER|DIGIT)* ;
-fragment LETTER : [A-Za-z] ;
-fragment DIGIT  : [0-9] ;
-fragment BASEDIGIT : [0-9A-Za-z] ;
-DIGITS         : DIGIT+ ;
-
-NEW_LINE : ('\r'? '\n')+ -> skip ;
-WS       : [ \t\f]+      -> skip ;
-COMMENT  : '"' .*? '"'   -> skip ;
+NEW_LINE: ('\r'? '\n')+ -> skip;
+WS: [ \t\f]+ -> skip;
+COMMENT: '"' .*? '"' -> skip;

@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -87,6 +87,18 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassDefinitionChunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMetaclassDefinitionChunk([NotNull] Smalltalk80Parser.MetaclassDefinitionChunkContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassCommentChunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMetaclassCommentChunk([NotNull] Smalltalk80Parser.MetaclassCommentChunkContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodCategoryChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -123,11 +135,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.answer"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitAnswer([NotNull] Smalltalk80Parser.AnswerContext context);
+	Result VisitStatements([NotNull] Smalltalk80Parser.StatementsContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statement"/>.
 	/// </summary>
@@ -135,11 +147,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitStatement([NotNull] Smalltalk80Parser.StatementContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.answer"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitStatements([NotNull] Smalltalk80Parser.StatementsContext context);
+	Result VisitAnswer([NotNull] Smalltalk80Parser.AnswerContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expression"/>.
 	/// </summary>
@@ -159,6 +171,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitAssignmentExpression([NotNull] Smalltalk80Parser.AssignmentExpressionContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordExpression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitKeywordExpression([NotNull] Smalltalk80Parser.KeywordExpressionContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.cascadeMessage"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -171,23 +189,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMessageSend([NotNull] Smalltalk80Parser.MessageSendContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordExpression"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryMessage"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitKeywordExpression([NotNull] Smalltalk80Parser.KeywordExpressionContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordMessage"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitKeywordMessage([NotNull] Smalltalk80Parser.KeywordMessageContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryExpression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitBinaryExpression([NotNull] Smalltalk80Parser.BinaryExpressionContext context);
+	Result VisitUnaryMessage([NotNull] Smalltalk80Parser.UnaryMessageContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryMessage"/>.
 	/// </summary>
@@ -195,17 +201,29 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitBinaryMessage([NotNull] Smalltalk80Parser.BinaryMessageContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryExpression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitBinaryExpression([NotNull] Smalltalk80Parser.BinaryExpressionContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryExpression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitUnaryExpression([NotNull] Smalltalk80Parser.UnaryExpressionContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryMessage"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordMessage"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitUnaryMessage([NotNull] Smalltalk80Parser.UnaryMessageContext context);
+	Result VisitKeywordMessage([NotNull] Smalltalk80Parser.KeywordMessageContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordPart"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitKeywordPart([NotNull] Smalltalk80Parser.KeywordPartContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primary"/>.
 	/// </summary>
@@ -249,35 +267,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitNumberLiteral([NotNull] Smalltalk80Parser.NumberLiteralContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.byteArrayLiteral"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.stringConst"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitByteArrayLiteral([NotNull] Smalltalk80Parser.ByteArrayLiteralContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolConst"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitSymbolConst([NotNull] Smalltalk80Parser.SymbolConstContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayLiteral"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitArrayLiteral([NotNull] Smalltalk80Parser.ArrayLiteralContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayElement"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitArrayElement([NotNull] Smalltalk80Parser.ArrayElementContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolName"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitSymbolName([NotNull] Smalltalk80Parser.SymbolNameContext context);
+	Result VisitStringConst([NotNull] Smalltalk80Parser.StringConstContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.characterLiteral"/>.
 	/// </summary>
@@ -303,6 +297,42 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitNilLiteral([NotNull] Smalltalk80Parser.NilLiteralContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.byteArrayLiteral"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitByteArrayLiteral([NotNull] Smalltalk80Parser.ByteArrayLiteralContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayLiteral"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArrayLiteral([NotNull] Smalltalk80Parser.ArrayLiteralContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayElement"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArrayElement([NotNull] Smalltalk80Parser.ArrayElementContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolConst"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitSymbolConst([NotNull] Smalltalk80Parser.SymbolConstContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitSymbolName([NotNull] Smalltalk80Parser.SymbolNameContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSymbolSelector"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitKeywordSymbolSelector([NotNull] Smalltalk80Parser.KeywordSymbolSelectorContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.separatorChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -315,12 +345,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassName([NotNull] Smalltalk80Parser.ClassNameContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.stringConst"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStringConst([NotNull] Smalltalk80Parser.StringConstContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unarySelector"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -332,11 +356,5 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitBinarySelector([NotNull] Smalltalk80Parser.BinarySelectorContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSelector"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitKeywordSelector([NotNull] Smalltalk80Parser.KeywordSelectorContext context);
 }
 } // namespace Smalltalk80.Generated
