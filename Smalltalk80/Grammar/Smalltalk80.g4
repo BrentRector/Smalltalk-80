@@ -36,7 +36,7 @@ subclassKind:
 	| 'variableByteSubclass:'
 	| 'variableWordSubclass:';
 
-primitiveDecl: '<' 'primitive:' NUMBER '>';
+primitiveDecl: BINARY_SELECTOR 'primitive:' NUMBER BINARY_SELECTOR;
 
 classBody: classSlotSpec* categoryDecl;
 
@@ -196,7 +196,7 @@ STRING: '\'' ( '\'\'' | ~'\'')* '\'';
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
-BINARY_SELECTOR: ([\-+*/%~<>=@|&!?\\,])+;
+BINARY_SELECTOR: ([-+*/%~<>=@|&?\\,])+;
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 
