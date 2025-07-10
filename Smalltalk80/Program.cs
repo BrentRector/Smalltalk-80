@@ -14,7 +14,6 @@ public static class Program
     /// <param name="args">
     ///     Command line arguments. Supported options are:
     ///     <list type="bullet">
-    ///         <item><description><c>--repl</c> – start an interactive REPL.</description></item>
     ///         <item><description><c>--load &lt;file&gt;</c> – load a Smalltalk source file.</description></item>
     ///         <item><description><c>--filein &lt;file&gt;</c> – load a classic Smalltalk file-in.</description></item>
     ///     </list>
@@ -63,9 +62,5 @@ public static class Program
             Console.WriteLine("GUI mode is not supported in this build.");
         }
 
-        if (args.Contains("--repl"))
-        {
-            vm.RunRepl();
-        }
     }
 }
