@@ -1,76 +1,77 @@
 grammar Smalltalk80;
 
 /*
-───────────────────────────────────────────────────────────
+ ───────────────────────────────────────────────────────────
  Important Contextual Distinction
-───────────────────────────────────────────────────────────
-| Use case                      | Rule used                         |
-|------------------------------|-----------------------------------|
-| Message send (e.g., `a at: i`) | `keywordMessage` with arguments   |
-| Method header (e.g., `at:put:`) | `(IDENTIFIER COLON formalArg)+`  |
-| Symbol (e.g., `#at:put:`)     | `keywordSymbolSelector`           |
-*/
+ ───────────────────────────────────────────────────────────
+ | Use case | Rule used |
+ |------------------------------|-----------------------------------|
+ | Message send (e.g., `a at:
+ i`) | `keywordMessage` with arguments |
+ | Method header (e.g., `at:put:`) | `(IDENTIFIER COLON
+ formalArg)+` |
+ | Symbol (e.g., `#at:put:`) | `keywordSymbolSelector` |
+ */
 
 // ─────────────────────────────────────────── Entry point
 fileIn: chunk* EOF;
 
 // ─────────────────────────────────────────── Chunks
-chunk
-  : metaclassCommentChunk
-  | metaclassDefinitionChunk
-  | classCommentChunk
-  | classDefChunk
-  | methodCategoryChunk
-  | separatorChunk
-  | BANG
-  ;
+chunk:
+	metaclassCommentChunk
+	| metaclassDefinitionChunk
+	| classCommentChunk
+	| classDefChunk
+	| methodCategoryChunk
+	| separatorChunk
+	| BANG;
 
 // ─────────────────────────────────────────── Class definitions
 classDefChunk: classHeader classBody BANG;
 classHeader: className subclassKind symbolConst;
 
 subclassKind:
-    'subclass:'
-  | 'variableSubclass:'
-  | 'variableByteSubclass:'
-  | 'variableWordSubclass:';
+	'subclass:'
+	| 'variableSubclass:'
+	| 'variableByteSubclass:'
+	| 'variableWordSubclass:';
+
+primitiveDecl: '<' 'primitive:' UNSIGNED_NUMBER '>';
 
 classBody: classSlotSpec* categoryDecl;
 
 classSlotSpec:
-    'instanceVariableNames:' stringConst
-  | 'classVariableNames:' stringConst
-  | 'classInstanceVariableNames:' stringConst
-  | 'poolDictionaries:' stringConst;
+	'instanceVariableNames:' stringConst
+	| 'classVariableNames:' stringConst
+	| 'classInstanceVariableNames:' stringConst
+	| 'poolDictionaries:' stringConst;
 
 categoryDecl: 'category:' stringConst;
 
 // ─────────────────────────────────────────── Class & metaclass comments
 classCommentChunk:
-    className 'comment:' NEW_LINE? stringConst BANG;
+	className 'comment:' NEW_LINE? stringConst BANG;
 
-metaclassDefinitionChunk:
-    className 'class' classSlotSpec* BANG;
+metaclassDefinitionChunk: className 'class' classSlotSpec* BANG;
 
 metaclassCommentChunk:
-    className 'class' 'comment:' NEW_LINE? stringConst BANG;
+	className 'class' 'comment:' NEW_LINE? stringConst BANG;
 
 // ─────────────────────────────────────────── Method category
 methodCategoryChunk:
-    BANG (className ('class')?) 'methodsFor:' stringConst BANG methodDef* BANG;
+	BANG (className ('class')?) 'methodsFor:' stringConst BANG methodDef* BANG;
 
 // ─────────────────────────────────────────── Method definition
 methodDef:
-    methodHeader NEW_LINE? temporaries? primitiveDecl? statements? BANG;
+	methodHeader NEW_LINE? temporaries? primitiveDecl? statements? BANG;
 
 methodHeader:
-    unarySelector
-  | binarySelector formalArg
-  | (IDENTIFIER COLON formalArg)+;
+	unarySelector
+	| binarySelector formalArg
+	| (IDENTIFIER COLON formalArg)+;
 
 formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
-primitiveDecl: PRIMITIVE_DECL;
 
 // ─────────────────────────────────────────── Statements and expressions
 statements: statement (PERIOD statement)* PERIOD?;
@@ -78,11 +79,12 @@ statement: answer | expression;
 answer: returnExpr PERIOD?;
 
 expression: assignmentExpression (SEMICOLON cascadeMessage)*;
-returnExpr: CARAT assignmentExpression (SEMICOLON cascadeMessage)*;
+returnExpr:
+	CARAT assignmentExpression (SEMICOLON cascadeMessage)*;
 
 assignmentExpression:
-    variable ASSIGN expression
-  | keywordExpression;
+	variable ASSIGN expression
+	| keywordExpression;
 
 keywordExpression: binaryExpression keywordMessage?;
 
@@ -100,11 +102,11 @@ keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────── Primary expressions
 primary:
-    MINUS numberLiteral
-  | literal
-  | variable
-  | block
-  | '(' expression ')';
+	MINUS numberLiteral
+	| literal
+	| variable
+	| block
+	| '(' expression ')';
 
 variable: IDENTIFIER;
 
@@ -115,15 +117,15 @@ blockTemps: PIPE IDENTIFIER+ PIPE;
 
 // ─────────────────────────────────────────── Literals
 literal:
-    stringConst
-  | numberLiteral
-  | symbolConst
-  | arrayLiteral
-  | byteArrayLiteral
-  | characterLiteral
-  | trueLiteral
-  | falseLiteral
-  | nilLiteral;
+	stringConst
+	| numberLiteral
+	| symbolConst
+	| arrayLiteral
+	| byteArrayLiteral
+	| characterLiteral
+	| trueLiteral
+	| falseLiteral
+	| nilLiteral;
 
 numberLiteral: UNSIGNED_NUMBER;
 stringConst: STRING;
@@ -137,24 +139,22 @@ byteArrayLiteral: HASH '[' UNSIGNED_NUMBER* ']';
 // ─────────────────────────────────────────── Arrays and symbols
 arrayLiteral: HASH '(' arrayElement* ')';
 
-arrayElement:
-    literal
-  | symbolName;
+arrayElement: literal | symbolName;
 
 symbolConst:
-    QUOTED_SYMBOL
-  | HASH (
-        MINUS
-      | unarySelector
-      | binarySelector
-      | keywordSymbolSelector
-    );
+	QUOTED_SYMBOL
+	| HASH (
+		MINUS
+		| unarySelector
+		| binarySelector
+		| keywordSymbolSelector
+	);
 
 symbolName:
-    IDENTIFIER
-  | unarySelector
-  | binarySelector
-  | keywordSymbolSelector;
+	IDENTIFIER
+	| unarySelector
+	| binarySelector
+	| keywordSymbolSelector;
 
 keywordSymbolSelector: (IDENTIFIER COLON)+;
 
@@ -179,20 +179,18 @@ SEMICOLON: ';';
 HASH: '#';
 MINUS: '-';
 
-PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
-
 UNSIGNED_NUMBER:
-    DIGITS [rR] BASEDIGIT+
-  | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
+	DIGITS [rR] BASEDIGIT+
+	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
 
-STRING: '\'' ( '\'\'' | ~'\'' )* '\'';
-QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'' )* '\'';
+STRING: '\'' ( '\'\'' | ~'\'')* '\'';
+QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
 BINARY_SELECTOR: ([+*/%~<>=@|&!?\\,] | '-') (
-        [+*/%~<>=@|&!?\\,]
-      | '-'
-    )*;
+		[+*/%~<>=@|&!?\\,]
+		| '-'
+	)*;
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 

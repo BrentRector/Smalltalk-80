@@ -63,6 +63,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitSubclassKind([NotNull] Smalltalk80Parser.SubclassKindContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primitiveDecl"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classBody"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -128,12 +134,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitTemporaries([NotNull] Smalltalk80Parser.TemporariesContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primitiveDecl"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
 	/// </summary>
