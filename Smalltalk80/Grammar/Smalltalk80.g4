@@ -36,7 +36,7 @@ subclassKind:
 	| 'variableByteSubclass:'
 	| 'variableWordSubclass:';
 
-primitiveDecl: '<' 'primitive:' UNSIGNED_NUMBER '>';
+primitiveDecl: '<' 'primitive:' NUMBER '>';
 
 classBody: classSlotSpec* categoryDecl;
 
@@ -78,9 +78,19 @@ statements: statement (PERIOD statement)* PERIOD?;
 statement: answer | expression;
 answer: returnExpr PERIOD?;
 
-expression: assignmentExpression (SEMICOLON cascadeMessage)*;
-returnExpr:
-	CARAT assignmentExpression (SEMICOLON cascadeMessage)*;
+expression:
+	assignable ASSIGN expression	# assignmentExpr
+	| keywordSend					# messageExpr;
+
+assignable: variable;
+
+keywordSend: binarySend keywordMessage*;
+
+binarySend: unarySend (binaryMessage)*;
+
+unarySend : primary (unaryMessage)*;
+
+returnExpr: CARAT expression (SEMICOLON cascadeMessage)*;
 
 assignmentExpression:
 	variable ASSIGN expression
@@ -102,11 +112,11 @@ keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────── Primary expressions
 primary:
-	MINUS numberLiteral
-	| literal
+    literal
 	| variable
 	| block
 	| '(' expression ')';
+
 
 variable: IDENTIFIER;
 
@@ -127,14 +137,15 @@ literal:
 	| falseLiteral
 	| nilLiteral;
 
-numberLiteral: UNSIGNED_NUMBER;
+numberLiteral: NUMBER;
+
 stringConst: STRING;
 characterLiteral: CHAR_LITERAL;
 trueLiteral: 'true';
 falseLiteral: 'false';
 nilLiteral: 'nil';
 
-byteArrayLiteral: HASH '[' UNSIGNED_NUMBER* ']';
+byteArrayLiteral: HASH '[' NUMBER* ']';
 
 // ─────────────────────────────────────────── Arrays and symbols
 arrayLiteral: HASH '(' arrayElement* ')';
@@ -144,7 +155,7 @@ arrayElement: literal | symbolName;
 symbolConst:
 	QUOTED_SYMBOL
 	| HASH (
-		MINUS
+		'-'
 		| unarySelector
 		| binarySelector
 		| keywordSymbolSelector
@@ -166,7 +177,7 @@ className: IDENTIFIER;
 
 // ─────────────────────────────────────────── Selectors
 unarySelector: IDENTIFIER;
-binarySelector: MINUS | BINARY_SELECTOR;
+binarySelector: BINARY_SELECTOR;
 
 // ─────────────────────────────────────────── Lexer rules
 BANG: '!';
@@ -177,20 +188,16 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
-MINUS: '-';
 
-UNSIGNED_NUMBER:
-	DIGITS [rR] BASEDIGIT+
-	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
+NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
+      | ('+' | '-')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
+
 
 STRING: '\'' ( '\'\'' | ~'\'')* '\'';
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
-BINARY_SELECTOR: ([+*/%~<>=@|&!?\\,] | '-') (
-		[+*/%~<>=@|&!?\\,]
-		| '-'
-	)*;
+BINARY_SELECTOR: ([\-+*/%~<>=@|&!?\\,])+;
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 

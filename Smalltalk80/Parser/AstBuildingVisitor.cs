@@ -112,7 +112,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         int primitiveIndex = 0;
         if (context.primitiveDecl() is { } primitive)
         {
-            var numberText = primitive.UNSIGNED_NUMBER().GetText();
+            var numberText = primitive.NUMBER().GetText();
             if (int.TryParse(numberText, out var parsed))
             {
                 primitiveIndex = parsed;
@@ -205,7 +205,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitNumberLiteral(Smalltalk80Parser.NumberLiteralContext context)
     {
-        var text = context.UNSIGNED_NUMBER().GetText();
+        var text = context.NUMBER().GetText();
+
         return int.TryParse(text, out var i)
             ? new LiteralExpression(i)
             : new LiteralExpression(double.Parse(text));

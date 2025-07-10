@@ -153,11 +153,43 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitAnswer([NotNull] Smalltalk80Parser.AnswerContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expression"/>.
+	/// Visit a parse tree produced by the <c>assignmentExpr</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitExpression([NotNull] Smalltalk80Parser.ExpressionContext context);
+	Result VisitAssignmentExpr([NotNull] Smalltalk80Parser.AssignmentExprContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>messageExpr</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMessageExpr([NotNull] Smalltalk80Parser.MessageExprContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.assignable"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitAssignable([NotNull] Smalltalk80Parser.AssignableContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSend"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitKeywordSend([NotNull] Smalltalk80Parser.KeywordSendContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binarySend"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitBinarySend([NotNull] Smalltalk80Parser.BinarySendContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unarySend"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitUnarySend([NotNull] Smalltalk80Parser.UnarySendContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.returnExpr"/>.
 	/// </summary>
