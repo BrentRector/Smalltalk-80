@@ -157,7 +157,23 @@ symbolConst
     | HASH ( MINUS | keywordSelector | unarySelector | binarySelector )
     ;
 
-arrayLiteral : HASH '(' literal* ')' ;
+// Localize array elements to literals or bare symbol names
+arrayLiteral
+    : HASH '(' arrayElement* ')'
+    ;
+
+arrayElement
+    : literal
+    | symbolName        // bare identifier or selector turned into symbol
+    ;
+
+// symbolName matches Smalltalk symbol tokens without '#'
+symbolName
+    : IDENTIFIER
+    | unarySelector
+    | binarySelector
+    | keywordSelector
+    ;
 
 characterLiteral : CHAR_LITERAL ;
 
