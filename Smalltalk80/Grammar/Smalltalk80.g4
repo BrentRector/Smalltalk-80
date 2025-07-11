@@ -107,7 +107,8 @@ cascadeMessage: expression (SEMICOLON expression)*;
 // ─────────────────────────────────────────── Primary expressions
 primary: literal | variable | block | '(' expression ')';
 
-variable: IDENTIFIER;
+variable: IDENTIFIER | SELF | SUPER | TRUE | FALSE | NIL;
+
 
 // ─────────────────────────────────────────── Blocks
 block: '[' blockArgs? blockTemps? statements? ']';
@@ -122,18 +123,14 @@ literal:
 	| arrayLiteral
 	| byteArrayLiteral
 	| characterLiteral
-	| trueLiteral
-	| falseLiteral
-	| nilLiteral;
+	| TRUE
+	| FALSE
+	| NIL;
 
 numberLiteral: NUMBER;
 
 stringConst: STRING;
 characterLiteral: CHAR_LITERAL;
-trueLiteral: 'true';
-falseLiteral: 'false';
-nilLiteral: 'nil';
-
 byteArrayLiteral: HASH '[' NUMBER* ']';
 
 // ─────────────────────────────────────────── Arrays and symbols
@@ -176,6 +173,13 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
+
+SELF: 'self';
+SUPER: 'super';
+TRUE: 'true';
+FALSE: 'false';
+NIL: 'nil';
+
 
 fragment INLINE_WS: [ \t];
 
