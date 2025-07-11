@@ -11,10 +11,10 @@
 function Invoke-Antlr4CSharp {
     [CmdletBinding()]
     param(
-        [string]$GrammarName = "$PSScriptRoot\..\Grammar\Smalltalk80.g4",
-        [string]$JarPath = "$PSScriptRoot\..\ANTLR4\antlr-4.13.2-complete.jar",
-        [string]$OutputDir = "$PSScriptRoot\..\Generated",
-        [string]$PackageName = "Smalltalk80.Generated"
+        [string]$GrammarName = (Join-Path $PSScriptRoot '../Grammar/Smalltalk80.g4'),
+        [string]$JarPath = (Join-Path $PSScriptRoot '../ANTLR4/antlr-4.13.2-complete.jar'),
+        [string]$OutputDir = (Join-Path $PSScriptRoot '../Generated'),
+        [string]$PackageName = 'Smalltalk80.Generated'
     )
 
     # Validate paths

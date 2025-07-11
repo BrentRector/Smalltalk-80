@@ -64,7 +64,7 @@ methodCategoryChunk:
 
 // ─────────────────────────────────────────── Method definition
 methodDef:
-	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements? BANG;
+        methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements BANG;
 
 methodHeader:
 	unarySelector
@@ -75,7 +75,11 @@ formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // ─────────────────────────────────────────── Statements and expressions
-statements: statement (PERIOD statement)* PERIOD?;
+statements: statementOrEmpty (PERIOD statementOrEmpty)*;
+
+statementOrEmpty:
+        statement
+        |;
 
 statement: answer | expression;
 
@@ -112,7 +116,7 @@ primary: literal | variable | block | '(' expression ')';
 variable: IDENTIFIER;
 
 // ─────────────────────────────────────────── Blocks
-block: '[' blockArgs? blockTemps? statements? ']';
+block: '[' blockArgs? blockTemps? statements ']';
 blockArgs: (COLON IDENTIFIER)+ PIPE?;
 blockTemps: PIPE IDENTIFIER+ PIPE;
 
@@ -189,7 +193,9 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 		('e' | 'E') ('+' | '-')? DIGITS
 	)?;
 
-STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
+STRING: '\'' ( '\'\'' | .)*? '\'';
+
+COMMENT: '"' ( '""' | .)*? '"' PERIOD? -> skip;
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
