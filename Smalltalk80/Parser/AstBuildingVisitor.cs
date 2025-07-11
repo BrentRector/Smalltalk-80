@@ -112,7 +112,8 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         int primitiveIndex = 0;
         if (context.primitiveDecl() is { } primitive)
         {
-            var numberText = primitive.NUMBER().GetText();
+            var text = primitive.PRIMITIVE_DECL().GetText();
+            var numberText = text["<primitive:".Length..^1];
             if (int.TryParse(numberText, out var parsed))
             {
                 primitiveIndex = parsed;

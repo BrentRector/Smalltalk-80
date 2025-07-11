@@ -31,12 +31,12 @@ classDefChunk: classHeader classBody BANG;
 classHeader: className subclassKind symbolConst;
 
 subclassKind:
-	'subclass:'
-	| 'variableSubclass:'
-	| 'variableByteSubclass:'
-	| 'variableWordSubclass:';
+        'subclass:'
+        | 'variableSubclass:'
+        | 'variableByteSubclass:'
+        | 'variableWordSubclass:';
 
-primitiveDecl: BINARY_SELECTOR 'primitive:' NUMBER BINARY_SELECTOR;
+primitiveDecl: PRIMITIVE_DECL;
 
 classBody: classSlotSpec* categoryDecl;
 
@@ -187,6 +187,8 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
+
+PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
 
 NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
       | ('+' | '-')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
