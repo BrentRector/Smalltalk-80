@@ -79,7 +79,8 @@ temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 // ─────────────────────────────────────────── Statements and expressions
 statements: statement (PERIOD statement)* PERIOD?;
 statement: answer | expression;
-answer: returnExpr PERIOD?;
+
+answer: returnExpr;
 
 expression:
 	assignable ASSIGN expression	# assignmentExpr
@@ -94,7 +95,8 @@ binarySend: unarySend (binaryMessage)*;
 
 unarySend: primary (unaryMessage)*;
 
-returnExpr: CARAT expression (SEMICOLON cascadeMessage)*;
+returnExpr:
+	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
 
 assignmentExpression:
 	variable ASSIGN expression
