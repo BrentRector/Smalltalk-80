@@ -84,8 +84,7 @@ answer: returnExpr PERIOD?;
 expression:
 	assignable ASSIGN expression	# assignmentExpr
 	| keywordSend					# messageExpr
-	| primary					    # primaryExpr
-	;
+	| primary						# primaryExpr;
 
 assignable: variable;
 
@@ -187,7 +186,7 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
-bugus
+
 fragment INLINE_WS: [ \t];
 
 PRIMITIVE_DECL:
@@ -198,9 +197,7 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 		('e' | 'E') ('+' | '-')? DIGITS
 	)?;
 
-STRING: '\'' ( '\'\'' | . )*? '\''
-      | '"'  ( '""'   | . )*? '"';
-
+STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];

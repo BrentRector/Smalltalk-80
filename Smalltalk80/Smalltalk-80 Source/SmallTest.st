@@ -1,11 +1,15 @@
-!AltoFileDirectory methodsFor: 'adding'!
-addNew: aFile 
-	| sn page |
-	sn _ self allocateSN: aFile.
+!ActionMenu class methodsFor: 'confirmation'!
+confirm  "ActionMenu confirm"
+	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !File subclass: #AltoFile
+	instanceVariableNames: 'writeTime pageAddresses leader '
+	classVariableNames: ''
+	poolDictionaries: 'AltoFilePool '
+	category: 'Files-Xerox Alto'!
+AltoFile comment:
+'A concrete example of class File.
 
-	"allocate a new page (more success after O.S. stuff, bittable etc.)"
-	self allocate: (page _ aFile initPageNumber: 0) after: 800.
-
-	"write 0th -- leader, in the process filling it in and then creating first page".
-	page reinitialize.
-	^aFile! !
+Instance Variables:
+	writeTime	<Time>
+	pageAddresses	<RunArray> of page addresses
+	leader		<Integer> address of the page where the leader information is stored
+	'!

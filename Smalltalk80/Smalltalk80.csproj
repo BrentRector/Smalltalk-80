@@ -11,16 +11,14 @@
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
-  <Target Name="RunAntlrIfNewer"
-    BeforeTargets="BeforeCompile">
+  <!-- Need to specify the PrepareForCompile before target so that ANTLR4 finishes generating the
+  parser before we try to compile it. -->
+  <Target Name="RunAntlrIfNewer" BeforeTargets="CoreCompile">
+    <Message Text="Calling script to build ANTLR4 parser..." Importance="high" />
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\scripts"
-      Command="pwsh -ExecutionPolicy Bypass -File GenerateIfNewer.ps1"
-      IgnoreExitCode="false"
-      ContinueOnError="false"
-      ConsoleToMSBuild="true"
-      StandardOutputImportance="high"
-      StandardErrorImportance="high" />
+      Command="pwsh -ExecutionPolicy Bypass -File GenerateIfNewer.ps1" />
   </Target>
+
   <Target Name="CleanGeneratedFiles" AfterTargets="Clean">
     <ItemGroup>
       <GeneratedFiles Include="$(MSBuildProjectDirectory)\Generated\**\*" />
