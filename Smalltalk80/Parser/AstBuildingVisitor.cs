@@ -195,9 +195,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitStatements(Smalltalk80Parser.StatementsContext context)
     {
         var statements = new List<StatementNode>();
-        foreach (var stmt in context.statement())
+        foreach (var stmt in context.statementOrEmpty())
         {
-            if (Visit(stmt) is StatementNode node)
+            if (stmt.statement() != null && Visit(stmt.statement()) is StatementNode node)
                 statements.Add(node);
         }
 
