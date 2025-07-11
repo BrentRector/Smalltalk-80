@@ -189,7 +189,10 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 		('e' | 'E') ('+' | '-')? DIGITS
 	)?;
 
+	// Comments are ignored when compiling Smalltalk source but we want to preserve them for round-tripping.
+COMMENT: '"' ( '""' | ~'"' )* '"' -> channel(HIDDEN);
 STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
+
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
