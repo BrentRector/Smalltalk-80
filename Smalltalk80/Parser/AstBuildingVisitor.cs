@@ -41,6 +41,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
+    /// Visits an expression chunk and returns an <see cref="ExpressionChunkNode"/>.
+    /// </summary>
+    public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
+        => new ExpressionChunkNode((ExpressionNode)Visit(context.expression())!);
+
+    /// <summary>
     /// Visits a class definition chunk and returns a <see cref="ClassDefinitionNode"/>.
     /// The implementation currently extracts only the superclass name, class name,
     /// and category information.
@@ -51,7 +57,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         var body = context.classBody();
         var superclass = header.className().GetText();
         var className = UnquoteSymbol(header.symbolConst().GetText());
-        var category = UnquoteString(body.categoryDecl().stringConst().GetText());
+        var category = body.categoryDecl() is { } cat
+            ? UnquoteString(cat.stringConst().GetText())
+            : string.Empty;
 
         return new ClassDefinitionNode(
             superclass,
@@ -226,6 +234,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         => Visit(context.keywordSend());
 
     /// <inheritdoc />
+    public override object? VisitPrimaryExpr(Smalltalk80Parser.PrimaryExprContext context)
+        => Visit(context.primary());
+
+    /// <inheritdoc />
     public override object? VisitKeywordSend(Smalltalk80Parser.KeywordSendContext context)
     {
         var receiver = (ExpressionNode)Visit(context.binarySend())!;
@@ -258,6 +270,20 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <inheritdoc />
+    public override object? VisitPrimary(Smalltalk80Parser.PrimaryContext context)
+    {
+        if (context.literal() != null)
+            return Visit(context.literal());
+        if (context.variable() != null)
+            return Visit(context.variable());
+        if (context.block() != null)
+            return Visit(context.block());
+        if (context.expression() != null)
+            return Visit(context.expression());
+        return null;
+    }
+
+    /// <inheritdoc />
     public override object? VisitUnarySend(Smalltalk80Parser.UnarySendContext context)
     {
         var expr = (ExpressionNode)Visit(context.primary())!;
@@ -286,6 +312,41 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return int.TryParse(text, out var i)
             ? new LiteralExpression(i)
             : new LiteralExpression(double.Parse(text));
+    }
+
+    /// <inheritdoc />
+    public override object? VisitStringConst(Smalltalk80Parser.StringConstContext context)
+        => new LiteralExpression(UnquoteString(context.STRING().GetText()));
+
+    /// <inheritdoc />
+    public override object? VisitCharacterLiteral(Smalltalk80Parser.CharacterLiteralContext context)
+        => new LiteralExpression(context.CHAR_LITERAL().GetText()[1]);
+
+    /// <inheritdoc />
+    public override object? VisitSymbolConst(Smalltalk80Parser.SymbolConstContext context)
+        => new LiteralExpression(new Symbol(UnquoteSymbol(context.GetText())));
+
+    /// <inheritdoc />
+    public override object? VisitArrayLiteral(Smalltalk80Parser.ArrayLiteralContext context)
+    {
+        var elements = new List<ExpressionNode>();
+        foreach (var element in context.arrayElement())
+        {
+            if (element.literal() != null)
+                elements.Add((ExpressionNode)Visit(element.literal())!);
+            else if (element.symbolName() != null)
+                elements.Add(new LiteralExpression(new Symbol(element.symbolName().GetText())));
+        }
+
+        return new DynamicArrayExpression(elements);
+    }
+
+    /// <inheritdoc />
+    public override object? VisitByteArrayLiteral(Smalltalk80Parser.ByteArrayLiteralContext context)
+    {
+        var bytes = context.NUMBER().Select(t => byte.Parse(t.GetText())).ToArray();
+        var elements = bytes.Select(b => (ExpressionNode)new LiteralExpression(b)).ToList();
+        return new DynamicArrayExpression(elements);
     }
 
     /// <summary>
