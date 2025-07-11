@@ -45,6 +45,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitChunk([NotNull] Smalltalk80Parser.ChunkContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressionChunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitExpressionChunk([NotNull] Smalltalk80Parser.ExpressionChunkContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classDefChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -166,6 +172,13 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitMessageExpr([NotNull] Smalltalk80Parser.MessageExprContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>primaryExpr</c>
+	/// labeled alternative in <see cref="Smalltalk80Parser.expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrimaryExpr([NotNull] Smalltalk80Parser.PrimaryExprContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.assignable"/>.
 	/// </summary>

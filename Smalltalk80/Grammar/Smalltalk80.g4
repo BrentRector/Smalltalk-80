@@ -24,7 +24,10 @@ chunk:
 	| classDefChunk
 	| methodCategoryChunk
 	| separatorChunk
+	| expressionChunk
 	| BANG;
+
+expressionChunk: expression BANG;
 
 // ─────────────────────────────────────────── Class definitions
 classDefChunk: classHeader classBody BANG;
@@ -80,7 +83,9 @@ answer: returnExpr PERIOD?;
 
 expression:
 	assignable ASSIGN expression	# assignmentExpr
-	| keywordSend					# messageExpr;
+	| keywordSend					# messageExpr
+	| primary					    # primaryExpr
+	;
 
 assignable: variable;
 
@@ -185,7 +190,8 @@ HASH: '#';
 
 fragment INLINE_WS: [ \t];
 
-PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
+PRIMITIVE_DECL:
+	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
 NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 	| ('+' | '-')? DIGITS ('.' DIGITS)? (
@@ -203,8 +209,10 @@ IDENTIFIER: LETTER (LETTER | DIGIT)*;
 fragment LETTER: [A-Za-z];
 fragment DIGIT: [0-9];
 fragment BASEDIGIT: [0-9A-Za-z];
+fragment WS_INLINE: [ \t\f];
 DIGITS: DIGIT+;
 
 NEW_LINE: ('\r'? '\n')+ -> skip;
+
 WS: [ \t\f]+ -> skip;
 COMMENT: '"' .*? '"' -> skip;
