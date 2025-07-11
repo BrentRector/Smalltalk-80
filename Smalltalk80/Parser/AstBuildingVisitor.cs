@@ -219,7 +219,17 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 
     /// <inheritdoc />
     public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
-        => Visit(context.expression());
+    {
+        var expr = (ExpressionNode)Visit(context.expression())!;
+        if (context.cascadeMessage().Length == 0)
+            return expr;
+
+        var messages = new List<ExpressionNode>();
+        foreach (var cascade in context.cascadeMessage())
+            messages.Add(ApplyMessage(this, expr, cascade.messageSend()));
+
+        return new CascadeExpression(expr, messages);
+    }
 
     /// <inheritdoc />
     public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
@@ -293,6 +303,34 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
 
         return expr;
+    }
+
+    private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.MessageSendContext message)
+    {
+        if (message.unaryMessage() is { } unary)
+        {
+            return new UnarySendExpression(receiver, unary.unarySelector().GetText());
+        }
+
+        if (message.binaryMessage() is { } bin)
+        {
+            var arg = (ExpressionNode)visitor.Visit(bin.unaryExpression())!;
+            return new BinarySendExpression(receiver, bin.binarySelector().GetText(), arg);
+        }
+
+        if (message.keywordMessage() is { } kw)
+        {
+            var parts = new List<string>();
+            var args = new List<ExpressionNode>();
+            foreach (var part in kw.keywordPart())
+            {
+                parts.Add(part.IDENTIFIER().GetText() + ":");
+                args.Add((ExpressionNode)visitor.Visit(part.expression())!);
+            }
+            return new KeywordSendExpression(receiver, parts, args);
+        }
+
+        throw new NotSupportedException("Unknown cascade message type.");
     }
 
     /// <summary>
