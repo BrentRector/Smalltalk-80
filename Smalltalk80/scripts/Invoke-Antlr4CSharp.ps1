@@ -12,8 +12,8 @@ function Invoke-Antlr4CSharp {
     [CmdletBinding()]
     param(
         [string]$GrammarName = "$PSScriptRoot\..\Grammar\Smalltalk80.g4",
-        [string]$JarPath     = "$PSScriptRoot\..\ANTLR4\antlr-4.13.2-complete.jar",
-        [string]$OutputDir   = "$PSScriptRoot\..\Generated",
+        [string]$JarPath = "$PSScriptRoot\..\ANTLR4\antlr-4.13.2-complete.jar",
+        [string]$OutputDir = "$PSScriptRoot\..\Generated",
         [string]$PackageName = "Smalltalk80.Generated"
     )
 
@@ -35,7 +35,7 @@ function Invoke-Antlr4CSharp {
     Write-Host "▶ Generating Smalltalk-80 C# parser from:" -NoNewline
     Write-Host " $GrammarName" -ForegroundColor Cyan
 
-    # Invoke ANTLR
+    # Run ANTLR and capture stderr
     & java -jar $JarPath `
         -Dlanguage=CSharp `
         -no-listener -visitor `
@@ -43,12 +43,14 @@ function Invoke-Antlr4CSharp {
         -o $OutputDir `
         $GrammarName
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Parser generation succeeded." -ForegroundColor Green
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host("❌ Parser generation failed (exit code $LASTEXITCODE).")
+        exit 1
     }
-    else {
-        Write-Error "❌ Parser generation failed (exit code $LASTEXITCODE)."
-    }
+
+    Write-Host "✅ Parser generation succeeded." -ForegroundColor Green
+    
 }
 
 # If script is called directly, invoke the function

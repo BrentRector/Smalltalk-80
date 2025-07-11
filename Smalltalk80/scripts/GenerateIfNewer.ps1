@@ -3,9 +3,9 @@
       Regenerate ANTLR C# parser if grammar is newer than generated output.
 #>
 param (
-    [string]$Grammar    = "$PSScriptRoot\..\Grammar\Smalltalk80.g4",
-    [string]$OutputDir  = "$PSScriptRoot\..\Generated",
-    [string]$Invoker    = "$PSScriptRoot\Invoke-Antlr4CSharp.ps1"
+    [string]$Grammar = "$PSScriptRoot\..\Grammar\Smalltalk80.g4",
+    [string]$OutputDir = "$PSScriptRoot\..\Generated",
+    [string]$Invoker = "$PSScriptRoot\Invoke-Antlr4CSharp.ps1"
 )
 
 # 1. Ensure grammar exists
@@ -24,7 +24,8 @@ $generatedFiles = Get-ChildItem -Path $OutputDir -Filter "Smalltalk80*.cs" -File
 
 if (-not $generatedFiles) {
     $needsBuild = $true
-} else {
+}
+else {
     $newestGenerated = $generatedFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $needsBuild = (Get-Item $Grammar).LastWriteTime -gt $newestGenerated.LastWriteTime
 }
@@ -34,10 +35,11 @@ if ($needsBuild) {
     Write-Host "🔄 Grammar is newer than generated parser; regenerating..."
     & $Invoker
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "❌ ANTLR generation failed (exit code $LASTEXITCODE)."
+        Write-Host "❌ ANTLR generation failed (exit code $LASTEXITCODE)."
         exit $LASTEXITCODE
     }
     Write-Host "✅ Parser regeneration complete."
-} else {
+}
+else {
     Write-Host "✅ Generated parser is up to date."
 }

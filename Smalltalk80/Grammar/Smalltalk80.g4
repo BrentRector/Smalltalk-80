@@ -187,7 +187,7 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
-
+bugus
 fragment INLINE_WS: [ \t];
 
 PRIMITIVE_DECL:
@@ -198,7 +198,10 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 		('e' | 'E') ('+' | '-')? DIGITS
 	)?;
 
-STRING: '\'' ( '\'\'' | ~'\'')* '\'';
+STRING: '\'' ( '\'\'' | . )*? '\''
+      | '"'  ( '""'   | . )*? '"';
+
+
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
@@ -215,4 +218,3 @@ DIGITS: DIGIT+;
 NEW_LINE: ('\r'? '\n')+ -> skip;
 
 WS: [ \t\f]+ -> skip;
-COMMENT: '"' .*? '"' -> skip;

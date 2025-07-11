@@ -7,13 +7,24 @@
     <LangVersion>preview</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-  <PropertyGroup>
-    <AntlrGrammar>$(MSBuildProjectDirectory)/Grammar/Smalltalk80.g4</AntlrGrammar>
-    <AntlrOutputDir>$(MSBuildProjectDirectory)/Generated</AntlrOutputDir>
-    <AntlrJar>$(MSBuildProjectDirectory)/ANTLR4/antlr-4.13.2-complete.jar</AntlrJar>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
+  <Target Name="RunAntlrIfNewer"
+    BeforeTargets="BeforeCompile">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\scripts"
+      Command="pwsh -ExecutionPolicy Bypass -File GenerateIfNewer.ps1"
+      IgnoreExitCode="false"
+      ContinueOnError="false"
+      StandardOutputImportance="high"
+      StandardErrorImportance="high" />
+  </Target>
+  <Target Name="CleanGeneratedFiles" AfterTargets="Clean">
+    <ItemGroup>
+      <GeneratedFiles Include="$(MSBuildProjectDirectory)\Generated\**\*" />
+    </ItemGroup>
+    <Delete Files="@(GeneratedFiles)" />
+  </Target>
+
 </Project>
