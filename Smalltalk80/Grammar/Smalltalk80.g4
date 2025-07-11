@@ -188,7 +188,9 @@ PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
 
-PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
+fragment INLINE_WS: [ \t];
+
+PRIMITIVE_DECL: '<' INLINE_WS* 'primitive:' INLINE_WS* DIGITS INLINE_WS* '>';
 
 NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
       | ('+' | '-')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
