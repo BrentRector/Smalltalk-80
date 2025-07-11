@@ -78,39 +78,28 @@ temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // ─────────────────────────────────────────── Statements and expressions
 statements: statement (PERIOD statement)* PERIOD?;
+
 statement: answer | expression;
 
 answer: returnExpr;
 
 expression:
 	assignable ASSIGN expression	# assignmentExpr
-	| keywordSend					# messageExpr
+	| binaryExpression				# messageExpr
 	| primary						# primaryExpr;
 
+unaryExpression: primary (unarySelector)*;
+
 assignable: variable;
-
-keywordSend: binarySend keywordMessage*;
-
-binarySend: unarySend (binaryMessage)*;
-
-unarySend: primary (unaryMessage)*;
 
 returnExpr:
 	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
 
-assignmentExpression:
-	variable ASSIGN expression
-	| keywordExpression;
+cascadeMessage: expression (SEMICOLON expression)*;
 
-keywordExpression: binaryExpression keywordMessage?;
-
-cascadeMessage: messageSend;
-messageSend: unaryMessage | binaryMessage | keywordMessage;
-
-unaryMessage: unarySelector;
-binaryMessage: binarySelector unaryExpression;
-binaryExpression: unaryExpression (binaryMessage)*;
-unaryExpression: primary (unarySelector)*;
+binaryExpression:
+	keywordExpression (binarySelector keywordExpression)*;
+keywordExpression: unaryExpression (keywordPart+)?;
 
 // ─────────────────────────────────────────── Keyword messages
 keywordMessage: keywordPart+;
