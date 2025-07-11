@@ -4,11 +4,13 @@ grammar Smalltalk80;
  ───────────────────────────────────────────────────────────
  Important Contextual Distinction
  ───────────────────────────────────────────────────────────
- | Use case                         | Rule used                       |
+ | Use case | Rule used |
  |----------------------------------|---------------------------------|
- | Message send (e.g., `a at: i`)   | messageExpr (via message chain) |
- | Method header (e.g., `at:put:`)  | (IDENTIFIER COLON formalArg)+   |
- | Symbol (e.g., `#at:put:`)        | keywordSymbolSelector           |
+ | Message send (e.g., `a
+ at: i`) | messageExpr (via message chain) |
+ | Method header (e.g., `at:put:`) | (IDENTIFIER COLON
+ formalArg)+ |
+ | Symbol (e.g., `#at:put:`) | keywordSymbolSelector |
  */
 
 // ─────────────────────────────────────────── Entry point
@@ -64,7 +66,7 @@ methodCategoryChunk:
 
 // ─────────────────────────────────────────── Method definition
 methodDef:
-        methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements BANG;
+	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements? BANG;
 
 methodHeader:
 	unarySelector
@@ -75,11 +77,7 @@ formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // ─────────────────────────────────────────── Statements and expressions
-statements: statementOrEmpty (PERIOD statementOrEmpty)*;
-
-statementOrEmpty:
-        statement
-        |;
+statements: statement (PERIOD statement)* PERIOD?;
 
 statement: answer | expression;
 
@@ -90,13 +88,9 @@ expression:
 	| messageChain					# messageExpr
 	| primary						# primaryExpr;
 
-messageChain:
-	primary messagePart*;
+messageChain: primary messagePart*;
 
-messagePart:
-	unaryMessage
-	| binaryMessage
-	| keywordMessage;
+messagePart: unaryMessage | binaryMessage | keywordMessage;
 
 unaryMessage: unarySelector;
 binaryMessage: binarySelector messageChain;
@@ -116,7 +110,7 @@ primary: literal | variable | block | '(' expression ')';
 variable: IDENTIFIER;
 
 // ─────────────────────────────────────────── Blocks
-block: '[' blockArgs? blockTemps? statements ']';
+block: '[' blockArgs? blockTemps? statements? ']';
 blockArgs: (COLON IDENTIFIER)+ PIPE?;
 blockTemps: PIPE IDENTIFIER+ PIPE;
 
@@ -193,10 +187,9 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 		('e' | 'E') ('+' | '-')? DIGITS
 	)?;
 
-	// Comments are ignored when compiling Smalltalk source but we want to preserve them for round-tripping.
-COMMENT: '"' ( '""' | ~'"' )* '"' -> channel(HIDDEN);
+// Comments are ignored when compiling Smalltalk source but we want to preserve them for round-tripping.
+COMMENT: '"' ( '""' | ~'"')* '"' -> channel(HIDDEN);
 STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
-
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
