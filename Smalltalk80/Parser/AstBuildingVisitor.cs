@@ -8,12 +8,26 @@ using Smalltalk80.Generated;
 
 namespace Smalltalk80.Parser;
 
+/// <summary>
+///     ANTLR visitor that constructs an abstract syntax tree from a parsed
+///     <see cref="Smalltalk80Parser"/> parse tree.
+/// </summary>
 public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 {
     private readonly CommonTokenStream tokens;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="AstBuildingVisitor"/> class.
+    /// </summary>
+    /// <param name="tokens">The token stream produced by the lexer.</param>
     public AstBuildingVisitor(CommonTokenStream tokens) => this.tokens = tokens;
 
+    /// <summary>
+    ///     Visits the root of a file-in operation and returns a <see cref="FileNode"/>
+    ///     representing all parsed chunks.
+    /// </summary>
+    /// <param name="context">The parse context for a file.</param>
+    /// <returns>The constructed <see cref="FileNode"/>.</returns>
     public override object? VisitFileIn(Smalltalk80Parser.FileInContext context)
     {
         var nodes = new List<AstNode>();
@@ -25,9 +39,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new FileNode(nodes);
     }
 
+    /// <summary>
+    ///     Converts an expression chunk into its AST representation.
+    /// </summary>
+    /// <param name="context">The expression chunk context.</param>
+    /// <returns>An <see cref="ExpressionChunkNode"/> for the chunk.</returns>
     public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
         => new ExpressionChunkNode((ExpressionNode)Visit(context.expression())!);
 
+    /// <summary>
+    ///     Creates a <see cref="ClassDefinitionNode"/> from a class definition chunk.
+    /// </summary>
+    /// <param name="context">The class definition context.</param>
+    /// <returns>The resulting class definition node.</returns>
     public override object? VisitClassDefChunk(Smalltalk80Parser.ClassDefChunkContext context)
     {
         var header = context.classHeader();
@@ -47,6 +71,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             category);
     }
 
+    /// <summary>
+    ///     Processes a class comment chunk.
+    /// </summary>
+    /// <param name="context">The class comment context.</param>
+    /// <returns>A <see cref="ClassCommentNode"/> containing the comment.</returns>
     public override object? VisitClassCommentChunk(Smalltalk80Parser.ClassCommentChunkContext context)
     {
         var className = context.className().GetText();
@@ -54,6 +83,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new ClassCommentNode(className, comment);
     }
 
+    /// <summary>
+    ///     Parses a method category block and its contained methods.
+    /// </summary>
+    /// <param name="context">The method category context.</param>
+    /// <returns>A <see cref="FileNode"/> representing the category header and methods.</returns>
     public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
     {
         var className = context.className().GetText();
@@ -74,6 +108,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new FileNode(nodes);
     }
 
+    /// <summary>
+    ///     Converts a method definition into a <see cref="MethodDefinitionNode"/>.
+    /// </summary>
+    /// <param name="context">The method definition context.</param>
+    /// <returns>The constructed method definition node, or <c>null</c> if the header is invalid.</returns>
     public override object? VisitMethodDef(Smalltalk80Parser.MethodDefContext context)
     {
         var header = (MethodHeaderParts?)Visit(context.methodHeader());
@@ -106,6 +145,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 
     private sealed record MethodHeaderParts(string Selector, List<string> Arguments);
 
+    /// <summary>
+    ///     Parses a method header and extracts the selector and argument list.
+    /// </summary>
+    /// <param name="context">The method header context.</param>
+    /// <returns>A <see cref="MethodHeaderParts"/> instance describing the header.</returns>
     public override object? VisitMethodHeader(Smalltalk80Parser.MethodHeaderContext context)
     {
         if (context.unarySelector() != null)
@@ -136,6 +180,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new MethodHeaderParts(selector, args);
     }
 
+    /// <summary>
+    ///     Visits a sequence of statements and returns a <see cref="SequenceNode"/> containing them.
+    /// </summary>
+    /// <param name="context">The statements context.</param>
+    /// <returns>A <see cref="SequenceNode"/> of statements.</returns>
     public override object? VisitStatements(Smalltalk80Parser.StatementsContext context)
     {
         var statements = new List<StatementNode>();
@@ -148,14 +197,28 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new SequenceNode(new List<string>(), statements);
     }
 
+    /// <summary>
+    ///     Processes a single statement, which may be an answer expression or a regular expression.
+    /// </summary>
+    /// <param name="context">The statement context.</param>
     public override object? VisitStatement(Smalltalk80Parser.StatementContext context)
         => context.answer() != null
             ? Visit(context.answer())
             : new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
 
+    /// <summary>
+    ///     Processes an ^ answer statement.
+    /// </summary>
+    /// <param name="context">The answer context.</param>
+    /// <returns>An <see cref="AnswerStatement"/> node.</returns>
     public override object? VisitAnswer(Smalltalk80Parser.AnswerContext context)
         => new AnswerStatement((ExpressionNode)Visit(context.returnExpr())!);
 
+    /// <summary>
+    ///     Parses a return expression that may contain cascaded messages.
+    /// </summary>
+    /// <param name="context">The return expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
     {
         var expr = (ExpressionNode)Visit(context.expression())!;
@@ -172,6 +235,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new CascadeExpression(expr, messages);
     }
 
+    /// <summary>
+    ///     Visits an assignment expression.
+    /// </summary>
+    /// <param name="context">The assignment expression context.</param>
+    /// <returns>The resulting <see cref="AssignmentExpression"/> node.</returns>
     public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
     {
         var variable = context.assignable().variable().IDENTIFIER().GetText();
@@ -179,6 +247,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new AssignmentExpression(variable, value);
     }
 
+    /// <summary>
+    ///     Evaluates a message chain starting with a primary expression.
+    /// </summary>
+    /// <param name="context">The message chain context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/> after applying all messages.</returns>
     public override object? VisitMessageChain(Smalltalk80Parser.MessageChainContext context)
     {
         var expr = (ExpressionNode)Visit(context.primary())!;
@@ -190,6 +263,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return expr;
     }
 
+    /// <summary>
+    ///     Applies an individual message part to the given receiver.
+    /// </summary>
+    /// <param name="visitor">The active AST visitor.</param>
+    /// <param name="receiver">The receiver expression.</param>
+    /// <param name="part">The parsed message part.</param>
+    /// <returns>The expression resulting from applying the message.</returns>
     private static ExpressionNode ApplyMessagePart(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.MessagePartContext part)
     {
         if (part.unaryMessage() != null)
@@ -221,6 +301,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         throw new NotSupportedException("Unknown message part type.");
     }
 
+    /// <summary>
+    ///     Visits a primary expression such as a literal, variable, block or parenthesized expression.
+    /// </summary>
+    /// <param name="context">The primary expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/> or <c>null</c> when the context is empty.</returns>
     public override object? VisitPrimary(Smalltalk80Parser.PrimaryContext context)
     {
         if (context.literal() != null)
@@ -234,6 +319,13 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return null;
     }
 
+    /// <summary>
+    ///     Applies a cascaded message to a receiver.
+    /// </summary>
+    /// <param name="visitor">The active visitor.</param>
+    /// <param name="receiver">The receiver of the message.</param>
+    /// <param name="message">The message expression.</param>
+    /// <returns>The resulting expression after applying the message.</returns>
     private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.ExpressionContext message)
     {
         var node = (ExpressionNode)visitor.Visit(message)!;
@@ -247,9 +339,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         };
     }
 
+    /// <summary>
+    ///     Visits a variable reference.
+    /// </summary>
+    /// <param name="context">The variable context.</param>
+    /// <returns>A <see cref="VariableExpression"/> node.</returns>
     public override object? VisitVariable(Smalltalk80Parser.VariableContext context)
         => new VariableExpression(context.IDENTIFIER()?.GetText() ?? context.GetText());
 
+    /// <summary>
+    ///     Parses a numeric literal and converts it to either an <see cref="int"/> or <see cref="double"/> literal expression.
+    /// </summary>
+    /// <param name="context">The numeric literal context.</param>
+    /// <returns>The resulting <see cref="LiteralExpression"/>.</returns>
     public override object? VisitNumberLiteral(Smalltalk80Parser.NumberLiteralContext context)
     {
         var text = context.NUMBER().GetText();
@@ -258,15 +360,35 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             : new LiteralExpression(double.Parse(text));
     }
 
+    /// <summary>
+    ///     Visits a single quoted string constant.
+    /// </summary>
+    /// <param name="context">The string constant context.</param>
+    /// <returns>A <see cref="LiteralExpression"/> containing the unescaped text.</returns>
     public override object? VisitStringConst(Smalltalk80Parser.StringConstContext context)
         => new LiteralExpression(UnquoteString(context.STRING().GetText()));
 
+    /// <summary>
+    ///     Visits a character literal (e.g., $a).
+    /// </summary>
+    /// <param name="context">The character literal context.</param>
+    /// <returns>A <see cref="LiteralExpression"/> with the character value.</returns>
     public override object? VisitCharacterLiteral(Smalltalk80Parser.CharacterLiteralContext context)
         => new LiteralExpression(context.CHAR_LITERAL().GetText()[1]);
 
+    /// <summary>
+    ///     Processes a symbol constant.
+    /// </summary>
+    /// <param name="context">The symbol constant context.</param>
+    /// <returns>A <see cref="LiteralExpression"/> containing the symbol.</returns>
     public override object? VisitSymbolConst(Smalltalk80Parser.SymbolConstContext context)
         => new LiteralExpression(new Symbol(UnquoteSymbol(context.GetText())));
 
+    /// <summary>
+    ///     Visits a dynamic array literal.
+    /// </summary>
+    /// <param name="context">The array literal context.</param>
+    /// <returns>A <see cref="DynamicArrayExpression"/> with its elements.</returns>
     public override object? VisitArrayLiteral(Smalltalk80Parser.ArrayLiteralContext context)
     {
         var elements = new List<ExpressionNode>();
@@ -281,6 +403,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new DynamicArrayExpression(elements);
     }
 
+    /// <summary>
+    ///     Visits a byte array literal and converts it into a dynamic array of byte values.
+    /// </summary>
+    /// <param name="context">The byte array literal context.</param>
+    /// <returns>A <see cref="DynamicArrayExpression"/> representing the array.</returns>
     public override object? VisitByteArrayLiteral(Smalltalk80Parser.ByteArrayLiteralContext context)
     {
         var bytes = context.NUMBER().Select(t => byte.Parse(t.GetText())).ToArray();
@@ -288,6 +415,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return new DynamicArrayExpression(elements);
     }
 
+    /// <summary>
+    ///     Dispatches to the specific literal type contained in the context.
+    /// </summary>
+    /// <param name="context">The literal context.</param>
+    /// <returns>The resulting literal expression.</returns>
     public override object? VisitLiteral(Smalltalk80Parser.LiteralContext context)
     {
         if (context.TRUE() != null)
@@ -312,9 +444,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return null!;
     }
 
+    /// <summary>
+    ///     Visits a block literal without parameters or statements.
+    /// </summary>
+    /// <param name="context">The block context.</param>
+    /// <returns>A minimal <see cref="BlockExpression"/>.</returns>
     public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
         => new BlockExpression(new List<string>(), new SequenceNode(new List<string>(), new List<StatementNode>()));
 
+    /// <summary>
+    ///     Removes surrounding single quotes and unescapes doubled quotes.
+    /// </summary>
+    /// <param name="text">The quoted text.</param>
+    /// <returns>The unquoted string.</returns>
     private static string UnquoteString(string text)
     {
         if (text.Length > 1 && text.StartsWith("'", StringComparison.Ordinal) && text.EndsWith("'", StringComparison.Ordinal))
@@ -322,6 +464,11 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return text;
     }
 
+    /// <summary>
+    ///     Removes the leading <c>#</c> and unquotes symbol text if necessary.
+    /// </summary>
+    /// <param name="text">The symbol token text.</param>
+    /// <returns>The symbol name.</returns>
     private static string UnquoteSymbol(string text)
     {
         if (text.StartsWith("#'", StringComparison.Ordinal))
