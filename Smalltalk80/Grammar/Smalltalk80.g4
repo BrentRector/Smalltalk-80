@@ -4,13 +4,11 @@ grammar Smalltalk80;
  ───────────────────────────────────────────────────────────
  Important Contextual Distinction
  ───────────────────────────────────────────────────────────
- | Use case | Rule used |
- |------------------------------|-----------------------------------|
- | Message send (e.g., `a at:
- i`) | `keywordMessage` with arguments |
- | Method header (e.g., `at:put:`) | `(IDENTIFIER COLON
- formalArg)+` |
- | Symbol (e.g., `#at:put:`) | `keywordSymbolSelector` |
+ | Use case                         | Rule used                       |
+ |----------------------------------|---------------------------------|
+ | Message send (e.g., `a at: i`)   | messageExpr (via message chain) |
+ | Method header (e.g., `at:put:`)  | (IDENTIFIER COLON formalArg)+   |
+ | Symbol (e.g., `#at:put:`)        | keywordSymbolSelector           |
  */
 
 // ─────────────────────────────────────────── Entry point
@@ -66,7 +64,7 @@ methodCategoryChunk:
 
 // ─────────────────────────────────────────── Method definition
 methodDef:
-	methodHeader NEW_LINE? temporaries? primitiveDecl? statements? BANG;
+	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements? BANG;
 
 methodHeader:
 	unarySelector
@@ -85,10 +83,21 @@ answer: returnExpr;
 
 expression:
 	assignable ASSIGN expression	# assignmentExpr
-	| binaryExpression				# messageExpr
+	| messageChain					# messageExpr
 	| primary						# primaryExpr;
 
-unaryExpression: primary (unarySelector)*;
+messageChain:
+	primary messagePart*;
+
+messagePart:
+	unaryMessage
+	| binaryMessage
+	| keywordMessage;
+
+unaryMessage: unarySelector;
+binaryMessage: binarySelector messageChain;
+keywordMessage: keywordPart+;
+keywordPart: IDENTIFIER COLON messageChain;
 
 assignable: variable;
 
@@ -96,14 +105,6 @@ returnExpr:
 	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
 
 cascadeMessage: expression (SEMICOLON expression)*;
-
-binaryExpression:
-	keywordExpression (binarySelector keywordExpression)*;
-keywordExpression: unaryExpression (keywordPart+)?;
-
-// ─────────────────────────────────────────── Keyword messages
-keywordMessage: keywordPart+;
-keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────── Primary expressions
 primary: literal | variable | block | '(' expression ')';
