@@ -76,6 +76,7 @@ public static class FileInLoader
 
                 case ClassCommentNode:
                 case ScriptNode:
+                case ExpressionChunkNode:
                     // Ignore comments and scripts outside method context
                     break;
             }

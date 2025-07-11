@@ -111,6 +111,12 @@ public sealed record PseudoVariableExpression(string Name) : ExpressionNode;
 public sealed record FileNode(IReadOnlyList<AstNode> Chunks) : AstNode;
 
 /// <summary>
+/// Node representing a top-level expression chunk within a file-in source.
+/// </summary>
+/// <param name="Expression">The expression evaluated by the chunk.</param>
+public sealed record ExpressionChunkNode(ExpressionNode Expression) : AstNode;
+
+/// <summary>
 /// Node representing a class definition chunk.
 /// </summary>
 /// <param name="Superclass">The superclass name.</param>
