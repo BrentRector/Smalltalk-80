@@ -17,6 +17,7 @@
       Command="pwsh -ExecutionPolicy Bypass -File GenerateIfNewer.ps1"
       IgnoreExitCode="false"
       ContinueOnError="false"
+      ConsoleToMSBuild="true"
       StandardOutputImportance="high"
       StandardErrorImportance="high" />
   </Target>
