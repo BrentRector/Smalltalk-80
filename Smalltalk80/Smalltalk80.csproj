@@ -17,7 +17,7 @@
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
 
-  <Target Name="GenerateAntlr" Inputs="$(AntlrGrammar)" Outputs="$(AntlrOutputDir)/Smalltalk80Parser.cs" BeforeTargets="BeforeCompile">
+  <Target Name="GenerateAntlr" Inputs="$(AntlrGrammar)" Outputs="Generated/Smalltalk80Parser.cs" BeforeTargets="BeforeCompile">
     <Message Importance="high" Text="Running ANTLR on $(AntlrGrammar)" />
-    <Exec Command="java -jar &quot;$(AntlrJar)&quot; -Dlanguage=CSharp -no-listener -visitor -package Smalltalk80.Generated -o &quot;$(AntlrOutputDir)&quot; &quot;$(AntlrGrammar)&quot;" />
+    <Exec Command="java -jar &quot;ANTLR4\antlr-4.13.2-complete.jar&quot; -Dlanguage=CSharp -no-listener -visitor -package Smalltalk80.Generated -o &quot;Generated&quot; &quot;Grammar\Smalltalk80.g4&quot;" />
   </Target></Project>
