@@ -54,4 +54,4 @@ TestResult.xml
 nunit-*.xml
 
 # Ignore generated grammar output
-#Smalltalk80/Generated/
+Smalltalk80/Generated/
