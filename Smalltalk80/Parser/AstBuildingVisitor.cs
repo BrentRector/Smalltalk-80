@@ -243,43 +243,49 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <inheritdoc />
-    public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
-        => Visit(context.binaryExpression());
-
-    /// <inheritdoc />
-    public override object? VisitPrimaryExpr(Smalltalk80Parser.PrimaryExprContext context)
-        => Visit(context.primary());
-
-    /// <inheritdoc />
-    public override object? VisitKeywordExpression(Smalltalk80Parser.KeywordExpressionContext context)
+    public override object? VisitMessageChain(Smalltalk80Parser.MessageChainContext context)
     {
-        var receiver = (ExpressionNode)Visit(context.unaryExpression())!;
-        if (context.keywordPart().Length == 0)
-            return receiver;
-
-        var parts = new List<string>();
-        var args = new List<ExpressionNode>();
-        foreach (var part in context.keywordPart())
+        var expr = (ExpressionNode)Visit(context.primary())!;
+        foreach (var part in context.messagePart())
         {
-            parts.Add(part.IDENTIFIER().GetText() + ":");
-            args.Add((ExpressionNode)Visit(part.expression())!);
-        }
-
-        return new KeywordSendExpression(receiver, parts, args);
-    }
-
-    /// <inheritdoc />
-    public override object? VisitBinaryExpression(Smalltalk80Parser.BinaryExpressionContext context)
-    {
-        var expr = (ExpressionNode)Visit(context.keywordExpression(0))!;
-        for (var i = 0; i < context.binarySelector().Length; i++)
-        {
-            var selector = context.binarySelector(i).GetText();
-            var arg = (ExpressionNode)Visit(context.keywordExpression(i + 1))!;
-            expr = new BinarySendExpression(expr, selector, arg);
+            expr = ApplyMessagePart(this, expr, part);
         }
 
         return expr;
+    }
+
+    /// <summary>
+    /// Applies a single message part to the given receiver.
+    /// </summary>
+    private static ExpressionNode ApplyMessagePart(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.MessagePartContext part)
+    {
+        if (part.unaryMessage() != null)
+        {
+            var selector = part.unaryMessage().unarySelector().GetText();
+            return new UnarySendExpression(receiver, selector);
+        }
+
+        if (part.binaryMessage() != null)
+        {
+            var selector = part.binaryMessage().binarySelector().GetText();
+            var arg = (ExpressionNode)visitor.Visit(part.binaryMessage().messageChain())!;
+            return new BinarySendExpression(receiver, selector, arg);
+        }
+
+        if (part.keywordMessage() != null)
+        {
+            var parts = new List<string>();
+            var args = new List<ExpressionNode>();
+            foreach (var kw in part.keywordMessage().keywordPart())
+            {
+                parts.Add(kw.IDENTIFIER().GetText() + ":");
+                args.Add((ExpressionNode)visitor.Visit(kw.messageChain())!);
+            }
+
+            return new KeywordSendExpression(receiver, parts, args);
+        }
+
+        throw new NotSupportedException("Unknown message part type.");
     }
 
     /// <inheritdoc />
@@ -296,17 +302,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return null;
     }
 
-    /// <inheritdoc />
-    public override object? VisitUnaryExpression(Smalltalk80Parser.UnaryExpressionContext context)
-    {
-        var expr = (ExpressionNode)Visit(context.primary())!;
-        foreach (var msg in context.unarySelector())
-        {
-            expr = new UnarySendExpression(expr, msg.GetText());
-        }
-
-        return expr;
-    }
 
     private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.ExpressionContext message)
     {

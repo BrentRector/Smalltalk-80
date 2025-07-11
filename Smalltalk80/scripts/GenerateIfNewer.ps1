@@ -3,9 +3,9 @@
       Regenerate ANTLR C# parser if grammar is newer than generated output.
 #>
 param (
-    [string]$Grammar = "$PSScriptRoot\..\Grammar\Smalltalk80.g4",
-    [string]$OutputDir = "$PSScriptRoot\..\Generated",
-    [string]$Invoker = "$PSScriptRoot\Invoke-Antlr4CSharp.ps1"
+    [string]$Grammar = (Join-Path $PSScriptRoot '../Grammar/Smalltalk80.g4'),
+    [string]$OutputDir = (Join-Path $PSScriptRoot '../Generated'),
+    [string]$Invoker = (Join-Path $PSScriptRoot 'Invoke-Antlr4CSharp.ps1')
 )
 
 # 1. Ensure grammar exists
