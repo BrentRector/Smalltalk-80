@@ -31,10 +31,10 @@ classDefChunk: classHeader classBody BANG;
 classHeader: className subclassKind symbolConst;
 
 subclassKind:
-        'subclass:'
-        | 'variableSubclass:'
-        | 'variableByteSubclass:'
-        | 'variableWordSubclass:';
+	'subclass:'
+	| 'variableSubclass:'
+	| 'variableByteSubclass:'
+	| 'variableWordSubclass:';
 
 primitiveDecl: PRIMITIVE_DECL;
 
@@ -88,7 +88,7 @@ keywordSend: binarySend keywordMessage*;
 
 binarySend: unarySend (binaryMessage)*;
 
-unarySend : primary (unaryMessage)*;
+unarySend: primary (unaryMessage)*;
 
 returnExpr: CARAT expression (SEMICOLON cascadeMessage)*;
 
@@ -111,12 +111,7 @@ keywordMessage: keywordPart+;
 keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────── Primary expressions
-primary:
-    literal
-	| variable
-	| block
-	| '(' expression ')';
-
+primary: literal | variable | block | '(' expression ')';
 
 variable: IDENTIFIER;
 
@@ -153,12 +148,12 @@ arrayLiteral: HASH '(' arrayElement* ')';
 arrayElement: literal | symbolName;
 
 symbolConst:
-        QUOTED_SYMBOL
-        | HASH (
-                unarySelector
-                | binarySelector
-                | keywordSymbolSelector
-        );
+	QUOTED_SYMBOL
+	| HASH (
+		unarySelector
+		| binarySelector
+		| keywordSymbolSelector
+	);
 
 symbolName:
 	IDENTIFIER
@@ -190,11 +185,12 @@ HASH: '#';
 
 fragment INLINE_WS: [ \t];
 
-PRIMITIVE_DECL: '<' INLINE_WS* 'primitive:' INLINE_WS* DIGITS INLINE_WS* '>';
+PRIMITIVE_DECL: '<' 'primitive:' DIGITS '>';
 
 NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
-      | ('+' | '-')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
-
+	| ('+' | '-')? DIGITS ('.' DIGITS)? (
+		('e' | 'E') ('+' | '-')? DIGITS
+	)?;
 
 STRING: '\'' ( '\'\'' | ~'\'')* '\'';
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
