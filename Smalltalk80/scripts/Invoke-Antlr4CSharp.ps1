@@ -35,17 +35,28 @@ function Invoke-Antlr4CSharp {
     Write-Host "▶ Generating Smalltalk-80 C# parser from:" -NoNewline
     Write-Host " $GrammarName" -ForegroundColor Cyan
 
-    # Run ANTLR and capture stderr
-    & java -jar $JarPath `
+    # Execute ANTLR and capture all output so we can surface diagnostics
+    $antlrOutput = & java -jar $JarPath `
         -Dlanguage=CSharp `
         -no-listener -visitor `
         -package $PackageName `
         -o $OutputDir `
-        $GrammarName
+        $GrammarName 2>&1
+    $exitCode = $LASTEXITCODE
+    $hadDiag = $false
 
+    foreach ($line in $antlrOutput) {
+        $text = $line.ToString().Trim()
+        if ($text -match '^(warning|error)\(') {
+            $hadDiag = $true
+            Write-Error $text
+        } elseif ($text) {
+            Write-Host $text
+        }
+    }
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host("❌ Parser generation failed (exit code $LASTEXITCODE).")
+    if ($exitCode -ne 0 -or $hadDiag) {
+        Write-Error "❌ Parser generation failed (exit code $exitCode)."
         exit 1
     }
 
