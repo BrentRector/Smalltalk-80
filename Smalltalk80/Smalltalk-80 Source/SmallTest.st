@@ -1,4 +1,4 @@
-!MyClass methodsFor: 'testing'!
-binarySubtraction
-	^ 	pn-fp > 10 ifTrue: [Cursor wait show]. "this may take a while..."
-! !
+!AltoFile methodsFor: 'private'!
+beSnapshotSerialNumber: aByteArray leaderVirtualDiskAddr: anInteger
+	<primitive: 135>
+	self primitiveFailed! !
