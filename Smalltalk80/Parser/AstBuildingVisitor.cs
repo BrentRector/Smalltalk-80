@@ -40,6 +40,87 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
+    ///     Parses a single expression entry such as might be entered in a REPL.
+    /// </summary>
+    /// <param name="context">The expression entry context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitExpressionEntry(Smalltalk80Parser.ExpressionEntryContext context)
+        => Visit(context.expression());
+
+    /// <summary>
+    ///     Parses a workspace statement sequence.
+    /// </summary>
+    /// <param name="context">The statements entry context.</param>
+    /// <returns>A <see cref="SequenceNode"/> representing the statements.</returns>
+    public override object? VisitStatementsEntry(Smalltalk80Parser.StatementsEntryContext context)
+        => Visit(context.statements());
+
+    /// <summary>
+    ///     Parses a single method definition without trailing bang terminator.
+    /// </summary>
+    /// <param name="context">The method entry context.</param>
+    /// <returns>The parsed <see cref="MethodDefinitionNode"/>.</returns>
+    public override object? VisitMethodEntry(Smalltalk80Parser.MethodEntryContext context)
+    {
+        var header = (MethodHeaderParts?)Visit(context.methodHeader());
+        if (header is null)
+            return null;
+
+        var temps = context.temporaries() is { } t
+            ? ((List<string>)Visit(t)!)
+            : new List<string>();
+
+        bool hasPrimitive = false;
+        int primitiveIndex = 0;
+        if (context.primitiveDecl() is { } primitive)
+        {
+            var text = primitive.PRIMITIVE_DECL().GetText();
+            var numberText = text["<primitive:".Length..^1];
+            if (int.TryParse(numberText, out var parsed))
+            {
+                primitiveIndex = parsed;
+                hasPrimitive = true;
+            }
+        }
+
+        var body = (SequenceNode)Visit(context.methodBodyNoBang())!;
+        body = new SequenceNode(temps, body.Statements);
+
+        return new MethodDefinitionNode(
+            header.Selector,
+            header.Arguments,
+            body,
+            null,
+            string.Empty,
+            hasPrimitive,
+            primitiveIndex);
+    }
+
+    /// <summary>
+    ///     Parses a class definition entry.
+    /// </summary>
+    /// <param name="context">The class entry context.</param>
+    /// <returns>The resulting <see cref="ClassDefinitionNode"/>.</returns>
+    public override object? VisitClassEntry(Smalltalk80Parser.ClassEntryContext context)
+    {
+        var header = context.classHeader();
+        var body = context.classBody();
+        var superclass = header.className().GetText();
+        var className = UnquoteSymbol(header.symbolConst().GetText());
+        var category = body.categoryDecl() is { } cat
+            ? UnquoteString(cat.stringConst().GetText())
+            : string.Empty;
+
+        return new ClassDefinitionNode(
+            superclass,
+            className,
+            new List<string>(),
+            new List<string>(),
+            new List<string>(),
+            category);
+    }
+
+    /// <summary>
     ///     Converts an expression chunk into its AST representation.
     /// </summary>
     /// <param name="context">The expression chunk context.</param>
@@ -221,6 +302,26 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The method body context.</param>
     /// <returns>The parsed <see cref="SequenceNode"/>.</returns>
     public override object? VisitMethodBody(Smalltalk80Parser.MethodBodyContext context)
+    {
+        if (context.statements() != null)
+            return Visit(context.statements());
+
+        if (context.returnExpr() != null)
+        {
+            var expr = (ExpressionNode)Visit(context.returnExpr())!;
+            var stmt = new AnswerStatement(expr);
+            return new SequenceNode(new List<string>(), new List<StatementNode> { stmt });
+        }
+
+        return new SequenceNode(new List<string>(), new List<StatementNode>());
+    }
+
+    /// <summary>
+    ///     Visits a REPL-compatible method body that omits the terminating bang.
+    /// </summary>
+    /// <param name="context">The method body context.</param>
+    /// <returns>The parsed <see cref="SequenceNode"/>.</returns>
+    public override object? VisitMethodBodyNoBang(Smalltalk80Parser.MethodBodyNoBangContext context)
     {
         if (context.statements() != null)
             return Visit(context.statements());
