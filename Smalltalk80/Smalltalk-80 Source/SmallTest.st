@@ -1,5 +1,5 @@
-!AltoFileDirectory methodsFor: 'adding'!
-addNew: aFile 
-i _ i-1.
-
-	^aFile ! !
+!ActionMenu methodsFor: 'action symbols'!
+selectorAt: index
+	^ selectors at: index!
+setSelectors: selArray
+	selectors _ selArray! !

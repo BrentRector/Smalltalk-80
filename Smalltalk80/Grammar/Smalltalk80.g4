@@ -61,7 +61,9 @@ metaclassCommentChunk:
 
 // Method category
 methodCategoryChunk:
-	BANG (className ('class')?) 'methodsFor:' stringConst BANG methodDef* BANG;
+	BANG className ('class')? 'methodsFor:' stringConst BANG (
+		methodDef PERIOD*
+	)* BANG;
 
 // Method definition
 methodDef:
@@ -76,7 +78,7 @@ formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // Statements and expressions
-statements: statement (PERIOD+ statement)* PERIOD+;
+statements: statement (PERIOD+ statement)* PERIOD*;
 
 statement: answer | expression;
 
@@ -187,13 +189,7 @@ arrayLiteral: HASH '(' arrayElement* ')';
 
 arrayElement: literal | symbolName;
 
-symbolConst:
-	QUOTED_SYMBOL
-	| HASH (
-		unarySelector
-		| binarySelector
-		| keywordSymbolSelector
-	);
+symbolConst: QUOTED_SYMBOL | HASH ( symbolName);
 
 symbolName:
 	IDENTIFIER
