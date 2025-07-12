@@ -116,7 +116,7 @@ public sealed class SmalltalkParser
         parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor(tokens);
 
-        var seqCtx = parser.statements();
+        var seqCtx = parser.methodBody();
         if (parser.NumberOfSyntaxErrors > 0)
             throw new InvalidOperationException("Invalid Smalltalk source.");
 

@@ -17,7 +17,7 @@ public class ParserIntegrationTests
     public void EvaluateSource_SimpleAddition_ReturnsSum()
     {
         var vm = new VirtualMachine();
-        var result = vm.EvaluateSource("1 + 2");
+        var result = vm.EvaluateSource("1 + 2!");
         Assert.Equal(3, result);
     }
 
@@ -29,7 +29,7 @@ public class ParserIntegrationTests
     public void EvaluateSource_TemporaryAssignment_ReturnsExpectedValue()
     {
         var vm = new VirtualMachine();
-        var result = vm.EvaluateSource("| x | x := 5. x + 2");
+        var result = vm.EvaluateSource("| x | x := 5. x + 2!");
         Assert.Equal(7, result);
     }
 
@@ -51,7 +51,7 @@ public class ParserIntegrationTests
     public void EvaluateSource_ChainedBinarySend_ReturnsSum()
     {
         var vm = new VirtualMachine();
-        var result = vm.EvaluateSource("1 + 2 + 3");
+        var result = vm.EvaluateSource("1 + 2 + 3!");
         Assert.Equal(6, result);
     }
 
@@ -61,7 +61,7 @@ public class ParserIntegrationTests
     [Fact]
     public void ParseMethod_UnaryCascade_DoesNotThrow()
     {
-        var parser = new SmalltalkParser("1 doThis; doThat");
+        var parser = new SmalltalkParser("1 doThis; doThat!");
         parser.ParseMethod();
     }
 
@@ -71,7 +71,7 @@ public class ParserIntegrationTests
     [Fact]
     public void ParseMethod_BinaryCascade_DoesNotThrow()
     {
-        var parser = new SmalltalkParser("1 + 1; doThat");
+        var parser = new SmalltalkParser("1 + 1; doThat!");
         parser.ParseMethod();
     }
 
@@ -81,7 +81,7 @@ public class ParserIntegrationTests
     [Fact]
     public void ParseMethod_KeywordCascade_DoesNotThrow()
     {
-        var parser = new SmalltalkParser("1 doThat: 42; doSomethingElse");
+        var parser = new SmalltalkParser("1 doThat: 42; doSomethingElse!");
         parser.ParseMethod();
     }
 
@@ -91,7 +91,7 @@ public class ParserIntegrationTests
     [Fact]
     public void ParseMethod_MixedCascade_DoesNotThrow()
     {
-        var parser = new SmalltalkParser("1 + 1 doThat: 42; doSomethingElse");
+        var parser = new SmalltalkParser("1 + 1 doThat: 42; doSomethingElse!");
         parser.ParseMethod();
     }
 
@@ -102,7 +102,7 @@ public class ParserIntegrationTests
     [Fact]
     public void ParseMethod_KeywordArgumentWithReturn_DoesNotThrow()
     {
-        var parser = new SmalltalkParser("| result descr | result := false. result = descr ifFalse: ^1. ^0");
+        var parser = new SmalltalkParser("| result descr | result := false. result = descr ifFalse: ^1. ^0!");
         parser.ParseMethod();
     }
 }
