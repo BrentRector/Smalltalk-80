@@ -59,15 +59,20 @@ metaclassDefinitionChunk: className 'class' classSlotSpec* BANG;
 metaclassCommentChunk:
 	className 'class' 'comment:' NEW_LINE? stringConst BANG;
 
-// Method category
-methodCategoryChunk:
-	BANG className ('class')? 'methodsFor:' stringConst BANG (
-		methodDef PERIOD*
-	)* BANG;
-
 // Method definition
 methodDef:
-	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements? BANG;
+	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? methodBody;
+
+methodBody:
+	statements PERIOD* BANG   // most common case
+	| returnExpr BANG         // allow `^ complexExpression !` with no period
+	| BANG                    // empty method
+	;
+
+// Method category
+methodCategoryChunk:
+	BANG className ('class')? 'methodsFor:' stringConst BANG (methodDef)* BANG;
+
 
 methodHeader:
 	unarySelector
@@ -85,7 +90,7 @@ statement: answer | expression;
 answer: returnExpr;
 
 returnExpr:
-	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
+	CARAT expression (SEMICOLON cascadeMessage)* (PERIOD | BANG);
 
 // Expression parsing with precedence handling for binary operations
 expression: lowPrecedenceExpr | messageExpr | assignmentExpr;
