@@ -121,6 +121,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         if (header is null)
             return null;
 
+        var comment = context.stringConst() is { } c ? UnquoteString(c.GetText()) : null;
+
+        var temps = context.temporaries() is { } t
+            ? ((List<string>)Visit(t)!)
+            : new List<string>();
+
         bool hasPrimitive = false;
         int primitiveIndex = 0;
         if (context.primitiveDecl() is { } primitive)
@@ -134,12 +140,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             }
         }
 
-        var body = new SequenceNode(new List<string>(), new List<StatementNode>());
+        var body = (SequenceNode)Visit(context.methodBody())!;
+        body = new SequenceNode(temps, body.Statements);
+
         return new MethodDefinitionNode(
             header.Selector,
             header.Arguments,
             body,
-            null,
+            comment,
             string.Empty,
             hasPrimitive,
             primitiveIndex);
@@ -200,6 +208,34 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
+    ///     Visits a list of temporary variable declarations.
+    /// </summary>
+    /// <param name="context">The temporaries context.</param>
+    /// <returns>A list of declared temporary variable names.</returns>
+    public override object? VisitTemporaries(Smalltalk80Parser.TemporariesContext context)
+        => context.IDENTIFIER().Select(i => i.GetText()).ToList();
+
+    /// <summary>
+    ///     Visits a method body returning the contained statement sequence.
+    /// </summary>
+    /// <param name="context">The method body context.</param>
+    /// <returns>The parsed <see cref="SequenceNode"/>.</returns>
+    public override object? VisitMethodBody(Smalltalk80Parser.MethodBodyContext context)
+    {
+        if (context.statements() != null)
+            return Visit(context.statements());
+
+        if (context.returnExpr() != null)
+        {
+            var expr = (ExpressionNode)Visit(context.returnExpr())!;
+            var stmt = new AnswerStatement(expr);
+            return new SequenceNode(new List<string>(), new List<StatementNode> { stmt });
+        }
+
+        return new SequenceNode(new List<string>(), new List<StatementNode>());
+    }
+
+    /// <summary>
     ///     Processes a single statement, which may be an answer expression or a regular expression.
     /// </summary>
     /// <param name="context">The statement context.</param>
@@ -245,7 +281,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitExpression(Smalltalk80Parser.ExpressionContext context)
         => context.messageExpr() != null
             ? Visit(context.messageExpr())
-            : Visit(context.lowPrecedenceExpr());
+            : context.assignmentExpr() != null
+                ? Visit(context.assignmentExpr())
+                : Visit(context.lowPrecedenceExpr());
 
     /// <summary>
     ///     Visits a low precedence expression handling addition and subtraction operators.
@@ -266,6 +304,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
 
         return expr;
+    }
+
+    /// <summary>
+    ///     Visits an assignment expression of the form <c>variable := value</c>.
+    /// </summary>
+    /// <param name="context">The assignment expression context.</param>
+    /// <returns>An <see cref="AssignmentExpression"/> representing the assignment.</returns>
+    public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
+    {
+        var variableName = context.lowPrecedenceExpr().GetText();
+        var value = (ExpressionNode)Visit(context.expression())!;
+        return new AssignmentExpression(variableName, value);
     }
 
     /// <summary>
