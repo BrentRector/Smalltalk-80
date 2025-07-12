@@ -91,7 +91,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
     {
         var className = context.className().GetText();
-        var isClassSide = context.GetText().Contains(" class ", StringComparison.Ordinal);
+        var isClassSide = context.children
+            .OfType<ITerminalNode>()
+            .Any(t => t.Symbol.Type == Smalltalk80Parser.T__10);
         var category = UnquoteString(context.stringConst().GetText());
 
         var nodes = new List<AstNode>
