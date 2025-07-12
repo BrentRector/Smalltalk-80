@@ -106,7 +106,12 @@ returnExpr:
 // Expression Parsing with Operator Precedence
 // ───────────────────────────────────────────────────────────────
 
-expression: lowPrecedenceExpr | messageExpr | assignmentExpr;
+// Expressions may be simple arithmetic, message sends, assignments, or a return
+// expression used by do-it blocks and workspace evaluations.
+expression: returnExpr
+          | assignmentExpr
+          | messageExpr
+          | lowPrecedenceExpr;
 
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
 
@@ -122,11 +127,14 @@ highPrecedenceExpr:
 
 unaryMessageExpr: unarySelector primaryExpr;
 
+// A message expression consists of a primary receiver followed by zero or more
+// unary, binary, or keyword messages. This aligns with the full Smalltalk
+// message syntax while remaining simple for this prototype grammar.
 messageExpr:
-    primaryExpr (
-        binarySelector expression
-      | keywordMessage expression
-    )*;
+    primaryExpr
+    (unaryMessage
+    | binaryMessage
+    | keywordMessage)*;
 
 primaryExpr: literal | variable | '(' expression ')';
 
@@ -134,7 +142,8 @@ primaryExpr: literal | variable | '(' expression ')';
 // Message Parts
 // ───────────────────────────────────────────────────────────────
 
-unaryMessage: unarySelector primaryExpr;
+// Unary messages have no arguments and simply apply a selector to the receiver.
+unaryMessage: unarySelector;
 binaryMessage: binarySelector expression;
 keywordMessage: keywordPart+;
 
@@ -144,7 +153,11 @@ keywordPart: IDENTIFIER COLON expression;
 // Selectors
 // ───────────────────────────────────────────────────────────────
 
-unarySelector: '!' | '-' | '~';
+// A unary selector is either an identifier (e.g., foo) or one of the
+// special unary messages used by the standard library. Supporting
+// identifiers here allows the grammar to parse regular unary method
+// definitions and sends such as `increment` or `yourself`.
+unarySelector: IDENTIFIER | '!' | '-' | '~';
 
 binarySelector:
     STAR | DIVIDE | MOD | PLUS | MINUS | LT | GT | EQUAL | LEQ | GEQ

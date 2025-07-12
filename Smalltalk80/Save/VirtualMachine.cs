@@ -46,6 +46,8 @@ public sealed class VirtualMachine
         var headerPart = parts[1].Trim();
         var (selectorName, args) = ParseSelector(headerPart);
         var body = string.Join(Environment.NewLine, lines[1..]);
+        if (!body.TrimEnd().EndsWith("!"))
+            body += "!";
 
         var parser = new SmalltalkParser(body);
         var superclass = SystemDictionary.TryGetClass("Object", out var objCls) ? objCls : null;
