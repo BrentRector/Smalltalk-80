@@ -236,69 +236,131 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
-    ///     Visits an assignment expression.
+    ///     Visits an expression and applies operator precedence rules.
     /// </summary>
-    /// <param name="context">The assignment expression context.</param>
-    /// <returns>The resulting <see cref="AssignmentExpression"/> node.</returns>
-    public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
-    {
-        var variable = context.assignable().variable().IDENTIFIER().GetText();
-        var value = (ExpressionNode)Visit(context.expression())!;
-        return new AssignmentExpression(variable, value);
-    }
+    /// <param name="context">The expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitExpression(Smalltalk80Parser.ExpressionContext context)
+        => context.messageExpr() != null
+            ? Visit(context.messageExpr())
+            : Visit(context.lowPrecedenceExpr());
 
     /// <summary>
-    ///     Evaluates a message chain starting with a primary expression.
+    ///     Visits a low precedence expression handling addition and subtraction operators.
     /// </summary>
-    /// <param name="context">The message chain context.</param>
-    /// <returns>The resulting <see cref="ExpressionNode"/> after applying all messages.</returns>
-    public override object? VisitMessageChain(Smalltalk80Parser.MessageChainContext context)
+    /// <param name="context">The low precedence expression context.</param>
+    /// <returns>The evaluated <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitLowPrecedenceExpr(Smalltalk80Parser.LowPrecedenceExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.primary())!;
-        foreach (var part in context.messagePart())
+        var expr = (ExpressionNode)Visit(context.mediumPrecedenceExpr(0))!;
+        for (int i = 1; i < context.ChildCount; i += 2)
         {
-            expr = ApplyMessagePart(this, expr, part);
+            if (context.children[i] is ITerminalNode op &&
+                context.children[i + 1] is Smalltalk80Parser.MediumPrecedenceExprContext rightCtx)
+            {
+                var right = (ExpressionNode)Visit(rightCtx)!;
+                expr = new BinarySendExpression(expr, op.GetText(), right);
+            }
         }
 
         return expr;
     }
 
     /// <summary>
-    ///     Applies an individual message part to the given receiver.
+    ///     Visits a medium precedence expression handling multiplication, division and modulo operators.
     /// </summary>
-    /// <param name="visitor">The active AST visitor.</param>
-    /// <param name="receiver">The receiver expression.</param>
-    /// <param name="part">The parsed message part.</param>
-    /// <returns>The expression resulting from applying the message.</returns>
-    private static ExpressionNode ApplyMessagePart(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.MessagePartContext part)
+    /// <param name="context">The medium precedence expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitMediumPrecedenceExpr(Smalltalk80Parser.MediumPrecedenceExprContext context)
     {
-        if (part.unaryMessage() != null)
+        var expr = (ExpressionNode)Visit(context.highPrecedenceExpr(0))!;
+        for (int i = 1; i < context.ChildCount; i += 2)
         {
-            var selector = part.unaryMessage().unarySelector().GetText();
-            return new UnarySendExpression(receiver, selector);
-        }
-
-        if (part.binaryMessage() != null)
-        {
-            var selector = part.binaryMessage().binarySelector().GetText();
-            var arg = (ExpressionNode)visitor.Visit(part.binaryMessage().messageChain())!;
-            return new BinarySendExpression(receiver, selector, arg);
-        }
-
-        if (part.keywordMessage() != null)
-        {
-            var parts = new List<string>();
-            var args = new List<ExpressionNode>();
-            foreach (var kw in part.keywordMessage().keywordPart())
+            if (context.children[i] is ITerminalNode op &&
+                context.children[i + 1] is Smalltalk80Parser.HighPrecedenceExprContext rightCtx)
             {
-                parts.Add(kw.IDENTIFIER().GetText() + ":");
-                args.Add((ExpressionNode)visitor.Visit(kw.messageChain())!);
+                var right = (ExpressionNode)Visit(rightCtx)!;
+                expr = new BinarySendExpression(expr, op.GetText(), right);
             }
-
-            return new KeywordSendExpression(receiver, parts, args);
         }
 
-        throw new NotSupportedException("Unknown message part type.");
+        return expr;
+    }
+
+    /// <summary>
+    ///     Visits a high precedence expression, which may be a unary message or a primary expression.
+    /// </summary>
+    /// <param name="context">The high precedence context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitHighPrecedenceExpr(Smalltalk80Parser.HighPrecedenceExprContext context)
+        => context.unaryMessageExpr() != null
+            ? Visit(context.unaryMessageExpr())
+            : Visit(context.primaryExpr());
+
+    /// <summary>
+    ///     Visits a unary message expression.
+    /// </summary>
+    /// <param name="context">The unary message expression context.</param>
+    /// <returns>The resulting <see cref="UnarySendExpression"/>.</returns>
+    public override object? VisitUnaryMessageExpr(Smalltalk80Parser.UnaryMessageExprContext context)
+    {
+        var receiver = (ExpressionNode)Visit(context.primaryExpr())!;
+        var selector = context.unarySelector().GetText();
+        return new UnarySendExpression(receiver, selector);
+    }
+
+    /// <summary>
+    ///     Visits a message expression consisting of a primary receiver and zero or more message parts.
+    /// </summary>
+    /// <param name="context">The message expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
+    {
+        var expr = (ExpressionNode)Visit(context.primaryExpr())!;
+        int index = 0;
+        for (int i = 1; i < context.ChildCount;)
+        {
+            switch (context.children[i])
+            {
+                case Smalltalk80Parser.BinarySelectorContext binSel when context.children[i + 1] is Smalltalk80Parser.ExpressionContext rhsCtx:
+                    var rhs = (ExpressionNode)Visit(rhsCtx)!;
+                    expr = new BinarySendExpression(expr, binSel.GetText(), rhs);
+                    i += 2;
+                    index++;
+                    break;
+
+                case Smalltalk80Parser.KeywordMessageContext kwMsg when context.children[i + 1] is Smalltalk80Parser.ExpressionContext nextCtx:
+                    var parts = kwMsg.keywordPart().Select(k => k.IDENTIFIER().GetText() + ":").ToList();
+                    var args = kwMsg.keywordPart().Select(k => (ExpressionNode)Visit(k.expression())!).ToList();
+                    expr = new KeywordSendExpression(expr, parts, args);
+                    expr = (ExpressionNode)Visit(nextCtx)!;
+                    i += 2;
+                    index++;
+                    break;
+
+                default:
+                    i++;
+                    break;
+            }
+        }
+
+        return expr;
+    }
+
+    /// <summary>
+    ///     Visits a primary expression such as a literal, variable, block or parenthesized expression.
+    /// </summary>
+    /// <param name="context">The primary expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/> or <c>null</c> when the context is empty.</returns>
+    public override object? VisitPrimaryExpr(Smalltalk80Parser.PrimaryExprContext context)
+    {
+        if (context.literal() != null)
+            return Visit(context.literal());
+        if (context.variable() != null)
+            return Visit(context.variable());
+        if (context.expression() != null)
+            return Visit(context.expression());
+        return null;
     }
 
     /// <summary>
