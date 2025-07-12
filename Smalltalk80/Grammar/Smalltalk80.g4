@@ -1,22 +1,19 @@
 grammar Smalltalk80;
 
 /*
- ───────────────────────────────────────────────────────────
  Important Contextual Distinction
- ───────────────────────────────────────────────────────────
+ ─────────────────────────────────────────────────────────────────
  | Use case | Rule used |
  |----------------------------------|---------------------------------|
- | Message send (e.g., `a
- at: i`) | messageExpr (via message chain) |
- | Method header (e.g., `at:put:`) | (IDENTIFIER COLON
- formalArg)+ |
+ | Message send (e.g., `a at: i`) | messageExpr (via message chain) |
+ | Method header (e.g., `at:put:`) | (IDENTIFIER COLON formalArg)+ |
  | Symbol (e.g., `#at:put:`) | keywordSymbolSelector |
  */
 
-// ─────────────────────────────────────────── Entry point
+// Entry point
 fileIn: chunk* EOF;
 
-// ─────────────────────────────────────────── Chunks
+// Chunks
 chunk:
 	metaclassCommentChunk
 	| metaclassDefinitionChunk
@@ -29,7 +26,7 @@ chunk:
 
 expressionChunk: expression BANG;
 
-// ─────────────────────────────────────────── Class definitions
+// Class definitions
 classDefChunk: classHeader classBody BANG;
 classHeader: className subclassKind symbolConst;
 
@@ -51,7 +48,7 @@ classSlotSpec:
 
 categoryDecl: 'category:' stringConst;
 
-// ─────────────────────────────────────────── Class & metaclass comments
+// Class & metaclass comments
 classCommentChunk:
 	className 'comment:' NEW_LINE? stringConst BANG;
 
@@ -60,11 +57,11 @@ metaclassDefinitionChunk: className 'class' classSlotSpec* BANG;
 metaclassCommentChunk:
 	className 'class' 'comment:' NEW_LINE? stringConst BANG;
 
-// ─────────────────────────────────────────── Method category
+// Method category
 methodCategoryChunk:
 	BANG (className ('class')?) 'methodsFor:' stringConst BANG methodDef* BANG;
 
-// ─────────────────────────────────────────── Method definition
+// Method definition
 methodDef:
 	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? statements? BANG;
 
@@ -76,50 +73,56 @@ methodHeader:
 formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
-// ─────────────────────────────────────────── Statements and expressions
-statements
-    : statement (PERIOD+ statement)* PERIOD+
-    ;
+// Statements and expressions
+statements: statement (PERIOD+ statement)* PERIOD+;
 
-statement:
-	answer
-	| expression
-;
+statement: answer | expression;
 
 answer: returnExpr;
 
-expression:
-	assignable ASSIGN expression	# assignmentExpr
-	| messageChain					# messageExpr
-	| primary						# primaryExpr;
+// Expression parsing with precedence handling for binary operations
+expression: messageExpr | additiveExpr | primaryExpr;
 
-messageChain: primary messagePart*;
+additiveExpr:
+    multiplicativeExpr ((PLUS | MINUS) multiplicativeExpr)*;
 
+multiplicativeExpr:
+    primaryExpr ((STAR | DIVIDE | MOD | TILDE) primaryExpr)*;
+
+primaryExpr: literal | variable | '(' expression ')';
+
+messageExpr: primaryExpr (binarySelector expression)*;
+
+// Message Part Handling
 messagePart: unaryMessage | binaryMessage | keywordMessage;
 
 unaryMessage: unarySelector;
-binaryMessage: binarySelector messageChain;
+
+binaryMessage: binarySelector expression;
+
 keywordMessage: keywordPart+;
-keywordPart: IDENTIFIER COLON messageChain;
+
+keywordPart: IDENTIFIER COLON expression;
 
 assignable: variable;
 
 returnExpr:
-	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
+    CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
 
 cascadeMessage: expression (SEMICOLON expression)*;
 
-// ─────────────────────────────────────────── Primary expressions
+
+// Primary expressions
 primary: literal | variable | block | '(' expression ')';
 
 variable: IDENTIFIER | SELF | SUPER | TRUE | FALSE | NIL;
 
-// ─────────────────────────────────────────── Blocks
+// Blocks
 block: '[' blockArgs? blockTemps? statements? ']';
 blockArgs: (COLON IDENTIFIER)+ PIPE?;
 blockTemps: PIPE IDENTIFIER+ PIPE;
 
-// ─────────────────────────────────────────── Literals
+// Literals
 literal:
 	stringConst
 	| numberLiteral
@@ -137,7 +140,7 @@ stringConst: STRING;
 characterLiteral: CHAR_LITERAL;
 byteArrayLiteral: HASH '[' NUMBER* ']';
 
-// ─────────────────────────────────────────── Arrays and symbols
+// Arrays and symbols
 arrayLiteral: HASH '(' arrayElement* ')';
 
 arrayElement: literal | symbolName;
@@ -158,17 +161,34 @@ symbolName:
 
 keywordSymbolSelector: (IDENTIFIER COLON)+;
 
-// ─────────────────────────────────────────── Separator
+// Separator
 separatorChunk: '--' (~BANG)* BANG;
 
-// ─────────────────────────────────────────── Helper rules
+// Helper rules
 className: IDENTIFIER;
 
-// ─────────────────────────────────────────── Selectors
+// Selectors
 unarySelector: IDENTIFIER;
-binarySelector: BINARY_SELECTOR;
+binarySelector:
+	PLUS
+	| MINUS
+	| STAR
+	| DIVIDE
+	| MOD
+	| TILDE
+	| LT
+	| GT
+	| EQUAL
+	| LEQ
+	| GEQ
+	| AT
+	| QUESTION
+	| BACKSLASH
+	| COMMA
+	| AND
+	| OR;
 
-// ─────────────────────────────────────────── Lexer rules
+// Lexer rules
 BANG: '!';
 COLON: ':';
 PERIOD: '.';
@@ -189,12 +209,10 @@ fragment INLINE_WS: [ \t\r\n\f];
 PRIMITIVE_DECL:
 	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
-NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
-	| ('+' | '-')? DIGITS ('.' DIGITS)? (
-		('e' | 'E') ('+' | '-')? DIGITS
-	)?;
+NUMBER:
+	DIGITS [rR] BASEDIGIT+
+	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
 
-// Comments are ignored when compiling Smalltalk source but we want to preserve them for round-tripping.
 COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
 
 STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
@@ -202,7 +220,24 @@ STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
-BINARY_SELECTOR: ([-+*/%~<>=@|&?\\,])+;
+// Token definitions for binary operators
+LEQ: '<=';
+GEQ: '>=';
+PLUS: '+';
+MINUS: '-';
+STAR: '*';
+DIVIDE: '/';
+MOD: '%';
+TILDE: '~';
+LT: '<';
+GT: '>';
+EQUAL: '=';
+AT: '@';
+QUESTION: '?';
+BACKSLASH: '\\';
+COMMA: ',';
+AND: 'and:';
+OR: 'or:';
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 
