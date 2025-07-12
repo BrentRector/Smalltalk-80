@@ -1,88 +1,98 @@
 grammar Smalltalk80;
 
-/*
- Important Contextual Distinction
- ─────────────────────────────────────────────────────────────────
- | Use case | Rule used |
- |----------------------------------|---------------------------------|
- | Message send (e.g., `a
- at: i`) | messageExpr (via message chain) |
- | Method header (e.g., `at:put:`) | (IDENTIFIER COLON
- formalArg)+ |
- | Symbol (e.g., `#at:put:`) | keywordSymbolSelector |
- */
+// ───────────────────────────────────────────────────────────────
+// Entry Points
+// ───────────────────────────────────────────────────────────────
 
-// Entry point
-fileIn: chunk* EOF;
+fileIn: chunk* EOF;                                // file-out style with ! terminators
+expressionEntry: expression EOF;                   // REPL expression input
+statementsEntry: statements EOF;                   // Workspace or do-it block
+methodEntry: methodHeader temporaries? primitiveDecl? methodBodyNoBang EOF;
+classEntry: classHeader classBody EOF;             // Class editor input
 
-// Chunks
+// ───────────────────────────────────────────────────────────────
+// Chunks (file-in mode)
+// ───────────────────────────────────────────────────────────────
+
 chunk:
-	metaclassCommentChunk
-	| metaclassDefinitionChunk
-	| classCommentChunk
-	| classDefChunk
-	| methodCategoryChunk
-	| separatorChunk
-	| expressionChunk
-	| BANG;
+    metaclassCommentChunk
+  | metaclassDefinitionChunk
+  | classCommentChunk
+  | classDefChunk
+  | methodCategoryChunk
+  | separatorChunk
+  | expressionChunk
+  | BANG;
 
 expressionChunk: expression BANG;
 
-// Class definitions
 classDefChunk: classHeader classBody BANG;
+
 classHeader: className subclassKind symbolConst;
 
 subclassKind:
-	'subclass:'
-	| 'variableSubclass:'
-	| 'variableByteSubclass:'
-	| 'variableWordSubclass:';
+    'subclass:'
+  | 'variableSubclass:'
+  | 'variableByteSubclass:'
+  | 'variableWordSubclass:';
 
 primitiveDecl: PRIMITIVE_DECL;
 
 classBody: classSlotSpec* categoryDecl;
 
 classSlotSpec:
-	'instanceVariableNames:' stringConst
-	| 'classVariableNames:' stringConst
-	| 'classInstanceVariableNames:' stringConst
-	| 'poolDictionaries:' stringConst;
+    'instanceVariableNames:' stringConst
+  | 'classVariableNames:' stringConst
+  | 'classInstanceVariableNames:' stringConst
+  | 'poolDictionaries:' stringConst;
 
 categoryDecl: 'category:' stringConst;
 
-// Class & metaclass comments
-classCommentChunk:
-	className 'comment:' NEW_LINE? stringConst BANG;
+// ───────────────────────────────────────────────────────────────
+// Comments & Metadata
+// ───────────────────────────────────────────────────────────────
 
-metaclassDefinitionChunk: className 'class' classSlotSpec* BANG;
+classCommentChunk:
+    className 'comment:' NEW_LINE? stringConst BANG;
+
+metaclassDefinitionChunk:
+    className 'class' classSlotSpec* BANG;
 
 metaclassCommentChunk:
-	className 'class' 'comment:' NEW_LINE? stringConst BANG;
+    className 'class' 'comment:' NEW_LINE? stringConst BANG;
 
-// Method definition
+// ───────────────────────────────────────────────────────────────
+// Method Definitions
+// ───────────────────────────────────────────────────────────────
+
 methodDef:
-	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? methodBody;
+    methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? methodBody;
 
 methodBody:
-	statements PERIOD* BANG   // most common case
-	| returnExpr BANG         // allow `^ complexExpression !` with no period
-	| BANG                    // empty method
-	;
+    statements PERIOD* BANG       // standard method
+  | returnExpr BANG               // short form return
+  | BANG;                         // empty method
 
-// Method category
+methodBodyNoBang:
+    statements PERIOD*            // REPL-compatible
+  | returnExpr;                   // ^expr (no bang)
+
 methodCategoryChunk:
-	BANG className ('class')? 'methodsFor:' stringConst BANG (methodDef)* BANG;
-
+    BANG className ('class')? 'methodsFor:' stringConst BANG (methodDef)* BANG;
 
 methodHeader:
-	unarySelector
-	| binarySelector formalArg
-	| (IDENTIFIER COLON formalArg)+;
+    unarySelector
+  | binarySelector formalArg
+  | (IDENTIFIER COLON formalArg)+;
 
 formalArg: IDENTIFIER;
+
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
-// Statements and expressions
+// ───────────────────────────────────────────────────────────────
+// Statements & Expressions
+// ───────────────────────────────────────────────────────────────
+
 statements: statement (PERIOD+ statement)* PERIOD*;
 
 statement: answer | expression;
@@ -90,98 +100,82 @@ statement: answer | expression;
 answer: returnExpr;
 
 returnExpr:
-	CARAT expression (SEMICOLON cascadeMessage)* (PERIOD | BANG);
+    CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
 
-// Expression parsing with precedence handling for binary operations
+// ───────────────────────────────────────────────────────────────
+// Expression Parsing with Operator Precedence
+// ───────────────────────────────────────────────────────────────
+
 expression: lowPrecedenceExpr | messageExpr | assignmentExpr;
 
-// Assignment expression handling (expression := expression)
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
 
-// Expression handling binary operations with precedence
 lowPrecedenceExpr:
-	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*; // Low precedence operators (+, -)
+    mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*;
 
 mediumPrecedenceExpr:
-	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
-// Medium precedence operators (*, /, %)
+    highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
 
 highPrecedenceExpr:
-	unaryMessageExpr
-	| primaryExpr; // High precedence includes unary messages
+    unaryMessageExpr
+  | primaryExpr;
 
-// Unary message expression
-unaryMessageExpr: unarySelector primaryExpr; // Example: ~a, -b
+unaryMessageExpr: unarySelector primaryExpr;
 
-// Message expression (handles both binary and keyword messages)
 messageExpr:
-	primaryExpr (
-		binarySelector expression
-		| keywordMessage expression
-	)*;
+    primaryExpr (
+        binarySelector expression
+      | keywordMessage expression
+    )*;
 
-// Primary expressions (handles literals, variables, etc.)
 primaryExpr: literal | variable | '(' expression ')';
 
-// Handles unary messages like ~a, -b
-unaryMessage: unarySelector primaryExpr; // e.g., ~a, -b
+// ───────────────────────────────────────────────────────────────
+// Message Parts
+// ───────────────────────────────────────────────────────────────
 
-// Handles binary messages like a + b, a * b
-binaryMessage: binarySelector expression; // e.g., a + b, a * b
+unaryMessage: unarySelector primaryExpr;
+binaryMessage: binarySelector expression;
+keywordMessage: keywordPart+;
 
-// Handles keyword messages like at:put:, at:
-keywordMessage: keywordPart+; // e.g., at: 1, at:put: 2
-
-// Keyword part handling (like at: or put:)
 keywordPart: IDENTIFIER COLON expression;
 
+// ───────────────────────────────────────────────────────────────
 // Selectors
-unarySelector: '!' | '-' | '~'; // Example: !a, -a, ~a
+// ───────────────────────────────────────────────────────────────
+
+unarySelector: '!' | '-' | '~';
 
 binarySelector:
-	STAR
-	| DIVIDE
-	| MOD
-	| PLUS
-	| MINUS
-	| LT
-	| GT
-	| EQUAL
-	| LEQ
-	| GEQ
-	| AT
-	| QUESTION
-	| BACKSLASH
-	| COMMA
-	| AND
-	| OR
-	| TILDE; // Example: a + b, a * b
+    STAR | DIVIDE | MOD | PLUS | MINUS | LT | GT | EQUAL | LEQ | GEQ
+  | AT | QUESTION | BACKSLASH | COMMA | AND | OR | TILDE;
 
-assignable: variable;
+// ───────────────────────────────────────────────────────────────
+// Cascade Messages
+// ───────────────────────────────────────────────────────────────
 
 cascadeMessage: expression (SEMICOLON expression)*;
 
-// Primary expressions
+// ───────────────────────────────────────────────────────────────
+// Literals & Variables
+// ───────────────────────────────────────────────────────────────
+
 primary: literal | variable | block | '(' expression ')';
 
 variable: IDENTIFIER | SELF | SUPER | TRUE | FALSE | NIL;
 
-// Blocks
 block: '[' blockArgs? blockTemps? statements? ']';
 blockArgs: (COLON IDENTIFIER)+ PIPE?;
 blockTemps: PIPE IDENTIFIER+ PIPE;
 
-// Literals
 literal:
-	stringConst
-	| numberLiteral
-	| symbolConst
-	| arrayLiteral
-	| byteArrayLiteral
-	| characterLiteral
-	| TRUE
-	| FALSE
-	| NIL;
+    stringConst
+  | numberLiteral
+  | symbolConst
+  | arrayLiteral
+  | byteArrayLiteral
+  | characterLiteral
+  | TRUE | FALSE | NIL;
 
 numberLiteral: NUMBER;
 
@@ -189,28 +183,36 @@ stringConst: STRING;
 characterLiteral: CHAR_LITERAL;
 byteArrayLiteral: HASH '[' NUMBER* ']';
 
-// Arrays and symbols
+// ───────────────────────────────────────────────────────────────
+// Arrays & Symbols
+// ───────────────────────────────────────────────────────────────
+
 arrayLiteral: HASH '(' arrayElement* ')';
 
 arrayElement: literal | symbolName;
 
-symbolConst: QUOTED_SYMBOL | HASH ( symbolName);
+symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
 symbolName:
-	IDENTIFIER
-	| unarySelector
-	| binarySelector
-	| keywordSymbolSelector;
+    IDENTIFIER
+  | unarySelector
+  | binarySelector
+  | keywordSymbolSelector;
 
 keywordSymbolSelector: (IDENTIFIER COLON)+;
 
-// Separator
+// ───────────────────────────────────────────────────────────────
+// Other Chunks
+// ───────────────────────────────────────────────────────────────
+
 separatorChunk: '--' (~BANG)* BANG;
 
-// Helper rules
+// ───────────────────────────────────────────────────────────────
+// Lexer Rules
+// ───────────────────────────────────────────────────────────────
+
 className: IDENTIFIER;
 
-// Lexer rules
 BANG: '!';
 COLON: ':';
 PERIOD: '.';
@@ -226,14 +228,11 @@ TRUE: 'true';
 FALSE: 'false';
 NIL: 'nil';
 
-fragment INLINE_WS: [ \t\r\n\f];
-
-PRIMITIVE_DECL:
-	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
+PRIMITIVE_DECL: '<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
 NUMBER:
-	DIGITS [rR] BASEDIGIT+
-	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
+    DIGITS [rR] BASEDIGIT+
+  | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
 
 COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
 
@@ -242,7 +241,6 @@ STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];
 
-// Token definitions for binary operators
 LEQ: '<=';
 GEQ: '>=';
 PLUS: '+';
@@ -270,5 +268,4 @@ fragment WS_INLINE: [ \t\f];
 DIGITS: DIGIT+;
 
 NEW_LINE: ('\r'? '\n')+ -> skip;
-
 WS: [ \t\f]+ -> skip;
