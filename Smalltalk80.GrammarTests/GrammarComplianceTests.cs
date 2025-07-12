@@ -33,7 +33,25 @@ public class GrammarComplianceTests
             var errorListener = new CollectingErrorListener();
             parser.AddErrorListener(errorListener);
 
-            parser.fileIn(); // Entry rule
+            var directory = Path.GetFileName(Path.GetDirectoryName(file)!);
+            switch (directory)
+            {
+                case "expressionEntry":
+                    parser.expressionEntry();
+                    break;
+                case "statementsEntry":
+                    parser.statementsEntry();
+                    break;
+                case "methodEntry":
+                    parser.methodEntry();
+                    break;
+                case "classEntry":
+                    parser.classEntry();
+                    break;
+                default:
+                    parser.fileIn();
+                    break;
+            }
 
             if (errorListener.HasErrors)
             {
