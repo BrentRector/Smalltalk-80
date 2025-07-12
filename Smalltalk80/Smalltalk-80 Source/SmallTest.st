@@ -1,14 +1,13 @@
-!AltoFile methodsFor: 'nonhomogeneous accessing'!
-readOrAdd: aPage 
-	| page p pn |
-	page _ aPage.
-	pn _ page pageNumber.
-	(self read: page) notNil ifTrue: [^page].
-	"page now contains last page"
-	(lastPageNumber to: pn - 1) do: 
-		[:p | 
-		page pageNumber: p.
-		page size: page dataSize.
-		"this writes current and allocates next (empty) page"
-		page _ self write: page].
-	^page! !
+!AltoFileDirectory methodsFor: 'adding'!
+addNew: aFile 
+	| sn page |
+	sn _ self allocateSN: aFile.
+	aFile serialNumber: sn.
+
+	"allocate a new page (more success after O.S. stuff, bittable etc.)"
+	self allocate: (page _ aFile initPageNumber: 0) after: 800.
+
+	"write 0th -- leader, in the process filling it in and then creating first page".
+	page reinitialize.
+
+	^aFile! !

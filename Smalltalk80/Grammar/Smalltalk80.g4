@@ -77,9 +77,12 @@ formalArg: IDENTIFIER;
 temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // ─────────────────────────────────────────── Statements and expressions
-statements: statement (PERIOD statement)* PERIOD?;
+statements: statement (PERIOD statement)* PERIOD;
 
-statement: answer | expression;
+statement:
+	answer
+	| expression
+;
 
 answer: returnExpr;
 
@@ -108,7 +111,6 @@ cascadeMessage: expression (SEMICOLON expression)*;
 primary: literal | variable | block | '(' expression ')';
 
 variable: IDENTIFIER | SELF | SUPER | TRUE | FALSE | NIL;
-
 
 // ─────────────────────────────────────────── Blocks
 block: '[' blockArgs? blockTemps? statements? ']';
@@ -180,8 +182,7 @@ TRUE: 'true';
 FALSE: 'false';
 NIL: 'nil';
 
-
-fragment INLINE_WS: [ \t];
+fragment INLINE_WS: [ \t\r\n\f];
 
 PRIMITIVE_DECL:
 	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
@@ -192,7 +193,8 @@ NUMBER: ('+' | '-')? DIGITS [rR] BASEDIGIT+
 	)?;
 
 // Comments are ignored when compiling Smalltalk source but we want to preserve them for round-tripping.
-COMMENT: '"' ( '""' | ~'"')* '"' -> channel(HIDDEN);
+COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
+
 STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
