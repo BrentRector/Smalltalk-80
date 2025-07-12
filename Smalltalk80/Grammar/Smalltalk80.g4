@@ -78,8 +78,7 @@ temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 // ─────────────────────────────────────────── Statements and expressions
 statements
-    : statement (PERIOD statement)* PERIOD?
-    | PERIOD (statement PERIOD)* statement? PERIOD?
+    : statement (PERIOD+ statement)* PERIOD+
     ;
 
 statement:
