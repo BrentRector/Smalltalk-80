@@ -470,29 +470,27 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
     {
         var expr = (ExpressionNode)Visit(context.primaryExpr())!;
-        int index = 0;
-        for (int i = 1; i < context.ChildCount;)
+
+        // Iterate over subsequent message parts and apply them to the running
+        // expression. The grammar emits each message as its own child node
+        // following the primary receiver.
+        foreach (var child in context.children.Skip(1))
         {
-            switch (context.children[i])
+            switch (child)
             {
-                case Smalltalk80Parser.BinarySelectorContext binSel when context.children[i + 1] is Smalltalk80Parser.ExpressionContext rhsCtx:
-                    var rhs = (ExpressionNode)Visit(rhsCtx)!;
-                    expr = new BinarySendExpression(expr, binSel.GetText(), rhs);
-                    i += 2;
-                    index++;
+                case Smalltalk80Parser.UnaryMessageContext unary:
+                    expr = new UnarySendExpression(expr, unary.unarySelector().GetText());
                     break;
 
-                case Smalltalk80Parser.KeywordMessageContext kwMsg when context.children[i + 1] is Smalltalk80Parser.ExpressionContext nextCtx:
-                    var parts = kwMsg.keywordPart().Select(k => k.IDENTIFIER().GetText() + ":").ToList();
-                    var args = kwMsg.keywordPart().Select(k => (ExpressionNode)Visit(k.expression())!).ToList();
+                case Smalltalk80Parser.BinaryMessageContext binary:
+                    var rhs = (ExpressionNode)Visit(binary.expression())!;
+                    expr = new BinarySendExpression(expr, binary.binarySelector().GetText(), rhs);
+                    break;
+
+                case Smalltalk80Parser.KeywordMessageContext kw:
+                    var parts = kw.keywordPart().Select(k => k.IDENTIFIER().GetText() + ":").ToList();
+                    var args = kw.keywordPart().Select(k => (ExpressionNode)Visit(k.expression())!).ToList();
                     expr = new KeywordSendExpression(expr, parts, args);
-                    expr = (ExpressionNode)Visit(nextCtx)!;
-                    i += 2;
-                    index++;
-                    break;
-
-                default:
-                    i++;
                     break;
             }
         }
