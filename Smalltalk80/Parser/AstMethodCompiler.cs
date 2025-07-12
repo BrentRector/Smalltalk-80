@@ -123,6 +123,9 @@ public static class AstMethodCompiler
                 case PseudoVariableExpression pv:
                     EmitPseudoVariable(pv.Name);
                     break;
+                case ReturnExpression ret:
+                    CompileExpression(ret.Value);
+                    break;
                 case BinarySendExpression bin:
                     CompileExpression(bin.Receiver);
                     CompileExpression(bin.Argument);

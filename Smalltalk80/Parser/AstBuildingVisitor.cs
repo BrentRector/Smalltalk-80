@@ -221,18 +221,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.expression())!;
-        if (context.cascadeMessage().Length == 0)
-            return expr;
-
-        var messages = new List<ExpressionNode>();
-        foreach (var cascade in context.cascadeMessage())
+        var value = (ExpressionNode)Visit(context.expression())!;
+        if (context.cascadeMessage().Length > 0)
         {
-            foreach (var msg in cascade.expression())
-                messages.Add(ApplyMessage(this, expr, msg));
+            var messages = new List<ExpressionNode>();
+            foreach (var cascade in context.cascadeMessage())
+                foreach (var msg in cascade.expression())
+                    messages.Add(ApplyMessage(this, value, msg));
+
+            value = new CascadeExpression(value, messages);
         }
 
-        return new CascadeExpression(expr, messages);
+        return new ReturnExpression(value);
     }
 
     /// <summary>

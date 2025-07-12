@@ -105,6 +105,13 @@ public sealed record CascadeExpression(ExpressionNode Receiver, IReadOnlyList<Ex
 public sealed record PseudoVariableExpression(string Name) : ExpressionNode;
 
 /// <summary>
+/// Expression that causes an immediate return from the enclosing method with the value of
+/// <paramref name="Value"/>.
+/// </summary>
+/// <param name="Value">The expression whose result is returned.</param>
+public sealed record ReturnExpression(ExpressionNode Value) : ExpressionNode;
+
+/// <summary>
 /// Root node representing a file-in consisting of multiple chunks.
 /// </summary>
 /// <param name="Chunks">The ordered chunks in the file.</param>
