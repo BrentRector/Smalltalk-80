@@ -81,28 +81,40 @@ statement: answer | expression;
 answer: returnExpr;
 
 // Expression parsing with precedence handling for binary operations
-expression: messageExpr | additiveExpr | primaryExpr;
+expression: messageExpr | lowPrecedenceExpr;
 
-additiveExpr:
-    multiplicativeExpr ((PLUS | MINUS) multiplicativeExpr)*;
+// Expression handling binary operations with precedence
+lowPrecedenceExpr: mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*; // Low precedence operators (+, -)
 
-multiplicativeExpr:
-    primaryExpr ((STAR | DIVIDE | MOD | TILDE) primaryExpr)*;
+mediumPrecedenceExpr: highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*; // Medium precedence operators (*, /, %)
 
+highPrecedenceExpr: unaryMessageExpr | primaryExpr; // High precedence includes unary messages
+
+// Unary message expression
+unaryMessageExpr: unarySelector primaryExpr; // Example: ~a, -b
+
+// Message expression (handles both binary and keyword messages)
+messageExpr: primaryExpr (binarySelector expression | keywordMessage expression)*;
+
+// Primary expressions (handles literals, variables, etc.)
 primaryExpr: literal | variable | '(' expression ')';
 
-messageExpr: primaryExpr (binarySelector expression)*;
+// Handles unary messages like ~a, -b
+unaryMessage: unarySelector primaryExpr; // e.g., ~a, -b
 
-// Message Part Handling
-messagePart: unaryMessage | binaryMessage | keywordMessage;
+// Handles binary messages like a + b, a * b
+binaryMessage: binarySelector expression; // e.g., a + b, a * b
 
-unaryMessage: unarySelector;
+// Handles keyword messages like at:put:, at:
+keywordMessage: keywordPart+; // e.g., at: 1, at:put: 2
 
-binaryMessage: binarySelector expression;
-
-keywordMessage: keywordPart+;
-
+// Keyword part handling (like at: or put:)
 keywordPart: IDENTIFIER COLON expression;
+
+// Selectors
+unarySelector: '!' | '-' | '~' | IDENTIFIER; // Example: !a, -a, ~a
+binarySelector: STAR | DIVIDE | MOD | PLUS | MINUS | LT | GT | EQUAL | LEQ | GEQ | AT | QUESTION | BACKSLASH | COMMA | AND | OR | TILDE; // Example: a + b, a * b
+
 
 assignable: variable;
 
@@ -166,27 +178,6 @@ separatorChunk: '--' (~BANG)* BANG;
 
 // Helper rules
 className: IDENTIFIER;
-
-// Selectors
-unarySelector: IDENTIFIER;
-binarySelector:
-	PLUS
-	| MINUS
-	| STAR
-	| DIVIDE
-	| MOD
-	| TILDE
-	| LT
-	| GT
-	| EQUAL
-	| LEQ
-	| GEQ
-	| AT
-	| QUESTION
-	| BACKSLASH
-	| COMMA
-	| AND
-	| OR;
 
 // Lexer rules
 BANG: '!';
