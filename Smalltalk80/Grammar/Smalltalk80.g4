@@ -5,8 +5,10 @@ grammar Smalltalk80;
  ─────────────────────────────────────────────────────────────────
  | Use case | Rule used |
  |----------------------------------|---------------------------------|
- | Message send (e.g., `a at: i`) | messageExpr (via message chain) |
- | Method header (e.g., `at:put:`) | (IDENTIFIER COLON formalArg)+ |
+ | Message send (e.g., `a
+ at: i`) | messageExpr (via message chain) |
+ | Method header (e.g., `at:put:`) | (IDENTIFIER COLON
+ formalArg)+ |
  | Symbol (e.g., `#at:put:`) | keywordSymbolSelector |
  */
 
@@ -80,21 +82,36 @@ statement: answer | expression;
 
 answer: returnExpr;
 
+returnExpr:
+	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
+
 // Expression parsing with precedence handling for binary operations
-expression: messageExpr | lowPrecedenceExpr;
+expression: lowPrecedenceExpr | messageExpr | assignmentExpr;
+
+// Assignment expression handling (expression := expression)
+assignmentExpr: lowPrecedenceExpr ASSIGN expression;
 
 // Expression handling binary operations with precedence
-lowPrecedenceExpr: mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*; // Low precedence operators (+, -)
+lowPrecedenceExpr:
+	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*; // Low precedence operators (+, -)
 
-mediumPrecedenceExpr: highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*; // Medium precedence operators (*, /, %)
+mediumPrecedenceExpr:
+	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
+// Medium precedence operators (*, /, %)
 
-highPrecedenceExpr: unaryMessageExpr | primaryExpr; // High precedence includes unary messages
+highPrecedenceExpr:
+	unaryMessageExpr
+	| primaryExpr; // High precedence includes unary messages
 
 // Unary message expression
 unaryMessageExpr: unarySelector primaryExpr; // Example: ~a, -b
 
 // Message expression (handles both binary and keyword messages)
-messageExpr: primaryExpr (binarySelector expression | keywordMessage expression)*;
+messageExpr:
+	primaryExpr (
+		binarySelector expression
+		| keywordMessage expression
+	)*;
 
 // Primary expressions (handles literals, variables, etc.)
 primaryExpr: literal | variable | '(' expression ')';
@@ -112,17 +129,30 @@ keywordMessage: keywordPart+; // e.g., at: 1, at:put: 2
 keywordPart: IDENTIFIER COLON expression;
 
 // Selectors
-unarySelector: '!' | '-' | '~' | IDENTIFIER; // Example: !a, -a, ~a
-binarySelector: STAR | DIVIDE | MOD | PLUS | MINUS | LT | GT | EQUAL | LEQ | GEQ | AT | QUESTION | BACKSLASH | COMMA | AND | OR | TILDE; // Example: a + b, a * b
+unarySelector: '!' | '-' | '~'; // Example: !a, -a, ~a
 
+binarySelector:
+	STAR
+	| DIVIDE
+	| MOD
+	| PLUS
+	| MINUS
+	| LT
+	| GT
+	| EQUAL
+	| LEQ
+	| GEQ
+	| AT
+	| QUESTION
+	| BACKSLASH
+	| COMMA
+	| AND
+	| OR
+	| TILDE; // Example: a + b, a * b
 
 assignable: variable;
 
-returnExpr:
-    CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
-
 cascadeMessage: expression (SEMICOLON expression)*;
-
 
 // Primary expressions
 primary: literal | variable | block | '(' expression ')';
