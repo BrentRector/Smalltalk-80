@@ -264,11 +264,14 @@ FALSE: 'false';
 NIL: 'nil';
 
 PRIMITIVE_DECL:
-	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
+        '<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
+
+MINUS: '-';
+TILDE: '~';
 
 NUMBER:
-	('-' | '~')? DIGITS [rR] BASEDIGIT+                         // radix
-  | ('-' | '~')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;  // decimal
+        DIGITS [rR] BASEDIGIT+                         // radix
+  | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;  // decimal
 
 
 COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
@@ -288,11 +291,9 @@ NOT_IDENTITY: '~~';
 LEQ: '<=';
 GEQ: '>=';
 PLUS: '+';
-MINUS: '-';
 STAR: '*';
 DIVIDE: '/';
 MOD: '%';
-TILDE: '~';
 LT: '<';
 GT: '>';
 EQUAL: '=';
