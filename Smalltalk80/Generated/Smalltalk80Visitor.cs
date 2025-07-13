@@ -243,6 +243,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitHighPrecedenceExpr([NotNull] Smalltalk80Parser.HighPrecedenceExprContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.prefixExpr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrefixExpr([NotNull] Smalltalk80Parser.PrefixExprContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageExpr"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

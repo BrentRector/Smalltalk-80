@@ -127,7 +127,13 @@ lowPrecedenceExpr:
 mediumPrecedenceExpr:
 	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
 
-highPrecedenceExpr: primaryExpr;
+highPrecedenceExpr
+	: primaryExpr
+	| prefixExpr
+	;
+
+prefixExpr:
+    (MINUS | TILDE) primaryExpr;
 
 
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or

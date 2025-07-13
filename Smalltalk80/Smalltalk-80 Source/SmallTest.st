@@ -1,17 +1,8 @@
-!Array methodsFor: 'printing'!
-storeOn: aStream 
-	"Use the literal form if possible."
-
-	self isLiteral
-		ifTrue: 
-			[aStream nextPut: $#; nextPut: $(.
-			self do: 
-				[:element | 
-				element printOn: aStream.
-				aStream space].
-			aStream nextPut: $)]
-		ifFalse: [super storeOn: aStream]! !SequenceableCollection subclass: #ArrayedCollection
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Collections-Abstract'! !
+!AltoFile methodsFor: 'file accessing'!
+endFile: aPage 
+	| page nextPage pn |
+	page _ aPage.
+	page isNil
+	  ifTrue: [pn _ -1 "free all of file"]
+	lastPageNumber _ nil "reset by read:".
+	! !
