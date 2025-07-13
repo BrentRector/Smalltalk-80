@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from /workspace/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -37,16 +37,14 @@ public partial class Smalltalk80Parser : Parser {
 	protected static DFA[] decisionToDFA;
 	protected static PredictionContextCache sharedContextCache = new PredictionContextCache();
 	public const int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, T__6=7, T__7=8, T__8=9, 
-		T__9=10, T__10=11, T__11=12, T__12=13, T__13=14, T__14=15, T__15=16, CLASS=17, 
-		BANG=18, COLON=19, PERIOD=20, ASSIGN=21, CARAT=22, PIPE=23, SEMICOLON=24, 
-		HASH=25, SELF=26, SUPER=27, TRUE=28, FALSE=29, NIL=30, PRIMITIVE_DECL=31, 
-		MINUS=32, TILDE=33, NUMBER=34, COMMENT=35, STRING=36, QUOTED_SYMBOL=37, 
-		CHAR_LITERAL=38, BIT_SHIFT_LEFT=39, BIT_SHIFT_RIGHT=40, MODULO=41, INTEGER_DIVIDE=42, 
-		EQUAL_EQUAL=43, NOT_EQUAL=44, NOT_IDENTITY=45, LEQ=46, GEQ=47, PLUS=48, 
-		STAR=49, DIVIDE=50, MOD=51, LT=52, GT=53, EQUAL=54, AT=55, QUESTION=56, 
-		BACKSLASH=57, COMMA=58, BIT_AND=59, AND=60, OR=61, IDENTIFIER=62, DIGITS=63, 
-		NEW_LINE=64, WS=65;
+		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, CLASS=6, BANG=7, COLON=8, PERIOD=9, 
+		ASSIGN=10, CARAT=11, PIPE=12, SEMICOLON=13, HASH=14, SELF=15, SUPER=16, 
+		TRUE=17, FALSE=18, NIL=19, PRIMITIVE_DECL=20, MINUS=21, TILDE=22, NUMBER=23, 
+		COMMENT=24, STRING=25, QUOTED_SYMBOL=26, CHAR_LITERAL=27, BIT_SHIFT_LEFT=28, 
+		BIT_SHIFT_RIGHT=29, MODULO=30, INTEGER_DIVIDE=31, EQUAL_EQUAL=32, NOT_EQUAL=33, 
+		NOT_IDENTITY=34, LEQ=35, GEQ=36, PLUS=37, STAR=38, DIVIDE=39, MOD=40, 
+		LT=41, GT=42, EQUAL=43, AT=44, QUESTION=45, BACKSLASH=46, COMMA=47, BIT_AND=48, 
+		AND=49, OR=50, IDENTIFIER=51, DIGITS=52, NEW_LINE=53, WS=54;
 	public const int
 		RULE_fileIn = 0, RULE_expressionEntry = 1, RULE_statementsEntry = 2, RULE_methodEntry = 3, 
 		RULE_classEntry = 4, RULE_chunk = 5, RULE_expressionChunk = 6, RULE_classDefChunk = 7, 
@@ -61,13 +59,13 @@ public partial class Smalltalk80Parser : Parser {
 		RULE_lowPrecedenceExpr = 33, RULE_mediumPrecedenceExpr = 34, RULE_highPrecedenceExpr = 35, 
 		RULE_prefixExpr = 36, RULE_messageBase = 37, RULE_messageExpr = 38, RULE_parenthesizedExpr = 39, 
 		RULE_primaryExpr = 40, RULE_unaryMessage = 41, RULE_binaryMessage = 42, 
-		RULE_keywordMessage = 43, RULE_keywordPart = 44, RULE_unarySelector = 45, 
-		RULE_binarySelector = 46, RULE_primary = 47, RULE_variable = 48, RULE_block = 49, 
-		RULE_blockArgs = 50, RULE_argumentName = 51, RULE_blockTemps = 52, RULE_literal = 53, 
-		RULE_numberLiteral = 54, RULE_stringConst = 55, RULE_characterLiteral = 56, 
-		RULE_byteArrayLiteral = 57, RULE_arrayLiteral = 58, RULE_arrayElement = 59, 
-		RULE_symbolConst = 60, RULE_symbolName = 61, RULE_keywordSymbolSelector = 62, 
-		RULE_separatorChunk = 63, RULE_className = 64;
+		RULE_keywordMessage = 43, RULE_keywordPart = 44, RULE_identifierColon = 45, 
+		RULE_unarySelector = 46, RULE_binarySelector = 47, RULE_primary = 48, 
+		RULE_variable = 49, RULE_block = 50, RULE_blockArgs = 51, RULE_argumentName = 52, 
+		RULE_blockTemps = 53, RULE_literal = 54, RULE_numberLiteral = 55, RULE_stringConst = 56, 
+		RULE_characterLiteral = 57, RULE_byteArrayLiteral = 58, RULE_arrayLiteral = 59, 
+		RULE_arrayElement = 60, RULE_symbolConst = 61, RULE_symbolName = 62, RULE_keywordSymbolSelector = 63, 
+		RULE_separatorChunk = 64, RULE_className = 65;
 	public static readonly string[] ruleNames = {
 		"fileIn", "expressionEntry", "statementsEntry", "methodEntry", "classEntry", 
 		"chunk", "expressionChunk", "classDefChunk", "classHeader", "subclassKind", 
@@ -78,30 +76,26 @@ public partial class Smalltalk80Parser : Parser {
 		"expression", "baseExpression", "messagePart", "assignmentExpr", "lowPrecedenceExpr", 
 		"mediumPrecedenceExpr", "highPrecedenceExpr", "prefixExpr", "messageBase", 
 		"messageExpr", "parenthesizedExpr", "primaryExpr", "unaryMessage", "binaryMessage", 
-		"keywordMessage", "keywordPart", "unarySelector", "binarySelector", "primary", 
-		"variable", "block", "blockArgs", "argumentName", "blockTemps", "literal", 
-		"numberLiteral", "stringConst", "characterLiteral", "byteArrayLiteral", 
+		"keywordMessage", "keywordPart", "identifierColon", "unarySelector", "binarySelector", 
+		"primary", "variable", "block", "blockArgs", "argumentName", "blockTemps", 
+		"literal", "numberLiteral", "stringConst", "characterLiteral", "byteArrayLiteral", 
 		"arrayLiteral", "arrayElement", "symbolConst", "symbolName", "keywordSymbolSelector", 
 		"separatorChunk", "className"
 	};
 
 	private static readonly string[] _LiteralNames = {
-		null, "'subclass:'", "'variableSubclass:'", "'variableByteSubclass:'", 
-		"'variableWordSubclass:'", "'instanceVariableNames:'", "'classVariableNames:'", 
-		"'classInstanceVariableNames:'", "'poolDictionaries:'", "'category:'", 
-		"'comment:'", "'methodsFor:'", "'('", "')'", "'['", "']'", "'--'", "'class'", 
-		"'!'", "':'", "'.'", null, "'^'", "'|'", "';'", "'#'", "'self'", "'super'", 
-		"'true'", "'false'", "'nil'", null, "'-'", "'~'", null, null, null, null, 
-		null, "'<<'", "'>>'", "'\\\\'", "'//'", "'=='", "'~='", "'~~'", "'<='", 
-		"'>='", "'+'", "'*'", "'/'", "'%'", "'<'", "'>'", "'='", "'@'", "'?'", 
-		"'\\'", "','", "'&'", "'and:'", "'or:'"
+		null, "'('", "')'", "'['", "']'", "'--'", "'class'", "'!'", "':'", "'.'", 
+		null, "'^'", "'|'", "';'", "'#'", "'self'", "'super'", "'true'", "'false'", 
+		"'nil'", null, "'-'", "'~'", null, null, null, null, null, "'<<'", "'>>'", 
+		"'\\\\'", "'//'", "'=='", "'~='", "'~~'", "'<='", "'>='", "'+'", "'*'", 
+		"'/'", "'%'", "'<'", "'>'", "'='", "'@'", "'?'", "'\\'", "','", "'&'", 
+		"'and:'", "'or:'"
 	};
 	private static readonly string[] _SymbolicNames = {
-		null, null, null, null, null, null, null, null, null, null, null, null, 
-		null, null, null, null, null, "CLASS", "BANG", "COLON", "PERIOD", "ASSIGN", 
-		"CARAT", "PIPE", "SEMICOLON", "HASH", "SELF", "SUPER", "TRUE", "FALSE", 
-		"NIL", "PRIMITIVE_DECL", "MINUS", "TILDE", "NUMBER", "COMMENT", "STRING", 
-		"QUOTED_SYMBOL", "CHAR_LITERAL", "BIT_SHIFT_LEFT", "BIT_SHIFT_RIGHT", 
+		null, null, null, null, null, null, "CLASS", "BANG", "COLON", "PERIOD", 
+		"ASSIGN", "CARAT", "PIPE", "SEMICOLON", "HASH", "SELF", "SUPER", "TRUE", 
+		"FALSE", "NIL", "PRIMITIVE_DECL", "MINUS", "TILDE", "NUMBER", "COMMENT", 
+		"STRING", "QUOTED_SYMBOL", "CHAR_LITERAL", "BIT_SHIFT_LEFT", "BIT_SHIFT_RIGHT", 
 		"MODULO", "INTEGER_DIVIDE", "EQUAL_EQUAL", "NOT_EQUAL", "NOT_IDENTITY", 
 		"LEQ", "GEQ", "PLUS", "STAR", "DIVIDE", "MOD", "LT", "GT", "EQUAL", "AT", 
 		"QUESTION", "BACKSLASH", "COMMA", "BIT_AND", "AND", "OR", "IDENTIFIER", 
@@ -130,6 +124,33 @@ public partial class Smalltalk80Parser : Parser {
 			decisionToDFA[i] = new DFA(_ATN.GetDecisionState(i), i);
 		}
 	}
+
+
+	    private bool IsMethodsFor()
+	    {
+	        var stream = TokenStream;
+	        int index = 1; // lookahead position
+	        if (stream.LA(index) != Smalltalk80Parser.BANG)
+	            return false;
+	        index++; // class name
+	        if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
+	            return false;
+	        index++;
+	        if (stream.LA(index) == Smalltalk80Parser.CLASS)
+	            index++;
+	        if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
+	            return false;
+	        var id = stream.LT(index)!.Text;
+	        return id == "methodsFor" && stream.LA(index + 1) == Smalltalk80Parser.COLON;
+	    }
+
+	    private bool NextMatchesKeyword(int offset, string keyword)
+	    {
+	        var stream = TokenStream;
+	        return stream.LA(offset) == Smalltalk80Parser.IDENTIFIER
+	            && stream.LA(offset + 1) == Smalltalk80Parser.COLON
+	            && stream.LT(offset)!.Text == keyword;
+	    }
 
 		public Smalltalk80Parser(ITokenStream input) : this(input, Console.Out, Console.Error) { }
 
@@ -164,25 +185,27 @@ public partial class Smalltalk80Parser : Parser {
 	public FileInContext fileIn() {
 		FileInContext _localctx = new FileInContext(Context, State);
 		EnterRule(_localctx, 0, RULE_fileIn);
-		int _la;
 		try {
+			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 133;
+			State = 135;
 			ErrorHandler.Sync(this);
-			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 4611686531647098880L) != 0)) {
-				{
-				{
-				State = 130;
-				chunk();
+			_alt = Interpreter.AdaptivePredict(TokenStream,0,Context);
+			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
+				if ( _alt==1 ) {
+					{
+					{
+					State = 132;
+					chunk();
+					}
+					} 
 				}
-				}
-				State = 135;
+				State = 137;
 				ErrorHandler.Sync(this);
-				_la = TokenStream.LA(1);
+				_alt = Interpreter.AdaptivePredict(TokenStream,0,Context);
 			}
-			State = 136;
+			State = 138;
 			Match(Eof);
 			}
 		}
@@ -222,9 +245,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 138;
+			State = 140;
 			expression();
-			State = 139;
+			State = 141;
 			Match(Eof);
 			}
 		}
@@ -264,9 +287,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 141;
+			State = 143;
 			statements();
-			State = 142;
+			State = 144;
 			Match(Eof);
 			}
 		}
@@ -316,31 +339,31 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 144;
-			methodHeader();
 			State = 146;
+			methodHeader();
+			State = 148;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==PIPE) {
 				{
-				State = 145;
+				State = 147;
 				temporaries();
 				}
 			}
 
-			State = 149;
+			State = 151;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==PRIMITIVE_DECL) {
 				{
-				State = 148;
+				State = 150;
 				primitiveDecl();
 				}
 			}
 
-			State = 151;
+			State = 153;
 			methodBodyNoBang();
-			State = 152;
+			State = 154;
 			Match(Eof);
 			}
 		}
@@ -383,11 +406,11 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 154;
-			classHeader();
-			State = 155;
-			classBody();
 			State = 156;
+			classHeader();
+			State = 157;
+			classBody();
+			State = 158;
 			Match(Eof);
 			}
 		}
@@ -415,14 +438,14 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public ClassDefChunkContext classDefChunk() {
 			return GetRuleContext<ClassDefChunkContext>(0);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public MethodCategoryChunkContext methodCategoryChunk() {
-			return GetRuleContext<MethodCategoryChunkContext>(0);
-		}
 		[System.Diagnostics.DebuggerNonUserCode] public SeparatorChunkContext separatorChunk() {
 			return GetRuleContext<SeparatorChunkContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ExpressionChunkContext expressionChunk() {
 			return GetRuleContext<ExpressionChunkContext>(0);
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public MethodCategoryChunkContext methodCategoryChunk() {
+			return GetRuleContext<MethodCategoryChunkContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode BANG() { return GetToken(Smalltalk80Parser.BANG, 0); }
 		public ChunkContext(ParserRuleContext parent, int invokingState)
@@ -443,62 +466,62 @@ public partial class Smalltalk80Parser : Parser {
 		ChunkContext _localctx = new ChunkContext(Context, State);
 		EnterRule(_localctx, 10, RULE_chunk);
 		try {
-			State = 166;
+			State = 168;
 			ErrorHandler.Sync(this);
 			switch ( Interpreter.AdaptivePredict(TokenStream,3,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 158;
+				State = 160;
 				metaclassCommentChunk();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 159;
+				State = 161;
 				metaclassDefinitionChunk();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 160;
+				State = 162;
 				classCommentChunk();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 161;
+				State = 163;
 				classDefChunk();
 				}
 				break;
 			case 5:
 				EnterOuterAlt(_localctx, 5);
 				{
-				State = 162;
-				methodCategoryChunk();
+				State = 164;
+				separatorChunk();
 				}
 				break;
 			case 6:
 				EnterOuterAlt(_localctx, 6);
 				{
-				State = 163;
-				separatorChunk();
+				State = 165;
+				expressionChunk();
 				}
 				break;
 			case 7:
 				EnterOuterAlt(_localctx, 7);
 				{
-				State = 164;
-				expressionChunk();
+				State = 166;
+				methodCategoryChunk();
 				}
 				break;
 			case 8:
 				EnterOuterAlt(_localctx, 8);
 				{
-				State = 165;
+				State = 167;
 				Match(BANG);
 				}
 				break;
@@ -540,9 +563,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 168;
+			State = 170;
 			expression();
-			State = 169;
+			State = 171;
 			Match(BANG);
 			}
 		}
@@ -585,11 +608,11 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 171;
-			classHeader();
-			State = 172;
-			classBody();
 			State = 173;
+			classHeader();
+			State = 174;
+			classBody();
+			State = 175;
 			Match(BANG);
 			}
 		}
@@ -634,11 +657,11 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 175;
-			className();
-			State = 176;
-			subclassKind();
 			State = 177;
+			className();
+			State = 178;
+			subclassKind();
+			State = 179;
 			symbolConst();
 			}
 		}
@@ -654,6 +677,10 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class SubclassKindContext : ParserRuleContext {
+		public IdentifierColonContext kind;
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
+		}
 		public SubclassKindContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
 		{
@@ -671,19 +698,16 @@ public partial class Smalltalk80Parser : Parser {
 	public SubclassKindContext subclassKind() {
 		SubclassKindContext _localctx = new SubclassKindContext(Context, State);
 		EnterRule(_localctx, 18, RULE_subclassKind);
-		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 179;
-			_la = TokenStream.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 30L) != 0)) ) {
-			ErrorHandler.RecoverInline(this);
-			}
-			else {
-				ErrorHandler.ReportMatch(this);
-			    Consume();
-			}
+			State = 181;
+			_localctx.kind = identifierColon();
+
+			          var text = (_localctx.kind!=null?TokenStream.GetText(_localctx.kind.Start,_localctx.kind.Stop):null);
+			          if (text is not ("subclass:" or "variableSubclass:" or "variableByteSubclass:" or "variableWordSubclass:"))
+			              NotifyErrorListeners($"invalid subclass kind: {text}");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -719,7 +743,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 181;
+			State = 184;
 			Match(PRIMITIVE_DECL);
 			}
 		}
@@ -761,25 +785,27 @@ public partial class Smalltalk80Parser : Parser {
 	public ClassBodyContext classBody() {
 		ClassBodyContext _localctx = new ClassBodyContext(Context, State);
 		EnterRule(_localctx, 22, RULE_classBody);
-		int _la;
 		try {
+			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 186;
-			ErrorHandler.Sync(this);
-			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 480L) != 0)) {
-				{
-				{
-				State = 183;
-				classSlotSpec();
-				}
-				}
-				State = 188;
-				ErrorHandler.Sync(this);
-				_la = TokenStream.LA(1);
-			}
 			State = 189;
+			ErrorHandler.Sync(this);
+			_alt = Interpreter.AdaptivePredict(TokenStream,4,Context);
+			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
+				if ( _alt==1 ) {
+					{
+					{
+					State = 186;
+					classSlotSpec();
+					}
+					} 
+				}
+				State = 191;
+				ErrorHandler.Sync(this);
+				_alt = Interpreter.AdaptivePredict(TokenStream,4,Context);
+			}
+			State = 192;
 			categoryDecl();
 			}
 		}
@@ -795,8 +821,12 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class ClassSlotSpecContext : ParserRuleContext {
+		public IdentifierColonContext spec;
 		[System.Diagnostics.DebuggerNonUserCode] public StringConstContext stringConst() {
 			return GetRuleContext<StringConstContext>(0);
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
 		}
 		public ClassSlotSpecContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -816,47 +846,21 @@ public partial class Smalltalk80Parser : Parser {
 		ClassSlotSpecContext _localctx = new ClassSlotSpecContext(Context, State);
 		EnterRule(_localctx, 24, RULE_classSlotSpec);
 		try {
-			State = 199;
-			ErrorHandler.Sync(this);
-			switch (TokenStream.LA(1)) {
-			case T__4:
-				EnterOuterAlt(_localctx, 1);
-				{
-				State = 191;
-				Match(T__4);
-				State = 192;
-				stringConst();
-				}
-				break;
-			case T__5:
-				EnterOuterAlt(_localctx, 2);
-				{
-				State = 193;
-				Match(T__5);
-				State = 194;
-				stringConst();
-				}
-				break;
-			case T__6:
-				EnterOuterAlt(_localctx, 3);
-				{
-				State = 195;
-				Match(T__6);
-				State = 196;
-				stringConst();
-				}
-				break;
-			case T__7:
-				EnterOuterAlt(_localctx, 4);
-				{
-				State = 197;
-				Match(T__7);
-				State = 198;
-				stringConst();
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
+			EnterOuterAlt(_localctx, 1);
+			{
+			State = 194;
+			_localctx.spec = identifierColon();
+			State = 195;
+			stringConst();
+
+			          var text = (_localctx.spec!=null?TokenStream.GetText(_localctx.spec.Start,_localctx.spec.Stop):null);
+			          if (text is not (
+			                  "instanceVariableNames:" or
+			                  "classVariableNames:" or
+			                  "classInstanceVariableNames:" or
+			                  "poolDictionaries:"))
+			              NotifyErrorListeners($"invalid slot specification: {text}");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -871,8 +875,12 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class CategoryDeclContext : ParserRuleContext {
+		public IdentifierColonContext kw;
 		[System.Diagnostics.DebuggerNonUserCode] public StringConstContext stringConst() {
 			return GetRuleContext<StringConstContext>(0);
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
 		}
 		public CategoryDeclContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -894,10 +902,14 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 201;
-			Match(T__8);
-			State = 202;
+			State = 198;
+			_localctx.kw = identifierColon();
+			State = 199;
 			stringConst();
+
+			          if ((_localctx.kw!=null?TokenStream.GetText(_localctx.kw.Start,_localctx.kw.Stop):null) != "category:")
+			              NotifyErrorListeners("expected 'category:'");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -912,6 +924,7 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class ClassCommentChunkContext : ParserRuleContext {
+		public IdentifierColonContext kw;
 		[System.Diagnostics.DebuggerNonUserCode] public ClassNameContext className() {
 			return GetRuleContext<ClassNameContext>(0);
 		}
@@ -919,6 +932,9 @@ public partial class Smalltalk80Parser : Parser {
 			return GetRuleContext<StringConstContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode BANG() { return GetToken(Smalltalk80Parser.BANG, 0); }
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
+		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode NEW_LINE() { return GetToken(Smalltalk80Parser.NEW_LINE, 0); }
 		public ClassCommentChunkContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -941,24 +957,30 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 204;
+			State = 202;
+			if (!( NextMatchesKeyword(2, "comment") )) throw new FailedPredicateException(this, " NextMatchesKeyword(2, \"comment\") ");
+			State = 203;
 			className();
-			State = 205;
-			Match(T__9);
-			State = 207;
+			State = 204;
+			_localctx.kw = identifierColon();
+			State = 206;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==NEW_LINE) {
 				{
-				State = 206;
+				State = 205;
 				Match(NEW_LINE);
 				}
 			}
 
-			State = 209;
+			State = 208;
 			stringConst();
-			State = 210;
+			State = 209;
 			Match(BANG);
+
+			          if ((_localctx.kw!=null?TokenStream.GetText(_localctx.kw.Start,_localctx.kw.Stop):null) != "comment:")
+			              NotifyErrorListeners("expected 'comment:'");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -1012,7 +1034,7 @@ public partial class Smalltalk80Parser : Parser {
 			State = 217;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 480L) != 0)) {
+			while (_la==IDENTIFIER) {
 				{
 				{
 				State = 214;
@@ -1039,6 +1061,7 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class MetaclassCommentChunkContext : ParserRuleContext {
+		public IdentifierColonContext kw;
 		[System.Diagnostics.DebuggerNonUserCode] public ClassNameContext className() {
 			return GetRuleContext<ClassNameContext>(0);
 		}
@@ -1047,6 +1070,9 @@ public partial class Smalltalk80Parser : Parser {
 			return GetRuleContext<StringConstContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode BANG() { return GetToken(Smalltalk80Parser.BANG, 0); }
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
+		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode NEW_LINE() { return GetToken(Smalltalk80Parser.NEW_LINE, 0); }
 		public MetaclassCommentChunkContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -1070,25 +1096,31 @@ public partial class Smalltalk80Parser : Parser {
 			EnterOuterAlt(_localctx, 1);
 			{
 			State = 222;
-			className();
+			if (!( NextMatchesKeyword(3, "comment") )) throw new FailedPredicateException(this, " NextMatchesKeyword(3, \"comment\") ");
 			State = 223;
-			Match(CLASS);
+			className();
 			State = 224;
-			Match(T__9);
-			State = 226;
+			Match(CLASS);
+			State = 225;
+			_localctx.kw = identifierColon();
+			State = 227;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==NEW_LINE) {
 				{
-				State = 225;
+				State = 226;
 				Match(NEW_LINE);
 				}
 			}
 
-			State = 228;
-			stringConst();
 			State = 229;
+			stringConst();
+			State = 230;
 			Match(BANG);
+
+			          if ((_localctx.kw!=null?TokenStream.GetText(_localctx.kw.Start,_localctx.kw.Stop):null) != "comment:")
+			              NotifyErrorListeners("expected 'comment:'");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -1140,49 +1172,49 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 231;
-			methodHeader();
 			State = 233;
+			methodHeader();
+			State = 235;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,9,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,8,Context) ) {
 			case 1:
 				{
-				State = 232;
+				State = 234;
 				stringConst();
 				}
 				break;
 			}
-			State = 236;
+			State = 238;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==NEW_LINE) {
 				{
-				State = 235;
+				State = 237;
 				Match(NEW_LINE);
 				}
 			}
 
-			State = 239;
+			State = 241;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==PIPE) {
 				{
-				State = 238;
+				State = 240;
 				temporaries();
 				}
 			}
 
-			State = 242;
+			State = 244;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==PRIMITIVE_DECL) {
 				{
-				State = 241;
+				State = 243;
 				primitiveDecl();
 				}
 			}
 
-			State = 244;
+			State = 246;
 			methodBody();
 			}
 		}
@@ -1228,45 +1260,45 @@ public partial class Smalltalk80Parser : Parser {
 		EnterRule(_localctx, 36, RULE_methodBody);
 		int _la;
 		try {
-			State = 259;
+			State = 261;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,14,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,13,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 246;
+				State = 248;
 				statements();
-				State = 250;
+				State = 252;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 				while (_la==PERIOD) {
 					{
 					{
-					State = 247;
+					State = 249;
 					Match(PERIOD);
 					}
 					}
-					State = 252;
+					State = 254;
 					ErrorHandler.Sync(this);
 					_la = TokenStream.LA(1);
 				}
-				State = 253;
+				State = 255;
 				Match(BANG);
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 255;
+				State = 257;
 				returnExpr();
-				State = 256;
+				State = 258;
 				Match(BANG);
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 258;
+				State = 260;
 				Match(BANG);
 				}
 				break;
@@ -1313,25 +1345,25 @@ public partial class Smalltalk80Parser : Parser {
 		EnterRule(_localctx, 38, RULE_methodBodyNoBang);
 		int _la;
 		try {
-			State = 269;
+			State = 271;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,16,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,15,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 261;
+				State = 263;
 				statements();
-				State = 265;
+				State = 267;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 				while (_la==PERIOD) {
 					{
 					{
-					State = 262;
+					State = 264;
 					Match(PERIOD);
 					}
 					}
-					State = 267;
+					State = 269;
 					ErrorHandler.Sync(this);
 					_la = TokenStream.LA(1);
 				}
@@ -1340,7 +1372,7 @@ public partial class Smalltalk80Parser : Parser {
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 268;
+				State = 270;
 				returnExpr();
 				}
 				break;
@@ -1358,6 +1390,7 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	public partial class MethodCategoryChunkContext : ParserRuleContext {
+		public IdentifierColonContext kw;
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode[] BANG() { return GetTokens(Smalltalk80Parser.BANG); }
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode BANG(int i) {
 			return GetToken(Smalltalk80Parser.BANG, i);
@@ -1367,6 +1400,9 @@ public partial class Smalltalk80Parser : Parser {
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public StringConstContext stringConst() {
 			return GetRuleContext<StringConstContext>(0);
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon() {
+			return GetRuleContext<IdentifierColonContext>(0);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode CLASS() { return GetToken(Smalltalk80Parser.CLASS, 0); }
 		[System.Diagnostics.DebuggerNonUserCode] public MethodDefContext[] methodDef() {
@@ -1396,42 +1432,48 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 271;
-			Match(BANG);
-			State = 272;
-			className();
+			State = 273;
+			if (!(IsMethodsFor())) throw new FailedPredicateException(this, "IsMethodsFor()");
 			State = 274;
+			Match(BANG);
+			State = 275;
+			className();
+			State = 277;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==CLASS) {
 				{
-				State = 273;
+				State = 276;
 				Match(CLASS);
 				}
 			}
 
-			State = 276;
-			Match(T__10);
-			State = 277;
+			State = 279;
+			_localctx.kw = identifierColon();
+			State = 280;
 			stringConst();
-			State = 278;
+			State = 281;
 			Match(BANG);
-			State = 282;
+			State = 285;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 9223371502072759808L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 4503599366246464L) != 0)) {
 				{
 				{
-				State = 279;
+				State = 282;
 				methodDef();
 				}
 				}
-				State = 284;
+				State = 287;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			}
-			State = 285;
+			State = 288;
 			Match(BANG);
+
+			          if ((_localctx.kw!=null?TokenStream.GetText(_localctx.kw.Start,_localctx.kw.Stop):null) != "methodsFor:")
+			              NotifyErrorListeners("expected 'methodsFor:'");
+			      
 			}
 		}
 		catch (RecognitionException re) {
@@ -1458,13 +1500,11 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public FormalArgContext formalArg(int i) {
 			return GetRuleContext<FormalArgContext>(i);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode[] IDENTIFIER() { return GetTokens(Smalltalk80Parser.IDENTIFIER); }
-		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode IDENTIFIER(int i) {
-			return GetToken(Smalltalk80Parser.IDENTIFIER, i);
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext[] identifierColon() {
+			return GetRuleContexts<IdentifierColonContext>();
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode[] COLON() { return GetTokens(Smalltalk80Parser.COLON); }
-		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode COLON(int i) {
-			return GetToken(Smalltalk80Parser.COLON, i);
+		[System.Diagnostics.DebuggerNonUserCode] public IdentifierColonContext identifierColon(int i) {
+			return GetRuleContext<IdentifierColonContext>(i);
 		}
 		public MethodHeaderContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -1483,32 +1523,31 @@ public partial class Smalltalk80Parser : Parser {
 	public MethodHeaderContext methodHeader() {
 		MethodHeaderContext _localctx = new MethodHeaderContext(Context, State);
 		EnterRule(_localctx, 42, RULE_methodHeader);
-		int _la;
 		try {
 			int _alt;
-			State = 310;
+			State = 302;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,22,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,19,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 287;
+				State = 291;
 				unarySelector();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 288;
+				State = 292;
 				binarySelector();
-				State = 289;
+				State = 293;
 				formalArg();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 294;
+				State = 298;
 				ErrorHandler.Sync(this);
 				_alt = 1;
 				do {
@@ -1516,11 +1555,9 @@ public partial class Smalltalk80Parser : Parser {
 					case 1:
 						{
 						{
-						State = 291;
-						Match(IDENTIFIER);
-						State = 292;
-						Match(COLON);
-						State = 293;
+						State = 295;
+						identifierColon();
+						State = 296;
 						formalArg();
 						}
 						}
@@ -1528,52 +1565,10 @@ public partial class Smalltalk80Parser : Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					State = 296;
+					State = 300;
 					ErrorHandler.Sync(this);
-					_alt = Interpreter.AdaptivePredict(TokenStream,19,Context);
+					_alt = Interpreter.AdaptivePredict(TokenStream,18,Context);
 				} while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
-			case 4:
-				EnterOuterAlt(_localctx, 4);
-				{
-				State = 300;
-				ErrorHandler.Sync(this);
-				_la = TokenStream.LA(1);
-				do {
-					{
-					{
-					State = 298;
-					Match(T__8);
-					State = 299;
-					formalArg();
-					}
-					}
-					State = 302;
-					ErrorHandler.Sync(this);
-					_la = TokenStream.LA(1);
-				} while ( _la==T__8 );
-				}
-				break;
-			case 5:
-				EnterOuterAlt(_localctx, 5);
-				{
-				State = 306;
-				ErrorHandler.Sync(this);
-				_la = TokenStream.LA(1);
-				do {
-					{
-					{
-					State = 304;
-					Match(T__9);
-					State = 305;
-					formalArg();
-					}
-					}
-					State = 308;
-					ErrorHandler.Sync(this);
-					_la = TokenStream.LA(1);
-				} while ( _la==T__9 );
 				}
 				break;
 			}
@@ -1613,7 +1608,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 312;
+			State = 304;
 			argumentName();
 			}
 		}
@@ -1661,30 +1656,30 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 314;
+			State = 306;
 			Match(PIPE);
-			State = 316;
+			State = 308;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			do {
 				{
 				{
-				State = 315;
+				State = 307;
 				temporaryName();
 				}
 				}
-				State = 318;
+				State = 310;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			} while ( _la==CLASS || _la==IDENTIFIER );
-			State = 320;
+			State = 312;
 			Match(PIPE);
-			State = 322;
+			State = 314;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==NEW_LINE) {
 				{
-				State = 321;
+				State = 313;
 				Match(NEW_LINE);
 				}
 			}
@@ -1726,7 +1721,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 324;
+			State = 316;
 			_la = TokenStream.LA(1);
 			if ( !(_la==CLASS || _la==IDENTIFIER) ) {
 			ErrorHandler.RecoverInline(this);
@@ -1781,53 +1776,53 @@ public partial class Smalltalk80Parser : Parser {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 326;
+			State = 318;
 			statement();
-			State = 335;
+			State = 327;
 			ErrorHandler.Sync(this);
-			_alt = Interpreter.AdaptivePredict(TokenStream,26,Context);
+			_alt = Interpreter.AdaptivePredict(TokenStream,23,Context);
 			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					State = 328;
+					State = 320;
 					ErrorHandler.Sync(this);
 					_la = TokenStream.LA(1);
 					do {
 						{
 						{
-						State = 327;
+						State = 319;
 						Match(PERIOD);
 						}
 						}
-						State = 330;
+						State = 322;
 						ErrorHandler.Sync(this);
 						_la = TokenStream.LA(1);
 					} while ( _la==PERIOD );
-					State = 332;
+					State = 324;
 					statement();
 					}
 					} 
 				}
-				State = 337;
+				State = 329;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,26,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,23,Context);
 			}
-			State = 341;
+			State = 333;
 			ErrorHandler.Sync(this);
-			_alt = Interpreter.AdaptivePredict(TokenStream,27,Context);
+			_alt = Interpreter.AdaptivePredict(TokenStream,24,Context);
 			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					State = 338;
+					State = 330;
 					Match(PERIOD);
 					}
 					} 
 				}
-				State = 343;
+				State = 335;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,27,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,24,Context);
 			}
 			}
 		}
@@ -1867,20 +1862,20 @@ public partial class Smalltalk80Parser : Parser {
 		StatementContext _localctx = new StatementContext(Context, State);
 		EnterRule(_localctx, 52, RULE_statement);
 		try {
-			State = 346;
+			State = 338;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,28,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,25,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 344;
+				State = 336;
 				answer();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 345;
+				State = 337;
 				expression();
 				}
 				break;
@@ -1921,7 +1916,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 348;
+			State = 340;
 			returnExpr();
 			}
 		}
@@ -1962,16 +1957,16 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 350;
+			State = 342;
 			Match(CARAT);
-			State = 351;
+			State = 343;
 			expression();
-			State = 353;
+			State = 345;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,29,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,26,Context) ) {
 			case 1:
 				{
-				State = 352;
+				State = 344;
 				Match(PERIOD);
 				}
 				break;
@@ -2024,25 +2019,25 @@ public partial class Smalltalk80Parser : Parser {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 355;
+			State = 347;
 			baseExpression();
-			State = 360;
+			State = 352;
 			ErrorHandler.Sync(this);
-			_alt = Interpreter.AdaptivePredict(TokenStream,30,Context);
+			_alt = Interpreter.AdaptivePredict(TokenStream,27,Context);
 			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					State = 356;
+					State = 348;
 					Match(SEMICOLON);
-					State = 357;
+					State = 349;
 					messagePart();
 					}
 					} 
 				}
-				State = 362;
+				State = 354;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,30,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,27,Context);
 			}
 			}
 		}
@@ -2088,34 +2083,34 @@ public partial class Smalltalk80Parser : Parser {
 		BaseExpressionContext _localctx = new BaseExpressionContext(Context, State);
 		EnterRule(_localctx, 60, RULE_baseExpression);
 		try {
-			State = 367;
+			State = 359;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,31,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,28,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 363;
+				State = 355;
 				returnExpr();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 364;
+				State = 356;
 				assignmentExpr();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 365;
+				State = 357;
 				messageExpr();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 366;
+				State = 358;
 				lowPrecedenceExpr();
 				}
 				break;
@@ -2160,27 +2155,27 @@ public partial class Smalltalk80Parser : Parser {
 		MessagePartContext _localctx = new MessagePartContext(Context, State);
 		EnterRule(_localctx, 62, RULE_messagePart);
 		try {
-			State = 372;
+			State = 364;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,32,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,29,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 369;
+				State = 361;
 				unaryMessage();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 370;
+				State = 362;
 				binaryMessage();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 371;
+				State = 363;
 				keywordMessage();
 				}
 				break;
@@ -2225,11 +2220,11 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 374;
+			State = 366;
 			lowPrecedenceExpr();
-			State = 375;
+			State = 367;
 			Match(ASSIGN);
-			State = 376;
+			State = 368;
 			expression();
 			}
 		}
@@ -2281,16 +2276,16 @@ public partial class Smalltalk80Parser : Parser {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 378;
+			State = 370;
 			mediumPrecedenceExpr();
-			State = 383;
+			State = 375;
 			ErrorHandler.Sync(this);
-			_alt = Interpreter.AdaptivePredict(TokenStream,33,Context);
+			_alt = Interpreter.AdaptivePredict(TokenStream,30,Context);
 			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					State = 379;
+					State = 371;
 					_la = TokenStream.LA(1);
 					if ( !(_la==MINUS || _la==PLUS) ) {
 					ErrorHandler.RecoverInline(this);
@@ -2299,14 +2294,14 @@ public partial class Smalltalk80Parser : Parser {
 						ErrorHandler.ReportMatch(this);
 					    Consume();
 					}
-					State = 380;
+					State = 372;
 					mediumPrecedenceExpr();
 					}
 					} 
 				}
-				State = 385;
+				State = 377;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,33,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,30,Context);
 			}
 			}
 		}
@@ -2362,32 +2357,32 @@ public partial class Smalltalk80Parser : Parser {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 386;
+			State = 378;
 			highPrecedenceExpr();
-			State = 391;
+			State = 383;
 			ErrorHandler.Sync(this);
-			_alt = Interpreter.AdaptivePredict(TokenStream,34,Context);
+			_alt = Interpreter.AdaptivePredict(TokenStream,31,Context);
 			while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					State = 387;
+					State = 379;
 					_la = TokenStream.LA(1);
-					if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 3940649673949184L) != 0)) ) {
+					if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 1924145348608L) != 0)) ) {
 					ErrorHandler.RecoverInline(this);
 					}
 					else {
 						ErrorHandler.ReportMatch(this);
 					    Consume();
 					}
-					State = 388;
+					State = 380;
 					highPrecedenceExpr();
 					}
 					} 
 				}
-				State = 393;
+				State = 385;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,34,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,31,Context);
 			}
 			}
 		}
@@ -2427,11 +2422,11 @@ public partial class Smalltalk80Parser : Parser {
 		HighPrecedenceExprContext _localctx = new HighPrecedenceExprContext(Context, State);
 		EnterRule(_localctx, 70, RULE_highPrecedenceExpr);
 		try {
-			State = 396;
+			State = 388;
 			ErrorHandler.Sync(this);
 			switch (TokenStream.LA(1)) {
-			case T__11:
-			case T__13:
+			case T__0:
+			case T__2:
 			case CLASS:
 			case HASH:
 			case SELF:
@@ -2446,7 +2441,7 @@ public partial class Smalltalk80Parser : Parser {
 			case IDENTIFIER:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 394;
+				State = 386;
 				primaryExpr();
 				}
 				break;
@@ -2454,7 +2449,7 @@ public partial class Smalltalk80Parser : Parser {
 			case TILDE:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 395;
+				State = 387;
 				prefixExpr();
 				}
 				break;
@@ -2500,7 +2495,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 398;
+			State = 390;
 			_la = TokenStream.LA(1);
 			if ( !(_la==MINUS || _la==TILDE) ) {
 			ErrorHandler.RecoverInline(this);
@@ -2509,7 +2504,7 @@ public partial class Smalltalk80Parser : Parser {
 				ErrorHandler.ReportMatch(this);
 			    Consume();
 			}
-			State = 399;
+			State = 391;
 			primaryExpr();
 			}
 		}
@@ -2555,34 +2550,34 @@ public partial class Smalltalk80Parser : Parser {
 		MessageBaseContext _localctx = new MessageBaseContext(Context, State);
 		EnterRule(_localctx, 74, RULE_messageBase);
 		try {
-			State = 405;
+			State = 397;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,36,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,33,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 401;
+				State = 393;
 				parenthesizedExpr();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 402;
+				State = 394;
 				returnExpr();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 403;
+				State = 395;
 				assignmentExpr();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 404;
+				State = 396;
 				lowPrecedenceExpr();
 				}
 				break;
@@ -2640,39 +2635,39 @@ public partial class Smalltalk80Parser : Parser {
 		EnterRule(_localctx, 76, RULE_messageExpr);
 		try {
 			int _alt;
-			State = 416;
+			State = 408;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,39,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,36,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 407;
+				State = 399;
 				messageBase();
-				State = 411;
+				State = 403;
 				ErrorHandler.Sync(this);
 				_alt = 1;
 				do {
 					switch (_alt) {
 					case 1:
 						{
-						State = 411;
+						State = 403;
 						ErrorHandler.Sync(this);
-						switch ( Interpreter.AdaptivePredict(TokenStream,37,Context) ) {
+						switch ( Interpreter.AdaptivePredict(TokenStream,34,Context) ) {
 						case 1:
 							{
-							State = 408;
+							State = 400;
 							unaryMessage();
 							}
 							break;
 						case 2:
 							{
-							State = 409;
+							State = 401;
 							binaryMessage();
 							}
 							break;
 						case 3:
 							{
-							State = 410;
+							State = 402;
 							keywordMessage();
 							}
 							break;
@@ -2682,16 +2677,16 @@ public partial class Smalltalk80Parser : Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					State = 413;
+					State = 405;
 					ErrorHandler.Sync(this);
-					_alt = Interpreter.AdaptivePredict(TokenStream,38,Context);
+					_alt = Interpreter.AdaptivePredict(TokenStream,35,Context);
 				} while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER );
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 415;
+				State = 407;
 				messageBase();
 				}
 				break;
@@ -2732,12 +2727,12 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 418;
-			Match(T__11);
-			State = 419;
+			State = 410;
+			Match(T__0);
+			State = 411;
 			expression();
-			State = 420;
-			Match(T__12);
+			State = 412;
+			Match(T__1);
 			}
 		}
 		catch (RecognitionException re) {
@@ -2782,39 +2777,39 @@ public partial class Smalltalk80Parser : Parser {
 		PrimaryExprContext _localctx = new PrimaryExprContext(Context, State);
 		EnterRule(_localctx, 80, RULE_primaryExpr);
 		try {
-			State = 429;
+			State = 421;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,40,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,37,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 422;
+				State = 414;
 				literal();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 423;
+				State = 415;
 				variable();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 424;
+				State = 416;
 				block();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 425;
-				Match(T__11);
-				State = 426;
+				State = 417;
+				Match(T__0);
+				State = 418;
 				expression();
-				State = 427;
-				Match(T__12);
+				State = 419;
+				Match(T__1);
 				}
 				break;
 			}
@@ -2854,7 +2849,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 431;
+			State = 423;
 			unarySelector();
 			}
 		}
@@ -2896,9 +2891,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 433;
+			State = 425;
 			binarySelector();
-			State = 434;
+			State = 426;
 			expression();
 			}
 		}
@@ -2941,7 +2936,7 @@ public partial class Smalltalk80Parser : Parser {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 437;
+			State = 429;
 			ErrorHandler.Sync(this);
 			_alt = 1;
 			do {
@@ -2949,7 +2944,7 @@ public partial class Smalltalk80Parser : Parser {
 				case 1:
 					{
 					{
-					State = 436;
+					State = 428;
 					keywordPart();
 					}
 					}
@@ -2957,9 +2952,9 @@ public partial class Smalltalk80Parser : Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				State = 439;
+				State = 431;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,41,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,38,Context);
 			} while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
@@ -3000,12 +2995,52 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 441;
+			State = 433;
 			Match(IDENTIFIER);
-			State = 442;
+			State = 434;
 			Match(COLON);
-			State = 443;
+			State = 435;
 			expression();
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			ErrorHandler.ReportError(this, re);
+			ErrorHandler.Recover(this, re);
+		}
+		finally {
+			ExitRule();
+		}
+		return _localctx;
+	}
+
+	public partial class IdentifierColonContext : ParserRuleContext {
+		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode IDENTIFIER() { return GetToken(Smalltalk80Parser.IDENTIFIER, 0); }
+		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode COLON() { return GetToken(Smalltalk80Parser.COLON, 0); }
+		public IdentifierColonContext(ParserRuleContext parent, int invokingState)
+			: base(parent, invokingState)
+		{
+		}
+		public override int RuleIndex { get { return RULE_identifierColon; } }
+		[System.Diagnostics.DebuggerNonUserCode]
+		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
+			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			if (typedVisitor != null) return typedVisitor.VisitIdentifierColon(this);
+			else return visitor.VisitChildren(this);
+		}
+	}
+
+	[RuleVersion(0)]
+	public IdentifierColonContext identifierColon() {
+		IdentifierColonContext _localctx = new IdentifierColonContext(Context, State);
+		EnterRule(_localctx, 90, RULE_identifierColon);
+		try {
+			EnterOuterAlt(_localctx, 1);
+			{
+			State = 437;
+			Match(IDENTIFIER);
+			State = 438;
+			Match(COLON);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3043,14 +3078,14 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public UnarySelectorContext unarySelector() {
 		UnarySelectorContext _localctx = new UnarySelectorContext(Context, State);
-		EnterRule(_localctx, 90, RULE_unarySelector);
+		EnterRule(_localctx, 92, RULE_unarySelector);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 445;
+			State = 440;
 			_la = TokenStream.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 4611686020507893760L) != 0)) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 2251799814701120L) != 0)) ) {
 			ErrorHandler.RecoverInline(this);
 			}
 			else {
@@ -3113,14 +3148,14 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public BinarySelectorContext binarySelector() {
 		BinarySelectorContext _localctx = new BinarySelectorContext(Context, State);
-		EnterRule(_localctx, 92, RULE_binarySelector);
+		EnterRule(_localctx, 94, RULE_binarySelector);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 447;
+			State = 442;
 			_la = TokenStream.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 4611685481564864512L) != 0)) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 2251799551545344L) != 0)) ) {
 			ErrorHandler.RecoverInline(this);
 			}
 			else {
@@ -3169,41 +3204,41 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public PrimaryContext primary() {
 		PrimaryContext _localctx = new PrimaryContext(Context, State);
-		EnterRule(_localctx, 94, RULE_primary);
+		EnterRule(_localctx, 96, RULE_primary);
 		try {
-			State = 456;
+			State = 451;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,42,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,39,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 449;
+				State = 444;
 				literal();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 450;
+				State = 445;
 				variable();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 451;
+				State = 446;
 				block();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 452;
-				Match(T__11);
-				State = 453;
+				State = 447;
+				Match(T__0);
+				State = 448;
 				expression();
-				State = 454;
-				Match(T__12);
+				State = 449;
+				Match(T__1);
 				}
 				break;
 			}
@@ -3243,14 +3278,14 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public VariableContext variable() {
 		VariableContext _localctx = new VariableContext(Context, State);
-		EnterRule(_localctx, 96, RULE_variable);
+		EnterRule(_localctx, 98, RULE_variable);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 458;
+			State = 453;
 			_la = TokenStream.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 4611686020507893760L) != 0)) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 2251799814701120L) != 0)) ) {
 			ErrorHandler.RecoverInline(this);
 			}
 			else {
@@ -3296,45 +3331,45 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public BlockContext block() {
 		BlockContext _localctx = new BlockContext(Context, State);
-		EnterRule(_localctx, 98, RULE_block);
+		EnterRule(_localctx, 100, RULE_block);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 460;
-			Match(T__13);
-			State = 462;
+			State = 455;
+			Match(T__2);
+			State = 457;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==COLON) {
 				{
-				State = 461;
+				State = 456;
 				blockArgs();
 				}
 			}
 
-			State = 465;
+			State = 460;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			if (_la==PIPE) {
 				{
-				State = 464;
+				State = 459;
 				blockTemps();
 				}
 			}
 
-			State = 468;
+			State = 463;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 4611686531646771200L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2251800064280650L) != 0)) {
 				{
-				State = 467;
+				State = 462;
 				statements();
 				}
 			}
 
-			State = 470;
-			Match(T__14);
+			State = 465;
+			Match(T__3);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3376,33 +3411,33 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public BlockArgsContext blockArgs() {
 		BlockArgsContext _localctx = new BlockArgsContext(Context, State);
-		EnterRule(_localctx, 100, RULE_blockArgs);
+		EnterRule(_localctx, 102, RULE_blockArgs);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 474;
+			State = 469;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			do {
 				{
 				{
-				State = 472;
+				State = 467;
 				Match(COLON);
-				State = 473;
+				State = 468;
 				argumentName();
 				}
 				}
-				State = 476;
+				State = 471;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			} while ( _la==COLON );
-			State = 479;
+			State = 474;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,47,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,44,Context) ) {
 			case 1:
 				{
-				State = 478;
+				State = 473;
 				Match(PIPE);
 				}
 				break;
@@ -3439,12 +3474,12 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public ArgumentNameContext argumentName() {
 		ArgumentNameContext _localctx = new ArgumentNameContext(Context, State);
-		EnterRule(_localctx, 102, RULE_argumentName);
+		EnterRule(_localctx, 104, RULE_argumentName);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 481;
+			State = 476;
 			_la = TokenStream.LA(1);
 			if ( !(_la==CLASS || _la==IDENTIFIER) ) {
 			ErrorHandler.RecoverInline(this);
@@ -3493,28 +3528,28 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public BlockTempsContext blockTemps() {
 		BlockTempsContext _localctx = new BlockTempsContext(Context, State);
-		EnterRule(_localctx, 104, RULE_blockTemps);
+		EnterRule(_localctx, 106, RULE_blockTemps);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 483;
+			State = 478;
 			Match(PIPE);
-			State = 485;
+			State = 480;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			do {
 				{
 				{
-				State = 484;
+				State = 479;
 				temporaryName();
 				}
 				}
-				State = 487;
+				State = 482;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			} while ( _la==CLASS || _la==IDENTIFIER );
-			State = 489;
+			State = 484;
 			Match(PIPE);
 			}
 		}
@@ -3567,71 +3602,71 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public LiteralContext literal() {
 		LiteralContext _localctx = new LiteralContext(Context, State);
-		EnterRule(_localctx, 106, RULE_literal);
+		EnterRule(_localctx, 108, RULE_literal);
 		try {
-			State = 500;
+			State = 495;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,49,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,46,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 491;
+				State = 486;
 				stringConst();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 492;
+				State = 487;
 				numberLiteral();
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 493;
+				State = 488;
 				symbolConst();
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 494;
+				State = 489;
 				arrayLiteral();
 				}
 				break;
 			case 5:
 				EnterOuterAlt(_localctx, 5);
 				{
-				State = 495;
+				State = 490;
 				byteArrayLiteral();
 				}
 				break;
 			case 6:
 				EnterOuterAlt(_localctx, 6);
 				{
-				State = 496;
+				State = 491;
 				characterLiteral();
 				}
 				break;
 			case 7:
 				EnterOuterAlt(_localctx, 7);
 				{
-				State = 497;
+				State = 492;
 				Match(TRUE);
 				}
 				break;
 			case 8:
 				EnterOuterAlt(_localctx, 8);
 				{
-				State = 498;
+				State = 493;
 				Match(FALSE);
 				}
 				break;
 			case 9:
 				EnterOuterAlt(_localctx, 9);
 				{
-				State = 499;
+				State = 494;
 				Match(NIL);
 				}
 				break;
@@ -3666,11 +3701,11 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public NumberLiteralContext numberLiteral() {
 		NumberLiteralContext _localctx = new NumberLiteralContext(Context, State);
-		EnterRule(_localctx, 108, RULE_numberLiteral);
+		EnterRule(_localctx, 110, RULE_numberLiteral);
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 502;
+			State = 497;
 			Match(NUMBER);
 			}
 		}
@@ -3703,11 +3738,11 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public StringConstContext stringConst() {
 		StringConstContext _localctx = new StringConstContext(Context, State);
-		EnterRule(_localctx, 110, RULE_stringConst);
+		EnterRule(_localctx, 112, RULE_stringConst);
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 504;
+			State = 499;
 			Match(STRING);
 			}
 		}
@@ -3740,11 +3775,11 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public CharacterLiteralContext characterLiteral() {
 		CharacterLiteralContext _localctx = new CharacterLiteralContext(Context, State);
-		EnterRule(_localctx, 112, RULE_characterLiteral);
+		EnterRule(_localctx, 114, RULE_characterLiteral);
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 506;
+			State = 501;
 			Match(CHAR_LITERAL);
 			}
 		}
@@ -3781,31 +3816,31 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public ByteArrayLiteralContext byteArrayLiteral() {
 		ByteArrayLiteralContext _localctx = new ByteArrayLiteralContext(Context, State);
-		EnterRule(_localctx, 114, RULE_byteArrayLiteral);
+		EnterRule(_localctx, 116, RULE_byteArrayLiteral);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 508;
+			State = 503;
 			Match(HASH);
-			State = 509;
-			Match(T__13);
-			State = 513;
+			State = 504;
+			Match(T__2);
+			State = 508;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
 			while (_la==NUMBER) {
 				{
 				{
-				State = 510;
+				State = 505;
 				Match(NUMBER);
 				}
 				}
-				State = 515;
+				State = 510;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			}
-			State = 516;
-			Match(T__14);
+			State = 511;
+			Match(T__3);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3843,31 +3878,31 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public ArrayLiteralContext arrayLiteral() {
 		ArrayLiteralContext _localctx = new ArrayLiteralContext(Context, State);
-		EnterRule(_localctx, 116, RULE_arrayLiteral);
+		EnterRule(_localctx, 118, RULE_arrayLiteral);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 518;
+			State = 513;
 			Match(HASH);
-			State = 519;
-			Match(T__11);
-			State = 523;
+			State = 514;
+			Match(T__0);
+			State = 518;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 9223372000322519040L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 4503599609532480L) != 0)) {
 				{
 				{
-				State = 520;
+				State = 515;
 				arrayElement();
 				}
 				}
-				State = 525;
+				State = 520;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			}
-			State = 526;
-			Match(T__12);
+			State = 521;
+			Match(T__1);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3904,22 +3939,22 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public ArrayElementContext arrayElement() {
 		ArrayElementContext _localctx = new ArrayElementContext(Context, State);
-		EnterRule(_localctx, 118, RULE_arrayElement);
+		EnterRule(_localctx, 120, RULE_arrayElement);
 		try {
-			State = 530;
+			State = 525;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,52,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,49,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 528;
+				State = 523;
 				literal();
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 529;
+				State = 524;
 				symbolName();
 				}
 				break;
@@ -3958,25 +3993,25 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public SymbolConstContext symbolConst() {
 		SymbolConstContext _localctx = new SymbolConstContext(Context, State);
-		EnterRule(_localctx, 120, RULE_symbolConst);
+		EnterRule(_localctx, 122, RULE_symbolConst);
 		try {
-			State = 535;
+			State = 530;
 			ErrorHandler.Sync(this);
 			switch (TokenStream.LA(1)) {
 			case QUOTED_SYMBOL:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 532;
+				State = 527;
 				Match(QUOTED_SYMBOL);
 				}
 				break;
 			case HASH:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 533;
+				State = 528;
 				Match(HASH);
 				{
-				State = 534;
+				State = 529;
 				symbolName();
 				}
 				}
@@ -4029,78 +4064,78 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public SymbolNameContext symbolName() {
 		SymbolNameContext _localctx = new SymbolNameContext(Context, State);
-		EnterRule(_localctx, 122, RULE_symbolName);
+		EnterRule(_localctx, 124, RULE_symbolName);
 		try {
-			State = 547;
+			State = 542;
 			ErrorHandler.Sync(this);
-			switch ( Interpreter.AdaptivePredict(TokenStream,54,Context) ) {
+			switch ( Interpreter.AdaptivePredict(TokenStream,51,Context) ) {
 			case 1:
 				EnterOuterAlt(_localctx, 1);
 				{
-				State = 537;
+				State = 532;
 				Match(IDENTIFIER);
 				}
 				break;
 			case 2:
 				EnterOuterAlt(_localctx, 2);
 				{
-				State = 538;
+				State = 533;
 				Match(CLASS);
 				}
 				break;
 			case 3:
 				EnterOuterAlt(_localctx, 3);
 				{
-				State = 539;
+				State = 534;
 				Match(SELF);
 				}
 				break;
 			case 4:
 				EnterOuterAlt(_localctx, 4);
 				{
-				State = 540;
+				State = 535;
 				Match(SUPER);
 				}
 				break;
 			case 5:
 				EnterOuterAlt(_localctx, 5);
 				{
-				State = 541;
+				State = 536;
 				Match(TRUE);
 				}
 				break;
 			case 6:
 				EnterOuterAlt(_localctx, 6);
 				{
-				State = 542;
+				State = 537;
 				Match(FALSE);
 				}
 				break;
 			case 7:
 				EnterOuterAlt(_localctx, 7);
 				{
-				State = 543;
+				State = 538;
 				Match(NIL);
 				}
 				break;
 			case 8:
 				EnterOuterAlt(_localctx, 8);
 				{
-				State = 544;
+				State = 539;
 				unarySelector();
 				}
 				break;
 			case 9:
 				EnterOuterAlt(_localctx, 9);
 				{
-				State = 545;
+				State = 540;
 				binarySelector();
 				}
 				break;
 			case 10:
 				EnterOuterAlt(_localctx, 10);
 				{
-				State = 546;
+				State = 541;
 				keywordSymbolSelector();
 				}
 				break;
@@ -4142,12 +4177,12 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public KeywordSymbolSelectorContext keywordSymbolSelector() {
 		KeywordSymbolSelectorContext _localctx = new KeywordSymbolSelectorContext(Context, State);
-		EnterRule(_localctx, 124, RULE_keywordSymbolSelector);
+		EnterRule(_localctx, 126, RULE_keywordSymbolSelector);
 		try {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 551;
+			State = 546;
 			ErrorHandler.Sync(this);
 			_alt = 1;
 			do {
@@ -4155,9 +4190,9 @@ public partial class Smalltalk80Parser : Parser {
 				case 1:
 					{
 					{
-					State = 549;
+					State = 544;
 					Match(IDENTIFIER);
-					State = 550;
+					State = 545;
 					Match(COLON);
 					}
 					}
@@ -4165,9 +4200,9 @@ public partial class Smalltalk80Parser : Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				State = 553;
+				State = 548;
 				ErrorHandler.Sync(this);
-				_alt = Interpreter.AdaptivePredict(TokenStream,55,Context);
+				_alt = Interpreter.AdaptivePredict(TokenStream,52,Context);
 			} while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
@@ -4203,20 +4238,20 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public SeparatorChunkContext separatorChunk() {
 		SeparatorChunkContext _localctx = new SeparatorChunkContext(Context, State);
-		EnterRule(_localctx, 126, RULE_separatorChunk);
+		EnterRule(_localctx, 128, RULE_separatorChunk);
 		int _la;
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 555;
-			Match(T__15);
-			State = 559;
+			State = 550;
+			Match(T__4);
+			State = 554;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & -262146L) != 0) || _la==NEW_LINE || _la==WS) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 36028797018963838L) != 0)) {
 				{
 				{
-				State = 556;
+				State = 551;
 				_la = TokenStream.LA(1);
 				if ( _la <= 0 || (_la==BANG) ) {
 				ErrorHandler.RecoverInline(this);
@@ -4227,11 +4262,11 @@ public partial class Smalltalk80Parser : Parser {
 				}
 				}
 				}
-				State = 561;
+				State = 556;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
 			}
-			State = 562;
+			State = 557;
 			Match(BANG);
 			}
 		}
@@ -4264,11 +4299,11 @@ public partial class Smalltalk80Parser : Parser {
 	[RuleVersion(0)]
 	public ClassNameContext className() {
 		ClassNameContext _localctx = new ClassNameContext(Context, State);
-		EnterRule(_localctx, 128, RULE_className);
+		EnterRule(_localctx, 130, RULE_className);
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 564;
+			State = 559;
 			Match(IDENTIFIER);
 			}
 		}
@@ -4283,8 +4318,35 @@ public partial class Smalltalk80Parser : Parser {
 		return _localctx;
 	}
 
+	public override bool Sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+		switch (ruleIndex) {
+		case 14: return classCommentChunk_sempred((ClassCommentChunkContext)_localctx, predIndex);
+		case 16: return metaclassCommentChunk_sempred((MetaclassCommentChunkContext)_localctx, predIndex);
+		case 20: return methodCategoryChunk_sempred((MethodCategoryChunkContext)_localctx, predIndex);
+		}
+		return true;
+	}
+	private bool classCommentChunk_sempred(ClassCommentChunkContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 0: return  NextMatchesKeyword(2, "comment") ;
+		}
+		return true;
+	}
+	private bool metaclassCommentChunk_sempred(MetaclassCommentChunkContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 1: return  NextMatchesKeyword(3, "comment") ;
+		}
+		return true;
+	}
+	private bool methodCategoryChunk_sempred(MethodCategoryChunkContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 2: return IsMethodsFor();
+		}
+		return true;
+	}
+
 	private static int[] _serializedATN = {
-		4,1,65,567,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,
+		4,1,54,562,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,
 		7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,2,14,7,14,
 		2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,7,20,2,21,7,21,
 		2,22,7,22,2,23,7,23,2,24,7,24,2,25,7,25,2,26,7,26,2,27,7,27,2,28,7,28,
@@ -4293,187 +4355,183 @@ public partial class Smalltalk80Parser : Parser {
 		2,43,7,43,2,44,7,44,2,45,7,45,2,46,7,46,2,47,7,47,2,48,7,48,2,49,7,49,
 		2,50,7,50,2,51,7,51,2,52,7,52,2,53,7,53,2,54,7,54,2,55,7,55,2,56,7,56,
 		2,57,7,57,2,58,7,58,2,59,7,59,2,60,7,60,2,61,7,61,2,62,7,62,2,63,7,63,
-		2,64,7,64,1,0,5,0,132,8,0,10,0,12,0,135,9,0,1,0,1,0,1,1,1,1,1,1,1,2,1,
-		2,1,2,1,3,1,3,3,3,147,8,3,1,3,3,3,150,8,3,1,3,1,3,1,3,1,4,1,4,1,4,1,4,
-		1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,3,5,167,8,5,1,6,1,6,1,6,1,7,1,7,1,7,1,
-		7,1,8,1,8,1,8,1,8,1,9,1,9,1,10,1,10,1,11,5,11,185,8,11,10,11,12,11,188,
-		9,11,1,11,1,11,1,12,1,12,1,12,1,12,1,12,1,12,1,12,1,12,3,12,200,8,12,1,
-		13,1,13,1,13,1,14,1,14,1,14,3,14,208,8,14,1,14,1,14,1,14,1,15,1,15,1,15,
-		5,15,216,8,15,10,15,12,15,219,9,15,1,15,1,15,1,16,1,16,1,16,1,16,3,16,
-		227,8,16,1,16,1,16,1,16,1,17,1,17,3,17,234,8,17,1,17,3,17,237,8,17,1,17,
-		3,17,240,8,17,1,17,3,17,243,8,17,1,17,1,17,1,18,1,18,5,18,249,8,18,10,
-		18,12,18,252,9,18,1,18,1,18,1,18,1,18,1,18,1,18,3,18,260,8,18,1,19,1,19,
-		5,19,264,8,19,10,19,12,19,267,9,19,1,19,3,19,270,8,19,1,20,1,20,1,20,3,
-		20,275,8,20,1,20,1,20,1,20,1,20,5,20,281,8,20,10,20,12,20,284,9,20,1,20,
-		1,20,1,21,1,21,1,21,1,21,1,21,1,21,1,21,4,21,295,8,21,11,21,12,21,296,
-		1,21,1,21,4,21,301,8,21,11,21,12,21,302,1,21,1,21,4,21,307,8,21,11,21,
-		12,21,308,3,21,311,8,21,1,22,1,22,1,23,1,23,4,23,317,8,23,11,23,12,23,
-		318,1,23,1,23,3,23,323,8,23,1,24,1,24,1,25,1,25,4,25,329,8,25,11,25,12,
-		25,330,1,25,5,25,334,8,25,10,25,12,25,337,9,25,1,25,5,25,340,8,25,10,25,
-		12,25,343,9,25,1,26,1,26,3,26,347,8,26,1,27,1,27,1,28,1,28,1,28,3,28,354,
-		8,28,1,29,1,29,1,29,5,29,359,8,29,10,29,12,29,362,9,29,1,30,1,30,1,30,
-		1,30,3,30,368,8,30,1,31,1,31,1,31,3,31,373,8,31,1,32,1,32,1,32,1,32,1,
-		33,1,33,1,33,5,33,382,8,33,10,33,12,33,385,9,33,1,34,1,34,1,34,5,34,390,
-		8,34,10,34,12,34,393,9,34,1,35,1,35,3,35,397,8,35,1,36,1,36,1,36,1,37,
-		1,37,1,37,1,37,3,37,406,8,37,1,38,1,38,1,38,1,38,4,38,412,8,38,11,38,12,
-		38,413,1,38,3,38,417,8,38,1,39,1,39,1,39,1,39,1,40,1,40,1,40,1,40,1,40,
-		1,40,1,40,3,40,430,8,40,1,41,1,41,1,42,1,42,1,42,1,43,4,43,438,8,43,11,
-		43,12,43,439,1,44,1,44,1,44,1,44,1,45,1,45,1,46,1,46,1,47,1,47,1,47,1,
-		47,1,47,1,47,1,47,3,47,457,8,47,1,48,1,48,1,49,1,49,3,49,463,8,49,1,49,
-		3,49,466,8,49,1,49,3,49,469,8,49,1,49,1,49,1,50,1,50,4,50,475,8,50,11,
-		50,12,50,476,1,50,3,50,480,8,50,1,51,1,51,1,52,1,52,4,52,486,8,52,11,52,
-		12,52,487,1,52,1,52,1,53,1,53,1,53,1,53,1,53,1,53,1,53,1,53,1,53,3,53,
-		501,8,53,1,54,1,54,1,55,1,55,1,56,1,56,1,57,1,57,1,57,5,57,512,8,57,10,
-		57,12,57,515,9,57,1,57,1,57,1,58,1,58,1,58,5,58,522,8,58,10,58,12,58,525,
-		9,58,1,58,1,58,1,59,1,59,3,59,531,8,59,1,60,1,60,1,60,3,60,536,8,60,1,
-		61,1,61,1,61,1,61,1,61,1,61,1,61,1,61,1,61,1,61,3,61,548,8,61,1,62,1,62,
-		4,62,552,8,62,11,62,12,62,553,1,63,1,63,5,63,558,8,63,10,63,12,63,561,
-		9,63,1,63,1,63,1,64,1,64,1,64,0,0,65,0,2,4,6,8,10,12,14,16,18,20,22,24,
-		26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,
-		74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110,112,114,
-		116,118,120,122,124,126,128,0,8,1,0,1,4,2,0,17,17,62,62,2,0,32,32,48,48,
-		1,0,49,51,1,0,32,33,3,0,17,17,26,30,62,62,3,0,23,23,32,33,39,61,1,0,18,
-		18,595,0,133,1,0,0,0,2,138,1,0,0,0,4,141,1,0,0,0,6,144,1,0,0,0,8,154,1,
-		0,0,0,10,166,1,0,0,0,12,168,1,0,0,0,14,171,1,0,0,0,16,175,1,0,0,0,18,179,
-		1,0,0,0,20,181,1,0,0,0,22,186,1,0,0,0,24,199,1,0,0,0,26,201,1,0,0,0,28,
-		204,1,0,0,0,30,212,1,0,0,0,32,222,1,0,0,0,34,231,1,0,0,0,36,259,1,0,0,
-		0,38,269,1,0,0,0,40,271,1,0,0,0,42,310,1,0,0,0,44,312,1,0,0,0,46,314,1,
-		0,0,0,48,324,1,0,0,0,50,326,1,0,0,0,52,346,1,0,0,0,54,348,1,0,0,0,56,350,
-		1,0,0,0,58,355,1,0,0,0,60,367,1,0,0,0,62,372,1,0,0,0,64,374,1,0,0,0,66,
-		378,1,0,0,0,68,386,1,0,0,0,70,396,1,0,0,0,72,398,1,0,0,0,74,405,1,0,0,
-		0,76,416,1,0,0,0,78,418,1,0,0,0,80,429,1,0,0,0,82,431,1,0,0,0,84,433,1,
-		0,0,0,86,437,1,0,0,0,88,441,1,0,0,0,90,445,1,0,0,0,92,447,1,0,0,0,94,456,
-		1,0,0,0,96,458,1,0,0,0,98,460,1,0,0,0,100,474,1,0,0,0,102,481,1,0,0,0,
-		104,483,1,0,0,0,106,500,1,0,0,0,108,502,1,0,0,0,110,504,1,0,0,0,112,506,
-		1,0,0,0,114,508,1,0,0,0,116,518,1,0,0,0,118,530,1,0,0,0,120,535,1,0,0,
-		0,122,547,1,0,0,0,124,551,1,0,0,0,126,555,1,0,0,0,128,564,1,0,0,0,130,
-		132,3,10,5,0,131,130,1,0,0,0,132,135,1,0,0,0,133,131,1,0,0,0,133,134,1,
-		0,0,0,134,136,1,0,0,0,135,133,1,0,0,0,136,137,5,0,0,1,137,1,1,0,0,0,138,
-		139,3,58,29,0,139,140,5,0,0,1,140,3,1,0,0,0,141,142,3,50,25,0,142,143,
-		5,0,0,1,143,5,1,0,0,0,144,146,3,42,21,0,145,147,3,46,23,0,146,145,1,0,
-		0,0,146,147,1,0,0,0,147,149,1,0,0,0,148,150,3,20,10,0,149,148,1,0,0,0,
-		149,150,1,0,0,0,150,151,1,0,0,0,151,152,3,38,19,0,152,153,5,0,0,1,153,
-		7,1,0,0,0,154,155,3,16,8,0,155,156,3,22,11,0,156,157,5,0,0,1,157,9,1,0,
-		0,0,158,167,3,32,16,0,159,167,3,30,15,0,160,167,3,28,14,0,161,167,3,14,
-		7,0,162,167,3,40,20,0,163,167,3,126,63,0,164,167,3,12,6,0,165,167,5,18,
-		0,0,166,158,1,0,0,0,166,159,1,0,0,0,166,160,1,0,0,0,166,161,1,0,0,0,166,
-		162,1,0,0,0,166,163,1,0,0,0,166,164,1,0,0,0,166,165,1,0,0,0,167,11,1,0,
-		0,0,168,169,3,58,29,0,169,170,5,18,0,0,170,13,1,0,0,0,171,172,3,16,8,0,
-		172,173,3,22,11,0,173,174,5,18,0,0,174,15,1,0,0,0,175,176,3,128,64,0,176,
-		177,3,18,9,0,177,178,3,120,60,0,178,17,1,0,0,0,179,180,7,0,0,0,180,19,
-		1,0,0,0,181,182,5,31,0,0,182,21,1,0,0,0,183,185,3,24,12,0,184,183,1,0,
-		0,0,185,188,1,0,0,0,186,184,1,0,0,0,186,187,1,0,0,0,187,189,1,0,0,0,188,
-		186,1,0,0,0,189,190,3,26,13,0,190,23,1,0,0,0,191,192,5,5,0,0,192,200,3,
-		110,55,0,193,194,5,6,0,0,194,200,3,110,55,0,195,196,5,7,0,0,196,200,3,
-		110,55,0,197,198,5,8,0,0,198,200,3,110,55,0,199,191,1,0,0,0,199,193,1,
-		0,0,0,199,195,1,0,0,0,199,197,1,0,0,0,200,25,1,0,0,0,201,202,5,9,0,0,202,
-		203,3,110,55,0,203,27,1,0,0,0,204,205,3,128,64,0,205,207,5,10,0,0,206,
-		208,5,64,0,0,207,206,1,0,0,0,207,208,1,0,0,0,208,209,1,0,0,0,209,210,3,
-		110,55,0,210,211,5,18,0,0,211,29,1,0,0,0,212,213,3,128,64,0,213,217,5,
-		17,0,0,214,216,3,24,12,0,215,214,1,0,0,0,216,219,1,0,0,0,217,215,1,0,0,
-		0,217,218,1,0,0,0,218,220,1,0,0,0,219,217,1,0,0,0,220,221,5,18,0,0,221,
-		31,1,0,0,0,222,223,3,128,64,0,223,224,5,17,0,0,224,226,5,10,0,0,225,227,
-		5,64,0,0,226,225,1,0,0,0,226,227,1,0,0,0,227,228,1,0,0,0,228,229,3,110,
-		55,0,229,230,5,18,0,0,230,33,1,0,0,0,231,233,3,42,21,0,232,234,3,110,55,
-		0,233,232,1,0,0,0,233,234,1,0,0,0,234,236,1,0,0,0,235,237,5,64,0,0,236,
-		235,1,0,0,0,236,237,1,0,0,0,237,239,1,0,0,0,238,240,3,46,23,0,239,238,
-		1,0,0,0,239,240,1,0,0,0,240,242,1,0,0,0,241,243,3,20,10,0,242,241,1,0,
-		0,0,242,243,1,0,0,0,243,244,1,0,0,0,244,245,3,36,18,0,245,35,1,0,0,0,246,
-		250,3,50,25,0,247,249,5,20,0,0,248,247,1,0,0,0,249,252,1,0,0,0,250,248,
-		1,0,0,0,250,251,1,0,0,0,251,253,1,0,0,0,252,250,1,0,0,0,253,254,5,18,0,
-		0,254,260,1,0,0,0,255,256,3,56,28,0,256,257,5,18,0,0,257,260,1,0,0,0,258,
-		260,5,18,0,0,259,246,1,0,0,0,259,255,1,0,0,0,259,258,1,0,0,0,260,37,1,
-		0,0,0,261,265,3,50,25,0,262,264,5,20,0,0,263,262,1,0,0,0,264,267,1,0,0,
-		0,265,263,1,0,0,0,265,266,1,0,0,0,266,270,1,0,0,0,267,265,1,0,0,0,268,
-		270,3,56,28,0,269,261,1,0,0,0,269,268,1,0,0,0,270,39,1,0,0,0,271,272,5,
-		18,0,0,272,274,3,128,64,0,273,275,5,17,0,0,274,273,1,0,0,0,274,275,1,0,
-		0,0,275,276,1,0,0,0,276,277,5,11,0,0,277,278,3,110,55,0,278,282,5,18,0,
-		0,279,281,3,34,17,0,280,279,1,0,0,0,281,284,1,0,0,0,282,280,1,0,0,0,282,
-		283,1,0,0,0,283,285,1,0,0,0,284,282,1,0,0,0,285,286,5,18,0,0,286,41,1,
-		0,0,0,287,311,3,90,45,0,288,289,3,92,46,0,289,290,3,44,22,0,290,311,1,
-		0,0,0,291,292,5,62,0,0,292,293,5,19,0,0,293,295,3,44,22,0,294,291,1,0,
-		0,0,295,296,1,0,0,0,296,294,1,0,0,0,296,297,1,0,0,0,297,311,1,0,0,0,298,
-		299,5,9,0,0,299,301,3,44,22,0,300,298,1,0,0,0,301,302,1,0,0,0,302,300,
-		1,0,0,0,302,303,1,0,0,0,303,311,1,0,0,0,304,305,5,10,0,0,305,307,3,44,
-		22,0,306,304,1,0,0,0,307,308,1,0,0,0,308,306,1,0,0,0,308,309,1,0,0,0,309,
-		311,1,0,0,0,310,287,1,0,0,0,310,288,1,0,0,0,310,294,1,0,0,0,310,300,1,
-		0,0,0,310,306,1,0,0,0,311,43,1,0,0,0,312,313,3,102,51,0,313,45,1,0,0,0,
-		314,316,5,23,0,0,315,317,3,48,24,0,316,315,1,0,0,0,317,318,1,0,0,0,318,
-		316,1,0,0,0,318,319,1,0,0,0,319,320,1,0,0,0,320,322,5,23,0,0,321,323,5,
-		64,0,0,322,321,1,0,0,0,322,323,1,0,0,0,323,47,1,0,0,0,324,325,7,1,0,0,
-		325,49,1,0,0,0,326,335,3,52,26,0,327,329,5,20,0,0,328,327,1,0,0,0,329,
-		330,1,0,0,0,330,328,1,0,0,0,330,331,1,0,0,0,331,332,1,0,0,0,332,334,3,
-		52,26,0,333,328,1,0,0,0,334,337,1,0,0,0,335,333,1,0,0,0,335,336,1,0,0,
-		0,336,341,1,0,0,0,337,335,1,0,0,0,338,340,5,20,0,0,339,338,1,0,0,0,340,
-		343,1,0,0,0,341,339,1,0,0,0,341,342,1,0,0,0,342,51,1,0,0,0,343,341,1,0,
-		0,0,344,347,3,54,27,0,345,347,3,58,29,0,346,344,1,0,0,0,346,345,1,0,0,
-		0,347,53,1,0,0,0,348,349,3,56,28,0,349,55,1,0,0,0,350,351,5,22,0,0,351,
-		353,3,58,29,0,352,354,5,20,0,0,353,352,1,0,0,0,353,354,1,0,0,0,354,57,
-		1,0,0,0,355,360,3,60,30,0,356,357,5,24,0,0,357,359,3,62,31,0,358,356,1,
-		0,0,0,359,362,1,0,0,0,360,358,1,0,0,0,360,361,1,0,0,0,361,59,1,0,0,0,362,
-		360,1,0,0,0,363,368,3,56,28,0,364,368,3,64,32,0,365,368,3,76,38,0,366,
-		368,3,66,33,0,367,363,1,0,0,0,367,364,1,0,0,0,367,365,1,0,0,0,367,366,
-		1,0,0,0,368,61,1,0,0,0,369,373,3,82,41,0,370,373,3,84,42,0,371,373,3,86,
-		43,0,372,369,1,0,0,0,372,370,1,0,0,0,372,371,1,0,0,0,373,63,1,0,0,0,374,
-		375,3,66,33,0,375,376,5,21,0,0,376,377,3,58,29,0,377,65,1,0,0,0,378,383,
-		3,68,34,0,379,380,7,2,0,0,380,382,3,68,34,0,381,379,1,0,0,0,382,385,1,
-		0,0,0,383,381,1,0,0,0,383,384,1,0,0,0,384,67,1,0,0,0,385,383,1,0,0,0,386,
-		391,3,70,35,0,387,388,7,3,0,0,388,390,3,70,35,0,389,387,1,0,0,0,390,393,
-		1,0,0,0,391,389,1,0,0,0,391,392,1,0,0,0,392,69,1,0,0,0,393,391,1,0,0,0,
-		394,397,3,80,40,0,395,397,3,72,36,0,396,394,1,0,0,0,396,395,1,0,0,0,397,
-		71,1,0,0,0,398,399,7,4,0,0,399,400,3,80,40,0,400,73,1,0,0,0,401,406,3,
-		78,39,0,402,406,3,56,28,0,403,406,3,64,32,0,404,406,3,66,33,0,405,401,
-		1,0,0,0,405,402,1,0,0,0,405,403,1,0,0,0,405,404,1,0,0,0,406,75,1,0,0,0,
-		407,411,3,74,37,0,408,412,3,82,41,0,409,412,3,84,42,0,410,412,3,86,43,
-		0,411,408,1,0,0,0,411,409,1,0,0,0,411,410,1,0,0,0,412,413,1,0,0,0,413,
-		411,1,0,0,0,413,414,1,0,0,0,414,417,1,0,0,0,415,417,3,74,37,0,416,407,
-		1,0,0,0,416,415,1,0,0,0,417,77,1,0,0,0,418,419,5,12,0,0,419,420,3,58,29,
-		0,420,421,5,13,0,0,421,79,1,0,0,0,422,430,3,106,53,0,423,430,3,96,48,0,
-		424,430,3,98,49,0,425,426,5,12,0,0,426,427,3,58,29,0,427,428,5,13,0,0,
-		428,430,1,0,0,0,429,422,1,0,0,0,429,423,1,0,0,0,429,424,1,0,0,0,429,425,
-		1,0,0,0,430,81,1,0,0,0,431,432,3,90,45,0,432,83,1,0,0,0,433,434,3,92,46,
-		0,434,435,3,58,29,0,435,85,1,0,0,0,436,438,3,88,44,0,437,436,1,0,0,0,438,
-		439,1,0,0,0,439,437,1,0,0,0,439,440,1,0,0,0,440,87,1,0,0,0,441,442,5,62,
-		0,0,442,443,5,19,0,0,443,444,3,58,29,0,444,89,1,0,0,0,445,446,7,5,0,0,
-		446,91,1,0,0,0,447,448,7,6,0,0,448,93,1,0,0,0,449,457,3,106,53,0,450,457,
-		3,96,48,0,451,457,3,98,49,0,452,453,5,12,0,0,453,454,3,58,29,0,454,455,
-		5,13,0,0,455,457,1,0,0,0,456,449,1,0,0,0,456,450,1,0,0,0,456,451,1,0,0,
-		0,456,452,1,0,0,0,457,95,1,0,0,0,458,459,7,5,0,0,459,97,1,0,0,0,460,462,
-		5,14,0,0,461,463,3,100,50,0,462,461,1,0,0,0,462,463,1,0,0,0,463,465,1,
-		0,0,0,464,466,3,104,52,0,465,464,1,0,0,0,465,466,1,0,0,0,466,468,1,0,0,
-		0,467,469,3,50,25,0,468,467,1,0,0,0,468,469,1,0,0,0,469,470,1,0,0,0,470,
-		471,5,15,0,0,471,99,1,0,0,0,472,473,5,19,0,0,473,475,3,102,51,0,474,472,
-		1,0,0,0,475,476,1,0,0,0,476,474,1,0,0,0,476,477,1,0,0,0,477,479,1,0,0,
-		0,478,480,5,23,0,0,479,478,1,0,0,0,479,480,1,0,0,0,480,101,1,0,0,0,481,
-		482,7,1,0,0,482,103,1,0,0,0,483,485,5,23,0,0,484,486,3,48,24,0,485,484,
-		1,0,0,0,486,487,1,0,0,0,487,485,1,0,0,0,487,488,1,0,0,0,488,489,1,0,0,
-		0,489,490,5,23,0,0,490,105,1,0,0,0,491,501,3,110,55,0,492,501,3,108,54,
-		0,493,501,3,120,60,0,494,501,3,116,58,0,495,501,3,114,57,0,496,501,3,112,
-		56,0,497,501,5,28,0,0,498,501,5,29,0,0,499,501,5,30,0,0,500,491,1,0,0,
-		0,500,492,1,0,0,0,500,493,1,0,0,0,500,494,1,0,0,0,500,495,1,0,0,0,500,
-		496,1,0,0,0,500,497,1,0,0,0,500,498,1,0,0,0,500,499,1,0,0,0,501,107,1,
-		0,0,0,502,503,5,34,0,0,503,109,1,0,0,0,504,505,5,36,0,0,505,111,1,0,0,
-		0,506,507,5,38,0,0,507,113,1,0,0,0,508,509,5,25,0,0,509,513,5,14,0,0,510,
-		512,5,34,0,0,511,510,1,0,0,0,512,515,1,0,0,0,513,511,1,0,0,0,513,514,1,
-		0,0,0,514,516,1,0,0,0,515,513,1,0,0,0,516,517,5,15,0,0,517,115,1,0,0,0,
-		518,519,5,25,0,0,519,523,5,12,0,0,520,522,3,118,59,0,521,520,1,0,0,0,522,
-		525,1,0,0,0,523,521,1,0,0,0,523,524,1,0,0,0,524,526,1,0,0,0,525,523,1,
-		0,0,0,526,527,5,13,0,0,527,117,1,0,0,0,528,531,3,106,53,0,529,531,3,122,
-		61,0,530,528,1,0,0,0,530,529,1,0,0,0,531,119,1,0,0,0,532,536,5,37,0,0,
-		533,534,5,25,0,0,534,536,3,122,61,0,535,532,1,0,0,0,535,533,1,0,0,0,536,
-		121,1,0,0,0,537,548,5,62,0,0,538,548,5,17,0,0,539,548,5,26,0,0,540,548,
-		5,27,0,0,541,548,5,28,0,0,542,548,5,29,0,0,543,548,5,30,0,0,544,548,3,
-		90,45,0,545,548,3,92,46,0,546,548,3,124,62,0,547,537,1,0,0,0,547,538,1,
-		0,0,0,547,539,1,0,0,0,547,540,1,0,0,0,547,541,1,0,0,0,547,542,1,0,0,0,
-		547,543,1,0,0,0,547,544,1,0,0,0,547,545,1,0,0,0,547,546,1,0,0,0,548,123,
-		1,0,0,0,549,550,5,62,0,0,550,552,5,19,0,0,551,549,1,0,0,0,552,553,1,0,
-		0,0,553,551,1,0,0,0,553,554,1,0,0,0,554,125,1,0,0,0,555,559,5,16,0,0,556,
-		558,8,7,0,0,557,556,1,0,0,0,558,561,1,0,0,0,559,557,1,0,0,0,559,560,1,
-		0,0,0,560,562,1,0,0,0,561,559,1,0,0,0,562,563,5,18,0,0,563,127,1,0,0,0,
-		564,565,5,62,0,0,565,129,1,0,0,0,57,133,146,149,166,186,199,207,217,226,
-		233,236,239,242,250,259,265,269,274,282,296,302,308,310,318,322,330,335,
-		341,346,353,360,367,372,383,391,396,405,411,413,416,429,439,456,462,465,
-		468,476,479,487,500,513,523,530,535,547,553,559
+		2,64,7,64,2,65,7,65,1,0,5,0,134,8,0,10,0,12,0,137,9,0,1,0,1,0,1,1,1,1,
+		1,1,1,2,1,2,1,2,1,3,1,3,3,3,149,8,3,1,3,3,3,152,8,3,1,3,1,3,1,3,1,4,1,
+		4,1,4,1,4,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,3,5,169,8,5,1,6,1,6,1,6,1,7,
+		1,7,1,7,1,7,1,8,1,8,1,8,1,8,1,9,1,9,1,9,1,10,1,10,1,11,5,11,188,8,11,10,
+		11,12,11,191,9,11,1,11,1,11,1,12,1,12,1,12,1,12,1,13,1,13,1,13,1,13,1,
+		14,1,14,1,14,1,14,3,14,207,8,14,1,14,1,14,1,14,1,14,1,15,1,15,1,15,5,15,
+		216,8,15,10,15,12,15,219,9,15,1,15,1,15,1,16,1,16,1,16,1,16,1,16,3,16,
+		228,8,16,1,16,1,16,1,16,1,16,1,17,1,17,3,17,236,8,17,1,17,3,17,239,8,17,
+		1,17,3,17,242,8,17,1,17,3,17,245,8,17,1,17,1,17,1,18,1,18,5,18,251,8,18,
+		10,18,12,18,254,9,18,1,18,1,18,1,18,1,18,1,18,1,18,3,18,262,8,18,1,19,
+		1,19,5,19,266,8,19,10,19,12,19,269,9,19,1,19,3,19,272,8,19,1,20,1,20,1,
+		20,1,20,3,20,278,8,20,1,20,1,20,1,20,1,20,5,20,284,8,20,10,20,12,20,287,
+		9,20,1,20,1,20,1,20,1,21,1,21,1,21,1,21,1,21,1,21,1,21,4,21,299,8,21,11,
+		21,12,21,300,3,21,303,8,21,1,22,1,22,1,23,1,23,4,23,309,8,23,11,23,12,
+		23,310,1,23,1,23,3,23,315,8,23,1,24,1,24,1,25,1,25,4,25,321,8,25,11,25,
+		12,25,322,1,25,5,25,326,8,25,10,25,12,25,329,9,25,1,25,5,25,332,8,25,10,
+		25,12,25,335,9,25,1,26,1,26,3,26,339,8,26,1,27,1,27,1,28,1,28,1,28,3,28,
+		346,8,28,1,29,1,29,1,29,5,29,351,8,29,10,29,12,29,354,9,29,1,30,1,30,1,
+		30,1,30,3,30,360,8,30,1,31,1,31,1,31,3,31,365,8,31,1,32,1,32,1,32,1,32,
+		1,33,1,33,1,33,5,33,374,8,33,10,33,12,33,377,9,33,1,34,1,34,1,34,5,34,
+		382,8,34,10,34,12,34,385,9,34,1,35,1,35,3,35,389,8,35,1,36,1,36,1,36,1,
+		37,1,37,1,37,1,37,3,37,398,8,37,1,38,1,38,1,38,1,38,4,38,404,8,38,11,38,
+		12,38,405,1,38,3,38,409,8,38,1,39,1,39,1,39,1,39,1,40,1,40,1,40,1,40,1,
+		40,1,40,1,40,3,40,422,8,40,1,41,1,41,1,42,1,42,1,42,1,43,4,43,430,8,43,
+		11,43,12,43,431,1,44,1,44,1,44,1,44,1,45,1,45,1,45,1,46,1,46,1,47,1,47,
+		1,48,1,48,1,48,1,48,1,48,1,48,1,48,3,48,452,8,48,1,49,1,49,1,50,1,50,3,
+		50,458,8,50,1,50,3,50,461,8,50,1,50,3,50,464,8,50,1,50,1,50,1,51,1,51,
+		4,51,470,8,51,11,51,12,51,471,1,51,3,51,475,8,51,1,52,1,52,1,53,1,53,4,
+		53,481,8,53,11,53,12,53,482,1,53,1,53,1,54,1,54,1,54,1,54,1,54,1,54,1,
+		54,1,54,1,54,3,54,496,8,54,1,55,1,55,1,56,1,56,1,57,1,57,1,58,1,58,1,58,
+		5,58,507,8,58,10,58,12,58,510,9,58,1,58,1,58,1,59,1,59,1,59,5,59,517,8,
+		59,10,59,12,59,520,9,59,1,59,1,59,1,60,1,60,3,60,526,8,60,1,61,1,61,1,
+		61,3,61,531,8,61,1,62,1,62,1,62,1,62,1,62,1,62,1,62,1,62,1,62,1,62,3,62,
+		543,8,62,1,63,1,63,4,63,547,8,63,11,63,12,63,548,1,64,1,64,5,64,553,8,
+		64,10,64,12,64,556,9,64,1,64,1,64,1,65,1,65,1,65,0,0,66,0,2,4,6,8,10,12,
+		14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,
+		62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,
+		108,110,112,114,116,118,120,122,124,126,128,130,0,7,2,0,6,6,51,51,2,0,
+		21,21,37,37,1,0,38,40,1,0,21,22,3,0,6,6,15,19,51,51,3,0,12,12,21,22,28,
+		50,1,0,7,7,582,0,135,1,0,0,0,2,140,1,0,0,0,4,143,1,0,0,0,6,146,1,0,0,0,
+		8,156,1,0,0,0,10,168,1,0,0,0,12,170,1,0,0,0,14,173,1,0,0,0,16,177,1,0,
+		0,0,18,181,1,0,0,0,20,184,1,0,0,0,22,189,1,0,0,0,24,194,1,0,0,0,26,198,
+		1,0,0,0,28,202,1,0,0,0,30,212,1,0,0,0,32,222,1,0,0,0,34,233,1,0,0,0,36,
+		261,1,0,0,0,38,271,1,0,0,0,40,273,1,0,0,0,42,302,1,0,0,0,44,304,1,0,0,
+		0,46,306,1,0,0,0,48,316,1,0,0,0,50,318,1,0,0,0,52,338,1,0,0,0,54,340,1,
+		0,0,0,56,342,1,0,0,0,58,347,1,0,0,0,60,359,1,0,0,0,62,364,1,0,0,0,64,366,
+		1,0,0,0,66,370,1,0,0,0,68,378,1,0,0,0,70,388,1,0,0,0,72,390,1,0,0,0,74,
+		397,1,0,0,0,76,408,1,0,0,0,78,410,1,0,0,0,80,421,1,0,0,0,82,423,1,0,0,
+		0,84,425,1,0,0,0,86,429,1,0,0,0,88,433,1,0,0,0,90,437,1,0,0,0,92,440,1,
+		0,0,0,94,442,1,0,0,0,96,451,1,0,0,0,98,453,1,0,0,0,100,455,1,0,0,0,102,
+		469,1,0,0,0,104,476,1,0,0,0,106,478,1,0,0,0,108,495,1,0,0,0,110,497,1,
+		0,0,0,112,499,1,0,0,0,114,501,1,0,0,0,116,503,1,0,0,0,118,513,1,0,0,0,
+		120,525,1,0,0,0,122,530,1,0,0,0,124,542,1,0,0,0,126,546,1,0,0,0,128,550,
+		1,0,0,0,130,559,1,0,0,0,132,134,3,10,5,0,133,132,1,0,0,0,134,137,1,0,0,
+		0,135,133,1,0,0,0,135,136,1,0,0,0,136,138,1,0,0,0,137,135,1,0,0,0,138,
+		139,5,0,0,1,139,1,1,0,0,0,140,141,3,58,29,0,141,142,5,0,0,1,142,3,1,0,
+		0,0,143,144,3,50,25,0,144,145,5,0,0,1,145,5,1,0,0,0,146,148,3,42,21,0,
+		147,149,3,46,23,0,148,147,1,0,0,0,148,149,1,0,0,0,149,151,1,0,0,0,150,
+		152,3,20,10,0,151,150,1,0,0,0,151,152,1,0,0,0,152,153,1,0,0,0,153,154,
+		3,38,19,0,154,155,5,0,0,1,155,7,1,0,0,0,156,157,3,16,8,0,157,158,3,22,
+		11,0,158,159,5,0,0,1,159,9,1,0,0,0,160,169,3,32,16,0,161,169,3,30,15,0,
+		162,169,3,28,14,0,163,169,3,14,7,0,164,169,3,128,64,0,165,169,3,12,6,0,
+		166,169,3,40,20,0,167,169,5,7,0,0,168,160,1,0,0,0,168,161,1,0,0,0,168,
+		162,1,0,0,0,168,163,1,0,0,0,168,164,1,0,0,0,168,165,1,0,0,0,168,166,1,
+		0,0,0,168,167,1,0,0,0,169,11,1,0,0,0,170,171,3,58,29,0,171,172,5,7,0,0,
+		172,13,1,0,0,0,173,174,3,16,8,0,174,175,3,22,11,0,175,176,5,7,0,0,176,
+		15,1,0,0,0,177,178,3,130,65,0,178,179,3,18,9,0,179,180,3,122,61,0,180,
+		17,1,0,0,0,181,182,3,90,45,0,182,183,6,9,-1,0,183,19,1,0,0,0,184,185,5,
+		20,0,0,185,21,1,0,0,0,186,188,3,24,12,0,187,186,1,0,0,0,188,191,1,0,0,
+		0,189,187,1,0,0,0,189,190,1,0,0,0,190,192,1,0,0,0,191,189,1,0,0,0,192,
+		193,3,26,13,0,193,23,1,0,0,0,194,195,3,90,45,0,195,196,3,112,56,0,196,
+		197,6,12,-1,0,197,25,1,0,0,0,198,199,3,90,45,0,199,200,3,112,56,0,200,
+		201,6,13,-1,0,201,27,1,0,0,0,202,203,4,14,0,0,203,204,3,130,65,0,204,206,
+		3,90,45,0,205,207,5,53,0,0,206,205,1,0,0,0,206,207,1,0,0,0,207,208,1,0,
+		0,0,208,209,3,112,56,0,209,210,5,7,0,0,210,211,6,14,-1,0,211,29,1,0,0,
+		0,212,213,3,130,65,0,213,217,5,6,0,0,214,216,3,24,12,0,215,214,1,0,0,0,
+		216,219,1,0,0,0,217,215,1,0,0,0,217,218,1,0,0,0,218,220,1,0,0,0,219,217,
+		1,0,0,0,220,221,5,7,0,0,221,31,1,0,0,0,222,223,4,16,1,0,223,224,3,130,
+		65,0,224,225,5,6,0,0,225,227,3,90,45,0,226,228,5,53,0,0,227,226,1,0,0,
+		0,227,228,1,0,0,0,228,229,1,0,0,0,229,230,3,112,56,0,230,231,5,7,0,0,231,
+		232,6,16,-1,0,232,33,1,0,0,0,233,235,3,42,21,0,234,236,3,112,56,0,235,
+		234,1,0,0,0,235,236,1,0,0,0,236,238,1,0,0,0,237,239,5,53,0,0,238,237,1,
+		0,0,0,238,239,1,0,0,0,239,241,1,0,0,0,240,242,3,46,23,0,241,240,1,0,0,
+		0,241,242,1,0,0,0,242,244,1,0,0,0,243,245,3,20,10,0,244,243,1,0,0,0,244,
+		245,1,0,0,0,245,246,1,0,0,0,246,247,3,36,18,0,247,35,1,0,0,0,248,252,3,
+		50,25,0,249,251,5,9,0,0,250,249,1,0,0,0,251,254,1,0,0,0,252,250,1,0,0,
+		0,252,253,1,0,0,0,253,255,1,0,0,0,254,252,1,0,0,0,255,256,5,7,0,0,256,
+		262,1,0,0,0,257,258,3,56,28,0,258,259,5,7,0,0,259,262,1,0,0,0,260,262,
+		5,7,0,0,261,248,1,0,0,0,261,257,1,0,0,0,261,260,1,0,0,0,262,37,1,0,0,0,
+		263,267,3,50,25,0,264,266,5,9,0,0,265,264,1,0,0,0,266,269,1,0,0,0,267,
+		265,1,0,0,0,267,268,1,0,0,0,268,272,1,0,0,0,269,267,1,0,0,0,270,272,3,
+		56,28,0,271,263,1,0,0,0,271,270,1,0,0,0,272,39,1,0,0,0,273,274,4,20,2,
+		0,274,275,5,7,0,0,275,277,3,130,65,0,276,278,5,6,0,0,277,276,1,0,0,0,277,
+		278,1,0,0,0,278,279,1,0,0,0,279,280,3,90,45,0,280,281,3,112,56,0,281,285,
+		5,7,0,0,282,284,3,34,17,0,283,282,1,0,0,0,284,287,1,0,0,0,285,283,1,0,
+		0,0,285,286,1,0,0,0,286,288,1,0,0,0,287,285,1,0,0,0,288,289,5,7,0,0,289,
+		290,6,20,-1,0,290,41,1,0,0,0,291,303,3,92,46,0,292,293,3,94,47,0,293,294,
+		3,44,22,0,294,303,1,0,0,0,295,296,3,90,45,0,296,297,3,44,22,0,297,299,
+		1,0,0,0,298,295,1,0,0,0,299,300,1,0,0,0,300,298,1,0,0,0,300,301,1,0,0,
+		0,301,303,1,0,0,0,302,291,1,0,0,0,302,292,1,0,0,0,302,298,1,0,0,0,303,
+		43,1,0,0,0,304,305,3,104,52,0,305,45,1,0,0,0,306,308,5,12,0,0,307,309,
+		3,48,24,0,308,307,1,0,0,0,309,310,1,0,0,0,310,308,1,0,0,0,310,311,1,0,
+		0,0,311,312,1,0,0,0,312,314,5,12,0,0,313,315,5,53,0,0,314,313,1,0,0,0,
+		314,315,1,0,0,0,315,47,1,0,0,0,316,317,7,0,0,0,317,49,1,0,0,0,318,327,
+		3,52,26,0,319,321,5,9,0,0,320,319,1,0,0,0,321,322,1,0,0,0,322,320,1,0,
+		0,0,322,323,1,0,0,0,323,324,1,0,0,0,324,326,3,52,26,0,325,320,1,0,0,0,
+		326,329,1,0,0,0,327,325,1,0,0,0,327,328,1,0,0,0,328,333,1,0,0,0,329,327,
+		1,0,0,0,330,332,5,9,0,0,331,330,1,0,0,0,332,335,1,0,0,0,333,331,1,0,0,
+		0,333,334,1,0,0,0,334,51,1,0,0,0,335,333,1,0,0,0,336,339,3,54,27,0,337,
+		339,3,58,29,0,338,336,1,0,0,0,338,337,1,0,0,0,339,53,1,0,0,0,340,341,3,
+		56,28,0,341,55,1,0,0,0,342,343,5,11,0,0,343,345,3,58,29,0,344,346,5,9,
+		0,0,345,344,1,0,0,0,345,346,1,0,0,0,346,57,1,0,0,0,347,352,3,60,30,0,348,
+		349,5,13,0,0,349,351,3,62,31,0,350,348,1,0,0,0,351,354,1,0,0,0,352,350,
+		1,0,0,0,352,353,1,0,0,0,353,59,1,0,0,0,354,352,1,0,0,0,355,360,3,56,28,
+		0,356,360,3,64,32,0,357,360,3,76,38,0,358,360,3,66,33,0,359,355,1,0,0,
+		0,359,356,1,0,0,0,359,357,1,0,0,0,359,358,1,0,0,0,360,61,1,0,0,0,361,365,
+		3,82,41,0,362,365,3,84,42,0,363,365,3,86,43,0,364,361,1,0,0,0,364,362,
+		1,0,0,0,364,363,1,0,0,0,365,63,1,0,0,0,366,367,3,66,33,0,367,368,5,10,
+		0,0,368,369,3,58,29,0,369,65,1,0,0,0,370,375,3,68,34,0,371,372,7,1,0,0,
+		372,374,3,68,34,0,373,371,1,0,0,0,374,377,1,0,0,0,375,373,1,0,0,0,375,
+		376,1,0,0,0,376,67,1,0,0,0,377,375,1,0,0,0,378,383,3,70,35,0,379,380,7,
+		2,0,0,380,382,3,70,35,0,381,379,1,0,0,0,382,385,1,0,0,0,383,381,1,0,0,
+		0,383,384,1,0,0,0,384,69,1,0,0,0,385,383,1,0,0,0,386,389,3,80,40,0,387,
+		389,3,72,36,0,388,386,1,0,0,0,388,387,1,0,0,0,389,71,1,0,0,0,390,391,7,
+		3,0,0,391,392,3,80,40,0,392,73,1,0,0,0,393,398,3,78,39,0,394,398,3,56,
+		28,0,395,398,3,64,32,0,396,398,3,66,33,0,397,393,1,0,0,0,397,394,1,0,0,
+		0,397,395,1,0,0,0,397,396,1,0,0,0,398,75,1,0,0,0,399,403,3,74,37,0,400,
+		404,3,82,41,0,401,404,3,84,42,0,402,404,3,86,43,0,403,400,1,0,0,0,403,
+		401,1,0,0,0,403,402,1,0,0,0,404,405,1,0,0,0,405,403,1,0,0,0,405,406,1,
+		0,0,0,406,409,1,0,0,0,407,409,3,74,37,0,408,399,1,0,0,0,408,407,1,0,0,
+		0,409,77,1,0,0,0,410,411,5,1,0,0,411,412,3,58,29,0,412,413,5,2,0,0,413,
+		79,1,0,0,0,414,422,3,108,54,0,415,422,3,98,49,0,416,422,3,100,50,0,417,
+		418,5,1,0,0,418,419,3,58,29,0,419,420,5,2,0,0,420,422,1,0,0,0,421,414,
+		1,0,0,0,421,415,1,0,0,0,421,416,1,0,0,0,421,417,1,0,0,0,422,81,1,0,0,0,
+		423,424,3,92,46,0,424,83,1,0,0,0,425,426,3,94,47,0,426,427,3,58,29,0,427,
+		85,1,0,0,0,428,430,3,88,44,0,429,428,1,0,0,0,430,431,1,0,0,0,431,429,1,
+		0,0,0,431,432,1,0,0,0,432,87,1,0,0,0,433,434,5,51,0,0,434,435,5,8,0,0,
+		435,436,3,58,29,0,436,89,1,0,0,0,437,438,5,51,0,0,438,439,5,8,0,0,439,
+		91,1,0,0,0,440,441,7,4,0,0,441,93,1,0,0,0,442,443,7,5,0,0,443,95,1,0,0,
+		0,444,452,3,108,54,0,445,452,3,98,49,0,446,452,3,100,50,0,447,448,5,1,
+		0,0,448,449,3,58,29,0,449,450,5,2,0,0,450,452,1,0,0,0,451,444,1,0,0,0,
+		451,445,1,0,0,0,451,446,1,0,0,0,451,447,1,0,0,0,452,97,1,0,0,0,453,454,
+		7,4,0,0,454,99,1,0,0,0,455,457,5,3,0,0,456,458,3,102,51,0,457,456,1,0,
+		0,0,457,458,1,0,0,0,458,460,1,0,0,0,459,461,3,106,53,0,460,459,1,0,0,0,
+		460,461,1,0,0,0,461,463,1,0,0,0,462,464,3,50,25,0,463,462,1,0,0,0,463,
+		464,1,0,0,0,464,465,1,0,0,0,465,466,5,4,0,0,466,101,1,0,0,0,467,468,5,
+		8,0,0,468,470,3,104,52,0,469,467,1,0,0,0,470,471,1,0,0,0,471,469,1,0,0,
+		0,471,472,1,0,0,0,472,474,1,0,0,0,473,475,5,12,0,0,474,473,1,0,0,0,474,
+		475,1,0,0,0,475,103,1,0,0,0,476,477,7,0,0,0,477,105,1,0,0,0,478,480,5,
+		12,0,0,479,481,3,48,24,0,480,479,1,0,0,0,481,482,1,0,0,0,482,480,1,0,0,
+		0,482,483,1,0,0,0,483,484,1,0,0,0,484,485,5,12,0,0,485,107,1,0,0,0,486,
+		496,3,112,56,0,487,496,3,110,55,0,488,496,3,122,61,0,489,496,3,118,59,
+		0,490,496,3,116,58,0,491,496,3,114,57,0,492,496,5,17,0,0,493,496,5,18,
+		0,0,494,496,5,19,0,0,495,486,1,0,0,0,495,487,1,0,0,0,495,488,1,0,0,0,495,
+		489,1,0,0,0,495,490,1,0,0,0,495,491,1,0,0,0,495,492,1,0,0,0,495,493,1,
+		0,0,0,495,494,1,0,0,0,496,109,1,0,0,0,497,498,5,23,0,0,498,111,1,0,0,0,
+		499,500,5,25,0,0,500,113,1,0,0,0,501,502,5,27,0,0,502,115,1,0,0,0,503,
+		504,5,14,0,0,504,508,5,3,0,0,505,507,5,23,0,0,506,505,1,0,0,0,507,510,
+		1,0,0,0,508,506,1,0,0,0,508,509,1,0,0,0,509,511,1,0,0,0,510,508,1,0,0,
+		0,511,512,5,4,0,0,512,117,1,0,0,0,513,514,5,14,0,0,514,518,5,1,0,0,515,
+		517,3,120,60,0,516,515,1,0,0,0,517,520,1,0,0,0,518,516,1,0,0,0,518,519,
+		1,0,0,0,519,521,1,0,0,0,520,518,1,0,0,0,521,522,5,2,0,0,522,119,1,0,0,
+		0,523,526,3,108,54,0,524,526,3,124,62,0,525,523,1,0,0,0,525,524,1,0,0,
+		0,526,121,1,0,0,0,527,531,5,26,0,0,528,529,5,14,0,0,529,531,3,124,62,0,
+		530,527,1,0,0,0,530,528,1,0,0,0,531,123,1,0,0,0,532,543,5,51,0,0,533,543,
+		5,6,0,0,534,543,5,15,0,0,535,543,5,16,0,0,536,543,5,17,0,0,537,543,5,18,
+		0,0,538,543,5,19,0,0,539,543,3,92,46,0,540,543,3,94,47,0,541,543,3,126,
+		63,0,542,532,1,0,0,0,542,533,1,0,0,0,542,534,1,0,0,0,542,535,1,0,0,0,542,
+		536,1,0,0,0,542,537,1,0,0,0,542,538,1,0,0,0,542,539,1,0,0,0,542,540,1,
+		0,0,0,542,541,1,0,0,0,543,125,1,0,0,0,544,545,5,51,0,0,545,547,5,8,0,0,
+		546,544,1,0,0,0,547,548,1,0,0,0,548,546,1,0,0,0,548,549,1,0,0,0,549,127,
+		1,0,0,0,550,554,5,5,0,0,551,553,8,6,0,0,552,551,1,0,0,0,553,556,1,0,0,
+		0,554,552,1,0,0,0,554,555,1,0,0,0,555,557,1,0,0,0,556,554,1,0,0,0,557,
+		558,5,7,0,0,558,129,1,0,0,0,559,560,5,51,0,0,560,131,1,0,0,0,54,135,148,
+		151,168,189,206,217,227,235,238,241,244,252,261,267,271,277,285,300,302,
+		310,314,322,327,333,338,345,352,359,364,375,383,388,397,403,405,408,421,
+		431,451,457,460,463,471,474,482,495,508,518,525,530,542,548,554
 	};
 
 	public static readonly ATN _ATN =

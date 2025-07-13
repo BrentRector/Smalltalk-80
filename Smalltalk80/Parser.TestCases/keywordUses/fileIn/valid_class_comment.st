@@ -1,0 +1,1 @@
+MyClass comment: 'good'!
