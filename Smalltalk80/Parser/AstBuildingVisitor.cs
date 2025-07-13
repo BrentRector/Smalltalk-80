@@ -455,13 +455,16 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
-    ///     Visits a message expression consisting of a primary receiver and zero or more message parts.
+    ///     Visits a message expression consisting of a primary or parenthesized
+    ///     receiver followed by zero or more message parts.
     /// </summary>
     /// <param name="context">The message expression context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.messageBase())!;
+        var expr = context.parenthesizedExpr() is { } paren
+            ? (ExpressionNode)Visit(paren)!
+            : (ExpressionNode)Visit(context.messageBase())!;
 
         // Apply each subsequent message node to the running expression.
         foreach (var child in context.children.Skip(1))
@@ -504,6 +507,14 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 
         return Visit(context.lowPrecedenceExpr());
     }
+
+    /// <summary>
+    ///     Visits a parenthesized expression used to group sub-expressions.
+    /// </summary>
+    /// <param name="context">The parenthesized expression context.</param>
+    /// <returns>The contained <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitParenthesizedExpr(Smalltalk80Parser.ParenthesizedExprContext context)
+        => Visit(context.expression());
 
     /// <summary>
     ///     Visits a primary expression such as a literal, variable, block or parenthesized expression.
