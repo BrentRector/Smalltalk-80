@@ -83,7 +83,7 @@ methodHeader:
 	| binarySelector formalArg
 	| (IDENTIFIER COLON formalArg)+;
 
-formalArg: IDENTIFIER;
+formalArg: argumentName;
 
 temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
 temporaryName: IDENTIFIER | CLASS;
@@ -129,11 +129,21 @@ highPrecedenceExpr: primaryExpr | prefixExpr;
 
 prefixExpr: (MINUS | TILDE) primaryExpr;
 
+messageBase:
+    returnExpr
+  | assignmentExpr
+  | lowPrecedenceExpr;
+
+
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
 // this prototype grammar.
 messageExpr:
-	primaryExpr (unaryMessage | binaryMessage | keywordMessage)*;
+	messageBase  (
+		unaryMessage
+		| binaryMessage
+		| keywordMessage
+	)*;
 
 primaryExpr: literal | variable | block | '(' expression ')';
 
@@ -208,7 +218,8 @@ variable:
 
 block: '[' blockArgs? blockTemps? statements? ']';
 
-blockArgs: (COLON IDENTIFIER)+ PIPE?;
+blockArgs: (COLON argumentName)+ PIPE?;
+argumentName: IDENTIFIER | CLASS;
 
 blockTemps: PIPE temporaryName+ PIPE;
 
