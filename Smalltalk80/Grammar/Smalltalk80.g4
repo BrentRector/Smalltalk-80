@@ -267,8 +267,9 @@ PRIMITIVE_DECL:
 	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
 NUMBER:
-	DIGITS [rR] BASEDIGIT+
-	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;
+	('-' | '~')? DIGITS [rR] BASEDIGIT+                         // radix
+  | ('-' | '~')? DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;  // decimal
+
 
 COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
 
