@@ -437,7 +437,22 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The high precedence context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitHighPrecedenceExpr(Smalltalk80Parser.HighPrecedenceExprContext context)
-        => Visit(context.primaryExpr());
+        => context.primaryExpr() != null
+            ? Visit(context.primaryExpr())
+            : Visit(context.prefixExpr());
+
+    /// <summary>
+    ///     Visits a prefix expression such as <c>-5</c> or <c>~value</c>.
+    /// </summary>
+    /// <param name="context">The prefix expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitPrefixExpr(Smalltalk80Parser.PrefixExprContext context)
+    {
+        var operand = (ExpressionNode)Visit(context.primaryExpr())!;
+        return context.MINUS() != null
+            ? new BinarySendExpression(new LiteralExpression(0), "-", operand)
+            : new BinarySendExpression(new LiteralExpression(-1), "-", operand);
+    }
 
     /// <summary>
     ///     Visits a message expression consisting of a primary receiver and zero or more message parts.
