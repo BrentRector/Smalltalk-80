@@ -294,7 +294,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The temporaries context.</param>
     /// <returns>A list of declared temporary variable names.</returns>
     public override object? VisitTemporaries(Smalltalk80Parser.TemporariesContext context)
-        => context.IDENTIFIER().Select(i => i.GetText()).ToList();
+        => context.temporaryName().Select(n => n.GetText()).ToList();
 
     /// <summary>
     ///     Visits a method body returning the contained statement sequence.
@@ -557,7 +557,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The variable context.</param>
     /// <returns>A <see cref="VariableExpression"/> node.</returns>
     public override object? VisitVariable(Smalltalk80Parser.VariableContext context)
-        => new VariableExpression(context.IDENTIFIER()?.GetText() ?? context.GetText());
+    {
+        if (context.SELF() != null || context.NIL() != null || context.TRUE() != null || context.FALSE() != null)
+            return new PseudoVariableExpression(context.GetText());
+
+        return new VariableExpression(context.IDENTIFIER()?.GetText() ?? context.GetText());
+    }
 
     /// <summary>
     ///     Parses a numeric literal and converts it to either an <see cref="int"/> or <see cref="double"/> literal expression.
