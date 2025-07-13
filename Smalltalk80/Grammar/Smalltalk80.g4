@@ -92,36 +92,34 @@ temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 statements: statement (PERIOD+ statement)* PERIOD*;
 
-statement:
-    answer
-  | cascadeExpression
-  | expression;
-
-cascadeExpression:
-    expression SEMICOLON messagePart (SEMICOLON messagePart)*;
+//🔧 statement: handles return and expression only
+statement: answer | expression;
 
 answer: returnExpr;
 
 returnExpr:
-    CARAT expression (SEMICOLON messagePart)+ PERIOD?
-  | CARAT expression PERIOD?;
+	CARAT expression PERIOD?;
 
 // ─────────────────────────────────────────────────────────────── Expression Parsing with Operator
 // Precedence ───────────────────────────────────────────────────────────────
 
 // Expressions may be simple arithmetic, message sends, assignments, or a return expression used by
 // do-it blocks and workspace evaluations.
+
+// 🔧 expression: full expression, possibly with cascade
 expression:
-	returnExpr
-	| assignmentExpr
-    | cascadeExpr
-	| messageExpr
-	| lowPrecedenceExpr;
+    baseExpression (SEMICOLON messagePart)*;
+
+// 🔧 baseExpression: no cascade, just real expressions
+baseExpression:
+    returnExpr
+  | assignmentExpr
+  | messageExpr
+  | lowPrecedenceExpr;
+
+messagePart: unaryMessage | binaryMessage | keywordMessage;
 
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
-
-cascadeExpr:
-    messageExpr (SEMICOLON messageExpr)+;
 
 lowPrecedenceExpr:
 	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*;
@@ -129,9 +127,8 @@ lowPrecedenceExpr:
 mediumPrecedenceExpr:
 	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
 
-highPrecedenceExpr: unaryMessageExpr | primaryExpr;
+highPrecedenceExpr: primaryExpr;
 
-unaryMessageExpr: unarySelector primaryExpr;
 
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
@@ -157,46 +154,41 @@ keywordPart: IDENTIFIER COLON expression;
 // A unary selector is either an identifier (e.g., foo) or one of the special unary messages used by
 // the standard library. Supporting identifiers here allows the grammar to parse regular unary
 // method definitions and sends such as `increment` or `yourself`.
-unarySelector: IDENTIFIER | '!' | '-' | '~';
+unarySelector: IDENTIFIER ;
 
 binarySelector:
-	STAR
-	| INTEGER_DIVIDE
-	| MODULO
-	| BIT_SHIFT_LEFT
-	| BIT_SHIFT_RIGHT
-	| NOT_EQUAL
-	| NOT_IDENTITY
-	| EQUAL_EQUAL
-	| NOT_IDENTITY
-	| DIVIDE
-	| MOD
-	| PLUS
-	| MINUS
-	| LT
-	| GT
-	| EQUAL
-	| EQUAL_EQUAL
-	| LEQ
-	| GEQ
-	| AT
-	| QUESTION
-	| BACKSLASH
-	| COMMA
-	| AND
-	| OR
-	| TILDE;
+	// ───────────── Arithmetic Operators ─────────────
+	PLUS // +
+	| MINUS // -
+	| STAR // *
+	| DIVIDE // /
+	| MOD // %
+	| INTEGER_DIVIDE // //
+	| MODULO // \\
 
-// ─────────────────────────────────────────────────────────────── Cascade Messages
-// ───────────────────────────────────────────────────────────────
+	// ───────────── Bitwise Operators ─────────────
+	| BIT_SHIFT_LEFT // <<
+	| BIT_SHIFT_RIGHT // >>
+	| BACKSLASH // \
+	| TILDE // ~
 
-messagePart:
-    unaryMessage
-  | binaryMessage
-  | keywordMessage;
+	// ───────────── Comparison Operators ─────────────
+	| EQUAL // =
+	| NOT_EQUAL // ~=
+	| EQUAL_EQUAL // ==
+	| NOT_IDENTITY // ~~
+	| LT // <
+	| LEQ // <=
+	| GT // >
+	| GEQ // >=
 
-// ─────────────────────────────────────────────────────────────── Literals & Variables
-// ───────────────────────────────────────────────────────────────
+	// ───────────── Other Symbols & Messaging ─────────────
+	| AT // @
+	| QUESTION // ?
+	| COMMA // ,
+	| AND // and:
+	| OR ; // or:
+
 
 primary: literal | variable | block | '(' expression ')';
 
