@@ -79,9 +79,10 @@ methodCategoryChunk:
 	)* BANG;
 
 methodHeader:
-	unarySelector
-	| binarySelector formalArg
-	| (IDENTIFIER COLON formalArg)+;
+        unarySelector
+        | binarySelector formalArg
+        | (IDENTIFIER COLON formalArg)+
+        | ('category:' formalArg)+;
 
 formalArg: argumentName;
 
@@ -154,7 +155,7 @@ unaryMessage: unarySelector;
 binaryMessage: binarySelector expression;
 keywordMessage: keywordPart+;
 
-keywordPart: IDENTIFIER COLON expression;
+keywordPart: (IDENTIFIER COLON | 'category:') expression;
 
 // ─────────────────────────────────────────────────────────────── Selectors
 // ───────────────────────────────────────────────────────────────
