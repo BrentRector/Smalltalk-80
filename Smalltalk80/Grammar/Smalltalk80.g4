@@ -182,10 +182,12 @@ binarySelector:
 	| MODULO // \\
 
 	// ───────────── Bitwise Operators ─────────────
-	| BIT_SHIFT_LEFT // <<
-	| BIT_SHIFT_RIGHT // >>
-	| BACKSLASH // \
-	| TILDE // ~
+        | BIT_SHIFT_LEFT // <<
+        | BIT_SHIFT_RIGHT // >>
+        | BACKSLASH // \
+        | TILDE // ~
+        | PIPE // |
+        | BIT_AND // &
 
 	// ───────────── Comparison Operators ─────────────
 	| EQUAL // =
@@ -325,6 +327,7 @@ AT: '@';
 QUESTION: '?';
 BACKSLASH: '\\';
 COMMA: ',';
+BIT_AND: '&';
 AND: 'and:';
 OR: 'or:';
 
