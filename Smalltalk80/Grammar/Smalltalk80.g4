@@ -53,10 +53,10 @@ categoryDecl: 'category:' stringConst;
 classCommentChunk:
 	className 'comment:' NEW_LINE? stringConst BANG;
 
-metaclassDefinitionChunk: className 'class' classSlotSpec* BANG;
+metaclassDefinitionChunk: className CLASS classSlotSpec* BANG;
 
 metaclassCommentChunk:
-	className 'class' 'comment:' NEW_LINE? stringConst BANG;
+	className CLASS 'comment:' NEW_LINE? stringConst BANG;
 
 // ─────────────────────────────────────────────────────────────── Method Definitions
 // ───────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ methodBodyNoBang:
 	| returnExpr; // ^expr (no bang)
 
 methodCategoryChunk:
-	BANG className ('class')? 'methodsFor:' stringConst BANG (
+	BANG className (CLASS)? 'methodsFor:' stringConst BANG (
 		methodDef
 	)* BANG;
 
@@ -85,8 +85,8 @@ methodHeader:
 
 formalArg: IDENTIFIER;
 
-temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
-
+temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
+temporaryName: IDENTIFIER | CLASS;
 // ─────────────────────────────────────────────────────────────── Statements & Expressions
 // ───────────────────────────────────────────────────────────────
 
@@ -97,8 +97,7 @@ statement: answer | expression;
 
 answer: returnExpr;
 
-returnExpr:
-	CARAT expression PERIOD?;
+returnExpr: CARAT expression PERIOD?;
 
 // ─────────────────────────────────────────────────────────────── Expression Parsing with Operator
 // Precedence ───────────────────────────────────────────────────────────────
@@ -107,15 +106,14 @@ returnExpr:
 // do-it blocks and workspace evaluations.
 
 // 🔧 expression: full expression, possibly with cascade
-expression:
-    baseExpression (SEMICOLON messagePart)*;
+expression: baseExpression (SEMICOLON messagePart)*;
 
 // 🔧 baseExpression: no cascade, just real expressions
 baseExpression:
-    returnExpr
-  | assignmentExpr
-  | messageExpr
-  | lowPrecedenceExpr;
+	returnExpr
+	| assignmentExpr
+	| messageExpr
+	| lowPrecedenceExpr;
 
 messagePart: unaryMessage | binaryMessage | keywordMessage;
 
@@ -127,14 +125,9 @@ lowPrecedenceExpr:
 mediumPrecedenceExpr:
 	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
 
-highPrecedenceExpr
-	: primaryExpr
-	| prefixExpr
-	;
+highPrecedenceExpr: primaryExpr | prefixExpr;
 
-prefixExpr:
-    (MINUS | TILDE) primaryExpr;
-
+prefixExpr: (MINUS | TILDE) primaryExpr;
 
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
@@ -160,7 +153,14 @@ keywordPart: IDENTIFIER COLON expression;
 // A unary selector is either an identifier (e.g., foo) or one of the special unary messages used by
 // the standard library. Supporting identifiers here allows the grammar to parse regular unary
 // method definitions and sends such as `increment` or `yourself`.
-unarySelector: IDENTIFIER ;
+unarySelector:
+	IDENTIFIER
+	| CLASS
+	| SELF
+	| SUPER
+	| TRUE
+	| FALSE
+	| NIL;
 
 binarySelector:
 	// ───────────── Arithmetic Operators ─────────────
@@ -193,16 +193,24 @@ binarySelector:
 	| QUESTION // ?
 	| COMMA // ,
 	| AND // and:
-	| OR ; // or:
-
+	| OR; // or:
 
 primary: literal | variable | block | '(' expression ')';
 
-variable: IDENTIFIER | SELF | SUPER | TRUE | FALSE | NIL;
+variable:
+	IDENTIFIER
+	| CLASS
+	| SELF
+	| SUPER
+	| TRUE
+	| FALSE
+	| NIL;
 
 block: '[' blockArgs? blockTemps? statements? ']';
+
 blockArgs: (COLON IDENTIFIER)+ PIPE?;
-blockTemps: PIPE IDENTIFIER+ PIPE;
+
+blockTemps: PIPE temporaryName+ PIPE;
 
 literal:
 	stringConst
@@ -232,6 +240,12 @@ symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
 symbolName:
 	IDENTIFIER
+	| CLASS
+	| SELF
+	| SUPER
+	| TRUE
+	| FALSE
+	| NIL
 	| unarySelector
 	| binarySelector
 	| keywordSymbolSelector;
@@ -242,11 +256,12 @@ keywordSymbolSelector: (IDENTIFIER COLON)+;
 // ───────────────────────────────────────────────────────────────
 
 separatorChunk: '--' (~BANG)* BANG;
+className: IDENTIFIER;
 
 // ─────────────────────────────────────────────────────────────── Lexer Rules
 // ───────────────────────────────────────────────────────────────
 
-className: IDENTIFIER;
+CLASS: 'class';
 
 BANG: '!';
 COLON: ':';
@@ -264,19 +279,18 @@ FALSE: 'false';
 NIL: 'nil';
 
 PRIMITIVE_DECL:
-        '<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
+	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
 MINUS: '-';
 TILDE: '~';
 
 NUMBER:
-        DIGITS [rR] BASEDIGIT+                         // radix
-  | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?;  // decimal
-
+	DIGITS [rR] BASEDIGIT+ // radix
+	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?; // decimal
 
 COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
 
-STRING: '\'' ( '\'\'' | .)*? '\'' | '"' ( '""' | .)*? '"';
+STRING: '\'' ( '\'\'' | ~'\'')* '\''; // single-quote strings
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL: '$' ~[\r\n];

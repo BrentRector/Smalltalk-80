@@ -177,6 +177,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitTemporaries([NotNull] Smalltalk80Parser.TemporariesContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.temporaryName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitTemporaryName([NotNull] Smalltalk80Parser.TemporaryNameContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
