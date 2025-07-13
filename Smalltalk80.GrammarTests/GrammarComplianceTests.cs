@@ -60,6 +60,60 @@ public class GrammarComplianceTests
         }
     }
 
+    [TestMethod]
+    public void KeywordUses_ValidFiles_ShouldParse()
+    {
+        var dir = Path.Combine(Root, "keywordUses");
+        foreach (var file in Directory.GetFiles(dir, "valid*.st"))
+            ParseFile(file, expectErrors: false);
+    }
+
+    [TestMethod]
+    public void KeywordUses_InvalidFiles_ShouldProduceErrors()
+    {
+        var dir = Path.Combine(Root, "..", "Parser.FailCases");
+        foreach (var file in Directory.GetFiles(dir, "*.st"))
+            ParseFile(file, expectErrors: true);
+    }
+
+    private static void ParseFile(string file, bool expectErrors)
+    {
+        var text = File.ReadAllText(file);
+        var input = new AntlrInputStream(text);
+        var lexer = new Smalltalk80Lexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+
+        parser.RemoveErrorListeners();
+        var errorListener = new CollectingErrorListener();
+        parser.AddErrorListener(errorListener);
+
+        var directory = Path.GetFileName(Path.GetDirectoryName(file)!);
+        switch (directory)
+        {
+            case "expressionEntry":
+                parser.expressionEntry();
+                break;
+            case "statementsEntry":
+                parser.statementsEntry();
+                break;
+            case "methodEntry":
+                parser.methodEntry();
+                break;
+            case "classEntry":
+                parser.classEntry();
+                break;
+            default:
+                parser.fileIn();
+                break;
+        }
+
+        if (expectErrors)
+            Assert.IsTrue(errorListener.HasErrors, $"Expected errors in {file}");
+        else if (errorListener.HasErrors)
+            Assert.Fail($"Parse errors in file: {file}\n{errorListener.Errors}");
+    }
+
     private class CollectingErrorListener : BaseErrorListener
     {
         public bool HasErrors => _errors.Count > 0;
