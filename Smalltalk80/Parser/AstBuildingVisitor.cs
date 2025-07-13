@@ -490,13 +490,19 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
-    ///     Visits the base portion of a message expression which may be a return,
-    ///     assignment or low precedence expression.
+    ///     Visits the base portion of a message expression. This can represent a
+    ///     parenthesized sub-expression, a return expression, an assignment
+    ///     expression, or a low precedence expression. Parentheses are preserved
+    ///     only for grouping purposes and are otherwise transparent in the
+    ///     resulting syntax tree.
     /// </summary>
     /// <param name="context">The message base context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitMessageBase(Smalltalk80Parser.MessageBaseContext context)
     {
+        if (context.parenthesizedExpr() is { } p)
+            return Visit(p);
+
         if (context.returnExpr() is { } r)
             return Visit(r);
 
