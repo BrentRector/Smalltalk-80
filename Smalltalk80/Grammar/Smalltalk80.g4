@@ -136,7 +136,10 @@ messageExpr:
     | binaryMessage
     | keywordMessage)*;
 
-primaryExpr: literal | variable | '(' expression ')';
+primaryExpr: literal
+           | variable
+           | block
+           | '(' expression ')';
 
 // ───────────────────────────────────────────────────────────────
 // Message Parts
