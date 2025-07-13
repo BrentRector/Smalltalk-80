@@ -354,37 +354,28 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         => new AnswerStatement((ExpressionNode)Visit(context.returnExpr())!);
 
     /// <summary>
-    ///     Parses a return expression that may contain cascaded messages.
+    ///     Parses a return expression.
     /// </summary>
     /// <param name="context">The return expression context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
-    {
-        var value = (ExpressionNode)Visit(context.expression())!;
-        if (context.cascadeMessage().Length > 0)
-        {
-            var messages = new List<ExpressionNode>();
-            foreach (var cascade in context.cascadeMessage())
-                foreach (var msg in cascade.expression())
-                    messages.Add(ApplyMessage(this, value, msg));
-
-            value = new CascadeExpression(value, messages);
-        }
-
-        return new ReturnExpression(value);
-    }
+        => new ReturnExpression((ExpressionNode)Visit(context.expression())!);
 
     /// <summary>
-    ///     Visits an expression and applies operator precedence rules.
+    ///     Visits an expression applying cascaded message sends.
     /// </summary>
     /// <param name="context">The expression context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitExpression(Smalltalk80Parser.ExpressionContext context)
-        => context.messageExpr() != null
-            ? Visit(context.messageExpr())
-            : context.assignmentExpr() != null
-                ? Visit(context.assignmentExpr())
-                : Visit(context.lowPrecedenceExpr());
+    {
+        var expr = (ExpressionNode)Visit(context.baseExpression())!;
+        foreach (var part in context.messagePart())
+        {
+            expr = ApplyMessagePart(expr, part);
+        }
+
+        return expr;
+    }
 
     /// <summary>
     ///     Visits a low precedence expression handling addition and subtraction operators.
@@ -446,21 +437,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The high precedence context.</param>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitHighPrecedenceExpr(Smalltalk80Parser.HighPrecedenceExprContext context)
-        => context.unaryMessageExpr() != null
-            ? Visit(context.unaryMessageExpr())
-            : Visit(context.primaryExpr());
-
-    /// <summary>
-    ///     Visits a unary message expression.
-    /// </summary>
-    /// <param name="context">The unary message expression context.</param>
-    /// <returns>The resulting <see cref="UnarySendExpression"/>.</returns>
-    public override object? VisitUnaryMessageExpr(Smalltalk80Parser.UnaryMessageExprContext context)
-    {
-        var receiver = (ExpressionNode)Visit(context.primaryExpr())!;
-        var selector = context.unarySelector().GetText();
-        return new UnarySendExpression(receiver, selector);
-    }
+        => Visit(context.primaryExpr());
 
     /// <summary>
     ///     Visits a message expression consisting of a primary receiver and zero or more message parts.
@@ -533,23 +510,30 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
-    ///     Applies a cascaded message to a receiver.
+    ///     Applies a single message part to a receiver expression.
     /// </summary>
-    /// <param name="visitor">The active visitor.</param>
-    /// <param name="receiver">The receiver of the message.</param>
-    /// <param name="message">The message expression.</param>
-    /// <returns>The resulting expression after applying the message.</returns>
-    private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.ExpressionContext message)
+    /// <param name="receiver">The expression receiving the message.</param>
+    /// <param name="part">The message part context.</param>
+    /// <returns>The resulting expression after application.</returns>
+    private ExpressionNode ApplyMessagePart(ExpressionNode receiver, Smalltalk80Parser.MessagePartContext part)
     {
-        var node = (ExpressionNode)visitor.Visit(message)!;
+        if (part.unaryMessage() is { } u)
+            return new UnarySendExpression(receiver, u.unarySelector().GetText());
 
-        return node switch
+        if (part.binaryMessage() is { } b)
         {
-            UnarySendExpression u => new UnarySendExpression(receiver, u.Selector),
-            BinarySendExpression b => new BinarySendExpression(receiver, b.Selector, b.Argument),
-            KeywordSendExpression k => new KeywordSendExpression(receiver, k.SelectorParts, k.Arguments),
-            _ => throw new NotSupportedException("Unknown cascade message type.")
-        };
+            var rhs = (ExpressionNode)Visit(b.expression())!;
+            return new BinarySendExpression(receiver, b.binarySelector().GetText(), rhs);
+        }
+
+        if (part.keywordMessage() is { } k)
+        {
+            var parts = k.keywordPart().Select(p => p.IDENTIFIER().GetText() + ":").ToList();
+            var args = k.keywordPart().Select(p => (ExpressionNode)Visit(p.expression())!).ToList();
+            return new KeywordSendExpression(receiver, parts, args);
+        }
+
+        return receiver;
     }
 
     /// <summary>
