@@ -462,9 +462,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
     {
-        var expr = context.parenthesizedExpr() is { } paren
-            ? (ExpressionNode)Visit(paren)!
-            : (ExpressionNode)Visit(context.messageBase())!;
+        var expr = (ExpressionNode)Visit(context.messageBase())!;
 
         // Apply each subsequent message node to the running expression.
         foreach (var child in context.children.Skip(1))

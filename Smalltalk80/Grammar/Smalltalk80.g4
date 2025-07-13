@@ -130,21 +130,19 @@ highPrecedenceExpr: primaryExpr | prefixExpr;
 prefixExpr: (MINUS | TILDE) primaryExpr;
 
 messageBase:
-    returnExpr
-  | assignmentExpr
-  | lowPrecedenceExpr;
-
+	parenthesizedExpr
+	| returnExpr
+	| assignmentExpr
+	| lowPrecedenceExpr;
 
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
 // this prototype grammar.
 messageExpr:
-    parenthesizedExpr (unaryMessage | binaryMessage | keywordMessage)+
-  | messageBase (unaryMessage | binaryMessage | keywordMessage)+
-  | messageBase;
+	messageBase (unaryMessage | binaryMessage | keywordMessage)+
+	| messageBase;
 
-  parenthesizedExpr: '(' expression ')';
-
+parenthesizedExpr: '(' expression ')';
 
 primaryExpr: literal | variable | block | '(' expression ')';
 
