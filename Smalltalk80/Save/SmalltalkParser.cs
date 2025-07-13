@@ -42,6 +42,8 @@ public sealed class SmalltalkParser
         {
             Tracer.Log($"Parsing method: {methodName}");
             Tracer.Log($"Entering method: {methodName}");
+            if (instanceVariables.Count > 0)
+                Tracer.Log($"Instance variables in scope: {string.Join(' ', instanceVariables)}");
         }
 
         var parsed = BuildAst(methodName, argumentNames, instanceVariables);
