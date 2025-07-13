@@ -155,7 +155,7 @@ unaryMessage: unarySelector;
 binaryMessage: binarySelector expression;
 keywordMessage: keywordPart+;
 
-keywordPart: (IDENTIFIER COLON | 'category:') expression;
+keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────────────────────────── Selectors
 // ───────────────────────────────────────────────────────────────

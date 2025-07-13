@@ -6,6 +6,8 @@ This repository contains a basic prototype of a Smalltalk-80 interpreter written
 
 Use the .NET SDK (`dotnet`) to build the solution:
 
+The projects target **.NET&nbsp;9.0**, so be sure to install a matching SDK before building.
+
 ```bash
 dotnet build Smalltalk80.sln
 ```
