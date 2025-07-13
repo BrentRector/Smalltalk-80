@@ -461,11 +461,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.primaryExpr())!;
+        var expr = (ExpressionNode)Visit(context.messageBase())!;
 
-        // Iterate over subsequent message parts and apply them to the running
-        // expression. The grammar emits each message as its own child node
-        // following the primary receiver.
+        // Apply each subsequent message node to the running expression.
         foreach (var child in context.children.Skip(1))
         {
             switch (child)
@@ -488,6 +486,23 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
 
         return expr;
+    }
+
+    /// <summary>
+    ///     Visits the base portion of a message expression which may be a return,
+    ///     assignment or low precedence expression.
+    /// </summary>
+    /// <param name="context">The message base context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitMessageBase(Smalltalk80Parser.MessageBaseContext context)
+    {
+        if (context.returnExpr() is { } r)
+            return Visit(r);
+
+        if (context.assignmentExpr() is { } a)
+            return Visit(a);
+
+        return Visit(context.lowPrecedenceExpr());
     }
 
     /// <summary>
