@@ -1,27 +1,7 @@
-!Behavior methodsFor: 'private'!
-accumulateInstVarNames: names traversedClasses: classSet
-	"accumulate instance variable names in 'names'.  Do this in depth-first,
-	  left-to-right order.  This will give the ordering of instance variable names
-	  expected by the compiler and other parts of the system."
-	self superclasses do: 
-		[:each | each accumulateInstVarNames: names traversedClasses: classSet].
-	(classSet includes: self) ifFalse:
-		[names addAll: self instVarNames.
-		classSet add: self]!
-checkMethodFor: selector
-	"copy method from superclass if necessary.  Answer true if no conflict detected"
-	| descr unmoved copyOK local copied conflict |
-	local _ methodDict includesKey: selector.
-	"If this method isnt on the dynamic chain, copy it."
-	descr = (self dynamicMethodDescriptionAt: selector) ifFalse:
-		[unmoved _ self unmovedVarsFrom: descr whichClass.
-		copyOK _ true.  "If method doesnt touch any vars which moved"
-		descr method fieldsTouched do:
-			[:field | copyOK _ copyOK & (unmoved at: field)].
-		copyOK
-			ifTrue:  "then can just install that same method"
-				[self addSelectorUnchecked: descr selector withMethod: descr method]
-			ifFalse:  "otherwise have to recompile it here"
-				[self compileUnchecked: descr sourceCode].
-		self insertClass: self selector: selector in: SelectorsOfCopiedMethods].
-	^true! !
+!Browser methodsFor: 'category list'!
+category
+	^ category!
+category: selection
+	category _ selection.
+	selection isNil ifTrue: [self textMode: nil].
+	self newClassList: className! !
