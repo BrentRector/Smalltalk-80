@@ -92,12 +92,19 @@ temporaries: PIPE IDENTIFIER+ PIPE NEW_LINE?;
 
 statements: statement (PERIOD+ statement)* PERIOD*;
 
-statement: answer | expression;
+statement:
+    answer
+  | cascadeExpression
+  | expression;
+
+cascadeExpression:
+    expression SEMICOLON messagePart (SEMICOLON messagePart)*;
 
 answer: returnExpr;
 
 returnExpr:
-	CARAT expression (SEMICOLON cascadeMessage)* PERIOD?;
+    CARAT expression (SEMICOLON messagePart)+ PERIOD?
+  | CARAT expression PERIOD?;
 
 // ─────────────────────────────────────────────────────────────── Expression Parsing with Operator
 // Precedence ───────────────────────────────────────────────────────────────
@@ -183,7 +190,10 @@ binarySelector:
 // ─────────────────────────────────────────────────────────────── Cascade Messages
 // ───────────────────────────────────────────────────────────────
 
-cascadeMessage: expression (SEMICOLON expression)*;
+messagePart:
+    unaryMessage
+  | binaryMessage
+  | keywordMessage;
 
 // ─────────────────────────────────────────────────────────────── Literals & Variables
 // ───────────────────────────────────────────────────────────────
