@@ -1,28 +1,41 @@
-!Behavior methodsFor: 'creating method dictionary'!
-tryCopyingCodeFor: selector
-	"Check if 'selector' is compound, and if so, try to copy down the appropriate code.
-	  Return #OK if sucessful,
-		#HierarchyViolation if the class part is not one of my immediate superclasses,
-		or #NotFound if the class part is OK but the
-		selector part is not found in the inheritance hierarchy."
-	| classPart whichClass simpleSelector descr |
-	selector isCompound ifFalse: [^#NotFound].
-	classPart _ selector classPart.
-	simpleSelector _ selector selectorPart.
-	"check for special class parts"
-	classPart==#all ifTrue:
-		[self compileBroadcastCodeFor: simpleSelector.
-		self insertClass: self selector: simpleSelector in: SelectorsOfDirectedMethods.
-		^#OK].
-	classPart==#super 
-		ifTrue: [descr _ self superMethodDescriptionAt: simpleSelector]
-		ifFalse: [whichClass _ Smalltalk at: classPart.
-				"if I'm a metaclass, get the metaclass of whichClass"
-				self isMeta ifTrue: [whichClass _ whichClass class].
-				"check that whichClass is one of my superclasses"
-				(self inheritsFrom: whichClass) ifFalse: [^#HierarchyViolation].
-				descr _ whichClass methodDescriptionAt: simpleSelector].
-	descr isBad ifTrue: [^#NotFound].
-	self compileUnchecked: classPart , '.' , descr sourceCode.
-	self insertClass: self selector: simpleSelector in: SelectorsOfDirectedMethods.
-	^#OK! !
+!Behavior methodsFor: 'private'!
+accumulateInstVarNames: names traversedClasses: classSet
+	"accumulate instance variable names in 'names'.  Do this in depth-first,
+	  left-to-right order.  This will give the ordering of instance variable names
+	  expected by the compiler and other parts of the system."
+	self superclasses do: 
+		[:each | each accumulateInstVarNames: names traversedClasses: classSet].
+	(classSet includes: self) ifFalse:
+		[names addAll: self instVarNames.
+		classSet add: self]!
+checkMethodFor: selector
+	"copy method from superclass if necessary.  Answer true if no conflict detected"
+	| descr unmoved copyOK local copied conflict |
+	local _ methodDict includesKey: selector.
+	copied _ (SelectorsOfCopiedMethods at: selector ifAbsent: [Array new]) includes: self.
+	conflict _ (SelectorsOfConflictMethods at: selector ifAbsent: [Array new]) includes: self.
+	local & copied not & conflict not
+		ifTrue: [^true].
+	descr _ self superMethodDescriptionAt: selector.
+	descr isMethodNotImplemented
+		ifTrue: [self removeSelectorUnchecked: selector.  ^true].
+	descr isConflictingMethods 
+		ifTrue: [self compileConflictCodeFor: selector.  ^false].
+
+	conflict ifTrue:  "Not conflicting any more, so remove if it had been."
+		[self removeSelectorUnchecked: selector.
+		self removeClass: self selector: selector in: SelectorsOfConflictMethods].
+
+	"If this method isnt on the dynamic chain, copy it."
+	descr = (self dynamicMethodDescriptionAt: selector) ifFalse:
+		[unmoved _ self unmovedVarsFrom: descr whichClass.
+		copyOK _ true.  "If method doesnt touch any vars which moved"
+		descr method fieldsTouched do:
+			[:field | copyOK _ copyOK & (unmoved at: field)].
+		copyOK
+			ifTrue:  "then can just install that same method"
+				[self addSelectorUnchecked: descr selector withMethod: descr method]
+			ifFalse:  "otherwise have to recompile it here"
+				[self compileUnchecked: descr sourceCode].
+		self insertClass: self selector: selector in: SelectorsOfCopiedMethods].
+	^true! !

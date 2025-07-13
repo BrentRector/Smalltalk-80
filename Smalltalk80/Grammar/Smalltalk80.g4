@@ -139,11 +139,12 @@ messageBase:
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
 // this prototype grammar.
 messageExpr:
-	messageBase  (
-		unaryMessage
-		| binaryMessage
-		| keywordMessage
-	)*;
+    parenthesizedExpr (unaryMessage | binaryMessage | keywordMessage)+
+  | messageBase (unaryMessage | binaryMessage | keywordMessage)+
+  | messageBase;
+
+  parenthesizedExpr: '(' expression ')';
+
 
 primaryExpr: literal | variable | block | '(' expression ')';
 
