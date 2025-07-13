@@ -82,7 +82,9 @@ methodHeader:
         unarySelector
         | binarySelector formalArg
         | (IDENTIFIER COLON formalArg)+
-        | ('category:' formalArg)+;
+        | ('category:' formalArg)+
+		| ('comment:' formalArg)+
+		;
 
 formalArg: argumentName;
 
@@ -155,7 +157,7 @@ unaryMessage: unarySelector;
 binaryMessage: binarySelector expression;
 keywordMessage: keywordPart+;
 
-keywordPart: (IDENTIFIER COLON | 'category:') expression;
+keywordPart: IDENTIFIER COLON expression;
 
 // ─────────────────────────────────────────────────────────────── Selectors
 // ───────────────────────────────────────────────────────────────
