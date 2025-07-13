@@ -343,7 +343,9 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitStatement(Smalltalk80Parser.StatementContext context)
         => context.answer() != null
             ? Visit(context.answer())
-            : new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
+            : context.cascadeExpression() != null
+                ? new ExpressionStatement((ExpressionNode)Visit(context.cascadeExpression())!)
+                : new ExpressionStatement((ExpressionNode)Visit(context.expression())!);
 
     /// <summary>
     ///     Processes an ^ answer statement.
@@ -361,17 +363,31 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitReturnExpr(Smalltalk80Parser.ReturnExprContext context)
     {
         var value = (ExpressionNode)Visit(context.expression())!;
-        if (context.cascadeMessage().Length > 0)
+        if (context.messagePart().Length > 0)
         {
             var messages = new List<ExpressionNode>();
-            foreach (var cascade in context.cascadeMessage())
-                foreach (var msg in cascade.expression())
-                    messages.Add(ApplyMessage(this, value, msg));
+            foreach (var part in context.messagePart())
+                messages.Add(ApplyMessage(this, value, part));
 
             value = new CascadeExpression(value, messages);
         }
 
         return new ReturnExpression(value);
+    }
+
+    /// <summary>
+    ///     Visits an expression containing cascaded messages.
+    /// </summary>
+    /// <param name="context">The cascade expression context.</param>
+    /// <returns>The resulting <see cref="CascadeExpression"/>.</returns>
+    public override object? VisitCascadeExpression(Smalltalk80Parser.CascadeExpressionContext context)
+    {
+        var receiver = (ExpressionNode)Visit(context.expression())!;
+        var messages = new List<ExpressionNode>();
+        foreach (var part in context.messagePart())
+            messages.Add(ApplyMessage(this, receiver, part));
+
+        return new CascadeExpression(receiver, messages);
     }
 
     /// <summary>
@@ -385,6 +401,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             : context.assignmentExpr() != null
                 ? Visit(context.assignmentExpr())
                 : Visit(context.lowPrecedenceExpr());
+
 
     /// <summary>
     ///     Visits a low precedence expression handling addition and subtraction operators.
@@ -539,15 +556,16 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="receiver">The receiver of the message.</param>
     /// <param name="message">The message expression.</param>
     /// <returns>The resulting expression after applying the message.</returns>
-    private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, Smalltalk80Parser.ExpressionContext message)
+    private static ExpressionNode ApplyMessage(AstBuildingVisitor visitor, ExpressionNode receiver, ParserRuleContext message)
     {
-        var node = (ExpressionNode)visitor.Visit(message)!;
-
-        return node switch
+        return message switch
         {
-            UnarySendExpression u => new UnarySendExpression(receiver, u.Selector),
-            BinarySendExpression b => new BinarySendExpression(receiver, b.Selector, b.Argument),
-            KeywordSendExpression k => new KeywordSendExpression(receiver, k.SelectorParts, k.Arguments),
+            Smalltalk80Parser.UnaryMessageContext u => new UnarySendExpression(receiver, u.unarySelector().GetText()),
+            Smalltalk80Parser.BinaryMessageContext b => new BinarySendExpression(receiver, b.binarySelector().GetText(), (ExpressionNode)visitor.Visit(b.expression())!),
+            Smalltalk80Parser.KeywordMessageContext k => new KeywordSendExpression(
+                receiver,
+                k.keywordPart().Select(p => p.IDENTIFIER().GetText() + ":").ToList(),
+                k.keywordPart().Select(p => (ExpressionNode)visitor.Visit(p.expression())!).ToList()),
             _ => throw new NotSupportedException("Unknown cascade message type.")
         };
     }
