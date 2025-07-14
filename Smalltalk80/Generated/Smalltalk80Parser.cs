@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from /workspace/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -149,6 +149,15 @@ public partial class Smalltalk80Parser : Parser {
 	        return stream.LA(offset) == Smalltalk80Parser.IDENTIFIER
 	            && stream.LA(offset + 1) == Smalltalk80Parser.COLON
 	            && stream.LT(offset)!.Text == keyword;
+	    }
+
+	    private bool LooksLikeMetaclassDef()
+	    {
+	        var stream = TokenStream;
+	        return stream.LA(1) == Smalltalk80Parser.IDENTIFIER
+	            && stream.LA(2) == Smalltalk80Parser.IDENTIFIER
+	            && stream.LA(3) == Smalltalk80Parser.IDENTIFIER
+	            && stream.LA(4) == Smalltalk80Parser.COLON;
 	    }
 
 		public Smalltalk80Parser(ITokenStream input) : this(input, Console.Out, Console.Error) { }
@@ -1028,24 +1037,26 @@ public partial class Smalltalk80Parser : Parser {
 			EnterOuterAlt(_localctx, 1);
 			{
 			State = 212;
-			className();
+			if (!( LooksLikeMetaclassDef() )) throw new FailedPredicateException(this, " LooksLikeMetaclassDef() ");
 			State = 213;
+			className();
+			State = 214;
 			_localctx.cls = Match(IDENTIFIER);
 			 if ((_localctx.cls!=null?_localctx.cls.Text:null) != "class") NotifyErrorListeners("expected 'class'"); 
-			State = 218;
+			State = 217;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while (_la==IDENTIFIER) {
+			do {
 				{
 				{
-				State = 215;
+				State = 216;
 				classSlotSpec();
 				}
 				}
-				State = 220;
+				State = 219;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
-			}
+			} while ( _la==IDENTIFIER );
 			State = 221;
 			Match(BANG);
 			}
@@ -4325,6 +4336,7 @@ public partial class Smalltalk80Parser : Parser {
 	public override bool Sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 14: return classCommentChunk_sempred((ClassCommentChunkContext)_localctx, predIndex);
+		case 15: return metaclassDefinitionChunk_sempred((MetaclassDefinitionChunkContext)_localctx, predIndex);
 		case 16: return metaclassCommentChunk_sempred((MetaclassCommentChunkContext)_localctx, predIndex);
 		case 20: return methodCategoryChunk_sempred((MethodCategoryChunkContext)_localctx, predIndex);
 		}
@@ -4336,15 +4348,21 @@ public partial class Smalltalk80Parser : Parser {
 		}
 		return true;
 	}
+	private bool metaclassDefinitionChunk_sempred(MetaclassDefinitionChunkContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 1: return  LooksLikeMetaclassDef() ;
+		}
+		return true;
+	}
 	private bool metaclassCommentChunk_sempred(MetaclassCommentChunkContext _localctx, int predIndex) {
 		switch (predIndex) {
-		case 1: return  NextMatchesKeyword(3, "comment") ;
+		case 2: return  NextMatchesKeyword(3, "comment") ;
 		}
 		return true;
 	}
 	private bool methodCategoryChunk_sempred(MethodCategoryChunkContext _localctx, int predIndex) {
 		switch (predIndex) {
-		case 2: return IsMethodsFor();
+		case 3: return IsMethodsFor();
 		}
 		return true;
 	}
@@ -4365,7 +4383,7 @@ public partial class Smalltalk80Parser : Parser {
 		1,7,1,7,1,7,1,8,1,8,1,8,1,8,1,9,1,9,1,9,1,10,1,10,1,11,5,11,188,8,11,10,
 		11,12,11,191,9,11,1,11,1,11,1,12,1,12,1,12,1,12,1,13,1,13,1,13,1,13,1,
 		14,1,14,1,14,1,14,3,14,207,8,14,1,14,1,14,1,14,1,14,1,15,1,15,1,15,1,15,
-		5,15,217,8,15,10,15,12,15,220,9,15,1,15,1,15,1,16,1,16,1,16,1,16,1,16,
+		1,15,4,15,218,8,15,11,15,12,15,219,1,15,1,15,1,16,1,16,1,16,1,16,1,16,
 		1,16,3,16,230,8,16,1,16,1,16,1,16,1,16,1,17,1,17,3,17,238,8,17,1,17,3,
 		17,241,8,17,1,17,3,17,244,8,17,1,17,3,17,247,8,17,1,17,1,17,1,18,1,18,
 		5,18,253,8,18,10,18,12,18,256,9,18,1,18,1,18,1,18,1,18,1,18,1,18,3,18,
@@ -4434,10 +4452,10 @@ public partial class Smalltalk80Parser : Parser {
 		0,198,199,3,90,45,0,199,200,3,112,56,0,200,201,6,13,-1,0,201,27,1,0,0,
 		0,202,203,4,14,0,0,203,204,3,130,65,0,204,206,3,90,45,0,205,207,5,50,0,
 		0,206,205,1,0,0,0,206,207,1,0,0,0,207,208,1,0,0,0,208,209,3,112,56,0,209,
-		210,5,6,0,0,210,211,6,14,-1,0,211,29,1,0,0,0,212,213,3,130,65,0,213,214,
-		5,48,0,0,214,218,6,15,-1,0,215,217,3,24,12,0,216,215,1,0,0,0,217,220,1,
-		0,0,0,218,216,1,0,0,0,218,219,1,0,0,0,219,221,1,0,0,0,220,218,1,0,0,0,
-		221,222,5,6,0,0,222,31,1,0,0,0,223,224,4,16,1,0,224,225,3,130,65,0,225,
+		210,5,6,0,0,210,211,6,14,-1,0,211,29,1,0,0,0,212,213,4,15,1,0,213,214,
+		3,130,65,0,214,215,5,48,0,0,215,217,6,15,-1,0,216,218,3,24,12,0,217,216,
+		1,0,0,0,218,219,1,0,0,0,219,217,1,0,0,0,219,220,1,0,0,0,220,221,1,0,0,
+		0,221,222,5,6,0,0,222,31,1,0,0,0,223,224,4,16,2,0,224,225,3,130,65,0,225,
 		226,5,48,0,0,226,227,6,16,-1,0,227,229,3,90,45,0,228,230,5,50,0,0,229,
 		228,1,0,0,0,229,230,1,0,0,0,230,231,1,0,0,0,231,232,3,112,56,0,232,233,
 		5,6,0,0,233,234,6,16,-1,0,234,33,1,0,0,0,235,237,3,42,21,0,236,238,3,112,
@@ -4452,7 +4470,7 @@ public partial class Smalltalk80Parser : Parser {
 		37,1,0,0,0,265,269,3,50,25,0,266,268,5,8,0,0,267,266,1,0,0,0,268,271,1,
 		0,0,0,269,267,1,0,0,0,269,270,1,0,0,0,270,274,1,0,0,0,271,269,1,0,0,0,
 		272,274,3,56,28,0,273,265,1,0,0,0,273,272,1,0,0,0,274,39,1,0,0,0,275,276,
-		4,20,2,0,276,277,5,6,0,0,277,280,3,130,65,0,278,279,5,48,0,0,279,281,6,
+		4,20,3,0,276,277,5,6,0,0,277,280,3,130,65,0,278,279,5,48,0,0,279,281,6,
 		20,-1,0,280,278,1,0,0,0,280,281,1,0,0,0,281,282,1,0,0,0,282,283,3,90,45,
 		0,283,284,3,112,56,0,284,288,5,6,0,0,285,287,3,34,17,0,286,285,1,0,0,0,
 		287,290,1,0,0,0,288,286,1,0,0,0,288,289,1,0,0,0,289,291,1,0,0,0,290,288,
@@ -4536,7 +4554,7 @@ public partial class Smalltalk80Parser : Parser {
 		560,564,5,5,0,0,561,563,8,5,0,0,562,561,1,0,0,0,563,566,1,0,0,0,564,562,
 		1,0,0,0,564,565,1,0,0,0,565,567,1,0,0,0,566,564,1,0,0,0,567,568,5,6,0,
 		0,568,129,1,0,0,0,569,570,5,48,0,0,570,131,1,0,0,0,55,135,148,151,168,
-		189,206,218,229,237,240,243,246,254,263,269,273,280,288,303,305,313,317,
+		189,206,219,229,237,240,243,246,254,263,269,273,280,288,303,305,313,317,
 		325,330,336,341,348,355,362,367,378,386,391,400,406,408,411,424,434,454,
 		460,463,466,474,477,485,498,511,521,532,536,541,552,558,564
 	};
