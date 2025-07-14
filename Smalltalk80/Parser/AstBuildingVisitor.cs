@@ -430,6 +430,28 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
+    ///     Visits a comparison expression consisting of one or more comparison
+    ///     operators applied left-to-right.
+    /// </summary>
+    /// <param name="context">The comparison expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitComparisonExpr(Smalltalk80Parser.ComparisonExprContext context)
+    {
+        var expr = (ExpressionNode)Visit(context.lowPrecedenceExpr(0))!;
+        for (int i = 1; i < context.ChildCount; i += 2)
+        {
+            if (context.children[i] is ITerminalNode op &&
+                context.children[i + 1] is Smalltalk80Parser.LowPrecedenceExprContext rightCtx)
+            {
+                var right = (ExpressionNode)Visit(rightCtx)!;
+                expr = new BinarySendExpression(expr, op.GetText(), right);
+            }
+        }
+
+        return expr;
+    }
+
+    /// <summary>
     ///     Visits a high precedence expression, which may be a unary message or a primary expression.
     /// </summary>
     /// <param name="context">The high precedence context.</param>
@@ -589,10 +611,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <c>nil</c>.</returns>
     public override object? VisitVariable(Smalltalk80Parser.VariableContext context)
     {
-        if (context.IDENTIFIER() == null)
-            return new PseudoVariableExpression(context.GetText());
-
-        return new VariableExpression(context.IDENTIFIER()!.GetText());
+        var name = context.IDENTIFIER().GetText();
+        return name is "self" or "super" or "nil" or "true" or "false"
+            ? new PseudoVariableExpression(name)
+            : new VariableExpression(name);
     }
 
     /// <summary>
