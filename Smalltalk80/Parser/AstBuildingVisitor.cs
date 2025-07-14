@@ -437,12 +437,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitComparisonExpr(Smalltalk80Parser.ComparisonExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.messageExpr(0))!;
+        var expr = (ExpressionNode)Visit(context.nonKeywordMessageExpr(0))!;
 
         for (int i = 1; i < context.ChildCount; i += 2)
         {
             if (context.children[i] is ITerminalNode op &&
-                context.children[i + 1] is Smalltalk80Parser.MessageExprContext rightCtx)
+                context.children[i + 1] is Smalltalk80Parser.NonKeywordMessageExprContext rightCtx)
             {
                 var right = (ExpressionNode)Visit(rightCtx)!;
                 expr = new BinarySendExpression(expr, op.GetText(), right);
@@ -503,6 +503,36 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
                     var parts = kw.keywordPart().Select(k => k.IDENTIFIER().GetText() + ":").ToList();
                     var args = kw.keywordPart().Select(k => (ExpressionNode)Visit(k.expression())!).ToList();
                     expr = new KeywordSendExpression(expr, parts, args);
+                    break;
+            }
+        }
+
+        return expr;
+    }
+
+    /// <summary>
+    ///     Visits a message expression that excludes keyword messages. This is
+    ///     used when parsing the operands of comparison operators so that any
+    ///     subsequent keyword messages apply to the comparison result rather
+    ///     than the right-hand side expression.
+    /// </summary>
+    /// <param name="context">The non-keyword message expression context.</param>
+    /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
+    public override object? VisitNonKeywordMessageExpr(Smalltalk80Parser.NonKeywordMessageExprContext context)
+    {
+        var expr = (ExpressionNode)Visit(context.messageBase())!;
+
+        foreach (var child in context.children.Skip(1))
+        {
+            switch (child)
+            {
+                case Smalltalk80Parser.UnaryMessageContext unary:
+                    expr = new UnarySendExpression(expr, unary.unarySelector().GetText());
+                    break;
+
+                case Smalltalk80Parser.BinaryMessageContext binary:
+                    var rhs = (ExpressionNode)Visit(binary.expression())!;
+                    expr = new BinarySendExpression(expr, binary.binarySelector().GetText(), rhs);
                     break;
             }
         }
