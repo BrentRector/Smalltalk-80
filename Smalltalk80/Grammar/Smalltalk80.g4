@@ -184,6 +184,14 @@ returnExpr: CARAT expression PERIOD?;
 // Expressions may be simple arithmetic, message sends, assignments, or a return expression used by
 // do-it blocks and workspace evaluations.
 
+//The precedence stack:
+/* expression
+  → baseExpression
+    → returnExpr | assignmentExpr | messageExpr | comparisonExpr
+      → lowPrecedenceExpr
+        → mediumPrecedenceExpr
+          → highPrecedenceExpr */
+
 // 🔧 expression: full expression, possibly with cascade
 expression: baseExpression (SEMICOLON messagePart)*;
 
@@ -192,11 +200,14 @@ baseExpression:
 	returnExpr
 	| assignmentExpr
 	| messageExpr
-	| lowPrecedenceExpr;
+	| comparisonExpr;
 
 messagePart: unaryMessage | binaryMessage | keywordMessage;
 
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
+
+comparisonExpr:
+    lowPrecedenceExpr ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ) lowPrecedenceExpr)*;
 
 lowPrecedenceExpr:
 	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*;
@@ -284,11 +295,6 @@ primary: literal | variable | block | '(' expression ')';
 
 variable:
         IDENTIFIER
-        | 'self'		// For now, let's recognize the pseudo variables specially
-        | 'super'
-        | 'true'
-        | 'false'
-        | 'nil'
 		;
 
 block: '[' blockArgs? blockTemps? statements? ']';
