@@ -557,23 +557,6 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         return null;
     }
 
-    /// <summary>
-    ///     Visits a primary expression such as a literal, variable, block or parenthesized expression.
-    /// </summary>
-    /// <param name="context">The primary expression context.</param>
-    /// <returns>The resulting <see cref="ExpressionNode"/> or <c>null</c> when the context is empty.</returns>
-    public override object? VisitPrimary(Smalltalk80Parser.PrimaryContext context)
-    {
-        if (context.literal() != null)
-            return Visit(context.literal());
-        if (context.variable() != null)
-            return Visit(context.variable());
-        if (context.block() != null)
-            return Visit(context.block());
-        if (context.expression() != null)
-            return Visit(context.expression());
-        return null;
-    }
 
     /// <summary>
     ///     Applies a single message part to a receiver expression.

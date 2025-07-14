@@ -211,7 +211,8 @@ messagePart: unaryMessage | binaryMessage | keywordMessage;
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
 
 comparisonExpr:
-    messageExpr ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ) messageExpr)*;
+    messageExpr ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ) messageExpr)*
+        (unaryMessage | binaryMessage | keywordMessage)*;
 
 // A message expression consists of a primary receiver followed by zero or more unary, binary, or
 // keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
@@ -298,7 +299,6 @@ binarySelector:
 	| COMMA // ,
 	;
 
-primary: literal | variable | block | '(' expression ')';
 
 variable:
         IDENTIFIER
