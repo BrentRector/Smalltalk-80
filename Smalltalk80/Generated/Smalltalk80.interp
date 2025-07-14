@@ -47,8 +47,6 @@ null
 '\\'
 ','
 '&'
-'and:'
-'or:'
 null
 null
 null
@@ -103,8 +101,6 @@ QUESTION
 BACKSLASH
 COMMA
 BIT_AND
-AND
-OR
 IDENTIFIER
 DIGITS
 NEW_LINE
