@@ -437,11 +437,12 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <returns>The resulting <see cref="ExpressionNode"/>.</returns>
     public override object? VisitComparisonExpr(Smalltalk80Parser.ComparisonExprContext context)
     {
-        var expr = (ExpressionNode)Visit(context.lowPrecedenceExpr(0))!;
+        var expr = (ExpressionNode)Visit(context.messageExpr(0))!;
+
         for (int i = 1; i < context.ChildCount; i += 2)
         {
             if (context.children[i] is ITerminalNode op &&
-                context.children[i + 1] is Smalltalk80Parser.LowPrecedenceExprContext rightCtx)
+                context.children[i + 1] is Smalltalk80Parser.MessageExprContext rightCtx)
             {
                 var right = (ExpressionNode)Visit(rightCtx)!;
                 expr = new BinarySendExpression(expr, op.GetText(), right);
