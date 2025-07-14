@@ -1,16 +1,21 @@
-!ChangeList methodsFor: 'checking-private'!
-finishReportOn: aStream
-	"report conflicts among the changes"
-	| cr previous terminator |
-	cr _ Character cr.
-	terminator _ $!!.
-	doItDict associationsDo:
-		[:aDoIt |
-		aStream cr; nextChunkPut: '"*** DoIts in ', aDoIt key, ' ***"'; cr; cr.
-		aDoIt value do:
-			[:doit | self tabText: doit text on: aStream] ].
+AltoFile class
+	instanceVariableNames: ''!
 
-	aStream isEmpty ifTrue:
-		[Transcript show: '*** no conflicts ***'.
-		aStream nextChunkPut: '"*** no conflicts ***"'; cr].
-	^aStream close! !
+
+!AltoFile class methodsFor: 'class initialization'!
+initialize  
+	| readStream |
+	AltoFilePool at: #(CRR CCR CCW CWW ) put: #(18496 18512 18520 18536 ).
+	readStream _ ReadStream on: #(1024 32 'SysDir.' ).
+	#(Dfmask Boffset Dirname ) do:
+		 [:each | AltoFilePool at: each put: readStream next].
+	readStream _ ReadStream on: #(1 2 3 4 5 6 7 8 ).
+	#(Nextp Backp Unused Numch Pagen Vn Sn1 Sn2 ) do: 
+		[:each | AltoFilePool at: each put: readStream next]! !
+
+AltoFile initialize!
+RunArray subclass: #AltoFileAddressArray
+	instanceVariableNames: 'directory '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Xerox Alto'! !
