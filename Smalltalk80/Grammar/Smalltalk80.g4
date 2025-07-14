@@ -1,5 +1,33 @@
 grammar Smalltalk80;
 
+@parser::members {
+    private bool IsMethodsFor()
+    {
+        var stream = TokenStream;
+        int index = 1; // lookahead position
+        if (stream.LA(index) != Smalltalk80Parser.BANG)
+            return false;
+        index++; // class name
+        if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
+            return false;
+        index++;
+        if (stream.LA(index) == Smalltalk80Parser.IDENTIFIER && stream.LT(index)!.Text == "class")
+            index++;
+        if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
+            return false;
+        var id = stream.LT(index)!.Text;
+        return id == "methodsFor" && stream.LA(index + 1) == Smalltalk80Parser.COLON;
+    }
+
+    private bool NextMatchesKeyword(int offset, string keyword)
+    {
+        var stream = TokenStream;
+        return stream.LA(offset) == Smalltalk80Parser.IDENTIFIER
+            && stream.LA(offset + 1) == Smalltalk80Parser.COLON
+            && stream.LT(offset)!.Text == keyword;
+    }
+}
+
 // ─────────────────────────────────────────────────────────────── Entry Points
 // ───────────────────────────────────────────────────────────────
 
@@ -14,14 +42,14 @@ classEntry: classHeader classBody EOF; // Class editor input
 // ───────────────────────────────────────────────────────────────
 
 chunk:
-	metaclassCommentChunk
-	| metaclassDefinitionChunk
-	| classCommentChunk
-	| classDefChunk
-	| methodCategoryChunk
-	| separatorChunk
-	| expressionChunk
-	| BANG;
+        metaclassCommentChunk
+        | metaclassDefinitionChunk
+        | classCommentChunk
+        | classDefChunk
+        | separatorChunk
+        | expressionChunk
+        | methodCategoryChunk
+        | BANG;
 
 expressionChunk: expression BANG;
 
@@ -29,34 +57,67 @@ classDefChunk: classHeader classBody BANG;
 
 classHeader: className subclassKind symbolConst;
 
-subclassKind:
-	'subclass:'
-	| 'variableSubclass:'
-	| 'variableByteSubclass:'
-	| 'variableWordSubclass:';
+subclassKind
+    : kind=identifierColon
+      {
+          var text = $kind.text;
+          if (text is not ("subclass:" or "variableSubclass:" or "variableByteSubclass:" or "variableWordSubclass:"))
+              NotifyErrorListeners($"invalid subclass kind: {text}");
+      }
+    ;
 
 primitiveDecl: PRIMITIVE_DECL;
 
 classBody: classSlotSpec* categoryDecl;
 
-classSlotSpec:
-	'instanceVariableNames:' stringConst
-	| 'classVariableNames:' stringConst
-	| 'classInstanceVariableNames:' stringConst
-	| 'poolDictionaries:' stringConst;
+classSlotSpec
+    : spec=identifierColon stringConst
+      {
+          var text = $spec.text;
+          if (text is not (
+                  "instanceVariableNames:" or
+                  "classVariableNames:" or
+                  "classInstanceVariableNames:" or
+                  "poolDictionaries:"))
+              NotifyErrorListeners($"invalid slot specification: {text}");
+      }
+    ;
 
-categoryDecl: 'category:' stringConst;
+categoryDecl
+    : kw=identifierColon stringConst
+      {
+          if ($kw.text != "category:")
+              NotifyErrorListeners("expected 'category:'");
+      }
+    ;
 
 // ─────────────────────────────────────────────────────────────── Comments & Metadata
 // ───────────────────────────────────────────────────────────────
 
-classCommentChunk:
-	className 'comment:' NEW_LINE? stringConst BANG;
+classCommentChunk
+    : { NextMatchesKeyword(2, "comment") }?
+      className kw=identifierColon NEW_LINE? stringConst BANG
+      {
+          if ($kw.text != "comment:")
+              NotifyErrorListeners("expected 'comment:'");
+      }
+    ;
 
-metaclassDefinitionChunk: className CLASS classSlotSpec* BANG;
+metaclassDefinitionChunk
+    : className cls=IDENTIFIER
+      { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
+      classSlotSpec* BANG;
 
-metaclassCommentChunk:
-	className CLASS 'comment:' NEW_LINE? stringConst BANG;
+metaclassCommentChunk
+    : { NextMatchesKeyword(3, "comment") }?
+      className cls=IDENTIFIER
+          { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
+      kw=identifierColon NEW_LINE? stringConst BANG
+      {
+          if ($kw.text != "comment:")
+              NotifyErrorListeners("expected 'comment:'");
+      }
+    ;
 
 // ─────────────────────────────────────────────────────────────── Method Definitions
 // ───────────────────────────────────────────────────────────────
@@ -73,23 +134,28 @@ methodBodyNoBang:
 	statements PERIOD* // REPL-compatible
 	| returnExpr; // ^expr (no bang)
 
-methodCategoryChunk:
-	BANG className (CLASS)? 'methodsFor:' stringConst BANG (
-		methodDef
-	)* BANG;
+methodCategoryChunk
+    : {IsMethodsFor()}?
+      BANG className (cls=IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })?
+      kw=identifierColon stringConst BANG (
+                methodDef
+        )* BANG
+      {
+          if ($kw.text != "methodsFor:")
+              NotifyErrorListeners("expected 'methodsFor:'");
+      }
+    ;
 
-methodHeader:
-        unarySelector
-        | binarySelector formalArg
-        | (IDENTIFIER COLON formalArg)+
-        | ('category:' formalArg)+
-		| ('comment:' formalArg)+
-		;
+methodHeader
+    : unarySelector
+    | binarySelector formalArg
+    | (identifierColon formalArg)+
+    ;
 
 formalArg: argumentName;
 
 temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
-temporaryName: IDENTIFIER | CLASS;
+temporaryName: IDENTIFIER;
 // ─────────────────────────────────────────────────────────────── Statements & Expressions
 // ───────────────────────────────────────────────────────────────
 
@@ -159,6 +225,8 @@ keywordMessage: keywordPart+;
 
 keywordPart: IDENTIFIER COLON expression;
 
+identifierColon: IDENTIFIER COLON;
+
 // ─────────────────────────────────────────────────────────────── Selectors
 // ───────────────────────────────────────────────────────────────
 
@@ -166,13 +234,12 @@ keywordPart: IDENTIFIER COLON expression;
 // the standard library. Supporting identifiers here allows the grammar to parse regular unary
 // method definitions and sends such as `increment` or `yourself`.
 unarySelector:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL;
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL;
 
 binarySelector:
 	// ───────────── Arithmetic Operators ─────────────
@@ -212,18 +279,17 @@ binarySelector:
 primary: literal | variable | block | '(' expression ')';
 
 variable:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL;
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL;
 
 block: '[' blockArgs? blockTemps? statements? ']';
 
 blockArgs: (COLON argumentName)+ PIPE?;
-argumentName: IDENTIFIER | CLASS;
+argumentName: IDENTIFIER;
 
 blockTemps: PIPE temporaryName+ PIPE;
 
@@ -254,13 +320,12 @@ arrayElement: literal | symbolName;
 symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
 symbolName:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL
 	| unarySelector
 	| binarySelector
 	| keywordSymbolSelector;
@@ -273,10 +338,10 @@ keywordSymbolSelector: (IDENTIFIER COLON)+;
 separatorChunk: '--' (~BANG)* BANG;
 className: IDENTIFIER;
 
+
 // ─────────────────────────────────────────────────────────────── Lexer Rules
 // ───────────────────────────────────────────────────────────────
 
-CLASS: 'class';
 
 BANG: '!';
 COLON: ':';
