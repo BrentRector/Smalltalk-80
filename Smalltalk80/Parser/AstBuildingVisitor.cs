@@ -583,13 +583,16 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     ///     Visits a variable reference.
     /// </summary>
     /// <param name="context">The variable context.</param>
-    /// <returns>A <see cref="VariableExpression"/> node.</returns>
+    /// <returns>A <see cref="VariableExpression"/> for identifiers or a
+    /// <see cref="PseudoVariableExpression"/> when the variable is one of the
+    /// pseudo variables <c>self</c>, <c>super</c>, <c>true</c>, <c>false</c> or
+    /// <c>nil</c>.</returns>
     public override object? VisitVariable(Smalltalk80Parser.VariableContext context)
     {
-        if (context.SELF() != null || context.NIL() != null || context.TRUE() != null || context.FALSE() != null)
+        if (context.IDENTIFIER() == null)
             return new PseudoVariableExpression(context.GetText());
 
-        return new VariableExpression(context.IDENTIFIER()?.GetText() ?? context.GetText());
+        return new VariableExpression(context.IDENTIFIER()!.GetText());
     }
 
     /// <summary>
@@ -675,15 +678,10 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     ///     Dispatches to the specific literal type contained in the context.
     /// </summary>
     /// <param name="context">The literal context.</param>
-    /// <returns>The resulting literal expression.</returns>
+    /// <returns>The resulting literal expression. Boolean and <c>nil</c> values
+    /// are handled as pseudo variables and not literals.</returns>
     public override object? VisitLiteral(Smalltalk80Parser.LiteralContext context)
     {
-        if (context.TRUE() != null)
-            return new LiteralExpression(true);
-        if (context.FALSE() != null)
-            return new LiteralExpression(false);
-        if (context.NIL() != null)
-            return new LiteralExpression(null!);
         if (context.stringConst() != null)
             return Visit(context.stringConst());
         if (context.numberLiteral() != null)
