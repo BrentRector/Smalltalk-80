@@ -244,12 +244,7 @@ identifierColon: IDENTIFIER COLON;
 // the standard library. Supporting identifiers here allows the grammar to parse regular unary
 // method definitions and sends such as `increment` or `yourself`.
 unarySelector:
-        IDENTIFIER
-        | SELF
-        | SUPER
-        | TRUE
-        | FALSE
-        | NIL;
+        IDENTIFIER;
 
 binarySelector:
 	// ───────────── Arithmetic Operators ─────────────
@@ -289,11 +284,12 @@ primary: literal | variable | block | '(' expression ')';
 
 variable:
         IDENTIFIER
-        | SELF
-        | SUPER
-        | TRUE
-        | FALSE
-        | NIL;
+        | 'self'		// For now, let's recognize the pseudo variables specially
+        | 'super'
+        | 'true'
+        | 'false'
+        | 'nil'
+		;
 
 block: '[' blockArgs? blockTemps? statements? ']';
 
@@ -308,10 +304,7 @@ literal:
 	| symbolConst
 	| arrayLiteral
 	| byteArrayLiteral
-	| characterLiteral
-	| TRUE
-	| FALSE
-	| NIL;
+	| characterLiteral;
 
 numberLiteral: NUMBER;
 
@@ -330,11 +323,6 @@ symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
 symbolName:
         IDENTIFIER
-        | SELF
-        | SUPER
-        | TRUE
-        | FALSE
-        | NIL
 	| unarySelector
 	| binarySelector
 	| keywordSymbolSelector;
@@ -360,12 +348,6 @@ CARAT: '^';
 PIPE: '|';
 SEMICOLON: ';';
 HASH: '#';
-
-SELF: 'self';
-SUPER: 'super';
-TRUE: 'true';
-FALSE: 'false';
-NIL: 'nil';
 
 PRIMITIVE_DECL:
 	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
