@@ -187,10 +187,15 @@ returnExpr: CARAT expression PERIOD?;
 //The precedence stack:
 /* expression
   → baseExpression
-    → returnExpr | assignmentExpr | messageExpr | comparisonExpr
-      → lowPrecedenceExpr
-        → mediumPrecedenceExpr
-          → highPrecedenceExpr */
+    → returnExpr
+    → assignmentExpr
+    → comparisonExpr
+      → messageExpr
+        → lowPrecedenceExpr
+          → mediumPrecedenceExpr
+            → highPrecedenceExpr
+              → primaryExpr | prefixExpr */
+
 
 // 🔧 expression: full expression, possibly with cascade
 expression: baseExpression (SEMICOLON messagePart)*;
@@ -199,7 +204,6 @@ expression: baseExpression (SEMICOLON messagePart)*;
 baseExpression:
 	returnExpr
 	| assignmentExpr
-	| messageExpr
 	| comparisonExpr;
 
 messagePart: unaryMessage | binaryMessage | keywordMessage;
@@ -207,7 +211,20 @@ messagePart: unaryMessage | binaryMessage | keywordMessage;
 assignmentExpr: lowPrecedenceExpr ASSIGN expression;
 
 comparisonExpr:
-    lowPrecedenceExpr ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ) lowPrecedenceExpr)*;
+    messageExpr ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ) messageExpr)*;
+
+// A message expression consists of a primary receiver followed by zero or more unary, binary, or
+// keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
+// this prototype grammar.
+messageExpr:
+	messageBase (unaryMessage | binaryMessage | keywordMessage)+
+	| messageBase;
+
+messageBase:
+	parenthesizedExpr
+	| returnExpr
+	| assignmentExpr
+	| lowPrecedenceExpr;
 
 lowPrecedenceExpr:
 	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*;
@@ -219,18 +236,8 @@ highPrecedenceExpr: primaryExpr | prefixExpr;
 
 prefixExpr: (MINUS | TILDE) primaryExpr;
 
-messageBase:
-	parenthesizedExpr
-	| returnExpr
-	| assignmentExpr
-	| lowPrecedenceExpr;
 
-// A message expression consists of a primary receiver followed by zero or more unary, binary, or
-// keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
-// this prototype grammar.
-messageExpr:
-	messageBase (unaryMessage | binaryMessage | keywordMessage)+
-	| messageBase;
+
 
 parenthesizedExpr: '(' expression ')';
 
