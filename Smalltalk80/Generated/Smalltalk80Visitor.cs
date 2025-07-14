@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from /workspace/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -237,6 +237,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitComparisonExpr([NotNull] Smalltalk80Parser.ComparisonExprContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.nonKeywordMessageExpr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitNonKeywordMessageExpr([NotNull] Smalltalk80Parser.NonKeywordMessageExprContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageExpr"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -326,12 +332,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitBinarySelector([NotNull] Smalltalk80Parser.BinarySelectorContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primary"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitPrimary([NotNull] Smalltalk80Parser.PrimaryContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.variable"/>.
 	/// </summary>
