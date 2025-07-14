@@ -1,0 +1,1 @@
+MyClass foo comment: 'bad'!

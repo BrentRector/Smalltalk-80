@@ -11,7 +11,7 @@ grammar Smalltalk80;
         if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
             return false;
         index++;
-        if (stream.LA(index) == Smalltalk80Parser.CLASS)
+        if (stream.LA(index) == Smalltalk80Parser.IDENTIFIER && stream.LT(index)!.Text == "class")
             index++;
         if (stream.LA(index) != Smalltalk80Parser.IDENTIFIER)
             return false;
@@ -103,11 +103,16 @@ classCommentChunk
       }
     ;
 
-metaclassDefinitionChunk: className CLASS classSlotSpec* BANG;
+metaclassDefinitionChunk
+    : className cls=IDENTIFIER
+      { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
+      classSlotSpec* BANG;
 
 metaclassCommentChunk
     : { NextMatchesKeyword(3, "comment") }?
-      className CLASS kw=identifierColon NEW_LINE? stringConst BANG
+      className cls=IDENTIFIER
+          { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
+      kw=identifierColon NEW_LINE? stringConst BANG
       {
           if ($kw.text != "comment:")
               NotifyErrorListeners("expected 'comment:'");
@@ -131,7 +136,8 @@ methodBodyNoBang:
 
 methodCategoryChunk
     : {IsMethodsFor()}?
-      BANG className (CLASS)? kw=identifierColon stringConst BANG (
+      BANG className (cls=IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })?
+      kw=identifierColon stringConst BANG (
                 methodDef
         )* BANG
       {
@@ -149,7 +155,7 @@ methodHeader
 formalArg: argumentName;
 
 temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
-temporaryName: IDENTIFIER | CLASS;
+temporaryName: IDENTIFIER;
 // ─────────────────────────────────────────────────────────────── Statements & Expressions
 // ───────────────────────────────────────────────────────────────
 
@@ -228,13 +234,12 @@ identifierColon: IDENTIFIER COLON;
 // the standard library. Supporting identifiers here allows the grammar to parse regular unary
 // method definitions and sends such as `increment` or `yourself`.
 unarySelector:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL;
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL;
 
 binarySelector:
 	// ───────────── Arithmetic Operators ─────────────
@@ -273,18 +278,17 @@ binarySelector:
 primary: literal | variable | block | '(' expression ')';
 
 variable:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL;
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL;
 
 block: '[' blockArgs? blockTemps? statements? ']';
 
 blockArgs: (COLON argumentName)+ PIPE?;
-argumentName: IDENTIFIER | CLASS;
+argumentName: IDENTIFIER;
 
 blockTemps: PIPE temporaryName+ PIPE;
 
@@ -315,13 +319,12 @@ arrayElement: literal | symbolName | '(' arrayElement* ')';
 symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
 symbolName:
-	IDENTIFIER
-	| CLASS
-	| SELF
-	| SUPER
-	| TRUE
-	| FALSE
-	| NIL
+        IDENTIFIER
+        | SELF
+        | SUPER
+        | TRUE
+        | FALSE
+        | NIL
 	| unarySelector
 	| binarySelector
 	| keywordSymbolSelector;
@@ -338,7 +341,6 @@ className: IDENTIFIER;
 // ─────────────────────────────────────────────────────────────── Lexer Rules
 // ───────────────────────────────────────────────────────────────
 
-CLASS: 'class';
 
 BANG: '!';
 COLON: ':';

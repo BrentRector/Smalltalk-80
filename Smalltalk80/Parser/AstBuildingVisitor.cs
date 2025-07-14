@@ -172,7 +172,7 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
     {
         var className = context.className().GetText();
-        var isClassSide = context.CLASS() is not null;
+        var isClassSide = context.cls is not null;
         var category = UnquoteString(context.stringConst().GetText());
 
         var nodes = new List<AstNode>
