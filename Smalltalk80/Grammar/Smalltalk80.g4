@@ -268,8 +268,7 @@ binarySelector:
 	| AT // @
 	| QUESTION // ?
 	| COMMA // ,
-	| AND // and:
-	| OR; // or:
+	;
 
 primary: literal | variable | block | '(' expression ')';
 
@@ -311,7 +310,7 @@ byteArrayLiteral: HASH '[' NUMBER* ']';
 
 arrayLiteral: HASH '(' arrayElement* ')';
 
-arrayElement: literal | symbolName;
+arrayElement: literal | symbolName | '(' arrayElement* ')';
 
 symbolConst: QUOTED_SYMBOL | HASH (symbolName);
 
@@ -371,7 +370,10 @@ COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
 STRING: '\'' ( '\'\'' | ~'\'')* '\''; // single-quote strings
 
 QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
-CHAR_LITERAL: '$' ~[\r\n];
+CHAR_LITERAL
+    : '$!!'   		// Escaped bang: treat $!! as a single $!
+    | '$' ~[\r\n]; 	// Regular character literal
+
 
 BIT_SHIFT_LEFT: '<<';
 BIT_SHIFT_RIGHT: '>>';
@@ -394,8 +396,7 @@ QUESTION: '?';
 BACKSLASH: '\\';
 COMMA: ',';
 BIT_AND: '&';
-AND: 'and:';
-OR: 'or:';
+
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 

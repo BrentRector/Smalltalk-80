@@ -619,7 +619,18 @@ public sealed class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// <param name="context">The character literal context.</param>
     /// <returns>A <see cref="LiteralExpression"/> with the character value.</returns>
     public override object? VisitCharacterLiteral(Smalltalk80Parser.CharacterLiteralContext context)
-        => new LiteralExpression(context.CHAR_LITERAL().GetText()[1]);
+    {
+        var text = context.CHAR_LITERAL().GetText();
+
+        if (text == "$!!")
+            return new LiteralExpression('!');
+
+        if (text.Length == 2)
+            return new LiteralExpression(text[1]);
+
+        throw new InvalidOperationException($"Invalid CHAR_LITERAL: {text}");
+    }
+
 
     /// <summary>
     ///     Processes a symbol constant.
