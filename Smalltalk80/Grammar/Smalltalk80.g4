@@ -26,6 +26,15 @@ grammar Smalltalk80;
             && stream.LA(offset + 1) == Smalltalk80Parser.COLON
             && stream.LT(offset)!.Text == keyword;
     }
+
+    private bool LooksLikeMetaclassDef()
+    {
+        var stream = TokenStream;
+        return stream.LA(1) == Smalltalk80Parser.IDENTIFIER
+            && stream.LA(2) == Smalltalk80Parser.IDENTIFIER
+            && stream.LA(3) == Smalltalk80Parser.IDENTIFIER
+            && stream.LA(4) == Smalltalk80Parser.COLON;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────── Entry Points
@@ -104,9 +113,10 @@ classCommentChunk
     ;
 
 metaclassDefinitionChunk
-    : className cls=IDENTIFIER
-      { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
-      classSlotSpec* BANG;
+    : { LooksLikeMetaclassDef() }?
+      className cls=IDENTIFIER
+          { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
+      classSlotSpec+ BANG;
 
 metaclassCommentChunk
     : { NextMatchesKeyword(3, "comment") }?
