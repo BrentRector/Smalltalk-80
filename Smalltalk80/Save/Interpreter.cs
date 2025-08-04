@@ -171,6 +171,50 @@ public class Interpreter
     }
 
     /// <summary>
+    ///     Sets up the interpreter's active context for method execution.
+    ///     Used by execution testing infrastructure.
+    /// </summary>
+    /// <param name="receiver">The object receiving the message.</param>
+    /// <param name="method">The compiled method to execute.</param>
+    /// <param name="arguments">Optional arguments to the method.</param>
+    public void SetActiveContext(SmalltalkObject receiver, CompiledMethod method, params object[] arguments)
+    {
+        var temps = new object?[method.TemporariesCount];
+
+        // Copy arguments into temporary array
+        for (int i = 0; i < arguments.Length && i < temps.Length; i++)
+        {
+            temps[i] = arguments[i];
+        }
+
+        currentContext = new MethodContext
+        {
+            Sender = null,
+            Method = method,
+            Receiver = receiver,
+            Arguments = arguments,
+            Temporaries = temps,
+            Stack = new Stack<object?>(),
+            PC = 0
+        };
+    }
+
+    /// <summary>
+    ///     Executes the currently active context method and returns the result.
+    ///     Used by execution testing infrastructure.
+    /// </summary>
+    /// <returns>The value returned by the method execution.</returns>
+    public object? ExecuteMethod()
+    {
+        var previousExit = ExitOnReturn;
+        ExitOnReturn = false;
+        LastResult = null;
+        Execute();
+        ExitOnReturn = previousExit;
+        return LastResult;
+    }
+
+    /// <summary>
     ///     Handles the given bytecode in the context of the running method.
     /// </summary>
     /// <param name="bytecode">The bytecode to execute.</param>
@@ -785,7 +829,58 @@ public class Interpreter
             return;
         }
 
+        // Handle .NET primitive types by mapping them to Smalltalk classes
+        var primitiveClass = GetClassForPrimitive(receiver);
+        if (primitiveClass != null)
+        {
+            // Perform method lookup on the mapped Smalltalk class
+            var method = primitiveClass.Lookup(selector);
+            if (method == null)
+                throw new InvalidOperationException($"Method {selector} not found on primitive type");
+
+            // Execute primitive method directly
+            if (method.HasPrimitive)
+            {
+                currentContext.Stack.Push(receiver);
+                foreach (var arg in arguments)
+                {
+                    currentContext.Stack.Push(arg);
+                }
+
+                if (Primitives.Execute(method.PrimitiveIndex, currentContext))
+                {
+                    return;
+                }
+
+                // If primitive failed, fall through to normal method execution
+                for (int i = 0; i <= argCount; i++)
+                {
+                    _ = currentContext.Stack.Pop();
+                }
+            }
+
+            // For now, we'll just handle primitive methods for primitive types
+            throw new InvalidOperationException($"Non-primitive method {selector} not supported on primitive type {receiver?.GetType().Name}");
+        }
+
         throw new InvalidOperationException($"Cannot send {selector} to {receiver}");
+    }
+
+    /// <summary>
+    /// Maps .NET primitive types to their corresponding Smalltalk classes.
+    /// </summary>
+    /// <param name="primitive">The .NET primitive object.</param>
+    /// <returns>The corresponding Smalltalk class, or null if no mapping exists.</returns>
+    private static SmalltalkClass? GetClassForPrimitive(object? primitive)
+    {
+        return primitive switch
+        {
+            int => SystemDictionary.TryGetClass("SmallInteger", out var intClass) ? intClass : null,
+            bool => SystemDictionary.TryGetClass("Boolean", out var boolClass) ? boolClass : null,
+            string => SystemDictionary.TryGetClass("String", out var stringClass) ? stringClass : null,
+            float or double => SystemDictionary.TryGetClass("Float", out var floatClass) ? floatClass : null,
+            _ => null
+        };
     }
 
     /// <summary>

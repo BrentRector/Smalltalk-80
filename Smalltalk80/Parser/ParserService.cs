@@ -82,7 +82,7 @@ public static class ParserService
         // Parse primitive declaration
         bool hasPrimitive = primitiveCtx != null;
         int primitiveIndex = 0;
-        if (hasPrimitive)
+        if (hasPrimitive && primitiveCtx != null)
         {
             var primitiveText = primitiveCtx.GetText();
             var match = System.Text.RegularExpressions.Regex.Match(primitiveText, @"<primitive:\s*(\d+)>");
