@@ -133,15 +133,10 @@ public static class AstMethodCompiler
                 case KeywordSendExpression kw:
                     if (kw.Receiver == null)
                     {
-                        // Handle standalone keyword sends - they implicitly send to 'self'
-                        // This commonly occurs with ifTrue:ifFalse: constructs
-                        Console.WriteLine($"[DEBUG] KeywordSendExpression has null Receiver for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())} - using 'self' as receiver");
-                        EmitPseudoVariable("self");
+                        throw new InvalidOperationException($"KeywordSendExpression has null Receiver for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())}. This indicates a parser error - keyword messages must have a receiver.");
                     }
-                    else
-                    {
-                        CompileExpression(kw.Receiver);
-                    }
+
+                    CompileExpression(kw.Receiver);
 
                     if (kw.Arguments == null)
                         throw new InvalidOperationException($"KeywordSendExpression has null Arguments for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())}");

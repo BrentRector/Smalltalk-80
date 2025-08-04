@@ -100,14 +100,23 @@ public class Interpreter
     public void Execute()
     {
         IsRunning = true;
-        while (IsRunning)
+        try
         {
-            // Check for process switches at the start of each cycle
-            // as specified in the Smalltalk-80 interpreter specification
-            Scheduler?.CheckProcessSwitch();
+            while (IsRunning)
+            {
+                // Check for process switches at the start of each cycle
+                // as specified in the Smalltalk-80 interpreter specification
+                Scheduler?.CheckProcessSwitch();
 
-            var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
-            Dispatch(opcode);
+                var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
+                Dispatch(opcode);
+            }
+        }
+        catch (NonLocalReturnException ex)
+        {
+            // Handle non-local returns by setting the result and stopping execution
+            LastResult = ex.ReturnValue;
+            IsRunning = false;
         }
     }
 

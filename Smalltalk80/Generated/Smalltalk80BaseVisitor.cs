@@ -386,7 +386,7 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <return>The visitor result.</return>
 	public virtual Result VisitMessageBase([NotNull] Smalltalk80Parser.MessageBaseContext context) { return VisitChildren(context); }
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryExpr"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.negativeNumber"/>.
 	/// <para>
 	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
 	/// on <paramref name="context"/>.
@@ -394,7 +394,7 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	public virtual Result VisitUnaryExpr([NotNull] Smalltalk80Parser.UnaryExprContext context) { return VisitChildren(context); }
+	public virtual Result VisitNegativeNumber([NotNull] Smalltalk80Parser.NegativeNumberContext context) { return VisitChildren(context); }
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messagePart"/>.
 	/// <para>
@@ -445,6 +445,16 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	public virtual Result VisitKeywordPart([NotNull] Smalltalk80Parser.KeywordPartContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.nonKeywordExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitNonKeywordExpr([NotNull] Smalltalk80Parser.NonKeywordExprContext context) { return VisitChildren(context); }
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.block"/>.
 	/// <para>

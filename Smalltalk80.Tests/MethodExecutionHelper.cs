@@ -28,6 +28,9 @@ public class MethodExecutionHelper
     /// <returns>The result of method execution.</returns>
     public object? CompileAndExecute(string methodSource, SmalltalkObject? receiver = null, params object[] arguments)
     {
+        // Ensure standard library is loaded by creating a VirtualMachine instance
+        var vm = new VirtualMachine();
+
         // Create a minimal receiver if none provided
         if (receiver == null)
         {
@@ -35,9 +38,16 @@ public class MethodExecutionHelper
             receiver = new SmalltalkObject(objectClass, 0);
         }
 
+        // Convert .NET primitive arguments to Smalltalk objects
+        var convertedArguments = new object[arguments.Length];
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            convertedArguments[i] = ConvertToSmalltalkObject(arguments[i]);
+        }
+
         // Generate argument names for the method
         var argumentNames = new List<string>();
-        for (int i = 0; i < arguments.Length; i++)
+        for (int i = 0; i < convertedArguments.Length; i++)
         {
             argumentNames.Add($"arg{i}");
         }
@@ -48,12 +58,87 @@ public class MethodExecutionHelper
         var method = parser.ParseMethod(argumentNames, instanceVars);
 
         // Execute the method
-        var interpreter = new Interpreter();
-        interpreter.SetActiveContext(receiver, method, arguments);
+        var interpreter = vm.Interpreter;
+        interpreter.SetActiveContext(receiver, method, convertedArguments);
         var result = interpreter.ExecuteMethod();
 
-        output.WriteLine($"Method executed successfully. Result: {result}");
-        return result;
+        // Convert SmalltalkObject strings back to .NET strings for test compatibility
+        var convertedResult = ConvertFromSmalltalkObject(result);
+
+        output.WriteLine($"Method executed successfully. Result: {convertedResult} (original: {result})");
+        if (result is SmalltalkObject obj)
+        {
+            output.WriteLine($"  SmalltalkObject details: ClassPointer={obj.ClassPointer?.Category}, Fields.Length={obj.Fields.Length}, Oop={obj.Oop}");
+            if (obj.Fields.Length > 0)
+            {
+                output.WriteLine($"  Fields[0]: {obj.Fields[0]}");
+            }
+        }
+        return convertedResult;
+    }
+
+    /// <summary>
+    /// Converts .NET primitive values to their corresponding Smalltalk objects.
+    /// </summary>
+    private object ConvertToSmalltalkObject(object value)
+    {
+        switch (value)
+        {
+            case bool b:
+                var className = b ? "True" : "False";
+                var result = GetSmalltalkObject(className);
+                return result;
+            case int i:
+                return i; // SmallIntegers are handled specially by the interpreter
+            case string s:
+                return s; // Strings will need String class implementation later
+            default:
+                return value;
+        }
+    }
+
+    /// <summary>
+    /// Converts Smalltalk objects back to .NET primitive values for test compatibility.
+    /// </summary>
+    private object? ConvertFromSmalltalkObject(object? value)
+    {
+        switch (value)
+        {
+            case SmalltalkObject obj:
+                // Check if this is a string object by looking at class structure
+                // String objects are typically created via the String class from SystemDictionary
+                if (SystemDictionary.TryGetClass("String", out var stringClass) &&
+                    obj.ClassPointer == stringClass &&
+                    obj.Fields.Length > 0)
+                {
+                    // String objects store their content in Fields[0]
+                    return obj.Fields[0]?.ToString();
+                }
+                // Check for boolean objects
+                if (SystemDictionary.TryGetClass("True", out var trueClass) && obj.ClassPointer == trueClass)
+                {
+                    return true;
+                }
+                if (SystemDictionary.TryGetClass("False", out var falseClass) && obj.ClassPointer == falseClass)
+                {
+                    return false;
+                }
+                return value;
+            default:
+                return value;
+        }
+    }
+
+    /// <summary>
+    /// Gets a Smalltalk object instance of the specified class.
+    /// </summary>
+    private SmalltalkObject GetSmalltalkObject(string className)
+    {
+        if (SystemDictionary.TryGetClass(className, out var cls))
+        {
+            return new SmalltalkObject(cls, 0);
+        }
+        throw new InvalidOperationException($"Class {className} not found in system dictionary");
     }
 
     /// <summary>

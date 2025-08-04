@@ -106,7 +106,7 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
                 foreach (var keywordPart in keyword.keywordPart())
                 {
                     parts.Add(keywordPart.IDENTIFIER().GetText() + ":");
-                    arguments.Add((ExpressionNode)Visit(keywordPart.messageExpr())!);
+                    arguments.Add((ExpressionNode)Visit(keywordPart.nonKeywordExpr())!);
                 }
 
                 current = new KeywordSendExpression(current, parts, arguments);
@@ -129,6 +129,8 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             return Visit(context.literal());
         if (context.variable() != null)
             return Visit(context.variable());
+        if (context.negativeNumber() != null)
+            return Visit(context.negativeNumber());
 
         throw new InvalidOperationException("Unknown message base type");
     }
@@ -184,6 +186,22 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         {
             return new LiteralExpression(int.Parse(text));
         }
+    }
+
+    /// <summary>
+    /// Visit a negative number context.
+    /// </summary>
+    public override object? VisitNegativeNumber(Smalltalk80Parser.NegativeNumberContext context)
+    {
+        var innerExpression = Visit(context.messageBase());
+        if (innerExpression is LiteralExpression literal)
+        {
+            if (literal.Value is int intValue)
+                return new LiteralExpression(-intValue);
+            if (literal.Value is double doubleValue)
+                return new LiteralExpression(-doubleValue);
+        }
+        throw new InvalidOperationException("Negative number must be applied to a numeric literal");
     }
 
     /// <summary>
@@ -245,5 +263,33 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             statements.Add((StatementNode)Visit(stmt)!);
         }
         return statements;
+    }
+
+    /// <summary>
+    /// Visit a non-keyword expression context (used in keyword arguments).
+    /// </summary>
+    public override object? VisitNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext context)
+    {
+        // Start with the message base
+        var current = (ExpressionNode)Visit(context.messageBase())!;
+
+        // Apply unary and binary messages in order
+        for (int i = 1; i < context.ChildCount; i++)
+        {
+            var child = context.GetChild(i);
+            if (child is Smalltalk80Parser.UnaryMessageContext unary)
+            {
+                var selector = unary.unarySelector().GetText();
+                current = new UnarySendExpression(current, selector);
+            }
+            else if (child is Smalltalk80Parser.BinaryMessageContext binary)
+            {
+                var selector = binary.binarySelector().GetText();
+                var argument = (ExpressionNode)Visit(binary.messageBase())!;
+                current = new BinarySendExpression(current, selector, argument);
+            }
+        }
+
+        return current;
     }
 }

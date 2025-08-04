@@ -243,11 +243,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMessageBase([NotNull] Smalltalk80Parser.MessageBaseContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryExpr"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.negativeNumber"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitUnaryExpr([NotNull] Smalltalk80Parser.UnaryExprContext context);
+	Result VisitNegativeNumber([NotNull] Smalltalk80Parser.NegativeNumberContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messagePart"/>.
 	/// </summary>
@@ -278,6 +278,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitKeywordPart([NotNull] Smalltalk80Parser.KeywordPartContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.nonKeywordExpr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitNonKeywordExpr([NotNull] Smalltalk80Parser.NonKeywordExprContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.block"/>.
 	/// </summary>

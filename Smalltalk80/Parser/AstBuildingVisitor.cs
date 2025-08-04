@@ -98,6 +98,7 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         for (int i = 0; i < context.ChildCount; i++)
         {
             var child = context.GetChild(i);
+
             if (child is Smalltalk80Parser.UnaryMessageContext unary)
             {
                 var selector = unary.unarySelector().GetText();
@@ -111,16 +112,64 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             }
             else if (child is Smalltalk80Parser.KeywordMessageContext keyword)
             {
-                var parts = new List<string>();
-                var arguments = new List<ExpressionNode>();
+                // Collect all consecutive keyword messages into a single message
+                var allParts = new List<string>();
+                var allArguments = new List<ExpressionNode>();
 
+                // Process current keyword message
                 foreach (var keywordPart in keyword.keywordPart())
                 {
-                    parts.Add(keywordPart.IDENTIFIER().GetText() + ":");
-                    arguments.Add((ExpressionNode)Visit(keywordPart.messageExpr())!);
+                    var part = keywordPart.IDENTIFIER().GetText() + ":";
+                    allParts.Add(part);
+                    allArguments.Add((ExpressionNode)Visit(keywordPart.nonKeywordExpr())!);
                 }
 
-                current = new KeywordSendExpression(current, parts, arguments);
+                // Look ahead for consecutive keyword messages
+                int j = i + 1;
+                while (j < context.ChildCount && context.GetChild(j) is Smalltalk80Parser.KeywordMessageContext nextKeyword)
+                {
+                    foreach (var keywordPart in nextKeyword.keywordPart())
+                    {
+                        var part = keywordPart.IDENTIFIER().GetText() + ":";
+                        allParts.Add(part);
+                        allArguments.Add((ExpressionNode)Visit(keywordPart.nonKeywordExpr())!);
+                    }
+                    j++;
+                }
+
+                // Create a single keyword expression with all parts
+                current = new KeywordSendExpression(current, allParts, allArguments);
+
+                // Skip the processed keyword messages
+                i = j - 1;
+            }
+        }
+
+        return current;
+    }
+
+    /// <summary>
+    /// Visit a non-keyword expression context (used in keyword arguments).
+    /// </summary>
+    public override object? VisitNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext context)
+    {
+        // Start with the message base
+        var current = (ExpressionNode)Visit(context.messageBase())!;
+
+        // Apply unary and binary messages in order
+        for (int i = 1; i < context.ChildCount; i++)
+        {
+            var child = context.GetChild(i);
+            if (child is Smalltalk80Parser.UnaryMessageContext unary)
+            {
+                var selector = unary.unarySelector().GetText();
+                current = new UnarySendExpression(current, selector);
+            }
+            else if (child is Smalltalk80Parser.BinaryMessageContext binary)
+            {
+                var selector = binary.binarySelector().GetText();
+                var argument = (ExpressionNode)Visit(binary.messageBase())!;
+                current = new BinarySendExpression(current, selector, argument);
             }
         }
 
@@ -140,6 +189,8 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             return Visit(context.literal());
         if (context.variable() != null)
             return Visit(context.variable());
+        if (context.negativeNumber() != null)
+            return Visit(context.negativeNumber());
 
         throw new InvalidOperationException("Unknown message base type");
     }
@@ -278,5 +329,62 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
 
         return new SequenceNode(temporaries, statements);
+    }
+
+    /// <summary>
+    /// Visit a block context.
+    /// </summary>
+    public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
+    {
+        var parameters = new List<string>();
+
+        // Extract block arguments if present
+        if (context.blockArgs() != null)
+        {
+            foreach (var arg in context.blockArgs().argumentName())
+            {
+                parameters.Add(arg.GetText());
+            }
+        }
+
+        // Extract block temporaries if present
+        var temporaries = new List<string>();
+        if (context.blockTemps() != null)
+        {
+            foreach (var temp in context.blockTemps().temporaryName())
+            {
+                temporaries.Add(temp.GetText());
+            }
+        }
+
+        // Create block body - if no statements, create empty sequence
+        SequenceNode body;
+        if (context.statements() != null)
+        {
+            var statements = (List<StatementNode>)Visit(context.statements())!;
+            body = new SequenceNode(temporaries, statements);
+        }
+        else
+        {
+            body = new SequenceNode(temporaries, new List<StatementNode>());
+        }
+
+        return new BlockExpression(parameters, body);
+    }
+
+    /// <summary>
+    /// Visit a negative number context.
+    /// </summary>
+    public override object? VisitNegativeNumber(Smalltalk80Parser.NegativeNumberContext context)
+    {
+        var innerExpression = Visit(context.messageBase());
+        if (innerExpression is LiteralExpression literal)
+        {
+            if (literal.Value is int intValue)
+                return new LiteralExpression(-intValue);
+            if (literal.Value is double doubleValue)
+                return new LiteralExpression(-doubleValue);
+        }
+        throw new InvalidOperationException("Negative number must be applied to a numeric literal");
     }
 }

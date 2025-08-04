@@ -173,16 +173,17 @@ cascadeExpr: messageExpr (SEMICOLON messagePart)*; // cascades
 ////
 // / Message expression //
 messageExpr:
-	messageBase (unaryMessage | binaryMessage | keywordMessage)*;
+	messageBase (unaryMessage | binaryMessage)* keywordMessage?
+	| messageBase (unaryMessage | binaryMessage)*;
 
 messageBase:
 	parenthesizedExpr
 	| block
 	| literal
 	| variable
-	| unaryExpr;
+	| negativeNumber;
 
-unaryExpr: MINUS messageBase;
+negativeNumber: MINUS messageBase;
 
 messagePart: unaryMessage | binaryMessage | keywordMessage;
 
@@ -194,7 +195,10 @@ binaryMessage: binarySelector messageBase;
 
 keywordMessage: keywordPart+;
 
-keywordPart: IDENTIFIER COLON messageExpr;
+keywordPart: IDENTIFIER COLON nonKeywordExpr;
+
+// Non-keyword expressions (for keyword arguments) - no keyword messages allowed
+nonKeywordExpr: messageBase (unaryMessage | binaryMessage)*;
 
 ////
 // / Blocks and Primary Expressions //
