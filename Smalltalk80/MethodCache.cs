@@ -44,8 +44,8 @@ public class MethodCache
         int index = HashFunction(receiverClass, selector);
         ref var entry = ref cache[index];
 
-        if (entry.IsValid && 
-            ReferenceEquals(entry.Class, receiverClass) && 
+        if (entry.IsValid &&
+            ReferenceEquals(entry.Class, receiverClass) &&
             ReferenceEquals(entry.Selector, selector))
         {
             Hits++;

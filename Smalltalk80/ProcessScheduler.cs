@@ -32,12 +32,12 @@ public class ProcessScheduler
         // 1. Check if higher priority processes are ready
         // 2. Check if current process time slice expired
         // 3. Perform context switch if needed
-        
+
         if (ActiveProcess == null)
         {
             ActiveProcess = GetNextRunnableProcess();
         }
-        
+
         // Time slice management and priority checking would go here
     }
 
@@ -51,7 +51,7 @@ public class ProcessScheduler
         {
             processQueues[process.Priority] = new Queue<Process>();
         }
-        
+
         processQueues[process.Priority].Enqueue(process);
     }
 

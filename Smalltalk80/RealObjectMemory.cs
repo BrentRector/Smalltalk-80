@@ -32,7 +32,7 @@ public class RealObjectMemory
     public int CreateObject(SmalltalkClass classPointer, int fieldCount)
     {
         int objectPointer;
-        
+
         if (freeObjects.Count > 0)
         {
             objectPointer = freeObjects.Pop();
@@ -67,7 +67,7 @@ public class RealObjectMemory
     {
         if (objectPointer < 0 || objectPointer >= heap.Count)
             throw new ArgumentOutOfRangeException(nameof(objectPointer));
-            
+
         return heap[objectPointer];
     }
 
@@ -82,7 +82,7 @@ public class RealObjectMemory
         var obj = GetObject(objectPointer);
         if (fieldIndex < 0 || fieldIndex >= obj.Fields.Length)
             throw new ArgumentOutOfRangeException(nameof(fieldIndex));
-            
+
         return obj.Fields[fieldIndex];
     }
 
@@ -139,7 +139,7 @@ public class RealObjectMemory
             return;
 
         referenceCounts[objectPointer]--;
-        
+
         if (referenceCounts[objectPointer] <= 0)
         {
             DeallocateObject(objectPointer);
@@ -153,7 +153,7 @@ public class RealObjectMemory
     private void DeallocateObject(int objectPointer)
     {
         var obj = GetObject(objectPointer);
-        
+
         // Decrement reference counts for all field values
         foreach (var field in obj.Fields)
         {
@@ -177,7 +177,7 @@ public class RealObjectMemory
         // Mark phase: mark all reachable objects
         var marked = new HashSet<int>();
         var roots = GetRootObjects();
-        
+
         foreach (var root in roots)
         {
             MarkObject(root, marked);

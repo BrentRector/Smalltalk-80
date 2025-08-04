@@ -100,11 +100,12 @@ public class Interpreter
     public void Execute()
     {
         IsRunning = true;
-        while (IsRunning) {
+        while (IsRunning)
+        {
             // Check for process switches at the start of each cycle
             // as specified in the Smalltalk-80 interpreter specification
             Scheduler?.CheckProcessSwitch();
-            
+
             var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
             Dispatch(opcode);
         }
@@ -176,27 +177,40 @@ public class Interpreter
     public void Dispatch(Bytecode bytecode)
     {
         Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
-        if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15) {
+        if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15)
+        {
             int index = (int)bytecode - (int)Bytecode.PushReceiverVariable0;
             currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
-        } else if (bytecode >= Bytecode.PushTemporaryVariable0 && bytecode <= Bytecode.PushTemporaryVariable15) {
+        }
+        else if (bytecode >= Bytecode.PushTemporaryVariable0 && bytecode <= Bytecode.PushTemporaryVariable15)
+        {
             int index = (int)bytecode - (int)Bytecode.PushTemporaryVariable0;
             currentContext.Stack.Push(currentContext.Temporaries[index]);
-        } else if (bytecode >= Bytecode.PushLiteralConstant0 && bytecode <= Bytecode.PushLiteralConstant31) {
+        }
+        else if (bytecode >= Bytecode.PushLiteralConstant0 && bytecode <= Bytecode.PushLiteralConstant31)
+        {
             int index = (int)bytecode - (int)Bytecode.PushLiteralConstant0;
             currentContext.Stack.Push(currentContext.Method.Literals[index]);
-        } else if (bytecode >= Bytecode.PushLiteralVariable0 && bytecode <= Bytecode.PushLiteralVariable31) {
+        }
+        else if (bytecode >= Bytecode.PushLiteralVariable0 && bytecode <= Bytecode.PushLiteralVariable31)
+        {
             int index = (int)bytecode - (int)Bytecode.PushLiteralVariable0;
             var assoc = (Association)currentContext.Method.Literals[index]!;
             currentContext.Stack.Push(assoc.Value);
-        } else if (bytecode >= Bytecode.StoreAndPopReceiverVariable0 && bytecode <= Bytecode.StoreAndPopReceiverVariable7) {
+        }
+        else if (bytecode >= Bytecode.StoreAndPopReceiverVariable0 && bytecode <= Bytecode.StoreAndPopReceiverVariable7)
+        {
             int index = (int)bytecode - (int)Bytecode.StoreAndPopReceiverVariable0;
             currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
-        } else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7) {
+        }
+        else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7)
+        {
             int index = (int)bytecode - (int)Bytecode.StoreAndPopTemporaryVariable0;
             currentContext.Temporaries[index] = currentContext.Stack.Pop()!;
-        } else if ((bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) ||
-                   (bytecode >= Bytecode.PushThree && bytecode <= Bytecode.PushTen)) {
+        }
+        else if ((bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) ||
+                   (bytecode >= Bytecode.PushThree && bytecode <= Bytecode.PushTen))
+        {
             object? constant = bytecode switch
             {
                 Bytecode.PushSelf => currentContext.Receiver,
@@ -218,7 +232,9 @@ public class Interpreter
                 _ => null
             };
             currentContext.Stack.Push(constant);
-        } else if (bytecode >= Bytecode.ReturnSelf && bytecode <= Bytecode.ReturnNil) {
+        }
+        else if (bytecode >= Bytecode.ReturnSelf && bytecode <= Bytecode.ReturnNil)
+        {
             object? value = bytecode switch
             {
                 Bytecode.ReturnSelf => currentContext.Receiver,
@@ -228,142 +244,206 @@ public class Interpreter
                 _ => null
             };
             HandleReturn(value!);
-        } else if (bytecode == Bytecode.ReturnTopFromMethod) {
+        }
+        else if (bytecode == Bytecode.ReturnTopFromMethod)
+        {
             var returnValue = currentContext.Stack.Count > 0
                 ? currentContext.Stack.Pop()
                 : currentContext.Receiver;
             HandleReturn(returnValue!);
-        } else if (bytecode == Bytecode.ReturnTopFromBlock) {
+        }
+        else if (bytecode == Bytecode.ReturnTopFromBlock)
+        {
             var returnValue = currentContext.Stack.Count > 0
                 ? currentContext.Stack.Pop()
                 : currentContext.Receiver;
             HandleBlockReturn(returnValue!);
-        } else if (bytecode == Bytecode.ExtendedStore) {
+        }
+        else if (bytecode == Bytecode.ExtendedStore)
+        {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             HandleExtendedStore(descriptor, false);
-        } else if (bytecode == Bytecode.ExtendedStoreAndPop) {
+        }
+        else if (bytecode == Bytecode.ExtendedStoreAndPop)
+        {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             HandleExtendedStore(descriptor, true);
-        } else if (bytecode == Bytecode.SingleExtendedSend) {
+        }
+        else if (bytecode == Bytecode.SingleExtendedSend)
+        {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             int argCount = descriptor >> 5;
             int selectorIndex = descriptor & 0x1F;
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, argCount, false);
-        } else if (bytecode == Bytecode.DoubleExtendedSend) {
+        }
+        else if (bytecode == Bytecode.DoubleExtendedSend)
+        {
             int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
             int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, argCount, false);
-        } else if (bytecode == Bytecode.SingleExtendedSuper) {
+        }
+        else if (bytecode == Bytecode.SingleExtendedSuper)
+        {
             byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
             int argCount = descriptor >> 5;
             int selectorIndex = descriptor & 0x1F;
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, argCount, true);
-        } else if (bytecode == Bytecode.DoubleExtendedSuper) {
+        }
+        else if (bytecode == Bytecode.DoubleExtendedSuper)
+        {
             int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
             int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, argCount, true);
-        } else if (bytecode == Bytecode.PopStack) {
+        }
+        else if (bytecode == Bytecode.PopStack)
+        {
             _ = currentContext.Stack.Pop();
-        } else if (bytecode == Bytecode.DuplicateTop) {
+        }
+        else if (bytecode == Bytecode.DuplicateTop)
+        {
             var top = currentContext.Stack.Peek();
             currentContext.Stack.Push(top);
-        } else if (bytecode == Bytecode.PushActiveContext) {
+        }
+        else if (bytecode == Bytecode.PushActiveContext)
+        {
             currentContext.Stack.Push(currentContext);
-        } else if (bytecode == Bytecode.JumpShort) {
+        }
+        else if (bytecode == Bytecode.JumpShort)
+        {
             var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
             currentContext.PC += offset;
-        } else if (bytecode == Bytecode.JumpLong) {
+        }
+        else if (bytecode == Bytecode.JumpLong)
+        {
             byte high = currentContext.Method.Bytecodes[currentContext.PC++];
             byte low = currentContext.Method.Bytecodes[currentContext.PC++];
             short offset = (short)((high << 8) | low);
             currentContext.PC += offset;
-        } else if (bytecode == Bytecode.JumpIfFalseShort) {
+        }
+        else if (bytecode == Bytecode.JumpIfFalseShort)
+        {
             var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b) {
+            if (condObj is bool b && !b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode == Bytecode.JumpIfFalseLong) {
+        }
+        else if (bytecode == Bytecode.JumpIfFalseLong)
+        {
             byte high = currentContext.Method.Bytecodes[currentContext.PC++];
             byte low = currentContext.Method.Bytecodes[currentContext.PC++];
             short offset = (short)((high << 8) | low);
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b) {
+            if (condObj is bool b && !b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode == Bytecode.JumpIfTrueShort) {
+        }
+        else if (bytecode == Bytecode.JumpIfTrueShort)
+        {
             var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b) {
+            if (condObj is bool b && b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode == Bytecode.JumpIfTrueLong) {
+        }
+        else if (bytecode == Bytecode.JumpIfTrueLong)
+        {
             byte high = currentContext.Method.Bytecodes[currentContext.PC++];
             byte low = currentContext.Method.Bytecodes[currentContext.PC++];
             short offset = (short)((high << 8) | low);
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b) {
+            if (condObj is bool b && b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode >= Bytecode.PopJumpFalseShort1 && bytecode <= Bytecode.PopJumpFalseShort8) {
+        }
+        else if (bytecode >= Bytecode.PopJumpFalseShort1 && bytecode <= Bytecode.PopJumpFalseShort8)
+        {
             int offset = (int)bytecode - (int)Bytecode.PopJumpFalseShort1 + 1;
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b) {
+            if (condObj is bool b && !b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode >= Bytecode.LongJump0 && bytecode <= Bytecode.LongJump7) {
+        }
+        else if (bytecode >= Bytecode.LongJump0 && bytecode <= Bytecode.LongJump7)
+        {
             int high = ((int)bytecode - (int)Bytecode.LongJump0) << 8;
             int low = currentContext.Method.Bytecodes[currentContext.PC++];
             int raw = high | low;
-            if ((raw & 0x400) != 0) {
+            if ((raw & 0x400) != 0)
+            {
                 raw |= unchecked((int)0xFFFFF800);
             }
             currentContext.PC += raw;
-        } else if (bytecode >= Bytecode.PopJumpTrueLong0 && bytecode <= Bytecode.PopJumpTrueLong3) {
+        }
+        else if (bytecode >= Bytecode.PopJumpTrueLong0 && bytecode <= Bytecode.PopJumpTrueLong3)
+        {
             int high = ((int)bytecode - (int)Bytecode.PopJumpTrueLong0) << 8;
             int low = currentContext.Method.Bytecodes[currentContext.PC++];
             int offset = high | low;
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b) {
+            if (condObj is bool b && b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode >= Bytecode.PopJumpFalseLong0 && bytecode <= Bytecode.PopJumpFalseLong3) {
+        }
+        else if (bytecode >= Bytecode.PopJumpFalseLong0 && bytecode <= Bytecode.PopJumpFalseLong3)
+        {
             int high = ((int)bytecode - (int)Bytecode.PopJumpFalseLong0) << 8;
             int low = currentContext.Method.Bytecodes[currentContext.PC++];
             int offset = high | low;
             var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b) {
+            if (condObj is bool b && !b)
+            {
                 currentContext.PC += offset;
             }
-        } else if (bytecode >= Bytecode.SendArithmeticSelector0 && bytecode <= Bytecode.SendArithmeticSelector15) {
+        }
+        else if (bytecode >= Bytecode.SendArithmeticSelector0 && bytecode <= Bytecode.SendArithmeticSelector15)
+        {
             int index = (int)bytecode - (int)Bytecode.SendArithmeticSelector0;
             var selector = SpecialSelectors[index];
             int argCount = SpecialSelectorArgCounts[index];
             PerformSend(selector, argCount, false);
-        } else if (bytecode >= Bytecode.SendSpecialSelector0 && bytecode <= Bytecode.SendSpecialSelector15) {
+        }
+        else if (bytecode >= Bytecode.SendSpecialSelector0 && bytecode <= Bytecode.SendSpecialSelector15)
+        {
             int index = (int)bytecode - (int)Bytecode.SendSpecialSelector0 + 16;
             var selector = SpecialSelectors[index];
             int argCount = SpecialSelectorArgCounts[index];
             PerformSend(selector, argCount, false);
-        } else if (bytecode >= Bytecode.SendLiteral0Args0 && bytecode <= Bytecode.SendLiteral0Args15) {
+        }
+        else if (bytecode >= Bytecode.SendLiteral0Args0 && bytecode <= Bytecode.SendLiteral0Args15)
+        {
             int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral0Args0;
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, 0, false);
-        } else if (bytecode >= Bytecode.SendLiteral1Arg0 && bytecode <= Bytecode.SendLiteral1Arg15) {
+        }
+        else if (bytecode >= Bytecode.SendLiteral1Arg0 && bytecode <= Bytecode.SendLiteral1Arg15)
+        {
             int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral1Arg0;
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, 1, false);
-        } else if (bytecode >= Bytecode.SendLiteral2Args0 && bytecode <= Bytecode.SendLiteral2Args15) {
+        }
+        else if (bytecode >= Bytecode.SendLiteral2Args0 && bytecode <= Bytecode.SendLiteral2Args15)
+        {
             int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral2Args0;
             var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
             PerformSend(selector, 2, false);
-        } else if ((byte)bytecode >= 128) {
+        }
+        else if ((byte)bytecode >= 128)
+        {
             SendSelector((byte)bytecode);
-        } else {
+        }
+        else
+        {
             throw new NotImplementedException($"Unhandled bytecode: {bytecode}");
         }
     }
@@ -374,7 +454,8 @@ public class Interpreter
     /// <param name="returnValue">The return value.</param>
     public void ReturnFrom(object returnValue)
     {
-        if (currentContext.Sender == null) {
+        if (currentContext.Sender == null)
+        {
             if (returnValue is MethodContext mc)
             {
                 returnValue = new Context
@@ -389,12 +470,15 @@ public class Interpreter
                 };
             }
             LastResult = returnValue;
-            if (ExitOnReturn) {
+            if (ExitOnReturn)
+            {
                 Console.WriteLine($"Returned: {returnValue}");
                 Environment.Exit(0);
             }
             IsRunning = false;
-        } else {
+        }
+        else
+        {
             currentContext = currentContext.Sender;
             currentContext.Stack.Push(returnValue);
         }
@@ -406,9 +490,12 @@ public class Interpreter
     /// <param name="returnValue">The value to return.</param>
     public void HandleReturn(object returnValue)
     {
-        try {
+        try
+        {
             ReturnFrom(returnValue);
-        } catch (NonLocalReturnException ex) {
+        }
+        catch (NonLocalReturnException ex)
+        {
             if (ex.TargetContext == null)
             {
                 LastResult = ex.ReturnValue;
@@ -420,10 +507,12 @@ public class Interpreter
                 }
                 return;
             }
-            while (currentContext != null && currentContext != ex.TargetContext) {
+            while (currentContext != null && currentContext != ex.TargetContext)
+            {
                 currentContext = currentContext.Sender!;
             }
-            if (currentContext == null) {
+            if (currentContext == null)
+            {
                 throw new Exception("Non-local return failed: target context not found");
             }
             currentContext.Stack.Push(ex.ReturnValue);
@@ -654,7 +743,7 @@ public class Interpreter
                 method = cls.Lookup(selector);
                 if (method == null)
                     throw new InvalidOperationException($"Method {selector} not found");
-                
+
                 // Cache the result for future use
                 MethodCache.Store(cls, selector, method);
             }
