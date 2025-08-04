@@ -16,6 +16,7 @@ public static class Program
     ///     <list type="bullet">
     ///         <item><description><c>--load &lt;file&gt;</c> – load a Smalltalk source file.</description></item>
     ///         <item><description><c>--filein &lt;file&gt;</c> – load a classic Smalltalk file-in.</description></item>
+    ///         <item><description><c>--system-image &lt;file&gt;</c> – load a complete Smalltalk-80 system image with dependency resolution.</description></item>
     ///     </list>
     /// </param>
     [STAThread]
@@ -53,6 +54,47 @@ public static class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to file in source: {ex.Message}");
+                return;
+            }
+        }
+
+        var systemImageIndex = Array.IndexOf(args, "--system-image");
+        if (systemImageIndex >= 0 && systemImageIndex < args.Length - 1)
+        {
+            var path = args[systemImageIndex + 1];
+            try
+            {
+                var result = SystemImageLoader.LoadSystemImage(path);
+                if (result.Success)
+                {
+                    Console.WriteLine($"Successfully loaded system image '{Path.GetFileName(path)}'.");
+                    Console.WriteLine($"Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} method chunks.");
+                    if (result.Warnings.Count > 0)
+                    {
+                        Console.WriteLine($"Warnings: {result.Warnings.Count}");
+                        foreach (var warning in result.Warnings.Take(5))
+                        {
+                            Console.WriteLine($"  Warning: {warning.Message}");
+                        }
+                        if (result.Warnings.Count > 5)
+                        {
+                            Console.WriteLine($"  ... and {result.Warnings.Count - 5} more warnings");
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to load system image: {result.Errors.Count} errors");
+                    foreach (var error in result.Errors.Take(5))
+                    {
+                        Console.WriteLine($"  Error: {error.Message}");
+                    }
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load system image: {ex.Message}");
                 return;
             }
         }
