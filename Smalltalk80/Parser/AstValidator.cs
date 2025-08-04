@@ -15,6 +15,10 @@ public static class AstValidator
         IReadOnlyList<ValidationWarning> Warnings
     )
     {
+        /// <summary>
+        /// Gets a pre-configured ValidationResult instance representing successful validation with no errors or warnings.
+        /// This is a convenience property for the common case of successful validation.
+        /// </summary>
         public static ValidationResult Success => new(true, Array.Empty<ValidationError>(), Array.Empty<ValidationWarning>());
     }
 

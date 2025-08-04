@@ -10,8 +10,19 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 {
+    /// <summary>
+    /// The token stream used for retrieving additional token information during AST construction.
+    /// This stream provides access to whitespace, comments, and detailed token positions
+    /// that may be needed for advanced parsing scenarios or error reporting.
+    /// May be null if detailed token information is not required.
+    /// </summary>
     protected readonly CommonTokenStream? tokens;
 
+    /// <summary>
+    /// Initializes a new instance of the BaseAstBuildingVisitor class with an optional token stream.
+    /// The token stream can be used to access detailed token information during AST construction.
+    /// </summary>
+    /// <param name="tokens">The token stream to use for detailed token access, or null if not needed.</param>
     protected BaseAstBuildingVisitor(CommonTokenStream? tokens = null)
     {
         this.tokens = tokens;
