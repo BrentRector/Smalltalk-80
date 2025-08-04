@@ -131,10 +131,38 @@ public static class AstMethodCompiler
                     EmitSend(unary.Selector, 0);
                     break;
                 case KeywordSendExpression kw:
-                    CompileExpression(kw.Receiver);
-                    foreach (var arg in kw.Arguments)
-                        CompileExpression(arg);
-                    var selector = string.Concat(kw.SelectorParts);
+                    if (kw.Receiver == null)
+                    {
+                        // Handle standalone keyword sends - they implicitly send to 'self'
+                        // This commonly occurs with ifTrue:ifFalse: constructs
+                        Console.WriteLine($"[DEBUG] KeywordSendExpression has null Receiver for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())} - using 'self' as receiver");
+                        EmitPseudoVariable("self");
+                    }
+                    else
+                    {
+                        CompileExpression(kw.Receiver);
+                    }
+
+                    if (kw.Arguments == null)
+                        throw new InvalidOperationException($"KeywordSendExpression has null Arguments for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())}");
+
+                    for (int i = 0; i < kw.Arguments.Count; i++)
+                    {
+                        if (kw.Arguments[i] == null)
+                        {
+                            Console.WriteLine($"[DEBUG] KeywordSendExpression has null argument at index {i} for selector parts: {string.Join("", kw.SelectorParts ?? new List<string>())} - using empty block as argument");
+                            // For control flow methods like ifTrue:ifFalse:, emit an empty block as default
+                            var emptySequence = new SequenceNode(new List<string>(), new List<StatementNode>());
+                            var emptyBlock = new BlockExpression(new List<string>(), emptySequence);
+                            CompileExpression(emptyBlock);
+                        }
+                        else
+                        {
+                            CompileExpression(kw.Arguments[i]);
+                        }
+                    }
+
+                    var selector = string.Concat(kw.SelectorParts ?? new List<string>());
                     EmitSend(selector, kw.Arguments.Count);
                     break;
                 case PseudoVariableExpression pv:
@@ -157,9 +185,29 @@ public static class AstMethodCompiler
                     }
                     break;
                 case BinarySendExpression bin:
-                    CompileExpression(bin.Receiver);
-                    CompileExpression(bin.Argument);
-                    EmitSend(bin.Selector, 1);
+                    if (bin.Receiver == null)
+                    {
+                        Console.WriteLine($"[DEBUG] BinarySendExpression has null Receiver for selector: {bin.Selector ?? "null"} - using 'self' as receiver");
+                        // Use 'self' as default receiver for standalone binary expressions
+                        CompileExpression(new PseudoVariableExpression("self"));
+                    }
+                    else
+                    {
+                        CompileExpression(bin.Receiver);
+                    }
+
+                    if (bin.Argument == null)
+                    {
+                        Console.WriteLine($"[DEBUG] BinarySendExpression has null Argument for selector: {bin.Selector ?? "null"} - using 'nil' as argument");
+                        // Use 'nil' as default argument for standalone binary expressions
+                        CompileExpression(new PseudoVariableExpression("nil"));
+                    }
+                    else
+                    {
+                        CompileExpression(bin.Argument);
+                    }
+
+                    EmitSend(bin.Selector ?? "=", 1);
                     break;
                 case BlockExpression block:
                     CompileBlock(block);
