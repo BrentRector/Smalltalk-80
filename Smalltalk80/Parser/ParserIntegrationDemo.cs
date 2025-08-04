@@ -114,26 +114,15 @@ testMethod: arg
 
         try
         {
-            // Load file with enhanced diagnostics
-            var options = new FileLoadOptions
-            {
-                ContinueOnError = true,
-                ValidateMethodSignatures = true,
-                CheckVariableConflicts = true
-            };
-
-            var result = EnhancedFileInLoader.LoadWithDiagnostics(testFilePath, options);
+            // Load file with SystemImageLoader
+            var result = SystemImageLoader.LoadSystemImage(testFilePath);
 
             Console.WriteLine($"✓ File loading completed");
             Console.WriteLine($"  Success: {result.Success}");
             Console.WriteLine($"  Errors: {result.Errors.Count}");
             Console.WriteLine($"  Warnings: {result.Warnings.Count}");
-
-            Console.WriteLine("  Processed chunks:");
-            foreach (var chunk in result.ProcessedChunks)
-            {
-                Console.WriteLine($"    {chunk.Key}: {chunk.Value}");
-            }
+            Console.WriteLine($"  Classes loaded: {result.ClassesLoaded}");
+            Console.WriteLine($"  Methods loaded: {result.MethodsLoaded}");
 
             if (result.Errors.Count > 0)
             {

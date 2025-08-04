@@ -14,9 +14,8 @@ public static class Program
     /// <param name="args">
     ///     Command line arguments. Supported options are:
     ///     <list type="bullet">
-    ///         <item><description><c>--load &lt;file&gt;</c> – load a Smalltalk source file.</description></item>
-    ///         <item><description><c>--filein &lt;file&gt;</c> – load a classic Smalltalk file-in.</description></item>
-    ///         <item><description><c>--system-image &lt;file&gt;</c> – load a complete Smalltalk-80 system image with dependency resolution.</description></item>
+    ///         <item><description><c>--load &lt;file&gt;</c> – load a single-method Smalltalk source file.</description></item>
+    ///         <item><description><c>--source &lt;file&gt;</c> – load any Smalltalk source file (file-in, system image, or library) with dependency resolution.</description></item>
     ///     </list>
     /// </param>
     [STAThread]
@@ -33,7 +32,7 @@ public static class Program
             try
             {
                 vm.LoadSourceFile(path);
-                Console.WriteLine($"Loaded '{Path.GetFileName(path)}'.");
+                Console.WriteLine($"Loaded single method from '{Path.GetFileName(path)}'.");
             }
             catch (Exception ex)
             {
@@ -42,32 +41,16 @@ public static class Program
             }
         }
 
-        var fileInIndex = Array.IndexOf(args, "--filein");
-        if (fileInIndex >= 0 && fileInIndex < args.Length - 1)
+        var sourceIndex = Array.IndexOf(args, "--source");
+        if (sourceIndex >= 0 && sourceIndex < args.Length - 1)
         {
-            var path = args[fileInIndex + 1];
-            try
-            {
-                vm.LoadSystemFile(path);
-                Console.WriteLine($"Filed in '{Path.GetFileName(path)}'.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to file in source: {ex.Message}");
-                return;
-            }
-        }
-
-        var systemImageIndex = Array.IndexOf(args, "--system-image");
-        if (systemImageIndex >= 0 && systemImageIndex < args.Length - 1)
-        {
-            var path = args[systemImageIndex + 1];
+            var path = args[sourceIndex + 1];
             try
             {
                 var result = SystemImageLoader.LoadSystemImage(path);
                 if (result.Success)
                 {
-                    Console.WriteLine($"Successfully loaded system image '{Path.GetFileName(path)}'.");
+                    Console.WriteLine($"Successfully loaded source '{Path.GetFileName(path)}'.");
                     Console.WriteLine($"Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} method chunks.");
                     if (result.Warnings.Count > 0)
                     {
@@ -84,7 +67,7 @@ public static class Program
                 }
                 else
                 {
-                    Console.WriteLine($"Failed to load system image: {result.Errors.Count} errors");
+                    Console.WriteLine($"Failed to load source: {result.Errors.Count} errors");
                     foreach (var error in result.Errors.Take(5))
                     {
                         Console.WriteLine($"  Error: {error.Message}");
@@ -94,7 +77,7 @@ public static class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load system image: {ex.Message}");
+                Console.WriteLine($"Failed to load source: {ex.Message}");
                 return;
             }
         }

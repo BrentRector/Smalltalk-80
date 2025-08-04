@@ -277,3 +277,71 @@ public class SystemImageLoadResult
     /// </summary>
     public int MethodsLoaded { get; set; }
 }
+
+/// <summary>
+/// Represents a parse error encountered during source loading.
+/// </summary>
+public class ParseError
+{
+    /// <summary>
+    /// Gets the line number where the error occurred.
+    /// </summary>
+    public int Line { get; }
+
+    /// <summary>
+    /// Gets the column number where the error occurred.
+    /// </summary>
+    public int Column { get; }
+
+    /// <summary>
+    /// Gets the error message.
+    /// </summary>
+    public string Message { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ParseError"/> class.
+    /// </summary>
+    /// <param name="line">The line number where the error occurred.</param>
+    /// <param name="column">The column number where the error occurred.</param>
+    /// <param name="message">The error message.</param>
+    public ParseError(int line, int column, string message)
+    {
+        Line = line;
+        Column = column;
+        Message = message;
+    }
+}
+
+/// <summary>
+/// Represents a warning generated during source loading.
+/// </summary>
+public class LoadWarning
+{
+    /// <summary>
+    /// Gets the line number where the warning occurred.
+    /// </summary>
+    public int Line { get; }
+
+    /// <summary>
+    /// Gets the column number where the warning occurred.
+    /// </summary>
+    public int Column { get; }
+
+    /// <summary>
+    /// Gets the warning message.
+    /// </summary>
+    public string Message { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LoadWarning"/> class.
+    /// </summary>
+    /// <param name="line">The line number where the warning occurred.</param>
+    /// <param name="column">The column number where the warning occurred.</param>
+    /// <param name="message">The warning message.</param>
+    public LoadWarning(int line, int column, string message)
+    {
+        Line = line;
+        Column = column;
+        Message = message;
+    }
+}

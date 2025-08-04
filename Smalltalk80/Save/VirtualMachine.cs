@@ -93,13 +93,18 @@ public sealed class VirtualMachine
     }
 
     /// <summary>
-    /// Loads a traditional Smalltalk file-in source containing multiple class
-    /// and method definitions.
+    /// Loads a Smalltalk system image or file-in source containing multiple class
+    /// and method definitions. Uses the advanced SystemImageLoader which handles
+    /// forward references and complex dependencies.
     /// </summary>
-    /// <param name="path">The path to the file-in source.</param>
+    /// <param name="path">The path to the system image or file-in source.</param>
     public void LoadSystemFile(string path)
     {
-        FileInLoader.Load(path);
+        var result = SystemImageLoader.LoadSystemImage(path);
+        if (!result.Success)
+        {
+            throw new InvalidOperationException($"Failed to load system file: {result.Errors.Count} errors");
+        }
         SystemStatePrinter.PrintSummary();
     }
 

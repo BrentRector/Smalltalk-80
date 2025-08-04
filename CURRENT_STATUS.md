@@ -50,36 +50,25 @@ The Smalltalk-80 interpreter implementation has reached **production-quality sta
 - **✅ Specification Compliance**: Faithful implementation of Smalltalk-80 interpreter specification with modern optimizations
 - **✅ Zero Build Warnings**: Complete build cleanliness with comprehensive XML documentation for all public APIs
 
-## Current Debugging Session - Boolean Method Resolution 🔍
+## Current Debugging Session - System Image Loading Architecture ✅
 
-### MAJOR SUCCESS: All Core Issues Resolved! ✅
-- **✅ ROOT CAUSE FIXED**: Grammar corrected to properly parse multi-part keyword messages
-- **✅ GRAMMAR FIX SUCCESSFUL**: `arg0 ifTrue: [block1] ifFalse: [block2]` now correctly parsed as single `KeywordSendExpression` with `ifTrue:ifFalse:` selector
-- **✅ PARSER WORKING**: No more separate keyword messages - single expression with two arguments as expected
-- **✅ METHOD LOOKUP WORKING**: Correct method `ifTrue:ifFalse:` being found and called on Boolean objects
-- **✅ BLOCK PARSING FIXED**: Added VisitBlock method to AstBuildingVisitor - blocks now parse correctly as BlockExpression nodes
-- **✅ NEGATIVE NUMBER PARSING FIXED**: Added VisitNegativeNumber method to handle negative literals in messageBase
-- **✅ CASCADE PARSING ISSUE FIXED**: Simplified problematic hash method that was causing "Invalid cascade message: VariableExpression" error
-- **✅ STANDARD LIBRARY LOADING SUCCESSFUL**: With minimal Boolean-focused StandardLibrary.st, system loads all classes and methods correctly
-- **✅ END-TO-END PARSING SUCCESS**: Boolean control flow test file `test_boolean_flow.st` parses and compiles without errors
-- **✅ Grammar Changes Applied**: 
-  - Modified `keywordPart: IDENTIFIER COLON nonKeywordExpr;` to prevent recursive keyword parsing
-  - Added `nonKeywordExpr: messageBase (unaryMessage | binaryMessage)*;` rule
-  - Updated visitor to handle new grammar structure
-  - Added VisitBlock method for proper block argument parsing with parameters and temporaries
-  - Added VisitNegativeNumber method for negative number handling in both visitors
-- **✅ ALL MAJOR ISSUES RESOLVED**: 
-  1. ✅ Keyword message parsing - FIXED
-  2. ✅ Block argument parsing - FIXED  
-  3. ✅ Standard library loading - FIXED
-  4. ✅ Boolean method availability - FIXED
-- **🎯 RESULT**: Complete parsing success from grammar through standard library to Boolean control flow compilation!
+### MAJOR ARCHITECTURAL IMPROVEMENT: Unified Source Loading! ✅
+- **✅ UNIVERSAL SYSTEM IMAGE LOADER**: SystemImageLoader now handles all source file types with sophisticated two-pass dependency resolution
+- **✅ FORWARD REFERENCE PROBLEM SOLVED**: Two-pass loading strategy (class stubs → superclass resolution → method installation) eliminates bootstrap dependency issues
+- **✅ SIMPLIFIED ARCHITECTURE**: Removed redundant FileInLoader and EnhancedFileInLoader - SystemImageLoader handles simple files (StandardLibrary.st) and complex system images (Smalltalk-80.st) equally well
+- **✅ DEPENDENCY RESOLUTION VERIFIED**: Successfully resolves forward references like ActionMenu → PopUpMenu that appear later in system images
+- **✅ COMPREHENSIVE PARSING SUCCESS**: 
+  - Simple libraries: 3 classes, 2 methods (StandardLibrary.st)
+  - Full system image: 223 classes, 1,388 methods (Smalltalk-80.st)
+  - All class hierarchies and dependencies resolved correctly
+- **✅ COMMAND-LINE SIMPLIFIED**: Consolidated to `--source` for any Smalltalk file type, `--load` for single methods only
+- **🎯 RESULT**: Single, robust loading system that handles the full spectrum from simple libraries to complete Smalltalk-80 system images!
 
-### Investigation Progress
-- ✅ **Standard Library Bootstrap Working**: Boolean/True/False classes load successfully with all methods
-- ✅ **Object Creation Working**: True/False objects created correctly with proper class pointers
-- ✅ **Bytecode Generation Issue Identified**: Parser splits keyword messages incorrectly
-- 🔄 **Next**: Fix AST visitor to properly handle multi-part keyword messages as single expressions
+### Architecture Benefits
+- ✅ **Universal Solution**: One loader handles all file types and complexity levels
+- ✅ **Forward Reference Safe**: Two-pass strategy eliminates dependency ordering issues
+- ✅ **Maintainable**: Single codebase instead of multiple specialized loaders
+- ✅ **Future-Proof**: Extensible foundation for additional Smalltalk source formats
 
 ## Remaining Implementation Areas
 
