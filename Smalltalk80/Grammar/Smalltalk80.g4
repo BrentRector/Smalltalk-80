@@ -152,7 +152,7 @@ temporaryName: IDENTIFIER;
 
 ////
 // / Statements //
-statements: statement (PERIOD+ statement)* PERIOD*;
+statements: PERIOD* statement (PERIOD+ statement)* PERIOD*;
 
 statement: returnStatement | expressionStatement;
 
@@ -168,8 +168,7 @@ assignmentExpr:
 	variable ASSIGN assignmentExpr // right-associative assignment
 	| cascadeExpr;
 
-cascadeExpr:
-	messageExpr (SEMICOLON messagePart)* ; // cascades
+cascadeExpr: messageExpr (SEMICOLON messagePart)*; // cascades
 
 ////
 // / Message expression //
@@ -245,7 +244,7 @@ binarySelector:
 	// ───────────── Other Symbols & Messaging ─────────────
 	| AT // @
 	| QUESTION // ?
-	| COMMA ; // ,
+	| COMMA; // ,
 
 variable: IDENTIFIER;
 

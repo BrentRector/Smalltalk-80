@@ -19,12 +19,12 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
-    /// Visit an assignment statement context.
+    /// Visit an assignment expression context.
     /// </summary>
-    public override object? VisitAssignmentStatement(Smalltalk80Parser.AssignmentStatementContext context)
+    public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
     {
         var variable = context.variable().GetText();
-        var value = (ExpressionNode)Visit(context.expression())!;
+        var value = (ExpressionNode)Visit(context.assignmentExpr())!;
         return new AssignmentExpression(variable, value);
     }
 
@@ -42,7 +42,7 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitExpression(Smalltalk80Parser.ExpressionContext context)
     {
-        return Visit(context.cascadeExpr());
+        return Visit(context.assignmentExpr());
     }
 
     /// <summary>
@@ -219,8 +219,6 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitStatement(Smalltalk80Parser.StatementContext context)
     {
-        if (context.assignmentStatement() != null)
-            return Visit(context.assignmentStatement());
         if (context.returnStatement() != null)
             return Visit(context.returnStatement());
         if (context.expressionStatement() != null)
