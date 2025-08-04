@@ -35,7 +35,7 @@ public class AdvancedAstCompilerTests
 
         var cascade = new CascadeExpression(receiver, messages);
         var sequence = new SequenceNode(
-            Array.Empty<string>(),
+            new[] { "obj" }, // Add 'obj' as a temporary variable
             new[] { new ExpressionStatement(cascade) }
         );
 
@@ -70,7 +70,7 @@ public class AdvancedAstCompilerTests
 
         var dynArray = new DynamicArrayExpression(elements);
         var sequence = new SequenceNode(
-            Array.Empty<string>(),
+            new[] { "obj" }, // Add 'obj' as a temporary variable
             new[] { new ExpressionStatement(dynArray) }
         );
 
@@ -87,9 +87,9 @@ public class AdvancedAstCompilerTests
         var bytecodes = compiled.Bytecodes;
         output.WriteLine($"Dynamic array bytecodes: {string.Join(", ", bytecodes.Select(b => (Bytecode)b))}");
 
-        // Should push the count (4) and contain Array class reference
-        Assert.Contains((byte)Bytecode.PushFour, bytecodes);
+        // Should contain Array class reference and the literal count (3)
         Assert.Contains("Array", compiled.Literals);
+        Assert.Contains(3, compiled.Literals); // The count 3 is pushed as a literal
     }
 
     [Fact]
@@ -128,18 +128,18 @@ public class AdvancedAstCompilerTests
     }
 
     [Fact]
-    public void CompileReturnStatements_GeneratesOptimizedBytecode()
+    public void CompileReturnStatements_GeneratesCorrectBytecode()
     {
-        // Test different return patterns that should generate optimized bytecode
+        // Test optimized return bytecodes for pseudo-variables
         var testCases = new[]
         {
-            (Expression: (object)new PseudoVariableExpression("self"), Bytecode: Bytecode.ReturnSelf),
-            (Expression: (object)new PseudoVariableExpression("nil"), Bytecode: Bytecode.ReturnNil),
-            (Expression: (object)new PseudoVariableExpression("true"), Bytecode: Bytecode.ReturnTrue),
-            (Expression: (object)new PseudoVariableExpression("false"), Bytecode: Bytecode.ReturnFalse)
+            (Expression: (object)new PseudoVariableExpression("self"), OptimizedReturn: Bytecode.ReturnSelf),
+            (Expression: (object)new PseudoVariableExpression("nil"), OptimizedReturn: Bytecode.ReturnNil),
+            (Expression: (object)new PseudoVariableExpression("true"), OptimizedReturn: Bytecode.ReturnTrue),
+            (Expression: (object)new PseudoVariableExpression("false"), OptimizedReturn: Bytecode.ReturnFalse)
         };
 
-        foreach (var (returnExpr, expectedBytecode) in testCases)
+        foreach (var (returnExpr, expectedReturnBytecode) in testCases)
         {
             var sequence = new SequenceNode(
                 Array.Empty<string>(),
@@ -158,8 +158,9 @@ public class AdvancedAstCompilerTests
             var bytecodes = compiled.Bytecodes;
             output.WriteLine($"Return {returnExpr} bytecodes: {string.Join(", ", bytecodes.Select(b => (Bytecode)b))}");
 
-            // Should contain the expected optimized return bytecode
-            Assert.Contains((byte)expectedBytecode, bytecodes);
+            // Should generate single optimized return bytecode (no push needed)
+            Assert.Single(bytecodes);
+            Assert.Equal((byte)expectedReturnBytecode, bytecodes[0]);
         }
     }
 
@@ -213,7 +214,7 @@ public class AdvancedAstCompilerTests
 
         var cascade = new CascadeExpression(receiver, messages);
         var sequence = new SequenceNode(
-            Array.Empty<string>(),
+            new[] { "obj", "a", "b" }, // Add all variables as temporaries
             new[] { new ExpressionStatement(cascade) }
         );
 
@@ -299,7 +300,7 @@ public class AdvancedAstCompilerTests
 
         var cascade = new CascadeExpression(receiver, messages);
         var sequence = new SequenceNode(
-            Array.Empty<string>(),
+            new[] { "obj" }, // Add 'obj' as a temporary variable
             new[] { new ExpressionStatement(cascade) }
         );
 

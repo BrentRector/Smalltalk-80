@@ -85,8 +85,20 @@ public static class AstMethodCompiler
                     bytecodes.Add(isLast ? (byte)Bytecode.ReturnTopFromMethod : (byte)Bytecode.PopStack);
                     break;
                 case AnswerStatement ans:
-                    CompileExpression(ans.Expression);
-                    bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
+                    // Emit optimized return bytecode based on expression type
+                    if (ans.Expression is PseudoVariableExpression { Name: "self" })
+                        bytecodes.Add((byte)Bytecode.ReturnSelf);
+                    else if (ans.Expression is PseudoVariableExpression { Name: "true" })
+                        bytecodes.Add((byte)Bytecode.ReturnTrue);
+                    else if (ans.Expression is PseudoVariableExpression { Name: "false" })
+                        bytecodes.Add((byte)Bytecode.ReturnFalse);
+                    else if (ans.Expression is PseudoVariableExpression { Name: "nil" })
+                        bytecodes.Add((byte)Bytecode.ReturnNil);
+                    else
+                    {
+                        CompileExpression(ans.Expression);
+                        bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
+                    }
                     break;
                 case PrimitiveStatement:
                     // Primitive declarations inside sequences are metadata only.
@@ -124,8 +136,7 @@ public static class AstMethodCompiler
                     EmitPseudoVariable(pv.Name);
                     break;
                 case ReturnExpression ret:
-                    CompileExpression(ret.Value);
-                    // Emit proper return bytecode based on context
+                    // Emit optimized return bytecode based on expression type
                     if (ret.Value is PseudoVariableExpression { Name: "self" })
                         bytecodes.Add((byte)Bytecode.ReturnSelf);
                     else if (ret.Value is PseudoVariableExpression { Name: "true" })
@@ -135,7 +146,10 @@ public static class AstMethodCompiler
                     else if (ret.Value is PseudoVariableExpression { Name: "nil" })
                         bytecodes.Add((byte)Bytecode.ReturnNil);
                     else
+                    {
+                        CompileExpression(ret.Value);
                         bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
+                    }
                     break;
                 case BinarySendExpression bin:
                     CompileExpression(bin.Receiver);
