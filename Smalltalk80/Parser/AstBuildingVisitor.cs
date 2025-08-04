@@ -257,4 +257,26 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
         return statements;
     }
+
+    /// <summary>
+    /// Visit a method body context and create a SequenceNode.
+    /// </summary>
+    public override object? VisitMethodBody(Smalltalk80Parser.MethodBodyContext context)
+    {
+        var statements = new List<StatementNode>();
+        var temporaries = new List<string>(); // No temporaries in method body
+
+        if (context.statements() != null)
+        {
+            var stmtList = (List<StatementNode>)Visit(context.statements())!;
+            statements.AddRange(stmtList);
+        }
+
+        if (context.returnStatement() != null)
+        {
+            statements.Add((StatementNode)Visit(context.returnStatement())!);
+        }
+
+        return new SequenceNode(temporaries, statements);
+    }
 }

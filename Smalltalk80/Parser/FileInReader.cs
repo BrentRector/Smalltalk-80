@@ -27,15 +27,8 @@ public static class FileInReader
         parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL_EXACT_AMBIG_DETECTION;
         parser.RemoveErrorListeners();
         var fileCtx = parser.fileIn();
-        var visitor = new AstBuildingVisitor(tokens);
-        var chunks = new List<AstNode>();
+        var visitor = new ClassDefBuildingVisitor();
 
-        foreach (var chunk in fileCtx.chunk())
-        {
-            if (visitor.Visit(chunk) is AstNode node)
-                chunks.Add(node);
-        }
-
-        return new FileNode(chunks);
+        return (FileNode)visitor.VisitFileIn(fileCtx)!;
     }
 }
