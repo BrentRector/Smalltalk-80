@@ -125,6 +125,17 @@ public static class AstMethodCompiler
                     break;
                 case ReturnExpression ret:
                     CompileExpression(ret.Value);
+                    // Emit proper return bytecode based on context
+                    if (ret.Value is PseudoVariableExpression { Name: "self" })
+                        bytecodes.Add((byte)Bytecode.ReturnSelf);
+                    else if (ret.Value is PseudoVariableExpression { Name: "true" })
+                        bytecodes.Add((byte)Bytecode.ReturnTrue);
+                    else if (ret.Value is PseudoVariableExpression { Name: "false" })
+                        bytecodes.Add((byte)Bytecode.ReturnFalse);
+                    else if (ret.Value is PseudoVariableExpression { Name: "nil" })
+                        bytecodes.Add((byte)Bytecode.ReturnNil);
+                    else
+                        bytecodes.Add((byte)Bytecode.ReturnTopFromMethod);
                     break;
                 case BinarySendExpression bin:
                     CompileExpression(bin.Receiver);
@@ -133,6 +144,15 @@ public static class AstMethodCompiler
                     break;
                 case BlockExpression block:
                     CompileBlock(block);
+                    break;
+                case CascadeExpression cascade:
+                    CompileCascade(cascade);
+                    break;
+                case DynamicArrayExpression dynArray:
+                    CompileDynamicArray(dynArray);
+                    break;
+                case DynamicDictionaryExpression dynDict:
+                    CompileDynamicDictionary(dynDict);
                     break;
                 default:
                     throw new NotSupportedException($"Unsupported expression node {expression.GetType().Name}");
@@ -371,6 +391,112 @@ public static class AstMethodCompiler
                 : 0;
 
             return new MethodHeader(raw, ext);
+        }
+
+        /// <summary>
+        /// Compiles cascade expressions with receiver optimization.
+        /// Generates bytecode: receiver ; msg1 ; msg2 ; ... ; msgN
+        /// </summary>
+        private void CompileCascade(CascadeExpression cascade)
+        {
+            // Compile the receiver once
+            CompileExpression(cascade.Receiver);
+
+            // For each message except the last, duplicate the receiver and send
+            for (int i = 0; i < cascade.Messages.Count - 1; i++)
+            {
+                bytecodes.Add((byte)Bytecode.DuplicateTop);
+                CompileMessage(cascade.Messages[i]);
+                bytecodes.Add((byte)Bytecode.PopStack); // Pop result, keep receiver
+            }
+
+            // Send the last message without duplicating (result remains on stack)
+            CompileMessage(cascade.Messages[cascade.Messages.Count - 1]);
+        }
+
+        /// <summary>
+        /// Compiles a message expression as part of a cascade.
+        /// </summary>
+        private void CompileMessage(ExpressionNode message)
+        {
+            switch (message)
+            {
+                case UnarySendExpression unary:
+                    EmitSend(unary.Selector, 0);
+                    break;
+                case BinarySendExpression binary:
+                    CompileExpression(binary.Argument);
+                    EmitSend(binary.Selector, 1);
+                    break;
+                case KeywordSendExpression keyword:
+                    foreach (var arg in keyword.Arguments)
+                        CompileExpression(arg);
+                    var selector = string.Concat(keyword.SelectorParts);
+                    EmitSend(selector, keyword.Arguments.Count);
+                    break;
+                default:
+                    throw new InvalidOperationException($"Invalid cascade message: {message.GetType().Name}");
+            }
+        }
+
+        /// <summary>
+        /// Compiles dynamic array expressions: { expr1. expr2. ... }
+        /// Generates bytecode to create array at runtime.
+        /// </summary>
+        private void CompileDynamicArray(DynamicArrayExpression dynArray)
+        {
+            // Push each element onto the stack
+            foreach (var element in dynArray.Elements)
+            {
+                CompileExpression(element);
+            }
+
+            // Push the array size
+            EmitSmallInteger(dynArray.Elements.Count);
+
+            // Send #newFrom: to Array class to create array from stack elements
+            int arrayClassIndex = AddLiteral("Array");
+            if (arrayClassIndex <= 31)
+                bytecodes.Add((byte)((int)Bytecode.PushLiteralVariable0 + arrayClassIndex));
+            else
+            {
+                bytecodes.Add((byte)Bytecode.ExtendedStore);
+                bytecodes.Add((byte)(0x40 | arrayClassIndex)); // Push literal variable extended
+            }
+            EmitSend("newFrom:", 1);
+        }
+
+        /// <summary>
+        /// Compiles dynamic dictionary expressions: { key1 -> value1. key2 -> value2. ... }
+        /// Generates bytecode to create dictionary at runtime.
+        /// </summary>
+        private void CompileDynamicDictionary(DynamicDictionaryExpression dynDict)
+        {
+            // For each pair, push key and value
+            int pairCount = 0;
+            for (int i = 0; i < dynDict.Elements.Count; i += 2)
+            {
+                if (i + 1 < dynDict.Elements.Count)
+                {
+                    CompileExpression(dynDict.Elements[i]);     // key
+                    CompileExpression(dynDict.Elements[i + 1]); // value
+                    pairCount++;
+                }
+            }
+
+            // Push the pair count
+            EmitSmallInteger(pairCount);
+
+            // Send #newFromPairs: to Dictionary class
+            int dictClassIndex = AddLiteral("Dictionary");
+            if (dictClassIndex <= 31)
+                bytecodes.Add((byte)((int)Bytecode.PushLiteralVariable0 + dictClassIndex));
+            else
+            {
+                bytecodes.Add((byte)Bytecode.ExtendedStore);
+                bytecodes.Add((byte)(0x40 | dictClassIndex)); // Push literal variable extended
+            }
+            EmitSend("newFromPairs:", 1);
         }
     }
 }
