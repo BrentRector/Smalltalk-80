@@ -23,4 +23,4 @@ complexCalculation: x with: y
     intermediate1 _ x + y.
     intermediate2 _ x - y.
     final _ intermediate1 * intermediate2.
-    ^final!
+    ^final! !

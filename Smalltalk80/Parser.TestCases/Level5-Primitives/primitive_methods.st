@@ -20,4 +20,4 @@ basicAt: index put: value
 
 size
     <primitive: 62>
-    ^0!
+    ^0! !

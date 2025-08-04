@@ -13,4 +13,4 @@ getName
     ^'test'!
 
 isReady
-    ^true!
+    ^true! !

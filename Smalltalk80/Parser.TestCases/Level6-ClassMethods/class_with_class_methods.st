@@ -17,7 +17,7 @@ instanceCount
     ^InstanceCount!
 
 initialize
-    InstanceCount _ 0!
+    InstanceCount _ 0! !
 
 !CountedClass methodsFor: 'accessing'!
 
@@ -25,5 +25,4 @@ id
     ^id!
 
 setId: newId
-    id _ newId!
-!
+    id _ newId! !

@@ -16,4 +16,4 @@ Object subclass: #ClassWithBinaryMethods
     ^self!
 
 = anObject
-    ^true!
+    ^true! !

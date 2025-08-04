@@ -16,4 +16,4 @@ at: anIndex put: aValue
     ^self!
 
 from: startIndex to: endIndex do: aBlock
-    ^self!
+    ^self! !

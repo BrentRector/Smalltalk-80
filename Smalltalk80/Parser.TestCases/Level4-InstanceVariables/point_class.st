@@ -26,4 +26,4 @@ distanceFromOrigin
     | xSquared ySquared |
     xSquared _ x * x.
     ySquared _ y * y.
-    ^(xSquared + ySquared) sqrt!
+    ^(xSquared + ySquared) sqrt! !
