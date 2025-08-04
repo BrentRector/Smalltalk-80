@@ -341,9 +341,14 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         // Extract block arguments if present
         if (context.blockArgs() != null)
         {
-            foreach (var arg in context.blockArgs().argumentName())
+            var argumentNames = context.blockArgs().argumentName();
+            if (argumentNames != null)
             {
-                parameters.Add(arg.GetText());
+                foreach (var arg in argumentNames)
+                {
+                    if (arg != null)
+                        parameters.Add(arg.GetText());
+                }
             }
         }
 
@@ -351,9 +356,14 @@ public class AstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         var temporaries = new List<string>();
         if (context.blockTemps() != null)
         {
-            foreach (var temp in context.blockTemps().temporaryName())
+            var temporaryNames = context.blockTemps().temporaryName();
+            if (temporaryNames != null)
             {
-                temporaries.Add(temp.GetText());
+                foreach (var temp in temporaryNames)
+                {
+                    if (temp != null)
+                        temporaries.Add(temp.GetText());
+                }
             }
         }
 

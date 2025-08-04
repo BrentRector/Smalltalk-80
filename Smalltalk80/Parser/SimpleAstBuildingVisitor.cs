@@ -189,6 +189,57 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     }
 
     /// <summary>
+    /// Visit a block context.
+    /// </summary>
+    public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
+    {
+        var parameters = new List<string>();
+
+        // Extract block arguments if present
+        if (context.blockArgs() != null)
+        {
+            var argumentNames = context.blockArgs().argumentName();
+            if (argumentNames != null)
+            {
+                foreach (var arg in argumentNames)
+                {
+                    if (arg != null)
+                        parameters.Add(arg.GetText());
+                }
+            }
+        }
+
+        // Extract block temporaries if present
+        var temporaries = new List<string>();
+        if (context.blockTemps() != null)
+        {
+            var temporaryNames = context.blockTemps().temporaryName();
+            if (temporaryNames != null)
+            {
+                foreach (var temp in temporaryNames)
+                {
+                    if (temp != null)
+                        temporaries.Add(temp.GetText());
+                }
+            }
+        }
+
+        // Create block body - if no statements, create empty sequence
+        SequenceNode body;
+        if (context.statements() != null)
+        {
+            var statements = (List<StatementNode>)Visit(context.statements())!;
+            body = new SequenceNode(temporaries, statements);
+        }
+        else
+        {
+            body = new SequenceNode(temporaries, new List<StatementNode>());
+        }
+
+        return new BlockExpression(parameters, body);
+    }
+
+    /// <summary>
     /// Visit a negative number context.
     /// </summary>
     public override object? VisitNegativeNumber(Smalltalk80Parser.NegativeNumberContext context)
