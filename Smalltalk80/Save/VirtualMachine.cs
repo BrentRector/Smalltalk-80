@@ -22,7 +22,43 @@ public sealed class VirtualMachine
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class and
     /// loads the standard library objects.
     /// </summary>
-    public VirtualMachine() => StandardLibrary.Initialize();
+    public VirtualMachine()
+    {
+        StandardLibrary.Initialize();
+        LoadStandardLibraryClasses();
+    }
+
+    /// <summary>
+    /// Loads the standard library classes from StandardLibrary.st if it exists.
+    /// This provides essential classes like Object, Boolean, True, False, SmallInteger
+    /// with all their control flow and arithmetic methods.
+    /// </summary>
+    private void LoadStandardLibraryClasses()
+    {
+        var standardLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "StandardLibrary.st");
+
+        if (File.Exists(standardLibraryPath))
+        {
+            try
+            {
+                Console.WriteLine($"[BOOTSTRAP] Loading standard library from: {standardLibraryPath}");
+                LoadSystemFile(standardLibraryPath);
+                Console.WriteLine("[BOOTSTRAP] Standard library loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: Failed to load standard library: {ex.Message}");
+                Console.WriteLine("[BOOTSTRAP] Continuing with minimal hardcoded standard library");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] StandardLibrary.st not found at: {standardLibraryPath}");
+            Console.WriteLine("[BOOTSTRAP] Using minimal hardcoded standard library only");
+        }
+    }
 
     /// <summary>
     /// Loads a Smalltalk source file containing a single method definition and

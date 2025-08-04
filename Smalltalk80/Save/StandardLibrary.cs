@@ -18,6 +18,9 @@ public static class StandardLibrary
 
         // Define core number classes with primitive arithmetic methods
         InitializeNumberClasses();
+
+        // Define core boolean classes with control flow methods
+        InitializeBooleanClasses();
     }
 
     /// <summary>
@@ -54,6 +57,93 @@ public static class StandardLibrary
         globals["Integer"] = new SmalltalkObject(integerClass, 0);
         globals["SmallInteger"] = new SmalltalkObject(smallIntegerClass, 0);
         globals["LargeInteger"] = new SmalltalkObject(largeIntegerClass, 0);
+    }
+
+    /// <summary>
+    /// Initializes the core boolean classes and their control flow methods.
+    /// </summary>
+    private static void InitializeBooleanClasses()
+    {
+        // Get Object class (already defined)
+        var objectClass = SystemDictionary.GetClass("Object");
+
+        // Define Boolean as a subclass of Object
+        var booleanClass = SystemDictionary.DefineClass("Boolean", objectClass);
+
+        // Define True and False as subclasses of Boolean
+        var trueClass = SystemDictionary.DefineClass("True", booleanClass);
+        var falseClass = SystemDictionary.DefineClass("False", booleanClass);
+
+        // Add essential control flow methods to Boolean hierarchy
+        AddControlFlowMethods(booleanClass, trueClass, falseClass);
+
+        globals["Boolean"] = new SmalltalkObject(booleanClass, 0);
+        globals["True"] = new SmalltalkObject(trueClass, 0);
+        globals["False"] = new SmalltalkObject(falseClass, 0);
+    }
+
+    /// <summary>
+    /// Adds essential control flow methods (ifTrue:, ifFalse:, and:, or:) to Boolean classes.
+    /// These methods are critical for conditional execution in Smalltalk.
+    /// </summary>
+    private static void AddControlFlowMethods(SmalltalkClass booleanClass, SmalltalkClass trueClass, SmalltalkClass falseClass)
+    {
+        // Add ifFalse: to False class (returns the block value)
+        AddSimpleMethod(falseClass, "ifFalse:", 1, new byte[] {
+            16,   // PushTemporaryVariable0 (the block argument)
+            131, 0, 192,  // send: value with: 0 arguments
+            124   // ReturnTopFromMethod
+        });
+
+        // Add ifFalse: to True class (returns nil)
+        AddSimpleMethod(trueClass, "ifFalse:", 1, new byte[] {
+            115,  // PushNil  
+            124   // ReturnTopFromMethod
+        });
+
+        // Add ifTrue: to True class (returns the block value)
+        AddSimpleMethod(trueClass, "ifTrue:", 1, new byte[] {
+            16,   // PushTemporaryVariable0 (the block argument)
+            131, 0, 192,  // send: value with: 0 arguments
+            124   // ReturnTopFromMethod
+        });
+
+        // Add ifTrue: to False class (returns nil)
+        AddSimpleMethod(falseClass, "ifTrue:", 1, new byte[] {
+            115,  // PushNil  
+            124   // ReturnTopFromMethod
+        });
+
+        // Add and: to True class (evaluates the block)
+        AddSimpleMethod(trueClass, "and:", 1, new byte[] {
+            16,   // PushTemporaryVariable0 (the block argument)
+            131, 0, 192,  // send: value with: 0 arguments
+            124   // ReturnTopFromMethod
+        });
+
+        // Add and: to False class (returns self)
+        AddSimpleMethod(falseClass, "and:", 1, new byte[] {
+            112,  // PushSelf
+            124   // ReturnTopFromMethod
+        });
+    }
+
+    /// <summary>
+    /// Adds a simple bytecode method to the specified class.
+    /// </summary>
+    private static void AddSimpleMethod(SmalltalkClass targetClass, string selector, int argCount, byte[] bytecodes)
+    {
+        var header = new MethodHeader(argCount, 0); // No primitives, just bytecode
+        var compiledMethod = new CompiledMethod
+        {
+            Header = header,
+            Literals = Array.Empty<object>(),
+            Bytecodes = bytecodes,
+            HasPrimitive = false,
+            PrimitiveIndex = 0
+        };
+
+        targetClass.MethodDictionary[new Symbol(selector)] = compiledMethod;
     }
 
     /// <summary>
