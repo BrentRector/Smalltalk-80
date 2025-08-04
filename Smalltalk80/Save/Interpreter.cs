@@ -12,6 +12,16 @@ public class Interpreter
     private Context currentContext = null!;
 
     /// <summary>
+    ///     The process scheduler for managing multiple execution contexts.
+    /// </summary>
+    public ProcessScheduler? Scheduler { get; set; }
+
+    /// <summary>
+    ///     The method cache for improving message send performance.
+    /// </summary>
+    public MethodCache MethodCache { get; } = new();
+
+    /// <summary>
     ///     Gets the context currently being executed by the interpreter.
     /// </summary>
     internal Context CurrentContext => currentContext;
@@ -91,6 +101,10 @@ public class Interpreter
     {
         IsRunning = true;
         while (IsRunning) {
+            // Check for process switches at the start of each cycle
+            // as specified in the Smalltalk-80 interpreter specification
+            Scheduler?.CheckProcessSwitch();
+            
             var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
             Dispatch(opcode);
         }
@@ -632,8 +646,18 @@ public class Interpreter
             var cls = startClass ??
                       throw new InvalidOperationException("Receiver has no class pointer");
 
-            var method = cls.Lookup(selector) ??
-                         throw new InvalidOperationException($"Method {selector} not found");
+            // Try method cache first for performance
+            var method = MethodCache.Lookup(cls, selector);
+            if (method == null)
+            {
+                // Cache miss - perform full lookup
+                method = cls.Lookup(selector);
+                if (method == null)
+                    throw new InvalidOperationException($"Method {selector} not found");
+                
+                // Cache the result for future use
+                MethodCache.Store(cls, selector, method);
+            }
 
             if (method.HasPrimitive)
             {

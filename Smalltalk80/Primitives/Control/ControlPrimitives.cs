@@ -244,6 +244,8 @@ public static class ControlPrimitives
     /// <param name="ctx">The execution context.</param>
     public static bool FlushCache(Context ctx)
     {
+        // In a real implementation, we would flush the interpreter's method cache
+        // For now, this is a placeholder that always succeeds
         return true;
     }
 }

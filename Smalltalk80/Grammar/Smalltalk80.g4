@@ -37,6 +37,10 @@ grammar Smalltalk80;
     }
 }
 
+identifierColon
+    : IDENTIFIER COLON
+    ;
+
 // ─────────────────────────────────────────────────────────────── Entry Points
 // ───────────────────────────────────────────────────────────────
 
@@ -137,12 +141,12 @@ methodDef:
 
 methodBody:
 	statements PERIOD* BANG // standard method
-	| returnExpr BANG // short form return
+	| returnStatement BANG // short form return
 	| BANG; // empty method
 
 methodBodyNoBang:
 	statements PERIOD* // REPL-compatible
-	| returnExpr; // ^expr (no bang)
+	| returnStatement; // ^expr (no bang)
 
 methodCategoryChunk
     : {IsMethodsFor()}?
@@ -166,113 +170,111 @@ formalArg: argumentName;
 
 temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
 temporaryName: IDENTIFIER;
-// ─────────────────────────────────────────────────────────────── Statements & Expressions
-// ───────────────────────────────────────────────────────────────
 
-statements: statement (PERIOD+ statement)* PERIOD*;
+////
+/// Statements
+////
+statements
+    : statement (PERIOD+ statement)* PERIOD*
+    ;
 
-//🔧 statement: handles return and expression only
-statement: answer | expression;
+statement
+    : assignmentStatement
+    | returnStatement
+    | expressionStatement
+    ;
 
-answer: returnExpr;
+assignmentStatement
+    : variable ASSIGN expression
+    ;
 
-returnExpr: CARAT expression PERIOD?;
+returnStatement
+    : CARET expression PERIOD?
+    ;
 
-// ─────────────────────────────────────────────────────────────── Expression Parsing with Operator
-// Precedence ───────────────────────────────────────────────────────────────
+expressionStatement
+    : expression
+    ;
 
-// Expressions may be simple arithmetic, message sends, assignments, or a return expression used by
-// do-it blocks and workspace evaluations.
+////
+/// Expression structure
+////
+expression
+    : cascadeExpr
+    ;
 
-//The precedence stack:
-/* expression
-  → baseExpression
-    → returnExpr
-    → assignmentExpr
-    → comparisonExpr
-      → messageExpr
-        → lowPrecedenceExpr
-          → mediumPrecedenceExpr
-            → highPrecedenceExpr
-              → primaryExpr | prefixExpr */
+cascadeExpr
+    : messageExpr (SEMICOLON messagePart)*   // cascades
+    ;
 
+////
+/// Message expression
+////
+messageExpr
+    : messageBase (unaryMessage | binaryMessage | keywordMessage)*
+    ;
 
-// 🔧 expression: full expression, possibly with cascade
-expression: baseExpression (SEMICOLON messagePart)*;
+messageBase
+    : parenthesizedExpr
+    | block
+    | literal
+    | variable
+    ;
 
-// 🔧 baseExpression: no cascade, just real expressions
-baseExpression:
-	returnExpr
-	| assignmentExpr
-	| comparisonExpr;
+messagePart
+    : unaryMessage
+    | binaryMessage
+    | keywordMessage
+    ;
 
-messagePart: unaryMessage | binaryMessage | keywordMessage;
+////
+/// Messages
+////
+unaryMessage
+    : unarySelector
+    ;
 
-assignmentExpr: lowPrecedenceExpr ASSIGN expression;
+binaryMessage
+    : binarySelector messageBase
+    ;
 
-comparisonExpr:
-    nonKeywordMessageExpr
-        ((EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY | LT | LEQ | GT | GEQ)
-        nonKeywordMessageExpr)*
-        (unaryMessage | binaryMessage | keywordMessage)*;
+keywordMessage
+    : keywordPart+
+    ;
 
-// Like messageExpr but disallows keyword messages. This ensures keyword
-// messages following a comparison apply to the comparison result rather than
-// being parsed as part of the right-hand side expression.
-nonKeywordMessageExpr:
-    messageBase (unaryMessage | binaryMessage)*
-    | messageBase;
+keywordPart
+    : IDENTIFIER COLON messageExpr
+    ;
 
-// A message expression consists of a primary receiver followed by zero or more unary, binary, or
-// keyword messages. This aligns with the full Smalltalk message syntax while remaining simple for
-// this prototype grammar.
-messageExpr:
-	messageBase (unaryMessage | binaryMessage | keywordMessage)+
-	| messageBase;
+////
+/// Blocks and Primary Expressions
+////
+block
+    : LEFT_BRACKET blockArgs? blockTemps? statements? RIGHT_BRACKET
+    ;
 
-messageBase:
-	parenthesizedExpr
-	| returnExpr
-	| assignmentExpr
-	| lowPrecedenceExpr;
+blockArgs
+    : (COLON argumentName)+ PIPE?
+    ;
 
-lowPrecedenceExpr:
-	mediumPrecedenceExpr ((PLUS | MINUS) mediumPrecedenceExpr)*;
+argumentName
+    : IDENTIFIER
+    ;
 
-mediumPrecedenceExpr:
-	highPrecedenceExpr ((STAR | DIVIDE | MOD) highPrecedenceExpr)*;
+blockTemps
+    : PIPE temporaryName+ PIPE
+    ;
 
-highPrecedenceExpr: primaryExpr | prefixExpr;
+parenthesizedExpr
+    : LEFT_PAREN expression RIGHT_PAREN
+    ;
 
-prefixExpr: (MINUS | TILDE) primaryExpr;
-
-
-
-
-parenthesizedExpr: '(' expression ')';
-
-primaryExpr: literal | variable | block | '(' expression ')';
-
-// ─────────────────────────────────────────────────────────────── Message Parts
-// ───────────────────────────────────────────────────────────────
-
-// Unary messages have no arguments and simply apply a selector to the receiver.
-unaryMessage: unarySelector;
-binaryMessage: binarySelector expression;
-keywordMessage: keywordPart+;
-
-keywordPart: IDENTIFIER COLON expression;
-
-identifierColon: IDENTIFIER COLON;
-
-// ─────────────────────────────────────────────────────────────── Selectors
-// ───────────────────────────────────────────────────────────────
-
-// A unary selector is either an identifier (e.g., foo) or one of the special unary messages used by
-// the standard library. Supporting identifiers here allows the grammar to parse regular unary
-// method definitions and sends such as `increment` or `yourself`.
-unarySelector:
-        IDENTIFIER;
+////
+/// Selectors and Tokens
+////
+unarySelector
+    : IDENTIFIER
+    ;
 
 binarySelector:
 	// ───────────── Arithmetic Operators ─────────────
@@ -308,48 +310,29 @@ binarySelector:
 	| COMMA // ,
 	;
 
+variable
+    : IDENTIFIER
+    ;
 
-variable:
-        IDENTIFIER
-		;
+literal
+    : numberLiteral
+    | stringConst
+    | symbolConst
+    | arrayLiteral
+    | byteArrayLiteral
+    | characterLiteral
+    ;
 
-block: '[' blockArgs? blockTemps? statements? ']';
+numberLiteral      : NUMBER ;
+stringConst        : STRING ;
+characterLiteral   : CHAR_LITERAL ;
+byteArrayLiteral   : HASH LEFT_BRACKET NUMBER* RIGHT_BRACKET ;
+arrayLiteral       : HASH LEFT_PAREN arrayElement* LEFT_PAREN ;
+arrayElement       : literal | symbolName | LEFT_PAREN arrayElement* LEFT_PAREN ;
+symbolConst        : QUOTED_SYMBOL | HASH symbolName ;
+symbolName         : IDENTIFIER | unarySelector | binarySelector | keywordSymbolSelector ;
+keywordSymbolSelector : (IDENTIFIER COLON)+ ;
 
-blockArgs: (COLON argumentName)+ PIPE?;
-argumentName: IDENTIFIER;
-
-blockTemps: PIPE temporaryName+ PIPE;
-
-literal:
-	stringConst
-	| numberLiteral
-	| symbolConst
-	| arrayLiteral
-	| byteArrayLiteral
-	| characterLiteral;
-
-numberLiteral: NUMBER;
-
-stringConst: STRING;
-characterLiteral: CHAR_LITERAL;
-byteArrayLiteral: HASH '[' NUMBER* ']';
-
-// ─────────────────────────────────────────────────────────────── Arrays & Symbols
-// ───────────────────────────────────────────────────────────────
-
-arrayLiteral: HASH '(' arrayElement* ')';
-
-arrayElement: literal | symbolName | '(' arrayElement* ')';
-
-symbolConst: QUOTED_SYMBOL | HASH (symbolName);
-
-symbolName:
-        IDENTIFIER
-	| unarySelector
-	| binarySelector
-	| keywordSymbolSelector;
-
-keywordSymbolSelector: (IDENTIFIER COLON)+;
 
 // ─────────────────────────────────────────────────────────────── Other Chunks
 // ───────────────────────────────────────────────────────────────
@@ -361,21 +344,45 @@ className: IDENTIFIER;
 // ─────────────────────────────────────────────────────────────── Lexer Rules
 // ───────────────────────────────────────────────────────────────
 
-
-BANG: '!';
-COLON: ':';
-PERIOD: '.';
-ASSIGN: ':=' | '_';
-CARAT: '^';
-PIPE: '|';
-SEMICOLON: ';';
-HASH: '#';
+ASSIGN             : ':=' ;
+BIT_SHIFT_LEFT     : '<<' ;
+BIT_SHIFT_RIGHT    : '>>' ;
+INTEGER_DIVIDE     : '\\\\' ;
+MODULO             : '//' ;
+EQUAL_EQUAL        : '==' ;
+NOT_IDENTITY       : '~~' ;
+LEQ                : '<=' ;
+GEQ                : '>=' ;
+NOT_EQUAL          : '~=' ;
+PLUS               : '+' ;
+MINUS              : '-' ;
+STAR               : '*' ;
+DIVIDE             : '/' ;
+MOD                : '%' ;
+BACKSLASH          : '\\' ;
+TILDE              : '~' ;
+PIPE               : '|' ;
+BIT_AND            : '&' ;
+EQUAL              : '=' ;
+LT                 : '<' ;
+GT                 : '>' ;
+AT                 : '@' ;
+QUESTION           : '?' ;
+COMMA              : ',' ;
+CARET              : '^' ;
+HASH               : '#' ;
+BANG               : '!' ;
+COLON              : ':';
+LEFT_BRACKET       : '[';
+RIGHT_BRACKET      : ']';
+LEFT_PAREN         : '(';
+RIGHT_PAREN        : ')';
+SEMICOLON          : ';';
+PERIOD             : '.';
 
 PRIMITIVE_DECL:
 	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
 
-MINUS: '-';
-TILDE: '~';
 
 NUMBER:
 	DIGITS [rR] BASEDIGIT+ // radix
@@ -389,30 +396,6 @@ QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
 CHAR_LITERAL
     : '$!!'   		// Escaped bang: treat $!! as a single $!
     | '$' ~[\r\n]; 	// Regular character literal
-
-
-BIT_SHIFT_LEFT: '<<';
-BIT_SHIFT_RIGHT: '>>';
-MODULO: '\\\\';
-INTEGER_DIVIDE: '//';
-EQUAL_EQUAL: '==';
-NOT_EQUAL: '~=';
-NOT_IDENTITY: '~~';
-LEQ: '<=';
-GEQ: '>=';
-PLUS: '+';
-STAR: '*';
-DIVIDE: '/';
-MOD: '%';
-LT: '<';
-GT: '>';
-EQUAL: '=';
-AT: '@';
-QUESTION: '?';
-BACKSLASH: '\\';
-COMMA: ',';
-BIT_AND: '&';
-
 
 IDENTIFIER: LETTER (LETTER | DIGIT)*;
 
