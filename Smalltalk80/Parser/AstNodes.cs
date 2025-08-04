@@ -156,6 +156,13 @@ public sealed record ClassCommentNode(string ClassName, string Comment) : AstNod
 public sealed record MethodHeaderNode(string ClassName, bool IsClassSide, string Category) : AstNode;
 
 /// <summary>
+/// Node representing a method category chunk containing a header and multiple method definitions.
+/// </summary>
+/// <param name="Header">The method category header.</param>
+/// <param name="Methods">The method definitions in this category.</param>
+public sealed record MethodCategoryNode(MethodHeaderNode Header, IReadOnlyList<MethodDefinitionNode> Methods) : AstNode;
+
+/// <summary>
 /// Node representing a method definition.
 /// </summary>
 /// <param name="Selector">The method selector.</param>

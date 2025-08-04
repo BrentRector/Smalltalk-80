@@ -23,9 +23,16 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
     {
-        var variable = context.variable().GetText();
-        var value = (ExpressionNode)Visit(context.assignmentExpr())!;
-        return new AssignmentExpression(variable, value);
+        // Check if this is an assignment (variable ASSIGN assignmentExpr)
+        if (context.variable() != null && context.ASSIGN() != null && context.assignmentExpr() != null)
+        {
+            var variable = context.variable().GetText();
+            var value = (ExpressionNode)Visit(context.assignmentExpr())!;
+            return new AssignmentExpression(variable, value);
+        }
+
+        // Otherwise, it's just a cascade expression
+        return Visit(context.cascadeExpr());
     }
 
     /// <summary>

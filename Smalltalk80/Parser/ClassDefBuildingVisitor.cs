@@ -92,11 +92,27 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
     public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
     {
         var className = context.className().GetText();
-        var isClassSide = context.GetText().Contains(" class ");
+        var contextText = context.GetText();
+
+        // More robust class side detection - check if "class" appears after the class name
+        var isClassSide = contextText.Contains($"{className}class");
+
         var categoryString = context.stringConst().GetText();
         var category = categoryString.Substring(1, categoryString.Length - 2);
 
-        return new MethodHeaderNode(className, isClassSide, category);
+        var header = new MethodHeaderNode(className, isClassSide, category);
+
+        // Process all method definitions in this category
+        var methods = new List<MethodDefinitionNode>();
+        foreach (var methodDefContext in context.methodDef())
+        {
+            if (Visit(methodDefContext) is MethodDefinitionNode methodDef)
+            {
+                methods.Add(methodDef);
+            }
+        }
+
+        return new MethodCategoryNode(header, methods);
     }
 
     /// <summary>
@@ -125,7 +141,7 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
         // Parse primitive declaration
         bool hasPrimitive = primitiveCtx != null;
         int primitiveIndex = 0;
-        if (hasPrimitive)
+        if (hasPrimitive && primitiveCtx != null)
         {
             var primitiveText = primitiveCtx.GetText();
             // Extract number from "<primitive: N>"
@@ -152,12 +168,19 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
 
         var sequence = new SequenceNode(temporaries, statements);
 
+        // Extract just the method body source (not the header), and remove trailing BANG
+        var methodBodySource = body?.GetText() ?? "";
+        if (methodBodySource.EndsWith("!"))
+        {
+            methodBodySource = methodBodySource.Substring(0, methodBodySource.Length - 1);
+        }
+
         return new MethodDefinitionNode(
             selector,
             arguments,
             sequence,
             null, // comment - TODO: Extract from comments
-            context.GetText(), // source
+            methodBodySource, // source - just the body without BANG
             hasPrimitive,
             primitiveIndex
         );

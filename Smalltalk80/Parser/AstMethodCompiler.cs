@@ -219,6 +219,26 @@ public static class AstMethodCompiler
 
         private void EmitVariable(string name)
         {
+            // Handle pseudo variables first
+            switch (name)
+            {
+                case "self":
+                    bytecodes.Add((byte)Bytecode.PushSelf);
+                    return;
+                case "super":
+                    bytecodes.Add((byte)Bytecode.PushSelf);
+                    return;
+                case "nil":
+                    bytecodes.Add((byte)Bytecode.PushNil);
+                    return;
+                case "true":
+                    bytecodes.Add((byte)Bytecode.PushTrue);
+                    return;
+                case "false":
+                    bytecodes.Add((byte)Bytecode.PushFalse);
+                    return;
+            }
+
             if (temporaries.TryGetValue(name, out var index))
             {
                 if (index < 16)
@@ -247,7 +267,7 @@ public static class AstMethodCompiler
                 return;
             }
 
-            throw new InvalidOperationException($"Unknown variable '{name}'");
+            throw new InvalidOperationException($"Unknown variable '{name}'. Available temporaries: [{string.Join(", ", temporaries.Keys)}]. Instance variables: [{string.Join(", ", instanceVariables)}]");
         }
 
         private void StoreVariable(string name)

@@ -37,6 +37,37 @@ public static class FileInLoader
                     currentHeader = header;
                     break;
 
+                case MethodCategoryNode methodCategory:
+                    currentHeader = methodCategory.Header;
+                    // Process all methods in the category
+                    var categoryClass = SystemDictionary.DefineClass(currentHeader.ClassName);
+                    var categoryVars = currentHeader.IsClassSide ? categoryClass.ClassVariables : categoryClass.InstanceVariables;
+
+                    foreach (var method in methodCategory.Methods)
+                    {
+                        // Use the already-parsed sequence from the ClassDefBuildingVisitor
+                        var categoryCompiled = AstMethodCompiler.CompileMethod(
+                            method.Body,
+                            method.Arguments,
+                            categoryVars,
+                            method.HasPrimitive,
+                            method.PrimitiveIndex);
+
+                        categoryCompiled = new CompiledMethod
+                        {
+                            Header = categoryCompiled.Header,
+                            Bytecodes = categoryCompiled.Bytecodes,
+                            Literals = categoryCompiled.Literals,
+                            TemporariesCount = categoryCompiled.TemporariesCount,
+                            HasPrimitive = method.HasPrimitive,
+                            PrimitiveIndex = method.PrimitiveIndex,
+                            Comment = categoryCompiled.Comment
+                        };
+
+                        categoryClass.MethodDictionary[new Symbol(method.Selector)] = categoryCompiled;
+                    }
+                    break;
+
                 case MethodDefinitionNode method when currentHeader is not null:
                     var cls = SystemDictionary.DefineClass(currentHeader.ClassName);
                     var vars = currentHeader.IsClassSide ? cls.ClassVariables : cls.InstanceVariables;
