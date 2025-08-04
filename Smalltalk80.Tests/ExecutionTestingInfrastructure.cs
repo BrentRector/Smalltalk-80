@@ -39,7 +39,7 @@ Object subclass: #Counter
 
 !Counter methodsFor: 'initialization'!
 initialize
-    count := 0.
+    count _ 0.
     ^self
 ! !
 
@@ -95,6 +95,7 @@ incrementBy: amount
         // Create interpreter and execute
         var interpreter = new Interpreter();
         interpreter.SetActiveContext(counterInstance, initializeMethod);
+        interpreter.ExecuteMethod(); // Actually execute the initialize method
 
         // Execute and verify results
         ExecuteMethodAndVerifyResult(interpreter, counterInstance, "count", 0);

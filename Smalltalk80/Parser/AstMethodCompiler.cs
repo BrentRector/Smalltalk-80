@@ -108,6 +108,11 @@ public static class AstMethodCompiler
 
         private void CompileExpression(ExpressionNode expression)
         {
+            if (expression == null)
+            {
+                throw new InvalidOperationException("Expression node is null - this indicates an issue in AST construction");
+            }
+
             switch (expression)
             {
                 case LiteralExpression lit:
