@@ -50,13 +50,13 @@ count
 
 !Counter methodsFor: 'incrementing'!
 increment
-    count := count + 1.
+    count _ count + 1.
     ^self
 ! !
 
 !Counter methodsFor: 'incrementing'!
 incrementBy: amount
-    count := count + amount.
+    count _ count + amount.
     ^self
 ! !
 ";

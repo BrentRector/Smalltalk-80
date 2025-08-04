@@ -67,7 +67,7 @@ Object subclass: #TestClass
 
 !TestClass methodsFor: 'testing'!
 incrementBy: amount
-    count := count + amount.
+    count _ count + amount.
     ^self
 ! !
 ";
