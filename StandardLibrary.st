@@ -539,7 +539,7 @@ asOop
 
 initialize
 	"Initialize the SmallInteger class."
-	Digitbuffer := String new: 40! !
+	Digitbuffer _ String new: 40! !
 
 Integer variableByteSubclass: #LargePositiveInteger
 	instanceVariableNames: ''
@@ -721,7 +721,7 @@ space
 
 initialize
 	"Initialize the Character table."
-	CharacterTable := Array new: 256.
+	CharacterTable _ Array new: 256.
 	0 to: 255 do: [:i | CharacterTable at: i + 1 put: (self basicNew value: i)]! !
 
 !UndefinedObject methodsFor: 'testing'!
@@ -745,13 +745,13 @@ Object subclass: #Collection
 	poolDictionaries: ''
 	category: 'Collections-Abstract'!
 
-Collection variableSubclass: #Array
+SequenceableCollection variableSubclass: #Array
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Collections-Sequenceable'!
 
-Collection variableByteSubclass: #String
+SequenceableCollection variableByteSubclass: #String
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -875,6 +875,623 @@ errorImproperStore
 maxPrint
 	"Answer the maximum number of characters to use when printing the receiver."
 	^5000! !
+
+Collection subclass: #SequenceableCollection
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Abstract'!
+
+!SequenceableCollection methodsFor: 'comparing'!
+= otherCollection 
+	"Answer whether the species of the receiver is the same as otherCollection's species,
+	and the receiver's size is the same as otherCollection's size, and each of the receiver's
+	elements equal the corresponding element of otherCollection"
+
+	| size index |
+	(size _ self size) = otherCollection size ifFalse: [^false].
+	self species == otherCollection species ifFalse: [^false].
+	index _ 0.
+	[(index _ index + 1) <= size]
+		whileTrue: [(self at: index) = (otherCollection at: index) ifFalse: [^false]].
+	^true! !
+
+!SequenceableCollection methodsFor: 'accessing'!
+atAll: anInterval put: anObject 
+	"Put anObject at every index specified by the integer elements of anInterval."
+
+	anInterval do: [:index | self at: index put: anObject]!
+atAllPut: anObject 
+	"Put anObject at every one of the receiver's indices."
+
+	| index size |
+	index _ 0.
+	size _ self size.
+	[(index _ index + 1) <= size]
+		whileTrue: [self at: index put: anObject]!
+first
+	"Answer the first element of the receiver.  Create an error if the receiver
+	contains no elements."
+
+	self emptyCheck.
+	^self at: 1!
+indexOf: anElement 
+	"Answer the index of anElement within the receiver.  If the receiver does
+	not contain anElement, answer 0."
+
+	^self indexOf: anElement ifAbsent: [0]!
+indexOf: anElement ifAbsent: exceptionBlock 
+	"Answer the index of anElement within the receiver.  If the receiver does
+	not contain anElement, answer the result of evaluating the exceptionBlock."
+
+	(1 to: self size)
+		do: [:i | (self at: i) = anElement ifTrue: [^i]].
+	^exceptionBlock value!
+last
+	"Answer the last element of the receiver.  Create an error if the receiver
+	contains no elements."
+
+	self emptyCheck.
+	^self at: self size!
+replaceFrom: start to: stop with: replacement 
+	"This destructively replaces elements from start to stop in the receiver.  
+	Answer the receiver itself.
+	Use copyReplaceFrom:to:with: for insertion/deletion which may alter the 
+	size of the result."
+
+	replacement size = (stop - start + 1)
+		ifFalse: [self error: 'Size of replacement doesnt match'].
+	^self replaceFrom: start to: stop with: replacement startingAt: 1!
+replaceFrom: start to: stop with: replacement startingAt: repStart 
+	"This destructively replaces elements from start to stop in the receiver
+	starting at index, repStart, in the collection, replacement.  Answer the
+	receiver.  No range checks are performed - this may be primitively implemented."
+
+	| index repOff |
+	repOff _ repStart - start.
+	index _ start - 1.
+	[(index _ index + 1) <= stop]
+		whileTrue: [self at: index put: (replacement at: repOff + index)]!
+size
+	self subclassResponsibility! !
+
+!SequenceableCollection methodsFor: 'adding'!
+grow
+	"The receiver becomes bigger--this is not a copy of the receiver, so all shared references survive."
+
+	| newArray |
+	newArray _ self species new: self size + self growSize.
+	newArray replaceFrom: 1 to: self size with: self.
+	^self become: newArray! !
+
+!SequenceableCollection methodsFor: 'removing'!
+remove: oldObject ifAbsent: anExceptionBlock 
+	"SequencableCollections cannot implement removing."
+
+	self shouldNotImplement! !
+
+!SequenceableCollection methodsFor: 'copying'!
+, aSequenceableCollection 
+	"Answer with a copy of the receiver concatenated with the argument,
+	a SequencableCollection."
+	
+	^self copyReplaceFrom: self size + 1
+		  to: self size
+		  with: aSequenceableCollection!
+copyFrom: start to: stop 
+	"Answer a copy of a subset of the receiver, starting from element at index start 
+	until element at index stop."
+
+	| newSize |
+	newSize _ stop - start + 1.
+	^(self species new: newSize)
+		replaceFrom: 1
+		to: newSize
+		with: self
+		startingAt: start!
+copyReplaceFrom: start to: stop with: replacementCollection 
+	"Answer a copy of the receiver satisfying the following conditions:
+
+	If stop is less than start, then this is an insertion;  
+		stop should be exactly start-1,  
+		start = 1 means insert before the first character,  
+		start = size+1 means append after last character.  
+	Otherwise, this is a replacement;  
+		start and stop have to be within the receiver's bounds."
+
+	| newSequenceableCollection newSize endReplacement |
+	newSize _ self size - (stop - start + 1) + replacementCollection size.
+	endReplacement _ start - 1 + replacementCollection size.
+	newSequenceableCollection _ self species new: newSize.
+	newSequenceableCollection
+		replaceFrom: 1
+		to: start - 1
+		with: self
+		startingAt: 1.
+	newSequenceableCollection
+		replaceFrom: start
+		to: endReplacement
+		with: replacementCollection
+		startingAt: 1.
+	newSequenceableCollection
+		replaceFrom: endReplacement + 1
+		to: newSize
+		with: self
+		startingAt: stop + 1.
+	^newSequenceableCollection!
+copyWith: newElement 
+	"Answer a copy of the receiver that is 1 bigger than the receiver and has 
+	newElement at the last element."
+
+	| newIC |
+	newIC _ self species new: self size + 1.
+	newIC 
+		replaceFrom: 1
+		to: self size
+		with: self
+		startingAt: 1.
+	newIC at: newIC size put: newElement.
+	^newIC!
+copyWithout: oldElement 
+	"Answer a copy of the receiver in which all occurrences of oldElement
+	have been left out."
+
+	| aStream |
+	aStream _ WriteStream on: (self species new: self size).
+	self do: [:each | oldElement = each ifFalse: [aStream nextPut: each]].
+	^aStream contents!
+shallowCopy
+	^self copyFrom: 1 to: self size! !
+
+!SequenceableCollection methodsFor: 'enumerating'!
+collect: aBlock 
+	| aStream index length |
+	aStream _ WriteStream on: (self species new: self size).
+	index _ 0.
+	length _ self size.
+	[(index _ index + 1) <= length]
+		whileTrue: [aStream nextPut: (aBlock value: (self at: index))].
+	^aStream contents!
+do: aBlock 
+	| index length |
+	index _ 0.
+	length _ self size.
+	[(index _ index + 1) <= length]
+		whileTrue: [aBlock value: (self at: index)]!
+findFirst: aBlock
+	"Return the index of my first element for which aBlock evaluates as true."
+
+	| index |
+	index _ 0.
+	[(index _ index + 1) <= self size] whileTrue:
+		[(aBlock value: (self at: index)) ifTrue: [^index]].
+	^ 0!
+findLast: aBlock
+	"Return the index of my last element for which aBlock evaluates as true."
+
+	| index |
+	index _ self size + 1.
+	[(index _ index - 1) >= 1] whileTrue:
+		[(aBlock value: (self at: index)) ifTrue: [^index]].
+	^ 0!
+reverse
+	"Answer with a new collection like me with its elements in the opposite order."
+
+	| aStream index length |
+	aStream _ WriteStream on: (self species new: self size).
+	index _ self size + 1.
+	[(index _ index - 1) > 0]
+		whileTrue: [aStream nextPut: (self at: index)].
+	^aStream contents!
+reverseDo: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument, starting
+	with the last element and taking each in sequence up to the first.  For
+	SequenceableCollections, this is the reverse of the enumeration in do:."
+
+	self size to: 1 by: -1 do: [:index | aBlock value: (self at: index)]!
+select: aBlock 
+	| aStream index length |
+	aStream _ WriteStream on: (self species new: self size).
+	index _ 0.
+	length _ self size.
+	[(index _ index + 1) <= length]
+		whileTrue: 
+			[(aBlock value: (self at: index)) ifTrue: [aStream nextPut: (self at: index)]].
+	^aStream contents!
+with: aSequenceableCollection do: aBlock 
+	"Evaluate aBlock with each of the receiver's elements along with the corresponding
+	element from aSequencableCollection."
+
+	| otherCollection |
+	self size ~= aSequenceableCollection size ifTrue: [^self errorNoMatch].
+	otherCollection _ ReadStream on: aSequenceableCollection.
+	self do: [:each | aBlock value: each value: otherCollection next]! !
+
+!SequenceableCollection methodsFor: 'converting'!
+asArray
+	"Answer a new instance of Array whose elements are the elements of
+	the receiver, in the same order."
+
+	| newArray |
+	newArray _ Array new: self size.
+	1 to: self size do: [:index | newArray at: index put: (self at: index)].
+	^newArray! !
+
+!SequenceableCollection methodsFor: 'private'!
+emptyCheck
+	"Check that the receiver contains elements."
+	self size = 0 ifTrue: [self error: 'attempt to index empty collection']!
+errorOutOfBounds
+	self error: 'indices are out of bounds'!
+errorNoMatch
+	self error: 'collections are of different sizes'!
+growSize
+	"Answer how much larger to make the receiver when it grows."
+	^self size max: 4!
+swap: oneIndex with: anotherIndex 
+	"Move the element at oneIndex to anotherIndex, and vice-versa."
+
+	| element |
+	element _ self at: oneIndex.
+	self at: oneIndex put: (self at: anotherIndex).
+	self at: anotherIndex put: element! !
+
+SequenceableCollection variableSubclass: #OrderedCollection
+	instanceVariableNames: 'firstIndex lastIndex'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Sequenceable'!
+
+!OrderedCollection methodsFor: 'accessing'!
+after: oldObject 
+	"Answer the element after oldObject.  If the receiver does not contain oldObject
+	or if the receiver contains no elements after oldObject, create an error message."
+
+	| index |
+	index _ self find: oldObject.
+	index = lastIndex
+		ifTrue: [^self errorLastObject]
+		ifFalse: [^self basicAt: index + 1]!
+at: anInteger 
+	"Answer with my element at index anInteger.
+	at: is used by a knowledgeable client to access an existing element"
+
+	(anInteger < 1 or: [anInteger + firstIndex - 1 > lastIndex])
+		ifTrue: [self errorNoSuchElement]
+		ifFalse: [^super at: anInteger + firstIndex - 1]!
+at: anInteger put: anObject 
+	"Put anObject at element index anInteger.
+	at:put: can not be used to append, front or back, to an ordered collection; 
+	 it is used by a knowledgeable client to replace an element"
+
+	| index |
+	index _ anInteger truncated.
+	(index < 1 or: [index + firstIndex - 1 > lastIndex])
+		ifTrue: [self errorNoSuchElement]
+		ifFalse: [^super at: index + firstIndex - 1 put: anObject]!
+before: oldObject 
+	"Answer the element before oldObject.  If the receiver does not contain oldObject
+	or if the receiver contains no elements before oldObject, create an error message."
+
+	| index |
+	index _ self find: oldObject.
+	index = firstIndex
+		ifTrue: [^self errorFirstObject]
+		ifFalse: [^self basicAt: index - 1]!
+first
+	"Answer the first element.  If the receiver is empty, create an errror message.
+	This is a little faster than the implementation in the superclass"
+
+	self emptyCheck.
+	^self basicAt: firstIndex!
+last
+	"Answer the last element.  If the receiver is empty, create an errror message.
+	This is a little faster than the implementation in the superclass"
+
+	self emptyCheck.
+	^self basicAt: lastIndex!
+size
+	^lastIndex - firstIndex + 1! !
+
+!OrderedCollection methodsFor: 'copying'!
+copyEmpty
+	"Answer a copy of the receiver that contains no elements."
+
+	^self species new!
+copyFrom: startIndex to: endIndex 
+	"Answer a copy of the receiver that contains elements from position startIndex
+	to endIndex."
+
+	| targetCollection index |
+	endIndex < startIndex ifTrue: [^self species new: 0].
+	targetCollection _ self species new: endIndex + 1 - startIndex.
+	startIndex to: endIndex do: [:index | targetCollection add: (self at: index)].
+	^targetCollection!
+copyReplaceFrom: start to: stop with: replacementCollection 
+	"Answer a copy of the receiver with replacementCollection's elements
+	in place of the receiver's start'th to stop'th elements.
+	This does not expect a 1-1 map from replacementCollection to the 
+	start to stop elements, so it will do an insert or append."
+
+	| newOrderedCollection delta newIndex index mySize startIndex stopIndex |
+	"if start is less than 1, ignore stop and assume this is inserting at the front. 
+	if start greater than self size, ignore stop and assume this is appending. 
+	otherwise, it is replacing part of me and start and stop have to be within my 
+	bounds. "
+	delta _ 0.
+	startIndex _ start.
+	stopIndex _ stop.
+	start < 1
+		ifTrue: [startIndex _ stopIndex _ 0]
+		ifFalse: [startIndex > self size
+				ifTrue: [startIndex _ stopIndex _ self size + 1]
+				ifFalse: 
+					[(stopIndex < (startIndex - 1) or: [stopIndex > self size])
+						ifTrue: [self errorOutOfBounds].
+					delta _ stopIndex - startIndex + 1]].
+	newOrderedCollection _ 
+		self species new: self size + replacementCollection size - delta.
+	1 to: startIndex - 1 do: [:index | newOrderedCollection add: (self at: index)].
+	1 to: replacementCollection size do: 
+		[:index | newOrderedCollection add: (replacementCollection at: index)].
+	stopIndex + 1 to: self size do: [:index | newOrderedCollection add: (self at: index)].
+	^newOrderedCollection!
+copyWith: newElement 
+	"Answer a copy of the receiver that is 1 bigger than the receiver and 
+	includes the argument, newElement, at the end."
+
+	| newCollection |
+	newCollection _ self copy.
+	newCollection add: newElement.
+	^newCollection!
+copyWithout: oldElement 
+	"Answer a copy of the receiver that does not contain any elements equal
+	to oldElement."
+
+	| newCollection each |
+	newCollection _ self species new: self size.
+	self do: [:each | oldElement = each ifFalse: [newCollection add: each]].
+	^newCollection! !
+
+!OrderedCollection methodsFor: 'adding'!
+add: newObject 
+	^self addLast: newObject!
+add: newObject after: oldObject 
+	"Add the argument, newObject, as an element of the receiver.  Put it
+	in the position just succeeding oldObject.  Answer newObject."
+	
+	| index |
+	index _ self find: oldObject.
+	self insert: newObject before: index + 1.
+	^newObject!
+add: newObject before: oldObject 
+	"Add the argument, newObject, as an element of the receiver.  Put it
+	in the position just preceding oldObject.  Answer newObject."
+	
+	| index |
+	index _ self find: oldObject.
+	self insert: newObject before: index.
+	^newObject!
+addAll: anOrderedCollection 
+	"Add each element of anOrderedCollection at my end.  Answer anOrderedCollection."
+
+	^self addAllLast: anOrderedCollection!
+addAllFirst: anOrderedCollection 
+	"Add each element of anOrderedCollection at the beginning of the receiver.	
+	Answer anOrderedCollection."
+
+	anOrderedCollection reverseDo: [:each | self addFirst: each].
+	^anOrderedCollection!
+addAllLast: anOrderedCollection 
+	"Add each element of anOrderedCollection at the end of the receiver.  Answer
+	anOrderedCollection."
+
+	anOrderedCollection do: [:each | self addLast: each].
+	^anOrderedCollection!
+addFirst: newObject 
+	"Add newObject to the beginning of the receiver.  Add newObject."
+
+	firstIndex = 1 ifTrue: [self makeRoomAtFirst].
+	firstIndex _ firstIndex - 1.
+	self basicAt: firstIndex put: newObject.
+	^newObject!
+addLast: newObject 
+	"Add newObject to the end of the receiver.  Answer newObject."
+
+	lastIndex = self basicSize ifTrue: [self makeRoomAtLast].
+	lastIndex _ lastIndex + 1.
+	self basicAt: lastIndex put: newObject.
+	^newObject!
+grow
+	"Become larger.
+	Typically, a subclass has to override this if the subclass adds instance variables"
+
+	| newSelf |
+	newSelf _ self species new: self size + self growSize.
+	self do: [:each | newSelf addLast: each].
+	self become: newSelf! !
+
+!OrderedCollection methodsFor: 'removing'!
+remove: oldObject ifAbsent: absentBlock 
+	| index |
+	index _ firstIndex.
+	[index <= lastIndex]
+		whileTrue: 
+			[oldObject = (self basicAt: index)
+				ifTrue: 
+					[self removeIndex: index.
+					^oldObject]
+				ifFalse: [index _ index + 1]].
+	^absentBlock value!
+removeAllSuchThat: aBlock 
+	"Evaluate aBlock for each element of the receiver.  Remove each element for
+	which aBlock evaluates to true.  
+	A subclass might have to override this message to initialize additional instance 
+	variables for newCollection"
+
+	| index element newCollection |
+	newCollection _ self species new.
+	index _ firstIndex.
+	[index <= lastIndex]
+		whileTrue: 
+			[element _ self basicAt: index.
+			(aBlock value: element)
+				ifTrue: 
+					[newCollection add: element.
+					self removeIndex: index]
+				ifFalse: [index _ index + 1]].
+	^newCollection!
+removeFirst
+	"Remove the first element of the receiver.  If the receiver is empty, create an error
+	message."
+
+	| firstObject |
+	self emptyCheck.
+	firstObject _ self basicAt: firstIndex.
+	self basicAt: firstIndex put: nil.
+	firstIndex _ firstIndex + 1.
+	^firstObject!
+removeLast
+	"Remove the last element of the receiver.  If the receiver is empty, create an error
+	message."
+
+	| lastObject |
+	self emptyCheck.
+	lastObject _ self basicAt: lastIndex.
+	self basicAt: lastIndex put: nil.
+	lastIndex _ lastIndex - 1.
+	^lastObject! !
+
+!OrderedCollection methodsFor: 'enumerating'!
+collect: aBlock 
+	"Evaluate aBlock with each of my elements as the argument.  Collect the 
+	resulting values into a collection that is like me.  Answer with the new 
+	collection. Override superclass in order to use add:, not at:put:."
+
+	| newCollection |
+	newCollection _ self species new.
+	self do: [:each | newCollection add: (aBlock value: each)].
+	^newCollection!
+do: aBlock 
+	"override the superclass for performance"
+
+	| index |
+	index _ firstIndex.
+	[index <= lastIndex]
+		whileTrue: 
+			[aBlock value: (self basicAt: index).
+			index _ index + 1]!
+reverse
+	"Answer with a new collection like me with its elements in the opposite order.
+	Override superclass in order to use add:, not at:put:."
+
+	| newCollection |
+	newCollection _ self species new.
+	self reverseDo: [:each | newCollection add: each].
+	^newCollection!
+reverseDo: aBlock 
+	"override the superclass for performance"
+
+	| index |
+	index _ lastIndex.
+	[index >= firstIndex]
+		whileTrue: 
+			[aBlock value: (self basicAt: index).
+			index _ index - 1]!
+select: aBlock 
+	"Evaluate aBlock with each of my elements as the argument.  Collect into a new 
+	collection like me, only those elements for which aBlock evaluates to true. 
+	Override superclass in order to use add:, not at:put:."
+
+	| newCollection |
+	newCollection _ self copyEmpty.
+	self do: [:each | (aBlock value: each) ifTrue: [newCollection add: each]].
+	^newCollection! !
+
+!OrderedCollection methodsFor: 'private'!
+errorFirstObject
+	self error: 'specified object is first object'!
+errorLastObject
+	self error: 'specified object is last object'!
+errorNoSuchElement
+	self error: 'attempt to index non-existent element in an ordered collection'!
+errorNotFound
+	self error: 'element not found'!
+find: oldObject 
+	| index |
+	index _ firstIndex.
+	[index <= lastIndex and: [oldObject ~= (self basicAt: index)]]
+		whileTrue: [index _ index + 1].
+	index <= lastIndex
+		ifTrue: [^index]
+		ifFalse: [self errorNotFound]!
+insert: anObject before: spot 
+	| index delta spotIndex|
+	spotIndex _ spot.
+	delta _ spotIndex - firstIndex.
+	firstIndex = 1
+		ifTrue: 
+			[self makeRoomAtFirst.
+			spotIndex _ firstIndex + delta].
+	index _ firstIndex _ firstIndex - 1.
+	[index < (spotIndex - 1)]
+		whileTrue: 
+			[self basicAt: index put: (self basicAt: index + 1).
+			index _ index + 1].
+	self basicAt: index put: anObject.
+	^anObject!
+makeRoomAtFirst
+	| delta index |
+	delta _ self basicSize - self size.
+	delta = 0
+		ifTrue: 
+			[self grow.
+			delta _ self basicSize - self size].
+	lastIndex = self basicSize ifTrue: [^self].
+	"just in case we got lucky"
+	index _ self basicSize.
+	[index > delta]
+		whileTrue: 
+			[self basicAt: index put: (self basicAt: index - delta + firstIndex - 1).
+			self basicAt: index - delta + firstIndex - 1 put: nil.
+			index _ index - 1].
+	firstIndex _ delta + 1.
+	lastIndex _ self basicSize!
+makeRoomAtLast
+	| index newLast |
+	newLast _ self size.
+	self basicSize - self size = 0 ifTrue: [self grow].
+	firstIndex = 1 ifTrue: [^self].
+	"we might be here under false premises or grow did the job for us"
+	index _ 1.
+	[index <= newLast]
+		whileTrue: 
+			[self basicAt: index put: (self basicAt: index + firstIndex - 1).
+			self basicAt: index + firstIndex - 1 put: nil.
+			index _ index + 1].
+	firstIndex _ 1.
+	lastIndex _ newLast!
+removeIndex: removedIndex 
+	| index |
+	index _ removedIndex.
+	[index < lastIndex]
+		whileTrue: 
+			[self basicAt: index put: (self basicAt: index + 1).
+			index _ index + 1].
+	self basicAt: lastIndex put: nil.
+	lastIndex _ lastIndex - 1!
+setIndices
+	firstIndex _ self basicSize // 2 max: 1.
+	lastIndex _ firstIndex - 1 max: 0! !
+
+!OrderedCollection class methodsFor: 'instance creation'!
+new
+	^self new: 10!
+new: anInteger 
+	"If a subclass adds fields, then it is necessary for that subclass to reimplement 
+	new: "
+
+	^(super new: anInteger) setIndices! !
 
 !Array methodsFor: 'accessing'!
 
