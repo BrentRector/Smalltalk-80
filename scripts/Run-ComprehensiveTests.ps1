@@ -9,6 +9,10 @@ param(
     [string]$OutputPath = $null
 )
 
+# Set UTF-8 encoding for proper character display
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # Configuration
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $SmalltalkProject = "Smalltalk80/Smalltalk80.csproj"
@@ -57,10 +61,11 @@ function Write-TestResult {
         Write-ColorOutput "❌ FAILED: $TestName" $Red
     }
     
-    if ($Verbose -or -not $Success) {
-        Write-ColorOutput "--- Output ---" $Yellow
+    # Always show output to capture individual test counts
+    if ($Output) {
+        Write-ColorOutput "--- Test Details ---" $Yellow
         Write-Host $Output
-        Write-ColorOutput "--- End Output ---" $Yellow
+        Write-ColorOutput "--- End Details ---" $Yellow
     }
 }
 
@@ -69,17 +74,20 @@ function Invoke-SmalltalkTest {
     
     Write-TestHeader $TestName
     
-    # Build command with proper dependency order
+    # Build command with proper dependency order and test execution
     # 1. Standard Library (automatically loaded)
     # 2. Test Framework (TestLibrary.st)
     # 3. Test Case file
+    # 4. Execute the test
+    $TestClassName = $TestName
     $Command = "dotnet"
     $Arguments = @(
         "run",
         "--project", $SmalltalkProject,
         "--",
         "--source", $TestLibrary,
-        "--source", $TestFile
+        "--source", $TestFile,
+        "-e", "$TestClassName new performTest"
     )
     
     if ($Verbose) {
@@ -87,9 +95,28 @@ function Invoke-SmalltalkTest {
     }
     
     try {
-        # Execute the test
-        $Output = & $Command @Arguments 2>&1
+        # Execute the test with UTF-8 encoding and filter debug output
+        $env:DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = $false
+        $AllOutput = & $Command @Arguments 2>&1
         $ExitCode = $LASTEXITCODE
+        
+        # Filter out debug and system messages, keep only actual test results
+        $FilteredOutput = $AllOutput | Where-Object {
+            $_ -notmatch '\[DEBUG_PARSER\]' -and
+            $_ -notmatch '\[SYSTEM_IMAGE\]' -and
+            $_ -notmatch '\[BOOTSTRAP\]' -and
+            $_ -notmatch 'Smalltalk-80 System Boot' -and
+            $_ -notmatch 'Class \w+' -and
+            $_ -notmatch '#\w+' -and
+            $_ -notmatch 'Successfully loaded' -and
+            $_ -notmatch 'Loaded \d+ classes' -and
+            $_ -notmatch 'Starting Smalltalk-80 REPL' -and
+            $_ -notmatch 'Smalltalk>' -and
+            $_ -notmatch 'Commands: LoadFile' -and
+            $_.ToString().Trim() -ne ''
+        }
+        
+        $Output = ($FilteredOutput | Out-String).Trim()
         
         # Log the results
         $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -103,8 +130,10 @@ $Output
 "@
         Add-Content -Path $LogFile -Value $LogEntry
         
-        # Determine success based on exit code and output
-        $Success = $ExitCode -eq 0 -and $Output -notmatch "Error|Exception|Failed"
+        # Determine success based on test output content
+        $Success = $ExitCode -eq 0 -and 
+        $Output -notmatch "Error|Exception|Failed" -and
+        $Output -match "tests run|ALL PASSED|PASSED"
         
         Write-TestResult $TestName $Success $Output
         return $Success

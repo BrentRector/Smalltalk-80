@@ -16,15 +16,15 @@ public static class Primitives
     private static readonly Dictionary<int, PrimitiveHandler> Handlers = new()
     {
         // SmallInteger primitives
-        [1]  = IntegerPrimitives.Add,
-        [2]  = IntegerPrimitives.Subtract,
-        [3]  = IntegerPrimitives.LessThan,
-        [4]  = IntegerPrimitives.GreaterThan,
-        [5]  = IntegerPrimitives.LessOrEqual,
-        [6]  = IntegerPrimitives.GreaterOrEqual,
-        [7]  = IntegerPrimitives.Equals,
-        [8]  = IntegerPrimitives.NotEqual,
-        [9]  = IntegerPrimitives.Multiply,
+        [1] = IntegerPrimitives.Add,
+        [2] = IntegerPrimitives.Subtract,
+        [3] = IntegerPrimitives.LessThan,
+        [4] = IntegerPrimitives.GreaterThan,
+        [5] = IntegerPrimitives.LessOrEqual,
+        [6] = IntegerPrimitives.GreaterOrEqual,
+        [7] = IntegerPrimitives.Equals,
+        [8] = IntegerPrimitives.NotEqual,
+        [9] = IntegerPrimitives.Multiply,
         [10] = IntegerPrimitives.Divide,
         [11] = IntegerPrimitives.Mod,
         [12] = IntegerPrimitives.Div,
@@ -106,16 +106,16 @@ public static class Primitives
         [89] = ControlPrimitives.FlushCache,
 
         // Input/output primitives
-        [90]  = InputOutputPrimitives.MousePoint,
-        [91]  = InputOutputPrimitives.CursorLocPut,
-        [92]  = InputOutputPrimitives.CursorLink,
-        [93]  = InputOutputPrimitives.InputSemaphore,
-        [94]  = InputOutputPrimitives.SampleInterval,
-        [95]  = InputOutputPrimitives.InputWord,
-        [96]  = InputOutputPrimitives.CopyBits,
-        [97]  = InputOutputPrimitives.Snapshot,
-        [98]  = InputOutputPrimitives.TimeWordsInto,
-        [99]  = InputOutputPrimitives.TickWordsInto,
+        [90] = InputOutputPrimitives.MousePoint,
+        [91] = InputOutputPrimitives.CursorLocPut,
+        [92] = InputOutputPrimitives.CursorLink,
+        [93] = InputOutputPrimitives.InputSemaphore,
+        [94] = InputOutputPrimitives.SampleInterval,
+        [95] = InputOutputPrimitives.InputWord,
+        [96] = InputOutputPrimitives.CopyBits,
+        [97] = InputOutputPrimitives.Snapshot,
+        [98] = InputOutputPrimitives.TimeWordsInto,
+        [99] = InputOutputPrimitives.TickWordsInto,
         [100] = InputOutputPrimitives.SignalAtTick,
         [101] = InputOutputPrimitives.BeCursor,
         [102] = InputOutputPrimitives.BeDisplay,
@@ -131,12 +131,30 @@ public static class Primitives
         [114] = SystemPrimitives.ExitToDebugger,
         [115] = SystemPrimitives.OopsLeft,
         [116] = SystemPrimitives.SignalAtOopsLeftWordsLeft,
+
+        // File system primitives
+        [142] = FileSystemPrimitives.OpenStream,
+        [143] = FileSystemPrimitives.CloseStream,
+        [144] = FileSystemPrimitives.ReadNextChar,
+        [145] = FileSystemPrimitives.WriteChar,
+        [146] = FileSystemPrimitives.GetFileSize,
+        [147] = FileSystemPrimitives.SetPosition,
+        [148] = FileSystemPrimitives.GetFileSizeByName,
+        [149] = FileSystemPrimitives.FileExists,
+        [150] = FileSystemPrimitives.DeleteFile,
+        [151] = FileSystemPrimitives.RenameFile,
+        [152] = FileSystemPrimitives.GetFileModificationTime,
+        [153] = FileSystemPrimitives.GetFileModificationTime,
+        [154] = FileSystemPrimitives.CreateDirectory,
+        [155] = FileSystemPrimitives.DeleteFile,
+        [156] = FileSystemPrimitives.IsDirectory,
+        [157] = FileSystemPrimitives.GetDirectoryEntries,
     };
 
     static Primitives()
     {
         // Fill remaining required primitive slots with stubs returning false
-        for (var i = 1; i <= 116; i++)
+        for (var i = 1; i <= 157; i++)
         {
             if (!Handlers.ContainsKey(i))
             {

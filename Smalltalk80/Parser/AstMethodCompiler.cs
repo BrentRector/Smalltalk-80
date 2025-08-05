@@ -349,7 +349,25 @@ public static class AstMethodCompiler
                 return;
             }
 
-            throw new InvalidOperationException($"Unknown variable '{name}'. Available temporaries: [{string.Join(", ", temporaries.Keys)}]. Instance variables: [{string.Join(", ", instanceVariables)}]");
+            // Check for global class names in SystemDictionary
+            if (SystemDictionary.TryGetClass(name, out var globalClass))
+            {
+                // Create an association for the global class and add it to literals
+                var association = new Association(new Symbol(name), globalClass);
+                int literalIndex = AddLiteral(association);
+
+                if (literalIndex < 32)
+                {
+                    bytecodes.Add((byte)((int)Bytecode.PushLiteralVariable0 + literalIndex));
+                }
+                else
+                {
+                    throw new NotSupportedException("Too many literals in method.");
+                }
+                return;
+            }
+
+            throw new InvalidOperationException($"Unknown variable '{name}'. Available temporaries: [{string.Join(", ", temporaries.Keys)}]. Instance variables: [{string.Join(", ", instanceVariables)}]. Global classes: [{string.Join(", ", SystemDictionary.AllClasses.Keys)}]");
         }
 
         private void StoreVariable(string name)

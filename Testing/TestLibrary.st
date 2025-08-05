@@ -102,11 +102,12 @@ printTestResults
 	"Print test results summary"
 	| summary |
 	summary _ self class name, ': ', self getTestCounts.
-	summary, ' (', 
+	summary _ summary, ' (', 
 	((testsPassed = testsRun) 
 		ifTrue: ['ALL PASSED'] 
 		ifFalse: [testsFailed printString, ' FAILED']), 
-	')'! !
+	')'.
+	^summary! !
 
 TestCase subclass: #BasicSmalltalkTests
 	instanceVariableNames: ''

@@ -24,7 +24,8 @@
         {
             "label": "build",
             "dependsOn": [
-                "build-and-test-all"
+                "build-and-test",
+                "run-tests"
             ],
             "dependsOrder": "sequence",
             "group": {

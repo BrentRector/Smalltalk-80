@@ -199,13 +199,13 @@ The project is configured to automatically run all test cases after a successful
 ```
 Default Build (Ctrl+Shift+B)
   ↓
-build-and-test-all
+build task (default)
   ↓
 build-and-test → generate-antlr → dotnet build
   ↓
 run-tests → Run-ComprehensiveTests.ps1
   ↓
-Test Results & Summary
+Test Results & Individual Test Counts
 ```
 
 #### Manual Task Execution
