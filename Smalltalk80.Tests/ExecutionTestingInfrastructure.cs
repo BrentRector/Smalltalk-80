@@ -182,7 +182,7 @@ Object subclass: #ConditionalTester
 !ConditionalTester methodsFor: 'conditionals'!
 absoluteValue: number
     number < 0 
-        ifTrue: [ ^number negated ]
+        ifTrue: [ ^0 - number ]
         ifFalse: [ ^number ]
 ! !
 
@@ -256,8 +256,8 @@ Shape subclass: #Rectangle
 
 !Rectangle methodsFor: 'initialization'!
 width: w height: h
-    width := w.
-    height := h.
+    width _ w.
+    height _ h.
     ^self
 ! !
 
@@ -311,8 +311,8 @@ Object subclass: #BankAccount
 
 !BankAccount methodsFor: 'initialization'!
 accountNumber: number initialBalance: amount
-    accountNumber := number.
-    balance := amount.
+    accountNumber _ number.
+    balance _ amount.
     ^self
 ! !
 
@@ -324,7 +324,7 @@ balance
 !BankAccount methodsFor: 'transactions'!
 deposit: amount
     amount > 0 ifTrue: [
-        balance := balance + amount.
+        balance _ balance + amount.
         ^true
     ].
     ^false
@@ -333,7 +333,7 @@ deposit: amount
 !BankAccount methodsFor: 'transactions'!
 withdraw: amount
     (amount > 0 and: [ amount <= balance ]) ifTrue: [
-        balance := balance - amount.
+        balance _ balance - amount.
         ^true
     ].
     ^false

@@ -233,16 +233,27 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
             var selectorParts = new List<string>();
             var formalArgs = header.formalArg();
 
+            // Debug the raw text to see what's being parsed
+            Console.WriteLine($"[DEBUG_PARSER] Method header raw text: '{header.GetText()}'");
+            Console.WriteLine($"[DEBUG_PARSER] Found {header.identifierColon().Length} keyword parts");
+            Console.WriteLine($"[DEBUG_PARSER] Found {formalArgs.Length} formal args");
+
             for (int i = 0; i < header.identifierColon().Length; i++)
             {
-                selectorParts.Add(header.identifierColon(i).GetText());
+                var keywordPart = header.identifierColon(i).GetText();
+                Console.WriteLine($"[DEBUG_PARSER] Keyword part {i}: '{keywordPart}'");
+                selectorParts.Add(keywordPart);
+
                 if (i < formalArgs.Length)
                 {
-                    arguments.Add(formalArgs[i].GetText());
+                    var argName = formalArgs[i].GetText();
+                    Console.WriteLine($"[DEBUG_PARSER] Arg {i}: '{argName}'");
+                    arguments.Add(argName);
                 }
             }
 
             var selector = string.Join("", selectorParts);
+            Console.WriteLine($"[DEBUG_PARSER] Final selector: '{selector}'");
             return (selector, arguments);
         }
 

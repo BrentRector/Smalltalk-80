@@ -114,10 +114,7 @@ public static class SystemImageLoader
                         }
 
                         // Update the class with resolved superclass
-                        if (cls.Superclass == null && superclass != null)
-                        {
-                            cls.Superclass = superclass;
-                        }
+                        cls.Superclass = superclass;
                     }
                 }
                 catch (Exception ex)

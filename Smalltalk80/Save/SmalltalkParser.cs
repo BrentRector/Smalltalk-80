@@ -118,6 +118,33 @@ public sealed class SmalltalkParser
         parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor(tokens);
 
+        // If source doesn't contain method signature, treat it as an expression
+        if (!source.Contains("::") && !source.Contains("methodsFor:") && !System.Text.RegularExpressions.Regex.IsMatch(source, @"^\s*[a-zA-Z_][a-zA-Z0-9_]*(:|\s|$)"))
+        {
+            // Try expression chunk first (handles expressions ending with !)
+            if (source.EndsWith("!"))
+            {
+                var exprChunkCtx = parser.expressionChunk();
+                if (parser.NumberOfSyntaxErrors > 0)
+                    throw new InvalidOperationException("Invalid Smalltalk source.");
+
+                var expression = (ExpressionNode)visitor.Visit(exprChunkCtx.expression())!;
+                var exprSequence = new SequenceNode(new List<string>(), new[] { new ExpressionStatement(expression) });
+                return new ParsedMethod(exprSequence, false, 0);
+            }
+            else
+            {
+                // Parse as expression entry (for plain expressions)
+                var exprCtx = parser.expressionEntry();
+                if (parser.NumberOfSyntaxErrors > 0)
+                    throw new InvalidOperationException("Invalid Smalltalk source.");
+
+                var expression = (ExpressionNode)visitor.Visit(exprCtx.expression())!;
+                var exprSequence = new SequenceNode(new List<string>(), new[] { new ExpressionStatement(expression) });
+                return new ParsedMethod(exprSequence, false, 0);
+            }
+        }
+
         // Parse the full method definition to capture primitives
         var methodCtx = parser.methodDef();
         if (parser.NumberOfSyntaxErrors > 0)
@@ -141,9 +168,9 @@ public sealed class SmalltalkParser
 
         // Parse the method body
         var bodyCtx = methodCtx.methodBody();
-        var sequence = (SequenceNode)visitor.Visit(bodyCtx)!;
+        var methodSequence = (SequenceNode)visitor.Visit(bodyCtx)!;
 
-        return new ParsedMethod(sequence, hasPrimitive, primitiveIndex);
+        return new ParsedMethod(methodSequence, hasPrimitive, primitiveIndex);
     }
 
 }

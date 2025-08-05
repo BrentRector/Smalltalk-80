@@ -186,7 +186,12 @@ public sealed class VirtualMachine
     {
         var parser = new SmalltalkParser(source);
         var method = parser.ParseMethod();
-        var receiver = StandardLibrary.Get("Object");
+
+        // Get Object class from SystemDictionary (where StandardLibrary.st classes are loaded)
+        if (!SystemDictionary.TryGetClass("Object", out var objectClass))
+            throw new InvalidOperationException("Object class not found in system dictionary.");
+
+        var receiver = new SmalltalkObject(objectClass, 0);
         return Interpreter.Evaluate(method, receiver);
     }
 

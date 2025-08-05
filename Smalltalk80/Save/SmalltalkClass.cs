@@ -59,12 +59,31 @@ public class SmalltalkClass : SmalltalkObject
     /// <returns>The <see cref="CompiledMethod"/> if found; otherwise <c>null</c>.</returns>
     public CompiledMethod? Lookup(Symbol selector)
     {
+        return LookupWithVisited(selector, new HashSet<SmalltalkClass>());
+    }
+
+    /// <summary>
+    ///     Internal lookup method with recursion detection.
+    /// </summary>
+    /// <param name="selector">The method selector.</param>
+    /// <param name="visited">Set of already visited classes to detect cycles.</param>
+    /// <returns>The <see cref="CompiledMethod"/> if found; otherwise <c>null</c>.</returns>
+    private CompiledMethod? LookupWithVisited(Symbol selector, HashSet<SmalltalkClass> visited)
+    {
+        // Detect infinite recursion
+        if (visited.Contains(this))
+        {
+            throw new InvalidOperationException($"Circular superclass reference detected while looking up {selector}. Class hierarchy contains cycle involving class with {MethodDictionary.Count} methods.");
+        }
+
+        visited.Add(this);
+
         if (MethodDictionary.TryGetValue(selector, out var method))
         {
             return method;
         }
 
-        return Superclass?.Lookup(selector);
+        return Superclass?.LookupWithVisited(selector, visited);
     }
 
     /// <summary>

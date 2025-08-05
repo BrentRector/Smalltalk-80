@@ -15,12 +15,15 @@ yourself
 	"Answer self."! !
 
 !Object methodsFor: 'testing'!
+isInteger
+	"Coerces Integers to true and everything else to false. Integer overrides with ^true"
+	^false!
 isNil
-	"Coerces nil to true and everything else to false."! !
-
-!Object methodsFor: 'testing'!
+	"Coerces nil to true and everything else to false."
+	^false!
 notNil
-	"Coerces nil to false and everything else to true."! !
+	"Coerces nil to false and everything else to true."
+	^true! !
 
 !Object methodsFor: 'comparing'!
 
@@ -42,6 +45,47 @@ hash
 	"Answer a SmallInteger whose value is related to the receiver's identity."
 	<primitive: 75>
 	^self basicAt: 2! !
+
+!Object methodsFor: 'error handling'!
+error: aString 
+	"The default behavior for error: is the same as halt:. 
+	This additional message is the one a subclass should override in order to
+	change the handling of errors."
+
+	self halt: aString!
+halt
+	"This is a simple message to use for inserting breakpoints during debugging."
+
+	self error: 'Halt encountered.'!
+halt: aString 
+	"This message can be used for inserting breakpoints during debugging.
+	It creates and schedules a Debugger with the argument, aString, as the label."
+
+	self error: aString!
+doesNotUnderstand: aMessage 
+	"First check for a compound selector.  If found, try copying down code
+	into the receiver's class.  If this is unsuccessful,
+	announce that the receiver does not understand the argument, aMessage,
+	as a message.  The default behavior is to create a Notifier containing the 
+	appropriate message and to allow the user to open a Debugger. 
+	Subclasses can override this message in order to modify this behavior."
+
+	self error: 'Message not understood: ', aMessage selector!
+subclassResponsibility
+	"This message sets up a framework for the behavior of the class' subclasses.
+	Announce that the subclass should have implemented this message."
+
+	self error: 'My subclass should have overridden one of my messages.'!
+shouldNotImplement
+	"Announce that although the receiver inherits this message, it
+	should not implement it."
+
+	self error: 'This message is not appropriate for this object'!
+primitiveFailed
+	"Announce that a primitive has failed and there is no appropriate 
+	Smalltalk code to run."
+
+	self error: 'a primitive has failed'! !
 
 !Object methodsFor: 'class membership'!
 
@@ -226,7 +270,27 @@ and: alternativeBlock
 	self subclassResponsibility!
 or: alternativeBlock
 	"Answer true if either the receiver or the result of evaluating alternativeBlock is true."
-	self subclassResponsibility! !
+	self subclassResponsibility!
+eqv: aBoolean 
+	"Answer true if the receiver is equivalent to aBoolean."
+
+	^self == aBoolean!
+xor: aBoolean 
+	"Exclusive OR -- answer true if the receiver is not equivalent to aBoolean."
+
+	^(self == aBoolean) not! !
+
+!Boolean methodsFor: 'copying'!
+deepCopy 
+	"Receiver has two concrete subclasses, True and False.
+	Only one instance of each should be made, so return self."!
+shallowCopy 
+	"Receiver has two concrete subclasses, True and False.
+	Only one instance of each should be made, so return self."! !
+
+!Boolean methodsFor: 'printing'!
+storeOn: aStream
+	self printOn: aStream! !
 
 !Boolean methodsFor: 'controlling'!
 
@@ -349,6 +413,20 @@ Number subclass: #Integer
 	poolDictionaries: ''
 	category: 'Numeric-Numbers'!
 
+!Integer methodsFor: 'testing'!
+even
+	"Answer whether the receiver is divisible by 2."
+	^((self digitAt: 1) bitAnd: 1) = 0!
+isInteger
+	"Answer true. Integers override Object>>isInteger."
+	^true! !
+
+!Number methodsFor: 'arithmetic'!
+
+negated
+	"Answer a Number that is the negation of the receiver."
+	^0 - self! !
+
 Integer subclass: #SmallInteger
 	instanceVariableNames: ''
 	classVariableNames: 'Digitbuffer '
@@ -392,7 +470,12 @@ Integer subclass: #SmallInteger
 	^super = aNumber!
 ~= aNumber 
 	<primitive: 8>
-	^super ~= aNumber! !
+	^super ~= aNumber!
+hash
+	^self!
+hashMappedBy: map
+	"My hash is independent of my oop"
+	^ self hash! !
 
 !SmallInteger methodsFor: 'bit manipulation'!
 
@@ -608,6 +691,8 @@ asUppercase
 	8r141 <= value
 		ifTrue: [value <= 8r172 
 					ifTrue: [^self class value: value-8r40]].
+	^self!
+asSymbol
 	^self! !
 
 !Character class methodsFor: 'instance creation'!
@@ -685,6 +770,18 @@ notEmpty
 	"Answer whether the receiver contains any elements."
 	^self isEmpty not! !
 
+!Collection methodsFor: 'testing'!
+includes: anObject
+	"Answer whether anObject is one of the receiver's elements."
+	self do: [:each | each = anObject ifTrue: [^true]].
+	^false!
+occurrencesOf: anObject
+	"Answer how many of the receiver's elements are equal to anObject."
+	| tally |
+	tally _ 0.
+	self do: [:each | anObject = each ifTrue: [tally _ tally + 1]].
+	^tally! !
+
 !Collection methodsFor: 'enumerating'!
 
 do: aBlock
@@ -717,17 +814,7 @@ inject: thisValue into: binaryBlock
 	| nextValue |
 	nextValue _ thisValue.
 	self do: [:each | nextValue _ binaryBlock value: nextValue value: each].
-	^nextValue!
-includes: anObject
-	"Answer whether anObject is one of the receiver's elements."
-	self do: [:each | each = anObject ifTrue: [^true]].
-	^false!
-occurrencesOf: anObject
-	"Answer how many of the receiver's elements are equal to anObject."
-	| tally |
-	tally _ 0.
-	self do: [:each | anObject = each ifTrue: [tally _ tally + 1]].
-	^tally! !
+	^nextValue! !
 
 !Collection methodsFor: 'adding'!
 
@@ -847,6 +934,41 @@ copyWith: anElement
 		newArray at: self size + index put: (anotherArray at: index)
 	].
 	^newArray! !
+
+!Array methodsFor: 'comparing'!
+hash
+	"make sure = arrays hash =ly"
+
+	self size = 0 ifTrue: [^17171].
+	^(self at: 1) hash + (self at: self size) hash!
+hashMappedBy: map
+	"Answer what my hash would be if oops changed according to map"
+	self size = 0 ifTrue: [^ self hash].
+	^ (self first hashMappedBy: map) + (self last hashMappedBy: map)! !
+
+!Array methodsFor: 'converting'!
+asArray
+	"Answer with the receiver itself."
+	^self! !
+
+!Array methodsFor: 'printing'!
+isLiteral
+	self detect: [:element | element isLiteral not] ifNone: [^true].
+	^false!
+printOn: aStream
+	| tooMany |
+	tooMany _ aStream position + self maxPrint.
+	aStream nextPut: $(.
+	self do: 
+		[:element | 
+		aStream position > tooMany ifTrue: [aStream nextPutAll: '...etc...)'. ^self].
+		element printOn: aStream.
+		aStream space].
+	aStream nextPut: $)!
+storeOn: aStream 
+	aStream nextPut: $(.
+	self do: [:element | element storeOn: aStream. aStream space].
+	aStream nextPut: $)! !
 
 !Array class methodsFor: 'instance creation'!
 
