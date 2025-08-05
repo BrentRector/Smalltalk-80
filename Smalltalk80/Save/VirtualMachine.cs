@@ -24,7 +24,6 @@ public sealed class VirtualMachine
     /// </summary>
     public VirtualMachine()
     {
-        StandardLibrary.Initialize();
         LoadStandardLibraryClasses();
     }
 
