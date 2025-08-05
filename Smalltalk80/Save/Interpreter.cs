@@ -842,7 +842,23 @@ public class Interpreter
         var primitiveClass = GetClassForPrimitive(receiver);
         if (primitiveClass != null)
         {
-            // Perform method lookup on the mapped Smalltalk class
+            // Convert .NET primitive to proper Smalltalk object
+            var smalltalkReceiver = ConvertPrimitiveToSmalltalkObject(receiver, primitiveClass);
+            if (smalltalkReceiver != null)
+            {
+                // Recursively call PerformSend with the Smalltalk object
+                var smalltalkMessage = new Message
+                {
+                    Selector = selector,
+                    Receiver = smalltalkReceiver,
+                    Arguments = arguments,
+                    SuperSend = false
+                };
+                PerformSend(smalltalkMessage);
+                return;
+            }
+
+            // Perform method lookup on the mapped Smalltalk class for primitive methods
             var method = primitiveClass.Lookup(selector);
             if (method == null)
                 throw new InvalidOperationException($"Method {selector} not found on primitive type");
@@ -890,6 +906,39 @@ public class Interpreter
             float or double => SystemDictionary.TryGetClass("Float", out var floatClass) ? floatClass : null,
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Converts .NET primitive values to proper Smalltalk objects.
+    /// </summary>
+    /// <param name="primitive">The .NET primitive value.</param>
+    /// <param name="smalltalkClass">The corresponding Smalltalk class.</param>
+    /// <returns>A Smalltalk object, or null if conversion is not needed/possible.</returns>
+    private static SmalltalkObject? ConvertPrimitiveToSmalltalkObject(object? primitive, SmalltalkClass smalltalkClass)
+    {
+        return primitive switch
+        {
+            bool b => ConvertBooleanToSmalltalkObject(b),
+            // For integers and other primitives, we can often work directly with the primitive
+            // Only convert when we need proper Smalltalk object behavior
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Converts a .NET boolean to the appropriate Smalltalk singleton object (True or False).
+    /// </summary>
+    /// <param name="value">The boolean value.</param>
+    /// <returns>The True or False singleton object.</returns>
+    private static SmalltalkObject? ConvertBooleanToSmalltalkObject(bool value)
+    {
+        var className = value ? "True" : "False";
+        if (SystemDictionary.TryGetClass(className, out var booleanClass))
+        {
+            // Create an instance of True or False
+            return new SmalltalkObject(booleanClass, 0);
+        }
+        return null;
     }
 
     /// <summary>

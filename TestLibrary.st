@@ -78,3 +78,64 @@ testBasicArithmetic
 performTest
 	"Run the arithmetic test"
 	self testBasicArithmetic! !
+
+Object subclass: #TestResult
+instanceVariableNames: ''
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Testing-Framework'!
+
+!TestResult methodsFor: 'initialization'!
+initialize
+"Initialize test result tracking"
+^self! !
+
+Object subclass: #TestFailure
+instanceVariableNames: ''
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Testing-Framework'!
+
+!TestFailure methodsFor: 'initialization'!
+initialize
+"Initialize test failure"
+^self! !
+
+Object subclass: #TestSuite
+instanceVariableNames: ''
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Testing-Framework'!
+
+!TestSuite methodsFor: 'initialization'!
+initialize
+"Initialize test suite"
+^self! !
+
+Object subclass: #TestRunner
+instanceVariableNames: ''
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Testing-Framework'!
+
+!TestRunner methodsFor: 'initialization'!
+initialize
+"Initialize test runner"
+^self! !
+
+TestCase subclass: #SampleBasicTest
+instanceVariableNames: ''
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Testing-Examples'!
+
+!SampleBasicTest methodsFor: 'testing'!
+testBasicArithmetic
+"Test basic arithmetic operations"
+self assertEqual: 7 to: 3 + 4.
+self assertEqual: 12 to: 3 * 4.
+self assertEqual: 1 to: 5 - 4!
+
+performTest
+"Run all basic tests"
+self testBasicArithmetic! !

@@ -445,6 +445,63 @@ do: aBlock
 	"Evaluate aBlock with each of the receiver's elements as the argument."
 	1 to: self size do: [:index | aBlock value: (self at: index)]! !
 
+!Array methodsFor: 'copying'!
+
+copyWith: anElement
+	"Answer a new Array with anElement added at the end."
+	| newArray |
+	newArray _ self class new: self size + 1.
+	1 to: self size do: [:index |
+		newArray at: index put: (self at: index)
+	].
+	newArray at: self size + 1 put: anElement.
+	^newArray! !
+
+!Array methodsFor: 'concatenation'!
+
+, anotherArray
+	"Answer a new Array containing the elements of the receiver followed by the elements of anotherArray."
+	| newArray |
+	newArray _ self class new: self size + anotherArray size.
+	1 to: self size do: [:index |
+		newArray at: index put: (self at: index)
+	].
+	1 to: anotherArray size do: [:index |
+		newArray at: self size + index put: (anotherArray at: index)
+	].
+	^newArray! !
+
+!Array class methodsFor: 'instance creation'!
+
+new: size
+	"Answer a new Array with size elements."
+	<primitive: 71>
+	^self basicNew: size!
+
+with: anObject
+	"Answer a new Array with one element."
+	| newArray |
+	newArray _ self new: 1.
+	newArray at: 1 put: anObject.
+	^newArray!
+
+with: firstObject with: secondObject
+	"Answer a new Array with two elements."
+	| newArray |
+	newArray _ self new: 2.
+	newArray at: 1 put: firstObject.
+	newArray at: 2 put: secondObject.
+	^newArray!
+
+with: firstObject with: secondObject with: thirdObject
+	"Answer a new Array with three elements."
+	| newArray |
+	newArray _ self new: 3.
+	newArray at: 1 put: firstObject.
+	newArray at: 2 put: secondObject.
+	newArray at: 3 put: thirdObject.
+	^newArray! !
+
 !String methodsFor: 'accessing'!
 
 at: index
@@ -493,6 +550,19 @@ do: aBlock
 	"Answer a new string containing the characters of the receiver followed by the characters of aString."
 	<primitive: 156>
 	^super , aString! !
+
+!String methodsFor: 'testing'!
+
+startsWith: aString
+	"Answer true if the receiver begins with the characters of aString"
+	| len |
+	len := aString size.
+	len > self size ifTrue: [^false].
+	^true!
+
+printString
+	"Answer a string representation of the receiver"
+	^self! !
 
 Object subclass: #BlockContext
 	instanceVariableNames: ''
