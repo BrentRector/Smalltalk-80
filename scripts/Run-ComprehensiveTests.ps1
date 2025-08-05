@@ -29,6 +29,9 @@ $TestCategories = @{
     "CollectionTests"          = "Testing/CollectionTests.st"
     "StringTests"              = "Testing/StringTests.st"
     "BlockContextTests"        = "Testing/BlockContextTests.st"
+    "DictionaryTests"          = "Testing/DictionaryTests.st"
+    "SymbolTests"              = "Testing/SymbolTests.st"
+    "IdentitySetTests"         = "Testing/IdentitySetTests.st"
     "StandardLibraryTestSuite" = "Testing/StandardLibraryTestSuite.st"
 }
 

@@ -4,8 +4,8 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 
 ## Overview
 
-**Total Classes:** 34  
-**Total Method Chunks:** 177  
+**Total Classes:** 35  
+**Total Method Chunks:** 191  
 **Last Updated:** August 5, 2025
 
 ## Recent Additions (August 5, 2025)
@@ -15,13 +15,13 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 - ✅ **Association** - Key-value pairs for dictionary entries (4 methods)
 - ✅ **Dictionary** - Hash-based key-value collections (38 methods)
 - ✅ **IdentityDictionary** - Dictionary using identity comparison (== instead of =) (16 methods)
-- 🔄 **Float** - Attempted addition but encountered parsing issues (deferred)
+- ✅ **Float** - IEEE 32-bit floating-point numbers with complete mathematical functions (35 methods)
 - ⏳ **Exception hierarchy** - Not present in original Smalltalk-80
 
 ## 5-Step Expansion Plan Status
 1. ✅ Dictionary/LookupKey/Association classes - Successfully added with full functionality
 2. ✅ Symbol class - Successfully added with full functionality 
-3. ❌ Float class - Encountered infinite loop issues, needs debugging
+3. ✅ Float class - Successfully added with complete mathematical functionality and constants
 4. ✅ IdentitySet - Successfully added as Set subclass with identity comparison
 5. ⏳ Exception handling - Not applicable (not in original Smalltalk-80 system)
 
@@ -32,10 +32,11 @@ Object
 ├── UndefinedObject
 ├── Magnitude
 │   ├── Number
-│   │   └── Integer
-│   │       ├── SmallInteger
-│   │       ├── LargePositiveInteger
-│   │       └── LargeNegativeInteger
+│   │   ├── Integer
+│   │   │   ├── SmallInteger
+│   │   │   ├── LargePositiveInteger
+│   │   │   └── LargeNegativeInteger
+│   │   └── Float
 │   ├── Character
 │   └── LookupKey
 │       └── Association
@@ -129,6 +130,31 @@ Object
 **Superclass:** Integer  
 **Instance Variables:** none (placeholder classes)  
 **Purpose:** Represents arbitrarily large positive and negative integers
+
+### Float
+**Superclass:** Number  
+**Instance Variables:** none (variable word subclass)  
+**Purpose:** Represents IEEE 32-bit floating-point numbers with 8-9 digits of accuracy
+
+**Class Variables:**
+- `Pi`, `Halfpi`, `Fourthpi`, `Twopi` - Mathematical constants for π and its derivatives
+- `RadiansPerDegree` - Conversion factor between degrees and radians
+- `Ln2`, `Sqrt2` - Mathematical constants for natural log of 2 and square root of 2
+- `SinCoefficients`, `TanCoefficients` - Polynomial coefficients for trigonometric functions
+- `ExpPCoefficients`, `ExpQCoefficients` - Polynomial coefficients for exponential function
+- `LnCoefficients` - Polynomial coefficients for natural logarithm function
+
+**Key Methods:**
+- Arithmetic: `#+`, `#-`, `#*`, `#/`, `#negated`
+- Mathematical functions: `#sin`, `#cos`, `#tan`, `#arcSin`, `#arcCos`, `#arcTan`, `#exp`, `#ln`, `#log`, `#sqrt`
+- Comparison: `#<`, `#<=`, `#>`, `#>=`, `#=`, `#~=`, `#hash`
+- Truncation: `#truncated`, `#rounded`, `#fractionPart`, `#integerPart`
+- Coercing: `#coerce:`, `#generality`
+- Converting: `#asFloat`, `#asFraction`, `#degreesToRadians`, `#radiansToDegrees`
+- Copying: `#deepCopy`, `#shallowCopy`
+- Printing: `#isLiteral`, `#printOn:`, `#printOn:digits:`
+- Private: `#exponent`, `#mantissa:`, `#timesTwoPower:`, `#absPrintOn:digits:`, `#floorLog:`
+- **Class Methods:** `#initialize`, `#pi`, `#readFrom:`
 
 ### Character
 **Superclass:** Magnitude  
