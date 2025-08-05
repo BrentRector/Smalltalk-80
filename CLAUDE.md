@@ -37,6 +37,12 @@ sudo apt install -y powershelloject contains a prototype of a Smalltalk-80 inter
 - **File Loading Order**: When running tests, always load `TestLibrary.st` first, then the specific test files. Use the pattern: `--source Testing/TestLibrary.st --source Testing/YourTestFile.st`
 - **PowerShell Commands**: The `tail` command does not exist in PowerShell. Use `Get-Content -Tail` or `Select-Object -Last` instead. For example, use `Get-Content file.txt -Tail 10` or `Get-Content file.txt | Select-Object -Last 10` instead of `tail -10 file.txt`.
 - **System Image Index**: Always use the system image index (`SYSTEM_IMAGE_INDEX.md`) to locate classes and methods in the system image. This index contains the complete mapping of all classes and their methods with line numbers in the `Smalltalk-80.st` file. Use this index before attempting to search or extract classes from the system image.
+- **Documentation Updates**: After any changes to the `StandardLibrary.st` file (adding new classes, methods, or modifying existing ones), ALWAYS update the `STANDARD_LIBRARY_CONTENTS.md` documentation file. This includes:
+  - Updating the total class count and method chunk count
+  - Adding complete documentation for new classes with all their methods
+  - Updating the class hierarchy diagram
+  - Marking completion status in the expansion plan
+  - Ensuring all class descriptions, instance variables, and key methods are documented
 - **Installing powershell**: This will have been done when setting up the Environment:
 1. Update package index
 sudo apt update
