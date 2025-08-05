@@ -745,13 +745,13 @@ Object subclass: #Collection
 	poolDictionaries: ''
 	category: 'Collections-Abstract'!
 
-SequenceableCollection variableSubclass: #Array
+ArrayedCollection variableSubclass: #Array
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Collections-Sequenceable'!
 
-SequenceableCollection variableByteSubclass: #String
+ArrayedCollection variableByteSubclass: #String
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -1136,6 +1136,102 @@ swap: oneIndex with: anotherIndex
 	self at: oneIndex put: (self at: anotherIndex).
 	self at: anotherIndex put: element! !
 
+SequenceableCollection subclass: #ArrayedCollection
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Abstract'!
+
+!ArrayedCollection methodsFor: 'accessing'!
+size
+	"Answer the number of indexable fields in the receiver. This value is the 
+	same as the largest legal subscript. Primitive is specified here to override 
+	SequenceableCollection size. Essential. See Object documentation 
+	whatIsAPrimitive. "
+
+	<primitive: 62>
+	^self basicSize! !
+
+!ArrayedCollection methodsFor: 'adding'!
+add: newObject
+	self shouldNotImplement! !
+
+!ArrayedCollection methodsFor: 'printing'!
+storeOn: aStream 
+	aStream nextPutAll: '(('.
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' new: '.
+	aStream store: self size.
+	aStream nextPut: $).
+	(self storeElementsFrom: 1 to: self size on: aStream)
+		ifFalse: [aStream nextPutAll: '; yourself'].
+	aStream nextPut: $)! !
+
+!ArrayedCollection methodsFor: 'private'!
+defaultElement
+	^nil!
+storeElementsFrom: firstIndex to: lastIndex on: aStream 
+	| noneYet defaultElement arrayElement |
+	noneYet _ true.
+	defaultElement _ self defaultElement.
+	firstIndex to: lastIndex do: 
+		[:index | 
+		arrayElement _ self at: index.
+		arrayElement = defaultElement
+			ifFalse: 
+				[noneYet
+					ifTrue: [noneYet _ false]
+					ifFalse: [aStream nextPut: $;].
+				aStream nextPutAll: ' at: '.
+				aStream store: index.
+				aStream nextPutAll: ' put: '.
+				aStream store: arrayElement]].
+	^noneYet! !
+
+!ArrayedCollection class methodsFor: 'instance creation'!
+new
+	"Answer a new instance of me, with size = 0."
+	^self new: 0!
+new: size withAll: value 
+	"Answer a new instance of me, whose every element is equal to the argument,
+	value."
+
+	^(self new: size) atAllPut: value!
+with: anObject 
+	"Answer a new instance of me, containing only anObject."
+
+	| newCollection |
+	newCollection _ self new: 1.
+	newCollection at: 1 put: anObject.
+	^newCollection!
+with: firstObject with: secondObject 
+	"Answer a new instance of me, containing firstObject and secondObject."
+
+	| newCollection |
+	newCollection _ self new: 2.
+	newCollection at: 1 put: firstObject.
+	newCollection at: 2 put: secondObject.
+	^newCollection!
+with: firstObject with: secondObject with: thirdObject 
+	"Answer a new instance of me, containing only these three objects."
+
+	| newCollection |
+	newCollection _ self new: 3.
+	newCollection at: 1 put: firstObject.
+	newCollection at: 2 put: secondObject.
+	newCollection at: 3 put: thirdObject.
+	^newCollection!
+with: firstObject with: secondObject with: thirdObject with: fourthObject 
+	"Answer a new instance of me, containing the four arguments as the elements."
+
+	| newCollection |
+	newCollection _ self new: 4.
+	newCollection at: 1 put: firstObject.
+	newCollection at: 2 put: secondObject.
+	newCollection at: 3 put: thirdObject.
+	newCollection at: 4 put: fourthObject.
+	^newCollection! !
+
 SequenceableCollection variableSubclass: #OrderedCollection
 	instanceVariableNames: 'firstIndex lastIndex'
 	classVariableNames: ''
@@ -1492,6 +1588,604 @@ new: anInteger
 	new: "
 
 	^(super new: anInteger) setIndices! !
+
+Collection variableSubclass: #Set
+	instanceVariableNames: 'tally'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Unordered'!
+
+!Set methodsFor: 'accessing'!
+at: index
+	self errorNotKeyed!
+at: index put: anObject
+	self errorNotKeyed!
+size
+	^tally! !
+
+!Set methodsFor: 'testing'!
+includes: anObject 
+	^(self basicAt: (self findElementOrNil: anObject)) ~~ nil!
+occurrencesOf: anObject 
+	(self includes: anObject)
+		ifTrue: [^1]
+		ifFalse: [^0]! !
+
+!Set methodsFor: 'adding'!
+add: newObject 
+	| index |
+	newObject == nil ifTrue: [^newObject].
+	index _ self findElementOrNil: newObject.
+	(self basicAt: index) == nil ifTrue: [self atNewIndex: index put: newObject].
+	^newObject!
+grow
+	"The receiver becomes twice as big--this is not a copy of the receiver, so all shared references survive."
+
+	| newSelf |
+	newSelf _ self species new: self basicSize + self growSize.
+	self do: [:each | newSelf noCheckAdd: each].
+	self become: newSelf! !
+
+!Set methodsFor: 'removing'!
+remove: oldObject ifAbsent: aBlock 
+	| index |
+	index _ self find: oldObject ifAbsent: [^aBlock value].
+	self basicAt: index put: nil.
+	tally _ tally - 1.
+	self fixCollisionsFrom: index.
+	^oldObject! !
+
+!Set methodsFor: 'enumerating'!
+collect: aBlock 
+	"Evaluate aBlock with each of the receiver's elements as the argument.  Collect the 
+	resulting values into another Set.  Answer the new Set.  We override the general
+	method, so that we make a big enough set and avoid growing. "
+
+	| newSet size index element |
+	tally = 0 ifTrue: [^Set new: 2].
+	newSet _ Set new: (size _ self basicSize).
+	index _ 0.
+	[(index _ index + 1) <= size] whileTrue:
+		[(element _ self basicAt: index) == nil ifFalse:
+			[newSet add: (aBlock value: element)]].
+	^newSet!
+do: aBlock 
+	tally = 0 ifTrue: [^self].
+	1 to: self basicSize do: 
+		[:index | 
+		(self basicAt: index) == nil ifFalse: [aBlock value: (self basicAt: index)]]! !
+
+!Set methodsFor: 'private'!
+atNewIndex: index put: anObject 
+	self basicAt: index put: anObject.
+	tally _ tally + 1.
+	self fullCheck!
+errorNotKeyed
+	self error: 'Sets do not have indexed access'!
+find: anObject ifAbsent: aBlock 
+	| index |
+	index _ self findElementOrNil: anObject.
+	(self basicAt: index) == nil
+		ifTrue: [^aBlock value]
+		ifFalse: [^index]!
+findElementOrNil: anObject 
+	| index length probe pass |
+	length _ self basicSize.
+	pass _ 1.
+	index _ anObject hash \\ length + 1.
+	[(probe _ self basicAt: index) == nil or: [probe = anObject]]
+		whileFalse: [(index _ index + 1) > length
+				ifTrue: 
+					[index _ 1.
+					pass _ pass + 1.
+					pass > 2 ifTrue: [^self grow findElementOrNil: anObject]]].
+	^index!
+fixCollisionsFrom: index 
+	| myLength oldIndex nextIndex nextObject |
+	oldIndex _ index.
+	myLength _ self basicSize.
+	[oldIndex _ oldIndex \\ myLength + 1.
+	nextObject _ self basicAt: oldIndex.
+	nextObject == nil]
+		whileFalse: 
+			[nextIndex _ self findElementOrNil: nextObject.
+			nextIndex = oldIndex
+				ifFalse: 
+					[self basicAt: nextIndex put: nextObject.
+					self basicAt: oldIndex put: nil]]!
+fullCheck
+	self basicSize - self size <= (self basicSize // 4) ifTrue: [self grow]!
+noCheckAdd: anObject 
+	self basicAt: (self findElementOrNil: anObject)
+		put: anObject.
+	tally _ tally + 1!
+rehash
+	| newSelf |
+	newSelf _ self species new: self basicSize.
+	self do: [:each | newSelf noCheckAdd: each].
+	self become: newSelf!
+setTally
+	tally _ 0!
+swap: oneElement with: otherElement 
+	| save |
+	save _ self basicAt: oneElement.
+	self basicAt: oneElement put: (self basicAt: otherElement).
+	self basicAt: otherElement put: save! !
+
+!Set class methodsFor: 'instance creation'!
+new
+	^self new: 2!
+new: anInteger 
+	^(super new: (anInteger max: 1)) setTally! !
+
+Collection subclass: #Bag
+	instanceVariableNames: 'contents'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Unordered'!
+
+!Bag methodsFor: 'accessing'!
+at: index 
+	self errorNotKeyed!
+at: index put: anObject
+	self errorNotKeyed!
+size
+	| tally |
+	tally _ 0.
+	contents do: [:each | tally _ tally + each].
+	^tally! !
+
+!Bag methodsFor: 'testing'!
+includes: anObject 
+	^contents includesKey: anObject!
+occurrencesOf: anObject 
+	(self includes: anObject)
+		ifTrue: [^contents at: anObject]
+		ifFalse: [^0]! !
+
+!Bag methodsFor: 'adding'!
+add: newObject 
+	^self add: newObject withOccurrences: 1!
+add: newObject withOccurrences: anInteger 
+	"Add the element newObject to the elements of the receiver.  Do so as
+	though the element were added anInteger number of times.  Answer newObject."
+
+	(self includes: newObject)
+		ifTrue: [contents at: newObject put: anInteger + (contents at: newObject)]
+		ifFalse: [contents at: newObject put: anInteger].
+	^newObject! !
+
+!Bag methodsFor: 'removing'!
+remove: oldObject ifAbsent: exceptionBlock 
+	| count |
+	(self includes: oldObject)
+		ifTrue: [(count _ contents at: oldObject) = 1
+				ifTrue: [contents removeKey: oldObject]
+				ifFalse: [contents at: oldObject put: count - 1]]
+		ifFalse: [^exceptionBlock value].
+	^oldObject! !
+
+!Bag methodsFor: 'enumerating'!
+do: aBlock 
+	contents associationsDo: [:assoc | assoc value timesRepeat: [aBlock value: assoc key]]! !
+
+!Bag methodsFor: 'private'!
+errorNotKeyed
+	self error: 'Bags do not have indexed access'!
+setDictionary
+	contents _ Dictionary new! !
+
+!Bag class methodsFor: 'instance creation'!
+new
+	^super new setDictionary! !
+
+SequenceableCollection subclass: #Interval
+	instanceVariableNames: 'start stop step'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Sequenceable'!
+
+!Interval methodsFor: 'comparing'!
+= anInterval 
+	"Answer true if my species and anInterval species are equal, and
+	if our starts, steps and sizes are equal."
+
+	self species == anInterval species
+		ifTrue: [^start = anInterval first
+					and: [step = anInterval increment and: [self size = anInterval size]]]
+		ifFalse: [^false]!
+hash
+	^(((start hash bitShift: 2)
+		bitOr: stop hash)
+		bitShift: 1)
+		bitOr: self size!
+hashMappedBy: map
+	"My hash is independent of my oop"
+	^ self hash! !
+
+!Interval methodsFor: 'accessing'!
+at: anInteger 
+	"Answer the anInteger'th element."
+
+	(anInteger >= 1 and: [anInteger <= self size])
+		ifTrue: [^start + (step * (anInteger - 1))]
+		ifFalse: [self errorSubscriptBounds: anInteger]!
+at: anInteger put: anObject 
+	"Storing into an Interval is not allowed."
+
+	self error: 'you can not store into an interval'!
+first
+	^start!
+increment
+	"Answer the receiver's interval increment."
+	^step!
+last
+	^stop - (stop - start \\ step)!
+size
+	step < 0
+		ifTrue: [start < stop
+				ifTrue: [^0]
+				ifFalse: [^stop - start // step + 1]]
+		ifFalse: [stop < start
+				ifTrue: [^0]
+				ifFalse: [^stop - start // step + 1]]! !
+
+!Interval methodsFor: 'adding'!
+add: newObject 
+	"Adding to an Interval is not allowed."
+	self shouldNotImplement! !
+
+!Interval methodsFor: 'removing'!
+remove: newObject 
+	"Removing from an Interval is not allowed."
+
+	self error: 'elements cannot be removed from an Interval'! !
+
+!Interval methodsFor: 'copying'!
+copy
+	"Return a copy of me.
+	I override this message because my species is Array and copy, as inherited 
+	from SequenceableCollection, uses copyFrom:to:, which creates a new object 
+	of my species"
+
+	^self shallowCopy! !
+
+!Interval methodsFor: 'enumerating'!
+collect: aBlock 
+	| nextValue i result |
+	result _ self species new: self size.
+	nextValue _ start.
+	i _ 1.
+	step < 0
+		ifTrue: [[stop <= nextValue]
+				whileTrue: 
+					[result at: i put: (aBlock value: nextValue).
+					nextValue _ nextValue + step.
+					i _ i + 1]]
+		ifFalse: [[stop >= nextValue]
+				whileTrue: 
+					[result at: i put: (aBlock value: nextValue).
+					nextValue _ nextValue + step.
+					i _ i + 1]].
+	^result!
+do: aBlock 
+	| aValue |
+	aValue _ start.
+	step < 0
+		ifTrue: [[stop <= aValue]
+				whileTrue: 
+					[aBlock value: aValue.
+					aValue _ aValue + step]]
+		ifFalse: [[stop >= aValue]
+				whileTrue: 
+					[aBlock value: aValue.
+					aValue _ aValue + step]]!
+reverseDo: aBlock 
+	"Evaluate aBlock for each element of my interval, in reverse order."
+
+	| aValue |
+	aValue _ stop.
+	step < 0
+		ifTrue: [[start >= aValue]
+				whileTrue: 
+					[aBlock value: aValue.
+					aValue _ aValue - step]]
+		ifFalse: [[start <= aValue]
+				whileTrue: 
+					[aBlock value: aValue.
+					aValue _ aValue - step]]! !
+
+!Interval methodsFor: 'printing'!
+printOn: aStream 
+	aStream nextPut: $(.
+	start printOn: aStream.
+	aStream nextPutAll: ' to: '.
+	stop printOn: aStream.
+	step ~= 1
+		ifTrue: 
+			[aStream nextPutAll: ' by: '.
+			step printOn: aStream].
+	aStream nextPut: $)!
+storeOn: aStream 
+	"This is possible because we know numbers store and print the same"
+
+	self printOn: aStream! !
+
+!Interval methodsFor: 'private'!
+setFrom: startInteger to: stopInteger by: stepInteger 
+	start _ startInteger.
+	stop _ stopInteger.
+	step _ stepInteger!
+species
+	^Array! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+Interval class
+	instanceVariableNames: ''!
+
+!Interval class methodsFor: 'instance creation'!
+from: startInteger to: stopInteger 
+	"Answer a new instance of me, starting at startInteger, ending and
+	stopInteger, and with an interval increment of 1."
+
+	^self new
+		setFrom: startInteger
+		to: stopInteger
+		by: 1!
+from: startInteger to: stopInteger by: stepInteger 
+	"Answer a new instance of me, starting at startInteger, ending and
+	stopInteger, and with an interval increment of stepInteger."
+
+	^self new
+		setFrom: startInteger
+		to: stopInteger
+		by: stepInteger!
+new
+	"Create and answer with a new instance of the receiver (a class) with no indexable 
+	fields.  Fail if the class is indexable.  Override SequenceableCollection new.  
+	Essential.  See Object documentation whatIsAPrimitive."
+
+	<primitive: 70>
+	self isVariable ifTrue: [^self new: 0].
+	self primitiveFailed! !
+
+Collection subclass: #MappedCollection
+	instanceVariableNames: 'domain map'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Sequenceable'!
+
+!MappedCollection methodsFor: 'accessing'!
+at: anIndex 
+	^domain at: (map at: anIndex)!
+at: anIndex put: anObject 
+	^domain at: (map at: anIndex) put: anObject!
+contents
+	"Answer the receiver's domain for mapping, a SequenceableCollection."
+	^map collect: [:mappedIndex | domain at: mappedIndex]!
+size
+	^map size! !
+
+!MappedCollection methodsFor: 'adding'!
+add: newObject
+	self shouldNotImplement! !
+
+!MappedCollection methodsFor: 'copying'!
+copy
+	"This returns another MappedCollection whereas copyFrom:to: will return an 
+	object like my domain"
+
+	^MappedCollection collection: domain map: map! !
+
+!MappedCollection methodsFor: 'printing'!
+storeOn: aStream 
+	aStream nextPut: $(.
+	domain storeOn: aStream.
+	aStream nextPutAll: ' mappedBy: '.
+	map storeOn: aStream.
+	aStream nextPut: $)! !
+
+!MappedCollection methodsFor: 'private'!
+setCollection: aCollection map: aDictionary 
+	domain _ aCollection.
+	map _ aDictionary!
+species
+	^domain species! !
+
+!MappedCollection methodsFor: 'enumerating'!
+collect: aBlock
+	| aStream |
+	aStream _ WriteStream on: (self species new: self size).
+	self do:
+		[:domainValue | 
+		aStream nextPut: (aBlock value: domainValue)].
+	^aStream contents!
+do: aBlock
+	map do:
+		[:mapValue | aBlock value: (domain at: mapValue)]!
+select: aBlock
+	| aStream |
+	aStream _ WriteStream on: (self species new: self size).
+	self do:
+		[:domainValue | 
+		(aBlock value: domainValue)
+			ifTrue: [aStream nextPut: domainValue]].
+	^aStream contents! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+MappedCollection class
+	instanceVariableNames: ''!
+
+!MappedCollection class methodsFor: 'instance creation'!
+collection: aCollection map: aSequenceableCollection 
+	"Answer a new instance of me that maps aCollection by aSequenceableCollection."
+	^self basicNew setCollection: aCollection map: aSequenceableCollection!
+new
+	self error: 'MappedCollections must be created using the collection:map: message'! !
+
+OrderedCollection variableSubclass: #SortedCollection
+	instanceVariableNames: 'sortBlock'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Sequenceable'!
+
+!SortedCollection methodsFor: 'comparing'!
+= aSortedCollection 
+	"Answer true if my and aSortedCollection's species are the same,
+	and if our blocks are the same, and if our elements are the same."
+
+	self species = aSortedCollection species ifFalse: [^false].
+	sortBlock = aSortedCollection sortBlock
+		ifTrue: [^super = aSortedCollection]
+		ifFalse: [^false]! !
+
+!SortedCollection methodsFor: 'accessing'!
+at: anInteger put: anObject 
+	"Storing into a SortedCollection with at:put: is not allowed."
+
+	self error: 'to add to a sorted collection, you must use add:'!
+sortBlock
+	"Answer the blockContext which is the criterion for sorting elements of
+	the receiver."
+	^sortBlock!
+sortBlock: aBlock 
+	"Make the argument, aBlock, be the criterion for ordering elements of the
+	receiver."
+
+	sortBlock _ aBlock fixTemps.
+	"The sortBlock must copy its home context, so as to avoid circularities!!"
+	"Therefore sortBlocks with side effects may not work right"
+	self size > 0 ifTrue: [self reSort]! !
+
+!SortedCollection methodsFor: 'copying'!
+copy
+	| newCollection |
+	newCollection _ self species sortBlock: sortBlock.
+	newCollection addAll: self.
+	^newCollection!
+copyEmpty
+	"Answer a copy of the receiver without any of the receiver's elements."
+
+	^SortedCollection sortBlock: sortBlock! !
+
+!SortedCollection methodsFor: 'adding'!
+add: newObject 
+	| nextIndex |
+	self isEmpty ifTrue: [^super addLast: newObject].
+	nextIndex _ self indexForInserting: newObject.
+	self insert: newObject before: nextIndex.
+	^newObject!
+addAll: aCollection 
+	aCollection size > (self size // 3)
+		ifTrue: 
+			["Faster to add the new elements and resort"
+			aCollection do: [:each | super addLast: each].
+			self reSort]
+		ifFalse: ["Faster to add the elements individually in their proper places"
+			aCollection do: [:each | self add: each]]!
+grow
+	"We must duplicate this message from OrderedCollection so the addLast: won't cause an error."
+
+	| newSelf |
+	newSelf _ self species new: self size + self growSize.
+	newSelf sortBlock: sortBlock.
+	newSelf addAll: self.
+	self become: newSelf! !
+
+!SortedCollection methodsFor: 'enumerating'!
+collect: aBlock 
+	"Evaluate aBlock with each of my elements as the argument.  Collect the 
+	resulting values into an OrderedCollection  Answer with the new collection. 
+	Override superclass in order to produce OrderedCollection instead of 
+	SortedCollection. "
+
+	| newCollection |
+	newCollection _ OrderedCollection new.
+	self do: [:each | newCollection add: (aBlock value: each)].
+	^newCollection! !
+
+!SortedCollection methodsFor: 'private'!
+indexForInserting: newObject 
+	| index low high |
+	low _ firstIndex.
+	high _ lastIndex.
+	[index _ high + low // 2.
+	low > high]
+		whileFalse: 
+			[(sortBlock value: (self basicAt: index) value: newObject)
+				ifTrue: [low _ index + 1]
+				ifFalse: [high _ index - 1]].
+	^low!
+reSort
+	self sort: firstIndex to: lastIndex!
+sort: i to: j 
+	"Sort elements i through j of self to be nondescending according to sortBlock."
+
+	| di dij dj tt ij k l n |
+	"The prefix d means the data at that index."
+	(n _ j + 1  - i) <= 1 ifTrue: [^self].	"Nothing to sort." 
+	 "Sort di,dj."
+	di _ self basicAt: i.
+	dj _ self basicAt: j.
+	(sortBlock value: di value: dj) "i.e., should di precede dj?"
+		ifFalse: 
+			[self swap: i with: j.
+			 tt _ di.
+			 di _ dj.
+			 dj _ tt].
+	n > 2
+		ifTrue:  "More than two elements."
+			[ij _ (i + j) // 2.  "ij is the midpoint of i and j."
+			 dij _ self basicAt: ij.  "Sort di,dij,dj.  Make dij be their median."
+			 (sortBlock value: di value: dij) "i.e. should di precede dij?"
+			   ifTrue: 
+				[(sortBlock value: dij value: dj) "i.e., should dij precede dj?"
+				  ifFalse: 
+					[self swap: j with: ij.
+					 dij _ dj]]
+			   ifFalse:  "i.e. di should come after dij"
+				[self swap: i with: ij.
+				 dij _ di].
+			n > 3
+			  ifTrue:  "More than three elements."
+				["Find k>i and l<j such that dk,dij,dl are in reverse order.
+				Swap k and l.  Repeat this procedure until k and l pass each other."
+				 k _ i.
+				 l _ j.
+				 [[l _ l - 1.  k <= l and: [sortBlock value: dij value: (self basicAt: l)]]
+				   whileTrue.  "i.e. while dl succeeds dij"
+				  [k _ k + 1.  k <= l and: [sortBlock value: (self basicAt: k) value: dij]]
+				   whileTrue.  "i.e. while dij succeeds dk"
+				  k <= l]
+				   whileTrue:
+					[self swap: k with: l]. 
+	"Now l<k (either 1 or 2 less), and di through dl are all less than or equal to dk
+	through dj.  Sort those two segments."
+				self sort: i to: l.
+				self sort: k to: j]]!
+swap: i with: j 
+	| t |
+	t _ self basicAt: i.
+	self basicAt: i put: (self basicAt: j).
+	self basicAt: j put: t! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+SortedCollection class
+	instanceVariableNames: ''!
+
+!SortedCollection class methodsFor: 'instance creation'!
+new: anInteger 
+	"The default sorting function is a <= comparison on elements."
+
+	^(super new: anInteger) sortBlock: [:x :y | x <= y]!
+sortBlock: aBlock 
+	"Answer a new instance of me such that its elements are sorted according
+	to the criterion specified in aBlock."
+
+	^(super new: 10) sortBlock: aBlock! !
 
 !Array methodsFor: 'accessing'!
 
