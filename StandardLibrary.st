@@ -51,7 +51,136 @@ class
 	^self basicAt: 1!
 isMemberOf: aClass
 	"Answer whether the receiver is an instance of the class, aClass."
-	^self class == aClass! !
+	^self class == aClass!
+isKindOf: aClass
+	"Answer a Boolean as to whether the class, aClass, is a superclass or class of the receiver."
+	self class == aClass
+		ifTrue: [^true]
+		ifFalse: [^self class inheritsFrom: aClass]!
+respondsTo: aSymbol
+	"Answer a Boolean as to whether the method dictionary of the receiver's class contains aSymbol as a message selector."
+	^self class canUnderstand: aSymbol! !
+
+!Object methodsFor: 'accessing'!
+
+at: index
+	"Answer the value of an indexable field in the receiver. Fail if the argument index is not an Integer or is out of bounds."
+	<primitive: 60>
+	index isInteger
+		ifTrue: [self errorSubscriptBounds: index].
+	^self basicAt: index truncated!
+at: index put: value
+	"Store the argument value in the indexable field of the receiver indicated by index."
+	<primitive: 61>
+	index isInteger
+		ifTrue: [(index >= 1 and: [index <= self size])
+					ifTrue: [self errorImproperStore]
+					ifFalse: [self errorSubscriptBounds: index]].
+	^self basicAt: index truncated put: value!
+basicAt: index
+	"Answer the value of an indexable field in the receiver. Do not override this message in any subclass."
+	<primitive: 60>
+	index isInteger ifTrue: [self errorSubscriptBounds: index].
+	^self basicAt: index truncated!
+basicAt: index put: value
+	"Store the second argument value in the indexable field of the receiver indicated by index. Do not override in a subclass."
+	<primitive: 61>
+	index isInteger
+		ifTrue: [(index >= 1 and: [index <= self size])
+					ifTrue: [self errorImproperStore]
+					ifFalse: [self errorSubscriptBounds: index]].
+	^self basicAt: index truncated put: value!
+basicSize
+	"Answer the number of indexable fields in the receiver. Do not override in any subclass."
+	<primitive: 62>
+	"The number of indexable fields of fixed-length objects is 0"
+	^0!
+size
+	"Answer the number of indexable fields in the receiver."
+	<primitive: 62>
+	"The number of indexable fields of fixed-length objects is 0"
+	^0! !
+
+!Object methodsFor: 'copying'!
+
+copy
+	"Answer another instance just like the receiver. Subclasses typically override this method."
+	^self shallowCopy!
+shallowCopy
+	"Answer a copy of the receiver which shares the receiver's instance variables."
+	| class newObject index |
+	class _ self class.
+	class superclass isNil ifTrue: [^self].
+	class isVariable
+		ifTrue: 
+			[index _ self basicSize.
+			newObject _ class basicNew: index.
+			[index > 0]
+				whileTrue: 
+					[newObject basicAt: index put: (self basicAt: index).
+					index _ index - 1]]
+		ifFalse: [newObject _ class basicNew].
+	index _ class instSize.
+	[index > 0]
+		whileTrue: 
+			[newObject instVarAt: index put: (self instVarAt: index).
+			index _ index - 1].
+	^newObject! !
+
+!Object methodsFor: 'printing'!
+
+printOn: aStream
+	"Append to the argument aStream a sequence of characters that identifies the receiver."
+	| title |
+	title _ self class name.
+	aStream nextPutAll: ((title at: 1) isVowel
+							ifTrue: ['an ']
+							ifFalse: ['a '])
+						, title!
+printString
+	"Answer a String whose characters are a description of the receiver."
+	^self class name, ' (printing not implemented)'!
+storeOn: aStream
+	"Append to the argument aStream a sequence of characters that is an expression whose evaluation creates an object similar to the receiver."
+	aStream nextPutAll: self class name, ' (storing not implemented)'!
+storeString
+	"Answer a String representation of the receiver from which the receiver can be reconstructed."
+	^self class name, ' (storing not implemented)'! !
+
+!Object methodsFor: 'error handling'!
+
+doesNotUnderstand: aMessage
+	"Handle the case when the receiver does not understand aMessage."
+	self error: 'Message not understood: ', aMessage selector!
+error: aString
+	"Handle an error condition."
+	self halt!
+halt
+	"This is a simple message to use for inserting breakpoints during debugging."
+	self! !
+
+!Object methodsFor: 'system primitives'!
+
+become: otherObject
+	"Swap the instance pointers of the receiver and otherObject."
+	<primitive: 72>
+	self primitiveFailed!
+instVarAt: index
+	"Answer the value of the instance variable of the receiver at position index."
+	<primitive: 73>
+	self primitiveFailed!
+instVarAt: index put: value
+	"Store value in the instance variable of the receiver at position index."
+	<primitive: 74>
+	self primitiveFailed!
+nextInstance
+	"Answer the next instance after the receiver in the enumeration of instances of the receiver's class."
+	<primitive: 78>
+	^nil!
+nextObject
+	"Answer the next object after the receiver in the enumeration of all objects."
+	<primitive: 139>
+	^nil! !
 
 !Object class methodsFor: 'instance creation'!
 
@@ -116,57 +245,91 @@ ifFalse: falseAlternativeBlock ifTrue: trueAlternativeBlock
 
 !True methodsFor: 'logical operations'!
 
+& alternativeObject 
+	"Evaluating conjunction -- answer alternativeObject since receiver is true."
+	^alternativeObject!
 not
-	"Answer false."
+	"Negation--answer false since the receiver is true."
 	^false!
+| aBoolean 
+	"Evaluating disjunction (OR) -- answer true since the receiver is true."
+	^self!
 and: alternativeBlock
-	"Answer the result of evaluating alternativeBlock."
+	"Nonevaluating conjunction -- answer the value of alternativeBlock since
+	the receiver is true."
 	^alternativeBlock value!
 or: alternativeBlock
-	"Answer true without evaluating alternativeBlock."
-	^true! !
+	"Nonevaluating disjunction -- answer true since the receiver is true."
+	^self! !
 
 !True methodsFor: 'controlling'!
 
-ifTrue: trueAlternativeBlock
-	"Answer the result of evaluating trueAlternativeBlock."
-	^trueAlternativeBlock value!
-ifFalse: falseAlternativeBlock
-	"Answer nil without evaluating falseAlternativeBlock."
+ifTrue: alternativeBlock 
+	"Answer the value of alternativeBlock. Execution does not actually 
+	reach here because the expression is compiled in-line."
+	^alternativeBlock value!
+ifFalse: alternativeBlock 
+	"Since the condition is true, the value is the true alternative, which is nil. 
+	Execution does not actually reach here because the expression is compiled 
+	in-line."
 	^nil!
-ifTrue: trueAlternativeBlock ifFalse: falseAlternativeBlock
-	"Answer the result of evaluating trueAlternativeBlock."
+ifTrue: trueAlternativeBlock ifFalse: falseAlternativeBlock 
+	"Answer with the value of trueAlternativeBlock. Execution does not 
+	actually reach here because the expression is compiled in-line."
 	^trueAlternativeBlock value!
-ifFalse: falseAlternativeBlock ifTrue: trueAlternativeBlock
-	"Answer the result of evaluating trueAlternativeBlock."
+ifFalse: falseAlternativeBlock ifTrue: trueAlternativeBlock 
+	"Answer the value of trueAlternativeBlock. Execution does not 
+	actually reach here because the expression is compiled in-line."
 	^trueAlternativeBlock value! !
+
+!True methodsFor: 'printing'!
+
+printOn: aStream 
+	aStream nextPutAll: 'true'! !
 
 !False methodsFor: 'logical operations'!
 
+& alternativeObject 
+	"Evaluating conjunction -- answer false since receiver is false."
+	^self!
 not
-	"Answer true."
+	"Negation -- answer true since the receiver is false."
 	^true!
+| aBoolean 
+	"Evaluating disjunction (OR) -- answer with the argument, aBoolean."
+	^aBoolean!
 and: alternativeBlock
-	"Answer false without evaluating alternativeBlock."
-	^false!
+	"Nonevaluating conjunction -- answer with false since the receiver is false."
+	^self!
 or: alternativeBlock
-	"Answer the result of evaluating alternativeBlock."
+	"Nonevaluating disjunction -- answer value of alternativeBlock."
 	^alternativeBlock value! !
 
 !False methodsFor: 'controlling'!
 
-ifTrue: trueAlternativeBlock
-	"Answer nil without evaluating trueAlternativeBlock."
+ifTrue: alternativeBlock 
+	"Since the condition is false, answer the value of the false alternative, 
+	which is nil. Execution does not actually reach here because the
+	expression is compiled in-line."
 	^nil!
-ifFalse: falseAlternativeBlock
-	"Answer the result of evaluating falseAlternativeBlock."
+ifFalse: alternativeBlock 
+	"Answer the value of alternativeBlock. Execution does not actually
+	reach here because the expression is compiled in-line."
+	^alternativeBlock value!
+ifTrue: trueAlternativeBlock ifFalse: falseAlternativeBlock 
+	"Answer the value of falseAlternativeBlock. Execution does not
+	actually reach here because the expression is compiled in-line."
 	^falseAlternativeBlock value!
-ifTrue: trueAlternativeBlock ifFalse: falseAlternativeBlock
-	"Answer the result of evaluating falseAlternativeBlock."
-	^falseAlternativeBlock value!
-ifFalse: falseAlternativeBlock ifTrue: trueAlternativeBlock
-	"Answer the result of evaluating falseAlternativeBlock."
+ifFalse: falseAlternativeBlock ifTrue: trueAlternativeBlock 
+	"Answer the value of falseAlternativeBlock. Execution does not
+	actually reach here because the expression is compiled in-line."
 	^falseAlternativeBlock value! !
+
+!False methodsFor: 'printing'!
+
+printOn: aStream 
+	"Print false."
+	aStream nextPutAll: 'false'! !
 
 Object subclass: #Magnitude
 	instanceVariableNames: ''
@@ -269,9 +432,25 @@ asString
 	"Answer a string representation of the receiver."
 	<primitive: 105>
 	^super asString!
+asFloat
+	"Create and answer an instance of Float whose value is the value of the receiver."
+	<primitive: 40>
+	self primitiveFailed!
 printString
 	"Answer a string representation of the receiver."
 	^self asString! !
+
+!SmallInteger methodsFor: 'system primitives'!
+
+asObject
+	"This is the inverse of Object.asOop."
+	<primitive: 76>
+	^self primitiveFailed!
+asOop
+	"Answer an integer which is unique to me, consistent with Object.asOop."
+	self >= 0
+		ifTrue: [^ 32768 + self]
+		ifFalse: [^ 65536 + self]! !
 
 !SmallInteger class methodsFor: 'class initialization'!
 
@@ -320,6 +499,14 @@ Magnitude subclass: #Character
 asciiValue
 	"Answer the receiver's ASCII numeric code."
 	^value!
+digitValue
+	"Answer 0-9 if the receiver is $0-$9, 10-35 if it is $A-$Z, and < 0 otherwise.
+	This is used to parse literal numbers of radix 2-36."
+	value <= $9 asciiValue 
+		ifTrue: [^value - $0 asciiValue].
+	value >= $A asciiValue 
+		ifTrue: [value <= $Z asciiValue ifTrue: [^value - $A asciiValue + 10]].
+	^-1!
 value
 	"Answer the receiver's ASCII numeric code."
 	^value! !
@@ -327,21 +514,101 @@ value
 !Character methodsFor: 'comparing'!
 
 = aCharacter
-	"Answer whether the receiver and aCharacter have the same ASCII value."
+	"Answer true if the receiver and the argument are the same object (have the 
+	same object pointer) and false otherwise.  Optional.  See Object documentation
+	whatIsAPrimitive."
 	<primitive: 110>
-	^value = aCharacter asciiValue!
+	^self == aCharacter!
 < aCharacter
-	"Answer whether the receiver's ASCII value is less than aCharacter's."
-	^value < aCharacter asciiValue!
+	"Answer true if the receiver's value < aCharacter's value."
+	^self asciiValue < aCharacter asciiValue!
 <= aCharacter
 	"Answer whether the receiver's ASCII value is less than or equal to aCharacter's."
 	^value <= aCharacter asciiValue!
 > aCharacter
-	"Answer whether the receiver's ASCII value is greater than aCharacter's."
-	^value > aCharacter asciiValue!
+	"Answer true if the receiver's value > aCharacter's value."
+	^self asciiValue > aCharacter asciiValue!
 >= aCharacter
 	"Answer whether the receiver's ASCII value is greater than or equal to aCharacter's."
-	^value >= aCharacter asciiValue! !
+	^value >= aCharacter asciiValue!
+hash
+	^value! !
+
+!Character methodsFor: 'testing'!
+
+isAlphaNumeric
+	"Answer whether the receiver is a letter or a digit."
+	^self isLetter or: [self isDigit]!
+isDigit
+	"Answer whether the receiver is a digit."
+	^self >= $0 and: [self <= $9]!
+isLetter
+	"Answer whether the receiver is a letter."
+	^(8r141 <= value and: [value <= 8r172])
+		or: [8r101 <= value and: [value <= 8r132]]!
+isLowercase
+	"Answer whether the receiver is a lowercase letter."
+	^self >= $a and: [self <= $z]!
+isSeparator
+	"Answer whether the receiver is one of the separator characters--space,
+	cr, tab, line feed, or form feed."
+	value = 32 ifTrue: [^true].	"space"
+	value = 13 ifTrue: [^true].	"cr"
+	value = 9 ifTrue: [^true].	"tab"
+	value = 10 ifTrue: [^true].	"line feed"
+	value = 12 ifTrue: [^true].	"form feed"
+	^false!
+isUppercase
+	"Answer whether the receiver is an uppercase letter."
+	^self >= $A and: [self <= $Z]!
+isVowel
+	"Answer whether the receiver is one of the vowels, AEIOU, in upper or lower case."
+	^'AEIOU' includes: self asUppercase!
+tokenish
+	"Answer whether the receiver is a valid token-character--letter, digit, or colon."
+	^self isLetter or: [self isDigit or: [self = $:]]! !
+
+!Character methodsFor: 'copying'!
+
+copy
+	"Answer with me because Characters are unique."!
+deepCopy
+	"Answer with me becuase Characters are unique."! !
+
+!Character methodsFor: 'printing'!
+
+isLiteral
+	^true!
+printOn: aStream 
+	aStream nextPut: $$.
+	aStream nextPut: self!
+storeOn: aStream
+	"Character literals are preceded by '$'."
+	aStream nextPut: $$.
+	aStream nextPut: self! !
+
+!Character methodsFor: 'converting'!
+
+asCharacter
+	"Answer the receiver itself."
+	^self!
+asInteger
+	"Answer the value of the receiver."
+	^value!
+asLowercase
+	"Answer a Character that is the lower case letter corresponding to the receiver.  If
+	the receiver is not an upper case letter, answer the receiver itself."
+	8r101 <= value 
+		ifTrue: [value <= 8r132 
+					ifTrue: [^self class value: value+8r40]].
+	^self!
+asUppercase
+	"Answer a Character that is the upper case letter corresponding to the receiver.  If
+	the receiver is not a lower case letter, answer the receiver itself."
+	8r141 <= value
+		ifTrue: [value <= 8r172 
+					ifTrue: [^self class value: value-8r40]].
+	^self! !
 
 !Character class methodsFor: 'instance creation'!
 
@@ -422,7 +689,105 @@ notEmpty
 
 do: aBlock
 	"Evaluate aBlock with each of the receiver's elements as the argument."
-	self subclassResponsibility! !
+	self subclassResponsibility!
+collect: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument. Collect the resulting values into a collection that is like the receiver."
+	| newCollection |
+	newCollection _ self species new.
+	self do: [:each | newCollection add: (aBlock value: each)].
+	^newCollection!
+select: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument. Collect into a new collection those elements for which aBlock evaluates to true."
+	| newCollection |
+	newCollection _ self species new.
+	self do: [:each | (aBlock value: each) ifTrue: [newCollection add: each]].
+	^newCollection!
+reject: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument. Collect into a new collection those elements for which aBlock evaluates to false."
+	^self select: [:each | (aBlock value: each) == false]!
+detect: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument. Answer the first element for which aBlock evaluates to true."
+	^self detect: aBlock ifNone: [self errorNotFound]!
+detect: aBlock ifNone: exceptionBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument. Answer the first element for which aBlock evaluates to true."
+	self do: [:each | (aBlock value: each) ifTrue: [^each]].
+	^exceptionBlock value!
+inject: thisValue into: binaryBlock
+	"Accumulate a running value associated with evaluating the argument, binaryBlock, with the current value and the receiver as block arguments."
+	| nextValue |
+	nextValue _ thisValue.
+	self do: [:each | nextValue _ binaryBlock value: nextValue value: each].
+	^nextValue!
+includes: anObject
+	"Answer whether anObject is one of the receiver's elements."
+	self do: [:each | each = anObject ifTrue: [^true]].
+	^false!
+occurrencesOf: anObject
+	"Answer how many of the receiver's elements are equal to anObject."
+	| tally |
+	tally _ 0.
+	self do: [:each | anObject = each ifTrue: [tally _ tally + 1]].
+	^tally! !
+
+!Collection methodsFor: 'adding'!
+
+add: newObject
+	"Include newObject as one of the receiver's elements. Answer newObject."
+	self subclassResponsibility!
+addAll: aCollection
+	"Include all the elements of aCollection as the receiver's elements. Answer aCollection."
+	aCollection do: [:each | self add: each].
+	^aCollection! !
+
+!Collection methodsFor: 'removing'!
+
+remove: oldObject
+	"Remove oldObject from the receiver. Answer oldObject unless no such element is found."
+	^self remove: oldObject ifAbsent: [self errorNotFound]!
+remove: oldObject ifAbsent: anExceptionBlock
+	"Remove oldObject from the receiver. If several of the elements are equal to oldObject, only one is removed. If no element is equal to oldObject, answer the result of evaluating anExceptionBlock."
+	self subclassResponsibility!
+removeAll: aCollection
+	"Remove each element of aCollection from the receiver. Answer aCollection."
+	aCollection do: [:each | self remove: each].
+	^aCollection! !
+
+!Collection methodsFor: 'converting'!
+
+!Collection methodsFor: 'printing'!
+
+printOn: aStream
+	"Append a sequence of characters to aStream that identify the receiver."
+	| tooMany |
+	tooMany _ aStream position + self maxPrint.
+	aStream nextPutAll: self class name, ' ('.
+	self do:
+		[:element |
+		aStream position > tooMany ifTrue: [aStream nextPutAll: '...'. aStream nextPut: $). ^self].
+		element printOn: aStream.
+		aStream space].
+	aStream nextPut: $)! !
+
+!Collection methodsFor: 'private'!
+
+species
+	"Answer the class to be used for creating new collections like the receiver."
+	^self class!
+errorNotFound
+	"Signal that an object is not found."
+	self error: 'Object not found'!
+errorNonIntegerIndex
+	"Signal that an index is not an integer."
+	self error: 'only integers should be used as indices'!
+errorSubscriptBounds: index
+	"Signal that an index is out of bounds."
+	self error: 'subscript is out of bounds: ', index printString!
+errorImproperStore
+	"Signal that the wrong type of object was stored into a collection."
+	self error: 'improper store into indexable object'!
+maxPrint
+	"Answer the maximum number of characters to use when printing the receiver."
+	^5000! !
 
 !Array methodsFor: 'accessing'!
 
@@ -444,6 +809,18 @@ size
 do: aBlock
 	"Evaluate aBlock with each of the receiver's elements as the argument."
 	1 to: self size do: [:index | aBlock value: (self at: index)]! !
+
+!Array methodsFor: 'adding'!
+
+add: newObject
+	"Arrays cannot grow, so this is an error."
+	self error: 'Arrays cannot grow'! !
+
+!Array methodsFor: 'removing'!
+
+remove: oldObject ifAbsent: anExceptionBlock
+	"Arrays cannot shrink, so this is an error."
+	self error: 'Arrays cannot shrink'! !
 
 !Array methodsFor: 'copying'!
 
@@ -524,6 +901,37 @@ do: aBlock
 	"Evaluate aBlock with each of the receiver's characters as the argument."
 	1 to: self size do: [:index | aBlock value: (self at: index)]! !
 
+!String methodsFor: 'adding'!
+
+add: newObject
+	"Strings cannot grow, so this is an error."
+	self error: 'Strings cannot grow'! !
+
+!String methodsFor: 'removing'!
+
+remove: oldObject ifAbsent: anExceptionBlock
+	"Strings cannot shrink, so this is an error."
+	self error: 'Strings cannot shrink'! !
+
+!String methodsFor: 'converting'!
+
+asSymbol
+	"Answer a Symbol whose characters are the characters of the receiver."
+	<primitive: 157>
+	self primitiveFailed!
+asUppercase
+	"Answer a String made up from the receiver whose characters are all uppercase."
+	| newString |
+	newString _ self copy.
+	1 to: newString size do: [:i | newString at: i put: (newString at: i) asUppercase].
+	^newString!
+asLowercase
+	"Answer a String made up from the receiver whose characters are all lowercase."
+	| newString |
+	newString _ self copy.
+	1 to: newString size do: [:i | newString at: i put: (newString at: i) asLowercase].
+	^newString! !
+
 !String methodsFor: 'comparing'!
 
 = aString
@@ -551,18 +959,7 @@ do: aBlock
 	<primitive: 156>
 	^super , aString! !
 
-!String methodsFor: 'testing'!
-
-startsWith: aString
-	"Answer true if the receiver begins with the characters of aString"
-	| len |
-	len := aString size.
-	len > self size ifTrue: [^false].
-	^true!
-
-printString
-	"Answer a string representation of the receiver"
-	^self! !
+! !
 
 Object subclass: #BlockContext
 	instanceVariableNames: ''

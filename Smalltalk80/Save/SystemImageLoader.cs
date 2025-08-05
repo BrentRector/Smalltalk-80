@@ -108,19 +108,16 @@ public static class SystemImageLoader
                                     $"Superclass '{classDef.Superclass}' not found for class '{classDef.ClassName}'"));
                             }
                         }
+                        else
+                        {
+                            Console.WriteLine($"[SYSTEM_IMAGE] Class {classDef.ClassName} has no superclass (root class)");
+                        }
 
                         // Update the class with resolved superclass
-                        // Note: This might require enhancing SmalltalkClass to allow superclass updates
-                        // For now, we'll recreate the class with the correct superclass
-                        var updatedClass = SystemDictionary.DefineClass(
-                            classDef.ClassName,
-                            superclass,
-                            classDef.InstanceVariables,
-                            classDef.ClassVariables,
-                            classDef.PoolDictionaries,
-                            classDef.Category);
-
-                        classStubs[classDef.ClassName] = updatedClass;
+                        if (cls.Superclass == null && superclass != null)
+                        {
+                            cls.Superclass = superclass;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -183,6 +180,10 @@ public static class SystemImageLoader
             else
             {
                 Console.WriteLine($"[SYSTEM_IMAGE] Failed to load system image: {errors.Count} errors");
+                foreach (var error in errors)
+                {
+                    Console.WriteLine($"[SYSTEM_IMAGE] ERROR: {error.Message} (Line {error.Line}, Col {error.Column})");
+                }
             }
 
             return result;
