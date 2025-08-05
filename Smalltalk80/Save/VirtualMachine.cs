@@ -61,6 +61,74 @@ public sealed class VirtualMachine
     }
 
     /// <summary>
+    /// Loads the test framework from TestLibrary.st if it exists.
+    /// This provides test classes like TestCase, TestSuite, TestResult, TestRunner
+    /// for validating interpreter operation with Smalltalk test cases.
+    /// </summary>
+    public void LoadTestLibrary()
+    {
+        var testLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "TestLibrary.st");
+
+        if (File.Exists(testLibraryPath))
+        {
+            try
+            {
+                Console.WriteLine($"[TEST-FRAMEWORK] Loading test library from: {testLibraryPath}");
+                LoadSystemFile(testLibraryPath);
+                Console.WriteLine("[TEST-FRAMEWORK] Test library loaded successfully");
+
+                // Print discovered test classes
+                PrintTestFrameworkSummary();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TEST-FRAMEWORK] Warning: Failed to load test library: {ex.Message}");
+                throw new InvalidOperationException($"Test framework loading failed: {ex.Message}", ex);
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[TEST-FRAMEWORK] TestLibrary.st not found at: {testLibraryPath}");
+            throw new FileNotFoundException($"TestLibrary.st not found at: {testLibraryPath}");
+        }
+    }
+
+    /// <summary>
+    /// Creates a VirtualMachine with both standard library and test framework loaded.
+    /// </summary>
+    /// <returns>A VirtualMachine ready for running Smalltalk test cases.</returns>
+    public static VirtualMachine CreateWithTestFramework()
+    {
+        var vm = new VirtualMachine();
+        vm.LoadTestLibrary();
+        return vm;
+    }
+
+    /// <summary>
+    /// Prints a summary of the loaded test framework classes.
+    /// </summary>
+    private void PrintTestFrameworkSummary()
+    {
+        Console.WriteLine("[TEST-FRAMEWORK] Test Framework Classes Loaded:");
+
+        var testFrameworkClasses = new[] { "TestCase", "TestResult", "TestSuite", "TestRunner", "TestFailure", "SampleBasicTest" };
+        foreach (var className in testFrameworkClasses)
+        {
+            if (SystemDictionary.TryGetClass(className, out var cls))
+            {
+                Console.WriteLine($"[TEST-FRAMEWORK]   ✅ {className} ({cls.MethodDictionary.Count} methods)");
+            }
+            else
+            {
+                Console.WriteLine($"[TEST-FRAMEWORK]   ❌ {className} (not found)");
+            }
+        }
+        Console.WriteLine($"[TEST-FRAMEWORK] Total classes in system: {SystemDictionary.AllClasses.Count}");
+    }
+
+    /// <summary>
     /// Loads a Smalltalk source file containing a single method definition and
     /// installs it on the specified class. The first line of the file must be
     /// of the form <c>ClassName&gt;&gt;selector</c> with the remaining lines
