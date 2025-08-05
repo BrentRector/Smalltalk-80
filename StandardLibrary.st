@@ -4,6 +4,12 @@ nil subclass: #Object
 	poolDictionaries: ''
 	category: 'Kernel-Objects'!
 
+Object subclass: #UndefinedObject
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Objects'!
+
 !Object methodsFor: 'accessing'!
 yourself
 	"Answer self."! !
@@ -46,6 +52,32 @@ class
 isMemberOf: aClass
 	"Answer whether the receiver is an instance of the class, aClass."
 	^self class == aClass! !
+
+!Object class methodsFor: 'instance creation'!
+
+new
+	"Answer a new instance of the receiver."
+	<primitive: 70>
+	^self basicNew!
+basicNew
+	"Answer a new instance of the receiver (a class) with no indexable fields."
+	<primitive: 70>
+	self primitiveFailed!
+new: size
+	"Answer a new instance of the receiver (a class) with size indexable fields."
+	<primitive: 71>
+	^self basicNew: size!
+basicNew: size
+	"Answer a new instance of the receiver (a class) with size indexable fields."
+	<primitive: 71>
+	self primitiveFailed! !
+
+!Object class methodsFor: 'class name'!
+
+name
+	"Answer the name of the receiver as a string."
+	<primitive: 111>
+	^'Object'! !
 
 !Boolean methodsFor: 'logical operations'!
 
@@ -231,6 +263,22 @@ sign
 	self < 0 ifTrue: [^-1].
 	^0! !
 
+!SmallInteger methodsFor: 'converting'!
+
+asString
+	"Answer a string representation of the receiver."
+	<primitive: 105>
+	^super asString!
+printString
+	"Answer a string representation of the receiver."
+	^self asString! !
+
+!SmallInteger class methodsFor: 'class initialization'!
+
+initialize
+	"Initialize the SmallInteger class."
+	Digitbuffer := String new: 40! !
+
 Integer variableByteSubclass: #LargePositiveInteger
 	instanceVariableNames: ''
 	classVariableNames: 'MaxHi '
@@ -267,6 +315,78 @@ Magnitude subclass: #Character
 	poolDictionaries: ''
 	category: 'Collections-Text'!
 
+!Character methodsFor: 'accessing'!
+
+asciiValue
+	"Answer the receiver's ASCII numeric code."
+	^value!
+value
+	"Answer the receiver's ASCII numeric code."
+	^value! !
+
+!Character methodsFor: 'comparing'!
+
+= aCharacter
+	"Answer whether the receiver and aCharacter have the same ASCII value."
+	<primitive: 110>
+	^value = aCharacter asciiValue!
+< aCharacter
+	"Answer whether the receiver's ASCII value is less than aCharacter's."
+	^value < aCharacter asciiValue!
+<= aCharacter
+	"Answer whether the receiver's ASCII value is less than or equal to aCharacter's."
+	^value <= aCharacter asciiValue!
+> aCharacter
+	"Answer whether the receiver's ASCII value is greater than aCharacter's."
+	^value > aCharacter asciiValue!
+>= aCharacter
+	"Answer whether the receiver's ASCII value is greater than or equal to aCharacter's."
+	^value >= aCharacter asciiValue! !
+
+!Character class methodsFor: 'instance creation'!
+
+value: ascii
+	"Answer a Character whose ASCII value is ascii."
+	<primitive: 170>
+	ascii < 0 ifTrue: [self error: 'Character value out of range'].
+	ascii > 255 ifTrue: [self error: 'Character value out of range'].
+	^CharacterTable at: ascii + 1!
+
+cr
+	"Answer the Character representing a carriage return."
+	^self value: 13!
+lf  
+	"Answer the Character representing a line feed."
+	^self value: 10!
+tab
+	"Answer the Character representing a tab."
+	^self value: 9!
+space
+	"Answer the Character representing a space."
+	^self value: 32! !
+
+!Character class methodsFor: 'class initialization'!
+
+initialize
+	"Initialize the Character table."
+	CharacterTable := Array new: 256.
+	0 to: 255 do: [:i | CharacterTable at: i + 1 put: (self basicNew value: i)]! !
+
+!UndefinedObject methodsFor: 'testing'!
+
+isNil
+	"Answer true: receiver is nil."
+	^true!
+notNil
+	"Answer false: receiver is nil."
+	^false! !
+
+!UndefinedObject methodsFor: 'printing'!
+
+printString
+	"Answer 'nil'."
+	^'nil'! !
+
 Object subclass: #Collection
 	instanceVariableNames: ''
 	classVariableNames: ''
@@ -298,6 +418,12 @@ notEmpty
 	"Answer whether the receiver contains any elements."
 	^self isEmpty not! !
 
+!Collection methodsFor: 'enumerating'!
+
+do: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument."
+	self subclassResponsibility! !
+
 !Array methodsFor: 'accessing'!
 
 at: index
@@ -313,9 +439,97 @@ size
 	<primitive: 62>
 	^self basicSize! !
 
+!Array methodsFor: 'enumerating'!
+
+do: aBlock
+	"Evaluate aBlock with each of the receiver's elements as the argument."
+	1 to: self size do: [:index | aBlock value: (self at: index)]! !
+
 !String methodsFor: 'accessing'!
 
+at: index
+	"Answer the character at index."
+	<primitive: 63>
+	^self basicAt: index!
+at: index put: aCharacter
+	"Store aCharacter at index. Answer aCharacter."
+	<primitive: 64>
+	self basicAt: index put: aCharacter.
+	^aCharacter!
 size
 	"Answer the number of characters in the receiver."
 	<primitive: 62>
 	^self basicSize! !
+
+!String methodsFor: 'enumerating'!
+
+do: aBlock
+	"Evaluate aBlock with each of the receiver's characters as the argument."
+	1 to: self size do: [:index | aBlock value: (self at: index)]! !
+
+!String methodsFor: 'comparing'!
+
+= aString
+	"Answer whether the receiver and aString are equal."
+	<primitive: 158>
+	^super = aString!
+< aString
+	"Answer whether the receiver is lexicographically less than aString."
+	<primitive: 159>
+	^super < aString!
+<= aString
+	"Answer whether the receiver is lexicographically less than or equal to aString."
+	^(self < aString) or: [self = aString]!
+> aString
+	"Answer whether the receiver is lexicographically greater than aString."
+	^aString < self!
+>= aString
+	"Answer whether the receiver is lexicographically greater than or equal to aString."
+	^(aString < self) or: [self = aString]! !
+
+!String methodsFor: 'copying'!
+
+, aString
+	"Answer a new string containing the characters of the receiver followed by the characters of aString."
+	<primitive: 156>
+	^super , aString! !
+
+Object subclass: #BlockContext
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Methods'!
+
+!BlockContext methodsFor: 'evaluating'!
+
+value
+	"Evaluate the receiver block with no arguments."
+	<primitive: 81>
+	^self primitiveFailed!
+value: anObject
+	"Evaluate the receiver block with one argument."
+	<primitive: 82>
+	^self primitiveFailed!
+value: firstObject value: secondObject
+	"Evaluate the receiver block with two arguments."
+	<primitive: 83>
+	^self primitiveFailed! !
+
+!BlockContext methodsFor: 'control structures'!
+
+whileTrue: aBlock
+	"Repeatedly evaluate the receiver while it returns true, also evaluate aBlock on each iteration."
+	<primitive: 86>
+	self value ifTrue: [aBlock value. self whileTrue: aBlock]!
+whileFalse: aBlock
+	"Repeatedly evaluate the receiver while it returns false, also evaluate aBlock on each iteration."
+	<primitive: 87>
+	self value ifFalse: [aBlock value. self whileFalse: aBlock]!
+whileTrue
+	"Repeatedly evaluate the receiver while it returns true."
+	<primitive: 84>
+	self value ifTrue: [self whileTrue]!
+whileFalse
+	"Repeatedly evaluate the receiver while it returns false."
+	<primitive: 85>
+	self value ifFalse: [self whileFalse]! !

@@ -243,7 +243,9 @@ public static class SystemImageLoader
             Comment = compiled.Comment
         };
 
-        targetClass.MethodDictionary[new Symbol(methodDef.Selector)] = compiled;
+        // Install in the appropriate method dictionary
+        var methodDictionary = header.IsClassSide ? targetClass.ClassMethodDictionary : targetClass.MethodDictionary;
+        methodDictionary[new Symbol(methodDef.Selector)] = compiled;
     }
 }
 

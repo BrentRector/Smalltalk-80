@@ -20,6 +20,16 @@ public static class SystemStatePrinter
             {
                 Console.WriteLine($"  {selector}");
             }
+
+            // Print class methods if they exist
+            if (cls.ClassMethodDictionary.Count > 0)
+            {
+                Console.WriteLine($"Class {name} class");
+                foreach (var selector in cls.ClassMethodDictionary.Keys.Select(k => k.ToString()))
+                {
+                    Console.WriteLine($"  {selector}");
+                }
+            }
         }
     }
 }
