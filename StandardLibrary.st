@@ -1137,10 +1137,10 @@ next
 	"Answer the next object in the receiver."
 	self subclassResponsibility!
 next: anInteger 
-	"Answer an OrderedCollection of the next anInteger number of random numbers."
+	"Answer an Array of the next anInteger number of elements."
 	| aCollection |
-	aCollection _ OrderedCollection new.
-	anInteger timesRepeat: [aCollection addLast: self next].
+	aCollection _ Array new: anInteger.
+	1 to: anInteger do: [:index | aCollection at: index put: self next].
 	^aCollection!
 next: anInteger put: anObject 
 	"Put anObject into the next anInteger elements of the receiver."
@@ -1172,3 +1172,323 @@ do: aBlock
 
 	[self atEnd]
 		whileFalse: [aBlock value: self next]! !
+
+Stream subclass: #PositionableStream
+	instanceVariableNames: 'collection position readLimit'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Streams'!
+
+!PositionableStream methodsFor: 'accessing'!
+contents
+	"Answer with a copy of my collection from 1 to readLimit."
+
+	^collection copyFrom: 1 to: readLimit!
+next: anInteger 
+	"Answer the next anInteger elements of the receiver."
+	| newArray |
+	newArray _ self contents species new: anInteger.
+	1 to: anInteger do: [:index | newArray at: index put: self next].
+	^newArray!
+peek
+	"Answer what would be returned with a self next, without
+	changing position.  If the receiver is at the end, answer nil."
+
+	| nextObject |
+	self atEnd ifTrue: [^nil].
+	nextObject _ self next.
+	position _ position - 1.
+	^nextObject!
+peekFor: anObject 
+	"Answer false and do not move the position if self next ~= anObject or if the
+	receiver is at the end. Answer true and increment position if self next = anObject."
+
+	| nextObject |
+	self atEnd ifTrue: [^false].
+	nextObject _ self next.
+	"peek for matching element"
+	anObject = nextObject ifTrue: [^true].
+	"gobble it if found"
+	position _ position - 1.
+	^false!
+through: anObject
+	"Answer a subcollection from position to the occurrence (if any, not  
+	inclusive) of anObject. If not there, answer everything."
+
+	| newStream element |
+	newStream _ WriteStream on: (collection species new: 64).
+	[(self atEnd or: [(element _ self next) = anObject]) or: [newStream size > 64000]]
+		whileFalse: [newStream nextPut: element].
+	self atEnd
+		ifFalse:	[newStream nextPut: element].
+	^newStream contents!
+upTo: anObject 
+	"Answer a subcollection from position to the occurrence (if any, not  
+	inclusive) of anObject. If not there, answer everything."
+
+	| newStream element |
+	newStream _ WriteStream on: (collection species new: 64).
+	[self atEnd or: [(element _ self next) = anObject]]
+		whileFalse: [newStream nextPut: element].
+	^newStream contents! !
+
+!PositionableStream methodsFor: 'testing'!
+atEnd
+	"Answer true if the position is greater than or equal to the limit, 
+	otherwise answer false. Fail if position or readLimit is not a SmallInteger. 
+	Optional. See Object documentation whatIsAPrimitive."
+
+	<primitive: 67>
+	^position >= readLimit!
+isEmpty
+	"Answer whether the receiver has no elements."
+	^position = 0! !
+
+!PositionableStream methodsFor: 'positioning'!
+position
+	"Answer the current position of accessing the stream."
+	^position!
+position: anInteger 
+	"Set position to anInteger as long as anInteger is within the bounds of the 
+	receiver's contents.  If it is not, cause an error."
+
+	anInteger >= 0 & (anInteger <= readLimit)
+		ifTrue: [position _ anInteger]
+		ifFalse: [self positionError]!
+reset
+	"Set the receiver's position to 0."
+	position _ 0!
+setToEnd
+	"Set the position of the receiver to the end of its stream of elements."
+	position _ readLimit!
+skip: anInteger 
+	"Set position to position+anInteger. A subclass might choose to be more 
+	helpful and select the minimum of self size and position+anInteger or 
+	maximum of 1 and position+anInteger for the repositioning."
+
+	self position: position + anInteger!
+skipTo: anObject 
+	"Position the receiver past the next occurrance of anObject.  Answer true if 
+	anObject is found, false otherwise."
+
+	[self atEnd]
+		whileFalse: [self next = anObject ifTrue: [^true]].
+	^false! !
+
+!PositionableStream methodsFor: 'fileIn/Out'!
+nextChunk
+	"Answer the contents of the receiver, up to the next terminator character, with
+	double terminators ignored."
+
+	| aStream char terminator |
+	terminator _ $!.
+	aStream _ WriteStream on: (String new: 200).
+	self skipSeparators.
+	[(char _ self next)==nil]
+		whileFalse: 
+			[char == terminator
+				ifTrue: [(self peekFor: terminator)
+						ifTrue: ["doubled terminator"
+							aStream nextPut: char]
+						ifFalse: [^aStream contents]]
+				ifFalse: [aStream nextPut: char]].
+	^aStream contents!
+skipSeparators
+	"Move the receiver's position past any separators."
+
+	[self atEnd == false and: [self peek isSeparator]]
+		whileTrue: [self next]! !
+
+!PositionableStream methodsFor: 'private'!
+on: aCollection 
+	collection _ aCollection.
+	readLimit _ aCollection size.
+	position _ 0.
+	self reset!
+positionError
+	"Since I am not necessarily writable, it is up to my subclasses to override 
+	position: if expanding the collection is preferrable to giving this error."
+
+	self error: 'Attempt to set the position of a PositionableStream out of bounds'! !
+
+!PositionableStream class methodsFor: 'instance creation'!
+on: aCollection 
+	"Answer a new instance of me, streaming over aCollection."
+
+	^self basicNew on: aCollection!
+on: aCollection from: firstIndex to: lastIndex 
+	"Answer a new instance of me, streaming over a copy of aCollection from
+	firstIndex to lastIndex."
+
+	^self basicNew on: (aCollection copyFrom: firstIndex to: lastIndex)! !
+
+PositionableStream subclass: #WriteStream
+	instanceVariableNames: 'writeLimit'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Streams'!
+
+!WriteStream methodsFor: 'accessing'!
+contents
+	readLimit _ readLimit max: position.
+	^collection copyFrom: 1 to: position!
+next
+	self shouldNotImplement!
+nextPut: anObject 
+	"Insert the argument at the next position in the Stream represented by the 
+	receiver. Fail if the collection of this stream is not an Array or a String. 
+	Fail if the stream is positioned at its end, or if the position is out of 
+	bounds in the collection. Fail if the argument is not of the right type for 
+	the collection. Optional. See Object documentation whatIsAPrimitive."
+
+	<primitive: 66>
+	position = writeLimit
+		ifTrue: [^self pastEndPut: anObject]
+		ifFalse: 
+			[^collection at: (position _ position + 1) put: anObject]!
+size
+	^readLimit _ readLimit max: position! !
+
+!WriteStream methodsFor: 'positioning'!
+position: anInteger 
+	readLimit _ readLimit max: position.
+	super position: anInteger!
+reset
+	readLimit _ readLimit max: position.
+	position _ 0! !
+
+!WriteStream methodsFor: 'character writing'!
+cr
+	"Append a return character to the receiver."
+
+	self nextPut: Character cr!
+crtab
+	"Append a return character, followed by a single tab character, to the receiver."
+
+	self nextPut: Character cr.
+	self nextPut: Character tab!
+crtab: anInteger 
+	"Append a return character, followed by anInteger tab characters, to the receiver."
+
+	self nextPut: Character cr.
+	anInteger timesRepeat: [self nextPut: Character tab]!
+emphasis
+	^ 1
+	"Allows compatibility with streams which carry emphasis"!
+emphasis: ignored
+	"Allows compatibility with streams which carry emphasis"!
+space
+	"Append a space character to the receiver."
+
+	self nextPut: Character space!
+tab
+	"Append a tab character to the receiver."
+
+	self nextPut: Character tab! !
+
+!WriteStream methodsFor: 'printing'!
+print: anObject 
+	"Have anObject print on the receiver."
+
+	anObject printOn: self!
+store: anObject 
+	"Have anObject print on me for rereading."
+
+	anObject storeOn: self! !
+
+!WriteStream methodsFor: 'fileIn/Out'!
+nextChunkPut: aString 
+	"Put aString onto self, doubling embedded terminators."
+
+	| index stringSize char terminator |
+	terminator _ $!.
+	index _ 0.
+	stringSize _ aString size.
+	[(index _ index + 1) <= stringSize]
+		whileTrue: 
+			[char _ aString at: index.
+			self nextPut: char.
+			char == terminator ifTrue: ["double imbedded terminator"
+				self nextPut: char]].
+	self nextPut: terminator! !
+
+!WriteStream methodsFor: 'private'!
+on: aCollection 
+	super on: aCollection.
+	readLimit _ 0.
+	writeLimit _ aCollection size!
+on: aCollection from: firstIndex to: lastIndex 
+	| len |
+	collection _ aCollection.
+	readLimit _ 
+		firstIndex = 1
+			ifTrue: [0]
+			ifFalse: [firstIndex - 1].
+	writeLimit _ lastIndex.
+	position _ readLimit!
+pastEndPut: anObject 
+	collection _ collection , (collection species with: anObject).
+	writeLimit _ collection size.
+	^collection at: (position _ position + 1) put: anObject!
+growToInclude: index
+	"Grow the collection in a WriteStream to include index"
+	| newCollection |
+	newCollection _ collection class new: (collection size max: index) * 2.
+	newCollection replaceFrom: 1 to: collection size with: collection.
+	collection _ newCollection.
+	writeLimit _ collection size! !
+
+!WriteStream class methodsFor: 'instance creation'!
+on: aCollection 
+	"Answer a new instance of me, streaming over aCollection."
+
+	^self basicNew on: aCollection!
+with: aCollection 
+	"Answer an instance of me on a copy of aCollection."
+	
+	^self on: aCollection copy!
+with: aCollection from: firstIndex to: lastIndex 
+	"Answer an instance of me on a copy of aCollection from firstIndex to lastIndex."
+	
+	^self on: (aCollection copyFrom: firstIndex to: lastIndex)! !
+
+PositionableStream subclass: #ReadStream
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Streams'!
+
+!ReadStream methodsFor: 'accessing'!
+next
+	"Answer with the next object in the Stream represented by the receiver. 
+	Fail if the collection of this stream is not an Array or a String. Fail if 
+	the stream is positioned at its end, or if the position is out of bounds in 
+	the collection. Optional. See Object documentation whatIsAPrimitive."
+
+	<primitive: 65>
+	position >= readLimit
+		ifTrue: [^nil]
+		ifFalse: [^collection at: (position _ position + 1)]!
+nextPut: anObject 
+	self shouldNotImplement! !
+
+!ReadStream methodsFor: 'private'!
+on: aCollection from: firstIndex to: lastIndex 
+	| len |
+	collection _ aCollection.
+	readLimit _  lastIndex > (len _ collection size)
+						ifTrue: [len]
+						ifFalse: [lastIndex].
+	position _ firstIndex <= 1
+				ifTrue: [0]
+				ifFalse: [firstIndex - 1]! !
+
+!ReadStream class methodsFor: 'instance creation'!
+on: aCollection from: firstIndex to: lastIndex 
+	"Answer with a new instance streaming over a copy of aCollection from
+	firstIndex to lastIndex."
+
+	^self basicNew
+		on: aCollection
+		from: firstIndex
+		to: lastIndex! !
