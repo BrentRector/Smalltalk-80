@@ -1,9 +1,6 @@
-Object subclass: #SimpleTest
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Test'!
+"Simple test method"
 
-!SimpleTest methodsFor: 'testing'!
-simpleMethod
-	^Object! !
+!Object methodsFor: 'testing'!
+simpleTest
+	"A simple test method"
+	^42! !

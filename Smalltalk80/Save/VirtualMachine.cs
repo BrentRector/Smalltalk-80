@@ -61,7 +61,7 @@ public sealed class VirtualMachine
     }
 
     /// <summary>
-    /// Loads the test framework from TestLibrary.st if it exists.
+    /// Loads the test framework from Testing/TestLibrary.st if it exists.
     /// This provides test classes like TestCase, TestSuite, TestResult, TestRunner
     /// for validating interpreter operation with Smalltalk test cases.
     /// </summary>
@@ -69,7 +69,7 @@ public sealed class VirtualMachine
     {
         var testLibraryPath = Path.Combine(
             Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
-            "..", "..", "..", "..", "TestLibrary.st");
+            "..", "..", "..", "..", "Testing", "TestLibrary.st");
 
         if (File.Exists(testLibraryPath))
         {

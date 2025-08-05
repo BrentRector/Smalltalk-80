@@ -118,19 +118,48 @@ public sealed class SmalltalkParser
         parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor(tokens);
 
-        // If source doesn't contain method signature, treat it as an expression
-        if (!source.Contains("::") && !source.Contains("methodsFor:") && !System.Text.RegularExpressions.Regex.IsMatch(source, @"^\s*[a-zA-Z_][a-zA-Z0-9_]*(:|\s|$)"))
+        // Check if this looks like a method definition with signature vs just method body
+        var trimmedSource = source.Trim();
+        bool hasMethodSignature =
+            trimmedSource.Contains("::") ||
+            trimmedSource.Contains("methodsFor:") ||
+            System.Text.RegularExpressions.Regex.IsMatch(trimmedSource, @"^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(:|\s+[a-zA-Z_]|\s*$)");
+
+        if (methodName is not null)
+        {
+            Tracer.Log($"[PARSER_DEBUG] Parsing source: '{trimmedSource}'");
+            Tracer.Log($"[PARSER_DEBUG] HasMethodSignature: {hasMethodSignature}");
+            Tracer.Log($"[PARSER_DEBUG] EndsWithExclamation: {trimmedSource.EndsWith("!")}");
+        }
+
+        // If source doesn't contain method signature, treat it as an expression or method body
+        if (!hasMethodSignature)
         {
             // Try expression chunk first (handles expressions ending with !)
-            if (source.EndsWith("!"))
+            if (trimmedSource.EndsWith("!"))
             {
-                var exprChunkCtx = parser.expressionChunk();
-                if (parser.NumberOfSyntaxErrors > 0)
-                    throw new InvalidOperationException("Invalid Smalltalk source.");
+                try
+                {
+                    var exprChunkCtx = parser.expressionChunk();
+                    if (parser.NumberOfSyntaxErrors > 0)
+                    {
+                        if (methodName is not null)
+                            Tracer.Log($"[PARSER_DEBUG] ExpressionChunk parsing failed with {parser.NumberOfSyntaxErrors} errors");
+                        throw new InvalidOperationException("Invalid Smalltalk source.");
+                    }
 
-                var expression = (ExpressionNode)visitor.Visit(exprChunkCtx.expression())!;
-                var exprSequence = new SequenceNode(new List<string>(), new[] { new ExpressionStatement(expression) });
-                return new ParsedMethod(exprSequence, false, 0);
+                    var expression = (ExpressionNode)visitor.Visit(exprChunkCtx.expression())!;
+                    var exprSequence = new SequenceNode(new List<string>(), new[] { new ExpressionStatement(expression) });
+                    if (methodName is not null)
+                        Tracer.Log($"[PARSER_DEBUG] Successfully parsed as expression chunk");
+                    return new ParsedMethod(exprSequence, false, 0);
+                }
+                catch (Exception ex)
+                {
+                    if (methodName is not null)
+                        Tracer.Log($"[PARSER_DEBUG] ExpressionChunk parsing exception: {ex.Message}");
+                    throw;
+                }
             }
             else
             {

@@ -39,3 +39,34 @@ Use the `--load` option to compile a single method file where the first line tak
 ```bash
 dotnet run --project Smalltalk80/Smalltalk80.csproj -- --filein "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st"
 ```
+
+## Project Structure
+
+### Core Components
+- **Smalltalk80/** - Main interpreter implementation in C#
+- **StandardLibrary.st** - Core Smalltalk-80 standard library classes
+- **docs/** - Documentation and implementation notes
+
+### Testing
+- **Testing/** - Complete test suite and testing framework
+  - `TestLibrary.st` - Core testing framework with TestCase base class
+  - `BasicTestMethods.st` - Comprehensive functionality tests
+  - `README.md` - Detailed testing documentation
+  - Various specific test files for different features
+
+### Testing Framework Usage
+
+Load and run tests from the Testing directory:
+
+```bash
+# Load the testing framework
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/TestLibrary.st"
+
+# Run basic functionality tests
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/BasicTestMethods.st"
+
+# Start REPL and load tests interactively
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --repl
+Smalltalk> LoadFile Testing/TestLibrary.st
+Smalltalk> LoadFile Testing/BasicTestMethods.st
+```

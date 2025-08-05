@@ -134,9 +134,14 @@ public static class SystemImageLoader
                     if (header != null)
                     {
                         currentHeader = header;
+                        // First check if class exists in local stubs, then in SystemDictionary
                         if (classStubs.TryGetValue(header.ClassName, out currentClass))
                         {
                             Console.WriteLine($"[SYSTEM_IMAGE] Processing methods for class: {header.ClassName}");
+                        }
+                        else if (SystemDictionary.TryGetClass(header.ClassName, out currentClass))
+                        {
+                            Console.WriteLine($"[SYSTEM_IMAGE] Processing methods for existing class: {header.ClassName}");
                         }
                         else
                         {
@@ -209,41 +214,48 @@ public static class SystemImageLoader
         var variables = header.IsClassSide ? targetClass.ClassVariables : targetClass.InstanceVariables;
 
         CompiledMethod compiled;
-        if (string.IsNullOrWhiteSpace(methodDef.Source))
+        try
         {
-            var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
-            compiled = AstMethodCompiler.CompileMethod(
-                emptyBody,
-                methodDef.Arguments,
-                variables,
-                methodDef.HasPrimitive,
-                methodDef.PrimitiveIndex);
-        }
-        else
-        {
-            // Use AstMethodCompiler directly with the pre-parsed body and primitive information
-            compiled = AstMethodCompiler.CompileMethod(
-                methodDef.Body,
-                methodDef.Arguments,
-                variables,
-                methodDef.HasPrimitive,
-                methodDef.PrimitiveIndex);
-        }
+            if (string.IsNullOrWhiteSpace(methodDef.Source) || methodDef.Body == null)
+            {
+                var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
+                compiled = AstMethodCompiler.CompileMethod(
+                    emptyBody,
+                    methodDef.Arguments,
+                    variables,
+                    methodDef.HasPrimitive,
+                    methodDef.PrimitiveIndex);
+            }
+            else
+            {
+                // Use AstMethodCompiler directly with the pre-parsed body and primitive information
+                compiled = AstMethodCompiler.CompileMethod(
+                    methodDef.Body,
+                    methodDef.Arguments,
+                    variables,
+                    methodDef.HasPrimitive,
+                    methodDef.PrimitiveIndex);
+            }
 
-        compiled = new CompiledMethod
-        {
-            Header = compiled.Header,
-            Bytecodes = compiled.Bytecodes,
-            Literals = compiled.Literals,
-            TemporariesCount = compiled.TemporariesCount,
-            HasPrimitive = methodDef.HasPrimitive,
-            PrimitiveIndex = methodDef.PrimitiveIndex,
-            Comment = compiled.Comment
-        };
+            compiled = new CompiledMethod
+            {
+                Header = compiled.Header,
+                Bytecodes = compiled.Bytecodes,
+                Literals = compiled.Literals,
+                TemporariesCount = compiled.TemporariesCount,
+                HasPrimitive = methodDef.HasPrimitive,
+                PrimitiveIndex = methodDef.PrimitiveIndex,
+                Comment = compiled.Comment
+            };
 
-        // Install in the appropriate method dictionary
-        var methodDictionary = header.IsClassSide ? targetClass.ClassMethodDictionary : targetClass.MethodDictionary;
-        methodDictionary[new Symbol(methodDef.Selector)] = compiled;
+            // Install in the appropriate method dictionary
+            var methodDictionary = header.IsClassSide ? targetClass.ClassMethodDictionary : targetClass.MethodDictionary;
+            methodDictionary[new Symbol(methodDef.Selector)] = compiled;
+        }
+        catch (Exception ex)
+        {
+            warnings.Add(new LoadWarning(0, 0, $"Failed to compile method {methodDef.Selector}: {ex.Message}"));
+        }
     }
 }
 
