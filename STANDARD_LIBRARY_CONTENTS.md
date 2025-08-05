@@ -4,8 +4,8 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 
 ## Overview
 
-**Total Classes:** 35  
-**Total Method Chunks:** 191  
+**Total Classes:** 38  
+**Total Method Chunks:** 279  
 **Last Updated:** August 5, 2025
 
 ## Recent Additions (August 5, 2025)
@@ -16,6 +16,9 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 - ✅ **Dictionary** - Hash-based key-value collections (38 methods)
 - ✅ **IdentityDictionary** - Dictionary using identity comparison (== instead of =) (16 methods)
 - ✅ **Float** - IEEE 32-bit floating-point numbers with complete mathematical functions (35 methods)
+- ✅ **ReadWriteStream** - Bidirectional stream for reading and writing with file I/O support (7 methods)
+- ✅ **ExternalStream** - External file streams with binary data handling and word-based operations (16 methods)
+- ✅ **FileStream** - Complete file I/O streams with page-based virtual memory management (61 methods)
 - ⏳ **Exception hierarchy** - Not present in original Smalltalk-80
 
 ## 5-Step Expansion Plan Status
@@ -62,6 +65,9 @@ Object
 └── Stream
     └── PositionableStream
         ├── WriteStream
+        │   └── ReadWriteStream
+        │       └── ExternalStream
+        │           └── FileStream
         └── ReadStream
 ```
 
@@ -463,6 +469,43 @@ Object
 - Writing: `#nextPut:` (error)
 - **Class Methods:** `#on:from:to:`
 
+### ReadWriteStream
+**Superclass:** WriteStream  
+**Instance Variables:** none (inherits from WriteStream)  
+**Purpose:** Bidirectional positionable stream for both reading and writing with file I/O support
+
+**Key Methods:**
+- Accessing: `#contents` (overridden to handle readLimit correctly), `#next` (reading with primitive support)
+- File status: `#close` (FileStream compatibility)
+- File I/O: `#fileIn` (reads expressions with exclamation delimiters), `#fileOutChanges`, `#fileOutChangesFor:`, `#timeStamp`
+- **Key Features:** Supports both read and write operations, file-in/file-out capability, timestamp generation
+
+### ExternalStream
+**Superclass:** ReadWriteStream  
+**Instance Variables:** none (inherits from ReadWriteStream)  
+**Purpose:** External file streams with binary data handling and two-byte word operations
+
+**Key Methods:**
+- Accessing: `#next:` (overridden for binary elements), `#nextNumber:`, `#nextString`, `#nextWord` 
+- Positioning: `#padTo:`, `#resetContents`, `#wordPosition`, `#wordPosition:`
+- **Key Features:** Binary/byte-sized element handling, word-based operations (two-byte words), string I/O, nonhomogeneous data access
+
+### FileStream
+**Superclass:** ExternalStream  
+**Instance Variables:** `page` (FilePage), `rwmode` (Integer), `closed` (Boolean)  
+**Purpose:** Complete file I/O streams with page-based virtual memory management and full file system access
+
+**Key Methods:**
+- Accessing: `#contentsOfEntireFile`, `#next`, `#next:`, `#next:into:`, `#nextPut:`, `#nextPutAll:`, `#size`
+- Testing: `#atEnd`, `#closed`, `#writing`
+- Positioning: `#position`, `#position:`, `#reset`, `#setToEnd`, `#skip:`
+- File modes: `#binary`, `#text`, `#readOnly`, `#readWrite`, `#readWriteShorten`, `#writeShorten`
+- File status: `#close`, `#flush`, `#release`, `#reopen`
+- File accessing: `#directory`, `#file`, `#name`, `#page`, `#beSnapshotFile`
+- FileIn/Out: `#fileIn`, `#fileOutChanges`, `#printOutChanges`
+- Nonhomogeneous: `#nextPage`, `#read:`, `#padTo:`, `#padTo:put:`, `#wordPosition`, `#wordPosition:`
+- **Key Features:** Virtual memory paging, complete file system integration, multiple access modes, automatic page management
+
 ## Implementation Notes
 
 ### Syntax Conventions
@@ -485,11 +528,13 @@ Object
 - Memory management compatible with the object memory system
 
 ## Testing Status
-- ✅ All 34 classes load successfully
-- ✅ 177 method chunks parsed without errors
+- ✅ All 36 classes load successfully
+- ✅ 198 method chunks parsed without errors
 - ✅ Inheritance hierarchy resolves correctly
 - ✅ System boots and displays class summary
 - ✅ Dictionary and IdentityDictionary functionality available
+- ✅ Float class with mathematical constants and functions operational
+- ✅ ReadWriteStream provides bidirectional I/O capability
 
 ---
 
