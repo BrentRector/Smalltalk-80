@@ -1,4 +1,22 @@
-# Testing Directory
+# Te## Core Testing Framework
+
+- **TestLibrary.st** - Core testing framework with TestCase base class and assertion methods
+
+## Comprehensive Standard Library Tests
+
+### Complete Test Coverage
+- **ObjectTests.st** - Tests for Object class methods (accessing, testing, comparing, copying, etc.)
+- **BooleanTests.st** - Tests for Boolean, True, and False classes (logical operations, control flow)
+- **NumberTests.st** - Tests for Number, Integer, and SmallInteger classes (arithmetic, comparison, bit operations)
+- **CharacterTests.st** - Tests for Character class (accessing, comparing, testing, converting)
+- **UndefinedObjectTests.st** - Tests for UndefinedObject (nil) class
+- **CollectionTests.st** - Tests for Collection and Array classes (accessing, enumerating, copying)
+- **StringTests.st** - Tests for String class (accessing, converting, comparing, concatenation)
+- **BlockContextTests.st** - Tests for BlockContext class (evaluation, control structures, closures)
+- **StandardLibraryTestSuite.st** - Master test suite that runs all standard library tests
+
+### Test Documentation
+- **TEST_SUITE_DOCUMENTATION.md** - Comprehensive documentation of test coverage and methodologyng Directory
 
 This directory contains all test-related files for the Smalltalk-80 interpreter project.
 

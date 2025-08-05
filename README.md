@@ -56,17 +56,61 @@ dotnet run --project Smalltalk80/Smalltalk80.csproj -- --filein "Smalltalk80/Sma
 
 ### Testing Framework Usage
 
-Load and run tests from the Testing directory:
+The project includes a comprehensive test suite covering all standard library classes.
 
+#### Quick Start - Run All Tests
 ```bash
-# Load the testing framework
+# Windows PowerShell
+.\scripts\Run-ComprehensiveTests.ps1
+
+# Windows Command Prompt
+.\scripts\run-tests.bat
+
+# Manual execution with proper dependencies
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/TestLibrary.st" --source "Testing/StandardLibraryTestSuite.st"
+```
+
+#### Test Categories Available
+- **ObjectTests** - Root Object class methods
+- **BooleanTests** - Boolean logic and control flow
+- **NumberTests** - Arithmetic and numeric operations
+- **CharacterTests** - Character operations and conversions
+- **UndefinedObjectTests** - nil object behavior
+- **CollectionTests** - Collection enumeration methods
+- **StringTests** - String operations and comparisons
+- **BlockContextTests** - Block evaluation and closures
+
+#### Advanced Test Execution
+```powershell
+# Run specific test category
+.\scripts\Run-ComprehensiveTests.ps1 -TestCategory "ObjectTests"
+
+# Run with verbose output
+.\scripts\Run-ComprehensiveTests.ps1 -Verbose
+
+# Run individual test quickly
+.\scripts\Run-QuickTests.ps1 -TestName "BooleanTests"
+
+# Stop on first failure
+.\scripts\Run-ComprehensiveTests.ps1 -StopOnFirstFailure
+```
+
+#### Dependency Loading Order
+Tests require proper loading sequence:
+1. **Standard Library** (automatically loaded)
+2. **Test Framework** (`Testing/TestLibrary.st`)
+3. **Test Cases** (specific test files)
+
+#### Manual Test Loading
+```bash
+# Load testing framework first
 dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/TestLibrary.st"
 
-# Run basic functionality tests
-dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/BasicTestMethods.st"
+# Then load specific tests with dependencies
+dotnet run --project Smalltalk80/Smalltalk80.csproj -- --source "Testing/TestLibrary.st" --source "Testing/ObjectTests.st"
 
-# Start REPL and load tests interactively
+# Interactive REPL testing
 dotnet run --project Smalltalk80/Smalltalk80.csproj -- --repl
 Smalltalk> LoadFile Testing/TestLibrary.st
-Smalltalk> LoadFile Testing/BasicTestMethods.st
+Smalltalk> LoadFile Testing/ObjectTests.st
 ```
