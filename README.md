@@ -1,6 +1,43 @@
 # Smalltalk-80
 
-This repository contains a basic prototype of a Smalltalk-80 interpreter written in C#. The solution includes a console application demonstrating a minimal bytecode parser and execution engine.
+This rep## VS Code Setup
+
+The repository contains a `.vscode` folder with build and debug tasks. After
+installing the [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
+extension, open this folder in VS Code and press <kbd>F5</kbd> to build and
+debug. 
+
+### Integrated Build and Test Workflow
+
+The VS Code build system is configured to automatically run all test cases after successful compilation:
+
+- **Default Build** (Ctrl+Shift+B): Builds the solution and runs comprehensive test suite
+- **Build Task**: Compiles `Smalltalk80.sln` with automatic ANTLR generation
+- **Test Integration**: Automatically executes all 9 test categories after successful build
+- **Results Display**: Shows test results with pass/fail status in the terminal
+
+### Available VS Code Tasks
+
+1. **`build`** (default) - Complete build and test workflow
+2. **`build-and-test`** - Build only without tests  
+3. **`run-tests`** - Run comprehensive test suite independently
+4. **`generate-antlr`** - Generate ANTLR parser files only
+5. **`run`** - Run the interpreter
+6. **`repl`** - Start REPL mode
+
+### Task Execution Flow
+```
+Ctrl+Shift+B (Build)
+  ↓
+ANTLR Generation → .NET Build → Comprehensive Tests
+  ↓
+Test Results: Pass/Fail Summary with Detailed Logging
+```
+
+### Manual Task Execution
+Access tasks via Command Palette (`Ctrl+Shift+P` → "Tasks: Run Task") or use keyboard shortcuts:
+- `Ctrl+Shift+B` - Default build with tests
+- `Ctrl+Shift+P` → "Tasks: Run Task" → Select specific task contains a basic prototype of a Smalltalk-80 interpreter written in C#. The solution includes a console application demonstrating a minimal bytecode parser and execution engine.
 
 ## Building
 

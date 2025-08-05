@@ -1,7 +1,7 @@
 "TestLibrary.st - Phase 1 Test Framework"
 
 Object subclass: #TestCase
-	instanceVariableNames: 'testSelector failureMessage'
+	instanceVariableNames: 'testSelector failureMessage testsRun testsPassed testsFailed'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Testing-Framework'!
@@ -11,6 +11,9 @@ initialize
 	"Initialize a new test case"
 	testSelector _ nil.
 	failureMessage _ nil.
+	testsRun _ 0.
+	testsPassed _ 0.
+	testsFailed _ 0.
 	^self! !
 
 !TestCase methodsFor: 'assertions'!
@@ -42,6 +45,38 @@ fail: message
 	failureMessage _ message.
 	self error: 'Test failed: ', message! !
 
+!TestCase methodsFor: 'test tracking'!
+recordTestStart
+	"Record that a test has started"
+	testsRun _ testsRun + 1!
+
+recordTestPassed
+	"Record that a test has passed"
+	testsPassed _ testsPassed + 1!
+
+recordTestFailed
+	"Record that a test has failed"
+	testsFailed _ testsFailed + 1!
+
+runIndividualTest: testMethodSelector
+	"Run a single test method and track results"
+	self recordTestStart.
+	self perform: testMethodSelector.
+	self recordTestPassed.
+	^true!
+
+getTestCounts
+	"Return test statistics as a string"
+	^testsRun printString, ' tests run, ', 
+	 testsPassed printString, ' passed, ', 
+	 testsFailed printString, ' failed'!
+
+resetTestCounts
+	"Reset test counters"
+	testsRun _ 0.
+	testsPassed _ 0.
+	testsFailed _ 0! !
+
 !TestCase methodsFor: 'running'!
 runTest
 	"Run this test case - simple version"
@@ -52,6 +87,7 @@ runTest
 
 performTest
 	"Perform the actual test - subclasses should override"
+	self resetTestCounts.
 	self error: 'Subclass must implement performTest'!
 
 setUp
@@ -60,7 +96,17 @@ setUp
 
 tearDown
 	"Clean up after testing - subclasses may override"
-	^self! !
+	^self!
+
+printTestResults
+	"Print test results summary"
+	| summary |
+	summary _ self class name, ': ', self getTestCounts.
+	summary, ' (', 
+	((testsPassed = testsRun) 
+		ifTrue: ['ALL PASSED'] 
+		ifFalse: [testsFailed printString, ' FAILED']), 
+	')'! !
 
 TestCase subclass: #BasicSmalltalkTests
 	instanceVariableNames: ''

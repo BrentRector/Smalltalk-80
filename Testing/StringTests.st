@@ -110,11 +110,6 @@ testIncludes
 	self assertTrue: (string includes: $o).
 	self assertFalse: (string includes: $x)!
 
-testSize
-	"Test String>>size (collection behavior)"
-	self assertEqual: 5 to: string size.
-	self assertEqual: 0 to: emptyString size!
-
 testIsEmpty
 	"Test String>>isEmpty (inherited from Collection)"
 	self assertFalse: string isEmpty.
@@ -137,21 +132,23 @@ testCharacterIteration
 !StringTests methodsFor: 'running'!
 performTest
 	"Run all the string tests"
+	self resetTestCounts.
 	self setUp.
-	self testAt.
-	self testAtPut.
-	self testSize.
-	self testDo.
-	self testAsSymbol.
-	self testAsUppercase.
-	self testAsLowercase.
-	self testEquality.
-	self testLessThan.
-	self testLessThanOrEqual.
-	self testGreaterThan.
-	self testGreaterThanOrEqual.
-	self testConcatenation.
-	self testIncludes.
-	self testIsEmpty.
-	self testNotEmpty.
-	self testCharacterIteration! !
+	self runIndividualTest: #testAt.
+	self runIndividualTest: #testAtPut.
+	self runIndividualTest: #testSize.
+	self runIndividualTest: #testDo.
+	self runIndividualTest: #testAsSymbol.
+	self runIndividualTest: #testAsUppercase.
+	self runIndividualTest: #testAsLowercase.
+	self runIndividualTest: #testEquality.
+	self runIndividualTest: #testLessThan.
+	self runIndividualTest: #testLessThanOrEqual.
+	self runIndividualTest: #testGreaterThan.
+	self runIndividualTest: #testGreaterThanOrEqual.
+	self runIndividualTest: #testConcatenation.
+	self runIndividualTest: #testIncludes.
+	self runIndividualTest: #testIsEmpty.
+	self runIndividualTest: #testNotEmpty.
+	self runIndividualTest: #testCharacterIteration.
+	self printTestResults! !

@@ -34,9 +34,11 @@ testEven
 !NumberTests methodsFor: 'running'!
 performTest
 	"Run all the number tests"
-	self testNegated.
-	self testIsInteger.
-	self testEven! !
+	self resetTestCounts.
+	self runIndividualTest: #testNegated.
+	self runIndividualTest: #testIsInteger.
+	self runIndividualTest: #testEven.
+	self printTestResults! !
 
 TestCase subclass: #SmallIntegerTests
 	instanceVariableNames: ''
@@ -203,27 +205,29 @@ testHash
 !SmallIntegerTests methodsFor: 'running'!
 performTest
 	"Run all the SmallInteger tests"
-	self testAddition.
-	self testSubtraction.
-	self testMultiplication.
-	self testDivision.
-	self testIntegerDivision.
-	self testModulo.
-	self testLessThan.
-	self testLessThanOrEqual.
-	self testGreaterThan.
-	self testGreaterThanOrEqual.
-	self testEquality.
-	self testBitAnd.
-	self testBitOr.
-	self testBitXor.
-	self testBitShift.
-	self testEven.
-	self testOdd.
-	self testPositive.
-	self testNegative.
-	self testStrictlyPositive.
-	self testSign.
-	self testAsString.
-	self testPrintString.
-	self testHash! !
+	self resetTestCounts.
+	self runIndividualTest: #testAddition.
+	self runIndividualTest: #testSubtraction.
+	self runIndividualTest: #testMultiplication.
+	self runIndividualTest: #testDivision.
+	self runIndividualTest: #testIntegerDivision.
+	self runIndividualTest: #testModulo.
+	self runIndividualTest: #testLessThan.
+	self runIndividualTest: #testLessThanOrEqual.
+	self runIndividualTest: #testGreaterThan.
+	self runIndividualTest: #testGreaterThanOrEqual.
+	self runIndividualTest: #testEquality.
+	self runIndividualTest: #testBitAnd.
+	self runIndividualTest: #testBitOr.
+	self runIndividualTest: #testBitXor.
+	self runIndividualTest: #testBitShift.
+	self runIndividualTest: #testEven.
+	self runIndividualTest: #testOdd.
+	self runIndividualTest: #testPositive.
+	self runIndividualTest: #testNegative.
+	self runIndividualTest: #testStrictlyPositive.
+	self runIndividualTest: #testSign.
+	self runIndividualTest: #testAsString.
+	self runIndividualTest: #testPrintString.
+	self runIndividualTest: #testHash.
+	self printTestResults! !

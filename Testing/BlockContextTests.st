@@ -114,15 +114,17 @@ testConditionalBlocks
 !BlockContextTests methodsFor: 'running'!
 performTest
 	"Run all the block context tests"
-	self testValue.
-	self testValueWithOneArgument.
-	self testValueWithTwoArguments.
-	self testWhileTrue.
-	self testWhileFalse.
-	self testWhileTrueNoBlock.
-	self testWhileFalseNoBlock.
-	self testNestedBlocks.
-	self testBlockWithLocalVariables.
-	self testClosure.
-	self testClosureWithModification.
-	self testConditionalBlocks! !
+	self resetTestCounts.
+	self runIndividualTest: #testValue.
+	self runIndividualTest: #testValueWithOneArgument.
+	self runIndividualTest: #testValueWithTwoArguments.
+	self runIndividualTest: #testWhileTrue.
+	self runIndividualTest: #testWhileFalse.
+	self runIndividualTest: #testWhileTrueNoBlock.
+	self runIndividualTest: #testWhileFalseNoBlock.
+	self runIndividualTest: #testNestedBlocks.
+	self runIndividualTest: #testBlockWithLocalVariables.
+	self runIndividualTest: #testClosure.
+	self runIndividualTest: #testClosureWithModification.
+	self runIndividualTest: #testConditionalBlocks.
+	self printTestResults! !

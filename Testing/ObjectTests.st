@@ -123,18 +123,20 @@ testPrintString
 !ObjectTests methodsFor: 'running'!
 performTest
 	"Run all the object tests"
+	self resetTestCounts.
 	self setUp.
-	self testYourself.
-	self testIsInteger.
-	self testIsNil.
-	self testNotNil.
-	self testEquality.
-	self testIdentity.
-	self testHash.
-	self testClass.
-	self testIsMemberOf.
-	self testIsKindOf.
-	self testSize.
-	self testCopy.
-	self testShallowCopy.
-	self testPrintString! !
+	self runIndividualTest: #testYourself.
+	self runIndividualTest: #testIsInteger.
+	self runIndividualTest: #testIsNil.
+	self runIndividualTest: #testNotNil.
+	self runIndividualTest: #testEquality.
+	self runIndividualTest: #testIdentity.
+	self runIndividualTest: #testHash.
+	self runIndividualTest: #testClass.
+	self runIndividualTest: #testIsMemberOf.
+	self runIndividualTest: #testIsKindOf.
+	self runIndividualTest: #testSize.
+	self runIndividualTest: #testCopy.
+	self runIndividualTest: #testShallowCopy.
+	self runIndividualTest: #testPrintString.
+	self printTestResults! !

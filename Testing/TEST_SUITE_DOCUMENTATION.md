@@ -176,6 +176,50 @@ Use the provided PowerShell script for comprehensive testing:
 .\scripts\Run-ComprehensiveTests.ps1 -Verbose
 ```
 
+### VS Code Integration
+
+The project is configured to automatically run all test cases after a successful compilation:
+
+#### Build Task Integration
+- **Default Build** (Ctrl+Shift+P → "Tasks: Run Build Task" or Ctrl+Shift+B):
+  1. Generates ANTLR parser files
+  2. Compiles the solution
+  3. Automatically runs comprehensive test suite
+  4. Reports test results in the terminal
+
+#### Available Tasks
+- **`build`** (default): Complete build and test workflow
+- **`build-and-test`**: Build only (without tests)
+- **`run-tests`**: Run tests independently
+- **`generate-antlr`**: Generate ANTLR parser files only
+- **`run`**: Run the interpreter
+- **`repl`**: Start REPL mode
+
+#### Task Execution Flow
+```
+Default Build (Ctrl+Shift+B)
+  ↓
+build-and-test-all
+  ↓
+build-and-test → generate-antlr → dotnet build
+  ↓
+run-tests → Run-ComprehensiveTests.ps1
+  ↓
+Test Results & Summary
+```
+
+#### Manual Task Execution
+You can run individual tasks using VS Code's Command Palette:
+1. Press `Ctrl+Shift+P`
+2. Type "Tasks: Run Task"
+3. Select the desired task from the list
+
+#### Test Results in VS Code
+- Test output appears in the Terminal panel
+- Colored output shows pass/fail status
+- Comprehensive logging with timestamps
+- Build problems appear in the Problems panel
+
 ## Expected Outcomes
 
 ### Successful Test Execution

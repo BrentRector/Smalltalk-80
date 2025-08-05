@@ -104,19 +104,21 @@ testInjectInto
 !CollectionTests methodsFor: 'running'!
 performTest
 	"Run all the collection tests"
+	self resetTestCounts.
 	self setUp.
-	self testSize.
-	self testIsEmpty.
-	self testNotEmpty.
-	self testIncludes.
-	self testOccurrencesOf.
-	self testDo.
-	self testCollect.
-	self testSelect.
-	self testReject.
-	self testDetect.
-	self testDetectIfNone.
-	self testInjectInto! !
+	self runIndividualTest: #testSize.
+	self runIndividualTest: #testIsEmpty.
+	self runIndividualTest: #testNotEmpty.
+	self runIndividualTest: #testIncludes.
+	self runIndividualTest: #testOccurrencesOf.
+	self runIndividualTest: #testDo.
+	self runIndividualTest: #testCollect.
+	self runIndividualTest: #testSelect.
+	self runIndividualTest: #testReject.
+	self runIndividualTest: #testDetect.
+	self runIndividualTest: #testDetectIfNone.
+	self runIndividualTest: #testInjectInto.
+	self printTestResults! !
 
 TestCase subclass: #ArrayTests
 	instanceVariableNames: 'array emptyArray'
@@ -237,16 +239,18 @@ testWithWithWith
 !ArrayTests methodsFor: 'running'!
 performTest
 	"Run all the array tests"
+	self resetTestCounts.
 	self setUp.
-	self testAt.
-	self testAtPut.
-	self testSize.
-	self testDo.
-	self testCopyWith.
-	self testConcatenation.
-	self testHash.
-	self testAsArray.
-	self testNew.
-	self testWith.
-	self testWithWith.
-	self testWithWithWith! !
+	self runIndividualTest: #testAt.
+	self runIndividualTest: #testAtPut.
+	self runIndividualTest: #testSize.
+	self runIndividualTest: #testDo.
+	self runIndividualTest: #testCopyWith.
+	self runIndividualTest: #testConcatenation.
+	self runIndividualTest: #testHash.
+	self runIndividualTest: #testAsArray.
+	self runIndividualTest: #testNew.
+	self runIndividualTest: #testWith.
+	self runIndividualTest: #testWithWith.
+	self runIndividualTest: #testWithWithWith.
+	self printTestResults! !

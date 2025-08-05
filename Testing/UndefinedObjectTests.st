@@ -31,7 +31,9 @@ testNilIdentity
 !UndefinedObjectTests methodsFor: 'running'!
 performTest
 	"Run all the UndefinedObject tests"
-	self testIsNil.
-	self testNotNil.
-	self testPrintString.
-	self testNilIdentity! !
+	self resetTestCounts.
+	self runIndividualTest: #testIsNil.
+	self runIndividualTest: #testNotNil.
+	self runIndividualTest: #testPrintString.
+	self runIndividualTest: #testNilIdentity.
+	self printTestResults! !

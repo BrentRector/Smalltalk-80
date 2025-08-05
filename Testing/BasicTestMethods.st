@@ -69,11 +69,13 @@ testCharacterOperations
 !BasicFunctionalityTests methodsFor: 'running'!
 performTest
 	"Run all the basic functionality tests"
-	self testBasicArithmetic.
-	self testArithmeticComplex.
-	self testBooleanLogic.
-	self testBooleanComplex.
-	self testArrayOperations.
-	self testCollectionSize.
-	self testStringOperations.
-	self testCharacterOperations! !
+	self resetTestCounts.
+	self runIndividualTest: #testBasicArithmetic.
+	self runIndividualTest: #testArithmeticComplex.
+	self runIndividualTest: #testBooleanLogic.
+	self runIndividualTest: #testBooleanComplex.
+	self runIndividualTest: #testArrayOperations.
+	self runIndividualTest: #testCollectionSize.
+	self runIndividualTest: #testStringOperations.
+	self runIndividualTest: #testCharacterOperations.
+	self printTestResults! !

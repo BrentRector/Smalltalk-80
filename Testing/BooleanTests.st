@@ -126,18 +126,20 @@ testPrinting
 !BooleanTests methodsFor: 'running'!
 performTest
 	"Run all the boolean tests"
-	self testAnd.
-	self testOr.
-	self testNot.
-	self testAndBlock.
-	self testOrBlock.
-	self testEqv.
-	self testXor.
-	self testIfTrue.
-	self testIfFalse.
-	self testIfTrueIfFalse.
-	self testIfFalseIfTrue.
-	self testCopying.
-	self testTrueLogicalOperations.
-	self testFalseLogicalOperations.
-	self testPrinting! !
+	self resetTestCounts.
+	self runIndividualTest: #testAnd.
+	self runIndividualTest: #testOr.
+	self runIndividualTest: #testNot.
+	self runIndividualTest: #testAndBlock.
+	self runIndividualTest: #testOrBlock.
+	self runIndividualTest: #testEqv.
+	self runIndividualTest: #testXor.
+	self runIndividualTest: #testIfTrue.
+	self runIndividualTest: #testIfFalse.
+	self runIndividualTest: #testIfTrueIfFalse.
+	self runIndividualTest: #testIfFalseIfTrue.
+	self runIndividualTest: #testCopying.
+	self runIndividualTest: #testTrueLogicalOperations.
+	self runIndividualTest: #testFalseLogicalOperations.
+	self runIndividualTest: #testPrinting.
+	self printTestResults! !

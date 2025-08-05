@@ -198,29 +198,31 @@ testSpecialCharacters
 !CharacterTests methodsFor: 'running'!
 performTest
 	"Run all the character tests"
-	self testAsciiValue.
-	self testDigitValue.
-	self testValue.
-	self testEquality.
-	self testLessThan.
-	self testLessThanOrEqual.
-	self testGreaterThan.
-	self testGreaterThanOrEqual.
-	self testHash.
-	self testIsAlphaNumeric.
-	self testIsDigit.
-	self testIsLetter.
-	self testIsLowercase.
-	self testIsUppercase.
-	self testIsSeparator.
-	self testIsVowel.
-	self testTokenish.
-	self testCopy.
-	self testDeepCopy.
-	self testAsCharacter.
-	self testAsInteger.
-	self testAsLowercase.
-	self testAsUppercase.
-	self testAsSymbol.
-	self testCharacterCreation.
-	self testSpecialCharacters! !
+	self resetTestCounts.
+	self runIndividualTest: #testAsciiValue.
+	self runIndividualTest: #testDigitValue.
+	self runIndividualTest: #testValue.
+	self runIndividualTest: #testEquality.
+	self runIndividualTest: #testLessThan.
+	self runIndividualTest: #testLessThanOrEqual.
+	self runIndividualTest: #testGreaterThan.
+	self runIndividualTest: #testGreaterThanOrEqual.
+	self runIndividualTest: #testHash.
+	self runIndividualTest: #testIsAlphaNumeric.
+	self runIndividualTest: #testIsDigit.
+	self runIndividualTest: #testIsLetter.
+	self runIndividualTest: #testIsLowercase.
+	self runIndividualTest: #testIsUppercase.
+	self runIndividualTest: #testIsSeparator.
+	self runIndividualTest: #testIsVowel.
+	self runIndividualTest: #testTokenish.
+	self runIndividualTest: #testCopy.
+	self runIndividualTest: #testDeepCopy.
+	self runIndividualTest: #testAsCharacter.
+	self runIndividualTest: #testAsInteger.
+	self runIndividualTest: #testAsLowercase.
+	self runIndividualTest: #testAsUppercase.
+	self runIndividualTest: #testAsSymbol.
+	self runIndividualTest: #testCharacterCreation.
+	self runIndividualTest: #testSpecialCharacters.
+	self printTestResults! !
