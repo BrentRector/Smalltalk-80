@@ -3041,3 +3041,413 @@ findElementOrNil: anObject
 					pass _ pass + 1.
 					pass > 2 ifTrue: [^self grow findElementOrNil: anObject]]].
 	^index! !
+
+Magnitude subclass: #LookupKey
+	instanceVariableNames: 'key'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Support'!
+
+!LookupKey methodsFor: 'comparing'!
+< aLookupKey
+	^key < aLookupKey key!
+= aLookupKey
+	self species = aLookupKey species
+		ifTrue: [^key = aLookupKey key]
+		ifFalse: [^false]!
+hash
+	^key hash!
+hashMappedBy: map
+	"Answer what my hash would be if oops changed according to map"
+	^key hashMappedBy: map! !
+
+!LookupKey methodsFor: 'accessing'!
+key
+	"Answer the lookup key of the receiver."
+	^key!
+key: anObject
+	"Store the argument, anObject, as the lookup key of the receiver."
+	key _ anObject! !
+
+!LookupKey methodsFor: 'printing'!
+printOn: aStream
+	key printOn: aStream! !
+
+!LookupKey class methodsFor: 'instance creation'!
+key: aKey
+	"Answer a new instance of me with the argument as the lookup up."
+	^self new key: aKey! !
+
+LookupKey subclass: #Association
+	instanceVariableNames: 'value'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Support'!
+
+!Association methodsFor: 'accessing'!
+key: aKey value: anObject
+	"Store the arguments as the variables of the receiver."
+	key _ aKey.
+	value _ anObject!
+value
+	"Answer the value of the receiver."
+	^value!
+value: anObject
+	"Store the argument, anObject, as the value of the receiver."
+	value _ anObject! !
+
+!Association methodsFor: 'printing'!
+printOn: aStream
+	super printOn: aStream.
+	aStream nextPutAll: '->'.
+	value printOn: aStream! !
+
+!Association class methodsFor: 'instance creation'!
+key: newKey value: newValue
+	"Answer a new instance of me with the arguments as the key and value of the association."
+	^(super key: newKey) value: newValue! !
+
+Set variableSubclass: #Dictionary
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Unordered'!
+
+!Dictionary methodsFor: 'accessing'!
+associationAt: key
+	"Answer the association at key. If key is not found, create an error message."
+	^self associationAt: key ifAbsent: [self errorKeyNotFound]!
+associationAt: key ifAbsent: aBlock
+	"Answer the association at key. If key is not found, answer the result of evaluating aBlock."
+	| index |
+	index _ self findKey: key ifAbsent: [^aBlock value].
+	^self basicAt: index!
+associations
+	"Answer an OrderedCollection containing the receiver's associations in an arbitrary order."
+	| aCollection |
+	aCollection _ OrderedCollection new: self size.
+	self associationsDo: [:association | aCollection add: association].
+	^aCollection!
+at: key
+	"Answer the value at key. If key is not found, create an error message."
+	^self at: key ifAbsent: [self errorKeyNotFound]!
+at: key ifAbsent: aBlock
+	"Answer the value at key. If key is not found, answer the result of evaluating aBlock."
+	| index |
+	index _ self findKey: key ifAbsent: [^aBlock value].
+	^(self basicAt: index) value!
+at: key put: anObject
+	"Set the value at key to be anObject. If key is not found, create a new entry for key and set is value to anObject. Answer anObject."
+	| index element |
+	index _ self findKeyOrNil: key.
+	element _ self basicAt: index.
+	element == nil
+		ifTrue: [self atNewIndex: index put: (Association key: key value: anObject)]
+		ifFalse: [element value: anObject].
+	^anObject!
+keyAtValue: value
+	"Answer the key whose value equals the argument, value. If there is none, cause an error."
+	^self keyAtValue: value ifAbsent: [self errorValueNotFound]!
+keyAtValue: value ifAbsent: exceptionBlock
+	"Answer the key whose value equals the argument, value. If there is none, answer the result of evaluating exceptionBlock."
+	self associationsDo:
+		[:association | value == association value ifTrue: [^association key]].
+	^exceptionBlock value!
+keys
+	"Answer a set containing the receiver's keys."
+	| aSet |
+	aSet _ Set new: self size.
+	self keysDo: [:key | aSet add: key].
+	^aSet!
+values
+	"Answer a Bag containing the receiver's values."
+	| aBag |
+	aBag _ Bag new.
+	self do: [:value | aBag add: value].
+	^aBag! !
+
+!Dictionary methodsFor: 'testing'!
+includes: anObject
+	self do: [:each | anObject = each ifTrue: [^true]].
+	^false!
+occurrencesOf: anObject
+	"Answer how many of the receiver's elements are equal to anObject."
+	| count |
+	count _ 0.
+	self do: [:each | anObject = each ifTrue: [count _ count + 1]].
+	^count! !
+
+!Dictionary methodsFor: 'adding'!
+add: anAssociation
+	| index element |
+	index _ self findKeyOrNil: anAssociation key.
+	element _ self basicAt: index.
+	element == nil
+		ifTrue: [self atNewIndex: index put: anAssociation]
+		ifFalse: [element value: anAssociation value].
+	^anAssociation!
+declare: key from: aDictionary
+	"Add key to the receiver. If key already exists, do nothing. If aDictionary includes key, then remove it from aDictionary and use its association as the entry to the receiver."
+	(self includesKey: key) ifTrue: [^self].
+	(aDictionary includesKey: key)
+		ifTrue:
+			[self add: (aDictionary associationAt: key).
+			aDictionary removeKey: key]
+		ifFalse:
+			[self at: key put: nil]!
+grow
+	| newSelf |
+	newSelf _ self species new: self basicSize + self growSize.
+	self associationsDo: [:each | newSelf noCheckAdd: each].
+	self become: newSelf! !
+
+!Dictionary methodsFor: 'removing'!
+remove: anObject
+	self shouldNotImplement!
+remove: anObject ifAbsent: exceptionBlock
+	self shouldNotImplement! !
+
+!Dictionary methodsFor: 'enumerating'!
+collect: aBlock
+	"Evaluate aBlock with each of my values as the argument. Collect the resulting values into a collection that is like me. Answer with the new collection."
+	| newCollection |
+	newCollection _ Bag new.
+	self do: [:each | newCollection add: (aBlock value: each)].
+	^newCollection!
+do: aBlock
+	super do: [:assoc | aBlock value: assoc value]!
+select: aBlock
+	"Evaluate aBlock with each of my values as the argument. Collect into a new dictionary, only those associations for which aBlock evaluates to true."
+	| newCollection |
+	newCollection _ self species new.
+	self associationsDo:
+		[:each |
+		(aBlock value: each value) ifTrue: [newCollection add: each]].
+	^newCollection! !
+
+!Dictionary methodsFor: 'converting'!
+asSortedCollection
+	| aSortedCollection |
+	aSortedCollection _ SortedCollection new: self size.
+	self associationsDo: [:association | aSortedCollection add: association].
+	^aSortedCollection! !
+
+!Dictionary methodsFor: 'printing'!
+printOn: aStream
+	| tooMany |
+	tooMany _ aStream position + self maxPrint.
+	aStream nextPutAll: self class name, ' ('.
+	self associationsDo:
+		[:element |
+		aStream position > tooMany ifTrue: [aStream nextPutAll: '...etc...)'. ^self].
+		element printOn: aStream.
+		aStream space].
+	aStream nextPut: $)!
+storeOn: aStream
+	| noneYet |
+	aStream nextPutAll: '(('.
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' new)'.
+	noneYet _ true.
+	self associationsDo:
+		[:each |
+		noneYet
+			ifTrue: [noneYet _ false]
+			ifFalse: [aStream nextPut: $;].
+		aStream nextPutAll: ' add: '.
+		aStream store: each].
+	noneYet ifFalse: [aStream nextPutAll: '; yourself'].
+	aStream nextPut: $)! !
+
+!Dictionary methodsFor: 'dictionary testing'!
+includesAssociation: anAssociation
+	"Answer whether the receiver has an element (association between a key and a value) that is equal to the argument, anAssociation."
+	^super includes: anAssociation!
+includesKey: key
+	"Answer whether the receiver has a key equal to the argument, key."
+	| index |
+	index _ self findKeyOrNil: key.
+	^(self basicAt: index) ~~ nil! !
+
+!Dictionary methodsFor: 'dictionary removing'!
+removeAssociation: anAssociation
+	"Remove the key and value association, anAssociation, from the receiver. Answer anAssociation."
+	^self removeAssociation: anAssociation ifAbsent: [self errorNotFound]!
+removeAssociation: anAssociation ifAbsent: anExceptionBlock
+	"Remove the key and value association, anAssociation, from the receiver. If not found, answer the result of evaluating anExceptionBlock, otherwise answer anAssociation."
+	^super remove: anAssociation ifAbsent: anExceptionBlock!
+removeKey: key
+	"Remove key from the receiver. If key is not in the receiver, create an error message. Otherwise, answer the value associated with key."
+	^self removeKey: key ifAbsent: [self errorKeyNotFound]!
+removeKey: key ifAbsent: aBlock
+	"Remove key from the receiver. If key is not in the receiver, answer the result of evaluating aBlock. Otherwise, answer the value associated with key."
+	| index element |
+	index _ self findKey: key ifAbsent: [^aBlock value].
+	element _ self basicAt: index.
+	self basicAt: index put: nil.
+	tally _ tally - 1.
+	self fixCollisionsFrom: index.
+	^element! !
+
+!Dictionary methodsFor: 'dictionary enumerating'!
+associationsDo: aBlock
+	"Evaluate aBlock for each of the receiver's key/value associations."
+	super do: aBlock!
+keysDo: aBlock
+	"Evaluate aBlock for each of the receiver's keys."
+	self associationsDo: [:association | aBlock value: association key]! !
+
+!Dictionary methodsFor: 'private'!
+errorKeyNotFound
+	self error: 'key not found'!
+errorValueNotFound
+	self error: 'value not found'!
+findKey: key ifAbsent: aBlock
+	| index |
+	index _ self findKeyOrNil: key.
+	(self basicAt: index) == nil ifTrue: [^aBlock value].
+	^index!
+findKeyOrNil: key
+	| location length probe pass |
+	length _ self basicSize.
+	pass _ 1.
+	location _ key hash \\ length + 1.
+	[(probe _ self basicAt: location) == nil or: [probe key = key]]
+		whileFalse:
+			[(location _ location + 1) > length
+				ifTrue:
+					[location _ 1.
+					pass _ pass + 1.
+					pass > 2 ifTrue: [^self grow findKeyOrNil: key]]].
+	^location!
+rehash
+	"Smalltalk rehash."
+	| newSelf |
+	newSelf _ self species new: self basicSize.
+	self associationsDo: [:each | newSelf noCheckAdd: each].
+	self become: newSelf! !
+
+Dictionary variableSubclass: #IdentityDictionary
+	instanceVariableNames: 'valueArray'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Unordered'!
+
+!IdentityDictionary methodsFor: 'accessing'!
+associationAt: key ifAbsent: aBlock
+	"Answer with an Association consisting of key and my value at that key. If key is not found, evaluate aBlock."
+	| index |
+	index _ self findKey: key ifAbsent: [^aBlock value].
+	^Association
+		key: (self basicAt: index)
+		value: (valueArray at: index)!
+at: key ifAbsent: aBlock
+	"Answer with the value at key. If key is not found, evaluate aBlock."
+	| index |
+	index _ self findKey: key ifAbsent: [^aBlock value].
+	^valueArray at: index!
+at: key put: value
+	"Set the value at key to be value."
+	| index |
+	index _ self findKeyOrNil: key.
+	(self basicAt: index) == nil
+		ifTrue:
+			[tally _ tally + 1.
+			self basicAt: index put: key].
+	valueArray at: index put: value.
+	self fullCheck.
+	^value!
+keyAtValue: value ifAbsent: exceptionBlock
+	"Answer the key whose value equals the argument, value. If there is none, answer the result of evaluating exceptionBlock."
+	| theKey |
+	1 to: self basicSize do:
+		[:index |
+		value == (valueArray at: index)
+			ifTrue:
+				[(theKey _ self basicAt: index) == nil
+					ifFalse: [^theKey]]].
+	^exceptionBlock value! !
+
+!IdentityDictionary methodsFor: 'adding'!
+add: anAssociation
+	self at: anAssociation key put: anAssociation value! !
+
+!IdentityDictionary methodsFor: 'copying'!
+copy
+	| v copy |
+	v _ valueArray.
+	valueArray _ valueArray shallowCopy.
+	copy _ super shallowCopy.
+	valueArray _ v.
+	^copy! !
+
+!IdentityDictionary methodsFor: 'enumerating'!
+do: aBlock
+	1 to: self basicSize do:
+		[:index |
+		(self basicAt: index) == nil ifFalse: [aBlock value: (valueArray at: index)]]! !
+
+!IdentityDictionary methodsFor: 'dictionary removing'!
+removeKey: key ifAbsent: errorBlock
+	self removeDangerouslyKey: key ifAbsent: [^errorBlock value]! !
+
+!IdentityDictionary methodsFor: 'dictionary enumerating'!
+associationsDo: aBlock
+	"Evaluate aBlock for associations consisting of my keys and their values."
+	1 to: self basicSize do:
+		[:index |
+		(self basicAt: index) == nil
+			ifFalse: [aBlock value: (Association
+									key: (self basicAt: index)
+									value: (valueArray at: index))]]! !
+
+!IdentityDictionary methodsFor: 'private'!
+findKeyOrNil: key
+	| index length probe pass |
+	length _ self basicSize.
+	pass _ 1.
+	index _ key asOop \\ length + 1.
+	[(probe _ self basicAt: index) == nil or: [probe == key]]
+		whileFalse: [(index _ index + 1) > length
+			ifTrue:
+				[index _ 1.
+				pass _ pass + 1.
+				pass > 2 ifTrue: [^self grow findKeyOrNil: key]]].
+	^index!
+noCheckAdd: anAssociation
+	^self noCheckAdd: anAssociation key with: anAssociation value!
+noCheckAdd: key with: value
+	| index |
+	index _ self findKeyOrNil: key.
+	self basicAt: index put: key.
+	tally _ tally + 1.
+	^valueArray at: index put: value!
+removeDangerouslyKey: key ifAbsent: errorBlock
+	| location oldKey length |
+	location _ self findKeyOrNil: key.
+	(self basicAt: location) == nil ifTrue: [^errorBlock value].
+	self basicAt: location put: nil.
+	valueArray at: location put: nil.
+	tally _ tally - 1.
+	length _ self basicSize.
+	[location _
+		location = length
+			ifTrue: [1]
+			ifFalse: [location + 1].
+	(self basicAt: location) == nil]
+		whileFalse:
+			[oldKey _ self findKeyOrNil: (self basicAt: location).
+			location = oldKey ifFalse: [self swap: location with: oldKey]]!
+setTally
+	super setTally.
+	valueArray _ Array new: self basicSize!
+swap: oneElement with: otherElement
+	super swap: oneElement with: otherElement.
+	valueArray swap: oneElement with: otherElement! !
+
+!IdentityDictionary class methodsFor: 'instance creation'!
+new: size
+	"Answer with a new instance of me, whose initial capacity is size. Size must be a power of 2."
+	(size bitAnd: size - 1) = 0 ifFalse: [self error: 'size must be a power of 2'].
+	size >= 1 ifFalse: [self error: 'size must be >= 1'].
+	^super new: size! !

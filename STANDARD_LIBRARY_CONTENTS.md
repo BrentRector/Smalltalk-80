@@ -4,19 +4,22 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 
 ## Overview
 
-**Total Classes:** 30  
-**Total Method Chunks:** 153  
+**Total Classes:** 34  
+**Total Method Chunks:** 177  
 **Last Updated:** August 5, 2025
 
 ## Recent Additions (August 5, 2025)
 - ✅ **Symbol** - Fundamental string-like objects with identity semantics (29 methods)
 - ✅ **IdentitySet** - Set variant using identity comparison (== instead of =) with 1 specialized method
+- ✅ **LookupKey** - Abstract key class for dictionary entries (6 methods)
+- ✅ **Association** - Key-value pairs for dictionary entries (4 methods)
+- ✅ **Dictionary** - Hash-based key-value collections (38 methods)
+- ✅ **IdentityDictionary** - Dictionary using identity comparison (== instead of =) (16 methods)
 - 🔄 **Float** - Attempted addition but encountered parsing issues (deferred)
-- ⏳ **IdentityDictionary** - Deferred (requires Dictionary class)
 - ⏳ **Exception hierarchy** - Not present in original Smalltalk-80
 
 ## 5-Step Expansion Plan Status
-1. ❌ Dictionary/LookupKey/Association classes - Parsing issues encountered, need simpler approach
+1. ✅ Dictionary/LookupKey/Association classes - Successfully added with full functionality
 2. ✅ Symbol class - Successfully added with full functionality 
 3. ❌ Float class - Encountered infinite loop issues, needs debugging
 4. ✅ IdentitySet - Successfully added as Set subclass with identity comparison
@@ -33,7 +36,9 @@ Object
 │   │       ├── SmallInteger
 │   │       ├── LargePositiveInteger
 │   │       └── LargeNegativeInteger
-│   └── Character
+│   ├── Character
+│   └── LookupKey
+│       └── Association
 ├── Boolean
 │   ├── True
 │   └── False
@@ -47,7 +52,9 @@ Object
 │   │   │   └── SortedCollection
 │   │   └── Interval
 │   ├── Set
-│   │   └── IdentitySet
+│   │   ├── IdentitySet
+│   │   └── Dictionary
+│   │       └── IdentityDictionary
 │   ├── Bag
 │   └── MappedCollection
 ├── BlockContext
@@ -134,6 +141,27 @@ Object
 - Classification: `#isAlphaNumeric`, `#isDigit`, `#isLetter`, `#isLowercase`, `#isUppercase`, `#isSeparator`, `#isVowel`
 - Conversion: `#asCharacter`, `#asInteger`, `#asLowercase`, `#asUppercase`, `#asSymbol`
 - **Class Methods:** `#value:`, `#cr`, `#lf`, `#tab`, `#space`, `#initialize`
+
+### LookupKey
+**Superclass:** Magnitude  
+**Instance Variables:** `key`  
+**Purpose:** Abstract key class for dictionary entries, provides comparison and hashing behavior
+
+**Key Methods:**
+- Comparison: `#<`, `#=`, `#hash`, `#hashMappedBy:`
+- Accessing: `#key`, `#key:`
+- Printing: `#printOn:`
+- **Class Methods:** `#key:`
+
+### Association
+**Superclass:** LookupKey  
+**Instance Variables:** `value`  
+**Purpose:** Key-value pairs for dictionary entries, combines a key with its associated value
+
+**Key Methods:**
+- Accessing: `#key:value:`, `#value`, `#value:`
+- Printing: `#printOn:` (shows key->value format)
+- **Class Methods:** `#key:value:`
 
 ## Boolean Hierarchy
 
@@ -327,6 +355,36 @@ Object
 - Enumeration: `#collect:`, `#do:`, `#select:`
 - **Class Methods:** `#collection:map:`, `#new` (error)
 
+### Dictionary
+**Superclass:** Set  
+**Instance Variables:** none (variable indexed, stores associations)  
+**Purpose:** Hash-based key-value collections using equality comparison for keys
+
+**Key Methods:**
+- Accessing: `#at:`, `#at:ifAbsent:`, `#at:put:`, `#associationAt:`, `#associationAt:ifAbsent:`
+- Key/Value access: `#keys`, `#values`, `#associations`, `#keyAtValue:`, `#keyAtValue:ifAbsent:`
+- Testing: `#includes:`, `#includesKey:`, `#includesAssociation:`, `#occurrencesOf:`
+- Adding: `#add:`, `#declare:from:`, `#grow`
+- Removing: `#remove:` (error), `#removeKey:`, `#removeKey:ifAbsent:`, `#removeAssociation:`, `#removeAssociation:ifAbsent:`
+- Enumeration: `#do:`, `#collect:`, `#select:`, `#associationsDo:`, `#keysDo:`
+- Converting: `#asSortedCollection`
+- Printing: `#printOn:`, `#storeOn:`
+- Private: `#errorKeyNotFound`, `#errorValueNotFound`, `#findKey:ifAbsent:`, `#findKeyOrNil:`, `#rehash`
+
+### IdentityDictionary
+**Superclass:** Dictionary  
+**Instance Variables:** `valueArray`  
+**Purpose:** Dictionary using identity comparison (==) instead of equality (=) for keys, with parallel arrays for keys and values
+
+**Key Methods:**
+- Accessing: `#at:ifAbsent:`, `#at:put:`, `#associationAt:ifAbsent:`, `#keyAtValue:ifAbsent:`
+- Adding: `#add:`
+- Copying: `#copy`
+- Enumeration: `#do:`, `#associationsDo:`
+- Removing: `#removeKey:ifAbsent:`
+- Private: `#findKeyOrNil:`, `#noCheckAdd:`, `#noCheckAdd:with:`, `#removeDangerouslyKey:ifAbsent:`, `#setTally`, `#swap:with:`
+- **Class Methods:** `#new:` (requires power of 2 size)
+
 ## Block and Stream Classes
 
 ### BlockContext
@@ -401,10 +459,11 @@ Object
 - Memory management compatible with the object memory system
 
 ## Testing Status
-- ✅ All 28 classes load successfully
-- ✅ 142 method chunks parsed without errors
+- ✅ All 34 classes load successfully
+- ✅ 177 method chunks parsed without errors
 - ✅ Inheritance hierarchy resolves correctly
 - ✅ System boots and displays class summary
+- ✅ Dictionary and IdentityDictionary functionality available
 
 ---
 
