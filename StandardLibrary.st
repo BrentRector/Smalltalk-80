@@ -41,30 +41,43 @@ Integer subclass: #SmallInteger
 	category: 'Numeric-Numbers'!
 
 !SmallInteger methodsFor: 'arithmetic'!
-+ aNumber 
-	<primitive: 1>!
+
++ aNumber
+    <primitive: 1>
+    ^super + aNumber!
 - aNumber 
-	<primitive: 2>!
+	<primitive: 2>
+	^super - aNumber!
 * aNumber 
-	<primitive: 9>!
+	<primitive: 9>
+	^super * aNumber!
 / aNumber 
-	<primitive: 10>!
+	<primitive: 10>
+	^super / aNumber!
 // aNumber 
-	<primitive: 12>!
+	<primitive: 12>
+	^super // aNumber!
 \\ aNumber 
-	<primitive: 11>!
+	<primitive: 11>
+	^super \\ aNumber!
 < aNumber 
-	<primitive: 3>!
+	<primitive: 3>
+	^super < aNumber!
 <= aNumber 
-	<primitive: 5>!
+	<primitive: 5>
+	^super <= aNumber!
 > aNumber 
-	<primitive: 4>!
+	<primitive: 4>
+	^super > aNumber!
 >= aNumber 
-	<primitive: 6>!
+	<primitive: 6>
+	^super >= aNumber!
 = aNumber 
-	<primitive: 7>!
+	<primitive: 7>
+	^super = aNumber!
 ~= aNumber 
-	<primitive: 8>! !
+	<primitive: 8>
+	^super ~= aNumber! !
 
 Integer variableByteSubclass: #LargePositiveInteger
 	instanceVariableNames: ''

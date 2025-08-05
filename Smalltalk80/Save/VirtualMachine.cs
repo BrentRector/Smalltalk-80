@@ -24,6 +24,7 @@ public sealed class VirtualMachine
     /// </summary>
     public VirtualMachine()
     {
+        // Load StandardLibrary.st with the improved primitive+fallback parsing
         LoadStandardLibraryClasses();
     }
 

@@ -223,8 +223,13 @@ public static class SystemImageLoader
         }
         else
         {
-            var parser = new SmalltalkParser(methodDef.Source);
-            compiled = parser.ParseMethod(methodDef.Arguments, variables, methodDef.Selector);
+            // Use AstMethodCompiler directly with the pre-parsed body and primitive information
+            compiled = AstMethodCompiler.CompileMethod(
+                methodDef.Body,
+                methodDef.Arguments,
+                variables,
+                methodDef.HasPrimitive,
+                methodDef.PrimitiveIndex);
         }
 
         compiled = new CompiledMethod

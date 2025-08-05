@@ -118,12 +118,32 @@ public sealed class SmalltalkParser
         parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor(tokens);
 
-        var seqCtx = parser.methodBody();
+        // Parse the full method definition to capture primitives
+        var methodCtx = parser.methodDef();
         if (parser.NumberOfSyntaxErrors > 0)
             throw new InvalidOperationException("Invalid Smalltalk source.");
 
-        var sequence = (SequenceNode)visitor.Visit(seqCtx)!;
-        return new ParsedMethod(sequence, false, 0);
+        // Extract primitive information if present
+        bool hasPrimitive = false;
+        int primitiveIndex = 0;
+        var primitiveCtx = methodCtx.primitiveDecl();
+        if (primitiveCtx != null)
+        {
+            hasPrimitive = true;
+            var primitiveText = primitiveCtx.GetText();
+            // Extract number from "<primitive: N>"
+            var match = System.Text.RegularExpressions.Regex.Match(primitiveText, @"<primitive:\s*(\d+)>");
+            if (match.Success)
+            {
+                primitiveIndex = int.Parse(match.Groups[1].Value);
+            }
+        }
+
+        // Parse the method body
+        var bodyCtx = methodCtx.methodBody();
+        var sequence = (SequenceNode)visitor.Visit(bodyCtx)!;
+
+        return new ParsedMethod(sequence, hasPrimitive, primitiveIndex);
     }
 
 }
