@@ -46,6 +46,9 @@ public sealed class VirtualMachine
                 Console.WriteLine($"[BOOTSTRAP] Loading standard library from: {standardLibraryPath}");
                 LoadSystemFile(standardLibraryPath);
                 Console.WriteLine("[BOOTSTRAP] Standard library loaded successfully");
+
+                // Initialize classes that have class-side initialize methods
+                InitializeClasses();
             }
             catch (Exception ex)
             {
@@ -184,15 +187,45 @@ public sealed class VirtualMachine
     /// <returns>The result of evaluating the method.</returns>
     public object? EvaluateSource(string source)
     {
-        var parser = new SmalltalkParser(source);
-        var method = parser.ParseMethod();
+        try
+        {
+            // For class initialization like "SmallInteger initialize", we need to:
+            // 1. Parse the class name from the source
+            // 2. Find the actual class object 
+            // 3. Use that class as receiver
 
-        // Get Object class from SystemDictionary (where StandardLibrary.st classes are loaded)
-        if (!SystemDictionary.TryGetClass("Object", out var objectClass))
-            throw new InvalidOperationException("Object class not found in system dictionary.");
+            var parts = source.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 && parts[1] == "initialize")
+            {
+                // This is a class initialization message
+                var className = parts[0];
+                if (SystemDictionary.TryGetClass(className, out var targetClass))
+                {
+                    // Use the class itself as the receiver for class-side messages
+                    var method = ParserService.CompileExpression(source);
+                    return Interpreter.Evaluate(method, targetClass);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Class {className} not found in system dictionary.");
+                }
+            }
+            else
+            {
+                // For other expressions, use a default Object receiver
+                var method = ParserService.CompileExpression(source);
 
-        var receiver = new SmalltalkObject(objectClass, 0);
-        return Interpreter.Evaluate(method, receiver);
+                if (!SystemDictionary.TryGetClass("Object", out var objectClass))
+                    throw new InvalidOperationException("Object class not found in system dictionary.");
+
+                var receiver = new SmalltalkObject(objectClass, 0);
+                return Interpreter.Evaluate(method, receiver);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to evaluate source: {source}. Error: {ex.Message}", ex);
+        }
     }
 
 
@@ -225,5 +258,49 @@ public sealed class VirtualMachine
 
         var selector = string.Concat(selectorParts);
         return (selector, args);
+    }
+
+    /// <summary>
+    /// Initialize all classes that have a class-side initialize method.
+    /// This should be called after all classes and methods have been loaded.
+    /// </summary>
+    private void InitializeClasses()
+    {
+        Console.WriteLine("[BOOTSTRAP] Initializing classes...");
+        var initializeSymbol = new Symbol("initialize");
+        var initializedCount = 0;
+
+        // Get all classes from the SystemDictionary
+        foreach (var (className, cls) in SystemDictionary.AllClasses)
+        {
+            try
+            {
+                // Check if this class has a class-side initialize method
+                // Class-side methods are now stored in the metaclass's regular MethodDictionary
+                if (cls.Metaclass != null && cls.Metaclass.MethodDictionary.ContainsKey(initializeSymbol))
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Initializing class: {className}");
+
+                    // Verify the class has proper metaclass setup
+                    if (cls.ClassPointer == null)
+                    {
+                        Console.WriteLine($"[BOOTSTRAP] Warning: Class {className} has no class pointer (metaclass). Skipping initialization.");
+                        continue;
+                    }
+
+                    // Execute the initialization by evaluating "ClassName initialize"
+                    EvaluateSource($"{className} initialize");
+                    initializedCount++;
+
+                    Console.WriteLine($"[BOOTSTRAP] Successfully initialized class: {className}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: Failed to initialize class {className}: {ex.Message}");
+            }
+        }
+
+        Console.WriteLine($"[BOOTSTRAP] Initialized {initializedCount} classes");
     }
 }

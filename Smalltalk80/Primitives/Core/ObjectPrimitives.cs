@@ -74,4 +74,31 @@ public static class ObjectPrimitives
         ctx.Stack.Push(obj.Fields.Length);
         return true;
     }
+
+    /// <summary>
+    /// Pushes the next object after the receiver in the enumeration of all objects.
+    /// Used by Object>>nextObject primitive 139.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    public static bool NextObject(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject obj)
+            return false;
+
+        int currentIndex = obj.Oop >> 1;
+        var objects = ObjectMemory.Objects;
+
+        // Find the next object in the enumeration
+        if (currentIndex + 1 < objects.Count)
+        {
+            ctx.Stack.Push(objects[currentIndex + 1]);
+        }
+        else
+        {
+            // No more objects, return nil
+            ctx.Stack.Push(null);
+        }
+
+        return true;
+    }
 }

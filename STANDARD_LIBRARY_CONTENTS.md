@@ -4,8 +4,8 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 
 ## Overview
 
-**Total Classes:** 38  
-**Total Method Chunks:** 279  
+**Total Classes:** 39  
+**Total Method Chunks:** 299  
 **Last Updated:** August 5, 2025
 
 ## Recent Additions (August 5, 2025)
@@ -19,6 +19,7 @@ This document describes the complete contents of the StandardLibrary.st file, wh
 - ✅ **ReadWriteStream** - Bidirectional stream for reading and writing with file I/O support (7 methods)
 - ✅ **ExternalStream** - External file streams with binary data handling and word-based operations (16 methods)
 - ✅ **FileStream** - Complete file I/O streams with page-based virtual memory management (61 methods)
+- ✅ **TextCollector** - System transcript for test output and debugging with stream protocol (20 methods)
 - ⏳ **Exception hierarchy** - Not present in original Smalltalk-80
 
 ## 5-Step Expansion Plan Status
@@ -62,6 +63,7 @@ Object
 │   ├── Bag
 │   └── MappedCollection
 ├── BlockContext
+├── TextCollector
 └── Stream
     └── PositionableStream
         ├── WriteStream
@@ -417,7 +419,22 @@ Object
 - Private: `#findKeyOrNil:`, `#noCheckAdd:`, `#noCheckAdd:with:`, `#removeDangerouslyKey:ifAbsent:`, `#setTally`, `#swap:with:`
 - **Class Methods:** `#new:` (requires power of 2 size)
 
-## Block and Stream Classes
+## Interface and Stream Classes
+
+### TextCollector
+**Superclass:** Object  
+**Instance Variables:** `contents` (String), `entryStream` (WriteStream)  
+**Purpose:** System transcript for test output and debugging with buffered stream protocol
+
+**Key Methods:**
+- Initialization: `#initialize`
+- Content access: `#contents`, `#nextEntry`
+- Stream protocol: `#nextPut:`, `#nextPutAll:`, `#next:put:`
+- Character writing: `#cr`, `#crtab`, `#crtab:`, `#space`, `#tab`
+- Object printing: `#print:`, `#store:`
+- Display control: `#show:`, `#clear`, `#refresh`
+- Entry management: `#beginEntry`, `#endEntry`, `#appendEntry`
+- **Key Features:** Buffered text collection, automatic content limiting (2000 chars), stream protocol compatibility for testing framework output
 
 ### BlockContext
 **Superclass:** Object  
@@ -528,13 +545,14 @@ Object
 - Memory management compatible with the object memory system
 
 ## Testing Status
-- ✅ All 36 classes load successfully
-- ✅ 198 method chunks parsed without errors
+- ✅ All 39 classes load successfully
+- ✅ 299 method chunks parsed without errors
 - ✅ Inheritance hierarchy resolves correctly
 - ✅ System boots and displays class summary
 - ✅ Dictionary and IdentityDictionary functionality available
 - ✅ Float class with mathematical constants and functions operational
-- ✅ ReadWriteStream provides bidirectional I/O capability
+- ✅ Complete I/O stream hierarchy (ReadWriteStream, ExternalStream, FileStream)
+- ✅ TextCollector provides Transcript functionality for test output and debugging
 
 ---
 

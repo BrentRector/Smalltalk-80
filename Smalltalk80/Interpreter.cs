@@ -794,6 +794,7 @@ public class Interpreter
             {
                 // Cache miss - perform full lookup
                 method = cls.Lookup(selector);
+
                 if (method == null)
                     throw new InvalidOperationException($"Method {selector} not found");
 
@@ -919,8 +920,10 @@ public class Interpreter
         return primitive switch
         {
             bool b => ConvertBooleanToSmalltalkObject(b),
-            // For integers and other primitives, we can often work directly with the primitive
-            // Only convert when we need proper Smalltalk object behavior
+            int i => ConvertIntegerToSmalltalkObject(i),
+            double d => ConvertFloatToSmalltalkObject(d),
+            char c => ConvertCharacterToSmalltalkObject(c),
+            string s => ConvertStringToSmalltalkObject(s),
             _ => null
         };
     }
@@ -937,6 +940,78 @@ public class Interpreter
         {
             // Create an instance of True or False
             return new SmalltalkObject(booleanClass, 0);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a .NET integer to a Smalltalk SmallInteger object.
+    /// </summary>
+    /// <param name="value">The integer value.</param>
+    /// <returns>A SmallInteger object.</returns>
+    private static SmalltalkObject? ConvertIntegerToSmalltalkObject(int value)
+    {
+        if (SystemDictionary.TryGetClass("SmallInteger", out var smallIntegerClass))
+        {
+            // Create a SmallInteger with 1 field to store the value
+            // Note: In canonical Smalltalk-80, SmallInteger values are encoded in the object pointer
+            // For our implementation, we'll use a field to store the value
+            var smallInteger = new SmalltalkObject(smallIntegerClass, 1);
+            smallInteger.SetField(0, value);
+            return smallInteger;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a .NET double to a Smalltalk Float object.
+    /// </summary>
+    /// <param name="value">The double value.</param>
+    /// <returns>A Float object.</returns>
+    private static SmalltalkObject? ConvertFloatToSmalltalkObject(double value)
+    {
+        if (SystemDictionary.TryGetClass("Float", out var floatClass))
+        {
+            var floatObject = new SmalltalkObject(floatClass, 1);
+            floatObject.SetField(0, value);
+            return floatObject;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a .NET char to a Smalltalk Character object.
+    /// </summary>
+    /// <param name="value">The character value.</param>
+    /// <returns>A Character object.</returns>
+    private static SmalltalkObject? ConvertCharacterToSmalltalkObject(char value)
+    {
+        if (SystemDictionary.TryGetClass("Character", out var characterClass))
+        {
+            var characterObject = new SmalltalkObject(characterClass, 1);
+            characterObject.SetField(0, value);
+            return characterObject;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a .NET string to a Smalltalk String object.
+    /// </summary>
+    /// <param name="value">The string value.</param>
+    /// <returns>A String object.</returns>
+    private static SmalltalkObject? ConvertStringToSmalltalkObject(string value)
+    {
+        if (SystemDictionary.TryGetClass("String", out var stringClass))
+        {
+            // Create a string object with enough fields to hold all characters
+            var stringObject = new SmalltalkObject(stringClass, value.Length);
+            // Store each character as a Character object in the fields
+            for (int i = 0; i < value.Length; i++)
+            {
+                stringObject.SetField(i, ConvertCharacterToSmalltalkObject(value[i]));
+            }
+            return stringObject;
         }
         return null;
     }

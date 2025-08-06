@@ -4,11 +4,87 @@ nil subclass: #Object
 	poolDictionaries: ''
 	category: 'Kernel-Objects'!
 
+Object subclass: #Behavior
+	instanceVariableNames: 'superclass methodDict format subclasses'
+	classVariableNames: 'SelectorsOfConflictMethods SelectorsOfCopiedMethods SelectorsOfDirectedMethods'
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+Object subclass: #Behavior
+	instanceVariableNames: 'superclass methodDict format subclasses'
+	classVariableNames: 'SelectorsOfConflictMethods SelectorsOfCopiedMethods SelectorsOfDirectedMethods'
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+!Behavior methodsFor: 'instance creation'!
+basicNew
+	"Answer a new instance of the receiver (which is a class) with no indexable 
+	variables.  Fail if the class is indexable.  Essential.  See Object documentation
+	whatIsAPrimitive."
+
+	<primitive: 70>
+	self isVariable ifTrue: [^self basicNew: 0].
+	self primitiveFailed!
+
+basicNew: anInteger 
+	"Answer a new instance of the receiver (which is a class) with the number of 
+	indexable variables specified by the argument, anInteger.  Fail if the class is not
+	indexable or if the argument is not a positive Integer.  Essential.  See Object
+	documentation whatIsAPrimitive."
+
+	<primitive: 71>
+	self primitiveFailed!
+
+new
+	"Answer a new instance of the receiver (which is a class) with no indexable 
+	variables.  Fail if the class is indexable.  Essential.  See Object documentation 
+	whatIsAPrimitive. "
+
+	<primitive: 70>
+	self isVariable ifTrue: [^self new: 0].
+	self primitiveFailed!
+
+new: anInteger 
+	"Answer a new instance of the receiver (which is a class) with the number of 
+	indexable variables specified by the argument, anInteger.  Fail if the class is not
+	indexable or if the argument is not a positive Integer.  Essential.  See Object
+	documentation whatIsAPrimitive."
+
+	<primitive: 71>
+	self primitiveFailed! !
+
+Behavior subclass: #ClassDescription
+	instanceVariableNames: 'instanceVariables organization'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+ClassDescription subclass: #Class
+	instanceVariableNames: 'name classPool sharedPools'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+ClassDescription subclass: #Metaclass
+	instanceVariableNames: 'thisClass'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
 Object subclass: #UndefinedObject
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Objects'!
+
+!Object methodsFor: 'initialize-release'!
+
+release
+	"Remove references to objects that may refer to the receiver. Answers self. 
+	This message should be overidden by subclasses with any cycles, in which
+	case the subclass should also include the expression super release."
+
+	self breakDependents! !
 
 !Object methodsFor: 'accessing'!
 yourself
@@ -170,6 +246,124 @@ shallowCopy
 			[newObject instVarAt: index put: (self instVarAt: index).
 			index _ index - 1].
 	^newObject! !
+
+!Object methodsFor: 'dependents access'!
+
+addDependent: anObject
+	"Add anObject as one of the receiver's dependents."
+	(DependentsFields at: self ifAbsent: [self setDependents])
+		add: anObject.
+	^anObject!
+dependents 
+	"Answer an OrderedCollection of the objects that are dependent on the
+	receiver, that is, the objects that should be notified if the receiver changes."
+
+	^ DependentsFields at: self ifAbsent: [OrderedCollection new]!
+removeDependent: anObject
+	"Remove the argument, anObject, as one of the receiver's dependents."
+	| dependents |
+	dependents _ DependentsFields at: self ifAbsent: [^ anObject].
+	dependents remove: anObject ifAbsent: [].
+	dependents isEmpty ifTrue: [self breakDependents].
+	^anObject! !
+
+!Object methodsFor: 'updating'!
+
+broadcast: aSymbol 
+	"Send the argument, aSymbol, as a unary message to all of the receiver's dependents."
+
+	self dependents ~~ nil
+		ifTrue: [self dependents do: 
+					[:aDependent | aDependent perform: aSymbol]]!
+broadcast: aSymbol with: anObject 
+	"Send the argument, aSymbol, as a keyword message with argument anObject to
+	all of the receiver's dependents."
+
+	self dependents ~~ nil
+		ifTrue: [self dependents do:
+					[:aDependent | aDependent perform: aSymbol with: anObject]]!
+changed
+	"Receiver changed in a general way; inform all the dependents by sending 
+	each dependent an update: message."
+
+	self changed: self!
+changed: aParameter 
+	"Receiver changed.  The change is denoted by the argument aParameter.
+	Usually the argument is a Symbol that is part of the dependent's change
+	protocol.  Inform all of the dependents."
+
+	self dependents do: [:aDependent | aDependent update: aParameter]!
+changeRequest
+	"Receiver wants to change; check with all dependents that it is OK."
+
+	self dependents do: [:dep | dep updateRequest ifFalse: [^false]].
+	^true!
+changeRequestFrom: requestor
+	"Receiver wants to change; check with all dependents (other than requestor) that it is OK."
+
+	self dependents do: [:dep | (dep == requestor or: [dep updateRequest]) ifFalse: [^false]].
+	^true!
+update: aParameter 
+	"Receive a change notice from an object of whom the receiver is a dependent. 
+	The default behavior is to do nothing;  a subclass might want to change
+	itself in some way."
+
+	^self!
+updateRequest
+	"Default behavior is to grant update requests;  a subclass might want to override
+	this behavior if it is in the middle of making another change."
+
+	^ true! !
+
+!Object methodsFor: 'message handling'!
+
+perform: aSymbol 
+	"Send the receiver the unary message indicated by the argument. The argument is 
+	the selector of the message. Invoke messageNotUnderstood: if the number of 
+	arguments expected by the selector is not zero. Optional. See documentation
+	in Object metaclass."
+
+	<primitive: 83>
+	^self perform: aSymbol withArguments: (Array new: 0)!
+perform: aSymbol with: anObject 
+	"Send the receiver the keyword message indicated by the arguments. The first 
+	argument is the selector of the message. The other argument is the 
+	argument of the message to be sent. Invoke messageNotUnderstood: if the 
+	number of arguments expected by the selector is not one. Optional. See 
+	documentation in Object metaclass."
+
+	<primitive: 83>
+	^self perform: aSymbol withArguments: (Array with: anObject)!
+perform: aSymbol with: firstObject with: secondObject 
+	"Send the receiver the keyword message indicated by the arguments. The first 
+	argument is the selector of the message. The other arguments are the 
+	arguments of the message to be sent. Invoke messageNotUnderstood: if 
+	the number of arguments expected by the selector is not two. Optional. 
+	See documentation in Object metaclass."
+
+	<primitive: 83>
+	^self perform: aSymbol withArguments: (Array with: firstObject with: secondObject)!
+perform: aSymbol with: firstObject with: secondObject with: thirdObject 
+	"Send the receiver the keyword message indicated by the arguments. The first 
+	argument is the selector of the message. The other arguments are the 
+	arguments of the message to be sent. Invoke messageNotUnderstood: if 
+	the number of arguments expected by the selector is not three. Optional. 
+	See documentation in Object metaclass."
+
+	<primitive: 83>
+	^self perform: aSymbol withArguments: (Array
+			with: firstObject
+			with: secondObject
+			with: thirdObject)!
+perform: selector withArguments: anArray 
+	"Send the receiver the keyword message indicated by the arguments. The argument  
+	selector is the selector of the message. The arguments of the message are the 
+	elements of anArray. Invoke messageNotUnderstood: if the number of 
+	arguments expected by the selector is not the same as the length of 
+	anArray. Essential. See documentation in Object metaclass."
+
+	<primitive: 84>
+	self primitiveFailed! !
 
 !Object methodsFor: 'printing'!
 
@@ -426,6 +620,46 @@ isInteger
 negated
 	"Answer a Number that is the negation of the receiver."
 	^0 - self! !
+
+!Number methodsFor: 'intervals'!
+
+to: stop
+	"Answer an Interval from the receiver up to the argument, stop,
+	incrementing by 1."
+
+	^Interval from: self to: stop by: 1!
+to: stop by: step
+	"Answer an Interval from the receiver up to the argument, stop,
+	incrementing by step."
+
+	^Interval from: self to: stop by: step!
+to: stop by: step do: aBlock 
+	"Create an Interval from the receiver up to the argument, stop,
+	incrementing by step.  For each element of the interval, evaluate the
+	block, aBlock."
+
+	| nextValue |
+	nextValue _ self.
+	step < 0
+		ifTrue: [[stop <= nextValue]
+				whileTrue: 
+					[aBlock value: nextValue.
+					nextValue _ nextValue + step]]
+		ifFalse: [[stop >= nextValue]
+				whileTrue: 
+					[aBlock value: nextValue.
+					nextValue _ nextValue + step]]!
+to: stop do: aBlock 
+	"Create an Interval from the receiver up to the argument, stop,
+	incrementing by 1.  For each element of the interval, evaluate the
+	block, aBlock."
+
+	| nextValue |
+	nextValue _ self.
+	[nextValue <= stop]
+		whileTrue: 
+			[aBlock value: nextValue.
+			nextValue _ nextValue + 1]! !
 
 Integer subclass: #SmallInteger
 	instanceVariableNames: ''
@@ -3010,56 +3244,321 @@ resetContents
 new
 	^self basicNew! !
 
-ExternalStream subclass: #FileStream
-	instanceVariableNames: 'page rwmode closed'
+Object subclass: #File
+	instanceVariableNames: 'fileName directory binary readWrite error handle'
 	classVariableNames: ''
-	poolDictionaries: 'FilePool'
+	poolDictionaries: ''
+	category: 'Files-Streams'!
+
+File comment:
+'I represent a file on the host file system. I provide the bridge between high-level Smalltalk file operations and low-level C# file system primitives.
+
+Instance Variables:
+	fileName		<String> - The name of the file
+	directory		<FileDirectory> - The directory containing this file  
+	binary			<Boolean> - Whether file contains binary or text data
+	readWrite		<Integer> - File access mode
+	error			<Symbol> - Error condition if any
+	handle			<Integer> - File handle from C# file system primitives
+'!
+
+!File methodsFor: 'accessing'!
+fileName
+	"Answer the name of the receiver."
+	^fileName!
+fileName: aString
+	"Set the name of the receiver."
+	fileName _ aString!
+directory
+	"Answer the directory containing this file."
+	^directory!
+directory: aFileDirectory
+	"Set the directory containing this file."
+	directory _ aFileDirectory!
+handle
+	"Answer the file handle from the host system."
+	^handle!
+handle: anInteger
+	"Set the file handle from the host system."
+	handle _ anInteger! !
+
+!File methodsFor: 'testing'!
+isBinary
+	"Answer whether this file contains binary data."
+	^binary == true!
+isText
+	"Answer whether this file contains text data."
+	^binary == false! !
+
+!File methodsFor: 'file modes'!
+binary
+	"Set this file to binary mode."
+	binary _ true!
+text
+	"Set this file to text mode."
+	binary _ false!
+readWrite: mode
+	"Set the read/write mode."
+	readWrite _ mode! !
+
+!File methodsFor: 'converting'!
+asFileStream
+	"Answer a FileStream on this file."
+	^FileStream on: self!
+
+asReadOnlyFileStream
+	"Answer a read-only FileStream on this file."
+	| stream |
+	stream _ FileStream on: self.
+	stream readOnly.
+	^stream!
+
+asReadWriteFileStream
+	"Answer a read-write FileStream on this file."
+	| stream |
+	stream _ FileStream on: self.
+	stream readWrite.
+	^stream! !
+
+!File methodsFor: 'file operations'!
+open: mode
+	"Open the file with the specified mode using primitive 142."
+	<primitive: 142>
+	"Fallback: should signal error"
+	self error: 'Cannot open file - primitive 142 failed'!
+close
+	"Close the file using primitive 143."
+	<primitive: 143>
+	"Fallback: should signal error"
+	handle _ nil!
+delete
+	"Delete this file using primitive 150."
+	<primitive: 150>
+	"Fallback: should signal error"
+	^false! !
+
+!File class methodsFor: 'instance creation'!
+named: aString
+	"Create a new file with the given name."
+	^self new fileName: aString; yourself!
+named: aString in: aDirectory
+	"Create a new file with the given name in the specified directory."
+	^self new fileName: aString; directory: aDirectory; yourself! !
+
+Object subclass: #FileDirectory
+	instanceVariableNames: 'directoryName'
+	classVariableNames: 'DefaultDirectory ExternalReferences'
+	poolDictionaries: ''
+	category: 'Files-Streams'!
+
+FileDirectory comment:
+'I represent a directory on the host file system. I manage collections of files and provide the interface between Smalltalk file operations and the underlying C# file system primitives.
+
+This class bridges the gap between the high-level Smalltalk-80 file system API and the modern C# file system primitives (142-157) implemented in the interpreter.
+'!
+
+!FileDirectory methodsFor: 'accessing'!
+directoryName
+	"Answer the name of this directory."
+	^directoryName!
+directoryName: aString
+	"Set the name of this directory."
+	directoryName _ aString! !
+
+!FileDirectory methodsFor: 'file creation'!
+file: aFileName
+	"Answer a FileStream on a file with the given name, creating it if necessary."
+	^(self fileNamed: aFileName) asFileStream!
+newFile: aFileName
+	"Create a new file with the given name."
+	| file |
+	file _ File named: aFileName in: self.
+	file open: 'w'.
+	^file!
+oldFile: aFileName
+	"Open an existing file with the given name."
+	| file |
+	file _ File named: aFileName in: self.
+	file open: 'r'.
+	^file! !
+
+!FileDirectory methodsFor: 'file operations'!
+fileNamed: aString
+	"Answer a File object for the file with the given name."
+	^File named: aString in: self!
+includesFileNamed: aString
+	"Answer whether a file with the given name exists using primitive 149."
+	<primitive: 149>
+	"Fallback implementation"
+	^false!
+deleteFileNamed: aString
+	"Delete the file with the given name using primitive 150."
+	<primitive: 150>
+	"Fallback implementation"
+	^false!
+rename: oldName newName: newName
+	"Rename a file using primitive 151."
+	<primitive: 151>
+	"Fallback implementation"
+	^false! !
+
+!FileDirectory methodsFor: 'directory operations'!
+createDirectory: aString
+	"Create a subdirectory with the given name using primitive 154."
+	<primitive: 154>
+	"Fallback implementation"
+	^false!
+isDirectory: aString
+	"Answer whether the named entry is a directory using primitive 156."
+	<primitive: 156>
+	"Fallback implementation"
+	^false!
+entries
+	"Answer a collection of the entries in this directory using primitive 157."
+	<primitive: 157>
+	"Fallback implementation"
+	^#()! !
+
+!FileDirectory class methodsFor: 'instance creation'!
+default
+	"Answer the default file directory."
+	DefaultDirectory isNil ifTrue: [
+		DefaultDirectory _ self new directoryName: '.'; yourself].
+	^DefaultDirectory!
+on: aString
+	"Answer a FileDirectory for the named directory."
+	^self new directoryName: aString; yourself! !
+
+!FileDirectory class methodsFor: 'external references'!
+addExternalReference: aFileStream
+	"Register a file stream for cleanup on system shutdown."
+	ExternalReferences isNil ifTrue: [ExternalReferences _ Set new].
+	ExternalReferences add: aFileStream!
+removeExternalReference: aFileStream
+	"Unregister a file stream."
+	ExternalReferences isNil ifFalse: [ExternalReferences remove: aFileStream ifAbsent: []]! !
+
+ExternalStream subclass: #FileStream
+	instanceVariableNames: 'file fileHandle fileSize closed rwmode'
+	classVariableNames: ''
+	poolDictionaries: ''
 	category: 'Files-Streams'!
 
 FileStream comment:
-'I represent a Stream that accesses a FilePage from a File.  One use for my instance is to access larger "virtual Strings" than can be stored contiguously in main memory.  I restrict the objects stored and retrieved to be Integers or Characters.  An end of file pointer terminates reading;  it can be extended by writing past it, or the file can be explicitly truncated.
+'I represent a Stream that accesses a File on the host file system. I provide a bridge between high-level Smalltalk stream operations and the low-level C# file system primitives.
 
-To use the file system for most applications, you typically create a FileStream.  This is done by sending a message to a FileDirectory (file:, oldFile:, newFile:, rename:newName:) which creates an instance of me.  Accesses to the file are then done via my instance.
+I have been updated to work with the modern File and FileDirectory classes and use C# file system primitives (142-157) instead of the original Alto-specific primitives.
 
-Instance variables
-	page			<FilePage> the current FilePage being accessed
-	rwmode			<Integer> denoting readOnly, readWrite, or readWriteShorten.
-					readWriteShorten with textual contents is the default.
-	closed			<Boolean> false if the file is open'!
+Instance variables:
+	file			<File> the File object being accessed
+	fileHandle		<Integer> the file handle from the C# file system
+	fileSize		<Integer> the size of the file in bytes
+	closed			<Boolean> false if the file is open
+	rwmode			<Integer> read/write mode flags
+'!
 
 !FileStream methodsFor: 'accessing'!
 contentsOfEntireFile
 	"Read all of the contents of the receiver."
-
-	| s |
+	| contents |
 	self readOnly.
 	self reset.
-	s _ self next: self size.
+	contents _ self next: self size.
 	self close.
-	^s!
+	^contents!
+
 next
-	(position >= readLimit and: [self atEnd])
-		ifTrue: [^nil]
-		ifFalse: [^collection at: (position _ position + 1)]!
+	"Read the next byte/character from the file using primitive 144."
+	<primitive: 144>
+	"Fallback: return nil at end of file"
+	^nil!
+
 next: anInteger
+	"Read the next anInteger bytes from the file using primitive 144."
+	| result |
+	result _ ByteArray new: anInteger.
+	<primitive: 144>
+	"Fallback: return empty collection"
+	^result!
 
-	| newCollection howManyRead increment |
+nextPut: anObject
+	"Write an object to the file using primitive 145."
+	<primitive: 145>
+	"Fallback: signal error"
+	self error: 'Cannot write to file - primitive 145 failed'!
 
-	newCollection _ collection species new: anInteger.
-	
-	howManyRead _ 0.
-	[howManyRead < anInteger] whileTrue:
-		[
-		self atEnd ifTrue:
-			[
-			(howManyRead + 1) to: anInteger do: [:i | newCollection at: i put: (self next)].
-			^newCollection
-			].
-		increment _ (readLimit - position) min: (anInteger - howManyRead).
-		newCollection replaceFrom: (howManyRead + 1) to: (howManyRead _ howManyRead + increment) with: collection startingAt: (position + 1).
-		position _ position + increment.
-		].
-	^newCollection!
+nextPutAll: aCollection
+	"Write a collection of objects to the file using primitive 145."
+	<primitive: 145>
+	"Fallback: write each element individually"
+	aCollection do: [:each | self nextPut: each].
+	^aCollection!
+
+size
+	"Answer the size of the file using primitive 147."
+	<primitive: 147>
+	"Fallback: return 0"
+	^0! !
+
+!FileStream methodsFor: 'initialization'!
+on: aFile
+	"Initialize the receiver to operate on the given File."
+	file _ aFile.
+	closed _ true.
+	rwmode _ 0.
+	self open!
+
+open
+	"Open the file for reading and writing."
+	closed ifFalse: [^self].
+	file open: 'rw'.
+	fileHandle _ file handle.
+	closed _ false!
+
+close
+	"Close the file."
+	closed ifTrue: [^self].
+	file close.
+	fileHandle _ nil.
+	closed _ true.
+	FileDirectory removeExternalReference: self! !
+
+!FileStream methodsFor: 'testing'!
+atEnd
+	"Answer true if current position is >= end of file position using primitive 148."
+	<primitive: 148>
+	"Fallback: assume not at end"
+	^false!
+
+isClosed
+	"Answer true if the file is closed."
+	^closed == true! !
+
+!FileStream methodsFor: 'positioning'!
+reset
+	"Position to the beginning of the file using primitive 146."
+	<primitive: 146>
+	"Fallback: do nothing"!
+
+position
+	"Answer the current file position using primitive 146."
+	<primitive: 146>
+	"Fallback: return 0"
+	^0!
+
+position: anInteger
+	"Set the file position using primitive 146."
+	<primitive: 146>
+	"Fallback: do nothing"! !
+
+!FileStream methodsFor: 'modes'!
+readOnly
+	"Set the file to read-only mode."
+	rwmode _ 1!
+
+readWrite
+	"Set the file to read-write mode."
+	rwmode _ 3!
 next: anInteger into: aCollection
 	"Copy the next anInteger bytes from the receiver into aCollection."
 
@@ -3482,24 +3981,28 @@ shorten
 !FileStream class methodsFor: 'instance creation'!
 fileNamed: fileDesignator
 	"Answer a FileStream on an old or new File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory fileNamed: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findOrAddKey: fName) asFileStream!
 newFileNamed: fileDesignator
-	"Answer a FileStream on a new File designated by the string fileDesignator.  Error if the argument is not a new file name."
+	"Answer a FileStream on a new File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory newFile: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir addKey: fName) asFileStream!
 oldFileNamed: fileDesignator
-	"Answer a FileStream on an old File designated by the string fileDesignator.  Error if the argument is not an old file name."
+	"Answer a FileStream on an old File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory oldFile: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findKey: fName) asFileStream!
-on: aFilePage 
-	^self new on: aFilePage! !
+on: aFile
+	"Create a new FileStream on the given File."
+	^self new on: aFile! !
 
 String variableByteSubclass: #Symbol
 	instanceVariableNames: ''
@@ -4622,4 +5125,127 @@ pi
 	"Answer the constant, Pi."
 	^Pi! !
 
-Float initialize!
+Object subclass: #TextCollector
+	instanceVariableNames: 'contents entryStream'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Interface-Transcript'!
+
+TextCollector comment:
+'I represent a text collector into which text can be gathered by sending messages using Stream protocol. I serve as the foundation for the System Transcript.
+
+Instance Variables
+	contents		<Text> the collected text content
+	entryStream		<WriteStream> buffered stream for efficient text collection
+'!
+
+!TextCollector methodsFor: 'initialize-release'!
+initialize
+	contents _ String new.
+	self beginEntry! !
+
+!TextCollector methodsFor: 'accessing'!
+contents
+	"Answer the contents of the receiver."
+	^contents!
+next: anInteger put: aCharacter 
+	"Insert the character, aCharacter, at position anInteger in the text."
+	^entryStream next: anInteger put: aCharacter!
+nextPut: aCharacter 
+	"Append aCharacter to the text."
+	^entryStream nextPut: aCharacter!
+nextPutAll: aCollection 
+	"Append all the characters in aCollection to the text."
+	^entryStream nextPutAll: aCollection!
+show: aString 
+	"Append all the characters in aCollection to the text and display the text."
+	self nextPutAll: aString.
+	self endEntry! !
+
+!TextCollector methodsFor: 'clearing'!
+clear
+	"Re-initialize the text to contain no characters."
+
+	contents _ String new.
+	self beginEntry.
+	self changed: #update
+	"Transcript clear"!
+refresh
+	"Bring window to front on screen"
+
+	self changed: #refresh
+	"Transcript refresh"! !
+
+!TextCollector methodsFor: 'entry control'!
+appendEntry
+	"Append the text contents of the receiver's WriteStream to its text."
+	contents _ contents , self nextEntry.
+	contents size > self characterLimit
+		ifTrue: [contents _ 
+					contents 
+						copyFrom: contents size - (self characterLimit // 2)
+						to: contents size].
+	self beginEntry!
+beginEntry
+	"To speed up appending information to the receiver, a WriteStream is
+	maintained.  Initialize it."
+	entryStream _ WriteStream on: (String new: 200)!
+endEntry
+	"If the receiver's WriteStream is not empty, then reinitialize it.  Send all
+	depends a message that the streaming has changed."
+	entryStream isEmpty
+		ifFalse: 
+			[self changed: #appendEntry.
+			self beginEntry]!
+nextEntry
+	"Answer the text contents of the receiver's WriteStream."
+	^entryStream contents! !
+
+!TextCollector methodsFor: 'character writing'!
+cr
+	"Append a carriage return to the text."
+	^entryStream cr!
+crtab
+	"Append a carriage return and a tab to the text."
+	^entryStream crtab!
+crtab: anInteger 
+	"Append a carriage return and anInteger number of tabs to the text."
+	^entryStream crtab: anInteger!
+space
+	"Append a space to the text."
+	^entryStream space!
+tab
+	"Append a tab to the text."
+	^entryStream tab! !
+
+!TextCollector methodsFor: 'printing'!
+print: anObject 
+	"Append a description of the object, anObject, to the text."
+	^entryStream print: anObject!
+store: anObject 
+	"Have anObject print on me for rereading."
+
+	anObject storeOn: self! !
+
+!TextCollector methodsFor: 'private'!
+characterLimit
+	^2000!
+changed: aSymbol
+	"Notify dependents of a change. Simplified version for testing framework use."
+	^self! !
+
+!TextCollector class methodsFor: 'system'!
+newTranscript: aTextCollector 
+	"Store aTextCollector as the value of the system global Transcript."
+	Smalltalk at: #Transcript put: aTextCollector.
+	^aTextCollector! !
+
+!TextCollector class methodsFor: 'examples'!
+example
+	"TextCollectors support WriteStream protocol for appending characters to the
+	System Transcript."
+
+	Transcript show: (3+4) printString; cr.
+	Transcript nextPutAll: '3+4 ='; space; print: 3+4; cr; endEntry
+
+	"TextCollector example"! !

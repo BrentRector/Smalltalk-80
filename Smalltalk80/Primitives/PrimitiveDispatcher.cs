@@ -132,6 +132,9 @@ public static class Primitives
         [115] = SystemPrimitives.OopsLeft,
         [116] = SystemPrimitives.SignalAtOopsLeftWordsLeft,
 
+        // Additional object primitives
+        [139] = ObjectPrimitives.NextObject,
+
         // File system primitives
         [142] = FileSystemPrimitives.OpenStream,
         [143] = FileSystemPrimitives.CloseStream,
@@ -149,6 +152,13 @@ public static class Primitives
         [155] = FileSystemPrimitives.DeleteFile,
         [156] = FileSystemPrimitives.IsDirectory,
         [157] = FileSystemPrimitives.GetDirectoryEntries,
+
+        // String comparison primitives
+        [158] = ArrayPrimitives.StringEquals,
+        [159] = ArrayPrimitives.StringLessThan,
+
+        // Character creation primitive
+        [170] = ArrayPrimitives.CharacterFromValue,
     };
 
     static Primitives()

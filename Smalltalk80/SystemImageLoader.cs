@@ -24,6 +24,9 @@ public static class SystemImageLoader
         var errors = new List<ParseError>();
         var warnings = new List<LoadWarning>();
 
+        // Initialize the metaclass system before processing any classes
+        SystemDictionary.InitializeMetaclassSystem();
+
         try
         {
             // Parse the entire file first
@@ -169,6 +172,25 @@ public static class SystemImageLoader
                 }
             }
 
+            // PASS 4: Mark classes that need initialization (but don't execute yet)
+            Console.WriteLine($"[SYSTEM_IMAGE] Marking classes for initialization...");
+            var initializeSymbol = new Symbol("initialize");
+            var classesNeedingInitialization = new List<string>();
+
+            // Check all loaded classes for initialize methods
+            foreach (var (className, cls) in classStubs)
+            {
+                if (cls.Metaclass != null && cls.Metaclass.MethodDictionary.ContainsKey(initializeSymbol))
+                {
+                    classesNeedingInitialization.Add(className);
+                    Console.WriteLine($"[SYSTEM_IMAGE] Class {className} has initialize method");
+                }
+            }
+
+            Console.WriteLine($"[SYSTEM_IMAGE] Found {classesNeedingInitialization.Count} classes needing initialization");
+            // Note: Actual initialization should be done after the loader completes
+            // to avoid circular dependencies during the loading process
+
             result.Success = errors.Count == 0;
             result.Errors = errors;
             result.Warnings = warnings;
@@ -249,8 +271,20 @@ public static class SystemImageLoader
             };
 
             // Install in the appropriate method dictionary
-            var methodDictionary = header.IsClassSide ? targetClass.ClassMethodDictionary : targetClass.MethodDictionary;
-            methodDictionary[new Symbol(methodDef.Selector)] = compiled;
+            if (header.IsClassSide)
+            {
+                // Class-side methods go into the metaclass's regular method dictionary
+                if (targetClass.Metaclass == null)
+                {
+                    throw new InvalidOperationException($"Class {header.ClassName} has no metaclass for class-side method {methodDef.Selector}");
+                }
+                targetClass.Metaclass.MethodDictionary[new Symbol(methodDef.Selector)] = compiled;
+            }
+            else
+            {
+                // Instance methods go into the class's method dictionary
+                targetClass.MethodDictionary[new Symbol(methodDef.Selector)] = compiled;
+            }
         }
         catch (Exception ex)
         {
