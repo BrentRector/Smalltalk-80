@@ -1,3 +1,81 @@
+Object subclass: #Behavior
+	instanceVariableNames: 'superclass methodDict format subclasses '
+	classVariableNames: 'SelectorsOfConflictMethods SelectorsOfCopiedMethods SelectorsOfDirectedMethods '
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+Behavior comment:
+'Instance Variables:
+	superclass	<Behavior> links the chain of inheritance
+	methodDict	<IdentityDictionary> associates message names with methods
+	format		<Integer> encodes storage layout of instances
+	subclasses	<Set> back-pointers to the class'' subclasses
+
+Behavior provides the minimum state necessary for compiling methods, and creating and running instances.  Most objects are created as instances of the more fully supported subclass, Class, but Behavior is a good starting point for providing instance-specific behavior (as in Metaclass).'!
+
+!Behavior methodsFor: 'initialize-release'!
+obsolete
+	"Invalidate and recycle local messages.  Remove the receiver from its superclass' 
+	subclass list."
+
+	methodDict _ MethodDictionary new.
+	self superclasses do: [:each | each removeSubclass: self].
+	self removeFromInheritanceTables! !
+
+!Behavior methodsFor: 'accessing'!
+format
+	"Answer an Integer that encodes the kinds and numbers of variables of instances
+	of the receiver."
+
+	^format! !
+
+!Behavior methodsFor: 'testing'!
+instSize
+	"Answer the number of named instance variables (as opposed to indexed
+	variables) of the receiver."
+
+	^format bitAnd: 255!
+isBits
+	"Answer whether the receiver contains just bits (not pointers)."
+
+	^format noMask: -16384!
+isBytes
+	"Answer whether the receiver has 8-bit instance variables."
+	^format noMask: 8192!
+isFixed
+	"Answer whether the receiver does not have a variable (indexable) part."
+
+	^self isVariable not!
+isPointers
+	"Answer whether the receiver contains just pointers (not bits)."
+
+	^self isBits not!
+isVariable
+	"Answer whether the receiver has a variable (indexable) part."
+
+	^(format bitAnd: 4096) ~= 0!
+isWords
+	"Answer whether the receiver has 16-bit instance variables."
+
+	^self isBytes not! !
+
+Behavior subclass: #ClassDescription
+	instanceVariableNames: 'instanceVariables organization '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+ClassDescription subclass: #Class
+	instanceVariableNames: 'name classPool sharedPools '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+ClassDescription subclass: #Metaclass
+	instanceVariableNames: 'thisClass '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
 nil subclass: #Object
 	instanceVariableNames: ''
 	classVariableNames: 'DependentsFields ErrorRecursion '
@@ -389,17 +467,8 @@ perform: selector withArguments: anArray
 
 !Object methodsFor: 'error handling'!
 confirm: aString 
-	"Create and start up a BinaryChoice menu with the argument as the message in order
-	to determine true or false.  Answers true or false."
-	| answer |
-	answer _ false.
-	BinaryChoice
-		message: aString
-		displayAt: Sensor cursorPoint
-		centered: true
-		ifTrue: [answer _ true]
-		ifFalse: [answer _ false].
-	^answer!
+	"TEMPORARY BOOTSTRAP: Always returns true. TODO: Fix when BinaryChoice/UI available."
+	^true!
 conflictingInheritanceError
 	"Browse to the method which called this,
 		redefine it appropriately,
@@ -5211,3 +5280,108 @@ pi
 	^Pi! !
 
 Float initialize!
+
+Object subclass: #BinaryChoice
+	instanceVariableNames: 'trueAction falseAction actionTaken'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Interface-Prompt/Confirm'!
+
+!BinaryChoice methodsFor: 'initialize-release'!
+falseAction: aBlock
+	"The argument, aBlock, will be evaluated if the receiver is sent the
+	message selectFalse."
+	falseAction _ aBlock!
+
+initialize
+	"Initialize the receiver so that it indicates no action has yet been taken."
+	actionTaken _ false!
+
+trueAction: aBlock
+	"The argument, aBlock, will be evaluated if the receiver is sent the
+	message selectTrue."
+	trueAction _ aBlock! !
+
+!BinaryChoice methodsFor: 'menu messages'!
+selectFalse
+	"Take the action, if one, associated with selecting no or false."	
+	actionTaken _ true.
+	falseAction notNil ifTrue: [falseAction value]!
+
+selectTrue
+	"Take the action, if one, associated with selecting yes or true."	
+	actionTaken _ true.
+	trueAction notNil ifTrue: [trueAction value]! !
+
+!BinaryChoice methodsFor: 'accessing'!
+actionTaken
+	"Answer whether the receiver has carried out its actions yet."
+	^actionTaken!
+
+active
+	"Answer whether the receiver is an active system view."
+	^false! !
+
+!BinaryChoice class methodsFor: 'instance creation'!
+message: messageString 
+	"Answer an instance of me whose question is messageString.  If the user
+	answer is yes, then return true.  If the user answer is no, return false.  
+	Display the view of the instance at the cursor location."
+	| answer |
+	answer _ true. "Default to true for bootstrap"
+	^answer!
+
+message: messageString displayAt: aPoint centered: centered ifTrue: trueAlternative ifFalse: falseAlternative
+	"Answer an instance of me whose question is messageString.  If the user
+	answer is yes, then evaluate trueAlternative.  If the user answer is no,
+	evaluate falseAlternative. If centered, a Boolean, is false, display the view of the
+	instance at aPoint; otherwise display it with its center at aPoint."
+
+	| newChoice |
+	newChoice _ self new initialize.
+	newChoice trueAction: trueAlternative.
+	newChoice falseAction: falseAlternative.
+	"BinaryChoiceView openOn: newChoice message: messageString displayAt: aPoint centered: centered"
+	"For bootstrap, just execute the true action"
+	trueAlternative notNil ifTrue: [trueAlternative value]!
+
+message: messageString displayAt: originPoint ifFalse: falseAlternative 
+	"Answer an instance of me whose question is messageString.  If the user
+	answer is yes, then do nothing.  If the user answer is no, evaluate falseAlternative. 
+	Display the view of the instance at originPoint."
+
+	^self
+		message: messageString
+		displayAt: originPoint
+		centered: false
+		ifTrue: nil
+		ifFalse: falseAlternative!
+
+message: messageString displayAt: originPoint ifTrue: trueAlternative 
+	"Answer an instance of me whose question is messageString.  If the user
+	answer is yes, then evaluate trueAlternative.  If the user answer is no,
+	do nothing.  Display the view of the instance at originPoint."
+
+	^self
+		message: messageString
+		displayAt: originPoint
+		centered: false
+		ifTrue: trueAlternative
+		ifFalse: nil!
+
+message: messageString displayAt: originPoint ifTrue: trueAlternative ifFalse: falseAlternative 
+	"Answer an instance of me whose question is messageString.  If the user
+	answer is yes, then evaluate trueAlternative.  If the user answer is no,
+	evaluate falseAlternative.  Display the view of the instance at originPoint."
+
+	^self
+		message: messageString
+		displayAt: originPoint
+		centered: false
+		ifTrue: trueAlternative
+		ifFalse: falseAlternative! !
+
+!BinaryChoice class methodsFor: 'examples'!
+example
+	"BinaryChoice example - simplified for bootstrap"
+	^true! !

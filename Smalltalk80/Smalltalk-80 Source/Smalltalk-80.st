@@ -26309,7 +26309,9 @@ readFrom: aStream
 		ifTrue: 
 			["<integer>e<exponent>"
 			^value * (radix raisedTo: (Integer readFrom: aStream))].
-	^value! !nil subclass: #Object
+	^value! !
+	
+nil subclass: #Object
 	instanceVariableNames: ''
 	classVariableNames: 'DependentsFields ErrorRecursion '
 	poolDictionaries: ''

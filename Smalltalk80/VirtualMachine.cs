@@ -297,6 +297,9 @@ public sealed class VirtualMachine
                         continue;
                     }
 
+                    // Log class structure for debugging
+                    Console.WriteLine($"[BOOTSTRAP] Class {className}: Fields={cls.Fields?.Length ?? 0}, ClassVars={cls.ClassVariables.Count}, InstVars={cls.InstanceVariables.Count}");
+
                     // Execute the initialization by evaluating "ClassName initialize"
                     EvaluateSource($"{className} initialize");
                     initializedCount++;
