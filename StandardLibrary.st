@@ -5291,7 +5291,7 @@ pi
 	"Answer the constant, Pi."
 	^Pi! !
 
-"Float initialize!"
+Float initialize!
 
 Object subclass: #BinaryChoice
 	instanceVariableNames: 'trueAction falseAction actionTaken'
