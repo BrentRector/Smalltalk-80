@@ -467,8 +467,19 @@ perform: selector withArguments: anArray
 
 !Object methodsFor: 'error handling'!
 confirm: aString 
-	"TEMPORARY BOOTSTRAP: Always returns true. TODO: Fix when BinaryChoice/UI available."
-	^true!
+	"Create and start up a BinaryChoice menu with the argument as the message in order
+	to determine true or false.  Answers true or false."
+	| answer |
+	"answer _ false."
+	answer _ true.
+	"BinaryChoice
+		message: aString
+		displayAt: Sensor cursorPoint
+		centered: true
+		ifTrue: [answer _ true]
+		ifFalse: [answer _ false]".
+	^answer!
+
 conflictingInheritanceError
 	"Browse to the method which called this,
 		redefine it appropriately,
@@ -767,11 +778,10 @@ Object class
 
 !Object class methodsFor: 'class initialization'!
 initialize 
-	(self confirm: 'Do you really want to initialize
-class Object?  It will reset all dependents.')
-		ifTrue:
-			[self initializeDependentsFields.
-			self initializeErrorRecursion]
+	"Initialize class Object. Initialize all dependents and error recursion."
+	self initializeDependentsFields.
+	self initializeErrorRecursion.
+	^self
 
 	"Object initialize"! !
 
@@ -893,15 +903,17 @@ whatIsAPrimitive
 
 !Object class methodsFor: 'private'!
 initializeDependentsFields
+	"Initialize DependentsFields safely during bootstrap."
 	DependentsFields _ IdentityDictionary new: 4
 
 	"Object initializeDependentsFields"!
 initializeErrorRecursion
+	"Initialize ErrorRecursion flag."
 	ErrorRecursion _ false
 
 	"Object initializeErrorRecursion"! !
 
-Object initialize!
+"Object initialize!"
 
 Object subclass: #UndefinedObject
 	instanceVariableNames: ''
@@ -5279,7 +5291,7 @@ pi
 	"Answer the constant, Pi."
 	^Pi! !
 
-Float initialize!
+"Float initialize!"
 
 Object subclass: #BinaryChoice
 	instanceVariableNames: 'trueAction falseAction actionTaken'

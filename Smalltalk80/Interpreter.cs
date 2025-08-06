@@ -830,7 +830,9 @@ public class Interpreter
                     return;
                 }
 
-                for (int i = 0; i <= argCount; i++)
+                // Pop the items we pushed (receiver + arguments) but only if the stack has enough items
+                var itemsToPop = argCount + 1; // receiver + arguments
+                for (int i = 0; i < itemsToPop && currentContext.Stack.Count > 0; i++)
                 {
                     _ = currentContext.Stack.Pop();
                 }

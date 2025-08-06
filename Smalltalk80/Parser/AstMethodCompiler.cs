@@ -58,10 +58,20 @@ public static class AstMethodCompiler
             foreach (var temp in sequence.Temporaries)
                 temporaries[temp] = temporaries.Count;
 
+            // Check if the last statement is an explicit return
+            bool endsWithExplicitReturn = sequence.Statements.Count > 0 &&
+                                        sequence.Statements[^1] is AnswerStatement;
+
             for (var i = 0; i < sequence.Statements.Count; i++)
             {
                 var isLast = i == sequence.Statements.Count - 1;
                 CompileStatement(sequence.Statements[i], isLast);
+            }
+
+            // Implement implicit return semantics: if no explicit return at the end, return self
+            if (!endsWithExplicitReturn)
+            {
+                bytecodes.Add((byte)Bytecode.ReturnSelf);
             }
 
             return new CompiledMethod
@@ -82,7 +92,8 @@ public static class AstMethodCompiler
             {
                 case ExpressionStatement es:
                     CompileExpression(es.Expression);
-                    bytecodes.Add(isLast ? (byte)Bytecode.ReturnTopFromMethod : (byte)Bytecode.PopStack);
+                    // Always pop expression statement results - we'll handle implicit return separately
+                    bytecodes.Add((byte)Bytecode.PopStack);
                     break;
                 case AnswerStatement ans:
                     // Emit optimized return bytecode based on expression type
@@ -257,7 +268,12 @@ public static class AstMethodCompiler
             }
 
             if (block.Body.Statements.Count == 0 || block.Body.Statements[^1] is not AnswerStatement)
+            {
+                // For empty blocks, push nil first, then return it
+                if (block.Body.Statements.Count == 0)
+                    bytecodes.Add((byte)Bytecode.PushNil);
                 bytecodes.Add((byte)Bytecode.ReturnTopFromBlock);
+            }
 
             short offset = (short)(bytecodes.Count - bodyStart);
             bytecodes[jumpIndex + 1] = (byte)(offset >> 8);

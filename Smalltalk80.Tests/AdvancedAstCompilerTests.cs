@@ -320,8 +320,11 @@ public class AdvancedAstCompilerTests
         var dupCount = bytecodes.Count(b => b == (byte)Bytecode.DuplicateTop);
         Assert.Equal(4, dupCount);
 
-        // Should have 4 PopStack (for first 4 message results)
+        // Should have 5 PopStack (4 for first 4 message results + 1 for cascade expression result)
         var popCount = bytecodes.Count(b => b == (byte)Bytecode.PopStack);
-        Assert.Equal(4, popCount);
+        Assert.Equal(5, popCount);
+
+        // Should have implicit return self
+        Assert.Contains((byte)Bytecode.ReturnSelf, bytecodes);
     }
 }
