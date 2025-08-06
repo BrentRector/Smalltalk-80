@@ -46,17 +46,9 @@ public class SmalltalkClass : SmalltalkObject
     public SmalltalkClass? Metaclass { get; set; }
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SmalltalkClass"/> class with no fields.
+    ///     Initializes a new instance of the <see cref="SmalltalkClass"/> class.
     /// </summary>
     public SmalltalkClass() : base(null, 0)
-    {
-    }
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SmalltalkClass"/> class with the specified field count.
-    ///     This is used when the class needs fields to store class variables.
-    /// </summary>
-    public SmalltalkClass(int fieldCount) : base(null, fieldCount)
     {
     }
 

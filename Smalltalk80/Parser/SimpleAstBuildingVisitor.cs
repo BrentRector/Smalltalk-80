@@ -57,22 +57,48 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitCascadeExpr(Smalltalk80Parser.CascadeExprContext context)
     {
-        var baseExpr = (ExpressionNode)Visit(context.messageExpr())!;
-
-        var messageParts = context.messagePart();
-        if (messageParts.Length == 0)
+        try
         {
-            return baseExpr;
-        }
+            var messageExprContext = context.messageExpr();
+            if (messageExprContext == null)
+            {
+                var lineInfo = context.Start != null ? $"Line {context.Start.Line}, Column {context.Start.Column}" : "Unknown location";
+                var contextText = context.GetText();
+                throw new InvalidOperationException($"Cascade expression has no base message expression at {lineInfo}. Context: '{contextText}'");
+            }
 
-        // Create a cascade expression
-        var messages = new List<ExpressionNode>();
-        foreach (var part in messageParts)
+            var baseExprResult = Visit(messageExprContext);
+            if (baseExprResult == null)
+            {
+                throw new InvalidOperationException("Cascade base expression returned null");
+            }
+            var baseExpr = (ExpressionNode)baseExprResult;
+
+            var messageParts = context.messagePart();
+            if (messageParts.Length == 0)
+            {
+                return baseExpr;
+            }
+
+            // Create a cascade expression
+            var messages = new List<ExpressionNode>();
+            foreach (var part in messageParts)
+            {
+                var partResult = Visit(part);
+                if (partResult != null)
+                {
+                    messages.Add((ExpressionNode)partResult);
+                }
+            }
+
+            return new CascadeExpression(baseExpr, messages);
+        }
+        catch (Exception ex)
         {
-            messages.Add((ExpressionNode)Visit(part)!);
+            var lineInfo = context.Start != null ? $"Line {context.Start.Line}, Column {context.Start.Column}" : "Unknown location";
+            var contextText = context.GetText();
+            throw new InvalidOperationException($"Error in VisitCascadeExpr at {lineInfo}: {ex.Message}. Context: '{contextText}'", ex);
         }
-
-        return new CascadeExpression(baseExpr, messages);
     }
 
     /// <summary>
@@ -80,40 +106,70 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
     {
-        var receiver = (ExpressionNode)Visit(context.messageBase())!;
-
-        // Apply all message sends to the receiver
-        var current = receiver;
-        for (int i = 0; i < context.ChildCount; i++)
+        try
         {
-            var child = context.GetChild(i);
-            if (child is Smalltalk80Parser.UnaryMessageContext unary)
+            var messageBase = context.messageBase();
+            if (messageBase == null)
             {
-                var selector = unary.unarySelector().GetText();
-                current = new UnarySendExpression(current, selector);
+                throw new InvalidOperationException("MessageExpr context has null messageBase");
             }
-            else if (child is Smalltalk80Parser.BinaryMessageContext binary)
-            {
-                var selector = binary.binarySelector().GetText();
-                var argument = (ExpressionNode)Visit(binary.messageBase())!;
-                current = new BinarySendExpression(current, selector, argument);
-            }
-            else if (child is Smalltalk80Parser.KeywordMessageContext keyword)
-            {
-                var parts = new List<string>();
-                var arguments = new List<ExpressionNode>();
 
-                foreach (var keywordPart in keyword.keywordPart())
+            var receiverResult = Visit(messageBase);
+            if (receiverResult == null)
+            {
+                throw new InvalidOperationException($"Message receiver Visit returned null for messageBase type: {messageBase.GetType().Name}");
+            }
+            var receiver = (ExpressionNode)receiverResult;
+
+            // Apply all message sends to the receiver
+            var current = receiver;
+            for (int i = 0; i < context.ChildCount; i++)
+            {
+                var child = context.GetChild(i);
+                if (child is Smalltalk80Parser.UnaryMessageContext unary)
                 {
-                    parts.Add(keywordPart.IDENTIFIER().GetText() + ":");
-                    arguments.Add((ExpressionNode)Visit(keywordPart.nonKeywordExpr())!);
+                    var selector = unary.unarySelector().GetText();
+                    current = new UnarySendExpression(current, selector);
                 }
+                else if (child is Smalltalk80Parser.BinaryMessageContext binary)
+                {
+                    var selector = binary.binarySelector().GetText();
+                    var argumentResult = Visit(binary.messageBase());
+                    if (argumentResult == null)
+                    {
+                        throw new InvalidOperationException("Binary message argument cannot be null");
+                    }
+                    var argument = (ExpressionNode)argumentResult;
+                    current = new BinarySendExpression(current, selector, argument);
+                }
+                else if (child is Smalltalk80Parser.KeywordMessageContext keyword)
+                {
+                    var parts = new List<string>();
+                    var arguments = new List<ExpressionNode>();
 
-                current = new KeywordSendExpression(current, parts, arguments);
+                    foreach (var keywordPart in keyword.keywordPart())
+                    {
+                        parts.Add(keywordPart.IDENTIFIER().GetText() + ":");
+                        var argResult = Visit(keywordPart.nonKeywordExpr());
+                        if (argResult == null)
+                        {
+                            throw new InvalidOperationException("Keyword message argument cannot be null");
+                        }
+                        arguments.Add((ExpressionNode)argResult);
+                    }
+
+                    current = new KeywordSendExpression(current, parts, arguments);
+                }
             }
-        }
 
-        return current;
+            return current;
+        }
+        catch (Exception ex)
+        {
+            var lineInfo = context.Start != null ? $"Line {context.Start.Line}, Column {context.Start.Column}" : "Unknown location";
+            var contextText = context.GetText();
+            throw new InvalidOperationException($"Error in VisitMessageExpr at {lineInfo}: {ex.Message}. Context: '{contextText}'", ex);
+        }
     }
 
     /// <summary>

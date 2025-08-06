@@ -60,15 +60,24 @@ public static class SystemDictionary
             return existing;
         }
 
-        // Calculate the number of fields needed for class variables
-        int classVariableCount = classVariables?.Count ?? 0;
+        var cls = CreateClassWithMetaclass(name, superclass, instanceVariables, classVariables, poolDictionaries, category);
+        classes[name] = cls;
+        return cls;
+    }
 
-        Console.WriteLine($"[DEFINE_CLASS] Creating class {name} with {classVariableCount} class variables");
-
-        // Create the class with proper field allocation for class variables
-        var cls = new SmalltalkClass(classVariableCount);
-        cls.Superclass = superclass;
-
+    /// <summary>
+    ///     Creates a class and its associated metaclass with proper relationships.
+    /// </summary>
+    private static SmalltalkClass CreateClassWithMetaclass(
+        string name,
+        SmalltalkClass? superclass,
+        IReadOnlyList<string>? instanceVariables,
+        IReadOnlyList<string>? classVariables,
+        IReadOnlyList<string>? poolDictionaries,
+        string? category)
+    {
+        // Create the class
+        var cls = new SmalltalkClass { Superclass = superclass };
         if (instanceVariables is not null)
             cls.InstanceVariables.AddRange(instanceVariables);
         if (classVariables is not null)
@@ -83,10 +92,6 @@ public static class SystemDictionary
         cls.Metaclass = metaclass;
         cls.ClassPointer = metaclass; // The class is an instance of its metaclass
 
-        // Register the class
-        classes[name] = cls;
-
-        Console.WriteLine($"[DEFINE_CLASS] Created class {name} with {cls.Fields?.Length ?? 0} fields for class variables");
         return cls;
     }
 
@@ -101,11 +106,10 @@ public static class SystemDictionary
         {
             superMetaclass = cls.Superclass.Metaclass;
         }
-        else if (TryGetClass("Class", out var classClass))
+        else if (className != "Object" && TryGetClass("Class", out var classClass))
         {
-            // If no superclass metaclass, inherit from Class's metaclass (Class class)
-            // This includes Object, whose metaclass should inherit from Class
-            superMetaclass = classClass.Metaclass;
+            // If no superclass metaclass, inherit from Class
+            superMetaclass = classClass;
         }
 
         var metaclass = new SmalltalkClass { Superclass = superMetaclass };
@@ -131,21 +135,30 @@ public static class SystemDictionary
             return;
         }
 
-        // Bootstrap the fundamental metaclass structure
-        // Object will be created when it's defined in the standard library with proper class variables
+        // Bootstrap the fundamental classes with circular references
 
-        // Create Class without metaclass first (no superclass initially)
-        var classClass = new SmalltalkClass();
+        // Create Object without metaclass first
+        var objectClass = new SmalltalkClass();
+        classes["Object"] = objectClass;
+
+        // Create Class without metaclass
+        var classClass = new SmalltalkClass { Superclass = objectClass };
         classes["Class"] = classClass;
 
         // Create Metaclass without metaclass
         var metaclassClass = new SmalltalkClass { Superclass = classClass };
         classes["Metaclass"] = metaclassClass;
 
-        // Set up the circular metaclass relationships
+        // Now set up the circular metaclass relationships
 
-        // Class's metaclass is a special instance of Metaclass
-        var classMetaclass = new SmalltalkClass { Superclass = metaclassClass };
+        // Object's metaclass is a special instance of Metaclass
+        var objectMetaclass = new SmalltalkClass { Superclass = classClass };
+        objectMetaclass.ClassPointer = metaclassClass;
+        objectClass.Metaclass = objectMetaclass;
+        objectClass.ClassPointer = objectMetaclass;
+
+        // Class's metaclass is a special instance of Metaclass  
+        var classMetaclass = new SmalltalkClass { Superclass = objectMetaclass };
         classMetaclass.ClassPointer = metaclassClass;
         classClass.Metaclass = classMetaclass;
         classClass.ClassPointer = classMetaclass;
@@ -153,8 +166,6 @@ public static class SystemDictionary
         // Metaclass's metaclass is itself (circular)
         metaclassClass.Metaclass = metaclassClass;
         metaclassClass.ClassPointer = metaclassClass;
-
-        Console.WriteLine("[SYSTEM_IMAGE] Initialized fundamental metaclass system (Class, Metaclass). Object will be created during library loading.");
     }
 
     /// <summary>

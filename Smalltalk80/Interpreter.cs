@@ -229,18 +229,11 @@ public class Interpreter
     /// <param name="bytecode">The bytecode to execute.</param>
     public void Dispatch(Bytecode bytecode)
     {
+        Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
         if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15)
         {
             int index = (int)bytecode - (int)Bytecode.PushReceiverVariable0;
-            try
-            {
-                currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
-            }
-            catch (IndexOutOfRangeException)
-            {
-                Console.WriteLine($"[ERROR] Array bounds error accessing receiver field[{index}]. Receiver has {currentContext.Receiver.Fields?.Length ?? 0} fields. Class: {currentContext.Receiver.ClassPointer?.GetType().Name ?? "null"}");
-                throw;
-            }
+            currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
         }
         else if (bytecode >= Bytecode.PushTemporaryVariable0 && bytecode <= Bytecode.PushTemporaryVariable15)
         {
@@ -261,15 +254,7 @@ public class Interpreter
         else if (bytecode >= Bytecode.StoreAndPopReceiverVariable0 && bytecode <= Bytecode.StoreAndPopReceiverVariable7)
         {
             int index = (int)bytecode - (int)Bytecode.StoreAndPopReceiverVariable0;
-            try
-            {
-                currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
-            }
-            catch (IndexOutOfRangeException)
-            {
-                Console.WriteLine($"[ERROR] Array bounds error storing to receiver field[{index}]. Receiver has {currentContext.Receiver.Fields?.Length ?? 0} fields. Class: {currentContext.Receiver.ClassPointer?.GetType().Name ?? "null"}");
-                throw;
-            }
+            currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
         }
         else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7)
         {
@@ -830,9 +815,7 @@ public class Interpreter
                     return;
                 }
 
-                // Pop the items we pushed (receiver + arguments) but only if the stack has enough items
-                var itemsToPop = argCount + 1; // receiver + arguments
-                for (int i = 0; i < itemsToPop && currentContext.Stack.Count > 0; i++)
+                for (int i = 0; i <= argCount; i++)
                 {
                     _ = currentContext.Stack.Pop();
                 }

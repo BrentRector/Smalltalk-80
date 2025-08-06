@@ -23,7 +23,9 @@ public static class Program
     {
         Console.WriteLine("Smalltalk-80 System Boot");
 
-        var vm = new VirtualMachine();
+        // Check for --no-stdlib option
+        bool skipStdlib = args.Contains("--no-stdlib");
+        var vm = new VirtualMachine(skipStandardLibrary: skipStdlib);
 
         var loadIndex = Array.IndexOf(args, "--load");
         if (loadIndex >= 0 && loadIndex < args.Length - 1)

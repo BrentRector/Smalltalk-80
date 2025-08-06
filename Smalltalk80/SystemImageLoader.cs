@@ -30,7 +30,18 @@ public static class SystemImageLoader
         try
         {
             // Parse the entire file first
-            FileNode fileAst = FileInReader.Parse(path);
+            FileNode fileAst = null!; // Suppress nullable warning
+            try
+            {
+                fileAst = FileInReader.Parse(path);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new ParseError(0, 0, $"Parse error in file '{path}': {ex.Message}\n{ex.StackTrace}"));
+                result.Success = false;
+                result.Errors = errors;
+                return result;
+            }
 
             // Collect all class definitions and method chunks
             var classDefinitions = new List<ClassDefinitionNode>();
@@ -39,23 +50,30 @@ public static class SystemImageLoader
 
             foreach (var chunk in fileAst.Chunks)
             {
-                switch (chunk)
+                try
                 {
-                    case ClassDefinitionNode classDef:
-                        classDefinitions.Add(classDef);
-                        break;
-                    case MethodCategoryNode methodCategory:
-                        methodChunks.Add((methodCategory, null, methodCategory.Header));
-                        break;
-                    case MethodDefinitionNode methodDef:
-                        methodChunks.Add((null, methodDef, null));
-                        break;
-                    case MethodHeaderNode header:
-                        methodChunks.Add((null, null, header));
-                        break;
-                    default:
-                        otherChunks.Add(chunk);
-                        break;
+                    switch (chunk)
+                    {
+                        case ClassDefinitionNode classDef:
+                            classDefinitions.Add(classDef);
+                            break;
+                        case MethodCategoryNode methodCategory:
+                            methodChunks.Add((methodCategory, null, methodCategory.Header));
+                            break;
+                        case MethodDefinitionNode methodDef:
+                            methodChunks.Add((null, methodDef, null));
+                            break;
+                        case MethodHeaderNode header:
+                            methodChunks.Add((null, null, header));
+                            break;
+                        default:
+                            otherChunks.Add(chunk);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new ParseError(0, 0, $"Error processing chunk in file '{path}': {ex.Message}\n{ex.StackTrace}"));
                 }
             }
 
@@ -157,96 +175,55 @@ public static class SystemImageLoader
                         // Process all methods in the category
                         foreach (var categoryMethod in category.Methods)
                         {
-                            InstallMethod(categoryMethod, currentClass, currentHeader, warnings);
+                            try
+                            {
+                                InstallMethod(categoryMethod, currentClass, currentHeader, warnings);
+                            }
+                            catch (Exception ex)
+                            {
+                                var methodName = categoryMethod?.Selector ?? "unknown";
+                                errors.Add(new ParseError(0, 0, $"Failed to install method {methodName} in class {currentHeader?.ClassName ?? "unknown"}: {ex.Message}\n{ex.StackTrace}"));
+                            }
                         }
                     }
                     else if (method != null && currentClass != null && currentHeader != null)
                     {
-                        InstallMethod(method, currentClass, currentHeader, warnings);
+                        try
+                        {
+                            InstallMethod(method, currentClass, currentHeader, warnings);
+                        }
+                        catch (Exception ex)
+                        {
+                            var methodName = method?.Selector ?? "unknown";
+                            errors.Add(new ParseError(0, 0, $"Failed to install method {methodName} in class {currentHeader?.ClassName ?? "unknown"}: {ex.Message}\n{ex.StackTrace}"));
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     var methodName = method?.Selector ?? category?.Methods.FirstOrDefault()?.Selector ?? "unknown";
-                    errors.Add(new ParseError(0, 0, $"Failed to install method {methodName}: {ex.Message}"));
+                    errors.Add(new ParseError(0, 0, $"Failed to process method chunk {methodName}: {ex.Message}\n{ex.StackTrace}"));
                 }
             }
 
-            // PASS 4: Process standalone expression chunks (like "Object initialize!")
-            Console.WriteLine($"[SYSTEM_IMAGE] Processing {otherChunks.Count} other chunks...");
-            foreach (var chunk in otherChunks)
+            // PASS 4: Mark classes that need initialization (but don't execute yet)
+            Console.WriteLine($"[SYSTEM_IMAGE] Marking classes for initialization...");
+            var initializeSymbol = new Symbol("initialize");
+            var classesNeedingInitialization = new List<string>();
+
+            // Check all loaded classes for initialize methods
+            foreach (var (className, cls) in classStubs)
             {
-                try
+                if (cls.Metaclass != null && cls.Metaclass.MethodDictionary.ContainsKey(initializeSymbol))
                 {
-                    if (chunk is ExpressionChunkNode exprChunk)
-                    {
-                        Console.WriteLine($"[SYSTEM_IMAGE] Found expression chunk: {exprChunk.Expression.GetType().Name}");
-
-                        // Handle unary sends like "Object initialize"
-                        if (exprChunk.Expression is UnarySendExpression unarySend &&
-                            unarySend.Receiver is VariableExpression variable &&
-                            unarySend.Selector == "initialize")
-                        {
-                            var source = $"{variable.Name} initialize";
-                            Console.WriteLine($"[SYSTEM_IMAGE] ***** FOUND INITIALIZATION STATEMENT: {source} *****");
-
-                            // Execute class initialization directly using ParserService and Interpreter
-                            try
-                            {
-                                Console.WriteLine($"[SYSTEM_IMAGE] Looking up class: {variable.Name}");
-                                if (SystemDictionary.TryGetClass(variable.Name, out var targetClass))
-                                {
-                                    Console.WriteLine($"[SYSTEM_IMAGE] Class {variable.Name} found, compiling and executing: {source}");
-                                    var method = ParserService.CompileExpression(source);
-                                    var interpreter = new Interpreter { ExitOnReturn = false };
-                                    var executionResult = interpreter.Evaluate(method, targetClass);
-                                    Console.WriteLine($"[SYSTEM_IMAGE] ***** SUCCESSFULLY EXECUTED: {source} *****");
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"[SYSTEM_IMAGE] ***** ERROR: Class {variable.Name} not found for initialization *****");
-                                    warnings.Add(new LoadWarning(0, 0, $"Class {variable.Name} not found for initialization"));
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[SYSTEM_IMAGE] ***** ERROR executing {source}: {ex.Message} *****");
-                                Console.WriteLine($"[SYSTEM_IMAGE] Stack trace: {ex.StackTrace}");
-                                warnings.Add(new LoadWarning(0, 0, $"Failed to execute {source}: {ex.Message}"));
-                            }
-                        }
-                        else
-                        {
-                            // Add detailed info about what we found instead
-                            if (exprChunk.Expression is UnarySendExpression unarySend2)
-                            {
-                                Console.WriteLine($"[SYSTEM_IMAGE] UnarySend - Receiver: {unarySend2.Receiver?.GetType().Name}, Selector: '{unarySend2.Selector}'");
-                                if (unarySend2.Receiver is VariableExpression variable2)
-                                {
-                                    Console.WriteLine($"[SYSTEM_IMAGE] Variable name: '{variable2.Name}', looking for 'initialize', got '{unarySend2.Selector}'");
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"[SYSTEM_IMAGE] Skipping unsupported expression type: {exprChunk.Expression.GetType().Name}");
-                            }
-                        }
-                    }
-                    else if (chunk is ScriptNode scriptChunk)
-                    {
-                        Console.WriteLine($"[SYSTEM_IMAGE] Found script chunk with {scriptChunk.Sequence.Statements.Count} statements");
-                        // Handle script chunks if needed
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[SYSTEM_IMAGE] Skipping unknown chunk type: {chunk.GetType().Name}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    warnings.Add(new LoadWarning(0, 0, $"Failed to execute chunk: {ex.Message}"));
+                    classesNeedingInitialization.Add(className);
+                    Console.WriteLine($"[SYSTEM_IMAGE] Class {className} has initialize method");
                 }
             }
+
+            Console.WriteLine($"[SYSTEM_IMAGE] Found {classesNeedingInitialization.Count} classes needing initialization");
+            // Note: Actual initialization should be done after the loader completes
+            // to avoid circular dependencies during the loading process
 
             result.Success = errors.Count == 0;
             result.Errors = errors;
@@ -271,9 +248,7 @@ public static class SystemImageLoader
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SYSTEM_IMAGE] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-            Console.WriteLine($"[SYSTEM_IMAGE] STACK TRACE: {ex.StackTrace}");
-            errors.Add(new ParseError(0, 0, $"Unexpected error loading system image: {ex.Message}"));
+            errors.Add(new ParseError(0, 0, $"Unexpected error loading system image: {ex.Message}. Stack trace: {ex.StackTrace}"));
             result.Success = false;
             result.Errors = errors;
             return result;
@@ -317,44 +292,6 @@ public static class SystemImageLoader
                     methodDef.HasPrimitive,
                     methodDef.PrimitiveIndex);
             }
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("Unknown variable"))
-        {
-            // Extract missing dependency information from compiler error
-            var missingVar = ExtractMissingVariable(ex.Message);
-            var className = header?.ClassName ?? "UnknownClass";
-            warnings.Add(new LoadWarning(0, 0,
-                $"Missing dependency in {className}>>{methodDef.Selector}: {missingVar}"));
-            Console.WriteLine($"[DEPENDENCY_MISSING] Class: {className}, Method: {methodDef.Selector}, Missing: {missingVar}");
-
-            // Create a minimal compiled method to avoid complete failure
-            var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
-            compiled = AstMethodCompiler.CompileMethod(
-                emptyBody,
-                new List<string>(),
-                new List<string>(),
-                false,
-                0);
-        }
-        catch (Exception ex)
-        {
-            var className = header?.ClassName ?? "UnknownClass";
-            warnings.Add(new LoadWarning(0, 0,
-                $"Compilation error in {className}>>{methodDef.Selector}: {ex.Message}"));
-            Console.WriteLine($"[COMPILATION_ERROR] Class: {className}, Method: {methodDef.Selector}, Error: {ex.Message}");
-
-            // Create a minimal compiled method to avoid complete failure
-            var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
-            compiled = AstMethodCompiler.CompileMethod(
-                emptyBody,
-                new List<string>(),
-                new List<string>(),
-                false,
-                0);
-        }
-
-        try
-        {
 
             compiled = new CompiledMethod
             {
@@ -368,7 +305,7 @@ public static class SystemImageLoader
             };
 
             // Install in the appropriate method dictionary
-            if (header?.IsClassSide == true)
+            if (header.IsClassSide)
             {
                 // Class-side methods go into the metaclass's regular method dictionary
                 if (targetClass.Metaclass == null)
@@ -387,23 +324,6 @@ public static class SystemImageLoader
         {
             warnings.Add(new LoadWarning(0, 0, $"Failed to compile method {methodDef.Selector}: {ex.Message}"));
         }
-    }
-
-    /// <summary>
-    /// Extracts the missing variable name from an AstMethodCompiler error message.
-    /// </summary>
-    /// <param name="errorMessage">The error message from the compiler.</param>
-    /// <returns>The name of the missing variable.</returns>
-    private static string ExtractMissingVariable(string errorMessage)
-    {
-        // Error message format: "Unknown variable 'VariableName'. Available temporaries: [...]"
-        var start = errorMessage.IndexOf("'") + 1;
-        var end = errorMessage.IndexOf("'", start);
-        if (start > 0 && end > start)
-        {
-            return errorMessage.Substring(start, end - start);
-        }
-        return "unknown";
     }
 }
 

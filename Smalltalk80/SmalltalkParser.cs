@@ -118,6 +118,14 @@ public sealed class SmalltalkParser
         parser.RemoveErrorListeners();
         var visitor = new AstBuildingVisitor(tokens);
 
+        // Log token stream for debugging
+        if (methodName is not null)
+        {
+            tokens.Fill();
+            var tokenDump = string.Join(" ", tokens.GetTokens().Select(t => $"[{t.Type}:{t.Text}]").ToArray());
+            Tracer.Log($"[PARSER_DEBUG] Token stream for '{methodName}': {tokenDump}");
+        }
+
         // Check if this looks like a method definition with signature vs just method body
         var trimmedSource = source.Trim();
         bool hasMethodSignature =
@@ -141,6 +149,8 @@ public sealed class SmalltalkParser
                 try
                 {
                     var exprChunkCtx = parser.expressionChunk();
+                    if (methodName is not null)
+                        Tracer.Log($"[PARSER_DEBUG] Parse tree for '{methodName}' (expressionChunk): {exprChunkCtx.ToStringTree(parser)}");
                     if (parser.NumberOfSyntaxErrors > 0)
                     {
                         if (methodName is not null)
@@ -165,6 +175,8 @@ public sealed class SmalltalkParser
             {
                 // Parse as expression entry (for plain expressions)
                 var exprCtx = parser.expressionEntry();
+                if (methodName is not null)
+                    Tracer.Log($"[PARSER_DEBUG] Parse tree for '{methodName}' (expressionEntry): {exprCtx.ToStringTree(parser)}");
                 if (parser.NumberOfSyntaxErrors > 0)
                     throw new InvalidOperationException("Invalid Smalltalk source.");
 
@@ -176,6 +188,8 @@ public sealed class SmalltalkParser
 
         // Parse the full method definition to capture primitives
         var methodCtx = parser.methodDef();
+        if (methodName is not null)
+            Tracer.Log($"[PARSER_DEBUG] Parse tree for '{methodName}' (methodDef): {methodCtx.ToStringTree(parser)}");
         if (parser.NumberOfSyntaxErrors > 0)
             throw new InvalidOperationException("Invalid Smalltalk source.");
 

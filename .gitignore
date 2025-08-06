@@ -55,8 +55,3 @@ nunit-*.xml
 
 # Ignore generated grammar output
 Smalltalk80/Generated/
-
-# Temporary files directory
-temp/
-# But keep the README in temp directory
-!temp/README.md

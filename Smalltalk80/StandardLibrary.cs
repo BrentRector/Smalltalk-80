@@ -91,9 +91,9 @@ public static class StandardLibrary
         // Add ifFalse: to False class (returns the block value)
         AddSimpleMethod(falseClass, "ifFalse:", 1, new byte[] {
             16,   // PushTemporaryVariable0 (the block argument)
-            131, 0,  // send: value with: 0 arguments
+            131, 0, 192,  // send: value with: 0 arguments
             124   // ReturnTopFromMethod
-        }, new object[] { new Symbol("value") });
+        });
 
         // Add ifFalse: to True class (returns nil)
         AddSimpleMethod(trueClass, "ifFalse:", 1, new byte[] {
@@ -104,9 +104,9 @@ public static class StandardLibrary
         // Add ifTrue: to True class (returns the block value)
         AddSimpleMethod(trueClass, "ifTrue:", 1, new byte[] {
             16,   // PushTemporaryVariable0 (the block argument)
-            131, 0,  // send: value with: 0 arguments
+            131, 0, 192,  // send: value with: 0 arguments
             124   // ReturnTopFromMethod
-        }, new object[] { new Symbol("value") });
+        });
 
         // Add ifTrue: to False class (returns nil)
         AddSimpleMethod(falseClass, "ifTrue:", 1, new byte[] {
@@ -117,9 +117,9 @@ public static class StandardLibrary
         // Add and: to True class (evaluates the block)
         AddSimpleMethod(trueClass, "and:", 1, new byte[] {
             16,   // PushTemporaryVariable0 (the block argument)
-            131, 0,  // send: value with: 0 arguments
+            131, 0, 192,  // send: value with: 0 arguments
             124   // ReturnTopFromMethod
-        }, new object[] { new Symbol("value") });
+        });
 
         // Add and: to False class (returns self)
         AddSimpleMethod(falseClass, "and:", 1, new byte[] {
@@ -138,24 +138,6 @@ public static class StandardLibrary
         {
             Header = header,
             Literals = Array.Empty<object>(),
-            Bytecodes = bytecodes,
-            HasPrimitive = false,
-            PrimitiveIndex = 0
-        };
-
-        targetClass.MethodDictionary[new Symbol(selector)] = compiledMethod;
-    }
-
-    /// <summary>
-    /// Adds a simple bytecode method with literals to the specified class.
-    /// </summary>
-    private static void AddSimpleMethod(SmalltalkClass targetClass, string selector, int argCount, byte[] bytecodes, object[] literals)
-    {
-        var header = new MethodHeader(argCount, 0); // No primitives, just bytecode
-        var compiledMethod = new CompiledMethod
-        {
-            Header = header,
-            Literals = literals,
             Bytecodes = bytecodes,
             HasPrimitive = false,
             PrimitiveIndex = 0

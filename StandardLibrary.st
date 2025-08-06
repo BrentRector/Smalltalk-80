@@ -1,90 +1,1799 @@
-Object subclass: #Behavior
-	instanceVariableNames: 'superclass methodDict format subclasses '
-	classVariableNames: 'SelectorsOfConflictMethods SelectorsOfCopiedMethods SelectorsOfDirectedMethods '
-	poolDictionaries: ''
-	category: 'Kernel-Classes'!
-Behavior comment:
-'Instance Variables:
-	superclass	<Behavior> links the chain of inheritance
-	methodDict	<IdentityDictionary> associates message names with methods
-	format		<Integer> encodes storage layout of instances
-	subclasses	<Set> back-pointers to the class'' subclasses
-
-Behavior provides the minimum state necessary for compiling methods, and creating and running instances.  Most objects are created as instances of the more fully supported subclass, Class, but Behavior is a good starting point for providing instance-specific behavior (as in Metaclass).'!
-
-!Behavior methodsFor: 'initialize-release'!
-obsolete
-	"Invalidate and recycle local messages.  Remove the receiver from its superclass' 
-	subclass list."
-
-	methodDict _ MethodDictionary new.
-	self superclasses do: [:each | each removeSubclass: self].
-	self removeFromInheritanceTables! !
-
-!Behavior methodsFor: 'accessing'!
-format
-	"Answer an Integer that encodes the kinds and numbers of variables of instances
-	of the receiver."
-
-	^format! !
-
-!Behavior methodsFor: 'testing'!
-instSize
-	"Answer the number of named instance variables (as opposed to indexed
-	variables) of the receiver."
-
-	^format bitAnd: 255!
-isBits
-	"Answer whether the receiver contains just bits (not pointers)."
-
-	^format noMask: -16384!
-isBytes
-	"Answer whether the receiver has 8-bit instance variables."
-	^format noMask: 8192!
-isFixed
-	"Answer whether the receiver does not have a variable (indexable) part."
-
-	^self isVariable not!
-isPointers
-	"Answer whether the receiver contains just pointers (not bits)."
-
-	^self isBits not!
-isVariable
-	"Answer whether the receiver has a variable (indexable) part."
-
-	^(format bitAnd: 4096) ~= 0!
-isWords
-	"Answer whether the receiver has 16-bit instance variables."
-
-	^self isBytes not! !
-
-Behavior subclass: #ClassDescription
-	instanceVariableNames: 'instanceVariables organization '
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Kernel-Classes'!
-
-ClassDescription subclass: #Class
-	instanceVariableNames: 'name classPool sharedPools '
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Kernel-Classes'!
-
-ClassDescription subclass: #Metaclass
-	instanceVariableNames: 'thisClass '
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Kernel-Classes'!
-
 nil subclass: #Object
 	instanceVariableNames: ''
-	classVariableNames: 'DependentsFields ErrorRecursion '
+	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Objects'!
-Object comment: 'Object is the superclass of all classes.  It thus provides default behavior common to all objects, such as class access, copying and printing.'!
 
+Object subclass: #Behavior
+        instanceVariableNames: 'superclass methodDict format subclasses '
+        classVariableNames: 'SelectorsOfConflictMethods SelectorsOfCopiedMethods SelectorsOfDirectedMethods '        
+        poolDictionaries: ''
+        category: 'Kernel-Classes'!
+Behavior comment:
+'Instance Variables:
+        superclass      <Behavior> links the chain of inheritance
+        methodDict      <IdentityDictionary> associates message names with methods
+        format          <Integer> encodes storage layout of instances
+        subclasses      <Set> back-pointers to the class'' subclasses
+Behavior provides the minimum state necessary for compiling methods, and creating and running instances.  Most object
+ts are created as instances of the more fully supported subclass, Class, but Behavior is a good starting point for pro
+oviding instance-specific behavior (as in Metaclass).'!
+!Behavior methodsFor: 'initialize-release'!
+obsolete
+        "Invalidate and recycle local messages.  Remove the receiver from its superclass'
+        subclass list."
+        methodDict _ MethodDictionary new.
+        self superclasses do: [:each | each removeSubclass: self].
+        self removeFromInheritanceTables! !
+!Behavior methodsFor: 'accessing'!
+format
+        "Answer an Integer that encodes the kinds and numbers of variables of instances
+        of the receiver."
+        ^format! !
+!Behavior methodsFor: 'testing'!
+instSize
+        "Answer the number of named instance variables (as opposed to indexed
+        variables) of the receiver."
+        ^format bitAnd: 255!
+isBits
+        "Answer whether the receiver contains just bits (not pointers)."
+        ^format noMask: -16384!
+isBytes
+        "Answer whether the receiver has 8-bit instance variables."
+        ^format noMask: 8192!
+isFixed
+        "Answer whether the receiver does not have a variable (indexable) part."
+        ^self isVariable not!
+isPointers
+        "Answer whether the receiver contains just pointers (not bits)."
+        ^self isBits not!
+isVariable
+        "Answer whether the receiver has a variable (indexable) part."
+        ^(format bitAnd: 4096) ~= 0!
+isWords
+        "Answer whether the receiver has 16-bit instance variables."
+        ^self isBytes not! !
+!Behavior methodsFor: 'copying'!
+copy
+        "Make a copy of the receiver without a list of subclasses."
+        | myCopy savedSubclasses |
+        savedSubclasses _ subclasses.
+        subclasses _ nil.
+        myCopy _ self shallowCopy.
+        subclasses _ savedSubclasses.
+        ^myCopy methodDictionary: methodDict copy! !
+!Behavior methodsFor: 'printing'!
+printHierarchy
+        "Answer a description containing the names and instance variable
+        names of all of the subclasses and superclasses of the receiver."
+        | aStream index supers |
+        index _ 0.
+        aStream _ WriteStream on: (String new: 16).
+        self allDynamicSuperclasses reverseDo:
+                [:aClass |
+                aStream crtab: index.
+                index _ index + 1.
+                aStream nextPutAll: aClass name.
+                aStream space.
+                aStream print: aClass instVarNames.
+                supers _ aClass superclasses.
+                supers size>1 ifTrue:
+                        [aStream nextPutAll: '  [also a '.
+                        (supers copyFrom: 2 to: supers size) do:
+                                [:s | aStream space; nextPutAll: s name; space; print: s allInstVarNames].
+                        aStream nextPutAll: '  ]  ]].
+        aStream cr.
+        self printSubclassesOn: aStream callingSuperclass: self dynamicSuperclass level: index.
+        ^aStream contents!
+printOn: aStream
+        aStream nextPutAll: 'a descendent of '.
+        superclass printOn: aStream! !
+!Behavior methodsFor: 'creating class hierarchy'!
+addSubclass: aSubclass
+        "Make the argument, aSubclass, be one of the subclasses of the receiver."
+        (aSubclass superclasses includes: self)
+                ifTrue: [subclasses == nil
+                                        ifTrue: [subclasses _ Set with: aSubclass]
+                                        ifFalse:        [subclasses add: aSubclass]]
+                ifFalse: [self error: aSubclass name , ' is not my subclass']!
+removeSubclass: aSubclass
+        "If the argument, aSubclass, is one of the receiver's subclasses, remove it."
+        subclasses == nil ifFalse:
+                [subclasses remove: aSubclass ifAbsent: [].
+                subclasses isEmpty ifTrue: [subclasses _ nil]]!
+superclass: aClass
+        "Change the receiver's superclass to be aClass."
+        (aClass isKindOf: Behavior)
+                ifTrue: [superclass _ aClass]
+                ifFalse: [self error: 'superclass must be a class-describing object']! !
+!Behavior methodsFor: 'creating method dictionary'!
+addSelector: selector withMethod: compiledMethod
+        "Add the message selector with the corresponding compiled method to the receiver's
+        method dictionary."
+        | wasThere |
+        wasThere _ methodDict includesKey: selector.
+        methodDict at: selector put: compiledMethod.
+        self flushCache.
+        "if the selector is indexed in SelectorsOfConflictMethods or SelectorsOfCopiedMethods,
+         remove it"
+        ((SelectorsOfConflictMethods at: selector ifAbsent: [Array new]) includes: self)
+                ifTrue: [self removeClass: self selector: selector in: SelectorsOfConflictMethods].
+        ((SelectorsOfCopiedMethods at: selector ifAbsent: [Array new]) includes: self)
+                ifTrue: [self removeClass: self selector: selector in: SelectorsOfCopiedMethods].
+        wasThere
+                ifTrue: [self checkChangeSelector: selector]
+                ifFalse: [self subclasses do:
+                        [:sub | sub checkSuperAddSelector: selector]]!
+addSelectorUnchecked: selector withMethod: compiledMethod
+        "Add the message selector with the corresponding compiled method to the receiver's
+        method dictionary.  Do not check for effect on (multiple) inheritance."
+        methodDict at: selector put: compiledMethod.
+        self flushCache!
+methodDictionary: aDictionary
+        "Store the argument, aDictionary, as the method dictionary of the receiver."
+        methodDict _ aDictionary!
+removeSelector: selector
+        "Assuming that the message selector is in the receiver's method dictionary,
+        remove it.  If the selector is not in the method dictionary, create an error
+        notification."
+        methodDict removeKey: selector.
+        self flushCache.
+        self checkChangeSelector: selector!
+removeSelectorUnchecked: selector
+        "Assuming that the message selector is in the receiver's method dictionary,
+        remove it.  If the selector is not in the method dictionary, create an error
+        notification.  Do not check for effect on (multiple) inheritance."
+        methodDict removeKey: selector.
+        self flushCache!
+tryCopyingCodeFor: selector
+        "Check if 'selector' is compound, and if so, try to copy down the appropriate code.
+          Return #OK if sucessful,
+                #HierarchyViolation if the class part is not one of my immediate superclasses,
+                or #NotFound if the class part is OK but the
+                selector part is not found in the inheritance hierarchy."
+        | classPart whichClass simpleSelector descr |
+        selector isCompound ifFalse: [^#NotFound].
+        classPart _ selector classPart.
+        simpleSelector _ selector selectorPart.
+        "check for special class parts"
+        classPart==#all ifTrue:
+                [self compileBroadcastCodeFor: simpleSelector.
+                self insertClass: self selector: simpleSelector in: SelectorsOfDirectedMethods.
+                ^#OK].
+        classPart==#super
+                ifTrue: [descr _ self superMethodDescriptionAt: simpleSelector]
+                ifFalse: [whichClass _ Smalltalk at: classPart.
+                                "if I'm a metaclass, get the metaclass of whichClass"
+                                self isMeta ifTrue: [whichClass _ whichClass class].
+                                "check that whichClass is one of my superclasses"
+                                (self inheritsFrom: whichClass) ifFalse: [^#HierarchyViolation].
+                                descr _ whichClass methodDescriptionAt: simpleSelector].
+        descr isBad ifTrue: [^#NotFound].
+        self compileUnchecked: classPart , '.' , descr sourceCode.
+        self insertClass: self selector: simpleSelector in: SelectorsOfDirectedMethods.
+        ^#OK! !
+!Behavior methodsFor: 'instance creation'!
+basicNew
+        "Answer a new instance of the receiver (which is a class) with no indexable
+        variables.  Fail if the class is indexable.  Essential.  See Object documentation
+        whatIsAPrimitive."
+        <primitive: 70>
+        self isVariable ifTrue: [^self basicNew: 0].
+        self primitiveFailed!
+basicNew: anInteger
+        "Answer a new instance of the receiver (which is a class) with the number of
+        indexable variables specified by the argument, anInteger.  Fail if the class is not
+        indexable or if the argument is not a positive Integer.  Essential.  See Object
+        documentation whatIsAPrimitive."
+        <primitive: 71>
+        self primitiveFailed!
+new
+        "Answer a new instance of the receiver (which is a class) with no indexable
+        variables.  Fail if the class is indexable.  Essential.  See Object documentation
+        whatIsAPrimitive. "
+        <primitive: 70>
+        self isVariable ifTrue: [^self new: 0].
+        self primitiveFailed!
+new: anInteger
+        "Answer a new instance of the receiver (which is a class) with the number of
+        indexable variables specified by the argument, anInteger.  Fail if the class is not
+        indexable or if the argument is not a positive Integer.  Essential.  See Object
+        documentation whatIsAPrimitive."
+        <primitive: 71>
+        self primitiveFailed! !
+!Behavior methodsFor: 'accessing class hierarchy'!
+allDynamicSuperclasses
+        "Answer an OrderedCollection of the receiver and the receiver's ancestor's
+        dynamic superclasses;  ordered with immediate superclass first."
+        | temp |
+        superclass == nil
+                ifTrue: [^OrderedCollection new]
+                ifFalse: [temp _ superclass allDynamicSuperclasses.
+                                temp addFirst: superclass.
+                                ^temp]!
+allSubclasses
+        "Answer an OrderedCollection of the receiver's subclasses and the receiver's ancestor's
+        subclasses in breadth-first order, with the immediate subclasses first."
+        | coll |
+        coll _ OrderedCollection new.
+        coll addAll: self subclasses.
+        self subclasses do: [:eachSubclass | coll addAll: eachSubclass allSubclasses].
+        ^coll!
+allSuperclasses
+        "Answer an OrderedCollection of the receiver's superclasses and the receiver's ancestor's
+        superclasses in breadth-first order, with the immediate superclasses first."
+        | coll |
+        coll _ OrderedCollection new.
+        self allSuperclassesInto: coll.
+        ^coll!
+allSuperclassesInto: orderedCollection
+        "Add all my superclasses to orderedCollection if not already there.
+          Use breadth-first order."
+        | mysupers |
+        mysupers _ self superclasses.
+        mysupers do: [:each | each allSuperclassesInto: orderedCollection].
+        mysupers reverseDo:
+                [:each | (orderedCollection includes: each) ifFalse: [orderedCollection addFirst: each]]!
+dynamicSuperclass
+        "Answer the receiver's superclass.  Only returns the first one - use 'superclasses'
+         to find them all."
+        ^superclass!
+hasMultipleSuperclasses
+        ^false!
+subclasses
+        "Answer the receiver's subclasses.  Return a copy so that callers who
+        add or delete subclasses won't get confused."
+        subclasses == nil
+                ifTrue: [^Set new]
+                ifFalse: [^subclasses copy]!
+superclass
+        "Answer the receiver's superclass.  Only returns the first one
+                - use 'superclasses' to find them all."
+        ^superclass!
+superclasses
+        "Answer with an array of all the receiver's superclasses."
+        superclass == nil ifTrue: [^#()].
+        self hasMultipleSuperclasses
+                ifTrue: [^ (Array with: superclass) , self class otherSuperclasses].
+        ^ Array with: superclass!
+withAllSubclasses
+        "Answer an OrderedCollection of subclasses including this class in breadth first order."
+        | subs |
+        subs _ self allSubclasses.
+        subs addFirst: self.
+        ^subs!
+withAllSuperclasses
+        "Answer an OrderedCollection of superclasses including this class in breadth first order."
+        | subs |
+        subs _ self allSuperclasses.
+        subs addFirst: self.
+        ^subs! !
+!Behavior methodsFor: 'accessing method dictionary'!
+allSelectors
+        "Answer a set of all the message selectors that instances of the receiver can
+        understand."
+        | aSet |
+        aSet _ Set new.
+        self withAllSuperclasses do: [:each | aSet addAll: each selectors].
+        ^aSet!
+compiledMethodAt: selector
+        "Answer the compiled method associated with the message selector in the
+        receiver's method dictionary.  If the selector is not in the dictionary,
+        create an error notification."
+        ^methodDict at: selector!
+selectors
+        "Answer a Set of all the message selectors specified in the receiver's
+        method dictionary."
+        ^methodDict keys!
+sourceCodeAt: messageSelector
+        "Answer the string corresponding to the source code for the argument."
+        ^ self sourceCodeForMethod: (methodDict at: messageSelector) at: messageSelector! !
+!Behavior methodsFor: 'testing class hierarchy'!
+inheritsFrom: aClass
+        "Answer whether the argument, aClass, is on the receiver's superclass chain."
+        self superclasses do:
+                [:each | (each==aClass or: [each inheritsFrom: aClass]) ifTrue: [^true]].
+        ^false!
+kindOfSubclass
+        "Answer a string which is the keyword that describes the receiver's kind of
+        subclass, either a regular subclass, a variableSubclass, a variableByteSubclass, or
+        a variableWordSubclass."
+        self isVariable
+                ifTrue: [self isBits
+                                        ifTrue: [self isBytes
+                                                                ifTrue: [^' variableByteSubclass: ']
+                                                                ifFalse: [^' variableWordSubclass: ']]
+                                        ifFalse: [^' variableSubclass: ']]
+                ifFalse: [^' subclass: ']! !
+!Behavior methodsFor: 'testing method dictionary'!
+canUnderstand: selector
+        "Answer true if the receiver can respond to the message whose selector
+        is the argument, false otherwise.  The selector can be in the method dictionary
+        of the receiver's class or any of its superclasses."
+        (self includesSelector: selector) ifTrue: [^true].
+        superclass == nil ifTrue: [^false].
+        ^superclass canUnderstand: selector!
+hasMethods
+        "Answer whether the receiver has any methods in its method dictionary."
+        ^methodDict size > 0!
+includesSelector: aSymbol
+        "Answer whether the message whose selector is the argument is in the
+        method dictionary of the receiver's class."
+        ^methodDict includesKey: aSymbol!
+whichClassIncludesSelector: aSymbol
+        "Answer the class on the receiver's superclass chain where the argument, aSymbol
+        (a message selector), will be found."
+        (methodDict includesKey: aSymbol) ifTrue: [^self].
+        superclass == nil ifTrue: [^nil].
+        ^superclass whichClassIncludesSelector: aSymbol! !
+!Behavior methodsFor: 'accessing instances and variables'!
+allInstances
+        "Answer a collection of all instances of this class."
+        | aCollection |
+        aCollection _ OrderedCollection new.
+        self allInstancesDo:
+                [:x | x == aCollection ifFalse: [aCollection add: x]].
+        ^aCollection!
+allInstVarNames
+        "Answer an Array of the names of the receiver's instance variables."
+        | names |
+        names _ OrderedCollection new.
+        self accumulateInstVarNames: names traversedClasses: Set new.
+        ^names!
+instanceCount
+        "Answer the number of instances of the receiver that are currently in use."
+        | count |
+        count _ 0.
+        self allInstancesDo: [:x | count _ count + 1].
+        ^count!
+instVarNames
+        "Answer an Array of the instance variable names.  Behaviors must make up fake
+        local instance variable names because Behaviors have instance variables for the
+        purpose of compiling methods, but these are not named instance variables.  "
+        | mySize superSize |
+        mySize _ self instSize.
+        superSize _
+                superclass == nil
+                        ifTrue: [0]
+                        ifFalse: [superclass instSize].
+        mySize = superSize ifTrue: [^#()].
+        ^(superSize + 1 to: mySize) collect: [:i | 'inst' , i printString]!
+someInstance
+        "Answer the first instance of this receiver.  See Object nextInstance.  Fails
+        if there are none.  Essential.  See Object documentation whatIsAPrimitive."
+        <primitive: 77>
+        ^nil! !
+!Behavior methodsFor: 'private'!
+flushCache
+        "Tell the interpreter to remove the contents of its method lookup cache, if it has
+        one.  Essential.  See Object documentation whatIsAPrimitive."
+        <primitive: 89>
+        self primitiveFailed! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+Behavior class
+        instanceVariableNames: ''!
+!Behavior class methodsFor: 'initialization'!
+init  "Behavior init."
+        SelectorsOfConflictMethods _ IdentityDictionary new.
+                "selector -> Array of classes"
+        SelectorsOfCopiedMethods _ IdentityDictionary new.
+                "selector -> Array of classes"
+        SelectorsOfDirectedMethods _ IdentityDictionary new! !
+
+Behavior subclass: #ClassDescription
+        instanceVariableNames: 'instanceVariables organization '
+        classVariableNames: ''
+        poolDictionaries: ''
+        category: 'Kernel-Classes'!
+ClassDescription comment:
+'Instance Variables:
+                instanceVariables       <Array> names of instance fields
+                organization            <ClassOrganizer> provides organization of message protocol
+ClassDescription adds a number of facilities to basic Behavior:
+                - named instance variables
+                - category organization for methods
+                - the notion of a name of this class (implemented as subclass responsibility)
+                - the maintenance of the Changes set, and logging changes on a file
+                - most of the mechanism for fileOut
+ClassDescription is an abstract class: its facilities are intended for inheritance by the two subclasses, Class and Metaclass.'!
+!ClassDescription methodsFor: 'initialize-release'!
+obsolete
+        "Make the receiver obsolete."
+        organization _ nil.
+        super obsolete!
+subclassOf: newSuper oldClass: oldClass instanceVariableNames: newInstVarString variable: v words: w pointers: p ifBad: badBlock
+        "Basic initialization message for creating classes using the information provided
+        as arguments.  Answer whether old instances will be invalidated."
+        | old new usedNames invalid oldSuperMeta newInstVarArray |
+        old _ self allInstVarNames.
+        usedNames _ #(self super thisContext true false nil ) asSet.
+        newInstVarArray _ Scanner new scanFieldNames: newInstVarString.
+        (invalid _ superclass ~~ newSuper)
+                ifTrue:
+                        ["superclass changed"
+                        oldSuperMeta _ superclass class.
+                        superclass removeSubclass: self.
+                        superclass _ newSuper.
+                        superclass addSubclass: self.
+                        self class superclass == oldSuperMeta
+                                ifTrue: ["Only false when self is a metaclass"
+                                                self class superclass: newSuper class]].
+        instanceVariables _ nil.  "To give us all super names"
+        new _ self allInstVarNames , newInstVarArray.
+        new do:
+                [:fieldName |
+                (usedNames includes: fieldName)
+                        ifTrue:
+                                [self error: fieldName , ' is reserved (maybe in a superclass)'.
+                                ^badBlock value].
+                usedNames add: fieldName].
+        instanceVariables _ newInstVarArray size = 0
+                ifTrue: [nil]
+                ifFalse: [newInstVarArray].
+        invalid _ invalid | (new ~= old).
+        "field names changed"
+        old _ format.
+        self
+                format: new size
+                variable: v
+                words: w
+                pointers: p.
+        invalid _ invalid | (format ~= old).
+        "format changed"
+        ^invalid!
+updateInstancesFrom: oldClass
+        "Recreate any existing instances of the argument, oldClass, as
+        instances of the receiver, which is a newly changed class.  Permute variables
+        as necessary."
+        | oldInstVarNames map variable old new instSize offset fieldName |
+        oldClass someInstance == nil ifTrue: [^self].
+        "no instances to convert"
+        oldInstVarNames _ oldClass allInstVarNames.
+        map _
+                self allInstVarNames
+                        collect: [:instVarName | oldInstVarNames indexOf: instVarName].
+        variable _ self isVariable.
+        instSize _ self instSize.
+        oldClass allInstances do:
+                [:old |
+                "note allInstsDo would get confused by becoming"
+                variable
+                        ifTrue: [new _ self basicNew: old basicSize]
+                        ifFalse: [new _ self basicNew].
+                1 to: instSize do:
+                        [:offset |
+                        (map at: offset) > 0
+                                ifTrue: [new instVarAt: offset put: (old instVarAt: (map at: offset))]].
+                variable
+                        ifTrue: [1 to: old basicSize do:
+                                                [:offset | new basicAt: offset put: (old basicAt: offset)]].
+                old become: new]!
+validateFrom: oldClass in: environ instanceVariableNames: invalidFields methods: invalidMethods
+        "Recompile the receiver, a class, and redefine its subclasses if necessary."
+        | sub newSub |
+        invalidFields & invalidMethods ifFalse: [^self].
+        invalidMethods & self hasMethods
+                ifTrue:
+                        [Transcript show: 'recompiling ' , self name , '...'.
+                        self compileAllFrom: oldClass.
+                        Transcript show: ' done'; cr].
+        self ~~ oldClass ifTrue: [self updateInstancesFrom: oldClass].
+        oldClass subclasses do:
+                [:sub |
+                newSub _ sub copyForValidation.
+                newSub
+                        subclassOf: self
+                        oldClass: sub
+                        instanceVariableNames: sub instVarNames
+                        variable: sub isVariable
+                        words: sub isBytes not
+                        pointers: sub isBits not
+                        ifBad: [self error: 'terrible problem in recompiling subclasses!!'].
+                newSub
+                        validateFrom: sub
+                        in: environ
+                        instanceVariableNames: invalidFields
+                        methods: invalidMethods]! !
+!ClassDescription methodsFor: 'accessing'!
+comment
+        "Answer the receiver's comment."
+        | aString |
+        aString _ self organization classComment.
+        aString size = 0 ifTrue: [^''].
+        "get string only of classComment, undoubling quotes"
+        ^ String readFromString: aString!
+comment: aString
+        "Set the receiver's comment to be the argument, aString."
+        | aStream |
+        aString size = 0
+                ifTrue:
+                        [self organization classComment: aString]
+                ifFalse:
+                        ["double internal quotes of the comment string"
+                        aStream _ WriteStream on: (String new: aString size).
+                        aStream nextPutAll: self name , ' comment:'; cr.
+                        aString storeOn: aStream.
+                        self organization classComment: aStream contents.
+        Smalltalk changes commentClass: self]!
+commentTemplate
+        "Answer an expression to edit and evaluate in order to produce the receiver's comment."
+        | aString |
+        aString _ self organization classComment.
+        aString size = 0
+                ifTrue: [^self name , ' comment:
+''This class has not yet been commented.  A proper comment should include the purpose of the class and the type and purpose of each instance variable.
+''']
+                ifFalse: [^aString]!
+name
+        "Answer a String that is the name of the receiver."
+        self subclassResponsibility! !
+!ClassDescription methodsFor: 'copying'!
+copy: sel from: class
+        "Install the method associated with the first arugment, sel, a message selector,
+        found in the method dictionary of the second argument, class, as one of the
+        receiver's methods.  Classify the message under -as yet not classified-"
+        self copy: sel
+                from: class
+                classified: nil!
+copy: sel from: class classified: cat
+        "Install the method associated with the first arugment, sel, a message selector,
+        found in the method dictionary of the second argument, class, as one of the
+        receiver's methods.  Classify the message under the third argument, cat."
+        | code category |
+        "Useful when modifying an existing class"
+        code _ class sourceMethodAt: sel.
+        code == nil
+                ifFalse:
+                        [cat == nil
+                                ifTrue: [category _ class organization categoryOfElement: sel]
+                                ifFalse: [category _ cat].
+                        (methodDict includesKey: sel)
+                                ifTrue: [code asString = (self sourceMethodAt: sel) asString
+                                                        ifFalse: [self error: self name
+                                                                                , ' '
+                                                                                , sel
+                                                                                , ' will be redefined if you proceed.
+.']].
+                        self compile: code classified: category]!
+copyAll: selArray from: class
+        "Install all the methods found in the method dictionary of the second argument, class,
+        as the receiver's methods.  Classify the messages under -as yet not classified-"
+        self copyAll: selArray
+                from: class
+                classified: nil!
+copyAll: selArray from: class classified: cat
+        "Install all the methods found in the method dictionary of the second argument, class,
+        as the receiver's methods.  Classify the messages under the third argument, cat."
+        selArray do:
+                [:s | self copy: s
+                                from: class
+                                classified: cat]!
+copyAllCategoriesFrom: aClass
+        "Specify that the categories of messages for the receiver include all of those found
+        in the class, aClass.  Install each of the messages found in these categories into the
+        method dictionary of the receiver, classified under the appropriate categories."
+        aClass organization categories do: [:cat | self copyCategory: cat from: aClass]!
+copyCategory: cat from: class
+        "Specify that one of the categories of messages for the receiver is cat, as found
+        in the class, aClass.  Copy each message found in this category."
+        self copyCategory: cat
+                from: class
+                classified: cat!
+copyCategory: cat from: aClass classified: newCat
+        "Specify that one of the categories of messages for the receiver is the third argument,
+        newCat.  Copy each message found in the category cat in class aClass into this
+        new category."
+        self copyAll: (aClass organization listAtCategoryNamed: cat)
+                from: aClass
+                classified: newCat! !
+!ClassDescription methodsFor: 'testing'!
+isMeta
+        ^ false! !
+!ClassDescription methodsFor: 'printing'!
+classVariablesString
+        "Answer a string of my class variable names separated by spaces, in alphabetical order."
+        | aStream |
+        aStream _ WriteStream on: (String new: 100).
+        self classPool keys asSortedCollection do: [:key | aStream nextPutAll: key; space].
+        ^ aStream contents!
+definition
+        "Answer a string that defines the receiver."
+        | aStream |
+        aStream _ WriteStream on: (String new: 300).
+        self hasMultipleSuperclasses
+                ifTrue:
+                        [aStream nextPutAll: 'Class named: '.
+                        self name storeOn: aStream.
+                        aStream cr; tab; nextPutAll: 'superclasses: '.
+                        aStream store: self superclassesString.
+                        aStream cr; tab; nextPutAll: 'instanceVariableNames: '.
+                        aStream store: self instanceVariablesString.
+                        aStream cr; tab; nextPutAll: 'classVariableNames: '.
+                        aStream store: self classVariablesString]
+                ifFalse:
+                        [aStream nextPutAll: (superclass == nil ifTrue: ['nil'] ifFalse: [superclass name]).
+                        aStream nextPutAll: self kindOfSubclass.
+                        self name storeOn: aStream.
+                        aStream cr; tab; nextPutAll: 'instanceVariableNames: '.
+                        aStream store: self instanceVariablesString.
+                        aStream cr; tab; nextPutAll: 'classVariableNames: '.
+                        aStream store: self classVariablesString.
+                        aStream cr; tab; nextPutAll: 'poolDictionaries: '.
+                        aStream store: self sharedPoolsString].
+        aStream cr; tab; nextPutAll: 'category: '.
+        (SystemOrganization categoryOfElement: self name) asString storeOn: aStream.
+        ^aStream contents!
+instanceVariablesString
+        "Answer a string of my instance variable names separated by spaces."
+        | aStream names |
+        aStream _ WriteStream on: (String new: 100).
+        names _ self instVarNames.
+        1 to: names size do: [:i | aStream nextPutAll: (names at: i); space].
+        ^ aStream contents!
+printOn: aStream
+        aStream nextPutAll: self name!
+sharedPoolsString
+        "Answer a string of my class variable names separated by spaces."
+        | aStream |
+        aStream _ WriteStream on: (String new: 100).
+        self sharedPools do: [:x | aStream nextPutAll: (Smalltalk keyAtValue: x); space].
+        ^ aStream contents!
+storeOn: aStream
+        "Clases and Metaclasses have global names."
+        aStream nextPutAll: self name!
+superclassesString
+        "Answer a string of my superclass names separated by spaces."
+        | aStream names |
+        aStream _ WriteStream on: (String new: 100).
+        self superclasses do: [:each | aStream nextPutAll: each name; space].
+        ^ aStream contents! !
+!ClassDescription methodsFor: 'instance variables'!
+addInstVarName: aString
+        "Add the argument, aString, as one of the receiver's instance variables."
+        self subclassResponsibility!
+instVarNames
+        "Answer an Array of the names of instance variables defined in the receiver."
+        instanceVariables == nil
+                ifTrue: [^#()]
+                ifFalse: [^instanceVariables]!
+removeInstVarName: aString
+        "Remove the argument, aString, as one of the receiver's instance variables."
+        self subclassResponsibility! !
+!ClassDescription methodsFor: 'method dictionary'!
+removeCategory: aString
+        "Remove each of the messages categorized under aString in the method dictionary
+        of the receiver.  Then remove the category aString."
+        (self organization listAtCategoryNamed: aString asSymbol) do:
+                [:sel | self removeSelector: sel].
+        self organization removeEmptyCategories!
+removeSelector: aSymbol
+        "Remove the message whose selector is aSymbol from the method
+        dictionary of the receiver, if it is there.  Answer nil otherwise."
+        (methodDict includesKey: aSymbol) ifFalse: [^nil].
+        super removeSelector: aSymbol.
+        self organization removeElement: aSymbol.
+        Smalltalk changes removeSelector: aSymbol class: self.
+        Smalltalk logChange: self name , ' removeSelector: #' , aSymbol! !
+!ClassDescription methodsFor: 'organization'!
+category
+        "Answer the system organization category for the receiver."
+        ^SystemOrganization categoryOfElement: self name!
+category: cat
+        "Categorize the receiver under the system category, cat, removing it from any
+        previous categorization."
+        (cat isKindOf: String)
+                ifTrue: [SystemOrganization classify: self name under: cat asSymbol]
+                ifFalse: [self errorCategoryName]!
+logOrganizationChange
+        "Record that the receiver is being reorganized on the changes file."
+        | file |
+        SourceFiles == nil
+                ifFalse:
+                        [file _ SourceFiles at: 2.
+                        file setToEnd; readWriteShorten.
+                        file cr; nextChunkPut:
+                                self name, ' organization changeFromString: ',
+                                        self organization printString storeString.
+                        file cr; readOnly]!
+organization
+        "Answer the instance of ClassOrganizer that represents the organization
+        of the messages of the receiver."
+        organization==nil
+                ifTrue: [organization _ ClassOrganizer new].
+        ^organization!
+reorganize
+        "Record that the receiver is being reorganized and answer the receiver's organization."
+        Smalltalk changes reorganizeClass: self.
+        ^self organization!
+whichCategoryIncludesSelector: aSelector
+        "Answer the category of the argument, aSelector, in the organization of the
+        receiver, or answer nil if the receiver does not inlcude this selector."
+        (self includesSelector: aSelector)
+                ifTrue: [^organization categoryOfElement: aSelector]
+                ifFalse: [^nil]! !
+!ClassDescription methodsFor: 'compiling'!
+compile: code classified: heading
+        "Compile the argument, code, as source code in the context of the receiver and
+        install the result in the receiver's method dictionary under the classification
+        indicated by the second argument, heading. nil is to be notified if an error occurs.
+        The argument code is either a string or an object that converts to a string or a
+        PositionableStream on an object that converts to a string."
+        ^self
+                compile: code
+                classified: heading
+                notifying: nil!
+compile: code classified: heading notifying: requestor
+        "Compile the argument, code, as source code in the context of the receiver and
+        install the result in the receiver's method dictionary under the classification
+        indicated by the second argument, heading  The third argument,
+        requestor, is to be notified if an error occurs. The argument code is either a string or
+        an object that converts to a string or a PositionableStream on an object that converts
+        to a string."
+        | selector |
+        selector _
+                self compile: code
+                        notifying: requestor
+                        trailer: #(0 0 0 )
+                        ifFail: [^nil].
+        (methodDict at: selector)
+                putSource: code asString
+                class: self
+                category: heading
+                inFile: 2.
+        self organization classify: selector under: heading.
+        ^selector!
+compile: code notifying: requestor trailer: bytes ifFail: failBlock
+        "Intercept this message in order to remember system changes."
+        | methodNode selector |
+        Cursor execute showWhile:
+                [methodNode _
+                                self compilerClass new
+                                        compile: code
+                                        in: self
+                                        notifying: requestor
+                                        ifFail: failBlock.
+        selector _ methodNode selector.
+        (methodDict includesKey: selector)
+                ifTrue: [Smalltalk changes changeSelector: selector class: self]
+                ifFalse: [Smalltalk changes addSelector: selector class: self].
+        self addSelector: selector withMethod: (methodNode generate: bytes)].
+        ^selector! !
+!ClassDescription methodsFor: 'fileIn/Out'!
+fileOutCategory: aString
+        "Create a file whose name is the name of the receiver with -.st- as the
+        extension, and file a description of the receiver's category aString onto it"
+        | fileName fileStream |
+        fileName _ Disk checkName: self name , '-' , aString , '.st' fixErrors: true.
+        fileStream _ Disk file: fileName.
+        fileStream timeStamp.
+        self fileOutCategory: aString
+                on: fileStream
+                moveSource: false
+                toFile: 0.
+        fileStream shorten; close!
+fileOutCategory: aString on: aFileStream moveSource: moveSource toFile: fileIndex
+        "File a description of the receiver's category, aString, onto aFileStream.  If
+        the boolean argument, moveSource, is true, then set the trailing bytes to the position 
+        of aFileStream and to fileIndex in order to indicate where to find the source code."
+        self printCategoryChunk: aString on: aFileStream.
+        (self organization listAtCategoryNamed: aString)
+                do: [:sel | self
+                                printMethodChunk: sel
+                                on: aFileStream
+                                moveSource: moveSource
+                                toFile: fileIndex].
+        aFileStream nextChunkPut: ' '!
+fileOutChangedMessages: aSet on: aFileStream
+        "File a description of the messages of the receiver that have been changed
+        (i.e., are entered into the system ChangeSet) onto aFileStream."
+        self fileOutChangedMessages: aSet
+                on: aFileStream
+                moveSource: false
+                toFile: 0!
+fileOutChangedMessages: aSet on: aFileStream moveSource: moveSource toFile: fileIndex
+        "File a description of the messages of the receiver that have been changed
+        (i.e., are entered into the system ChangeSet) onto aFileStream.  If
+        the boolean argument, moveSource, is true, then set the trailing bytes to the position
+        of aFileStream and to fileIndex in order to indicate where to find the source code."
+        | org sels |
+        (org _ self organization) categories do:
+                [:cat |
+                sels _ (org listAtCategoryNamed: cat) select: [:sel | aSet includes: sel].
+                sels size > 0
+                        ifTrue:
+                                [Transcript cr; show: self name , '>' , cat.
+                                self printCategoryChunk: cat on: aFileStream.
+                                sels do: [:sel |
+                                                self
+                                                        printMethodChunk: sel
+                                                        on: aFileStream
+                                                        moveSource: moveSource
+                                                        toFile: fileIndex].
+                                aFileStream nextChunkPut: ' ']]!
+fileOutMessage: aString
+        "Create a fileName which is the name of the receiver with -.st as the
+        extension, and file a description of the receiver's message aString onto it"
+        self fileOutMessage: aString
+                fileName: (Disk checkName: self name , '-' , aString , '.st' fixErrors: true)!
+fileOutMessage: aString fileName: fileName
+        "Create a local file named fileName
+        and file a description of the receiver's message aString onto it"
+        | fileStream |
+        fileStream _ Disk file: fileName.
+        fileStream timeStamp.
+        self fileOutMessage: aString
+                on: fileStream
+                moveSource: false
+                toFile: 0.
+        fileStream close!
+fileOutMessage: aString on: aFileStream moveSource: moveSource toFile: fileIndex
+        "File a description of the receiver's message, aString, onto aFileStream.  If
+        the boolean argument, moveSource, is true, then set the trailing bytes to the position
+        of aFileStream and to fileIndex in order to indicate where to find the source code."
+        | cat |
+        cat _ self organization categoryOfElement: aString.
+        cat == nil ifTrue: [^self error: 'no such message'].
+        self printCategoryChunk: cat on: aFileStream.
+        self
+                printMethodChunk: aString
+                on: aFileStream
+                moveSource: moveSource
+                toFile: fileIndex.
+        aFileStream nextChunkPut: ' '!
+fileOutOn: aFileStream
+        "File a description of the receiver on aFileStream."
+        self fileOutOn: aFileStream
+                moveSource: false
+                toFile: 0!
+fileOutOn: aFileStream moveSource: moveSource toFile: fileIndex
+        "file me out on aFileStream"
+        aFileStream emphasis: 5.                "Meant to be 12 point bold font."
+        aFileStream nextChunkPut: self definition.
+        self organization
+                putCommentOnFile: aFileStream
+                numbered: fileIndex
+                moveSource: moveSource.
+        aFileStream cr.
+        self organization categories do:
+                [:heading |
+                self
+                        fileOutCategory: heading
+                        on: aFileStream
+                        moveSource: moveSource
+                        toFile: fileIndex]!
+fileOutOrganizationOn: aFileStream
+        "File a description of the receiver's organization onto aFileStream."
+        aFileStream emphasis: 3.
+        aFileStream cr; nextPut: $!!.
+        aFileStream nextChunkPut: self name, ' reorganize'; cr.
+        aFileStream nextChunkPut: self organization printString; cr.
+        aFileStream emphasis: 1!
+kindOfSubclass
+        "Answer a string that describes what kind of subclass the receiver is, i.e.,
+        variable, variable byte, variable word, or not variable."
+        self isVariable
+                ifTrue: [self isBits
+                                        ifTrue: [self isBytes
+                                                                ifTrue: [^' variableByteSubclass: ']
+                                                                ifFalse: [^' variableWordSubclass: ']]
+                                        ifFalse: [^' variableSubclass: ']]
+                ifFalse: [^' subclass: ']!
+methodsFor: aString
+        "Answer a ClassCategoryReader for accessing the messages in the method
+        dictionary category, aString, of the receiver."
+        ^ClassCategoryReader class: self category: aString asSymbol
+        "False methodsFor: 'logical operations' inspect"!
+moveChangesTo: newFile
+        "Used in the process of condensing changes, this message requests that the source
+        code of all methods of the receiver that have been changed should be moved to
+        newFile."
+        | changes |
+        self organization moveChangedCommentToFile: newFile numbered: 2.
+        changes _ methodDict keys select: [:sel | (methodDict at: sel) fileIndex > 1].
+        self fileOutChangedMessages: changes
+                on: newFile
+                moveSource: true
+                toFile: 2!
+printCategoryChunk: aString on: aFileStream
+        "print category definition on aFileStream"
+        aFileStream cr; cr; nextPut: $!!.
+        aFileStream nextChunkPut:
+                                self name , ' methodsFor: ' , '''' , aString , ''''!
+printMethodChunk: aSelector on: aFileStream moveSource: moveSource toFile: fileIndex
+        "Print the source code for the method associated with the argument
+        selector onto
+        the fileStream. aFileStream, and, for backup, if the argument
+        moveSource (a Boolean)
+        is true, also set the file index within the method to be the argument
+        fileIndex. "
+        | position |
+        aFileStream cr.
+        Cursor write showWhile:
+                [moveSource
+                        ifTrue:
+                                [position _ aFileStream position.
+                                aFileStream nextChunkPut: (self sourceCodeAt: aSelector).
+                                (self compiledMethodAt: aSelector)
+                                        setSourcePosition: position inFile: fileIndex]
+                        ifFalse: [aFileStream cr; nextChunkPut: (self sourceCodeAt: aSelector)]]!
+printOutCategory: aString
+        "Create a readable version of the message category aString, and send to a printer.
+        Defaults to fileOut."
+        self fileOutCategory: aString!
+printOutMessage: aString
+        "Create a readable version of the message with selector aString, and send to a printer.
+        Defaults to fileOut."
+        self fileOutMessage: aString! !
+!ClassDescription methodsFor: 'private'!
+errorCategoryName
+        self error: 'Category name must be a String'! !
+
+ClassDescription subclass: #Class
+        instanceVariableNames: 'name classPool sharedPools '
+        classVariableNames: ''
+        poolDictionaries: ''
+        category: 'Kernel-Classes'!
+Class comment:
+'My instances describe the representation and behavior of objects.  I add more comprehensive programming support facilities to the basic attributes of Behavior and the descriptive facilities of ClassDescription.  An example is accessing shared (pool) variables.
+Instance Variables:
+                name            <Symbol> name of class for printing and global reference
+                classPool       <Dictionary> of variables common to all instances
+                sharedPools     <Array> of Dictionaries access to other shared variables
+'!
+!Class methodsFor: 'initialize-release'!
+declare: varString
+        "Declare class variables common to all instances.  Answer whether
+        recompilation is advisable."
+        | newVars conflicts assoc class |
+        newVars _
+                (Scanner new scanFieldNames: varString)
+                        collect: [:x | x asSymbol].
+        newVars do:
+                [:var | var first isLowercase
+                        ifTrue: [self error: var, ' class variable name should be capitalized; proceed to include anyway.']].
+        conflicts _ false.
+        classPool == nil
+                ifFalse: [(classPool keys reject: [:x | newVars includes: x]) do:
+                                        [:var | self removeClassVarName: var]].
+        (newVars reject: [:var | self classPool includesKey: var])
+                do: [:var | "adding"
+                        "check if new vars defined elsewhere"
+                        (self scopeHas: var ifTrue: [:ignored | ignored])
+                                ifTrue:
+                                        [self error: var , ' is defined elsewhere'.
+                                        conflicts _ true]].
+        newVars size > 0
+                ifTrue:
+                        [classPool _ self classPool.
+                        "in case it was nil"
+                        newVars do: [:var | classPool declare: var from: Undeclared]].
+        ^conflicts!
+obsolete
+        "Change the receiver to an obsolete class by changing its name to have the prefix -AnObsolete-, and nilling the fields of any instances."
+        self isPointers ifTrue:
+                [self allInstancesDo: [:instance | instance nilFields]].        "nil fields of instances"
+        ('AnObsolete*' match: name) ifFalse:
+                [name _ 'AnObsolete' , name].
+        classPool _ Dictionary new.
+        self class obsolete.
+        super obsolete!
+removeFromSystem
+        "Forget the receiver, and all of its subclasses, from the Smalltalk global dictionary.  Any existing instances will refer to an obsolete version of the receiver."
+        Smalltalk removeClassNamed: self name.                  "remove from system dictionary"!
+sharing: poolString
+        "Set up sharedPools.  Answer whether recompilation is advisable."
+        | oldPools poolName pool |
+        oldPools _ self sharedPools.
+        sharedPools _ Set new.
+        (Scanner new scanFieldNames: poolString) do:
+                [:poolName |
+                sharedPools add: (Smalltalk at: poolName asSymbol)].
+        sharedPools isEmpty ifTrue: [sharedPools _ nil].
+        oldPools
+                detect: [:pool | (self sharedPools includes: pool) not]
+                ifNone: [^false].
+        ^true   "A pool got deleted - who knows if there are still references?"!
+superclass: sup methodDict: md format: ft name: nm organization: org instVarNames: nilOrArray classPool: pool sharedPools: poolSet
+        "Answer an instance of me, a new class, using the arguments of the message
+        as the needed information."
+        superclass _ sup.
+        methodDict _ md.
+        format _ ft.
+        name _ nm.
+        organization _ org.
+        instanceVariables _ nilOrArray.
+        classPool _ pool.
+        sharedPools _ poolSet!
+validateFrom: oldClass in: environ instanceVariableNames: invalidFields methods: invalidMethods
+        "Recompile the receiver and redefine its subclasses if necessary."
+        super
+                validateFrom: oldClass
+                in: environ
+                instanceVariableNames: invalidFields
+                methods: invalidMethods.
+        self ~~ oldClass
+                ifTrue:
+                        [environ at: name put: self.
+                        self updateInheritanceTables: oldClass.
+                        oldClass obsolete]! !
+!Class methodsFor: 'accessing'!
+classPool
+        "Answer the dictionary of class variables."
+        classPool == nil
+                ifTrue: [^Dictionary new]
+                ifFalse: [^classPool]!
+name
+        "Answer the name of the receiver."
+        name == nil
+                ifTrue: [^super name]
+                ifFalse: [^name]! !
+!Class methodsFor: 'accessing class hierarchy'!
+hasMultipleSuperclasses
+        ^self class instHasMultipleSuperclasses!
+isObsolete
+        "Answer whether the receiver is an obsolete class."
+        ^self class isObsolete          "ask the metaclass"! !
+!Class methodsFor: 'testing method dictionary'!
+hasMethods
+        "Answer a Boolean as to whether any methods are defined for the receiver
+        (includes whether there are methods defined in the receiver's metaclass)."
+        ^super hasMethods or: [self class hasMethods]! !
+!Class methodsFor: 'copying'!
+copy
+        | newClass |
+        newClass _ self class copy new
+                superclass: superclass
+                methodDict: methodDict copy
+                format: format
+                name: name
+                organization: organization copy
+                instVarNames: instanceVariables copy
+                classPool: classPool copy
+                sharedPools: sharedPools.
+        Class instSize to: self class instSize do:
+                [:offset | newClass instVarAt: offset put: (self instVarAt: offset)].
+        ^newClass!
+copyForValidation
+        "Make a copy of the receiver (a class) but do not install the created class
+        as a new class in the system.  This is used for creating a new version of
+        the receiver in which the installation is deferred until all changes are
+        successfully completed."
+        ^self class copy new
+                superclass: superclass
+                methodDict: methodDict copy
+                format: format
+                name: name
+                organization: organization
+                instVarNames: instanceVariables copy
+                classPool: classPool
+                sharedPools: sharedPools! !
+!Class methodsFor: 'class name'!
+rename: aString
+        "The new name of the receiver is the argument, aString."
+        | newName |
+        newName _ aString asSymbol.
+        (Smalltalk includesKey: newName)
+                ifTrue: [^self error: newName , ' already exists'].
+        Smalltalk renameClass: self as: newName.
+        name _ newName.
+        self comment: self comment.
+        self class comment: self class comment! !
+!Class methodsFor: 'instance variables'!
+addInstVarName: aString
+        "Add the argument, aString, as one of the receiver's instance variables."
+        superclass class
+                name: self name
+                inEnvironment: Smalltalk
+                subclassOf: superclass
+                instanceVariableNames: self instanceVariablesString , aString
+                variable: self isVariable
+                words: self isWords
+                pointers: self isPointers
+                classVariableNames: self classVariablesString
+                poolDictionaries: self sharedPoolsString
+                category: self category
+                comment: nil
+                changed: false!
+removeInstVarName: aString
+        "Remove the argument, aString, as one of the receiver's instance variables."
+        | newInstVarString |
+        (self instVarNames includes: aString)
+                ifFalse: [self error: aString , ' is not one of my instance variables'].
+        newInstVarString _ ''.
+        (self instVarNames copyWithout: aString) do:
+                [:varName | newInstVarString _ newInstVarString , ' ' , varName].
+        superclass class
+                name: self name
+                inEnvironment: Smalltalk
+                subclassOf: superclass
+                instanceVariableNames: newInstVarString
+                variable: self isVariable
+                words: self isWords
+                pointers: self isPointers
+                classVariableNames: self classVariablesString
+                poolDictionaries: self sharedPoolsString
+                category: self category
+                comment: nil
+                changed: false! !
+!Class methodsFor: 'class variables'!
+addClassVarName: aString
+        "Add the argument, aString, as a class variable of the receiver."
+        aString first isLowercase
+                ifTrue: [^self error: aString, ' class variable name should be capitalized; proceed to include anyway.'].
+        self withAllSubclasses do:
+                [:subclass |
+                subclass
+                        poolHas: aString asSymbol
+                        ifTrue:
+                                [:ignored |
+                                ^self error: aString , ' is already used as a variable name in ' , subclass name]].  
+        classPool _ self classPool.  "might be nil"
+        classPool add: (Association key: aString asSymbol value: nil)!
+allClassVarNames
+        "Answer a Set of the names of the receiver's class variables, including those
+        defined in the superclasses of the receiver."
+        | aSet |
+        superclass == nil
+                ifTrue:
+                        [^self classVarNames]  "This is the keys so it is a new Set."
+                ifFalse:
+                        [aSet _ superclass allClassVarNames.
+                        aSet addAll: self classVarNames.
+                        ^aSet]!
+classVarNames
+        "Answer a Set of the names of the class variables defined in the receiver."
+        ^self classPool keys!
+initialize
+        "Typically used for the initialization of class variables and metaclass instance
+        variables.  Does nothing, but may be overridden in Metaclasses."
+        ^self!
+removeClassVarName: aString
+        "Remove the class variable whose name is the argument, aString, from the names
+        defined in the receiver, a class."
+        | anAssoc aSymbol |
+        aSymbol _ aString asSymbol.
+        (classPool includesKey: aSymbol)
+                ifFalse: [^self error: aString, ' is not a class variable'].
+        anAssoc _ classPool associationAt: aSymbol.
+        self withAllSubclasses do:
+                [:subclass |
+                (Array with: subclass with: subclass class) do:
+                        [:classOrMeta |
+                        (classOrMeta whichSelectorsReferTo: (classPool associationAt: aSymbol))
+                                isEmpty
+                                        ifFalse: [^self error: aString
+                                                                , ' is still used in code of class '
+                                                                , classOrMeta name]]].
+        classPool removeKey: aSymbol! !
+!Class methodsFor: 'pool variables'!
+addSharedPool: aDictionary
+        "Add the argument, aDictionary, as one of the receiver's pool dictionaries.  Create
+        an error if the dictionary is already one of the pools."
+        (self sharedPools includes: aDictionary)
+                ifTrue: [^self error: 'The dictionary is already in my pool'].
+        sharedPools == nil
+                ifTrue: [sharedPools _ Set with: aDictionary]
+                ifFalse: [sharedPools add: aDictionary]!
+allSharedPools
+        "Answer a Set of the pools the receiver shares, including those defined
+        in the superclasses of the receiver."
+        | aSet |
+        superclass == nil
+                ifTrue:
+                        [^self sharedPools copy]
+                ifFalse:
+                        [aSet _ superclass allSharedPools.
+                        aSet addAll: self sharedPools.
+                        ^aSet]!
+removeSharedPool: aDictionary
+        "Remove the pool dictionary, aDictionary, as one of the receiver's pool dictionaries.
+        Create an error if the dictionary is not one of the pools."
+        | satisfiedSet workingSet aSubclass|
+        (self sharedPools includes: aDictionary)
+                ifFalse: [^self error: 'the dictionary is not in my pool'].
+        "first see if it is declared in a superclass in which case we can remove it."
+        (self allSuperclasses select: [:class | class sharedPools includes: aDictionary]) isEmpty
+                ifFalse: [sharedPools remove: aDictionary.
+                                sharedPools isEmpty ifTrue: [sharedPools _ nil].
+                                ^self].
+        "second get all the subclasses that reference aDictionary through me rather than a
+        superclass that is one of my subclasses."
+        workingSet _ self subclasses asOrderedCollection.
+        satisfiedSet _ Set new.
+        [workingSet isEmpty] whileFalse:
+                [aSubclass _ workingSet removeFirst.
+                (aSubclass sharedPools includes: aDictionary)
+                        ifFalse:
+                                [satisfiedSet add: aSubclass.
+                                workingSet addAll: aSubclass subclasses]].
+        "for each of these, see if they refer to any of the variables in aDictionary because
+        if they do, we can not remove the dictionary."
+        satisfiedSet add: self.
+        satisfiedSet do:
+                [:aSubclass |
+                aDictionary associationsDo:
+                        [:aGlobal |
+                        (aSubclass whichSelectorsReferTo: aGlobal) isEmpty
+                                ifFalse: [^self error: aGlobal key
+                                                                , ' is still used in code of class '
+                                                                , aSubclass name]]].
+        sharedPools remove: aDictionary.
+        sharedPools isEmpty ifTrue: [sharedPools _ nil]!
+sharedPools
+        "Answer a Set of the pool dictionaries declared in the receiver."
+        sharedPools == nil
+                ifTrue: [^Set new]
+                ifFalse: [^sharedPools]! !
+!Class methodsFor: 'compiling'!
+compileAllFrom: otherClass
+        super compileAllFrom: otherClass.
+        self class compileAllFrom: otherClass class!
+poolHas: varName ifTrue: assocBlock
+        "Look up the first argument in the context of the receiver.  If it is there,
+        pass the association to assocBlock, and answer true, else answer false."
+        | assoc pool |
+        assoc _ self classPool associationAt: varName ifAbsent: [].
+        assoc == nil
+                ifFalse:
+                        [assocBlock value: assoc.
+                        ^true].
+        self sharedPools do:
+                [:pool |
+                assoc _ pool associationAt: varName ifAbsent: [].
+                assoc == nil
+                        ifFalse:
+                                [assocBlock value: assoc.
+                                ^true]].
+        ^ false! !
+!Class methodsFor: 'subclass creation'!
+subclass: t instanceVariableNames: f classVariableNames: d poolDictionaries: s category: cat
+        "This is the standard initialization message for creating a new class as a subclass
+        of an existing class (the receiver)."
+        self isVariable
+                ifTrue:
+                        [self isPointers
+                                ifTrue: [^self
+                                                        variableSubclass: t
+                                                        instanceVariableNames: f
+                                                        classVariableNames: d
+                                                        poolDictionaries: s
+                                                        category: cat].
+                        self isBytes
+                                ifTrue: [^self
+                                                        variableByteSubclass: t
+                                                        instanceVariableNames: f
+                                                        classVariableNames: d
+                                                        poolDictionaries: s
+                                                        category: cat].
+                        ^self
+                                variableWordSubclass: t
+                                instanceVariableNames: f
+                                classVariableNames: d
+                                poolDictionaries: s
+                                category: cat].
+        ^self class
+                name: t
+                inEnvironment: Smalltalk
+                subclassOf: self
+                instanceVariableNames: f
+                variable: false
+                words: true
+                pointers: true
+                classVariableNames: d
+                poolDictionaries: s
+                category: cat
+                comment: nil
+                changed: false!
+subclass: t otherSupers: others instanceVariableNames: f classVariableNames: d category: cat
+        "This is the standard initialization message for creating a new class as a subclass
+        of an existing class (the receiver)."
+        self isVariable
+                ifTrue:
+                        [self isPointers
+                                ifTrue: [^self
+                                                        variableSubclass: t
+                                                        instanceVariableNames: f
+                                                        classVariableNames: d
+                                                        poolDictionaries: ''
+                                                        category: cat].
+                        self isBytes
+                                ifTrue: [^self
+                                                        variableByteSubclass: t
+                                                        instanceVariableNames: f
+                                                        classVariableNames: d
+                                                        poolDictionaries: ''
+                                                        category: cat].
+                        ^self
+                                variableWordSubclass: t
+                                instanceVariableNames: f
+                                classVariableNames: d
+                                poolDictionaries: ''
+                                category: cat].
+        ^self class
+                name: t
+                inEnvironment: Smalltalk
+                subclassOf: self and: others
+                instanceVariableNames: f
+                variable: false
+                words: true
+                pointers: true
+                classVariableNames: d
+                poolDictionaries: ''
+                category: cat
+                comment: nil
+                changed: false!
+variableByteSubclass: t instanceVariableNames: f
+        classVariableNames: d poolDictionaries: s category: cat
+        "This is the standard initialization message for creating a new class as a subclass
+        of an existing class (the receiver) in which the subclass is to have indexable
+        byte-sized nonpointer variables."
+        self instSize > 0
+                ifTrue: [^self error: 'cannot make a byte subclass of a class with named fields'].
+        (self isVariable and: [self isWords])
+                ifTrue: [^self error: 'cannot make a byte subclass of a class with word fields'].
+        (self isVariable and: [self isPointers])
+                ifTrue: [^self error:
+                                        'cannot make a byte subclass of a class with pointer fields'].
+        ^self class name: t
+                inEnvironment: Smalltalk
+                subclassOf: self
+                instanceVariableNames: f
+                variable: true
+                words: false
+                pointers: false
+                classVariableNames: d
+                poolDictionaries: s
+                category: cat
+                comment: nil
+                changed: false!
+variableSubclass: t instanceVariableNames: f
+        classVariableNames: d poolDictionaries: s category: cat
+        "This is the standard initialization message for creating a new class as a subclass
+        of an existing class (the receiver) in which the subclass is to have indexable
+        pointer variables."
+        self isBits
+                ifTrue:
+                        [^self error:
+                                'cannot make a pointer subclass of a class with non-pointer fields'].
+        ^self class name: t
+                inEnvironment: Smalltalk
+                subclassOf: self
+                instanceVariableNames: f
+                variable: true
+                words: true
+                pointers: true
+                classVariableNames: d
+                poolDictionaries: s
+                category: cat
+                comment: nil
+                changed: false!
+variableWordSubclass: t instanceVariableNames: f
+        classVariableNames: d poolDictionaries: s category: cat
+        "This is the standard initialization message for creating a new class as a subclass
+        of an existing class (the receiver) in which the subclass is to have indexable
+        word-sized nonpointer variables."
+        self instSize > 0
+                ifTrue: [^self error:
+                                        'cannot make a word subclass of a class with named fields'].
+        self isBytes
+                ifTrue: [^self error: 'cannot make a word subclass of a class with byte fields'].
+        (self isVariable and: [self isPointers])
+                ifTrue: [^self error:
+                                        'cannot make a word subclass of a class with pointer fields'].
+        ^self class name: t
+                inEnvironment: Smalltalk
+                subclassOf: self
+                instanceVariableNames: f
+                variable: true
+                words: true
+                pointers: false
+                classVariableNames: d
+                poolDictionaries: s
+                category: cat
+                comment: nil
+                changed: false! !
+!Class methodsFor: 'fileIn/Out'!
+fileOut
+        "Create a file whose name is the name of the receiver with -.st- as the
+        extension, and file a description of the receiver onto it"
+        | fileStream |
+        Transcript refresh; cr; cr; show: 'Filing out class:'.
+                                        fileStream _ Disk file: self name , '.st'.
+        fileStream timeStamp.
+        self fileOutOn: fileStream
+                moveSource: false
+                toFile: 0.
+        fileStream shorten; close.
+        self removeFromChanges.!
+fileOutOn: aFileStream moveSource: moveSource toFile: fileIndex
+        "File a description of the receiver on aFileStream.  If the boolean argument,
+        moveSource, is true, then set the trailing bytes to the position of aFileStream and
+        to fileIndex in order to indicate where to find the source code."
+        Transcript cr; show: name.
+        super
+                fileOutOn: aFileStream
+                moveSource: moveSource
+                toFile: fileIndex.
+        self class nonTrivial
+                ifTrue:
+                        [aFileStream cr; nextPutAll: '"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!!'; cr.
+                        self class
+                                fileOutOn: aFileStream
+                                moveSource: moveSource
+                                toFile: fileIndex].!
+printOut
+        "Create a readable version of my definition, and send to a printer.
+        Defaults to fileOut."
+        self fileOut!
+removeFromChanges
+        "References to the receiver, a class, and its metaclass should no longer be included
+        in the system ChangeSet."
+        Smalltalk changes removeClassChanges: self! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+Class class
+        instanceVariableNames: ''!
+!Class class methodsFor: 'instance creation'!
+getSuperclasses: superNames
+        | supers |
+        "find the superclasses corresponding to the superclass names"
+        supers _ (Scanner new scanTokens: superNames) collect:
+                [:each | Smalltalk at: each].
+        "check that each is a kind of Behavior"
+        supers do: [:each | (each isKindOf: Behavior) ifFalse:
+                [self error: 'superclass must be a class-describing object']].
+        ^supers!
+named: newClassName superclasses: newSuperNames instanceVariableNames: myInstVarNames classVariableNames: classVarNames category: cat
+        | newClass supers firstSuper otherSupers fork |
+        "find the superclasses corresponding to the superclass names"
+        supers _ self getSuperclasses: newSuperNames.
+        supers size=1 ifTrue:
+                [^supers first   "if there's only one superclass, just use old code"
+                        subclass: newClassName
+                        instanceVariableNames: myInstVarNames
+                        classVariableNames: classVarNames
+                        poolDictionaries: ''
+                        category: cat].
+        newClass _ supers first
+                subclass: newClassName
+                otherSupers: (supers copyFrom: 2 to: supers size)
+                instanceVariableNames: myInstVarNames
+                classVariableNames: classVarNames
+                category: cat.
+        ^newClass!
+template: category
+        "Answer an expression that can be edited and evaluated in order to define
+         a new class."
+        ^'NameOfSuperclass subclass: #NameOfClass
+        instanceVariableNames: ''instVarName1 instVarName2''
+        classVariableNames: ''ClassVarName1 ClassVarName2''
+        poolDictionaries: ''''
+        category: ''' , category , ''''! !
+
+ClassDescription subclass: #Metaclass
+	instanceVariableNames: 'thisClass'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Classes'!
+
+Metaclass comment:
+'Instance Variables:
+        thisClass       <Class> the chief instance of me, which I describe
+Metaclasses add instance-specific behavior to various classes in the system.  This typically includes messages for initializing class variables and instance creation messages particular to that class.  There is only one instance of a  metaclass, namely the class (thisClass) which is being described.  A metaclass shares the class variables of its instance.
+[Subtle] In general, the superclass hierarchy for metaclasses parallels that for classes.  Thus,
+        Integer superclass == Number, and
+        Integer class superclass == Number class.
+However there is a singularity at Object.  Here the class hierarchy terminates, but the metaclass hierarchy must wrap around to Class, since ALL metaclasses are subclasses of Class.  Thus,
+        Object superclass == nil, and
+        Object class superclass == Class.'!
+
+!Metaclass methodsFor: 'initialize-release'!
+instanceVariableNames: instVarString
+	"Declare additional variables for my instances."
+	| newMeta invalid ok |
+	newMeta _ self copyForValidation.
+	invalid _ newMeta
+				subclassOf: superclass
+				oldClass: self
+				instanceVariableNames: instVarString
+				variable: false
+				words: true
+				pointers: true
+				ifBad: [^false].
+	invalid
+		ifTrue:
+			[ok _ newMeta
+						validateFrom: self
+						in: Smalltalk
+						instanceVariableNames: true
+						methods: true.
+			Smalltalk changes changeClass: self.
+			^ok]!
+
+newNamed: aSymbol
+	"Answer a new instance of me whose name is the argument, aSymbol."
+	^(Metaclass subclassOf: self) new
+		superclass: Object
+		methodDict: MethodDictionary new
+		format: -8192
+		name: aSymbol
+		organization: ClassOrganizer new
+		instVarNames: nil
+		classPool: nil
+		sharedPools: nil!
+
+newNamed: aSymbol otherSupers: others
+	"Answer a new instance of me whose name is the argument, aSymbol."
+	^ (MetaclassForMultipleInheritance subclassOf: self and: others) new
+		superclass: Object
+		methodDict: MethodDictionary new
+		format: -8192
+		name: aSymbol
+		organization: ClassOrganizer new
+		instVarNames: nil
+		classPool: nil
+		sharedPools: nil!
+
+obsolete
+	"Invalidate and recycle local messages.  Remove the receiver from its superclass'
+	subclass list."
+	thisClass_ nil.
+	super obsolete!
+
+subclassOf: superMeta
+	"Change the receiver to be a subclass of the argument, superMeta, a metaclass.
+	Reset the receiver's method dictionary and properties."
+	superclass _ superMeta.
+	methodDict _ MethodDictionary new.
+	format _ superMeta format.
+	instanceVariables _ nil!
+
+superclass: superMeta
+	"Change the receiver's superclass to be the argument, superMeta, a metaclass."
+	superclass _ superMeta! !
+
+!Metaclass methodsFor: 'accessing'!
+name
+	"Answer a String that is the name of the receiver, either Metaclass or the
+	name of the receiver's class followed by the ' class'."
+	thisClass == nil
+		ifTrue: [^'a Metaclass']
+		ifFalse: [^thisClass name , ' class']!
+
+soleInstance
+	"The receiver has only one instance.  Answer it."
+	^thisClass! !
+
+!Metaclass methodsFor: 'testing'!
+isMeta
+	^ true!
+
+isObsolete
+	"Answer whether the receiver is an obsolete metaclass."
+	^thisClass == nil or: [thisClass ~~ (Smalltalk at: thisClass name ifAbsent: [nil])]
+	"should only be true for obsolete metaclass"! !
+
+!Metaclass methodsFor: 'copying'!
+copy
+	"Make a copy of the receiver without a list of subclasses.  Share the
+	reference to the sole instance."
+	| copy t |
+	t _ thisClass.
+	thisClass _ nil.
+	copy _ super copy.
+	thisClass _ t.
+	^copy!
+
+copyForValidation
+	"Special copy for ClassDescription validateFrom:in:fields:methods:.  Answer a copy
+	of the receiver without the subclasses."
+	^super copy! !
+
+!Metaclass methodsFor: 'instance creation'!
+new
+	"The receiver can only have one instance.  Create it or complain that
+	one already exists."
+	thisClass == nil
+		ifTrue: [^thisClass _ super new]
+		ifFalse: [self error: 'A Metaclass should only have one instance!!']! !
+
+!Metaclass methodsFor: 'instance variables'!
+addInstVarName: aString
+	"Add the argument, aString, as one of the receiver's instance variables."
+	| fullString |
+	fullString _ aString.
+	self instVarNames do: [:aString2 | fullString _ aString2 , ' ' , fullString].
+	self instanceVariableNames: fullString!
+
+removeInstVarName: aString
+	"Remove the argument, aString, as one of the receiver's instance variables."
+	| newArray newString |
+	(self instVarNames includes: aString)
+		ifFalse: [self error: aString , ' is not one of my instance variables'].
+	newArray _ self instVarNames copyWithout: aString.
+	newString _ ''.
+	newArray do: [:aString2 | newString _ aString2 , ' ' , newString].
+	self instanceVariableNames: newString! !
+
+!Metaclass methodsFor: 'class variables'!
+addClassVarName: aString
+	^thisClass addClassVarName: aString!
+
+classPool
+	"Answer the dictionary of class variables."
+	^thisClass classPool! !
+
+!Metaclass methodsFor: 'class hierarchy'!
+instHasMultipleSuperclasses
+	^false!
+
+name: newName inEnvironment: environ subclassOf: sup and: others instanceVariableNames: instVarString variable: v words: w pointers: p classVariableNames: classVarString poolDictionaries: poolString category: categoryName comment: commentString changed: changed
+	"Create a new metaclass from the information provided in the arguments.
+	Create an error if the name does not begin with an uppercase letter or if a
+	class of the same name already exists."
+	| wasPresent oldClass newClass invalidFields invalidMethods |
+	newName first isUppercase
+		ifFalse:
+			[self error: 'Class names must be capitalized'.
+			^false].
+	(wasPresent _ environ includesKey: newName)
+		ifTrue:
+			[oldClass _ environ at: newName.
+			(oldClass isKindOf: Behavior)
+				ifFalse:
+					[self error: newName , ' already exists!!  Proceed will store over it'.
+					wasPresent _ false.
+					oldClass _ self newNamed: newName otherSupers: others]]
+		ifFalse: [oldClass _ self newNamed: newName otherSupers: others].
+	newClass _ oldClass copy.
+	invalidFields _
+		changed | (newClass
+					subclassOf: sup
+					oldClass: oldClass
+					instanceVariableNames: instVarString
+					variable: v
+					words: w
+					pointers: p
+					ifBad: [^false]).
+	invalidFields ifFalse: [newClass obsolete.  newClass _ oldClass].
+	invalidMethods _ invalidFields | (newClass declare:  classVarString) | (newClass sharing: poolString).
+	commentString == nil ifFalse: [newClass comment: commentString].
+	(environ includesKey: newName)
+		ifFalse:
+			[environ declare: newName from: Undeclared.
+			environ at: newName put: newClass].
+	SystemOrganization classify: newClass name under: categoryName asSymbol.
+	newClass
+		validateFrom: oldClass
+		in: environ
+		instanceVariableNames: invalidFields
+		methods: invalidMethods.
+	"update subclass lists"
+	newClass superclasses do:
+		[:sup | sup removeSubclass: oldClass; addSubclass: newClass].
+	"Update Changes"
+	wasPresent
+		ifTrue: [Smalltalk changes changeClass: newClass]
+		ifFalse: [Smalltalk changes addClass: newClass].
+	"Now check for possible conflicting definitions in superclasses"
+	invalidFields ifTrue:
+		[newClass copyMethods.
+		newClass class copyMethods].
+	^newClass!
+
+name: newName inEnvironment: environ subclassOf: sup instanceVariableNames: instVarString variable: v words: w pointers: p classVariableNames: classVarString poolDictionaries: poolString category: categoryName comment: commentString changed: changed
+	"Create a new metaclass from the information provided in the arguments.
+	Create an error if the name does not begin with an uppercase letter or if a
+	class of the same name already exists."
+	| wasPresent oldClass newClass invalidFields invalidMethods |
+	newName first isUppercase
+		ifFalse:
+			[self error: 'Class names must be capitalized'.
+			^false].
+	(wasPresent _ environ includesKey: newName)
+		ifTrue:
+			[oldClass _ environ at: newName.
+			(oldClass isKindOf: Behavior)
+				ifFalse:
+					[self error: newName , ' already exists!!  Proceed will store over it'.
+					wasPresent _ false.
+					oldClass _ self newNamed: newName]]
+		ifFalse: [oldClass _ self newNamed: newName].
+	newClass _ oldClass copy.
+	invalidFields _
+		changed | (newClass
+					subclassOf: sup
+					oldClass: oldClass
+					instanceVariableNames: instVarString
+					variable: v
+					words: w
+					pointers: p
+					ifBad: [^false]).
+	invalidFields ifFalse: [newClass obsolete.  newClass _ oldClass].
+	invalidMethods _ invalidFields | (newClass declare:  classVarString) | (newClass sharing: poolString).
+	commentString == nil ifFalse: [newClass comment: commentString].
+	(environ includesKey: newName)
+		ifFalse:
+			[environ declare: newName from: Undeclared.
+			environ at: newName put: newClass].
+	SystemOrganization classify: newClass name under: categoryName asSymbol.
+	newClass
+		validateFrom: oldClass
+		in: environ
+		instanceVariableNames: invalidFields
+		methods: invalidMethods.
+	"update subclass lists"
+	newClass superclass removeSubclass: oldClass.
+	newClass superclass addSubclass: newClass.
+	"Update Changes"
+	wasPresent
+		ifTrue: [Smalltalk changes changeClass: newClass]
+		ifFalse: [Smalltalk changes addClass: newClass].
+	^newClass!
+
+subclasses
+	"Answer the receiver's subclasses."
+	| temp |
+	self == Class class
+		ifTrue: ["Meta-Object is exceptional subclass of Class"
+				temp _ thisClass subclasses copy.
+				temp remove: Object class.
+				^temp collect: [:aSubClass | aSubClass class]].
+	thisClass == nil
+		ifTrue: [^Set new]
+		ifFalse: [^thisClass subclasses collect: [:aSubClass | aSubClass class]]! !
+
+!Metaclass methodsFor: 'compiling'!
+scopeHas: name ifTrue: assocBlock
+	^thisClass scopeHas: name ifTrue: assocBlock! !
+
+!Metaclass methodsFor: 'printing'!
+definition
+	"Answer with a string that defines me"
+	| aStream names |
+	aStream _ WriteStream on: (String new: 300).
+	self printOn: aStream.
+	aStream nextPutAll: '
+		instanceVariableNames: '''.
+	names _ self instVarNames.
+	1 to: names size do: [:i | aStream nextPutAll: (names at: i); space].
+	aStream nextPut: $'.
+	^ aStream contents! !
+
+!Metaclass methodsFor: 'fileIn/Out'!
+fileOutOn: aFileStream moveSource: moveSource toFile: fileIndex
+	"File me out on aFileStream."
+	super
+		fileOutOn: aFileStream
+		moveSource: moveSource
+		toFile: fileIndex.
+	(methodDict includesKey: #initialize)
+		ifTrue:
+			[aFileStream cr.
+			aFileStream cr.
+			aFileStream nextChunkPut: thisClass name , ' initialize'.
+			aFileStream cr]!
+
+nonTrivial
+	^self instVarNames size > 0 or: [methodDict size > 0 or: [self comment size > 0]]! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+Metaclass class
+	instanceVariableNames: ''!
+
+!Metaclass class methodsFor: 'instance creation'!
+subclassOf: superMeta
+	"Answer a metaclass that is a subclass of metaclass superMeta."
+	^self new subclassOf: superMeta! !
+
+Object subclass: #UndefinedObject
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Objects'!
 
 !Object methodsFor: 'initialize-release'!
+
 release
 	"Remove references to objects that may refer to the receiver. Answers self. 
 	This message should be overidden by subclasses with any cycles, in which
@@ -93,168 +1802,150 @@ release
 	self breakDependents! !
 
 !Object methodsFor: 'accessing'!
-at: index 
-	"Answer the value of an indexable field in the receiver. Fail if the 
-	argument index is not an Integer or is out of bounds. Essential. See 
-	documentation in Object metaclass."
-
-	<primitive: 60>
-	index isInteger
-		ifTrue: [self errorSubscriptBounds: index].
-	(index isKindOf: Number)
-		ifTrue: [^self at: index truncated]
-		ifFalse: [self errorNonIntegerIndex]!
-at: index put: value 
-	"Store the argument value in the indexable field of the receiver indicated by 
-	index. Fail if the index is not an Integer or is out of bounds. Or fail if the 
-	value is not of the right type for this kind of collection. Answer the 
-	value that was stored. Essential. See documentation in Object metaclass."
-
-	<primitive: 61>
-	index isInteger
-		ifTrue: [(index >= 1 and: [index <= self size])
-					ifTrue: [self errorImproperStore]
-					ifFalse: [self errorSubscriptBounds: index]].
-	(index isKindOf: Number)
-		ifTrue: [^self at: index truncated put: value]
-		ifFalse: [self errorNonIntegerIndex]!
-basicAt: index 
-	"Answer the value of an indexable field in the receiver. Fail if the 
-	argument index is not an Integer or is out of bounds. Essential. See 
-	documentation in Object metaclass.  Do not override this message in any 
-	subclass."
-
-	<primitive: 60>
-	(index isKindOf: Integer) ifTrue: [self errorSubscriptBounds: index].
-	(index isKindOf: Number)
-		ifTrue: [^self basicAt: index truncated]
-		ifFalse: [self errorNonIntegerIndex]!
-basicAt: index put: value 
-	"Store the second argument value in the indexable field of the receiver 
-	indicated by index. Fail if the index is not an Integer or is out of bounds. Or 
-	fail if the value is not of the right type for this kind of collection. Answer 
-	the value that was stored. Essential. See documentation in Object 
-	metaclass. Do not override in a subclass."
-
-	<primitive: 61>
-	(index isKindOf: Integer)
-		ifTrue: [(index >= 1 and: [index <= self size])
-					ifTrue: [self errorImproperStore]
-					ifFalse: [self errorSubscriptBounds: index]].
-	(index isKindOf: Number)
-		ifTrue: [^self basicAt: index truncated put: value]
-		ifFalse: [self errorNonIntegerIndex]!
-basicSize
-	"Answer the number of indexable fields in the receiver. This value is the 
-	same as the largest legal subscript. Essential. See documentation in Object 
-	metaclass. Do not override in any subclass."
-
-	<primitive: 62>
-	"The number of indexable fields of fixed-length objects is 0"
-	^0!
-readFromString: aString
-	"Create an object based on the contents of aString."
-
-	^self readFrom: (ReadStream on: aString)!
-size
-	"Answer the number of indexable fields in the receiver.  This value is the 
-	same as the largest legal subscript.  Essential.  See documentation in Object 
-	metaclass. "
-
-	<primitive: 62>
-	"The number of indexable fields of fixed-length objects is 0"
-	^0!
 yourself
 	"Answer self."! !
 
 !Object methodsFor: 'testing'!
 isInteger
-	"Coerces Integers to true and everything else to false.  Integer
-	overrides with ^true"
-
+	"Coerces Integers to true and everything else to false. Integer overrides with ^true"
 	^false!
 isNil
-	"Coerces nil to true and everything else to false.  UndefinedObject 
-	overrides with ^true"
-
+	"Coerces nil to true and everything else to false."
 	^false!
 notNil
-	"Coerces nil to false and everything else to true.  UndefinedObject 
-	overrides with ^false"
-
+	"Coerces nil to false and everything else to true."
 	^true! !
 
 !Object methodsFor: 'comparing'!
-= anObject 
-	"Answer true if the receiver and the argument represent the same object 
-	and false otherwise. If = is redefined in any subclass, consider also
-	redefining the message hash."
 
-	^self == anObject!
-== anObject 
-	"Answer true if the receiver and the argument are the same object (have the same 
-	object pointer) and false otherwise.  Do not redefine the message == in any 
-	other class!!  Essential.  No Lookup.  See documentation in Object metaclass."
-
+= anObject
+	"Answer whether the receiver and anObject are the same object (have the same object pointer)."
 	<primitive: 110>
-	self primitiveFailed!
+	^self == anObject!
+~= anObject
+	"Answer whether the receiver and anObject are not the same object."
+	^(self = anObject) == false!
+== anObject
+	"Answer whether the receiver and anObject are the same object (have the same object pointer)."
+	<primitive: 110>
+	^self == anObject!
+~~ anObject
+	"Answer whether the receiver and anObject are not the same object."
+	^(self == anObject) == false!
 hash
-	"Answer a SmallInteger whose value is half of the receiver's object pointer
-	(interpreting object pointers as 16-bit signed quantities).  Fails if the 
-	receiver is a SmallInteger.  Essential.  See documentation in Object metaclass."
-
+	"Answer a SmallInteger whose value is related to the receiver's identity."
 	<primitive: 75>
-	self primitiveFailed!
-hashMappedBy: map
-	"Answer what my hash would be if oops changed according to map"
-	^ map newHashFor: self hash!
-~= anObject 
-	"Answer true if the receiver and the argument do not represent the same 
-	object and false otherwise."
+	^self basicAt: 2! !
 
-	^self = anObject == false!
-~~ anObject 
-	"Answer true if the receiver and the argument are not the same object 
-	(have the same object pointer) and false otherwise."
+!Object methodsFor: 'error handling'!
+error: aString 
+	"The default behavior for error: is the same as halt:. 
+	This additional message is the one a subclass should override in order to
+	change the handling of errors."
 
-	^(self == anObject) not! !
+	self halt: aString!
+halt
+	"This is a simple message to use for inserting breakpoints during debugging."
+
+	self error: 'Halt encountered.'!
+halt: aString 
+	"This message can be used for inserting breakpoints during debugging.
+	It creates and schedules a Debugger with the argument, aString, as the label."
+
+	self error: aString!
+doesNotUnderstand: aMessage 
+	"First check for a compound selector.  If found, try copying down code
+	into the receiver's class.  If this is unsuccessful,
+	announce that the receiver does not understand the argument, aMessage,
+	as a message.  The default behavior is to create a Notifier containing the 
+	appropriate message and to allow the user to open a Debugger. 
+	Subclasses can override this message in order to modify this behavior."
+
+	self error: 'Message not understood: ', aMessage selector!
+subclassResponsibility
+	"This message sets up a framework for the behavior of the class' subclasses.
+	Announce that the subclass should have implemented this message."
+
+	self error: 'My subclass should have overridden one of my messages.'!
+shouldNotImplement
+	"Announce that although the receiver inherits this message, it
+	should not implement it."
+
+	self error: 'This message is not appropriate for this object'!
+primitiveFailed
+	"Announce that a primitive has failed and there is no appropriate 
+	Smalltalk code to run."
+
+	self error: 'a primitive has failed'! !
+
+!Object methodsFor: 'class membership'!
+
+class
+	"Answer the receiver's class."
+	<primitive: 111>
+	^self basicAt: 1!
+isMemberOf: aClass
+	"Answer whether the receiver is an instance of the class, aClass."
+	^self class == aClass!
+isKindOf: aClass
+	"Answer a Boolean as to whether the class, aClass, is a superclass or class of the receiver."
+	self class == aClass
+		ifTrue: [^true]
+		ifFalse: [^self class inheritsFrom: aClass]!
+respondsTo: aSymbol
+	"Answer a Boolean as to whether the method dictionary of the receiver's class contains aSymbol as a message selector."
+	^self class canUnderstand: aSymbol! !
+
+!Object methodsFor: 'accessing'!
+
+at: index
+	"Answer the value of an indexable field in the receiver. Fail if the argument index is not an Integer or is out of bounds."
+	<primitive: 60>
+	index isInteger
+		ifTrue: [self errorSubscriptBounds: index].
+	^self basicAt: index truncated!
+at: index put: value
+	"Store the argument value in the indexable field of the receiver indicated by index."
+	<primitive: 61>
+	index isInteger
+		ifTrue: [(index >= 1 and: [index <= self size])
+					ifTrue: [self errorImproperStore]
+					ifFalse: [self errorSubscriptBounds: index]].
+	^self basicAt: index truncated put: value!
+basicAt: index
+	"Answer the value of an indexable field in the receiver. Do not override this message in any subclass."
+	<primitive: 60>
+	index isInteger ifTrue: [self errorSubscriptBounds: index].
+	^self basicAt: index truncated!
+basicAt: index put: value
+	"Store the second argument value in the indexable field of the receiver indicated by index. Do not override in a subclass."
+	<primitive: 61>
+	index isInteger
+		ifTrue: [(index >= 1 and: [index <= self size])
+					ifTrue: [self errorImproperStore]
+					ifFalse: [self errorSubscriptBounds: index]].
+	^self basicAt: index truncated put: value!
+basicSize
+	"Answer the number of indexable fields in the receiver. Do not override in any subclass."
+	<primitive: 62>
+	"The number of indexable fields of fixed-length objects is 0"
+	^0!
+size
+	"Answer the number of indexable fields in the receiver."
+	<primitive: 62>
+	"The number of indexable fields of fixed-length objects is 0"
+	^0! !
 
 !Object methodsFor: 'copying'!
+
 copy
-	"Answer another instance just like the receiver. Subclasses typically override
-	this method;  they typically do not override shallowCopy"
-
+	"Answer another instance just like the receiver. Subclasses typically override this method."
 	^self shallowCopy!
-deepCopy
-	"Answer a copy of the receiver with its own copy of each instance variable."
-
-	| newObject class index |
-	class _ self class.
-	(class == Object) ifTrue: [^self].
-	class isVariable
-		ifTrue: 
-			[index _ self basicSize.
-			newObject _ class basicNew: index.
-			[index > 0]
-				whileTrue: 
-					[newObject basicAt: index put: (self basicAt: index) deepCopy.
-					index _ index - 1]]
-		ifFalse: [newObject _ class basicNew].
-	index _ class instSize.
-	[index > 0]
-		whileTrue: 
-			[newObject instVarAt: index put: (self instVarAt: index) deepCopy.
-			index _ index - 1].
-	^newObject!
 shallowCopy
-	"Answer a copy of the receiver which shares the receiver's instance 
-	variables. "
-
+	"Answer a copy of the receiver which shares the receiver's instance variables."
 	| class newObject index |
 	class _ self class.
-	"I don't understand why the following check is here.  Object is not 
-	supposed to have any instances at all."
-	class == Object ifTrue: [^self].
+	class superclass isNil ifTrue: [^self].
 	class isVariable
 		ifTrue: 
 			[index _ self basicSize.
@@ -272,6 +1963,7 @@ shallowCopy
 	^newObject! !
 
 !Object methodsFor: 'dependents access'!
+
 addDependent: anObject
 	"Add anObject as one of the receiver's dependents."
 	(DependentsFields at: self ifAbsent: [self setDependents])
@@ -291,6 +1983,7 @@ removeDependent: anObject
 	^anObject! !
 
 !Object methodsFor: 'updating'!
+
 broadcast: aSymbol 
 	"Send the argument, aSymbol, as a unary message to all of the receiver's dependents."
 
@@ -337,86 +2030,8 @@ updateRequest
 
 	^ true! !
 
-!Object methodsFor: 'printing'!
-isLiteral
-	"Answer whether the receiver has a literal text form recognized by the compiler."
-
-	^false!
-printOn: aStream 
-	"Append to the argument aStream a sequence of characters that identifies the receiver."
-
-	| title |
-	title _ self class name.
-	aStream nextPutAll: ((title at: 1) isVowel
-							ifTrue: ['an ']
-							ifFalse: ['a '])
-						, title!
-printString
-	"Answer a String whose characters are a description of the receiver."
-
-	| aStream |
-	aStream _ WriteStream on: (String new: 16).
-	self printOn: aStream.
-	^aStream contents!
-storeOn: aStream 
-	"Append to the argument aStream a sequence of characters that is an expression 
-	whose evaluation creates an object similar to the receiver."
-
-	aStream nextPut: $(.
-	self class isVariable
-		ifTrue: [aStream nextPutAll: '(', self class name, ' basicNew: ';
-					store: self basicSize;
-					nextPutAll: ') ']
-		ifFalse: [aStream nextPutAll: self class name, ' basicNew'].
-	1 to: self class instSize do:
-		[:i |
-		aStream nextPutAll: ' instVarAt: ';
-			store: i;
-			nextPutAll: ' put: ';
-			store: (self instVarAt: i);
-			nextPut: $;].
-	1 to: self basicSize do:
-		[:i |
-		aStream nextPutAll: ' basicAt: ';
-			store: i;
-			nextPutAll: ' put: ';
-			store: (self basicAt: i);
-			nextPut: $;].
-	aStream nextPutAll: ' yourself)'!
-storeString
-	"Answer a String representation of the receiver from which the receiver
-	can be reconstructed."
-
-	| aStream |
-	aStream _ WriteStream on: (String new: 16).
-	self storeOn: aStream.
-	^aStream contents! !
-
-!Object methodsFor: 'class membership'!
-class
-	"Answer the object which is the receiver's class. Essential.  See 
-	documentation in Object metaclass."
-
-	<primitive: 111>
-	self primitiveFailed!
-isKindOf: aClass 
-	"Answer a Boolean as to whether the class, aClass, is a superclass or class of
-	the receiver."
-
-	self class == aClass
-		ifTrue: [^true]
-		ifFalse: [^self class inheritsFrom: aClass]!
-isMemberOf: aClass 
-	"Answer a Boolean as to whether the receiver is an instance of the class, aClass."
-
-	^self class == aClass!
-respondsTo: aSymbol 
-	"Answer a Boolean as to whether the method dictionary of the receiver's class 
-	contains aSymbol as a message selector."
-
-	^self class canUnderstand: aSymbol! !
-
 !Object methodsFor: 'message handling'!
+
 perform: aSymbol 
 	"Send the receiver the unary message indicated by the argument. The argument is 
 	the selector of the message. Invoke messageNotUnderstood: if the number of 
@@ -465,461 +2080,86 @@ perform: selector withArguments: anArray
 	<primitive: 84>
 	self primitiveFailed! !
 
+!Object methodsFor: 'printing'!
+
+printOn: aStream
+	"Append to the argument aStream a sequence of characters that identifies the receiver."
+	| title |
+	title _ self class name.
+	aStream nextPutAll: ((title at: 1) isVowel
+							ifTrue: ['an ']
+							ifFalse: ['a '])
+						, title!
+printString
+	"Answer a String whose characters are a description of the receiver."
+	^self class name, ' (printing not implemented)'!
+storeOn: aStream
+	"Append to the argument aStream a sequence of characters that is an expression whose evaluation creates an object similar to the receiver."
+	aStream nextPutAll: self class name, ' (storing not implemented)'!
+storeString
+	"Answer a String representation of the receiver from which the receiver can be reconstructed."
+	^self class name, ' (storing not implemented)'! !
+
 !Object methodsFor: 'error handling'!
-confirm: aString 
-	"Create and start up a BinaryChoice menu with the argument as the message in order
-	to determine true or false.  Answers true or false."
-	| answer |
-	"answer _ false."
-	answer _ true.
-	"BinaryChoice
-		message: aString
-		displayAt: Sensor cursorPoint
-		centered: true
-		ifTrue: [answer _ true]
-		ifFalse: [answer _ false]".
-	^answer!
 
-conflictingInheritanceError
-	"Browse to the method which called this,
-		redefine it appropriately,
-		and then restart that calling method. "
-
-	self error: 'Conflicting methods due to multiple inheritance'!
-doesNotUnderstand: aMessage 
-	"First check for a compound selector.  If found, try copying down code
-	into the receiver's class.  If this is unsuccessful,
-	announce that the receiver does not understand the argument, aMessage,
-	as a message.  The default behavior is to create a Notifier containing the 
-	appropriate message and to allow the user to open a Debugger. 
-	Subclasses can override this message in order to modify this behavior."
-	| status gripe |
-
-	status _ self class tryCopyingCodeFor: aMessage selector.
-	status==#OK ifTrue:
-		[^self perform: aMessage selector withArguments: aMessage arguments].
-
-	gripe _ status==#HierarchyViolation
-		ifTrue: [aMessage selector classPart , ' is not one of my superclasses: ']
-		ifFalse: ['Message not understood: '].
-	NotifierView
-		openContext: thisContext
-		label: gripe , aMessage selector
-		contents: thisContext shortStack.
-	"Try the message again if the programmer decides to proceed."
-	^self perform: aMessage selector withArguments: aMessage arguments
-
-	"3 zork."!
-error: aString 
-	"The default behavior for error: is the same as halt:. 
-	This additional message is the one a subclass should override in order to
-	change the handling of errors."
-
-	NotifierView
-		openContext: thisContext
-		label: aString
-		contents: thisContext shortStack
-
-	"nil error: 'error message'."!
+doesNotUnderstand: aMessage
+	"Handle the case when the receiver does not understand aMessage."
+	self error: 'Message not understood: ', aMessage selector!
+error: aString
+	"Handle an error condition."
+	self halt!
 halt
 	"This is a simple message to use for inserting breakpoints during debugging."
-
-	NotifierView
-		openContext: thisContext
-		label: 'Halt encountered.'
-		contents: thisContext shortStack
-
-	"nil halt."!
-halt: aString 
-	"This message can be used for inserting breakpoints during debugging.
-	It creates and schedules a Debugger with the argument, aString, as the label."
-
-	NotifierView
-		openContext: thisContext
-		label: aString
-		contents: thisContext shortStack
-
-	"nil halt: 'Test of halt:.'."!
-notify: aString 
-	"Create and schedule a Notifier with the argument as the message in order
-	to request confirmation before a process can proceed."
-
-
-	NotifierView
-		openContext: thisContext
-		label: 'Notifier'
-		contents: aString
-
-	"nil notify: 'confirmation message'."!
-primitiveFailed
-	"Announce that a primitive has failed and there is no appropriate 
-	Smalltalk code to run."
-
-	self error: 'a primitive has failed'!
-shouldNotImplement
-	"Announce that although the receiver inherits this message, it
-	should not implement it."
-
-	self error: 'This message is not appropriate for this object'!
-subclassResponsibility
-	"This message sets up a framework for the behavior of the class' subclasses.
-	Announce that the subclass should have implemented this message."
-
-	self error: 'My subclass should have overridden one of my messages.'! !
-
-!Object methodsFor: 'user interface'!
-basicInspect
-	"Create and schedule an Inspector in which the user can examine the
-	receiver's variables.  This method should not be overwritten."
-
-	InspectorView open: (Inspector inspect: self)!
-inspect
-	"Create and schedule an Inspector in which the user can examine the
-	receiver's variables."
-	self basicInspect! !
+	self! !
 
 !Object methodsFor: 'system primitives'!
-asOop
-	"Answer an Integer which is unique to me.  See below.
-	Essential.  See also documentation in Object metaclass."
-	<primitive: 75>
-	self primitiveFailed
-	"
-	Non-Stretch mapping between objects and asOop value:
-	oops 0...16K-1			-->	0...16K-1
-	oops 16K...32K-1			-->	-16K...-1
-	SmallIntegers 0...16K		-->	32K...48K-1
-	SmallIntegers -16K...0	-->	48K...64K-1
 
-	Stretch mapping between objects and asOop value:
-	oops 0...48K-1			-->	0...48K-1
-	SmallIntegers -8K...-1	-->	-16K...-2 even
-	SmallIntegers 0...8K-1	-->	-(16K-1)...-1 odd
-
-	Non-Stretch Consistency check:
-	| obj |
-	-16384 to: 16383 do:
-		[:i | obj _ i asObject.
-		(obj == #NonExistentObject or: [obj asOop = i])
-			ifFalse: [self error: 'inconsistency']].
-	32768 to: 65536 do:
-		[:i | obj _ i asObject.
-		(obj == #NonExistentObject or: [obj asOop = i])
-			ifFalse: [self error: 'inconsistency']].
-
-	Stretch Consistency check:
-	| obj |
-	-16384 to: 49151 do:
-		[:i | obj _ i asObject.
-		(obj == #NonExistentObject or: [obj asOop = i])
-			ifFalse: [self error: 'inconsistency']].
-	"!
-become: otherObject 
-	"Swap the instance pointers of the receiver and the argument, otherObject.  All
-	variables in the entire system that used to point to the receiver now point to the
-	argument, and vice-versa.  Fails if either object in a SmallInteger.  Answer the
-	argument which is now the same instance pointer that formerly denoted the receiver.  	Essential.  See documentation in Object metaclass."
-
+become: otherObject
+	"Swap the instance pointers of the receiver and otherObject."
 	<primitive: 72>
 	self primitiveFailed!
-instVarAt: index 
-	"Answer a fixed variable in an object.  The numbering of the variables 
-	corresponds to the named instance variables.  Fail if the index is not an 
-	Integer or is not the index of a fixed variable.  Essential.  See documentation in 
-	Object metaclass."
-
+instVarAt: index
+	"Answer the value of the instance variable of the receiver at position index."
 	<primitive: 73>
-	"Access beyond fixed variables."
-	^self basicAt: index - self class instSize!
-instVarAt: anInteger put: anObject 
-	"Store a value into a fixed variable in the receiver.  The numbering of the variables  
-	corresponds to the named instance variables.  Fail if the index is not an  
-	Integer or is not the index of a fixed variable.   Answer the value stored as the  
-	result.  Using this message violates the principle that each object has  
-	sovereign control over the storing of values into its instance variables.   
-	Essential.  See documentation in Object metaclass."
-
+	self primitiveFailed!
+instVarAt: index put: value
+	"Store value in the instance variable of the receiver at position index."
 	<primitive: 74>
-	"Access beyond fixed fields"
-	^self basicAt: anInteger - self class instSize put: anObject!
+	self primitiveFailed!
 nextInstance
-	"Answer the next instance after the receiver in the enumeration of all 
-	instances of this class.  Fails if all instances have been enumerated.  
-	Essential.  See documentation in Object metaclass."
-
+	"Answer the next instance after the receiver in the enumeration of instances of the receiver's class."
 	<primitive: 78>
+	^nil!
+nextObject
+	"Answer the next object after the receiver in the enumeration of all objects."
+	<primitive: 139>
 	^nil! !
 
-!Object methodsFor: 'system simulation'!
-tryPrimitive0
-	"Warning!!!! This is not a real primitive.  This method is a template that the 
-	Smalltalk simulator uses to execute primitives with no arguments.  See 
-	ContextPart class initPrimitives and ContextPart doPrimitive:receiver:args:."
-
-	<primitive: 007>
-	^#primitiveFail!
-tryPrimitive1: arg1 
-	"Warning!!!! This is not a real primitive.  This method is a template that the 
-	Smalltalk simulator uses execute primitives with one argument.  See 
-	ContextPart class|initPrimitives and ContextPart|doPrimitive:receiver:args:."
-
-	<primitive: 007>
-	^#primitiveFail!
-tryPrimitive2: arg1 with: arg2 
-	"Warning!!!! This is not a real primitive.  This method is a template that the 
-	Smalltalk simulator uses execute primitives with two arguments.  See 
-	ContextPart class|initPrimitives and ContextPart|doPrimitive:receiver:args:."
-
-	<primitive: 007>
-	^#primitiveFail!
-tryPrimitive3: arg1 with: arg2 with: arg3 
-	"Warning!!!! This is not a real primitive.  This method is a template that the 
-	Smalltalk simulator uses execute primitives with three arguments.  See 
-	ContextPart class|initPrimitives and ContextPart|doPrimitive:receiver:args:."
-
-	<primitive: 007>
-	^#primitiveFail!
-tryPrimitive4: arg1 with: arg2 with: arg3 with: arg4 
-	"Warning!!!! This is not a real primitive.  This method is a template that the 
-	Smalltalk simulator uses execute primitives with four arguments.  See 
-	ContextPart class|initPrimitives and ContextPart|doPrimitive:receiver:args:."
-
-	<primitive: 007>
-	^#primitiveFail! !
-
-!Object methodsFor: 'private'!
-breakDependents
-	"Deallocate the soft field for the receiver's dependents."
-
-	DependentsFields removeKey: self ifAbsent: []!
-errorImproperStore
-	"Create an error notification that an improper store was attempted."
-
-	self error: 'Improper store into indexable object'!
-errorNonIntegerIndex
-	"Create an error notification that an improper object was used as an index."
-
-	self error: 'only integers should be used as indices'!
-errorSubscriptBounds: index 
-	"Create an error notification that an improper integer was used as an index."
-
-	self error: 'subscript is out of bounds: ' , index printString!
-forkEmergencyEvaluatorAt: priority
-	"Fork a process running a simple Smalltalk evaluator using as little of the system as possible.  Used for desperate debugging.  may be invoked by control-shift-C."
-
-	| stream char |
-		[Display white: (0@0 extent: 1024@36).
-		'EMERGENCY EVALUATOR (priority ', priority printString, ') -- type an expression terminated by ESC' displayAt: 50@0.
-		Display reverse: (0@0 extent: 1024@36).
-		stream _ WriteStream on: String new.
-		[[Sensor keyboardPressed] whileFalse.
-		(char _ Sensor keyboard) = 160 asCharacter] whileFalse:
-			[char = Character backspace
-				ifTrue: [stream skip: -1.  Display black: (0@18 extent: 1024@18)]
-				ifFalse: [stream nextPut: char].
-			stream contents displayAt: 50@18].
-		Display black: (0@0 extent: 1024@18).
-		(Compiler evaluate: stream contents) printString displayAt: 50@0] forkAt: priority!
-mustBeBoolean
-	"Catches attempts to test truth of non-Booleans.  This message is sent from the
-	interpreter."
-
-	self error: 'NonBoolean receiver--proceed for truth.'.
-	^true!
-nilFields
-	"Store nil into all pointer fields of the receiver."
-
-	self class isPointers ifFalse: [^self].
-	1 to: self basicSize do:
-		[:index | self basicAt: index put: nil].
-	1 to: self class instSize do:
-		[:index | self instVarAt: index put: nil].!
-primitiveError: aString 
-	"This method is called when the error handling results in a recursion in calling
-	on error: or halt or halt:."
-
-	| context key |
-	Transcript cr.
-	Transcript show: '**System Error Handling Failed** '.
-	Transcript show: aString.
-	Transcript cr.
-	context _ thisContext sender sender.
-	3 timesRepeat: 
-		[context == nil ifFalse: [Transcript print: (context _ context sender); cr]].
-
-	[Transcript show: '**type <s> for more stack; anything else restarts scheduler**'.
-	Transcript cr.
-	key _ Sensor keyboard.
-	key = $s | (key = $S)] 
-		whileTrue: 
-			[5 timesRepeat: 
-				[context == nil 
-					ifFalse: [Transcript print: (context _ context sender); cr]]].
-	ScheduledControllers searchForActiveController!
-setDependents
-	"Allocate the soft field for the receiver's dependents."
-	| dependents |
-	dependents _ OrderedCollection new.
-	DependentsFields add: (Association key: self value: dependents).
-	^ dependents!
-species
-	"Answer the preferred class for reconstructing the receiver.  For example, 
-	collections create new collections whenever enumeration messages such as 
-	collect: or select: are invoked.  The new kind of collection is determined by 
-	the species of the original collection.  Species and class are not always the 
-	same.  For example, the species of Interval is Array."
-
-	^self class! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-Object class
-	instanceVariableNames: ''!
-
-
-!Object class methodsFor: 'class initialization'!
-initialize 
-	"Initialize class Object. Initialize all dependents and error recursion."
-	self initializeDependentsFields.
-	self initializeErrorRecursion.
-	^self
-
-	"Object initialize"! !
-
 !Object class methodsFor: 'instance creation'!
-readFrom: aStream
-	"Create an object based on the contents of aStream."
 
-	| object |
-	object _ Compiler evaluate: aStream.
-	(object isKindOf: self) ifFalse: [self error: self name, ' expected'].
-	^object! !
+new
+	"Answer a new instance of the receiver."
+	<primitive: 70>
+	^self basicNew!
+basicNew
+	"Answer a new instance of the receiver (a class) with no indexable fields."
+	<primitive: 70>
+	self primitiveFailed!
+new: size
+	"Answer a new instance of the receiver (a class) with size indexable fields."
+	<primitive: 71>
+	^self basicNew: size!
+basicNew: size
+	"Answer a new instance of the receiver (a class) with size indexable fields."
+	<primitive: 71>
+	self primitiveFailed! !
 
-!Object class methodsFor: 'documentation'!
-howToModifyPrimitives
-	"You are allowed to write methods which specify primitives, but please use 
-	caution.  If you make a subclass of a class which contains a primitive method, 
-	the subclass inherits the primitive.  The message which is implemented 
-	primitively may be overridden in the subclass (E.g., see at:put: in String's 
-	subclass Symbol).  The primitive behavior can be invoked using super (see 
-	Symbol string:). 
-	 
-	A class which attempts to mimic the behavior of another class without being 
-	its subclass may or may not be able to use the primitives of the original class.  
-	In general, if the instance variables read or written by a primitive have the 
-	same meanings and are in the same fields in both classes, the primitive will 
-	work.  
+!Object class methodsFor: 'class name'!
 
-	For certain frequently used 'special selectors', the compiler emits a 
-	send-special-selector bytecode instead of a send-message bytecode.  
-	Special selectors were created because they offer two advantages.  Code 
-	which sends special selectors compiles into fewer bytes than normal.  For 
-	some pairs of receiver classes and special selectors, the interpreter jumps 
-	directly to a primitive routine without looking up the method in the class.  
-	This is much faster than a normal message lookup. 
-	 
-	A selector which is a special selector solely in order to save space has a 
-	normal behavior.  Methods whose selectors are special in order to 
-	gain speed contain the comment, 'No Lookup'.  When the interpreter 
-	encounters a send-special-selector bytecode, it checks the class of the 
-	receiver and the selector.  If the class-selector pair is a no-lookup pair, 
-	then the interpreter swiftly jumps to the routine which implements the 
-	corresponding primitive.  (A special selector whose receiver is not of the 
-	right class to make a no-lookup pair, is looked up normally).  The pairs are 
-	listed below.  No-lookup methods contain a primitive number specification, 
-	<primitive: xx>, which is redundant.  Since the method is not normally looked 
-	up, deleting the primitive number specification cannot prevent this 
-	primitive from running.  If a no-lookup primitive fails, the method is looked 
-	up normally, and the expressions in it are executed. 
-	 
-	No Lookup pairs of (class, selector) 
-	 
-	SmallInteger with any of		+ - * /  \\  bitOr: bitShift: bitAnd:  // 
-	SmallInteger with any of		=  ~=  >  <  >=  <= 
-	Any class with					== 
-	Any class with 					@ 
-	Point with either of				x y 
-	ContextPart with					blockCopy: 
-	BlockContext with either of 		value value:
-	"
-
-	self error: 'comment only'!
-whatIsAPrimitive
-	"Some messages in the system are responded to primitively. A primitive   
-	response is performed directly by the interpreter rather than by evaluating   
-	expressions in a method. The methods for these messages indicate the   
-	presence of a primitive response by including <primitive: xx> before the   
-	first expression in the method.   
-	  
-	Primitives exist for several reasons. Certain basic or 'primitive' 
-	operations cannot be performed in any other way. Smalltalk without 
-	primitives can move values from one variable to another, but cannot add two 
-	SmallIntegers together. Many methods for arithmetic and comparison 
-	between numbers are primitives. Some primitives allow Smalltalk to 
-	communicate with I/O devices such as the disk, the display, and the keyboard. 
-	Some primitives exist only to make the system run faster; each does the same 
-	thing as a certain Smalltalk method, and its implementation as a primitive is 
-	optional.  
-	  
-	When the Smalltalk interpreter begins to execute a method which specifies a 
-	primitive response, it tries to perform the primitive action and to return a 
-	result. If the routine in the interpreter for this primitive is successful, 
-	it will return a value and the expressions in the method will not be evaluated. 
-	If the primitive routine is not successful, the primitive 'fails', and the 
-	Smalltalk expressions in the method are executed instead. These 
-	expressions are evaluated as though the primitive routine had not been 
-	called.  
-	  
-	The Smalltalk code that is evaluated when a primitive fails usually 
-	anticipates why that primitive might fail. If the primitive is optional, the 
-	expressions in the method do exactly what the primitive would have done (See 
-	Number @). If the primitive only works on certain classes of arguments, the 
-	Smalltalk code tries to coerce the argument or appeals to a superclass to find 
-	a more general way of doing the operation (see SmallInteger +). If the 
-	primitive is never supposed to fail, the expressions signal an error (see 
-	SmallInteger asFloat).  
-	  
-	Each method that specifies a primitive has a comment in it. If the primitive is 
-	optional, the comment will say 'Optional'. An optional primitive that is not 
-	implemented always fails, and the Smalltalk expressions do the work 
-	instead.  
-	 
-	If a primitive is not optional, the comment will say, 'Essential'. Some 
-	methods will have the comment, 'No Lookup'. See Object 
-	howToModifyPrimitives for an explanation of special selectors which are 
-	not looked up.  
-	  
-	For the primitives for +, -, *, and bitShift: in SmallInteger, and truncated 
-	in Float, the primitive constructs and returns a 16-bit 
-	LargePositiveInteger when the result warrants it. Returning 16-bit 
-	LargePositiveIntegers from these primitives instead of failing is 
-	optional in the same sense that the LargePositiveInteger arithmetic 
-	primitives are optional. The comments in the SmallInteger primitives say, 
-	'Fails if result is not a SmallInteger', even though the implementor has the 
-	option to construct a LargePositiveInteger. For further information on 
-	primitives, see the 'Primitive Methods' part of the chapter on the formal 
-	specification of the interpreter in the Smalltalk book."
-
-	self error: 'comment only'! !
-
-!Object class methodsFor: 'private'!
-initializeDependentsFields
-	"Initialize DependentsFields safely during bootstrap."
-	DependentsFields _ IdentityDictionary new: 4
-
-	"Object initializeDependentsFields"!
-initializeErrorRecursion
-	"Initialize ErrorRecursion flag."
-	ErrorRecursion _ false
-
-	"Object initializeErrorRecursion"! !
-
-"Object initialize!"
-
-Object subclass: #UndefinedObject
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Kernel-Objects'!
+name
+	"Answer the name of the receiver as a string."
+	<primitive: 111>
+	^'Object'! !
 
 !Boolean methodsFor: 'logical operations'!
 
@@ -1095,6 +2335,46 @@ isInteger
 negated
 	"Answer a Number that is the negation of the receiver."
 	^0 - self! !
+
+!Number methodsFor: 'intervals'!
+
+to: stop
+	"Answer an Interval from the receiver up to the argument, stop,
+	incrementing by 1."
+
+	^Interval from: self to: stop by: 1!
+to: stop by: step
+	"Answer an Interval from the receiver up to the argument, stop,
+	incrementing by step."
+
+	^Interval from: self to: stop by: step!
+to: stop by: step do: aBlock 
+	"Create an Interval from the receiver up to the argument, stop,
+	incrementing by step.  For each element of the interval, evaluate the
+	block, aBlock."
+
+	| nextValue |
+	nextValue _ self.
+	step < 0
+		ifTrue: [[stop <= nextValue]
+				whileTrue: 
+					[aBlock value: nextValue.
+					nextValue _ nextValue + step]]
+		ifFalse: [[stop >= nextValue]
+				whileTrue: 
+					[aBlock value: nextValue.
+					nextValue _ nextValue + step]]!
+to: stop do: aBlock 
+	"Create an Interval from the receiver up to the argument, stop,
+	incrementing by 1.  For each element of the interval, evaluate the
+	block, aBlock."
+
+	| nextValue |
+	nextValue _ self.
+	[nextValue <= stop]
+		whileTrue: 
+			[aBlock value: nextValue.
+			nextValue _ nextValue + 1]! !
 
 Integer subclass: #SmallInteger
 	instanceVariableNames: ''
@@ -3679,56 +4959,321 @@ resetContents
 new
 	^self basicNew! !
 
-ExternalStream subclass: #FileStream
-	instanceVariableNames: 'page rwmode closed'
+Object subclass: #File
+	instanceVariableNames: 'fileName directory binary readWrite error handle'
 	classVariableNames: ''
-	poolDictionaries: 'FilePool'
+	poolDictionaries: ''
+	category: 'Files-Streams'!
+
+File comment:
+'I represent a file on the host file system. I provide the bridge between high-level Smalltalk file operations and low-level C# file system primitives.
+
+Instance Variables:
+	fileName		<String> - The name of the file
+	directory		<FileDirectory> - The directory containing this file  
+	binary			<Boolean> - Whether file contains binary or text data
+	readWrite		<Integer> - File access mode
+	error			<Symbol> - Error condition if any
+	handle			<Integer> - File handle from C# file system primitives
+'!
+
+!File methodsFor: 'accessing'!
+fileName
+	"Answer the name of the receiver."
+	^fileName!
+fileName: aString
+	"Set the name of the receiver."
+	fileName _ aString!
+directory
+	"Answer the directory containing this file."
+	^directory!
+directory: aFileDirectory
+	"Set the directory containing this file."
+	directory _ aFileDirectory!
+handle
+	"Answer the file handle from the host system."
+	^handle!
+handle: anInteger
+	"Set the file handle from the host system."
+	handle _ anInteger! !
+
+!File methodsFor: 'testing'!
+isBinary
+	"Answer whether this file contains binary data."
+	^binary == true!
+isText
+	"Answer whether this file contains text data."
+	^binary == false! !
+
+!File methodsFor: 'file modes'!
+binary
+	"Set this file to binary mode."
+	binary _ true!
+text
+	"Set this file to text mode."
+	binary _ false!
+readWrite: mode
+	"Set the read/write mode."
+	readWrite _ mode! !
+
+!File methodsFor: 'converting'!
+asFileStream
+	"Answer a FileStream on this file."
+	^FileStream on: self!
+
+asReadOnlyFileStream
+	"Answer a read-only FileStream on this file."
+	| stream |
+	stream _ FileStream on: self.
+	stream readOnly.
+	^stream!
+
+asReadWriteFileStream
+	"Answer a read-write FileStream on this file."
+	| stream |
+	stream _ FileStream on: self.
+	stream readWrite.
+	^stream! !
+
+!File methodsFor: 'file operations'!
+open: mode
+	"Open the file with the specified mode using primitive 142."
+	<primitive: 142>
+	"Fallback: should signal error"
+	self error: 'Cannot open file - primitive 142 failed'!
+close
+	"Close the file using primitive 143."
+	<primitive: 143>
+	"Fallback: should signal error"
+	handle _ nil!
+delete
+	"Delete this file using primitive 150."
+	<primitive: 150>
+	"Fallback: should signal error"
+	^false! !
+
+!File class methodsFor: 'instance creation'!
+named: aString
+	"Create a new file with the given name."
+	^self new fileName: aString; yourself!
+named: aString in: aDirectory
+	"Create a new file with the given name in the specified directory."
+	^self new fileName: aString; directory: aDirectory; yourself! !
+
+Object subclass: #FileDirectory
+	instanceVariableNames: 'directoryName'
+	classVariableNames: 'DefaultDirectory ExternalReferences'
+	poolDictionaries: ''
+	category: 'Files-Streams'!
+
+FileDirectory comment:
+'I represent a directory on the host file system. I manage collections of files and provide the interface between Smalltalk file operations and the underlying C# file system primitives.
+
+This class bridges the gap between the high-level Smalltalk-80 file system API and the modern C# file system primitives (142-157) implemented in the interpreter.
+'!
+
+!FileDirectory methodsFor: 'accessing'!
+directoryName
+	"Answer the name of this directory."
+	^directoryName!
+directoryName: aString
+	"Set the name of this directory."
+	directoryName _ aString! !
+
+!FileDirectory methodsFor: 'file creation'!
+file: aFileName
+	"Answer a FileStream on a file with the given name, creating it if necessary."
+	^(self fileNamed: aFileName) asFileStream!
+newFile: aFileName
+	"Create a new file with the given name."
+	| file |
+	file _ File named: aFileName in: self.
+	file open: 'w'.
+	^file!
+oldFile: aFileName
+	"Open an existing file with the given name."
+	| file |
+	file _ File named: aFileName in: self.
+	file open: 'r'.
+	^file! !
+
+!FileDirectory methodsFor: 'file operations'!
+fileNamed: aString
+	"Answer a File object for the file with the given name."
+	^File named: aString in: self!
+includesFileNamed: aString
+	"Answer whether a file with the given name exists using primitive 149."
+	<primitive: 149>
+	"Fallback implementation"
+	^false!
+deleteFileNamed: aString
+	"Delete the file with the given name using primitive 150."
+	<primitive: 150>
+	"Fallback implementation"
+	^false!
+rename: oldName newName: newName
+	"Rename a file using primitive 151."
+	<primitive: 151>
+	"Fallback implementation"
+	^false! !
+
+!FileDirectory methodsFor: 'directory operations'!
+createDirectory: aString
+	"Create a subdirectory with the given name using primitive 154."
+	<primitive: 154>
+	"Fallback implementation"
+	^false!
+isDirectory: aString
+	"Answer whether the named entry is a directory using primitive 156."
+	<primitive: 156>
+	"Fallback implementation"
+	^false!
+entries
+	"Answer a collection of the entries in this directory using primitive 157."
+	<primitive: 157>
+	"Fallback implementation"
+	^#()! !
+
+!FileDirectory class methodsFor: 'instance creation'!
+default
+	"Answer the default file directory."
+	DefaultDirectory isNil ifTrue: [
+		DefaultDirectory _ self new directoryName: '.'; yourself].
+	^DefaultDirectory!
+on: aString
+	"Answer a FileDirectory for the named directory."
+	^self new directoryName: aString; yourself! !
+
+!FileDirectory class methodsFor: 'external references'!
+addExternalReference: aFileStream
+	"Register a file stream for cleanup on system shutdown."
+	ExternalReferences isNil ifTrue: [ExternalReferences _ Set new].
+	ExternalReferences add: aFileStream!
+removeExternalReference: aFileStream
+	"Unregister a file stream."
+	ExternalReferences isNil ifFalse: [ExternalReferences remove: aFileStream ifAbsent: []]! !
+
+ExternalStream subclass: #FileStream
+	instanceVariableNames: 'file fileHandle fileSize closed rwmode'
+	classVariableNames: ''
+	poolDictionaries: ''
 	category: 'Files-Streams'!
 
 FileStream comment:
-'I represent a Stream that accesses a FilePage from a File.  One use for my instance is to access larger "virtual Strings" than can be stored contiguously in main memory.  I restrict the objects stored and retrieved to be Integers or Characters.  An end of file pointer terminates reading;  it can be extended by writing past it, or the file can be explicitly truncated.
+'I represent a Stream that accesses a File on the host file system. I provide a bridge between high-level Smalltalk stream operations and the low-level C# file system primitives.
 
-To use the file system for most applications, you typically create a FileStream.  This is done by sending a message to a FileDirectory (file:, oldFile:, newFile:, rename:newName:) which creates an instance of me.  Accesses to the file are then done via my instance.
+I have been updated to work with the modern File and FileDirectory classes and use C# file system primitives (142-157) instead of the original Alto-specific primitives.
 
-Instance variables
-	page			<FilePage> the current FilePage being accessed
-	rwmode			<Integer> denoting readOnly, readWrite, or readWriteShorten.
-					readWriteShorten with textual contents is the default.
-	closed			<Boolean> false if the file is open'!
+Instance variables:
+	file			<File> the File object being accessed
+	fileHandle		<Integer> the file handle from the C# file system
+	fileSize		<Integer> the size of the file in bytes
+	closed			<Boolean> false if the file is open
+	rwmode			<Integer> read/write mode flags
+'!
 
 !FileStream methodsFor: 'accessing'!
 contentsOfEntireFile
 	"Read all of the contents of the receiver."
-
-	| s |
+	| contents |
 	self readOnly.
 	self reset.
-	s _ self next: self size.
+	contents _ self next: self size.
 	self close.
-	^s!
+	^contents!
+
 next
-	(position >= readLimit and: [self atEnd])
-		ifTrue: [^nil]
-		ifFalse: [^collection at: (position _ position + 1)]!
+	"Read the next byte/character from the file using primitive 144."
+	<primitive: 144>
+	"Fallback: return nil at end of file"
+	^nil!
+
 next: anInteger
+	"Read the next anInteger bytes from the file using primitive 144."
+	| result |
+	result _ ByteArray new: anInteger.
+	<primitive: 144>
+	"Fallback: return empty collection"
+	^result!
 
-	| newCollection howManyRead increment |
+nextPut: anObject
+	"Write an object to the file using primitive 145."
+	<primitive: 145>
+	"Fallback: signal error"
+	self error: 'Cannot write to file - primitive 145 failed'!
 
-	newCollection _ collection species new: anInteger.
-	
-	howManyRead _ 0.
-	[howManyRead < anInteger] whileTrue:
-		[
-		self atEnd ifTrue:
-			[
-			(howManyRead + 1) to: anInteger do: [:i | newCollection at: i put: (self next)].
-			^newCollection
-			].
-		increment _ (readLimit - position) min: (anInteger - howManyRead).
-		newCollection replaceFrom: (howManyRead + 1) to: (howManyRead _ howManyRead + increment) with: collection startingAt: (position + 1).
-		position _ position + increment.
-		].
-	^newCollection!
+nextPutAll: aCollection
+	"Write a collection of objects to the file using primitive 145."
+	<primitive: 145>
+	"Fallback: write each element individually"
+	aCollection do: [:each | self nextPut: each].
+	^aCollection!
+
+size
+	"Answer the size of the file using primitive 147."
+	<primitive: 147>
+	"Fallback: return 0"
+	^0! !
+
+!FileStream methodsFor: 'initialization'!
+on: aFile
+	"Initialize the receiver to operate on the given File."
+	file _ aFile.
+	closed _ true.
+	rwmode _ 0.
+	self open!
+
+open
+	"Open the file for reading and writing."
+	closed ifFalse: [^self].
+	file open: 'rw'.
+	fileHandle _ file handle.
+	closed _ false!
+
+close
+	"Close the file."
+	closed ifTrue: [^self].
+	file close.
+	fileHandle _ nil.
+	closed _ true.
+	FileDirectory removeExternalReference: self! !
+
+!FileStream methodsFor: 'testing'!
+atEnd
+	"Answer true if current position is >= end of file position using primitive 148."
+	<primitive: 148>
+	"Fallback: assume not at end"
+	^false!
+
+isClosed
+	"Answer true if the file is closed."
+	^closed == true! !
+
+!FileStream methodsFor: 'positioning'!
+reset
+	"Position to the beginning of the file using primitive 146."
+	<primitive: 146>
+	"Fallback: do nothing"!
+
+position
+	"Answer the current file position using primitive 146."
+	<primitive: 146>
+	"Fallback: return 0"
+	^0!
+
+position: anInteger
+	"Set the file position using primitive 146."
+	<primitive: 146>
+	"Fallback: do nothing"! !
+
+!FileStream methodsFor: 'modes'!
+readOnly
+	"Set the file to read-only mode."
+	rwmode _ 1!
+
+readWrite
+	"Set the file to read-write mode."
+	rwmode _ 3!
 next: anInteger into: aCollection
 	"Copy the next anInteger bytes from the receiver into aCollection."
 
@@ -4151,24 +5696,28 @@ shorten
 !FileStream class methodsFor: 'instance creation'!
 fileNamed: fileDesignator
 	"Answer a FileStream on an old or new File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory fileNamed: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findOrAddKey: fName) asFileStream!
 newFileNamed: fileDesignator
-	"Answer a FileStream on a new File designated by the string fileDesignator.  Error if the argument is not a new file name."
+	"Answer a FileStream on a new File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory newFile: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir addKey: fName) asFileStream!
 oldFileNamed: fileDesignator
-	"Answer a FileStream on an old File designated by the string fileDesignator.  Error if the argument is not an old file name."
+	"Answer a FileStream on an old File designated by the string fileDesignator."
+	| directory file |
+	directory _ FileDirectory default.
+	file _ directory oldFile: fileDesignator.
+	^self on: file!
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findKey: fName) asFileStream!
-on: aFilePage 
-	^self new on: aFilePage! !
+on: aFile
+	"Create a new FileStream on the given File."
+	^self new on: aFile! !
 
 String variableByteSubclass: #Symbol
 	instanceVariableNames: ''
@@ -5291,109 +6840,127 @@ pi
 	"Answer the constant, Pi."
 	^Pi! !
 
-Float initialize!
-
-Object subclass: #BinaryChoice
-	instanceVariableNames: 'trueAction falseAction actionTaken'
+Object subclass: #TextCollector
+	instanceVariableNames: 'contents entryStream'
 	classVariableNames: ''
 	poolDictionaries: ''
-	category: 'Interface-Prompt/Confirm'!
+	category: 'Interface-Transcript'!
 
-!BinaryChoice methodsFor: 'initialize-release'!
-falseAction: aBlock
-	"The argument, aBlock, will be evaluated if the receiver is sent the
-	message selectFalse."
-	falseAction _ aBlock!
+TextCollector comment:
+'I represent a text collector into which text can be gathered by sending messages using Stream protocol. I serve as the foundation for the System Transcript.
 
+Instance Variables
+	contents		<Text> the collected text content
+	entryStream		<WriteStream> buffered stream for efficient text collection
+'!
+
+!TextCollector methodsFor: 'initialize-release'!
 initialize
-	"Initialize the receiver so that it indicates no action has yet been taken."
-	actionTaken _ false!
+	contents _ String new.
+	self beginEntry! !
 
-trueAction: aBlock
-	"The argument, aBlock, will be evaluated if the receiver is sent the
-	message selectTrue."
-	trueAction _ aBlock! !
+!TextCollector methodsFor: 'accessing'!
+contents
+	"Answer the contents of the receiver."
+	^contents!
+next: anInteger put: aCharacter 
+	"Insert the character, aCharacter, at position anInteger in the text."
+	^entryStream next: anInteger put: aCharacter!
+nextPut: aCharacter 
+	"Append aCharacter to the text."
+	^entryStream nextPut: aCharacter!
+nextPutAll: aCollection 
+	"Append all the characters in aCollection to the text."
+	^entryStream nextPutAll: aCollection!
+show: aString 
+	"Append all the characters in aCollection to the text and display the text."
+	self nextPutAll: aString.
+	self endEntry! !
 
-!BinaryChoice methodsFor: 'menu messages'!
-selectFalse
-	"Take the action, if one, associated with selecting no or false."	
-	actionTaken _ true.
-	falseAction notNil ifTrue: [falseAction value]!
+!TextCollector methodsFor: 'clearing'!
+clear
+	"Re-initialize the text to contain no characters."
 
-selectTrue
-	"Take the action, if one, associated with selecting yes or true."	
-	actionTaken _ true.
-	trueAction notNil ifTrue: [trueAction value]! !
+	contents _ String new.
+	self beginEntry.
+	self changed: #update
+	"Transcript clear"!
+refresh
+	"Bring window to front on screen"
 
-!BinaryChoice methodsFor: 'accessing'!
-actionTaken
-	"Answer whether the receiver has carried out its actions yet."
-	^actionTaken!
+	self changed: #refresh
+	"Transcript refresh"! !
 
-active
-	"Answer whether the receiver is an active system view."
-	^false! !
+!TextCollector methodsFor: 'entry control'!
+appendEntry
+	"Append the text contents of the receiver's WriteStream to its text."
+	contents _ contents , self nextEntry.
+	contents size > self characterLimit
+		ifTrue: [contents _ 
+					contents 
+						copyFrom: contents size - (self characterLimit // 2)
+						to: contents size].
+	self beginEntry!
+beginEntry
+	"To speed up appending information to the receiver, a WriteStream is
+	maintained.  Initialize it."
+	entryStream _ WriteStream on: (String new: 200)!
+endEntry
+	"If the receiver's WriteStream is not empty, then reinitialize it.  Send all
+	depends a message that the streaming has changed."
+	entryStream isEmpty
+		ifFalse: 
+			[self changed: #appendEntry.
+			self beginEntry]!
+nextEntry
+	"Answer the text contents of the receiver's WriteStream."
+	^entryStream contents! !
 
-!BinaryChoice class methodsFor: 'instance creation'!
-message: messageString 
-	"Answer an instance of me whose question is messageString.  If the user
-	answer is yes, then return true.  If the user answer is no, return false.  
-	Display the view of the instance at the cursor location."
-	| answer |
-	answer _ true. "Default to true for bootstrap"
-	^answer!
+!TextCollector methodsFor: 'character writing'!
+cr
+	"Append a carriage return to the text."
+	^entryStream cr!
+crtab
+	"Append a carriage return and a tab to the text."
+	^entryStream crtab!
+crtab: anInteger 
+	"Append a carriage return and anInteger number of tabs to the text."
+	^entryStream crtab: anInteger!
+space
+	"Append a space to the text."
+	^entryStream space!
+tab
+	"Append a tab to the text."
+	^entryStream tab! !
 
-message: messageString displayAt: aPoint centered: centered ifTrue: trueAlternative ifFalse: falseAlternative
-	"Answer an instance of me whose question is messageString.  If the user
-	answer is yes, then evaluate trueAlternative.  If the user answer is no,
-	evaluate falseAlternative. If centered, a Boolean, is false, display the view of the
-	instance at aPoint; otherwise display it with its center at aPoint."
+!TextCollector methodsFor: 'printing'!
+print: anObject 
+	"Append a description of the object, anObject, to the text."
+	^entryStream print: anObject!
+store: anObject 
+	"Have anObject print on me for rereading."
 
-	| newChoice |
-	newChoice _ self new initialize.
-	newChoice trueAction: trueAlternative.
-	newChoice falseAction: falseAlternative.
-	"BinaryChoiceView openOn: newChoice message: messageString displayAt: aPoint centered: centered"
-	"For bootstrap, just execute the true action"
-	trueAlternative notNil ifTrue: [trueAlternative value]!
+	anObject storeOn: self! !
 
-message: messageString displayAt: originPoint ifFalse: falseAlternative 
-	"Answer an instance of me whose question is messageString.  If the user
-	answer is yes, then do nothing.  If the user answer is no, evaluate falseAlternative. 
-	Display the view of the instance at originPoint."
+!TextCollector methodsFor: 'private'!
+characterLimit
+	^2000!
+changed: aSymbol
+	"Notify dependents of a change. Simplified version for testing framework use."
+	^self! !
 
-	^self
-		message: messageString
-		displayAt: originPoint
-		centered: false
-		ifTrue: nil
-		ifFalse: falseAlternative!
+!TextCollector class methodsFor: 'system'!
+newTranscript: aTextCollector 
+	"Store aTextCollector as the value of the system global Transcript."
+	Smalltalk at: #Transcript put: aTextCollector.
+	^aTextCollector! !
 
-message: messageString displayAt: originPoint ifTrue: trueAlternative 
-	"Answer an instance of me whose question is messageString.  If the user
-	answer is yes, then evaluate trueAlternative.  If the user answer is no,
-	do nothing.  Display the view of the instance at originPoint."
-
-	^self
-		message: messageString
-		displayAt: originPoint
-		centered: false
-		ifTrue: trueAlternative
-		ifFalse: nil!
-
-message: messageString displayAt: originPoint ifTrue: trueAlternative ifFalse: falseAlternative 
-	"Answer an instance of me whose question is messageString.  If the user
-	answer is yes, then evaluate trueAlternative.  If the user answer is no,
-	evaluate falseAlternative.  Display the view of the instance at originPoint."
-
-	^self
-		message: messageString
-		displayAt: originPoint
-		centered: false
-		ifTrue: trueAlternative
-		ifFalse: falseAlternative! !
-
-!BinaryChoice class methodsFor: 'examples'!
+!TextCollector class methodsFor: 'examples'!
 example
-	"BinaryChoice example - simplified for bootstrap"
-	^true! !
+	"TextCollectors support WriteStream protocol for appending characters to the
+	System Transcript."
+
+	Transcript show: (3+4) printString; cr.
+	Transcript nextPutAll: '3+4 ='; space; print: 3+4; cr; endEntry
+
+	"TextCollector example"! !
