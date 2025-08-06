@@ -214,6 +214,8 @@ public static class SystemImageLoader
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[SYSTEM_IMAGE] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"[SYSTEM_IMAGE] STACK TRACE: {ex.StackTrace}");
             errors.Add(new ParseError(0, 0, $"Unexpected error loading system image: {ex.Message}"));
             result.Success = false;
             result.Errors = errors;
@@ -258,6 +260,44 @@ public static class SystemImageLoader
                     methodDef.HasPrimitive,
                     methodDef.PrimitiveIndex);
             }
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Unknown variable"))
+        {
+            // Extract missing dependency information from compiler error
+            var missingVar = ExtractMissingVariable(ex.Message);
+            var className = header?.ClassName ?? "UnknownClass";
+            warnings.Add(new LoadWarning(0, 0,
+                $"Missing dependency in {className}>>{methodDef.Selector}: {missingVar}"));
+            Console.WriteLine($"[DEPENDENCY_MISSING] Class: {className}, Method: {methodDef.Selector}, Missing: {missingVar}");
+
+            // Create a minimal compiled method to avoid complete failure
+            var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
+            compiled = AstMethodCompiler.CompileMethod(
+                emptyBody,
+                new List<string>(),
+                new List<string>(),
+                false,
+                0);
+        }
+        catch (Exception ex)
+        {
+            var className = header?.ClassName ?? "UnknownClass";
+            warnings.Add(new LoadWarning(0, 0,
+                $"Compilation error in {className}>>{methodDef.Selector}: {ex.Message}"));
+            Console.WriteLine($"[COMPILATION_ERROR] Class: {className}, Method: {methodDef.Selector}, Error: {ex.Message}");
+
+            // Create a minimal compiled method to avoid complete failure
+            var emptyBody = new SequenceNode(new List<string>(), new List<StatementNode>());
+            compiled = AstMethodCompiler.CompileMethod(
+                emptyBody,
+                new List<string>(),
+                new List<string>(),
+                false,
+                0);
+        }
+
+        try
+        {
 
             compiled = new CompiledMethod
             {
@@ -271,7 +311,7 @@ public static class SystemImageLoader
             };
 
             // Install in the appropriate method dictionary
-            if (header.IsClassSide)
+            if (header?.IsClassSide == true)
             {
                 // Class-side methods go into the metaclass's regular method dictionary
                 if (targetClass.Metaclass == null)
@@ -290,6 +330,23 @@ public static class SystemImageLoader
         {
             warnings.Add(new LoadWarning(0, 0, $"Failed to compile method {methodDef.Selector}: {ex.Message}"));
         }
+    }
+
+    /// <summary>
+    /// Extracts the missing variable name from an AstMethodCompiler error message.
+    /// </summary>
+    /// <param name="errorMessage">The error message from the compiler.</param>
+    /// <returns>The name of the missing variable.</returns>
+    private static string ExtractMissingVariable(string errorMessage)
+    {
+        // Error message format: "Unknown variable 'VariableName'. Available temporaries: [...]"
+        var start = errorMessage.IndexOf("'") + 1;
+        var end = errorMessage.IndexOf("'", start);
+        if (start > 0 && end > start)
+        {
+            return errorMessage.Substring(start, end - start);
+        }
+        return "unknown";
     }
 }
 

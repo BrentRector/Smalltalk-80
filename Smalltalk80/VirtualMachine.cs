@@ -174,6 +174,15 @@ public sealed class VirtualMachine
         var result = SystemImageLoader.LoadSystemImage(path);
         if (!result.Success)
         {
+            Console.WriteLine($"[SYSTEM_LOAD] Failed to load {path}. Detailed errors:");
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"[SYSTEM_LOAD_ERROR] Line {error.Line}, Column {error.Column}: {error.Message}");
+            }
+            foreach (var warning in result.Warnings)
+            {
+                Console.WriteLine($"[SYSTEM_LOAD_WARNING] Line {warning.Line}, Column {warning.Column}: {warning.Message}");
+            }
             throw new InvalidOperationException($"Failed to load system file: {result.Errors.Count} errors");
         }
         SystemStatePrinter.PrintSummary();
