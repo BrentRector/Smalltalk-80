@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Smalltalk80</AssemblyName>
+    <RootNamespace>Smalltalk80.CLI</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    
+    <!-- Single file deployment options -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier></RuntimeIdentifier>
+  </PropertyGroup>
+
+  <!-- Project References -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Smalltalk80.Core\Smalltalk80.Core.csproj" />
+    <ProjectReference Include="..\..\Core\Smalltalk80.VM\Smalltalk80.VM.csproj" />
+    <ProjectReference Include="..\..\Bootstrap\Smalltalk80.Bootstrap\Smalltalk80.Bootstrap.csproj" />
+    <ProjectReference Include="..\..\Bootstrap\Smalltalk80.Bootstrap.Data\Smalltalk80.Bootstrap.Data.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- NuGet Packages -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <!-- Application settings -->
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <DependentUpon>appsettings.json</DependentUpon>
+    </None>
+  </ItemGroup>
+
+  <!-- Copy Bootstrap files from Smalltalk80.Bootstrap.Data project -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <PropertyGroup>
+      <BootstrapSourcePath>$(ProjectDir)..\..\Bootstrap\Smalltalk80.Bootstrap.Data</BootstrapSourcePath>
+      <BootstrapTargetPath>$(OutputPath)Bootstrap</BootstrapTargetPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BootstrapFiles Include="$(BootstrapSourcePath)\bootstrap_phase*.json" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(BootstrapTargetPath)" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(BootstrapTargetPath)"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="SuccessfullyCopiedFiles" />
+    </Copy>
+    
+    <Message Importance="high" Text="Copied $(SuccessfullyCopiedFiles-&gt;Count()) bootstrap files to: $(BootstrapTargetPath)" />
+  </Target>
+
+  <!-- Copy Bootstrap files for publish -->
+  <Target Name="CopyBootstrapFilesForPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <BootstrapSourcePath>$(ProjectDir)..\..\Bootstrap\Smalltalk80.Bootstrap.Data</BootstrapSourcePath>
+      <BootstrapPublishPath>$(PublishDir)Bootstrap</BootstrapPublishPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BootstrapFiles Include="$(BootstrapSourcePath)\bootstrap_phase*.json" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(BootstrapPublishPath)" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(BootstrapPublishPath)"
+          SkipUnchangedFiles="true" />
+    
+    <Message Importance="high" Text="Copied bootstrap files to publish directory: $(BootstrapPublishPath)" />
+  </Target>
+
+  <!-- Clean Bootstrap files -->
+  <Target Name="CleanBootstrapFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)Bootstrap" Condition="Exists('$(OutputPath)Bootstrap')" />
+    <Message Importance="high" Text="Cleaned bootstrap directory: $(OutputPath)Bootstrap" />
+  </Target>
+
+</Project>

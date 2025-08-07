@@ -276,6 +276,9 @@ public enum Bytecode : byte
     ReturnTopFromMethod = 124,
     /// <inheritdoc cref="ReturnTopFromMethod" />
     ReturnTopFromBlock,
+    
+    /// <summary>Alias for ReturnTopFromMethod for backward compatibility.</summary>
+    ReturnTop = ReturnTopFromMethod,
 
     // 126-127 unused
     /// <summary>Reserved for future use.</summary>

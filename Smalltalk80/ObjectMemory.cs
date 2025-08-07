@@ -49,7 +49,7 @@ public static class ObjectMemory
     /// </summary>
     /// <param name="cls">The class to search for.</param>
     /// <returns>The first instance found or <c>null</c>.</returns>
-    public static SmalltalkObject? SomeInstance(SmalltalkClass cls)
+    public static SmalltalkObject? SomeInstance(SmalltalkObject cls)
         => objects.FirstOrDefault(o => ReferenceEquals(o.ClassPointer, cls));
 
     /// <summary>

@@ -392,7 +392,7 @@ public static class GeneratedBootstrap
             var cls = kvp.Value;
             if (cls.Superclass != null && cls.Superclass.Metaclass != null)
             {
-                cls.Metaclass.Superclass = cls.Superclass.Metaclass;
+                cls.Metaclass!.Superclass = cls.Superclass.Metaclass;
             }
         }
         

@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Bootstrap JSON files as Content -->
+  <ItemGroup>
+    <Content Include="bootstrap_phase1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="bootstrap_phase2.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="bootstrap_phase3.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Copy bootstrap files to output directory in Bootstrap subfolder -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <ItemGroup>
+      <BootstrapFiles Include="bootstrap_phase*.json" />
+    </ItemGroup>
+    
+    <MakeDir Directories="$(OutputPath)Bootstrap" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(OutputPath)Bootstrap"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="SuccessfullyCopiedFiles" />
+    </Copy>
+    
+    <Message Importance="high" Text="Copied bootstrap files to: $(OutputPath)Bootstrap" />
+  </Target>
+
+  <!-- Clean bootstrap files on clean -->
+  <Target Name="CleanBootstrapFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)Bootstrap" Condition="Exists('$(OutputPath)Bootstrap')" />
+    <Message Importance="high" Text="Removed bootstrap directory: $(OutputPath)Bootstrap" />
+  </Target>
+
+</Project>

@@ -29,7 +29,7 @@ public class RealObjectMemory
     /// <param name="classPointer">The class of the new object.</param>
     /// <param name="fieldCount">Number of instance variables.</param>
     /// <returns>Object pointer to the new object.</returns>
-    public int CreateObject(SmalltalkClass classPointer, int fieldCount)
+    public int CreateObject(SmalltalkObject classPointer, int fieldCount)
     {
         int objectPointer;
 
@@ -274,7 +274,7 @@ public class HeapObject
     /// <summary>
     /// The class of this object.
     /// </summary>
-    public SmalltalkClass? ClassPointer { get; set; }
+    public SmalltalkObject? ClassPointer { get; set; }
 
     /// <summary>
     /// The instance variables/fields of this object.

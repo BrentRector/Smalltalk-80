@@ -1,0 +1,22 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "phase": "3",
+  "description": "Load standard library and additional classes from Smalltalk source files",
+  "operations": [
+    {
+      "op": "initialize",
+      "target": "FileLoader",
+      "name": "StandardLibrary.st"
+    },
+    {
+      "op": "initialize",
+      "target": "FileLoader",
+      "name": "Collections.st"
+    },
+    {
+      "op": "initialize",
+      "target": "FileLoader",
+      "name": "SystemClasses.st"
+    }
+  ]
+}

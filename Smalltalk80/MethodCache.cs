@@ -12,7 +12,7 @@ public class MethodCache
     /// </summary>
     private struct CacheEntry
     {
-        public SmalltalkClass Class;
+        public SmalltalkObject Class;
         public Symbol Selector;
         public CompiledMethod Method;
         public bool IsValid;
@@ -39,7 +39,7 @@ public class MethodCache
     /// <param name="receiverClass">The class of the receiver.</param>
     /// <param name="selector">The message selector.</param>
     /// <returns>The cached method, or null if not cached.</returns>
-    public CompiledMethod? Lookup(SmalltalkClass receiverClass, Symbol selector)
+    public CompiledMethod? Lookup(SmalltalkObject receiverClass, Symbol selector)
     {
         int index = HashFunction(receiverClass, selector);
         ref var entry = ref cache[index];
@@ -62,7 +62,7 @@ public class MethodCache
     /// <param name="receiverClass">The class of the receiver.</param>
     /// <param name="selector">The message selector.</param>
     /// <param name="method">The compiled method.</param>
-    public void Store(SmalltalkClass receiverClass, Symbol selector, CompiledMethod method)
+    public void Store(SmalltalkObject receiverClass, Symbol selector, CompiledMethod method)
     {
         int index = HashFunction(receiverClass, selector);
         cache[index] = new CacheEntry
@@ -91,7 +91,7 @@ public class MethodCache
     /// This is called when a class is modified.
     /// </summary>
     /// <param name="classToFlush">The class whose entries should be removed.</param>
-    public void FlushClass(SmalltalkClass classToFlush)
+    public void FlushClass(SmalltalkObject classToFlush)
     {
         for (int i = 0; i < cache.Length; i++)
         {
@@ -109,7 +109,7 @@ public class MethodCache
     /// <param name="receiverClass">The receiver class.</param>
     /// <param name="selector">The message selector.</param>
     /// <returns>Cache index.</returns>
-    private int HashFunction(SmalltalkClass receiverClass, Symbol selector)
+    private int HashFunction(SmalltalkObject receiverClass, Symbol selector)
     {
         int classHash = receiverClass.GetHashCode();
         int selectorHash = selector.GetHashCode();

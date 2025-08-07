@@ -10,19 +10,8 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 {
-    /// <summary>
-    /// The token stream used for retrieving additional token information during AST construction.
-    /// This stream provides access to whitespace, comments, and detailed token positions
-    /// that may be needed for advanced parsing scenarios or error reporting.
-    /// May be null if detailed token information is not required.
-    /// </summary>
     protected readonly CommonTokenStream? tokens;
 
-    /// <summary>
-    /// Initializes a new instance of the BaseAstBuildingVisitor class with an optional token stream.
-    /// The token stream can be used to access detailed token information during AST construction.
-    /// </summary>
-    /// <param name="tokens">The token stream to use for detailed token access, or null if not needed.</param>
     protected BaseAstBuildingVisitor(CommonTokenStream? tokens = null)
     {
         this.tokens = tokens;
@@ -41,24 +30,33 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitLiteral(Smalltalk80Parser.LiteralContext context)
     {
-        if (context.numberLiteral() != null)
+        if (context.NUMBER() != null)
         {
-            return Visit(context.numberLiteral());
+            var text = context.NUMBER().GetText();
+            if (text.Contains('.'))
+                return new FloatLiteralExpression(double.Parse(text));
+            else
+                return new IntegerLiteralExpression(int.Parse(text));
         }
 
-        if (context.stringConst() != null)
+        if (context.STRING() != null)
         {
-            return Visit(context.stringConst());
+            var text = context.STRING().GetText();
+            // Remove quotes and handle escape sequences
+            var value = text[1..^1].Replace("''", "'");
+            return new StringLiteralExpression(value);
         }
 
-        if (context.characterLiteral() != null)
+        if (context.CHARACTER() != null)
         {
-            return Visit(context.characterLiteral());
+            var text = context.CHARACTER().GetText();
+            return new CharacterLiteralExpression(text[1]); // Skip the $
         }
 
-        if (context.symbolConst() != null)
+        if (context.SYMBOL() != null)
         {
-            return Visit(context.symbolConst());
+            var text = context.SYMBOL().GetText();
+            return new SymbolLiteralExpression(text[1..]); // Skip the #
         }
 
         if (context.arrayLiteral() != null)
@@ -66,65 +64,7 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             return Visit(context.arrayLiteral());
         }
 
-        if (context.byteArrayLiteral() != null)
-        {
-            return Visit(context.byteArrayLiteral());
-        }
-
         throw new InvalidOperationException("Unknown literal type");
-    }
-
-
-    /// <summary>
-    /// Visit a number literal context.
-    /// </summary>
-    public override object? VisitNumberLiteral(Smalltalk80Parser.NumberLiteralContext context)
-    {
-        var text = context.NUMBER().GetText();
-        if (text.Contains('.'))
-            return new LiteralExpression(double.Parse(text));
-        else
-            return new LiteralExpression(int.Parse(text));
-    }
-
-    /// <summary>
-    /// Visit a string constant context.
-    /// </summary>
-    public override object? VisitStringConst(Smalltalk80Parser.StringConstContext context)
-    {
-        var text = context.STRING().GetText();
-        // Remove quotes and handle escape sequences
-        var value = text[1..^1].Replace("''", "'");
-        return new LiteralExpression(value);
-    }
-
-    /// <summary>
-    /// Visit a character literal context.
-    /// </summary>
-    public override object? VisitCharacterLiteral(Smalltalk80Parser.CharacterLiteralContext context)
-    {
-        var text = context.CHAR_LITERAL().GetText();
-        return new LiteralExpression(text[1]); // Skip the $
-    }
-
-    /// <summary>
-    /// Visit a symbol constant context.
-    /// </summary>
-    public override object? VisitSymbolConst(Smalltalk80Parser.SymbolConstContext context)
-    {
-        if (context.QUOTED_SYMBOL() != null)
-        {
-            var text = context.QUOTED_SYMBOL().GetText();
-            return new LiteralExpression(text[1..]); // Skip the #
-        }
-
-        if (context.symbolName() != null)
-        {
-            var symbolName = context.symbolName().GetText();
-            return new LiteralExpression(symbolName);
-        }
-
-        throw new InvalidOperationException("Unknown symbol type");
     }
 
     /// <summary>
@@ -132,21 +72,17 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     /// </summary>
     public override object? VisitArrayLiteral(Smalltalk80Parser.ArrayLiteralContext context)
     {
-        var elements = new List<object>();
-
+        var elements = new List<ExpressionNode>();
+        
         if (context.arrayElement() != null)
         {
             foreach (var element in context.arrayElement())
             {
-                var elementValue = Visit(element);
-                if (elementValue is LiteralExpression literal)
-                    elements.Add(literal.Value);
-                else
-                    elements.Add(elementValue!);
+                elements.Add((ExpressionNode)Visit(element)!);
             }
         }
 
-        return new LiteralExpression(elements.ToArray());
+        return new ArrayLiteralExpression(elements);
     }
 
     /// <summary>
@@ -156,48 +92,30 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
     {
         if (context.literal() != null)
             return Visit(context.literal());
+        
+        if (context.IDENTIFIER() != null)
+            return new SymbolLiteralExpression(context.IDENTIFIER().GetText());
 
-        if (context.symbolName() != null)
-        {
-            var symbolName = context.symbolName().GetText();
-            return new LiteralExpression(symbolName);
-        }
-
-        // Handle nested array elements (parenthesized arrays)
-        if (context.LEFT_PAREN() != null)
-        {
-            var elements = new List<object>();
-            foreach (var element in context.arrayElement())
-            {
-                var elementValue = Visit(element);
-                if (elementValue is LiteralExpression literal)
-                    elements.Add(literal.Value);
-                else
-                    elements.Add(elementValue!);
-            }
-            return new LiteralExpression(elements.ToArray());
-        }
-
-        throw new InvalidOperationException("Unknown array element type");
+        return Visit(context.arrayLiteral());
     }
 
     /// <summary>
     /// Visit a block expression context.
     /// </summary>
-    public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
+    public override object? VisitBlockExpr(Smalltalk80Parser.BlockExprContext context)
     {
         var parameters = new List<string>();
-
-        if (context.blockArgs() != null)
+        
+        if (context.blockParameters() != null)
         {
-            foreach (var param in context.blockArgs().argumentName())
+            foreach (var param in context.blockParameters().IDENTIFIER())
             {
-                parameters.Add(param.IDENTIFIER().GetText());
+                parameters.Add(param.GetText());
             }
         }
 
         var statements = new List<StatementNode>();
-
+        
         if (context.statements() != null)
         {
             var stmtList = (List<StatementNode>)Visit(context.statements())!;
@@ -232,21 +150,13 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         if (context.returnStatement() != null)
             return Visit(context.returnStatement());
 
-        if (context.expressionStatement() != null)
+        if (context.expression() != null)
         {
-            return Visit(context.expressionStatement());
+            var expr = (ExpressionNode)Visit(context.expression())!;
+            return new ExpressionStatement(expr);
         }
 
         throw new InvalidOperationException("Unknown statement type");
-    }
-
-    /// <summary>
-    /// Visit an expression statement context.
-    /// </summary>
-    public override object? VisitExpressionStatement(Smalltalk80Parser.ExpressionStatementContext context)
-    {
-        var expr = (ExpressionNode)Visit(context.expression())!;
-        return new ExpressionStatement(expr);
     }
 
     /// <summary>
@@ -281,5 +191,57 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         {
             return Visit(context.cascadeExpr());
         }
+    }
+}
+
+/// <summary>
+/// Message node base class for cascade expressions.
+/// </summary>
+public abstract class MessageNode
+{
+    public abstract string Selector { get; }
+}
+
+/// <summary>
+/// Unary message node for cascade expressions.
+/// </summary>
+public class UnaryMessageNode : MessageNode
+{
+    public override string Selector { get; }
+
+    public UnaryMessageNode(string selector)
+    {
+        Selector = selector;
+    }
+}
+
+/// <summary>
+/// Binary message node for cascade expressions.
+/// </summary>
+public class BinaryMessageNode : MessageNode
+{
+    public override string Selector { get; }
+    public ExpressionNode Argument { get; }
+
+    public BinaryMessageNode(string selector, ExpressionNode argument)
+    {
+        Selector = selector;
+        Argument = argument;
+    }
+}
+
+/// <summary>
+/// Keyword message node for cascade expressions.
+/// </summary>
+public class KeywordMessageNode : MessageNode
+{
+    public List<string> Keywords { get; }
+    public List<ExpressionNode> Arguments { get; }
+    public override string Selector => string.Join("", Keywords);
+
+    public KeywordMessageNode(List<string> keywords, List<ExpressionNode> arguments)
+    {
+        Keywords = keywords;
+        Arguments = arguments;
     }
 }

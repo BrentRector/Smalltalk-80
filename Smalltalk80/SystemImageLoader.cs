@@ -1,33 +1,23 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using Smalltalk80.Parser;
 
 /// <summary>
-/// Specialized loader for complete Smalltalk-80 system images that handles
-/// forward references and circular dependencies between classes.
-/// Uses a two-pass loading strategy to resolve dependencies correctly.
+/// STUB IMPLEMENTATION - Simplified for shadow class removal.
+/// Specialized loader for complete Smalltalk-80 system images.
 /// </summary>
 public static class SystemImageLoader
 {
     /// <summary>
-    /// Load a complete Smalltalk-80 system image with proper dependency resolution.
-    /// Uses a two-pass strategy:
-    /// 1. First pass: Create all class stubs without superclass relationships
-    /// 2. Second pass: Resolve superclass relationships and install methods
+    /// Stub implementation for system image loading.
     /// </summary>
-    /// <param name="path">Path to the system image file.</param>
-    /// <returns>Result containing success status and any errors encountered.</returns>
     public static SystemImageLoadResult LoadSystemImage(string path)
     {
-        var result = new SystemImageLoadResult { SourcePath = path };
-        var errors = new List<ParseError>();
-        var warnings = new List<LoadWarning>();
-
-        // Initialize the metaclass system before processing any classes
-        SystemDictionary.InitializeMetaclassSystem();
-
-        try
+        Console.WriteLine($"[SYSIMG] Stub system image loader - shadow classes removed. File: {path}");
+        return new SystemImageLoadResult 
+        { 
+            SourcePath = path, 
+            Success = false,
+            Errors = new() { new ParseError { Message = "System image loading disabled - shadow classes removed" } }
+        };
         {
             // Parse the entire file first
             FileNode fileAst = null!; // Suppress nullable warning

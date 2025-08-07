@@ -768,11 +768,11 @@ public class Interpreter
 
         if (receiver is SmalltalkObject recvObj)
         {
-            SmalltalkClass? startClass;
+            SmalltalkObject? startClass;
             if (superSend)
             {
                 if (currentContext.Method.Literals.Length == 0 ||
-                    currentContext.Method.Literals[^1] is not SmalltalkClass methodClass)
+                    currentContext.Method.Literals[^1] is not SmalltalkObject methodClass)
                 {
                     throw new InvalidOperationException("Super send missing method class literal");
                 }
@@ -897,16 +897,11 @@ public class Interpreter
     /// </summary>
     /// <param name="primitive">The .NET primitive object.</param>
     /// <returns>The corresponding Smalltalk class, or null if no mapping exists.</returns>
-    private static SmalltalkClass? GetClassForPrimitive(object? primitive)
+    private static SmalltalkObject? GetClassForPrimitive(object? primitive)
     {
-        return primitive switch
-        {
-            int => SystemDictionary.TryGetClass("SmallInteger", out var intClass) ? intClass : null,
-            bool => SystemDictionary.TryGetClass("Boolean", out var boolClass) ? boolClass : null,
-            string => SystemDictionary.TryGetClass("String", out var stringClass) ? stringClass : null,
-            float or double => SystemDictionary.TryGetClass("Float", out var floatClass) ? floatClass : null,
-            _ => null
-        };
+        // Stub implementation - returns null since shadow classes removed
+        // In a full implementation, this would look up class objects in ObjectMemory
+        return null;
     }
 
     /// <summary>
@@ -915,7 +910,7 @@ public class Interpreter
     /// <param name="primitive">The .NET primitive value.</param>
     /// <param name="smalltalkClass">The corresponding Smalltalk class.</param>
     /// <returns>A Smalltalk object, or null if conversion is not needed/possible.</returns>
-    private static SmalltalkObject? ConvertPrimitiveToSmalltalkObject(object? primitive, SmalltalkClass smalltalkClass)
+    private static SmalltalkObject? ConvertPrimitiveToSmalltalkObject(object? primitive, SmalltalkObject? smalltalkClass)
     {
         return primitive switch
         {

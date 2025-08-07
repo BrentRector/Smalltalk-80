@@ -1,0 +1,1256 @@
+{
+  "phase": "1",
+  "description": "Minimal class/metaclass lattice using VM primitives",
+  "version": "1.0",
+  "operations": [
+    {
+      "comment": "=== STEP 1: Create self-referential Metaclass ===",
+      "op": "newClass",
+      "result": "Metaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "Metaclass",
+      "slot": 0,
+      "value": "Metaclass",
+      "comment": "Metaclass's class pointer points to itself"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Metaclass",
+      "name": "name",
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Metaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Metaclass",
+      "name": "format",
+      "value": 0
+    },
+
+    {
+      "comment": "=== STEP 2: Create Class ===",
+      "op": "newClass",
+      "result": "Class"
+    },
+    {
+      "op": "setSlot",
+      "target": "Class",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "name",
+      "value": "Class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "superclass",
+      "value": null
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "format",
+      "value": 0
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Metaclass",
+      "name": "superclass",
+      "value": "Class",
+      "comment": "Fix Metaclass's superclass"
+    },
+
+    {
+      "comment": "=== STEP 3: Create Behavior ===",
+      "op": "newClass",
+      "result": "Behavior"
+    },
+    {
+      "op": "setSlot",
+      "target": "Behavior",
+      "slot": 0,
+      "value": "Class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Behavior",
+      "name": "name",
+      "value": "Behavior"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Behavior",
+      "name": "superclass",
+      "value": null
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Behavior",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Behavior",
+      "name": "instanceVariables",
+      "value": { "op": "newArray", "size": 0 }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "superclass",
+      "value": "Behavior",
+      "comment": "Fix Class's superclass"
+    },
+
+    {
+      "comment": "=== STEP 4: Create ProtoObject (root class) ===",
+      "op": "newClass",
+      "result": "ProtoObjectMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "ProtoObjectMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObjectMetaclass",
+      "name": "name",
+      "value": "ProtoObject class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObjectMetaclass",
+      "name": "superclass",
+      "value": "Class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObjectMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "ProtoObject"
+    },
+    {
+      "op": "setSlot",
+      "target": "ProtoObject",
+      "slot": 0,
+      "value": "ProtoObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObject",
+      "name": "name",
+      "value": "ProtoObject"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObject",
+      "name": "superclass",
+      "value": null,
+      "comment": "ProtoObject is the root"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObject",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ProtoObject",
+      "name": "instanceVariables",
+      "value": { "op": "newArray", "size": 0 }
+    },
+
+    {
+      "comment": "=== STEP 5: Create Object ===",
+      "op": "newClass",
+      "result": "ObjectMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "ObjectMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ObjectMetaclass",
+      "name": "name",
+      "value": "Object class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ObjectMetaclass",
+      "name": "superclass",
+      "value": "ProtoObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ObjectMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "Object"
+    },
+    {
+      "op": "setSlot",
+      "target": "Object",
+      "slot": 0,
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Object",
+      "name": "name",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Object",
+      "name": "superclass",
+      "value": "ProtoObject"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Object",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Object",
+      "name": "instanceVariables",
+      "value": { "op": "newArray", "size": 0 }
+    },
+
+    {
+      "comment": "=== STEP 6: Fix Behavior's superclass ===",
+      "op": "setNamedSlot",
+      "target": "Behavior",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "newClass",
+      "result": "BehaviorMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "BehaviorMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BehaviorMetaclass",
+      "name": "name",
+      "value": "Behavior class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BehaviorMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BehaviorMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setSlot",
+      "target": "Behavior",
+      "slot": 0,
+      "value": "BehaviorMetaclass"
+    },
+
+    {
+      "comment": "=== STEP 7: Create ClassDescription ===",
+      "op": "newClass",
+      "result": "ClassDescriptionMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "ClassDescriptionMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescriptionMetaclass",
+      "name": "name",
+      "value": "ClassDescription class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescriptionMetaclass",
+      "name": "superclass",
+      "value": "BehaviorMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescriptionMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "ClassDescription"
+    },
+    {
+      "op": "setSlot",
+      "target": "ClassDescription",
+      "slot": 0,
+      "value": "ClassDescriptionMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescription",
+      "name": "name",
+      "value": "ClassDescription"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescription",
+      "name": "superclass",
+      "value": "Behavior"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassDescription",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Class",
+      "name": "superclass",
+      "value": "ClassDescription",
+      "comment": "Fix Class hierarchy"
+    },
+    {
+      "op": "newClass",
+      "result": "ClassMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "ClassMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassMetaclass",
+      "name": "name",
+      "value": "Class class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassMetaclass",
+      "name": "superclass",
+      "value": "ClassDescriptionMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ClassMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setSlot",
+      "target": "Class",
+      "slot": 0,
+      "value": "ClassMetaclass"
+    },
+
+    {
+      "comment": "=== STEP 8: Create essential support classes ===",
+      "comment2": "UndefinedObject for nil",
+      "op": "newClass",
+      "result": "UndefinedObjectMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "UndefinedObjectMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObjectMetaclass",
+      "name": "name",
+      "value": "UndefinedObject class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObjectMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObjectMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "UndefinedObject"
+    },
+    {
+      "op": "setSlot",
+      "target": "UndefinedObject",
+      "slot": 0,
+      "value": "UndefinedObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObject",
+      "name": "name",
+      "value": "UndefinedObject"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObject",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "UndefinedObject",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "Boolean hierarchy",
+      "op": "newClass",
+      "result": "BooleanMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "BooleanMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BooleanMetaclass",
+      "name": "name",
+      "value": "Boolean class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BooleanMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "BooleanMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "Boolean"
+    },
+    {
+      "op": "setSlot",
+      "target": "Boolean",
+      "slot": 0,
+      "value": "BooleanMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Boolean",
+      "name": "name",
+      "value": "Boolean"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Boolean",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Boolean",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "True class",
+      "op": "newClass",
+      "result": "TrueMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "TrueMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "TrueMetaclass",
+      "name": "name",
+      "value": "True class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "TrueMetaclass",
+      "name": "superclass",
+      "value": "BooleanMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "TrueMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "True"
+    },
+    {
+      "op": "setSlot",
+      "target": "True",
+      "slot": 0,
+      "value": "TrueMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "True",
+      "name": "name",
+      "value": "True"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "True",
+      "name": "superclass",
+      "value": "Boolean"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "True",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "False class",
+      "op": "newClass",
+      "result": "FalseMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "FalseMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "FalseMetaclass",
+      "name": "name",
+      "value": "False class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "FalseMetaclass",
+      "name": "superclass",
+      "value": "BooleanMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "FalseMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "False"
+    },
+    {
+      "op": "setSlot",
+      "target": "False",
+      "slot": 0,
+      "value": "FalseMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "False",
+      "name": "name",
+      "value": "False"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "False",
+      "name": "superclass",
+      "value": "Boolean"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "False",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "Symbol class",
+      "op": "newClass",
+      "result": "SymbolMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "SymbolMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SymbolMetaclass",
+      "name": "name",
+      "value": "Symbol class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SymbolMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SymbolMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "Symbol"
+    },
+    {
+      "op": "setSlot",
+      "target": "Symbol",
+      "slot": 0,
+      "value": "SymbolMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Symbol",
+      "name": "name",
+      "value": "Symbol"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Symbol",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Symbol",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Symbol",
+      "name": "instanceVariables",
+      "value": ["value"]
+    },
+
+    {
+      "comment": "Array class",
+      "op": "newClass",
+      "result": "ArrayMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "ArrayMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ArrayMetaclass",
+      "name": "name",
+      "value": "Array class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ArrayMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "ArrayMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "Array"
+    },
+    {
+      "op": "setSlot",
+      "target": "Array",
+      "slot": 0,
+      "value": "ArrayMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Array",
+      "name": "name",
+      "value": "Array"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Array",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Array",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Array",
+      "name": "format",
+      "value": 1,
+      "comment": "variable format"
+    },
+
+    {
+      "comment": "Dictionary class",
+      "op": "newClass",
+      "result": "DictionaryMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "DictionaryMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "DictionaryMetaclass",
+      "name": "name",
+      "value": "Dictionary class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "DictionaryMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "DictionaryMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "Dictionary"
+    },
+    {
+      "op": "setSlot",
+      "target": "Dictionary",
+      "slot": 0,
+      "value": "DictionaryMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Dictionary",
+      "name": "name",
+      "value": "Dictionary"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Dictionary",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Dictionary",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "Dictionary",
+      "name": "instanceVariables",
+      "value": ["keys", "values"]
+    },
+
+    {
+      "comment": "MethodDictionary class",
+      "op": "newClass",
+      "result": "MethodDictionaryMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "MethodDictionaryMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionaryMetaclass",
+      "name": "name",
+      "value": "MethodDictionary class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionaryMetaclass",
+      "name": "superclass",
+      "value": "DictionaryMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionaryMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "MethodDictionary"
+    },
+    {
+      "op": "setSlot",
+      "target": "MethodDictionary",
+      "slot": 0,
+      "value": "MethodDictionaryMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionary",
+      "name": "name",
+      "value": "MethodDictionary"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionary",
+      "name": "superclass",
+      "value": "Dictionary"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "MethodDictionary",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "CompiledMethod class",
+      "op": "newClass",
+      "result": "CompiledMethodMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "CompiledMethodMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethodMetaclass",
+      "name": "name",
+      "value": "CompiledMethod class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethodMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethodMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "CompiledMethod"
+    },
+    {
+      "op": "setSlot",
+      "target": "CompiledMethod",
+      "slot": 0,
+      "value": "CompiledMethodMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethod",
+      "name": "name",
+      "value": "CompiledMethod"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethod",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethod",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "CompiledMethod",
+      "name": "format",
+      "value": 3,
+      "comment": "compiled method format"
+    },
+
+    {
+      "comment": "SmallInteger class",
+      "op": "newClass",
+      "result": "SmallIntegerMetaclass"
+    },
+    {
+      "op": "setSlot",
+      "target": "SmallIntegerMetaclass",
+      "slot": 0,
+      "value": "Metaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallIntegerMetaclass",
+      "name": "name",
+      "value": "SmallInteger class"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallIntegerMetaclass",
+      "name": "superclass",
+      "value": "ObjectMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallIntegerMetaclass",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+    {
+      "op": "newClass",
+      "result": "SmallInteger"
+    },
+    {
+      "op": "setSlot",
+      "target": "SmallInteger",
+      "slot": 0,
+      "value": "SmallIntegerMetaclass"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallInteger",
+      "name": "name",
+      "value": "SmallInteger"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallInteger",
+      "name": "superclass",
+      "value": "Object"
+    },
+    {
+      "op": "setNamedSlot",
+      "target": "SmallInteger",
+      "name": "methodDict",
+      "value": { "op": "newDictionary" }
+    },
+
+    {
+      "comment": "=== STEP 9: Install critical primitive methods ===",
+      "op": "installMethod",
+      "target": "ProtoObject",
+      "selector": "doesNotUnderstand:",
+      "source": "doesNotUnderstand: aMessage\n    <primitive: 999>\n    self error: 'Message not understood'"
+    },
+    {
+      "op": "installMethod",
+      "target": "Object",
+      "selector": "class",
+      "source": "class\n    <primitive: 111>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Object",
+      "selector": "==",
+      "source": "== anObject\n    <primitive: 110>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Object",
+      "selector": "perform:",
+      "source": "perform: aSymbol\n    <primitive: 83>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Object",
+      "selector": "perform:with:",
+      "source": "perform: aSymbol with: anObject\n    <primitive: 84>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Behavior",
+      "selector": "new",
+      "source": "new\n    <primitive: 70>\n    ^self basicNew initialize"
+    },
+    {
+      "op": "installMethod",
+      "target": "Behavior",
+      "selector": "basicNew",
+      "source": "basicNew\n    <primitive: 70>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Behavior",
+      "selector": "basicNew:",
+      "source": "basicNew: size\n    <primitive: 71>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Array",
+      "selector": "at:",
+      "source": "at: index\n    <primitive: 60>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Array",
+      "selector": "at:put:",
+      "source": "at: index put: value\n    <primitive: 61>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "Array",
+      "selector": "size",
+      "source": "size\n    <primitive: 62>\n    ^self primitiveFailed"
+    },
+    {
+      "op": "installMethod",
+      "target": "True",
+      "selector": "ifTrue:",
+      "source": "ifTrue: trueBlock\n    ^trueBlock value"
+    },
+    {
+      "op": "installMethod",
+      "target": "False",
+      "selector": "ifFalse:",
+      "source": "ifFalse: falseBlock\n    ^falseBlock value"
+    },
+
+    {
+      "comment": "=== STEP 10: Create global objects ===",
+      "op": "newInstance",
+      "class": "UndefinedObject",
+      "result": "nil"
+    },
+    {
+      "op": "newInstance",
+      "class": "True",
+      "result": "true"
+    },
+    {
+      "op": "newInstance",
+      "class": "False",
+      "result": "false"
+    },
+    {
+      "op": "newInstance",
+      "class": "Dictionary",
+      "result": "Smalltalk"
+    },
+    {
+      "op": "registerGlobal",
+      "name": "nil",
+      "value": "nil"
+    },
+    {
+      "op": "registerGlobal",
+      "name": "true",
+      "value": "true"
+    },
+    {
+      "op": "registerGlobal",
+      "name": "false",
+      "value": "false"
+    },
+    {
+      "op": "registerGlobal",
+      "name": "Smalltalk",
+      "value": "Smalltalk"
+    },
+
+    {
+      "comment": "Register all classes in Smalltalk dictionary",
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "ProtoObject",
+      "value": "ProtoObject"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Object",
+      "value": "Object"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Behavior",
+      "value": "Behavior"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "ClassDescription",
+      "value": "ClassDescription"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Class",
+      "value": "Class"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Metaclass",
+      "value": "Metaclass"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "UndefinedObject",
+      "value": "UndefinedObject"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Boolean",
+      "value": "Boolean"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "True",
+      "value": "True"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "False",
+      "value": "False"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Symbol",
+      "value": "Symbol"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Array",
+      "value": "Array"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "Dictionary",
+      "value": "Dictionary"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "MethodDictionary",
+      "value": "MethodDictionary"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "CompiledMethod",
+      "value": "CompiledMethod"
+    },
+    {
+      "op": "dictionaryPut",
+      "target": "Smalltalk",
+      "key": "SmallInteger",
+      "value": "SmallInteger"
+    }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "Metaclass is self-referential",
+        "test": "Metaclass.class == Metaclass"
+      },
+      {
+        "description": "ProtoObject has no superclass",
+        "test": "ProtoObject.superclass == nil"
+      },
+      {
+        "description": "Object's superclass is ProtoObject",
+        "test": "Object.superclass == ProtoObject"
+      },
+      {
+        "description": "ProtoObject class → Class creates loop",
+        "test": "ProtoObject.class.superclass == Class"
+      },
+      {
+        "description": "Class hierarchy correct",
+        "test": "Class.superclass == ClassDescription && ClassDescription.superclass == Behavior"
+      },
+      {
+        "description": "Method lookup works",
+        "test": "Object.methodDict['class'] != nil"
+      },
+      {
+        "description": "Global objects exist",
+        "test": "nil != undefined && true != undefined && false != undefined"
+      },
+      {
+        "description": "Smalltalk dictionary populated",
+        "test": "Smalltalk['Object'] == Object"
+      }
+    ]
+  }
+}

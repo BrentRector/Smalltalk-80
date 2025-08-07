@@ -39,7 +39,7 @@ public static class StorageManagementPrimitives
     /// <summary>Creates a new instance of a class with no indexable fields.</summary>
     public static bool New(Context ctx)
     {
-        if (ctx.Stack.Pop() is not SmalltalkClass cls)
+        if (ctx.Stack.Pop() is not SmalltalkObject cls)
             return false;
         var instance = new SmalltalkObject(cls, 0);
         ctx.Stack.Push(instance);
@@ -49,7 +49,7 @@ public static class StorageManagementPrimitives
     /// <summary>Creates a new instance of a class with a given field count.</summary>
     public static bool NewWithArg(Context ctx)
     {
-        if (ctx.Stack.Pop() is not int size || ctx.Stack.Pop() is not SmalltalkClass cls)
+        if (ctx.Stack.Pop() is not int size || ctx.Stack.Pop() is not SmalltalkObject cls)
             return false;
         var instance = new SmalltalkObject(cls, size);
         ctx.Stack.Push(instance);
@@ -130,7 +130,7 @@ public static class StorageManagementPrimitives
     /// <summary>Pushes an arbitrary instance of the specified class.</summary>
     public static bool SomeInstance(Context ctx)
     {
-        if (ctx.Stack.Pop() is not SmalltalkClass cls)
+        if (ctx.Stack.Pop() is not SmalltalkObject cls)
             return false;
         var instance = ObjectMemory.SomeInstance(cls);
         if (instance == null) return false;
@@ -152,7 +152,7 @@ public static class StorageManagementPrimitives
     /// <summary>Creates a new CompiledMethod-like object.</summary>
     public static bool NewMethod(Context ctx)
     {
-        if (ctx.Stack.Pop() is not int header || ctx.Stack.Pop() is not int byteCount || ctx.Stack.Pop() is not SmalltalkClass cls)
+        if (ctx.Stack.Pop() is not int header || ctx.Stack.Pop() is not int byteCount || ctx.Stack.Pop() is not SmalltalkObject cls)
             return false;
         var method = new SmalltalkObject(cls, byteCount + 1);
         method.Fields[0] = header;

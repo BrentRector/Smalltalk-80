@@ -26,4 +26,15 @@
     <Delete Files="@(GeneratedFiles)" />
   </Target>
 
+  <!-- Copy bootstrap JSON files to output directory -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <Message Text="Copying bootstrap JSON files to output directory..." Importance="high" />
+    <ItemGroup>
+      <BootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\*.json" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutputPath)Bootstrap" />
+    <Copy SourceFiles="@(BootstrapFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Message Text="Copied bootstrap files: @(BootstrapFiles -> '%(Filename)%(Extension)', ', ')" Importance="high" />
+  </Target>
+
 </Project>

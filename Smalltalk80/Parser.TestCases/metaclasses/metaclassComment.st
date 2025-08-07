@@ -1,0 +1,1 @@
+"Test case: metaclassComment.st"

@@ -44,7 +44,7 @@ public static class LegacyImageLoader
         for (int i = 0; i < objectTable.Count; i++) {
             int classRefIndex = forwardPointers[i];
             if (classRefIndex >= 0 && classRefIndex < objectTable.Count) {
-                var candidate = objectTable[classRefIndex] as SmalltalkClass;
+                var candidate = objectTable[classRefIndex];
                 if (candidate != null) objectTable[i].ClassPointer = candidate;
             }
         }

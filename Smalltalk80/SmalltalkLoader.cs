@@ -342,7 +342,7 @@ public class SmalltalkLoader
             if (firstToken == "nil")
             {
                 // Use nil as receiver
-                if (!SystemDictionary.TryGetGlobal("nil", out receiver))
+                if (!SystemDictionary.TryGetGlobal("nil", out receiver!))
                 {
                     // Create a nil object if not found
                     if (!SystemDictionary.TryGetClass("UndefinedObject", out var nilClass))

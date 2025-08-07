@@ -1,0 +1,550 @@
+{
+  "phase": "2",
+  "description": "Define base classes using Smalltalk messaging and bytecode execution",
+  "prerequisites": [
+    "Phase 1 complete",
+    "Message dispatch functional",
+    "perform: primitive working",
+    "Method compilation primitive available"
+  ],
+  "steps": [
+    {
+      "comment": "=== Create Boolean hierarchy ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Boolean"},
+        "",
+        "",
+        "",
+        "Kernel-Objects"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Boolean",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "True"},
+        "",
+        "",
+        "",
+        "Kernel-Objects"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Boolean",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "False"},
+        "",
+        "",
+        "",
+        "Kernel-Objects"
+      ]
+    },
+    {
+      "comment": "=== Install Boolean methods ===",
+      "action": "sendMessage",
+      "receiver": "True",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifTrue: trueBlock\n    ^trueBlock value",
+        "controlling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "True",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifFalse: falseBlock\n    ^nil",
+        "controlling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "True",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifTrue: trueBlock ifFalse: falseBlock\n    ^trueBlock value",
+        "controlling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "False",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifTrue: trueBlock\n    ^nil",
+        "controlling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "False",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifFalse: falseBlock\n    ^falseBlock value",
+        "controlling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "False",
+      "selector": "compile:classified:",
+      "arguments": [
+        "ifTrue: trueBlock ifFalse: falseBlock\n    ^falseBlock value",
+        "controlling"
+      ]
+    },
+    {
+      "comment": "=== Create UndefinedObject ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "UndefinedObject"},
+        "",
+        "",
+        "",
+        "Kernel-Objects"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "UndefinedObject",
+      "selector": "compile:classified:",
+      "arguments": [
+        "isNil\n    ^true",
+        "testing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "UndefinedObject",
+      "selector": "compile:classified:",
+      "arguments": [
+        "notNil\n    ^false",
+        "testing"
+      ]
+    },
+    {
+      "comment": "=== Create Message ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Message"},
+        "selector arguments",
+        "",
+        "",
+        "Kernel-Methods"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Message",
+      "selector": "compile:classified:",
+      "arguments": [
+        "selector\n    ^selector",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Message",
+      "selector": "compile:classified:",
+      "arguments": [
+        "selector: aSymbol\n    selector := aSymbol",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Message",
+      "selector": "compile:classified:",
+      "arguments": [
+        "arguments\n    ^arguments",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Message",
+      "selector": "compile:classified:",
+      "arguments": [
+        "arguments: anArray\n    arguments := anArray",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Message",
+      "selector": "compile:classified:",
+      "arguments": [
+        "sendTo: receiver\n    ^receiver perform: selector withArguments: arguments",
+        "sending"
+      ]
+    },
+    {
+      "comment": "=== Create BlockContext ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "BlockContext"},
+        "nargs startpc home",
+        "",
+        "",
+        "Kernel-Methods"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "BlockContext",
+      "selector": "compile:classified:",
+      "arguments": [
+        "value\n    <primitive: 81>\n    self primitiveFailed",
+        "evaluating"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "BlockContext",
+      "selector": "compile:classified:",
+      "arguments": [
+        "value: arg1\n    <primitive: 81>\n    self primitiveFailed",
+        "evaluating"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "BlockContext",
+      "selector": "compile:classified:",
+      "arguments": [
+        "whileTrue: aBlock\n    self value ifTrue: [\n        aBlock value.\n        self whileTrue: aBlock]",
+        "controlling"
+      ]
+    },
+    {
+      "comment": "=== Create Collection hierarchy ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Collection"},
+        "",
+        "",
+        "",
+        "Collections-Abstract"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Collection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "isEmpty\n    ^self size = 0",
+        "testing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Collection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "do: aBlock\n    self subclassResponsibility",
+        "enumerating"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Collection",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "SequenceableCollection"},
+        "",
+        "",
+        "",
+        "Collections-Abstract"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SequenceableCollection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "first\n    ^self at: 1",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SequenceableCollection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "last\n    ^self at: self size",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SequenceableCollection",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "OrderedCollection"},
+        "array firstIndex lastIndex",
+        "",
+        "",
+        "Collections-Sequenceable"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "OrderedCollection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "initialize\n    array := Array new: 10.\n    firstIndex := 5.\n    lastIndex := 4",
+        "initialization"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "OrderedCollection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "size\n    ^lastIndex - firstIndex + 1",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "OrderedCollection",
+      "selector": "compile:classified:",
+      "arguments": [
+        "add: anObject\n    lastIndex := lastIndex + 1.\n    lastIndex > array size ifTrue: [self grow].\n    array at: lastIndex put: anObject.\n    ^anObject",
+        "adding"
+      ]
+    },
+    {
+      "comment": "=== Create String ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "String"},
+        "",
+        "",
+        "",
+        "Collections-Text"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "String",
+      "selector": "compile:classified:",
+      "arguments": [
+        "at: index\n    <primitive: 63>\n    self primitiveFailed",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "String",
+      "selector": "compile:classified:",
+      "arguments": [
+        "size\n    <primitive: 62>\n    self primitiveFailed",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "String",
+      "selector": "compile:classified:",
+      "arguments": [
+        ", aString\n    | newString |\n    newString := String new: self size + aString size.\n    1 to: self size do: [:i | newString at: i put: (self at: i)].\n    1 to: aString size do: [:i | newString at: self size + i put: (aString at: i)].\n    ^newString",
+        "concatenation"
+      ]
+    },
+    {
+      "comment": "=== Create Number hierarchy ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Magnitude"},
+        "",
+        "",
+        "",
+        "Kernel-Numbers"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Magnitude",
+      "selector": "compile:classified:",
+      "arguments": [
+        "< aMagnitude\n    self subclassResponsibility",
+        "comparing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Magnitude",
+      "selector": "compile:classified:",
+      "arguments": [
+        "> aMagnitude\n    ^aMagnitude < self",
+        "comparing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Magnitude",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Number"},
+        "",
+        "",
+        "",
+        "Kernel-Numbers"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Number",
+      "selector": "compile:classified:",
+      "arguments": [
+        "negated\n    ^0 - self",
+        "arithmetic"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Number",
+      "selector": "compile:classified:",
+      "arguments": [
+        "abs\n    self < 0 ifTrue: [^self negated].\n    ^self",
+        "arithmetic"
+      ]
+    },
+    {
+      "comment": "=== Create SystemDictionary ===",
+      "action": "sendMessage",
+      "receiver": "Dictionary",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "SystemDictionary"},
+        "",
+        "",
+        "",
+        "System-Support"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SystemDictionary",
+      "selector": "compile:classified:",
+      "arguments": [
+        "at: key put: value\n    super at: key put: value.\n    (value isKindOf: Class) ifTrue: [value instVarAt: 6 put: key].\n    ^value",
+        "accessing"
+      ]
+    },
+    {
+      "comment": "=== Create Compiler stubs ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Compiler"},
+        "source class category",
+        "",
+        "",
+        "System-Compiler"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Compiler",
+      "selector": "compile:classified:",
+      "arguments": [
+        "compile: sourceString\n    ^self compile: sourceString in: class classified: category",
+        "compiling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Compiler",
+      "selector": "compile:classified:",
+      "arguments": [
+        "compile: sourceString in: aClass classified: aCategory\n    <primitive: 117>\n    self primitiveFailed",
+        "compiling"
+      ]
+    },
+    {
+      "comment": "=== Register global instances ===",
+      "action": "sendMessage",
+      "receiver": "Smalltalk",
+      "selector": "at:put:",
+      "arguments": [
+        {"symbol": "nil"},
+        {"instance": "UndefinedObject"}
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Smalltalk",
+      "selector": "at:put:",
+      "arguments": [
+        {"symbol": "true"},
+        {"instance": "True"}
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Smalltalk",
+      "selector": "at:put:",
+      "arguments": [
+        {"symbol": "false"},
+        {"instance": "False"}
+      ]
+    },
+    {
+      "comment": "=== Register all classes in Smalltalk globals ===",
+      "action": "registerClasses",
+      "classes": [
+        "Boolean", "True", "False", "UndefinedObject",
+        "Message", "BlockContext",
+        "Collection", "SequenceableCollection", "OrderedCollection",
+        "String", "Magnitude", "Number",
+        "SystemDictionary", "Compiler"
+      ]
+    }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "Boolean control structures work",
+        "test": "true ifTrue: [42] == 42"
+      },
+      {
+        "description": "Message objects can be created",
+        "test": "Message new notNil"
+      },
+      {
+        "description": "Collections are operational",
+        "test": "OrderedCollection new add: 1; size == 1"
+      },
+      {
+        "description": "Compiler stub exists",
+        "test": "Compiler respondsTo: #compile:"
+      },
+      {
+        "description": "Smalltalk globals accessible",
+        "test": "Smalltalk at: #Object == Object"
+      }
+    ]
+  }
+}

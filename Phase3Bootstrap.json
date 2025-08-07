@@ -1,0 +1,524 @@
+{
+  "phase": "3",
+  "description": "Load remaining classes for headless system using in-image compiler",
+  "prerequisites": [
+    "Phase 2 complete",
+    "Compiler functional",
+    "File I/O primitives available",
+    "Parser and Scanner operational"
+  ],
+  "configuration": {
+    "sourceFile": "HeadlessStandardLibrary.st",
+    "loadOrder": [
+      "Kernel-Numbers",
+      "Kernel-Methods",
+      "Collections-Streams",
+      "System-Files",
+      "System-Processes",
+      "System-Exceptions",
+      "System-Utilities"
+    ]
+  },
+  "steps": [
+    {
+      "comment": "=== Initialize file reader ===",
+      "action": "sendMessage",
+      "receiver": "FileStream",
+      "selector": "open:forReading:",
+      "arguments": ["HeadlessStandardLibrary.st"],
+      "result": "fileStream"
+    },
+    {
+      "comment": "=== Main loading loop ===",
+      "action": "loop",
+      "condition": {
+        "receiver": "fileStream",
+        "selector": "atEnd",
+        "expected": false
+      },
+      "body": [
+        {
+          "action": "sendMessage",
+          "receiver": "fileStream",
+          "selector": "nextChunk",
+          "result": "sourceChunk"
+        },
+        {
+          "action": "conditional",
+          "test": {
+            "receiver": "sourceChunk",
+            "selector": "isClassDefinition"
+          },
+          "true": [
+            {
+              "action": "sendMessage",
+              "receiver": "Compiler",
+              "selector": "evaluateClassDefinition:",
+              "arguments": ["sourceChunk"]
+            }
+          ],
+          "false": [
+            {
+              "action": "sendMessage",
+              "receiver": "Compiler",
+              "selector": "compileMethod:",
+              "arguments": ["sourceChunk"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "=== Complete Integer class ===",
+      "action": "sendMessage",
+      "receiver": "Number",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Integer"},
+        "",
+        "",
+        "",
+        "Kernel-Numbers"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Integer",
+      "selector": "compile:classified:",
+      "arguments": [
+        "factorial\n    self = 0 ifTrue: [^1].\n    self < 0 ifTrue: [self error: 'Not valid for negative integers'].\n    ^self * (self - 1) factorial",
+        "mathematical functions"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Integer",
+      "selector": "compile:classified:",
+      "arguments": [
+        "gcd: anInteger\n    | a b |\n    a := self abs. b := anInteger abs.\n    [b = 0] whileFalse: [\n        | temp |\n        temp := a \\\\ b.\n        a := b.\n        b := temp].\n    ^a",
+        "mathematical functions"
+      ]
+    },
+    {
+      "comment": "=== Create SmallInteger ===",
+      "action": "sendMessage",
+      "receiver": "Integer",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "SmallInteger"},
+        "",
+        "",
+        "",
+        "Kernel-Numbers"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SmallInteger",
+      "selector": "compile:classified:",
+      "arguments": [
+        "+ aNumber\n    <primitive: 1>\n    ^super + aNumber",
+        "arithmetic"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SmallInteger",
+      "selector": "compile:classified:",
+      "arguments": [
+        "- aNumber\n    <primitive: 2>\n    ^super - aNumber",
+        "arithmetic"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SmallInteger",
+      "selector": "compile:classified:",
+      "arguments": [
+        "* aNumber\n    <primitive: 9>\n    ^super * aNumber",
+        "arithmetic"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "SmallInteger",
+      "selector": "compile:classified:",
+      "arguments": [
+        "to: stop do: aBlock\n    | i |\n    i := self.\n    [i <= stop] whileTrue: [\n        aBlock value: i.\n        i := i + 1]",
+        "enumerating"
+      ]
+    },
+    {
+      "comment": "=== Create Float ===",
+      "action": "sendMessage",
+      "receiver": "Number",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Float"},
+        "",
+        "",
+        "",
+        "Kernel-Numbers"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Float",
+      "selector": "compile:classified:",
+      "arguments": [
+        "+ aNumber\n    <primitive: 41>\n    ^self primitiveFailed",
+        "arithmetic"
+      ]
+    },
+    {
+      "comment": "=== Create Character ===",
+      "action": "sendMessage",
+      "receiver": "Magnitude",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Character"},
+        "value",
+        "",
+        "",
+        "Collections-Text"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Character",
+      "selector": "compile:classified:",
+      "arguments": [
+        "asciiValue\n    ^value",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Character",
+      "selector": "compile:classified:",
+      "arguments": [
+        "isLetter\n    ^(self >= $a and: [self <= $z]) or: [self >= $A and: [self <= $Z]]",
+        "testing"
+      ]
+    },
+    {
+      "comment": "=== Create Stream hierarchy ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Stream"},
+        "",
+        "",
+        "",
+        "Collections-Streams"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Stream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "atEnd\n    self subclassResponsibility",
+        "testing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Stream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "next\n    self subclassResponsibility",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Stream",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "FileStream"},
+        "file position",
+        "",
+        "",
+        "System-Files"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "FileStream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "nextLine\n    | line char |\n    line := String new.\n    [self atEnd] whileFalse: [\n        char := self next.\n        char = Character cr ifTrue: [^line].\n        line := line, (String with: char)].\n    ^line",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "FileStream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "nextChunk\n    | chunk char |\n    chunk := String new.\n    [self atEnd] whileFalse: [\n        char := self next.\n        char = $! ifTrue: [^chunk].\n        chunk := chunk, (String with: char)].\n    ^chunk",
+        "accessing"
+      ]
+    },
+    {
+      "comment": "=== Create Process and Scheduler ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Process"},
+        "suspendedContext priority myList",
+        "",
+        "",
+        "System-Processes"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Process",
+      "selector": "compile:classified:",
+      "arguments": [
+        "priority\n    ^priority",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Process",
+      "selector": "compile:classified:",
+      "arguments": [
+        "resume\n    Processor resume: self",
+        "scheduling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "ProcessorScheduler"},
+        "quiescentProcessLists activeProcess",
+        "",
+        "",
+        "System-Processes"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "ProcessorScheduler",
+      "selector": "compile:classified:",
+      "arguments": [
+        "activeProcess\n    ^activeProcess",
+        "accessing"
+      ]
+    },
+    {
+      "comment": "=== Create Exception hierarchy ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Exception"},
+        "messageText tag signalContext handlerContext outerContext",
+        "",
+        "",
+        "System-Exceptions"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Exception",
+      "selector": "compile:classified:",
+      "arguments": [
+        "signal\n    self signal: ''",
+        "signaling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Exception",
+      "selector": "compile:classified:",
+      "arguments": [
+        "signal: aString\n    messageText := aString.\n    ^self primitiveSignal",
+        "signaling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Exception",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Error"},
+        "",
+        "",
+        "",
+        "System-Exceptions"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Error",
+      "selector": "compile:classified:",
+      "arguments": [
+        "defaultAction\n    self halt",
+        "handling"
+      ]
+    },
+    {
+      "comment": "=== Create Transcript ===",
+      "action": "sendMessage",
+      "receiver": "Stream",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "TranscriptStream"},
+        "",
+        "",
+        "",
+        "System-Utilities"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "TranscriptStream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "show: anObject\n    <primitive: 999>\n    ^self",
+        "printing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "TranscriptStream",
+      "selector": "compile:classified:",
+      "arguments": [
+        "cr\n    self show: String cr",
+        "printing"
+      ]
+    },
+    {
+      "comment": "=== Initialize global Transcript ===",
+      "action": "sendMessage",
+      "receiver": "Smalltalk",
+      "selector": "at:put:",
+      "arguments": [
+        {"symbol": "Transcript"},
+        {"sendMessage": {
+          "receiver": "TranscriptStream",
+          "selector": "new"
+        }}
+      ]
+    },
+    {
+      "comment": "=== Create Context for debugging ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "arguments": [
+        {"symbol": "Context"},
+        "sender pc stackp method receiver",
+        "",
+        "",
+        "Kernel-Methods"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Context",
+      "selector": "compile:classified:",
+      "arguments": [
+        "sender\n    ^sender",
+        "accessing"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Context",
+      "selector": "compile:classified:",
+      "arguments": [
+        "receiver\n    ^receiver",
+        "accessing"
+      ]
+    },
+    {
+      "comment": "=== System utility methods ===",
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "compile:classified:",
+      "arguments": [
+        "halt\n    self error: 'Halt encountered'",
+        "debugging"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "compile:classified:",
+      "arguments": [
+        "error: aString\n    ^Error new signal: aString",
+        "error handling"
+      ]
+    },
+    {
+      "action": "sendMessage",
+      "receiver": "Object",
+      "selector": "compile:classified:",
+      "arguments": [
+        "inspect\n    ^InspectorWindow openOn: self",
+        "debugging"
+      ]
+    },
+    {
+      "comment": "=== Register all Phase 3 classes ===",
+      "action": "registerClasses",
+      "classes": [
+        "Integer", "SmallInteger", "Float", "Character",
+        "Stream", "FileStream", "TranscriptStream",
+        "Process", "ProcessorScheduler",
+        "Exception", "Error",
+        "Context"
+      ]
+    },
+    {
+      "comment": "=== Close file stream ===",
+      "action": "sendMessage",
+      "receiver": "fileStream",
+      "selector": "close"
+    }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "Integer arithmetic works",
+        "test": "5 factorial == 120"
+      },
+      {
+        "description": "File I/O operational",
+        "test": "FileStream respondsTo: #nextLine"
+      },
+      {
+        "description": "Exception handling available",
+        "test": "Error canUnderstand: #signal:"
+      },
+      {
+        "description": "Transcript available",
+        "test": "Transcript notNil"
+      },
+      {
+        "description": "Process scheduling exists",
+        "test": "Process canUnderstand: #resume"
+      },
+      {
+        "description": "Full numeric tower",
+        "test": "(3.14 + 2) isKindOf: Float"
+      }
+    ]
+  },
+  "metrics": {
+    "expectedClasses": 312,
+    "expectedMethods": 3147,
+    "memoryFootprint": "~2MB",
+    "loadTime": "~5 seconds"
+  }
+}

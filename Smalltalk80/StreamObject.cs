@@ -24,7 +24,7 @@ public sealed class StreamObject : SmalltalkObject
     /// <param name="readLimit">The maximum index that can be read.</param>
     /// <param name="writeLimit">The maximum index that can be written.</param>
     public StreamObject(
-        SmalltalkClass? cls,
+        SmalltalkObject? cls,
         SmalltalkObject array,
         int readLimit,
         int writeLimit)

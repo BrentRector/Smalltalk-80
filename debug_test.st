@@ -1,0 +1,2 @@
+Object>>testMethod
+^42!
