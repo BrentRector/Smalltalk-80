@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Smalltalk80.Compiler</AssemblyName>
+    <RootNamespace>Smalltalk80.Compiler</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
+  </ItemGroup>
+
+  <!-- Automatically validate the Smalltalk-80 system image after build -->
+  <Target Name="ValidateSystemImage" AfterTargets="Build">
+    <Message Text="Validating Smalltalk-80 system image..." Importance="high" />
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; --validate &quot;$(MSBuildProjectDirectory)\..\Smalltalk80\Smalltalk-80 Source\Smalltalk-80.st&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)\.."
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ValidationOutput" />
+    </Exec>
+    <Message Text="✓ Smalltalk-80 system image validation passed" Importance="high" />
+  </Target>
+
+</Project>

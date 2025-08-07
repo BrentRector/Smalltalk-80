@@ -364,10 +364,10 @@ public interface ISmalltalkVM_Stage2 : ISmalltalkVM
     /// <summary>
     /// Lookup a global by name
     /// </summary>
-    int PrimitiveLookupGlobal(string name);
+    new int PrimitiveLookupGlobal(string name);
     
     /// <summary>
     /// Intern a string (create String object)
     /// </summary>
-    int PrimitiveInternString(string str);
+    new int PrimitiveInternString(string str);
 }

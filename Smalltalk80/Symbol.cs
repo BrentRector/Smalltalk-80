@@ -9,6 +9,11 @@ public sealed class Symbol
     ///     Gets the textual name of the symbol.
     /// </summary>
     public string Name { get; }
+    
+    /// <summary>
+    ///     Gets the value of the symbol (alias for Name).
+    /// </summary>
+    public string Value => Name;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="Symbol"/> class.

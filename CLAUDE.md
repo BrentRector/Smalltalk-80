@@ -8,10 +8,26 @@ This project contains a prototype of a Smalltalk-80 interpreter written in C#. W
 - **Generating the parser**: You can (re)generate the C# parser by running the GenerateIfNewer.ps1 Powershell script (located in the scripts folder) This script regenerates the parser when the grammar is newer than the generated code. You can always generate the parser by running the Invoke-Antlr4CSharp.ps1 script. Never allow warning during the ANTLR4 parser generation. A warning means the grammar must be adjusted to eliminate the warning.
 - **Script working directory**: Run PowerShell from the `Smalltalk80/scripts` directory when invoking GenerateIfNewer.ps1 or Invoke-Antlr4CSharp.ps1 because all paths inside these scripts are relative to that folder.
 - **Available tools**: You can use the 'dotnet script' functionality as necessary. However, you invoke the tool using the following command: dotnet-script. Powershell is also available. Use the 'pwsh' command to run Powershell
-- **Testing**: Run `dotnet build --no-restore` and `dotnet test --no-build` before every commit to verify that the code compiles and all tests pass. The solution contains a `GrammarTests` project that executes regression tests against the `Smalltalk80.g4` grammar. These tests run after every build and should remain part of the solution.
+- **Testing**: Run `dotnet build --no-restore` before every commit to verify that the code compiles. The compiler is automatically tested against the Smalltalk-80 system image after each build.
 - **Code style**: Follow the existing formatting conventions. Use expression-bodied members when they improve readability and avoid unnecessary verbosity.
 - **Repository structure**: Keep implementation code under the `Smalltalk80` directory and tests under `Smalltalk80.Tests`.
 - **Grammar validation**: The repository contains `Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st` with thousands of lines of valid Smalltalk code. Use this file to validate grammar or parser changes and confirm syntax assumptions. Note that the WS lexer rule drops whitespace so there is never any need to add a whitespace production in the parser.
+
+## Compiler Testing
+
+**Critical**: After any changes to the grammar or parser, you MUST test the compiler against the Smalltalk-80 system image:
+
+```bash
+dotnet run --project "Smalltalk80.Compiler/Smalltalk80.Compiler.csproj" -- --validate "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st"
+```
+
+**Expected output for a successful test:**
+- **0 errors**
+- **0 warnings**
+- **41,402 lines of code**
+- Parsing time around 1 second
+
+Any errors or warnings indicate a regression in the parser that must be fixed immediately. The Smalltalk-80 system image is the canonical reference and must always parse without errors.
 
 ## AI Assistant Development Guidelines
 

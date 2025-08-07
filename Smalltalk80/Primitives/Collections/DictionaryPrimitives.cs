@@ -54,7 +54,7 @@ public static class DictionaryPrimitives
         if (receiver == SystemDictionary.GetSmalltalk())
         {
             var dict = SystemDictionary.GetSmalltalkDictionary();
-            dict[key] = value;
+            dict[key] = value!;
             ctx.Stack.Push(value); // at:put: returns the value
             
             Console.WriteLine($"[DICTIONARY] Stored {key.Value} in Smalltalk global dictionary");

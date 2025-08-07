@@ -81,4 +81,34 @@ public class SmalltalkObject
     ///     STUB: Metaclass reference - simplified for shadow class removal.
     /// </summary>
     public SmalltalkObject? Metaclass { get; set; }
+    
+    /// <summary>
+    /// Checks if this object appears to be a SmallInteger.
+    /// </summary>
+    public bool IsSmallInteger => false; // TODO: Implement proper SmallInteger check
+    
+    /// <summary>
+    /// Gets the SmallInteger value if this is a SmallInteger.
+    /// </summary>
+    public int SmallIntegerValue => 0; // TODO: Implement proper SmallInteger value extraction
+    
+    /// <summary>
+    /// Tries to get a field value by name.
+    /// </summary>
+    public bool TryGetField(string fieldName, out object? value)
+    {
+        // TODO: Implement field lookup by name
+        value = null;
+        return false;
+    }
+    
+    /// <summary>
+    /// Tries to get the string value if this object represents a string.
+    /// </summary>
+    public bool TryGetStringValue(out string value)
+    {
+        // TODO: Implement proper string extraction
+        value = string.Empty;
+        return false;
+    }
 }

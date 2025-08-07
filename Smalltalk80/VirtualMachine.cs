@@ -82,21 +82,16 @@ public sealed class VirtualMachine
             throw new FileNotFoundException($"Phase 1 bootstrap file not found: {phase1Path}");
         }
         
-        // Clear object memory and create basic class objects as VM objects
+        // Clear object memory
         ObjectMemory.Reset();
         Console.WriteLine("[BOOTSTRAP] Cleared VM object memory");
         
-        // Create essential class objects directly in VM object memory
-        // These are SmalltalkObject instances that represent classes
-        var objectClass = new SmalltalkObject(null, 0); // Object has no superclass
-        var collectionClass = new SmalltalkObject(objectClass, 0);
-        var setClass = new SmalltalkObject(collectionClass, 2); // tally, array fields
-        var dictClass = new SmalltalkObject(setClass, 0);
-        var identityDictClass = new SmalltalkObject(dictClass, 0);
-        var systemDictClass = new SmalltalkObject(identityDictClass, 32); // indexed fields for dictionary
+        // Parse and execute JSON bootstrap operations
+        var jsonContent = File.ReadAllText(phase1Path);
+        var bootstrapExecutor = new JsonBootstrapExecutor(new VMPrimitiveAdapter(this));
+        bootstrapExecutor.ExecutePhase1(jsonContent);
         
-        Console.WriteLine($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} class objects in VM memory");
-        
+        Console.WriteLine($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
         Console.WriteLine("[BOOTSTRAP] Phase 1 complete: VM primitives executed");
         
         // Dump classes after Phase 1
@@ -494,4 +489,20 @@ public sealed class VirtualMachine
     }
     
     // InitializeClasses method removed - no longer needed without shadow classes
+    
+    /// <summary>
+    /// Gets the global variables currently registered in the VM.
+    /// </summary>
+    public Dictionary<string, SmalltalkObject> GetGlobalVariables()
+    {
+        var globals = new Dictionary<string, SmalltalkObject>();
+        
+        // Add known globals from ObjectMemory
+        // TODO: Implement global object access once ObjectMemory is updated
+        
+        // In a full implementation, we would have a proper global dictionary
+        // For now, return just the basic globals
+        return globals;
+    }
+    
 }

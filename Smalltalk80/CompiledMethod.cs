@@ -14,6 +14,11 @@ public sealed class CompiledMethod
     ///     Gets the bytecodes that make up the body of the method.
     /// </summary>
     public required byte[] Bytecodes { get; init; } = Array.Empty<byte>();
+    
+    /// <summary>
+    ///     Gets the bytecodes (alias for Bytecodes for compatibility).
+    /// </summary>
+    public byte[] Bytecode => Bytecodes;
 
     /// <summary>
     ///     Gets the literal objects referenced by the method.
