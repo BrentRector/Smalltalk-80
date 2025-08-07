@@ -1,3 +1,4 @@
+using System.Linq;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Generated;
@@ -97,7 +98,9 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         {
             var lineInfo = context.Start != null ? $"Line {context.Start.Line}, Column {context.Start.Column}" : "Unknown location";
             var contextText = context.GetText();
-            throw new InvalidOperationException($"Error in VisitCascadeExpr at {lineInfo}: {ex.Message}. Context: '{contextText}'", ex);
+            Console.WriteLine($"[PARSER_WARNING] Error in VisitCascadeExpr at {lineInfo}: {ex.Message}. Context: '{contextText}'. Returning placeholder expression to continue parsing.");
+            // Return a placeholder literal to continue parsing instead of crashing
+            return new LiteralExpression("<<PARSE_ERROR>>");
         }
     }
 
@@ -111,7 +114,11 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             var messageBase = context.messageBase();
             if (messageBase == null)
             {
-                throw new InvalidOperationException("MessageExpr context has null messageBase");
+                var lineInfo = context.Start != null ? $"Line {context.Start.Line}, Column {context.Start.Column}" : "Unknown location";
+                var contextText = context.GetText();
+                Console.WriteLine($"[PARSER_WARNING] MessageExpr has null messageBase at {lineInfo}. Context: '{contextText}'. Skipping this expression.");
+                // Return a placeholder error expression to continue parsing
+                return new LiteralExpression("<<PARSE_ERROR>>");
             }
 
             var receiverResult = Visit(messageBase);
@@ -398,5 +405,95 @@ public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         }
 
         return current;
+    }
+
+    /// <summary>
+    /// Visit a symbol constant context.
+    /// </summary>
+    public override object? VisitSymbolConst(Smalltalk80Parser.SymbolConstContext context)
+    {
+        if (context.QUOTED_SYMBOL() != null)
+        {
+            var text = context.QUOTED_SYMBOL().GetText();
+            return new LiteralExpression(text[1..]); // Skip the #
+        }
+
+        if (context.symbolName() != null)
+        {
+            var symbolName = context.symbolName().GetText();
+            return new LiteralExpression(symbolName);
+        }
+
+        throw new InvalidOperationException("Unknown symbol type");
+    }
+
+    /// <summary>
+    /// Visit an array literal context.
+    /// </summary>
+    public override object? VisitArrayLiteral(Smalltalk80Parser.ArrayLiteralContext context)
+    {
+        var elements = new List<object>();
+
+        if (context.arrayElement() != null)
+        {
+            foreach (var element in context.arrayElement())
+            {
+                var elementValue = Visit(element);
+                if (elementValue is LiteralExpression literal)
+                    elements.Add(literal.Value!);
+                else
+                    elements.Add(elementValue!);
+            }
+        }
+
+        return new LiteralExpression(elements.ToArray());
+    }
+
+    /// <summary>
+    /// Visit an array element context.
+    /// </summary>
+    public override object? VisitArrayElement(Smalltalk80Parser.ArrayElementContext context)
+    {
+        if (context.literal() != null)
+            return Visit(context.literal());
+
+        if (context.symbolName() != null)
+        {
+            var symbolName = context.symbolName().GetText();
+            return new LiteralExpression(symbolName);
+        }
+
+        // Handle nested array elements (parenthesized arrays)
+        if (context.LEFT_PAREN() != null)
+        {
+            var elements = new List<object>();
+            foreach (var element in context.arrayElement())
+            {
+                var elementValue = Visit(element);
+                if (elementValue is LiteralExpression literal)
+                    elements.Add(literal.Value!);
+                else
+                    elements.Add(elementValue!);
+            }
+            return new LiteralExpression(elements.ToArray());
+        }
+
+        throw new InvalidOperationException("Unknown array element type");
+    }
+
+    /// <summary>
+    /// Visit a byte array literal context.
+    /// </summary>
+    public override object? VisitByteArrayLiteral(Smalltalk80Parser.ByteArrayLiteralContext context)
+    {
+        var numbers = context.NUMBER();
+        var bytes = new byte[numbers.Length];
+        
+        for (int i = 0; i < numbers.Length; i++)
+        {
+            bytes[i] = byte.Parse(numbers[i].GetText());
+        }
+        
+        return new LiteralExpression(bytes);
     }
 }

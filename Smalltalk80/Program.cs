@@ -1,6 +1,9 @@
 using System;
 using System.Linq;
 using System.IO;
+using Antlr4.Runtime;
+using Smalltalk80.Generated;
+using Smalltalk80.Parser;
 // GUI functionality removed for cross-platform build
 
 /// <summary>
@@ -21,11 +24,22 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Check for bootstrap generation command
+        if (args.Length > 0 && args[0] == "--generate-bootstrap")
+        {
+            Console.WriteLine("Generating bootstrap code...");
+            var generator = new Smalltalk80.BootstrapGenerator();
+            generator.Generate("Bootstrap.st", "Smalltalk80/GeneratedBootstrap.cs");
+            Console.WriteLine("Bootstrap generation complete!");
+            return;
+        }
+        
         Console.WriteLine("Smalltalk-80 System Boot");
 
-        // Check for --no-stdlib option
+        // Check for --no-stdlib and --legacy-bootstrap options
         bool skipStdlib = args.Contains("--no-stdlib");
-        var vm = new VirtualMachine(skipStandardLibrary: skipStdlib);
+        bool useLegacyBootstrap = args.Contains("--legacy-bootstrap");
+        var vm = new VirtualMachine(skipStandardLibrary: skipStdlib, useGeneratedBootstrap: !useLegacyBootstrap);
 
         var loadIndex = Array.IndexOf(args, "--load");
         if (loadIndex >= 0 && loadIndex < args.Length - 1)
@@ -99,6 +113,22 @@ public static class Program
         {
             Console.WriteLine("Running Smalltalk-based test suite...");
             RunSmalltalkTests(vm);
+        }
+
+        var debugIndex = Array.IndexOf(args, "--debug-tokens");
+        if (debugIndex >= 0 && debugIndex < args.Length - 1)
+        {
+            var input = args[debugIndex + 1];
+            DebugTokenParsing(input);
+            return;
+        }
+
+        var visitorIndex = Array.IndexOf(args, "--debug-visitor");
+        if (visitorIndex >= 0 && visitorIndex < args.Length - 1)
+        {
+            var input = args[visitorIndex + 1];
+            DebugVisitorParsing(input);
+            return;
         }
     }
 
@@ -206,6 +236,130 @@ public static class Program
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Test execution failed: {ex.Message}");
+        }
+    }
+
+    private static void DebugTokenParsing(string input)
+    {
+        Console.WriteLine($"Testing input: {input}");
+        
+        // Create lexer and get tokens
+        var inputStream = new AntlrInputStream(input);
+        var lexer = new Smalltalk80Lexer(inputStream);
+        
+        // Print all tokens
+        Console.WriteLine("Tokens:");
+        var tokens = new CommonTokenStream(lexer);
+        tokens.Fill();
+        
+        for (int i = 0; i < tokens.Size; i++)
+        {
+            var token = tokens.Get(i);
+            var tokenName = lexer.Vocabulary.GetDisplayName(token.Type);
+            Console.WriteLine($"  Token[{i}]: {tokenName} = '{token.Text}' (type={token.Type}, start={token.StartIndex}, stop={token.StopIndex})");
+        }
+        
+        // Reset for parsing
+        tokens.Seek(0);
+        var parser = new Smalltalk80Parser(tokens);
+        
+        try
+        {
+            // Parse as literal directly
+            Console.WriteLine("\nParsing as literal:");
+            var literalContext = parser.literal();
+            Console.WriteLine($"Literal context: {literalContext?.GetType().Name}");
+            Console.WriteLine($"Literal children count: {literalContext?.ChildCount}");
+            
+            if (literalContext != null)
+            {
+                for (int i = 0; i < literalContext.ChildCount; i++)
+                {
+                    var child = literalContext.GetChild(i);
+                    Console.WriteLine($"  Child[{i}]: {child.GetType().Name} = '{child.GetText()}'");
+                }
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing as literal: {ex.Message}");
+        }
+        
+        // Reset and try parsing as messageBase
+        tokens.Seek(0);
+        parser = new Smalltalk80Parser(tokens);
+        
+        try
+        {
+            Console.WriteLine("\nParsing as messageBase:");
+            var messageBaseContext = parser.messageBase();
+            Console.WriteLine($"MessageBase context: {messageBaseContext?.GetType().Name}");
+            Console.WriteLine($"MessageBase children count: {messageBaseContext?.ChildCount}");
+            
+            if (messageBaseContext != null)
+            {
+                for (int i = 0; i < messageBaseContext.ChildCount; i++)
+                {
+                    var child = messageBaseContext.GetChild(i);
+                    Console.WriteLine($"  Child[{i}]: {child.GetType().Name} = '{child.GetText()}'");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing as messageBase: {ex.Message}");
+        }
+    }
+
+    private static void DebugVisitorParsing(string input)
+    {
+        Console.WriteLine($"Testing visitor with: {input}");
+        
+        var inputStream = new AntlrInputStream(input);
+        var lexer = new Smalltalk80Lexer(inputStream);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        
+        try
+        {
+            // Parse as messageBase
+            var messageBaseContext = parser.messageBase();
+            Console.WriteLine($"MessageBase context: {messageBaseContext?.GetType().Name}");
+            Console.WriteLine($"MessageBase children count: {messageBaseContext?.ChildCount}");
+            
+            if (messageBaseContext != null)
+            {
+                for (int i = 0; i < messageBaseContext.ChildCount; i++)
+                {
+                    var child = messageBaseContext.GetChild(i);
+                    Console.WriteLine($"  Child[{i}]: {child.GetType().Name} = '{child.GetText()}'");
+                }
+                
+                // Now test the visitor
+                Console.WriteLine("\nTesting visitor:");
+                var visitor = new SimpleAstBuildingVisitor();
+                
+                try
+                {
+                    var result = visitor.Visit(messageBaseContext);
+                    Console.WriteLine($"Visitor result: {result?.GetType().Name}");
+                    if (result is LiteralExpression lit)
+                    {
+                        Console.WriteLine($"Literal value: {lit.Value} (type: {lit.Value?.GetType().Name})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Visitor error: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                }
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing: {ex.Message}");
         }
     }
 }

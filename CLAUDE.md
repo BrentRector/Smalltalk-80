@@ -21,7 +21,7 @@ Another term in the "standard library" aka "library". This is a Smalltalk-80 fil
 - **Testing Framework**: ALWAYS use the existing test case framework (`TestCase` class in `TestLibrary.st`) for new tests. Never create new testing infrastructure. The existing framework provides `assert:`, `assertEqual:to:`, `assertTrue:`, `assertFalse:` and other assertion methods.
 - **Standard Library Preservation**: NEVER generate new standard library code. ALWAYS use the version from the system image, without change. Do not modify or recreate any part of it.
 - **Test File Organization**: Place all test classes in the `Testing/` directory using the `.st` extension. Test classes should inherit from `TestCase` and follow the naming convention `<ClassName>Tests`.
-- **Testing guidelines**: By default, the interpreter loads the stadnard library so its classes are available to subsequently loaded code. However, when testing errors related to the standard library, it's useful to disable this automatic loading of the standard library and explicitly load it (or alternative versions) explicitly. There is a no standard lib command line option to do this. Along with a --source option to specify a library to load.
+- **Testing guidelines**: By default, the interpreter loads the standard library so its classes are available to subsequently loaded code. However, when testing errors related to the standard library, it's useful to disable this automatic loading of the standard library and explicitly load it (or alternative versions) explicitly. There is a --no-stdlib command line option to do this. Along with a --source option to specify a library to load.
 
 - **File Loading Order**: When running tests, always load the standard library first, then the test infrastructure library named `TestLibrary.st` first, then the specific test files. Use the pattern: `--source Testing/TestLibrary.st --source Testing/YourTestFile.st` (which presumes the standard library is preloaded).
 - **PowerShell Commands**: The `tail` command does not exist in PowerShell. Use `Get-Content -Tail` or `Select-Object -Last` instead. For example, use `Get-Content file.txt -Tail 10` or `Get-Content file.txt | Select-Object -Last 10` instead of `tail -10 file.txt`. Similarly, `grep` and `sort` commands are not available - use `Select-String` and `Sort-Object` instead.
@@ -33,11 +33,50 @@ Another term in the "standard library" aka "library". This is a Smalltalk-80 fil
   - Marking completion status in the expansion plan
   - Ensuring all class descriptions, instance variables, and key methods are documented
 - **File System Implementation**: The file system has been completely implemented with modern File and FileDirectory classes that bridge to C# file system primitives (142-157). The FileStream class has been updated to work with these new classes instead of the original Alto-specific FilePage class. All file I/O operations now use primitive-based implementations.
-- **Documentation Updates**: After any changes to the `StandardLibrary.st` file (adding new classes, methods, or modifying existing ones), ALWAYS update the `STANDARD_LIBRARY_CONTENTS.md` documentation file. This includes:
-  - Updating the total class count and method chunk count
-  - Adding complete documentation for new classes with all their methods
-  - Updating the class hierarchy diagram
-  - Marking completion status in the expansion plan
-  - Ensuring all class descriptions, instance variables, and key methods are documented
+
+## Bootstrap Architecture
+
+The interpreter uses a three-phase bootstrap architecture to minimize C# code and maximize Smalltalk-based initialization:
+
+### Phase 1: Generated Bootstrap (GeneratedBootstrap.cs)
+- **30 core classes** are "baked into" the interpreter binary for instant startup
+- Classes include: Object, UndefinedObject, Behavior, ClassDescription, Class, Metaclass, Boolean, True, False, Magnitude, Number, Integer, SmallInteger, Symbol, String, Collection, SequenceableCollection, ArrayedCollection, Array, Set, Dictionary, SystemDictionary, IdentityDictionary, MethodDictionary, LookupKey, Association, BlockContext, CompiledMethod, ClassOrganizer, SystemOrganizer
+- **22 essential methods** with primitive implementations
+- **7 global variables**: nil, true, false, Smalltalk, SystemOrganization, Undeclared, Transcript
+- Source maintained in `Bootstrap.st` with exact 1:1 correspondence documented in `BOOTSTRAP_CORRESPONDENCE.md`
+
+### Phase 2: Second Stage Bootstrap (SecondStageBootstrap.st)
+- Adds class creation infrastructure extracted from the system image
+- Implements `subclass:instanceVariableNames:...` methods in Behavior
+- Implements `name:inEnvironment:subclassOf:...` in Class class
+- Provides `compile:` and `compile:classified:` methods for method compilation
+- Enables Smalltalk to create its own classes via message sends
+
+### Phase 3: StandardLibrary Loading
+- Uses `SmalltalkLoader` class which sends Smalltalk messages instead of C# manipulation
+- Handles bootstrap class enhancement (adding methods to existing bootstrap classes)
+- Processes class definitions via `subclass:` family of messages
+- Compiles methods via `compile:classified:` messages
+- All class creation after bootstrap uses Smalltalk's own mechanisms
+
+### Key Design Decisions
+- **Minimal C# involvement**: Only the absolute minimum classes/methods are in C#
+- **Bootstrap classes are never recreated**: They can be enhanced with new methods but not redefined
+- **Clear phase separation**: Each phase has specific responsibilities
+- **Smalltalk-based loading**: After Phase 2, all class creation uses Smalltalk messages
+
+### Important Files
+- `GeneratedBootstrap.cs`: Hardcoded C# bootstrap (30 classes, 22 methods)
+- `Bootstrap.st`: Smalltalk source that corresponds exactly to GeneratedBootstrap.cs
+- `SecondStageBootstrap.st`: Class creation infrastructure from system image
+- `SmalltalkLoader.cs`: Loads files by sending Smalltalk messages
+- `BOOTSTRAP_DESIGN.md`: Comprehensive bootstrap architecture documentation
+- `BOOTSTRAP_CORRESPONDENCE.md`: Documents exact mapping between Bootstrap.st and GeneratedBootstrap.cs
+
+### Loading Modes
+The VirtualMachine supports different loading modes:
+- `useGeneratedBootstrap=true` (default): Uses the baked-in bootstrap for instant startup
+- `skipStandardLibrary=true`: Loads only bootstrap, useful for testing
+- Legacy mode: Can still load StandardLibrary.st directly via C# (deprecated)
 
 These guidelines apply to all future contributions unless otherwise specified.

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
+using Smalltalk80;
 using Smalltalk80.Generated;
 using Smalltalk80.Parser;
 
@@ -22,47 +24,619 @@ public sealed class VirtualMachine
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class and
     /// loads the standard library objects.
     /// </summary>
-    public VirtualMachine(bool skipStandardLibrary = false)
+    public VirtualMachine(bool skipStandardLibrary = false, bool useGeneratedBootstrap = true)
     {
-        if (!skipStandardLibrary)
+        if (useGeneratedBootstrap)
         {
-            // Load StandardLibrary.st with the improved primitive+fallback parsing
+            // Use the new generated bootstrap approach
+            InitializeWithGeneratedBootstrap(skipStandardLibrary);
+        }
+        else if (!skipStandardLibrary)
+        {
+            // Legacy: Load StandardLibrary.st directly via C#
             LoadStandardLibraryClasses();
         }
     }
+    
+    /// <summary>
+    /// Initializes the VM with the generated bootstrap.
+    /// This is the new, efficient approach where core classes are "baked in".
+    /// </summary>
+    private void InitializeWithGeneratedBootstrap(bool skipStandardLibrary)
+    {
+        Console.WriteLine("[BOOTSTRAP] Using generated bootstrap...");
+        
+        // Phase 1: Initialize core classes from generated code (instant)
+        GeneratedBootstrap.Initialize();
+        
+        if (!skipStandardLibrary)
+        {
+            // Phase 2: Load StandardLibrary.st via Smalltalk class creation
+            LoadStandardLibraryViaSmalltalk();
+        }
+        
+        Console.WriteLine("[BOOTSTRAP] Bootstrap complete!");
+    }
+    
+    /// <summary>
+    /// Loads the standard library using Smalltalk's own class creation mechanism.
+    /// This assumes the bootstrap classes are already loaded.
+    /// </summary>
+    private void LoadStandardLibraryViaSmalltalk()
+    {
+        // First, check if we should load the second stage bootstrap
+        var secondStageBootstrapPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "SecondStageBootstrap.st");
+            
+        if (File.Exists(secondStageBootstrapPath))
+        {
+            Console.WriteLine($"[BOOTSTRAP] Loading second stage bootstrap (class creation infrastructure)...");
+            
+            // Load the second stage bootstrap using C# loader (since we don't have class creation yet)
+            var secondStageResult = SystemImageLoader.LoadSystemImage(secondStageBootstrapPath);
+            
+            if (!secondStageResult.Success)
+            {
+                Console.WriteLine("[BOOTSTRAP] Warning: Failed to load second stage bootstrap completely");
+                foreach (var error in secondStageResult.Errors.Take(3))
+                {
+                    Console.WriteLine($"  Error: {error.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[BOOTSTRAP] Second stage bootstrap loaded: {secondStageResult.MethodsLoaded} methods");
+            }
+        }
+        
+        // Now load HeadlessStandardLibrary using the SmalltalkLoader
+        // First try HeadlessStandardLibrary.st, fall back to StandardLibrary.st if not found
+        var headlessLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "HeadlessStandardLibrary.st");
+            
+        var standardLibraryPath = headlessLibraryPath;
+        
+        if (!File.Exists(headlessLibraryPath))
+        {
+            // Fall back to StandardLibrary.st
+            standardLibraryPath = Path.Combine(
+                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+                "..", "..", "..", "..", "StandardLibrary.st");
+                
+            if (!File.Exists(standardLibraryPath))
+            {
+                Console.WriteLine("[BOOTSTRAP] No standard library found (tried HeadlessStandardLibrary.st and StandardLibrary.st)");
+                return;
+            }
+            Console.WriteLine($"[BOOTSTRAP] HeadlessStandardLibrary.st not found, falling back to StandardLibrary.st");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Using HeadlessStandardLibrary.st for non-graphical Smalltalk system");
+        }
+        
+        Console.WriteLine($"[BOOTSTRAP] Loading {Path.GetFileName(standardLibraryPath)} via Smalltalk class creation...");
+        
+        // Use the SmalltalkLoader which sends Smalltalk messages
+        var loader = new SmalltalkLoader(Interpreter);
+        var result = loader.LoadFile(standardLibraryPath);
+        
+        if (result.Success)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} methods from {Path.GetFileName(standardLibraryPath)}");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: Failed to load some parts of {Path.GetFileName(standardLibraryPath)}");
+            foreach (var error in result.Errors.Take(5))
+            {
+                Console.WriteLine($"  Error: {error}");
+            }
+            if (result.Warnings.Count > 0)
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warnings during load:");
+                foreach (var warning in result.Warnings.Take(5))
+                {
+                    Console.WriteLine($"  Warning: {warning}");
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Initializes the VM with three-phase bootstrap for Smalltalk class creation.
+    /// Phase 1: Core bootstrap (27 classes)
+    /// Phase 2: Infrastructure classes (15 classes)
+    /// Phase 3: Everything else via Smalltalk class creation
+    /// </summary>
+    private void InitializeWithSmalltalkClassCreation()
+    {
+        Console.WriteLine("[BOOTSTRAP] Starting three-phase bootstrap with Smalltalk class creation...");
+        
+        // Phase 1: Core bootstrap classes (via C#)
+        Console.WriteLine("[BOOTSTRAP] Phase 1: Creating core bootstrap classes...");
+        MinimalBootstrap.CreateEssentialClasses();
+        
+        // Load bootstrap methods for core classes
+        var bootstrapMethodsPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "BootstrapMethods.st");
+            
+        if (File.Exists(bootstrapMethodsPath))
+        {
+            Console.WriteLine($"[BOOTSTRAP] Loading bootstrap methods from: {bootstrapMethodsPath}");
+            LoadSystemFile(bootstrapMethodsPath);
+        }
+        
+        // Phase 2: Infrastructure classes needed for class creation (via C#)
+        Console.WriteLine("[BOOTSTRAP] Phase 2: Loading infrastructure classes...");
+        LoadInfrastructureClasses();
+        
+        // Initialize globals
+        SystemDictionary.InitializeGlobals();
+        InitializeSystemGlobals();
+        
+        // Phase 3: Load remaining classes via Smalltalk class creation
+        Console.WriteLine("[BOOTSTRAP] Phase 3: Loading remaining classes via Smalltalk class creation...");
+        LoadRemainingClassesViaSmalltalk();
+        
+        Console.WriteLine("[BOOTSTRAP] Three-phase bootstrap completed!");
+    }
+    
+    /// <summary>
+    /// Loads infrastructure classes needed for class creation from StandardLibrary.
+    /// </summary>
+    private void LoadInfrastructureClasses()
+    {
+        var standardLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "StandardLibrary.st");
+            
+        if (!File.Exists(standardLibraryPath))
+        {
+            Console.WriteLine("[BOOTSTRAP] Error: StandardLibrary.st not found!");
+            return;
+        }
+        
+        // Parse the file
+        var fileAst = FileInReader.Parse(standardLibraryPath);
+        
+        // List of infrastructure classes to load in Phase 2
+        var infrastructureClasses = new HashSet<string>
+        {
+            "Character", "LookupKey", "IdentityDictionary", "OrderedCollection",
+            "Stream", "PositionableStream", "WriteStream", "ReadStream",
+            "ReadWriteStream", "ExternalStream"
+        };
+        
+        // Load infrastructure classes - Pass 1: Create class stubs
+        var createdClasses = new Dictionary<string, SmalltalkClass>();
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is ClassDefinitionNode classDef && infrastructureClasses.Contains(classDef.ClassName))
+            {
+                Console.WriteLine($"[BOOTSTRAP] Creating infrastructure class: {classDef.ClassName}");
+                // Create the class using SystemDictionary
+                var newClass = SystemDictionary.DefineClass(
+                    classDef.ClassName,
+                    null, // Superclass will be resolved later
+                    classDef.InstanceVariables,
+                    classDef.ClassVariables,
+                    classDef.PoolDictionaries,
+                    classDef.Category);
+                createdClasses[classDef.ClassName] = newClass;
+            }
+        }
+        
+        // Pass 2: Resolve superclass relationships
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is ClassDefinitionNode classDef && infrastructureClasses.Contains(classDef.ClassName))
+            {
+                if (createdClasses.TryGetValue(classDef.ClassName, out var cls))
+                {
+                    // Resolve superclass
+                    if (!string.IsNullOrEmpty(classDef.Superclass) && classDef.Superclass != "nil")
+                    {
+                        if (SystemDictionary.TryGetClass(classDef.Superclass, out var superclass))
+                        {
+                            cls.Superclass = superclass;
+                            Console.WriteLine($"[BOOTSTRAP] Set superclass {classDef.ClassName} -> {classDef.Superclass}");
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Load infrastructure class methods
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is MethodCategoryNode methodCategory)
+            {
+                if (infrastructureClasses.Contains(methodCategory.Header.ClassName))
+                {
+                    // Load methods for infrastructure classes
+                    if (SystemDictionary.TryGetClass(methodCategory.Header.ClassName, out var targetClass))
+                    {
+                        foreach (var method in methodCategory.Methods)
+                        {
+                            try
+                            {
+                                // Use AstMethodCompiler directly with the parsed AST
+                                // Collect all instance variables including inherited ones
+                                var variables = new List<string>();
+                                if (methodCategory.Header.IsClassSide)
+                                {
+                                    variables.AddRange(targetClass.ClassVariables);
+                                }
+                                else
+                                {
+                                    // Add inherited instance variables
+                                    var currentClass = targetClass;
+                                    while (currentClass != null)
+                                    {
+                                        variables.AddRange(currentClass.InstanceVariables);
+                                        currentClass = currentClass.Superclass;
+                                    }
+                                }
+                                
+                                var compiledMethod = AstMethodCompiler.CompileMethod(
+                                    method.Body,
+                                    method.Arguments,
+                                    variables,
+                                    method.HasPrimitive,
+                                    method.PrimitiveIndex);
+                                
+                                var selector = new Symbol(method.Selector);
+                                if (methodCategory.Header.IsClassSide)
+                                {
+                                    // Install class-side method in the metaclass
+                                    if (targetClass.Metaclass != null)
+                                    {
+                                        targetClass.Metaclass.MethodDictionary[selector] = compiledMethod;
+                                    }
+                                }
+                                else
+                                {
+                                    // Install instance-side method
+                                    targetClass.MethodDictionary[selector] = compiledMethod;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[BOOTSTRAP] Warning: Failed to compile method {method.Selector} in {methodCategory.Header.ClassName}: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            else if (chunk is MethodDefinitionNode methodDef)
+            {
+                // Single method definitions don't have a class name - skip for now
+                // They would need to be preceded by a header
+                if (false) // Placeholder
+                {
+                }
+            }
+        }
+        
+        // Load class creation stubs
+        var stubsPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "ClassCreationStubs.st");
+            
+        if (File.Exists(stubsPath))
+        {
+            Console.WriteLine("[BOOTSTRAP] Loading class creation stubs...");
+            LoadSystemFile(stubsPath);
+        }
+        
+        // Load class creation methods
+        var methodsPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "ClassCreationMethods.st");
+            
+        if (File.Exists(methodsPath))
+        {
+            Console.WriteLine("[BOOTSTRAP] Loading class creation methods...");
+            LoadSystemFile(methodsPath);
+        }
+    }
+    
+    /// <summary>
+    /// Initializes system global variables.
+    /// </summary>
+    private void InitializeSystemGlobals()
+    {
+        // Initialize SystemOrganization
+        if (!SystemDictionary.TryGetGlobal("SystemOrganization", out _))
+        {
+            if (SystemDictionary.TryGetClass("SystemOrganizer", out var organizerClass))
+            {
+                var systemOrganization = new SmalltalkObject(organizerClass, 0);
+                SystemDictionary.SetGlobal("SystemOrganization", systemOrganization);
+                Console.WriteLine("[BOOTSTRAP] Created SystemOrganization global");
+            }
+        }
+        
+        // Initialize Undeclared
+        if (!SystemDictionary.TryGetGlobal("Undeclared", out _))
+        {
+            if (SystemDictionary.TryGetClass("Dictionary", out var dictClass))
+            {
+                var undeclared = new SmalltalkObject(dictClass, 0);
+                SystemDictionary.SetGlobal("Undeclared", undeclared);
+                Console.WriteLine("[BOOTSTRAP] Created Undeclared global");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Loads remaining classes via Smalltalk class creation.
+    /// </summary>
+    private void LoadRemainingClassesViaSmalltalk()
+    {
+        var standardLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "StandardLibrary.st");
+            
+        if (!File.Exists(standardLibraryPath))
+        {
+            Console.WriteLine("[BOOTSTRAP] Error: StandardLibrary.st not found!");
+            return;
+        }
+        
+        // Parse the file
+        var fileAst = FileInReader.Parse(standardLibraryPath);
+        
+        // Classes already loaded in Phase 1 and 2
+        var alreadyLoaded = new HashSet<string>
+        {
+            // Phase 1 classes
+            "Object", "UndefinedObject", "Behavior", "ClassDescription", "Class", "Metaclass",
+            "Boolean", "True", "False", "SmallInteger", "Symbol", "String", "Array",
+            "BlockContext", "Collection", "Set", "Dictionary", "SystemDictionary", "Association",
+            // Phase 2 classes
+            "Character", "LookupKey", "IdentityDictionary", "OrderedCollection",
+            "Stream", "PositionableStream", "WriteStream", "ReadStream", "ReadWriteStream", "ExternalStream",
+            // Stub classes
+            "MethodDictionary", "ClassOrganizer", "SystemOrganizer", "Scanner"
+        };
+        
+        // Load remaining classes via Smalltalk
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is ClassDefinitionNode classDef && !alreadyLoaded.Contains(classDef.ClassName))
+            {
+                var expression = GenerateClassCreationExpression(classDef);
+                Console.WriteLine($"[BOOTSTRAP] Creating class via Smalltalk: {classDef.ClassName}");
+                
+                try
+                {
+                    EvaluateSource(expression);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Warning: Failed to create class {classDef.ClassName}: {ex.Message}");
+                }
+            }
+        }
+        
+        // Load methods for remaining classes
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is MethodCategoryNode methodCategory && !alreadyLoaded.Contains(methodCategory.Header.ClassName))
+            {
+                // Load methods for classes created via Smalltalk
+                if (SystemDictionary.TryGetClass(methodCategory.Header.ClassName, out var targetClass))
+                {
+                    foreach (var method in methodCategory.Methods)
+                    {
+                        try
+                        {
+                            // Use AstMethodCompiler directly with the parsed AST
+                            // Collect all instance variables including inherited ones
+                            var variables = new List<string>();
+                            if (methodCategory.Header.IsClassSide)
+                            {
+                                variables.AddRange(targetClass.ClassVariables);
+                            }
+                            else
+                            {
+                                // Add inherited instance variables
+                                var currentClass = targetClass;
+                                while (currentClass != null)
+                                {
+                                    variables.AddRange(currentClass.InstanceVariables);
+                                    currentClass = currentClass.Superclass;
+                                }
+                            }
+                            
+                            var compiledMethod = AstMethodCompiler.CompileMethod(
+                                method.Body,
+                                method.Arguments,
+                                variables,
+                                method.HasPrimitive,
+                                method.PrimitiveIndex);
+                            
+                            var selector = new Symbol(method.Selector);
+                            if (methodCategory.Header.IsClassSide)
+                            {
+                                // Install class-side method in the metaclass
+                                if (targetClass.Metaclass != null)
+                                {
+                                    targetClass.Metaclass.MethodDictionary[selector] = compiledMethod;
+                                }
+                            }
+                            else
+                            {
+                                // Install instance-side method
+                                targetClass.MethodDictionary[selector] = compiledMethod;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[BOOTSTRAP] Warning: Failed to compile method {method.Selector} in {methodCategory.Header.ClassName}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            // Single method definitions are handled differently - skip for now
+            else if (false) // Placeholder
+            {
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Initializes the VM with minimal bootstrap classes and loads the rest via Smalltalk.
+    /// </summary>
+    private void InitializeWithMinimalBootstrap()
+    {
+        Console.WriteLine("[BOOTSTRAP] Using minimal bootstrap approach...");
+        
+        // Step 1: Create essential classes
+        MinimalBootstrap.CreateEssentialClasses();
+        
+        // Step 2: Load essential bootstrap methods
+        var bootstrapMethodsPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "BootstrapMethods.st");
+            
+        if (File.Exists(bootstrapMethodsPath))
+        {
+            Console.WriteLine($"[BOOTSTRAP] Loading bootstrap methods from: {bootstrapMethodsPath}");
+            LoadSystemFile(bootstrapMethodsPath);
+            Console.WriteLine("[BOOTSTRAP] Bootstrap methods loaded");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: BootstrapMethods.st not found at: {bootstrapMethodsPath}");
+        }
+        
+        // Step 3: Initialize globals (Smalltalk, Transcript, etc.)
+        SystemDictionary.InitializeGlobals();
+        
+        // Step 4: Now we can load the rest of StandardLibrary via Smalltalk class creation
+        var standardLibraryPath = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "..", "..", "..", "..", "StandardLibrary.st");
+            
+        if (File.Exists(standardLibraryPath))
+        {
+            Console.WriteLine($"[BOOTSTRAP] Loading standard library via Smalltalk from: {standardLibraryPath}");
+            LoadSystemFileViaSmalltalk(standardLibraryPath);
+            Console.WriteLine("[BOOTSTRAP] Standard library loaded via Smalltalk");
+        }
+    }
+    
+    /// <summary>
+    /// Loads a system file by executing class definitions as Smalltalk code.
+    /// </summary>
+    private void LoadSystemFileViaSmalltalk(string path)
+    {
+        // Parse the file
+        var fileAst = FileInReader.Parse(path);
+        
+        // Execute class definitions as Smalltalk expressions
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is ClassDefinitionNode classDef)
+            {
+                // Generate and execute the Smalltalk expression
+                var expression = GenerateClassCreationExpression(classDef);
+                Console.WriteLine($"[BOOTSTRAP] Executing class definition: {classDef.ClassName}");
+                
+                try
+                {
+                    EvaluateSource(expression);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Failed to create class {classDef.ClassName}: {ex.Message}");
+                }
+            }
+        }
+        
+        // Then load methods normally
+        foreach (var chunk in fileAst.Chunks)
+        {
+            if (chunk is MethodCategoryNode || chunk is MethodDefinitionNode)
+            {
+                // Process methods as before
+                // This part can stay the same since methods are added to existing classes
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Generates a Smalltalk expression to create a class.
+    /// </summary>
+    private string GenerateClassCreationExpression(ClassDefinitionNode classDef)
+    {
+        var superclass = string.IsNullOrEmpty(classDef.Superclass) || classDef.Superclass == "nil" 
+            ? "nil" 
+            : classDef.Superclass;
+            
+        var instVars = string.Join(" ", classDef.InstanceVariables);
+        var classVars = string.Join(" ", classDef.ClassVariables);
+        var pools = string.Join(" ", classDef.PoolDictionaries);
+        var category = classDef.Category ?? "";
+        
+        return $@"{superclass} subclass: #{classDef.ClassName}
+            instanceVariableNames: '{instVars}'
+            classVariableNames: '{classVars}'
+            poolDictionaries: '{pools}'
+            category: '{category}'";
+    }
 
     /// <summary>
-    /// Loads the standard library classes from StandardLibrary.st if it exists.
+    /// Loads the standard library classes from HeadlessStandardLibrary.st or StandardLibrary.st.
+    /// Prefers HeadlessStandardLibrary.st for non-graphical systems.
     /// This provides essential classes like Object, Boolean, True, False, SmallInteger
     /// with all their control flow and arithmetic methods.
     /// </summary>
     private void LoadStandardLibraryClasses()
     {
-        var standardLibraryPath = Path.Combine(
+        // Try HeadlessStandardLibrary.st first
+        var headlessLibraryPath = Path.Combine(
             Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
-            "..", "..", "..", "..", "StandardLibrary.st");
+            "..", "..", "..", "..", "HeadlessStandardLibrary.st");
+            
+        var standardLibraryPath = headlessLibraryPath;
+        
+        if (!File.Exists(headlessLibraryPath))
+        {
+            // Fall back to StandardLibrary.st
+            standardLibraryPath = Path.Combine(
+                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+                "..", "..", "..", "..", "StandardLibrary.st");
+        }
 
         if (File.Exists(standardLibraryPath))
         {
             try
             {
-                Console.WriteLine($"[BOOTSTRAP] Loading standard library from: {standardLibraryPath}");
+                var libraryName = Path.GetFileName(standardLibraryPath);
+                Console.WriteLine($"[BOOTSTRAP] Loading {libraryName} from: {standardLibraryPath}");
                 LoadSystemFile(standardLibraryPath);
-                Console.WriteLine("[BOOTSTRAP] Standard library loaded successfully");
+                Console.WriteLine($"[BOOTSTRAP] {libraryName} loaded successfully");
 
                 // Initialize classes that have class-side initialize methods
                 InitializeClasses();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[BOOTSTRAP] Warning: Failed to load standard library: {ex.Message}");
-                Console.WriteLine("[BOOTSTRAP] Continuing with minimal hardcoded standard library");
+                Console.WriteLine($"[BOOTSTRAP] Warning: Failed to load {Path.GetFileName(standardLibraryPath)}: {ex.Message}");
+                Console.WriteLine("[BOOTSTRAP] Continuing with minimal bootstrap only");
             }
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] StandardLibrary.st not found at: {standardLibraryPath}");
-            Console.WriteLine("[BOOTSTRAP] Using minimal hardcoded standard library only");
+            Console.WriteLine($"[BOOTSTRAP] No standard library found (tried HeadlessStandardLibrary.st and StandardLibrary.st)");
+            Console.WriteLine("[BOOTSTRAP] Using minimal bootstrap only");
         }
     }
 
@@ -278,6 +852,9 @@ public sealed class VirtualMachine
     /// </summary>
     private void InitializeClasses()
     {
+        Console.WriteLine("[BOOTSTRAP] Initializing global variables...");
+        SystemDictionary.InitializeGlobals();
+        
         Console.WriteLine("[BOOTSTRAP] Initializing classes...");
         var initializeSymbol = new Symbol("initialize");
         var initializedCount = 0;

@@ -74,6 +74,7 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
         throw new InvalidOperationException("Unknown literal type");
     }
 
+
     /// <summary>
     /// Visit a number literal context.
     /// </summary>
@@ -162,8 +163,8 @@ public abstract class BaseAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
             return new LiteralExpression(symbolName);
         }
 
-        // Handle nested array elements
-        if (context.arrayElement() != null && context.arrayElement().Length > 0)
+        // Handle nested array elements (parenthesized arrays)
+        if (context.LEFT_PAREN() != null)
         {
             var elements = new List<object>();
             foreach (var element in context.arrayElement())

@@ -349,11 +349,11 @@ public static class AstMethodCompiler
                 return;
             }
 
-            // Check for global class names in SystemDictionary
-            if (SystemDictionary.TryGetClass(name, out var globalClass))
+            // Check for global variables and classes in SystemDictionary
+            if (SystemDictionary.TryGetGlobal(name, out var globalValue))
             {
-                // Create an association for the global class and add it to literals
-                var association = new Association(new Symbol(name), globalClass);
+                // Create an association for the global and add it to literals
+                var association = new Association(new Symbol(name), globalValue);
                 int literalIndex = AddLiteral(association);
 
                 if (literalIndex < 32)

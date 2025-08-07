@@ -225,6 +225,68 @@ public static class SystemImageLoader
             // Note: Actual initialization should be done after the loader completes
             // to avoid circular dependencies during the loading process
 
+            // PASS 5: Execute standalone initialization statements
+            if (otherChunks.Count > 0)
+            {
+                Console.WriteLine($"[SYSTEM_IMAGE] Found {otherChunks.Count} standalone chunks to execute");
+                var interpreter = new Interpreter();
+                
+                foreach (var chunk in otherChunks)
+                {
+                    try
+                    {
+                        if (chunk is ExpressionChunkNode exprChunk)
+                        {
+                            Console.WriteLine($"[SYSTEM_IMAGE] Executing standalone expression");
+                            
+                            // Compile the expression to bytecode
+                            var emptyVars = new List<string>();
+                            var statements = new List<StatementNode>();
+                            
+                            // Create a proper statement from the expression
+                            if (exprChunk.Expression != null)
+                            {
+                                statements.Add(new ExpressionStatement(exprChunk.Expression));
+                            }
+                            
+                            var sequence = new SequenceNode(emptyVars, statements);
+                            
+                            var compiled = AstMethodCompiler.CompileMethod(
+                                sequence,
+                                emptyVars, // no arguments
+                                emptyVars, // no instance variables
+                                false,     // no primitive
+                                0);
+                            
+                            // Execute the compiled expression using Interpreter's Evaluate method
+                            if (SystemDictionary.TryGetClass("Object", out var objectClass))
+                            {
+                                var receiver = new SmalltalkObject(objectClass, 0);
+                                var executionResult = interpreter.Evaluate(compiled, receiver);
+                                Console.WriteLine($"[SYSTEM_IMAGE] Standalone expression executed successfully");
+                            }
+                            else
+                            {
+                                warnings.Add(new LoadWarning(0, 0, "Could not find Object class for standalone expression execution"));
+                            }
+                        }
+                        else if (chunk is ClassCommentNode)
+                        {
+                            // Skip class comments - they're not executable
+                            continue;
+                        }
+                        else
+                        {
+                            warnings.Add(new LoadWarning(0, 0, $"Unknown chunk type: {chunk.GetType().Name}"));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        warnings.Add(new LoadWarning(0, 0, $"Failed to execute standalone chunk: {ex.Message}"));
+                    }
+                }
+            }
+
             result.Success = errors.Count == 0;
             result.Errors = errors;
             result.Warnings = warnings;

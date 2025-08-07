@@ -173,13 +173,12 @@ cascadeExpr: messageExpr (SEMICOLON messagePart)*; // cascades
 ////
 // / Message expression //
 messageExpr:
-	messageBase (unaryMessage | binaryMessage)* keywordMessage?
-	| messageBase (unaryMessage | binaryMessage)*;
+	messageBase (unaryMessage | binaryMessage)* keywordMessage?;
 
 messageBase:
-	parenthesizedExpr
+	literal
+	| parenthesizedExpr
 	| block
-	| literal
 	| variable
 	| negativeNumber;
 

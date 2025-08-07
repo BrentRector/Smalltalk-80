@@ -7,6 +7,8 @@ using System.Collections.Generic;
 public static class SystemDictionary
 {
     private static readonly Dictionary<string, SmalltalkClass> classes = new(StringComparer.Ordinal);
+    private static SmalltalkObject? smalltalkInstance;
+    private static Dictionary<object, object>? smalltalkDictionary;
 
     /// <summary>
     ///     Registers a new class object under the specified name. If a class with the
@@ -62,6 +64,13 @@ public static class SystemDictionary
 
         var cls = CreateClassWithMetaclass(name, superclass, instanceVariables, classVariables, poolDictionaries, category);
         classes[name] = cls;
+        
+        // Also add to Smalltalk dictionary if it exists
+        if (smalltalkDictionary != null)
+        {
+            smalltalkDictionary[new Symbol(name)] = cls;
+        }
+        
         return cls;
     }
 
@@ -100,21 +109,36 @@ public static class SystemDictionary
     /// </summary>
     private static SmalltalkClass CreateMetaclassFor(SmalltalkClass cls, string className)
     {
-        // The metaclass inherits from the superclass's metaclass
+        var metaclass = new SmalltalkClass();
+        
+        // CRITICAL: Add the 'thisClass' instance variable to every metaclass
+        // This is inherited from the Metaclass class definition
+        metaclass.InstanceVariables.Add("thisClass");
+        
+        // Set the thisClass property to point to the class this metaclass describes
+        metaclass.ThisClass = cls;
+        
+        // The metaclass inherits from the superclass's metaclass (parallel hierarchy)
         SmalltalkClass? superMetaclass = null;
         if (cls.Superclass?.Metaclass is not null)
         {
             superMetaclass = cls.Superclass.Metaclass;
         }
+        else if (className == "Object")
+        {
+            // Object's metaclass inherits from Class
+            if (TryGetClass("Class", out var classClass))
+                superMetaclass = classClass;
+        }
         else if (className != "Object" && TryGetClass("Class", out var classClass))
         {
-            // If no superclass metaclass, inherit from Class
+            // Orphan classes get Class as their metaclass's superclass
             superMetaclass = classClass;
         }
+        
+        metaclass.Superclass = superMetaclass;
 
-        var metaclass = new SmalltalkClass { Superclass = superMetaclass };
-
-        // Set up the metaclass's class pointer
+        // All metaclasses are instances of Metaclass
         if (TryGetClass("Metaclass", out var metaclassClass))
         {
             metaclass.ClassPointer = metaclassClass;
@@ -137,35 +161,79 @@ public static class SystemDictionary
 
         // Bootstrap the fundamental classes with circular references
 
-        // Create Object without metaclass first
-        var objectClass = new SmalltalkClass();
+        // Create Object as the root (classic Smalltalk-80)
+        var objectClass = new SmalltalkClass { Superclass = null };
+        objectClass.ClassVariables.Add("DependentsFields");
+        objectClass.ClassVariables.Add("ErrorRecursion");
         classes["Object"] = objectClass;
 
-        // Create Class without metaclass
-        var classClass = new SmalltalkClass { Superclass = objectClass };
+        // Create Behavior
+        var behavior = new SmalltalkClass { Superclass = objectClass };
+        behavior.InstanceVariables.Add("superclass");
+        behavior.InstanceVariables.Add("methodDict");
+        behavior.InstanceVariables.Add("format");
+        behavior.InstanceVariables.Add("subclasses");
+        classes["Behavior"] = behavior;
+
+        // Create ClassDescription
+        var classDescription = new SmalltalkClass { Superclass = behavior };
+        classDescription.InstanceVariables.Add("instanceVariables");
+        classDescription.InstanceVariables.Add("organization");
+        classes["ClassDescription"] = classDescription;
+
+        // Create Class
+        var classClass = new SmalltalkClass { Superclass = classDescription };
+        classClass.InstanceVariables.Add("name");
+        classClass.InstanceVariables.Add("classPool");
+        classClass.InstanceVariables.Add("sharedPools");
         classes["Class"] = classClass;
 
-        // Create Metaclass without metaclass
-        var metaclassClass = new SmalltalkClass { Superclass = classClass };
+        // Create Metaclass
+        var metaclassClass = new SmalltalkClass { Superclass = classDescription };
+        metaclassClass.InstanceVariables.Add("thisClass");
         classes["Metaclass"] = metaclassClass;
 
-        // Now set up the circular metaclass relationships
+        // Now set up the metaclass relationships with proper parallel hierarchy
 
-        // Object's metaclass is a special instance of Metaclass
+        // Object class -> Class
         var objectMetaclass = new SmalltalkClass { Superclass = classClass };
+        objectMetaclass.InstanceVariables.Add("thisClass");
         objectMetaclass.ClassPointer = metaclassClass;
+        objectMetaclass.ThisClass = objectClass;
         objectClass.Metaclass = objectMetaclass;
         objectClass.ClassPointer = objectMetaclass;
 
-        // Class's metaclass is a special instance of Metaclass  
-        var classMetaclass = new SmalltalkClass { Superclass = objectMetaclass };
+        // Behavior class -> Object class (parallel hierarchy)
+        var behaviorMetaclass = new SmalltalkClass { Superclass = objectMetaclass };
+        behaviorMetaclass.InstanceVariables.Add("thisClass");
+        behaviorMetaclass.ClassPointer = metaclassClass;
+        behaviorMetaclass.ThisClass = behavior;
+        behavior.Metaclass = behaviorMetaclass;
+        behavior.ClassPointer = behaviorMetaclass;
+
+        // ClassDescription class -> Behavior class (parallel hierarchy)
+        var classDescriptionMetaclass = new SmalltalkClass { Superclass = behaviorMetaclass };
+        classDescriptionMetaclass.InstanceVariables.Add("thisClass");
+        classDescriptionMetaclass.ClassPointer = metaclassClass;
+        classDescriptionMetaclass.ThisClass = classDescription;
+        classDescription.Metaclass = classDescriptionMetaclass;
+        classDescription.ClassPointer = classDescriptionMetaclass;
+
+        // Class class -> ClassDescription class (parallel hierarchy)
+        var classMetaclass = new SmalltalkClass { Superclass = classDescriptionMetaclass };
+        classMetaclass.InstanceVariables.Add("thisClass");
         classMetaclass.ClassPointer = metaclassClass;
+        classMetaclass.ThisClass = classClass;
         classClass.Metaclass = classMetaclass;
         classClass.ClassPointer = classMetaclass;
 
-        // Metaclass's metaclass is itself (circular)
-        metaclassClass.Metaclass = metaclassClass;
-        metaclassClass.ClassPointer = metaclassClass;
+        // Metaclass class -> ClassDescription class (parallel hierarchy)
+        var metaclassMetaclass = new SmalltalkClass { Superclass = classDescriptionMetaclass };
+        metaclassMetaclass.InstanceVariables.Add("thisClass");
+        metaclassMetaclass.ClassPointer = metaclassClass;
+        metaclassMetaclass.ThisClass = metaclassClass;
+        metaclassClass.Metaclass = metaclassMetaclass;
+        metaclassClass.ClassPointer = metaclassMetaclass;
     }
 
     /// <summary>
@@ -214,4 +282,226 @@ public static class SystemDictionary
     ///     system dictionary.
     /// </summary>
     public static IReadOnlyDictionary<string, SmalltalkClass> AllClasses => classes;
+    
+    /// <summary>
+    ///     Clears all classes and globals (used for bootstrap).
+    /// </summary>
+    public static void Clear()
+    {
+        classes.Clear();
+        smalltalkDictionary?.Clear();
+        smalltalkInstance = null;
+        Console.WriteLine("[SYSTEM] Cleared all classes and globals");
+    }
+    
+    /// <summary>
+    ///     Registers a bootstrap class directly without going through Smalltalk.
+    ///     This should ONLY be used for the minimal bootstrap classes.
+    /// </summary>
+    public static void RegisterBootstrapClass(string name, SmalltalkClass cls)
+    {
+        classes[name] = cls;
+        
+        // Also register in Smalltalk dictionary if it exists
+        if (smalltalkDictionary != null)
+        {
+            smalltalkDictionary[new Symbol(name)] = cls;
+        }
+        
+        Console.WriteLine($"[BOOTSTRAP] Registered bootstrap class: {name}");
+    }
+
+    /// <summary>
+    ///     Gets or creates the global Smalltalk instance (the system dictionary).
+    /// </summary>
+    public static SmalltalkObject GetSmalltalk()
+    {
+        if (smalltalkInstance == null)
+        {
+            InitializeSmalltalkGlobal();
+        }
+        return smalltalkInstance!;
+    }
+    
+    /// <summary>
+    ///     Initializes the Smalltalk global as a SystemDictionary instance.
+    /// </summary>
+    private static void InitializeSmalltalkGlobal()
+    {
+        // Create the backing dictionary for our C# bridge
+        smalltalkDictionary = new Dictionary<object, object>();
+        
+        // Create the Smalltalk global as an instance of SystemDictionary
+        if (TryGetClass("SystemDictionary", out var systemDictClass))
+        {
+            // SystemDictionary is a variableSubclass of Dictionary, which is a variableSubclass of Set
+            // Set has 'tally' instance variable, Dictionary adds no instance variables
+            // So we need: instance variables (1 for tally) + indexed fields for storing Associations
+            
+            // Get the number of instance variables from the class
+            var instSize = systemDictClass.InstanceVariables.Count;
+            if (systemDictClass.Superclass != null)
+                instSize += systemDictClass.Superclass.InstanceVariables.Count;
+            
+            // Create with enough indexed slots for associations
+            smalltalkInstance = new SmalltalkObject(systemDictClass, instSize + 32); // instVars + 32 indexed slots
+            
+            // Initialize tally to 0 (number of elements in dictionary)
+            smalltalkInstance.SetField(0, 0); // tally is the first instance variable from Set
+            
+            // Now populate the dictionary with existing classes as Associations
+            int tally = 0;
+            foreach (var (className, cls) in classes)
+            {
+                var key = new Symbol(className);
+                var association = new Association(key, cls);
+                
+                // Store in our C# backing dictionary
+                smalltalkDictionary[key] = cls;
+                
+                // Also store the Association in the Smalltalk dictionary's indexed fields
+                // This is simplified - real Dictionary uses hashing
+                if (tally < 32)
+                {
+                    smalltalkInstance.SetField(instSize + tally, association);
+                    tally++;
+                }
+            }
+            
+            // Add Smalltalk itself
+            var smalltalkKey = new Symbol("Smalltalk");
+            var smalltalkAssoc = new Association(smalltalkKey, smalltalkInstance);
+            smalltalkDictionary[smalltalkKey] = smalltalkInstance;
+            if (tally < 32)
+            {
+                smalltalkInstance.SetField(instSize + tally, smalltalkAssoc);
+                tally++;
+            }
+            
+            // Update tally
+            smalltalkInstance.SetField(0, tally);
+            
+            Console.WriteLine($"[SYSTEM] Created Smalltalk global instance with {tally} entries");
+        }
+        else if (TryGetClass("Dictionary", out var dictClass))
+        {
+            Console.WriteLine("[SYSTEM] Warning: SystemDictionary class not found, using Dictionary");
+            
+            // Dictionary is variableSubclass of Set, so has tally instance variable
+            var instSize = 1; // tally from Set
+            smalltalkInstance = new SmalltalkObject(dictClass, instSize + 32);
+            smalltalkInstance.SetField(0, 0); // Initialize tally
+            
+            // Populate as above
+            int tally = 0;
+            foreach (var (className, cls) in classes)
+            {
+                var key = new Symbol(className);
+                smalltalkDictionary[key] = cls;
+                
+                if (tally < 32)
+                {
+                    var association = new Association(key, cls);
+                    smalltalkInstance.SetField(instSize + tally, association);
+                    tally++;
+                }
+            }
+            
+            // Add Smalltalk itself
+            smalltalkDictionary[new Symbol("Smalltalk")] = smalltalkInstance;
+            smalltalkInstance.SetField(0, tally);
+        }
+        else
+        {
+            throw new InvalidOperationException("Cannot create Smalltalk global: no suitable dictionary class found");
+        }
+    }
+
+    /// <summary>
+    ///     Registers a global variable in the Smalltalk dictionary.
+    /// </summary>
+    /// <param name="name">The global variable name.</param>
+    /// <param name="value">The value to store.</param>
+    public static void SetGlobal(string name, object value)
+    {
+        if (smalltalkDictionary == null)
+        {
+            InitializeSmalltalkGlobal();
+        }
+        
+        var symbol = new Symbol(name);
+        smalltalkDictionary![symbol] = value;
+        Console.WriteLine($"[SYSTEM] Registered global: {name}");
+    }
+
+    /// <summary>
+    ///     Gets a global variable value from the Smalltalk dictionary.
+    /// </summary>
+    /// <param name="name">The global variable name.</param>
+    /// <param name="value">When this method returns, contains the value if found.</param>
+    /// <returns><c>true</c> if the global exists; otherwise <c>false</c>.</returns>
+    public static bool TryGetGlobal(string name, out object? value)
+    {
+        if (smalltalkDictionary == null)
+        {
+            InitializeSmalltalkGlobal();
+        }
+        
+        var symbol = new Symbol(name);
+        if (smalltalkDictionary!.TryGetValue(symbol, out var globalValue))
+        {
+            value = globalValue;
+            return true;
+        }
+        
+        // Fallback to checking classes directly (for bootstrap)
+        if (classes.TryGetValue(name, out var cls))
+        {
+            value = cls;
+            // Also add it to Smalltalk dictionary
+            smalltalkDictionary[symbol] = cls;
+            return true;
+        }
+        
+        value = null;
+        return false;
+    }
+    
+    /// <summary>
+    ///     Gets the internal dictionary backing the Smalltalk global.
+    ///     This is used by primitive operations for at: and at:put:
+    /// </summary>
+    public static Dictionary<object, object> GetSmalltalkDictionary()
+    {
+        if (smalltalkDictionary == null)
+        {
+            InitializeSmalltalkGlobal();
+        }
+        return smalltalkDictionary!;
+    }
+
+    /// <summary>
+    ///     Initializes standard global variables.
+    /// </summary>
+    public static void InitializeGlobals()
+    {
+        // Ensure Smalltalk global exists
+        GetSmalltalk();
+        
+        // Create Transcript global if TextCollector exists
+        if (TryGetClass("TextCollector", out var textCollectorClass))
+        {
+            var transcript = new SmalltalkObject(textCollectorClass, 0);
+            SetGlobal("Transcript", transcript);
+        }
+        
+        // Create SystemOrganization placeholder
+        if (TryGetClass("Object", out var objectClass))
+        {
+            var systemOrg = new SmalltalkObject(objectClass, 0);
+            SetGlobal("SystemOrganization", systemOrg);
+        }
+        
+        Console.WriteLine($"[SYSTEM] Smalltalk dictionary initialized with {smalltalkDictionary!.Count} globals");
+    }
 }

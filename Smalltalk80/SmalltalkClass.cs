@@ -11,9 +11,10 @@ public class SmalltalkClass : SmalltalkObject
     public Dictionary<Symbol, CompiledMethod> MethodDictionary { get; } = new();
 
     /// <summary>
-    ///     Gets the dictionary mapping class-side method selectors to compiled methods.
+    ///     Gets or sets the class that this metaclass describes (only set for metaclasses).
+    ///     This corresponds to the 'thisClass' instance variable in Smalltalk Metaclass.
     /// </summary>
-    public Dictionary<Symbol, CompiledMethod> ClassMethodDictionary { get; } = new();
+    public SmalltalkClass? ThisClass { get; set; }
 
     /// <summary>
     ///     Gets the list of instance variable names defined on this class.
@@ -87,17 +88,19 @@ public class SmalltalkClass : SmalltalkObject
     }
 
     /// <summary>
-    ///     Searches the class hierarchy for a class-side method matching the given selector.
+    ///     Determines if this class is a metaclass.
     /// </summary>
-    /// <param name="selector">The method selector.</param>
-    /// <returns>The <see cref="CompiledMethod"/> if found; otherwise <c>null</c>.</returns>
-    public CompiledMethod? LookupClassMethod(Symbol selector)
+    /// <returns>True if this is a metaclass; otherwise false.</returns>
+    public bool IsMetaclass()
     {
-        if (ClassMethodDictionary.TryGetValue(selector, out var method))
-        {
-            return method;
-        }
-
-        return Superclass?.LookupClassMethod(selector);
+        // A class is a metaclass if it has ThisClass set or if its class pointer is Metaclass
+        if (ThisClass != null)
+            return true;
+            
+        // Check if this class's class is Metaclass
+        if (ClassPointer != null && SystemDictionary.TryGetClass("Metaclass", out var metaclassClass))
+            return ClassPointer == metaclassClass || ClassPointer.ClassPointer == metaclassClass;
+            
+        return false;
     }
 }
