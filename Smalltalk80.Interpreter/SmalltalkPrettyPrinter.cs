@@ -254,17 +254,9 @@ public class SmalltalkPrettyPrinter
             if (obj.ClassPointer.Oop == classOop)
                 return true;
                 
-            // Check if the class pointer points to a metaclass (has "Class" suffix in globals)
-            // This handles the case where the object is an instance of FooClass (a metaclass)
-            var globals = vm.GetGlobals();
-            foreach (var kvp in globals)
-            {
-                if (kvp.Value == obj.ClassPointer.Oop && kvp.Key.EndsWith("Class") && kvp.Key != "Class" && kvp.Key != "Metaclass")
-                {
-                    // This object's class is a metaclass, so this object is a class
-                    return true;
-                }
-            }
+            // Check if the class pointer points to a metaclass
+            // Note: Without the ability to enumerate globals, we can't check for metaclass naming pattern
+            // This is a limitation of the new API but acceptable for the pretty printer
         }
         
         // Fallback: Check if slot 1 looks like a method dictionary
