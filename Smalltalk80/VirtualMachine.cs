@@ -41,7 +41,7 @@ public sealed class VirtualMachine
     /// </summary>
     private void InitializeWithJsonBootstrap(bool skipStandardLibrary)
     {
-        Console.WriteLine("[BOOTSTRAP] Starting JSON-based bootstrap...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting JSON-based bootstrap...");
         
         var bootstrapDir = Path.Combine(
             Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
@@ -60,7 +60,7 @@ public sealed class VirtualMachine
             throw new DirectoryNotFoundException($"Bootstrap directory not found. Searched: {bootstrapDir}");
         }
         
-        Console.WriteLine($"[BOOTSTRAP] Using bootstrap files from: {bootstrapDir}");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Using bootstrap files from: {bootstrapDir}");
         
         // Phase 1: VM primitive operations (create objects and patch pointers)
         ExecutePhase1Bootstrap(bootstrapDir);
@@ -74,7 +74,7 @@ public sealed class VirtualMachine
             ExecutePhase3Bootstrap(bootstrapDir);
         }
         
-        Console.WriteLine("[BOOTSTRAP] JSON bootstrap complete!");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] JSON bootstrap complete!");
     }
     
     /// <summary>
@@ -82,7 +82,7 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecutePhase1Bootstrap(string bootstrapDir)
     {
-        Console.WriteLine("[BOOTSTRAP] Phase 1: VM primitive operations...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1: VM primitive operations...");
         
         var phase1Path = Path.Combine(bootstrapDir, "bootstrap_phase1.json");
         if (!File.Exists(phase1Path))
@@ -92,7 +92,7 @@ public sealed class VirtualMachine
         
         // Clear object memory
         ObjectMemory.Reset();
-        Console.WriteLine("[BOOTSTRAP] Cleared VM object memory");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Cleared VM object memory");
         
         // Parse and execute JSON bootstrap operations
         var jsonContent = File.ReadAllText(phase1Path);
@@ -100,8 +100,8 @@ public sealed class VirtualMachine
         var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
         bootstrapExecutor.ExecutePhase1(jsonContent);
         
-        Console.WriteLine($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
-        Console.WriteLine("[BOOTSTRAP] Phase 1 complete: VM primitives executed");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 complete: VM primitives executed");
         
         // Dump classes after Phase 1
         // DumpAllClasses("PHASE 1 CLASSES");  // Commented out - Phase 1 is solid
@@ -112,12 +112,12 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecutePhase2Bootstrap(string bootstrapDir)
     {
-        Console.WriteLine("[BOOTSTRAP] Phase 2: Message-based class construction...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 2: Message-based class construction...");
         
         var phase2Path = Path.Combine(bootstrapDir, "bootstrap_phase2.json");
         if (!File.Exists(phase2Path))
         {
-            Console.WriteLine($"[BOOTSTRAP] Phase 2 file not found at {phase2Path}, skipping Phase 2");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2 file not found at {phase2Path}, skipping Phase 2");
             return;
         }
         
@@ -131,14 +131,14 @@ public sealed class VirtualMachine
         var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
         bootstrapExecutor.ExecutePhase2(jsonContent);
         
-        Console.WriteLine($"[BOOTSTRAP] Phase 2 complete: Messaging infrastructure created");
-        Console.WriteLine($"[BOOTSTRAP] Total objects in VM: {ObjectMemory.Objects.Count}");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Messaging infrastructure created");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Total objects in VM: {ObjectMemory.Objects.Count}");
         
         // Dump classes after Phase 2
         DumpAllClasses("PHASE 2 CLASSES");
         
         // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
-        Console.WriteLine("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
         if (bootstrapAdapter is VMPrimitiveAdapter adapter)
         {
             adapter.CompleteBootstrapWithMessageSends();
@@ -150,7 +150,7 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecutePhase3Bootstrap(string bootstrapDir)
     {
-        Console.WriteLine("[BOOTSTRAP] Phase 3: Message-driven class construction...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3: Message-driven class construction...");
         
         if (bootstrapAdapter == null)
         {
@@ -161,17 +161,17 @@ public sealed class VirtualMachine
         var phase3Path = Path.Combine(bootstrapDir, "bootstrap_phase3.json");
         if (File.Exists(phase3Path))
         {
-            Console.WriteLine("[BOOTSTRAP] Loading Phase 3 manifest: bootstrap_phase3.json");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading Phase 3 manifest: bootstrap_phase3.json");
             var jsonContent = File.ReadAllText(phase3Path);
             
             var phase3Executor = new Phase3Executor(bootstrapAdapter);
             phase3Executor.ExecuteManifest(jsonContent);
             
-            Console.WriteLine("[BOOTSTRAP] Phase 3 manifest executed");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3 manifest executed");
         }
         else
         {
-            Console.WriteLine("[BOOTSTRAP] Warning: bootstrap_phase3.json not found");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: bootstrap_phase3.json not found");
         }
         
         // Fall back to loading Smalltalk source files
@@ -183,16 +183,16 @@ public sealed class VirtualMachine
         if (File.Exists(headlessLibraryPath))
         {
             libraryPath = headlessLibraryPath;
-            Console.WriteLine("[BOOTSTRAP] Using HeadlessStandardLibrary.st");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Using HeadlessStandardLibrary.st");
         }
         else if (File.Exists(standardLibraryPath))
         {
             libraryPath = standardLibraryPath;
-            Console.WriteLine("[BOOTSTRAP] Using StandardLibrary.st");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Using StandardLibrary.st");
         }
         else
         {
-            Console.WriteLine("[BOOTSTRAP] No standard library found - continuing with bootstrap classes only");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] No standard library found - continuing with bootstrap classes only");
             return;
         }
         
@@ -202,18 +202,18 @@ public sealed class VirtualMachine
         
         if (result.Success)
         {
-            Console.WriteLine($"[BOOTSTRAP] Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} methods");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} methods");
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Failed to load some parts of standard library");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Warning: Failed to load some parts of standard library");
             foreach (var error in result.Errors.Take(3))
             {
                 Console.WriteLine($"  Error: {error}");
             }
         }
         
-        Console.WriteLine("[BOOTSTRAP] Phase 3 complete: Standard library processed");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3 complete: Standard library processed");
     }
     
     /// <summary>
@@ -236,7 +236,7 @@ public sealed class VirtualMachine
         var phase3Executor = new Phase3Executor(bootstrapAdapter);
         phase3Executor.ExecuteManifest(jsonContent);
         
-        Console.WriteLine($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
     }
     
     /// <summary>

@@ -14,6 +14,22 @@ public class Phase3Executor
     private readonly ISmalltalkVM vm;
     private readonly Dictionary<string, int> testVariables = new();
     
+    /// <summary>
+    /// Controls whether Phase 3 debug output is displayed.
+    /// </summary>
+    public static bool EnablePhase3DebugOutput { get; set; } = false;
+    
+    /// <summary>
+    /// Logs a Phase 3 message only if debug output is enabled.
+    /// </summary>
+    public static void Phase3Log(string message)
+    {
+        if (EnablePhase3DebugOutput)
+        {
+            Console.WriteLine(message);
+        }
+    }
+    
     public Phase3Executor(ISmalltalkVM vm)
     {
         this.vm = vm;
@@ -135,7 +151,7 @@ public class Phase3Executor
             throw new InvalidOperationException("Failed to parse Phase 3 manifest");
         }
         
-        Console.WriteLine($"[PHASE3] Executing: {manifest.Description}");
+        Phase3Log($"[PHASE3] Executing: {manifest.Description}");
         
         // Step 1: Create classes
         foreach (var classDef in manifest.Classes)
@@ -155,7 +171,7 @@ public class Phase3Executor
             ExecuteTestSequence(manifest.TestSequence);
         }
         
-        Console.WriteLine("[PHASE3] Manifest execution complete");
+        Phase3Log("[PHASE3] Manifest execution complete");
     }
     
     /// <summary>
@@ -163,13 +179,13 @@ public class Phase3Executor
     /// </summary>
     private void CreateClass(ClassDef classDef)
     {
-        Console.WriteLine($"[PHASE3] Creating class {classDef.Name} < {classDef.Superclass}");
+        Phase3Log($"[PHASE3] Creating class {classDef.Name} < {classDef.Superclass}");
         
         // Look up superclass
         var superclassOop = vm.PrimitiveLookupClass(classDef.Superclass);
         if (superclassOop < 0)
         {
-            Console.WriteLine($"[PHASE3] Warning: Superclass {classDef.Superclass} not found");
+            Phase3Log($"[PHASE3] Warning: Superclass {classDef.Superclass} not found");
             return;
         }
         
@@ -205,7 +221,7 @@ public class Phase3Executor
         // Register the class globally
         vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
         
-        Console.WriteLine($"[PHASE3] Created class {classDef.Name} -> OOP {classOop}");
+        Phase3Log($"[PHASE3] Created class {classDef.Name} -> OOP {classOop}");
     }
     
     /// <summary>
@@ -213,30 +229,30 @@ public class Phase3Executor
     /// </summary>
     private void InstallMethod(MethodDef methodDef)
     {
-        Console.WriteLine($"[PHASE3] Installing {methodDef.ClassName}>>{methodDef.Selector}");
+        Phase3Log($"[PHASE3] Installing {methodDef.ClassName}>>{methodDef.Selector}");
         
         // Step 1: Look up the target class
         var classOop = vm.PrimitiveLookupClass(methodDef.ClassName);
         if (classOop < 0)
         {
-            Console.WriteLine($"[PHASE3] Warning: Class {methodDef.ClassName} not found");
+            Phase3Log($"[PHASE3] Warning: Class {methodDef.ClassName} not found");
             return;
         }
         
         // Step 2: Ensure the selector is properly interned as a Symbol
         var selectorSymbol = vm.PrimitiveInternSymbol(methodDef.Selector);
-        Console.WriteLine($"[PHASE3]   - Selector '{methodDef.Selector}' interned as Symbol OOP {selectorSymbol}");
+        Phase3Log($"[PHASE3]   - Selector '{methodDef.Selector}' interned as Symbol OOP {selectorSymbol}");
         
         // Step 3: Create the CompiledMethod object with proper setup
         var compiledMethodClass = vm.PrimitiveLookupClass("CompiledMethod");
         if (compiledMethodClass < 0)
         {
-            Console.WriteLine("[PHASE3] Warning: CompiledMethod class not found, cannot install method");
+            Phase3Log("[PHASE3] Warning: CompiledMethod class not found, cannot install method");
             return;
         }
         
         var methodOop = vm.PrimitiveNewInstance(compiledMethodClass);
-        Console.WriteLine($"[PHASE3]   - Created CompiledMethod instance OOP {methodOop}");
+        Phase3Log($"[PHASE3]   - Created CompiledMethod instance OOP {methodOop}");
         
         // CompiledMethod has 4 fields: selector, bytecode, literals, header
         // Set selector (slot 0)
@@ -254,7 +270,7 @@ public class Phase3Executor
                 vm.PrimitiveArrayAtPut(bytecodeArray, i, byteObj);
             }
             vm.PrimitiveSetSlot(methodOop, 1, bytecodeArray);
-            Console.WriteLine($"[PHASE3]   - Set bytecodes ({methodDef.Bytecodes.Count} bytes): [{string.Join(", ", methodDef.Bytecodes)}]");
+            Phase3Log($"[PHASE3]   - Set bytecodes ({methodDef.Bytecodes.Count} bytes): [{string.Join(", ", methodDef.Bytecodes)}]");
         }
         else
         {
@@ -290,7 +306,7 @@ public class Phase3Executor
             vm.PrimitiveArrayAtPut(literalsArray, i, literalOop);
         }
         vm.PrimitiveSetSlot(methodOop, 2, literalsArray);
-        Console.WriteLine($"[PHASE3]   - Set literals ({methodDef.Literals.Count} literals)");
+        Phase3Log($"[PHASE3]   - Set literals ({methodDef.Literals.Count} literals)");
         
         // Set header (slot 3) - Blue Book encoding (16-bit word):
         // Bits 0-8: Primitive number (0 if no primitive)
@@ -309,7 +325,7 @@ public class Phase3Executor
         
         // Format the header for display
         var headerDesc = FormatBlueBookHeader(headerValue);
-        Console.WriteLine($"[PHASE3]   - Set header: {headerDesc}");
+        Phase3Log($"[PHASE3]   - Set header: {headerDesc}");
         
         // Step 4: Retrieve or create the class's method dictionary using message sends
         var methodDictOop = vm.GetSlot(classOop, 1);
@@ -322,32 +338,32 @@ public class Phase3Executor
             {
                 var newSelector = vm.PrimitiveInternSymbol("new");
                 methodDictOop = vm.PrimitiveSendMessage(methodDictClass, newSelector, new int[0]);
-                Console.WriteLine($"[PHASE3]   - Created MethodDictionary via message send: MethodDictionary new -> OOP {methodDictOop}");
+                Phase3Log($"[PHASE3]   - Created MethodDictionary via message send: MethodDictionary new -> OOP {methodDictOop}");
             }
             else
             {
                 // Fallback: use simple dictionary
                 methodDictOop = vm.PrimitiveNewDictionary();
-                Console.WriteLine($"[PHASE3]   - Created simple dictionary OOP {methodDictOop}");
+                Phase3Log($"[PHASE3]   - Created simple dictionary OOP {methodDictOop}");
             }
             
             // Install the dictionary in the class (slot 1 of Behavior)
             vm.PrimitiveSetSlot(classOop, 1, methodDictOop);
-            Console.WriteLine($"[PHASE3]   - Installed method dictionary in class slot 1");
+            Phase3Log($"[PHASE3]   - Installed method dictionary in class slot 1");
         }
         else
         {
-            Console.WriteLine($"[PHASE3]   - Using existing method dictionary OOP {methodDictOop}");
+            Phase3Log($"[PHASE3]   - Using existing method dictionary OOP {methodDictOop}");
         }
         
         // Step 5: Install the method via "dict at: selector put: method" message send
         var atPutSelector = vm.PrimitiveInternSymbol("at:put:");
         var result = vm.PrimitiveSendMessage(methodDictOop, atPutSelector, new int[] { selectorSymbol, methodOop });
-        Console.WriteLine($"[PHASE3]   - Installed method via message send: dict at: #{methodDef.Selector} put: method -> result OOP {result}");
+        Phase3Log($"[PHASE3]   - Installed method via message send: dict at: #{methodDef.Selector} put: method -> result OOP {result}");
         
         // The dictionary will automatically expand if needed via its inherited fullCheck mechanism
         
-        Console.WriteLine($"[PHASE3] ✓ Method {methodDef.ClassName}>>{methodDef.Selector} successfully installed");
+        Phase3Log($"[PHASE3] ✓ Method {methodDef.ClassName}>>{methodDef.Selector} successfully installed");
     }
     
     /// <summary>
@@ -355,7 +371,7 @@ public class Phase3Executor
     /// </summary>
     private void ExecuteTestSequence(List<TestAction> testSequence)
     {
-        Console.WriteLine("[PHASE3] Executing test sequence...");
+        Phase3Log("[PHASE3] Executing test sequence...");
         
         foreach (var action in testSequence)
         {
@@ -370,7 +386,7 @@ public class Phase3Executor
                     break;
                     
                 default:
-                    Console.WriteLine($"[PHASE3] Unknown test action: {action.Action}");
+                    Phase3Log($"[PHASE3] Unknown test action: {action.Action}");
                     break;
             }
         }
@@ -383,16 +399,16 @@ public class Phase3Executor
     {
         if (action.ClassName == null)
         {
-            Console.WriteLine("[PHASE3] createInstance requires className");
+            Phase3Log("[PHASE3] createInstance requires className");
             return;
         }
         
-        Console.WriteLine($"[PHASE3] Creating instance of {action.ClassName}");
+        Phase3Log($"[PHASE3] Creating instance of {action.ClassName}");
         
         var classOop = vm.PrimitiveLookupClass(action.ClassName);
         if (classOop < 0)
         {
-            Console.WriteLine($"[PHASE3] Class {action.ClassName} not found");
+            Phase3Log($"[PHASE3] Class {action.ClassName} not found");
             return;
         }
         
@@ -401,7 +417,7 @@ public class Phase3Executor
         if (!string.IsNullOrEmpty(action.AssignTo))
         {
             testVariables[action.AssignTo] = instanceOop;
-            Console.WriteLine($"[PHASE3] Created instance -> OOP {instanceOop}, assigned to '{action.AssignTo}'");
+            Phase3Log($"[PHASE3] Created instance -> OOP {instanceOop}, assigned to '{action.AssignTo}'");
         }
     }
     
@@ -443,11 +459,11 @@ public class Phase3Executor
     {
         if (action.Receiver == null || action.Selector == null)
         {
-            Console.WriteLine("[PHASE3] sendMessage requires receiver and selector");
+            Phase3Log("[PHASE3] sendMessage requires receiver and selector");
             return;
         }
         
-        Console.WriteLine($"[PHASE3] Sending {action.Selector} to {action.Receiver}");
+        Phase3Log($"[PHASE3] Sending {action.Selector} to {action.Receiver}");
         
         // Get receiver OOP
         if (!testVariables.TryGetValue(action.Receiver, out int receiverOop))
@@ -456,15 +472,15 @@ public class Phase3Executor
             receiverOop = vm.PrimitiveLookupClass(action.Receiver);
             if (receiverOop < 0)
             {
-                Console.WriteLine($"[PHASE3] Receiver '{action.Receiver}' not found in test variables or as a class");
+                Phase3Log($"[PHASE3] Receiver '{action.Receiver}' not found in test variables or as a class");
                 return;
             }
-            Console.WriteLine($"[PHASE3]   - Found receiver as class '{action.Receiver}' -> OOP {receiverOop}");
+            Phase3Log($"[PHASE3]   - Found receiver as class '{action.Receiver}' -> OOP {receiverOop}");
         }
         
         // Intern the selector as a Symbol
         var selectorOop = vm.PrimitiveInternSymbol(action.Selector);
-        Console.WriteLine($"[PHASE3]   - Selector '{action.Selector}' -> Symbol OOP {selectorOop}");
+        Phase3Log($"[PHASE3]   - Selector '{action.Selector}' -> Symbol OOP {selectorOop}");
         
         // Prepare arguments
         var argOops = new int[action.Arguments?.Count ?? 0];
@@ -475,33 +491,33 @@ public class Phase3Executor
                 var arg = action.Arguments[i];
                 // For now, just intern as string
                 argOops[i] = vm.PrimitiveInternString(arg);
-                Console.WriteLine($"[PHASE3]   - Argument '{arg}' -> String OOP {argOops[i]}");
+                Phase3Log($"[PHASE3]   - Argument '{arg}' -> String OOP {argOops[i]}");
             }
         }
         
         // Actually send the message using the VM primitive
-        Console.WriteLine($"[PHASE3] Invoking PrimitiveSendMessage(receiver: {receiverOop}, selector: {selectorOop}, args: [{string.Join(", ", argOops)}])");
+        Phase3Log($"[PHASE3] Invoking PrimitiveSendMessage(receiver: {receiverOop}, selector: {selectorOop}, args: [{string.Join(", ", argOops)}])");
         var resultOop = vm.PrimitiveSendMessage(receiverOop, selectorOop, argOops);
         
         if (resultOop >= 0)
         {
-            Console.WriteLine($"[PHASE3] Message send returned OOP {resultOop}");
+            Phase3Log($"[PHASE3] Message send returned OOP {resultOop}");
             
             // Store result if needed
             if (!string.IsNullOrEmpty(action.AssignTo))
             {
                 testVariables[action.AssignTo] = resultOop;
-                Console.WriteLine($"[PHASE3] Result assigned to '{action.AssignTo}'");
+                Phase3Log($"[PHASE3] Result assigned to '{action.AssignTo}'");
             }
         }
         else
         {
-            Console.WriteLine($"[PHASE3] Message send failed or returned nil");
+            Phase3Log($"[PHASE3] Message send failed or returned nil");
         }
         
         if (!string.IsNullOrEmpty(action.ExpectResult))
         {
-            Console.WriteLine($"[PHASE3] Expected result: {action.ExpectResult}");
+            Phase3Log($"[PHASE3] Expected result: {action.ExpectResult}");
             // TODO: Compare actual result with expected result
         }
     }

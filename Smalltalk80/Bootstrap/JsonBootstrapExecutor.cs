@@ -13,6 +13,22 @@ public class JsonBootstrapExecutor
     private readonly ISmalltalkVM vm;
     private readonly Dictionary<string, int> namedObjects = new();
     
+    /// <summary>
+    /// Controls whether bootstrap debug output is displayed.
+    /// </summary>
+    public static bool EnableBootstrapDebugOutput { get; set; } = false;
+    
+    /// <summary>
+    /// Logs a bootstrap message only if debug output is enabled.
+    /// </summary>
+    public static void BootstrapLog(string message)
+    {
+        if (EnableBootstrapDebugOutput)
+        {
+            Console.WriteLine(message);
+        }
+    }
+    
     public JsonBootstrapExecutor(ISmalltalkVM vm)
     {
         this.vm = vm;
@@ -33,7 +49,7 @@ public class JsonBootstrapExecutor
         if (bootstrap == null)
             throw new InvalidOperationException("Failed to parse bootstrap JSON");
             
-        Console.WriteLine($"[BOOTSTRAP] Executing {bootstrap.Operations?.Count ?? 0} operations from {bootstrap.Description}");
+        BootstrapLog($"[BOOTSTRAP] Executing {bootstrap.Operations?.Count ?? 0} operations from {bootstrap.Description}");
         
         if (bootstrap.Operations == null)
             return;
@@ -43,11 +59,11 @@ public class JsonBootstrapExecutor
             ExecuteOperation(operation);
         }
         
-        Console.WriteLine($"[BOOTSTRAP] Phase 1 created {namedObjects.Count} named objects");
+        BootstrapLog($"[BOOTSTRAP] Phase 1 created {namedObjects.Count} named objects");
         
         // Don't migrate yet - wait until after Phase 2/3 when at:put: method is available
         // This avoids the dictionary expansion problem
-        Console.WriteLine("[BOOTSTRAP] Phase 1 complete - will migrate to Smalltalk dictionary after methods are installed");
+        BootstrapLog("[BOOTSTRAP] Phase 1 complete - will migrate to Smalltalk dictionary after methods are installed");
     }
     
     /// <summary>
@@ -65,12 +81,12 @@ public class JsonBootstrapExecutor
         if (phase2 == null)
             throw new InvalidOperationException("Failed to parse Phase 2 bootstrap JSON");
             
-        Console.WriteLine($"[BOOTSTRAP] Phase 2: {phase2.Description}");
+        BootstrapLog($"[BOOTSTRAP] Phase 2: {phase2.Description}");
         
         // First, create all classes
         if (phase2.Classes != null)
         {
-            Console.WriteLine($"[BOOTSTRAP] Creating {phase2.Classes.Count} classes");
+            BootstrapLog($"[BOOTSTRAP] Creating {phase2.Classes.Count} classes");
             foreach (var classDef in phase2.Classes)
             {
                 CreatePhase2Class(classDef);
@@ -80,7 +96,7 @@ public class JsonBootstrapExecutor
         // Then, create all objects with explicit IDs
         if (phase2.Objects != null)
         {
-            Console.WriteLine($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
+            BootstrapLog($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
             foreach (var objDef in phase2.Objects)
             {
                 CreatePhase2Object(objDef);
@@ -90,14 +106,14 @@ public class JsonBootstrapExecutor
         // Finally, apply patches to wire everything together
         if (phase2.Patches != null)
         {
-            Console.WriteLine($"[BOOTSTRAP] Applying {phase2.Patches.Count} patches");
+            BootstrapLog($"[BOOTSTRAP] Applying {phase2.Patches.Count} patches");
             foreach (var patch in phase2.Patches)
             {
                 ApplyPhase2Patch(patch);
             }
         }
         
-        Console.WriteLine($"[BOOTSTRAP] Phase 2 complete: Created messaging infrastructure");
+        BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Created messaging infrastructure");
     }
     
     /// <summary>
@@ -117,7 +133,7 @@ public class JsonBootstrapExecutor
     {
         if (!string.IsNullOrEmpty(operation.Comment))
         {
-            Console.WriteLine($"[BOOTSTRAP] {operation.Comment}");
+            BootstrapLog($"[BOOTSTRAP] {operation.Comment}");
             return;
         }
         
@@ -197,7 +213,7 @@ public class JsonBootstrapExecutor
                 
             default:
                 if (!string.IsNullOrEmpty(operation.Op))
-                    Console.WriteLine($"[BOOTSTRAP] Warning: Unknown operation '{operation.Op}'");
+                    BootstrapLog($"[BOOTSTRAP] Warning: Unknown operation '{operation.Op}'");
                 break;
         }
     }
@@ -219,19 +235,19 @@ public class JsonBootstrapExecutor
         {
             // It's a metaclass
             oop = vm.PrimitiveNewMetaclass();
-            Console.WriteLine($"[BOOTSTRAP] Created metaclass '{op.Result}' -> OOP {oop}");
+            BootstrapLog($"[BOOTSTRAP] Created metaclass '{op.Result}' -> OOP {oop}");
         }
         else if (op.Result == "nil")
         {
             // Special case for nil
             oop = vm.PrimitiveNil();
-            Console.WriteLine($"[BOOTSTRAP] Created nil -> OOP {oop}");
+            BootstrapLog($"[BOOTSTRAP] Created nil -> OOP {oop}");
         }
         else
         {
             // It's a regular class object
             oop = vm.PrimitiveNewClass();
-            Console.WriteLine($"[BOOTSTRAP] Created class '{op.Result}' -> OOP {oop}");
+            BootstrapLog($"[BOOTSTRAP] Created class '{op.Result}' -> OOP {oop}");
         }
         
         namedObjects[op.Result] = oop;
@@ -282,16 +298,16 @@ public class JsonBootstrapExecutor
         if (op.Slot == "class")
         {
             vm.PrimitiveSetClass(targetOop, valueOop);
-            Console.WriteLine($"[BOOTSTRAP] Set class of '{op.Target}' (OOP {targetOop}) to '{op.Value}' (OOP {valueOop})");
+            BootstrapLog($"[BOOTSTRAP] Set class of '{op.Target}' (OOP {targetOop}) to '{op.Value}' (OOP {valueOop})");
         }
         else if (int.TryParse(op.Slot, out var slotIndex))
         {
             vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
-            Console.WriteLine($"[BOOTSTRAP] Set slot {slotIndex} of '{op.Target}' to '{op.Value}'");
+            BootstrapLog($"[BOOTSTRAP] Set slot {slotIndex} of '{op.Target}' to '{op.Value}'");
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Unknown slot type '{op.Slot}'");
+            BootstrapLog($"[BOOTSTRAP] Warning: Unknown slot type '{op.Slot}'");
         }
     }
     
@@ -344,7 +360,7 @@ public class JsonBootstrapExecutor
         {
             vm.PrimitiveSetSlot(targetOop, 0, superclassOop);
         }
-        Console.WriteLine($"[BOOTSTRAP] Set superclass of '{op.Target}' to '{op.Value ?? "nil"}'");
+        BootstrapLog($"[BOOTSTRAP] Set superclass of '{op.Target}' to '{op.Value ?? "nil"}'");
     }
     
     /// <summary>
@@ -399,7 +415,7 @@ public class JsonBootstrapExecutor
             
         var oop = vm.PrimitiveInternSymbol(valueStr!);
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created symbol '{valueStr}' -> OOP {oop}");
+        BootstrapLog($"[BOOTSTRAP] Created symbol '{valueStr}' -> OOP {oop}");
     }
     
     /// <summary>
@@ -426,7 +442,7 @@ public class JsonBootstrapExecutor
             
         var oop = vm.PrimitiveInternString(valueStr!);
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created string '{valueStr}' -> OOP {oop}");
+        BootstrapLog($"[BOOTSTRAP] Created string '{valueStr}' -> OOP {oop}");
     }
     
     /// <summary>
@@ -440,7 +456,7 @@ public class JsonBootstrapExecutor
         var size = op.Size ?? 0;
         var oop = vm.PrimitiveNewArray(size);
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created array of size {size} -> OOP {oop}");
+        BootstrapLog($"[BOOTSTRAP] Created array of size {size} -> OOP {oop}");
     }
     
     /// <summary>
@@ -453,7 +469,7 @@ public class JsonBootstrapExecutor
             
         var oop = vm.PrimitiveNewDictionary();
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created dictionary -> OOP {oop}");
+        BootstrapLog($"[BOOTSTRAP] Created dictionary -> OOP {oop}");
     }
     
     /// <summary>
@@ -501,11 +517,11 @@ public class JsonBootstrapExecutor
             }
             vm.PrimitiveSetSlot(targetOop, 3, namesArray);
             
-            Console.WriteLine($"[BOOTSTRAP] Set instance variables of '{op.Target}' to [{string.Join(", ", varNames)}]");
+            BootstrapLog($"[BOOTSTRAP] Set instance variables of '{op.Target}' to [{string.Join(", ", varNames)}]");
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: setInstanceVariables value must be an array");
+            BootstrapLog($"[BOOTSTRAP] Warning: setInstanceVariables value must be an array");
         }
     }
     
@@ -524,7 +540,7 @@ public class JsonBootstrapExecutor
         int slotIndex = GetSlotIndex(op.Target, op.Slot);
         if (slotIndex < 0)
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Unknown slot '{op.Slot}' for '{op.Target}'");
+            BootstrapLog($"[BOOTSTRAP] Warning: Unknown slot '{op.Slot}' for '{op.Target}'");
             return;
         }
         
@@ -555,7 +571,7 @@ public class JsonBootstrapExecutor
         }
         
         vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
-        Console.WriteLine($"[BOOTSTRAP] Set slot '{op.Slot}' of '{op.Target}' to '{op.Value}'");
+        BootstrapLog($"[BOOTSTRAP] Set slot '{op.Slot}' of '{op.Target}' to '{op.Value}'");
     }
     
     /// <summary>
@@ -602,7 +618,7 @@ public class JsonBootstrapExecutor
             
         // Category is typically stored in the organization slot (4)
         // For now, just log it
-        Console.WriteLine($"[BOOTSTRAP] Set category of '{op.Target}' to '{op.Value}'");
+        BootstrapLog($"[BOOTSTRAP] Set category of '{op.Target}' to '{op.Value}'");
     }
     
     /// <summary>
@@ -619,13 +635,13 @@ public class JsonBootstrapExecutor
         // Check if it's a primitive method
         if (op.Primitive > 0)
         {
-            Console.WriteLine($"[BOOTSTRAP] Installing primitive method '{op.Selector}' (primitive {op.Primitive}) on '{op.Target}'");
+            BootstrapLog($"[BOOTSTRAP] Installing primitive method '{op.Selector}' (primitive {op.Primitive}) on '{op.Target}'");
             
             // Create a CompiledMethod for the primitive
             var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
             if (compiledMethodClassOop < 0)
             {
-                Console.WriteLine($"[BOOTSTRAP] Warning: CompiledMethod class not found, cannot install method");
+                BootstrapLog($"[BOOTSTRAP] Warning: CompiledMethod class not found, cannot install method");
                 return;
             }
             
@@ -658,13 +674,13 @@ public class JsonBootstrapExecutor
             
             // Add method to dictionary
             vm.PrimitiveDictionaryAtPut(methodDictOop, selectorOop, methodOop);
-            Console.WriteLine($"[BOOTSTRAP] Installed method '{op.Selector}' in class '{op.Target}'");
+            BootstrapLog($"[BOOTSTRAP] Installed method '{op.Selector}' in class '{op.Target}'");
         }
         else if (!string.IsNullOrEmpty(op.Source))
         {
             // For Phase 1, we can't actually compile methods yet
             // Just log it for now
-            Console.WriteLine($"[BOOTSTRAP] Define method '{op.Selector}' on '{op.Target}' (source methods not yet supported)");
+            BootstrapLog($"[BOOTSTRAP] Define method '{op.Selector}' on '{op.Target}' (source methods not yet supported)");
         }
         else
         {
@@ -743,7 +759,7 @@ public class JsonBootstrapExecutor
                 }
                 else
                 {
-                    Console.WriteLine($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
+                    BootstrapLog($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
                 }
                 break;
         }
@@ -751,7 +767,7 @@ public class JsonBootstrapExecutor
         if (oop > 0)
         {
             namedObjects[objDef.Id] = oop;
-            Console.WriteLine($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{objDef.ClassName}' -> OOP {oop}");
+            BootstrapLog($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{objDef.ClassName}' -> OOP {oop}");
         }
     }
     
@@ -816,7 +832,7 @@ public class JsonBootstrapExecutor
                 }
                 else
                 {
-                    Console.WriteLine($"[BOOTSTRAP] Warning: Referenced object '{refId}' not found");
+                    BootstrapLog($"[BOOTSTRAP] Warning: Referenced object '{refId}' not found");
                 }
             }
             else if (elements[i] is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.String)
@@ -843,7 +859,7 @@ public class JsonBootstrapExecutor
         var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
         if (compiledMethodClassOop < 0)
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: CompiledMethod class not found");
+            BootstrapLog($"[BOOTSTRAP] Warning: CompiledMethod class not found");
             return 0;
         }
         
@@ -903,7 +919,7 @@ public class JsonBootstrapExecutor
         var methodDictClassOop = vm.PrimitiveLookupClass("MethodDictionary");
         if (methodDictClassOop < 0)
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: MethodDictionary class not found, using generic dictionary");
+            BootstrapLog($"[BOOTSTRAP] Warning: MethodDictionary class not found, using generic dictionary");
             return vm.PrimitiveNewDictionary();
         }
         
@@ -954,7 +970,7 @@ public class JsonBootstrapExecutor
                     var keyOop = vm.GetSlot(keysArray, i);
                     if (keyOop < 0)
                     {
-                        Console.WriteLine($"[BOOTSTRAP] Warning: Could not get key at index {i} from keys array");
+                        BootstrapLog($"[BOOTSTRAP] Warning: Could not get key at index {i} from keys array");
                         continue;
                     }
                     vm.PrimitiveSetSlot(dictOop, i + 1, keyOop);
@@ -1009,7 +1025,7 @@ public class JsonBootstrapExecutor
             {
                 return oop;
             }
-            Console.WriteLine($"[BOOTSTRAP] Warning: Reference '{refId}' not found");
+            BootstrapLog($"[BOOTSTRAP] Warning: Reference '{refId}' not found");
         }
         else if (reference is JsonElement jsonElem)
         {
@@ -1068,7 +1084,7 @@ public class JsonBootstrapExecutor
         if (isNewClass)
         {
             // Class doesn't exist, create it
-            Console.WriteLine($"[BOOTSTRAP] Creating class '{classDef.Name}'");
+            BootstrapLog($"[BOOTSTRAP] Creating class '{classDef.Name}'");
             classOop = vm.PrimitiveNewClass();
             namedObjects[classDef.Name] = classOop;
             vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
@@ -1081,7 +1097,7 @@ public class JsonBootstrapExecutor
         else
         {
             // Class exists, enhance it
-            Console.WriteLine($"[BOOTSTRAP] Enhancing existing class '{classDef.Name}'");
+            BootstrapLog($"[BOOTSTRAP] Enhancing existing class '{classDef.Name}'");
             namedObjects[classDef.Name] = classOop;
             
             // Get the existing metaclass
@@ -1099,7 +1115,7 @@ public class JsonBootstrapExecutor
             // Add class to Smalltalk dictionary: Smalltalk at: #ClassName put: ClassObject
             var keySymbol = vm.PrimitiveInternSymbol(classDef.Name);
             vm.PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, classOop);
-            Console.WriteLine($"[BOOTSTRAP]   - Registered {classDef.Name} in Smalltalk dictionary");
+            BootstrapLog($"[BOOTSTRAP]   - Registered {classDef.Name} in Smalltalk dictionary");
         }
         
         // Mark variable-sized classes (Array, ByteArray, etc.)
@@ -1135,7 +1151,7 @@ public class JsonBootstrapExecutor
             }
             else
             {
-                Console.WriteLine($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+                BootstrapLog($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
             }
         }
         
@@ -1178,7 +1194,7 @@ public class JsonBootstrapExecutor
             }
             else
             {
-                Console.WriteLine($"[BOOTSTRAP] Warning: Superclass '{classDef.Superclass}' not found for '{classDef.Name}'");
+                BootstrapLog($"[BOOTSTRAP] Warning: Superclass '{classDef.Superclass}' not found for '{classDef.Name}'");
             }
         }
         
@@ -1213,7 +1229,7 @@ public class JsonBootstrapExecutor
             targetOop = vm.PrimitiveLookupClass(patch.Target);
             if (targetOop < 0)
             {
-                Console.WriteLine($"[BOOTSTRAP] Warning: Patch target '{patch.Target}' not found");
+                BootstrapLog($"[BOOTSTRAP] Warning: Patch target '{patch.Target}' not found");
                 return;
             }
         }
@@ -1222,7 +1238,7 @@ public class JsonBootstrapExecutor
         int slotIndex = GetSlotIndex(patch.Target, patch.Slot);
         if (slotIndex < 0)
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Unknown slot '{patch.Slot}' for '{patch.Target}'");
+            BootstrapLog($"[BOOTSTRAP] Warning: Unknown slot '{patch.Slot}' for '{patch.Target}'");
             return;
         }
         
@@ -1231,7 +1247,7 @@ public class JsonBootstrapExecutor
         
         // Apply the patch
         vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
-        Console.WriteLine($"[BOOTSTRAP] Patched '{patch.Target}'.{patch.Slot} = {patch.Value}");
+        BootstrapLog($"[BOOTSTRAP] Patched '{patch.Target}'.{patch.Slot} = {patch.Value}");
     }
     
     /// <summary>
@@ -1320,11 +1336,11 @@ public class JsonBootstrapExecutor
         if (!string.IsNullOrEmpty(op.Result))
         {
             namedObjects[op.Result] = resultOop;
-            Console.WriteLine($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> '{op.Result}' (OOP {resultOop})");
+            BootstrapLog($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> '{op.Result}' (OOP {resultOop})");
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> OOP {resultOop}");
+            BootstrapLog($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> OOP {resultOop}");
         }
     }
     
@@ -1347,11 +1363,11 @@ public class JsonBootstrapExecutor
         if (!string.IsNullOrEmpty(op.Type))
         {
             // TODO: Verify the object's class matches the expected type
-            Console.WriteLine($"[BOOTSTRAP] Assert: '{op.Target}' exists (type check for '{op.Type}' not implemented)");
+            BootstrapLog($"[BOOTSTRAP] Assert: '{op.Target}' exists (type check for '{op.Type}' not implemented)");
         }
         else
         {
-            Console.WriteLine($"[BOOTSTRAP] Assert: '{op.Target}' exists at OOP {targetOop}");
+            BootstrapLog($"[BOOTSTRAP] Assert: '{op.Target}' exists at OOP {targetOop}");
         }
     }
     
@@ -1377,7 +1393,7 @@ public class JsonBootstrapExecutor
         var instanceOop = vm.PrimitiveNewInstance(classOop);
         namedObjects[op.Result] = instanceOop;
         
-        Console.WriteLine($"[BOOTSTRAP] Created instance '{op.Result}' of class '{op.ClassName}' -> OOP {instanceOop}");
+        BootstrapLog($"[BOOTSTRAP] Created instance '{op.Result}' of class '{op.ClassName}' -> OOP {instanceOop}");
     }
     
     /// <summary>
@@ -1415,12 +1431,12 @@ public class JsonBootstrapExecutor
         {
             // For dictionaries, slot 0 is the tally (count of entries)
             var zeroOop = vm.PrimitiveNewSmallInteger(0);
-            Console.WriteLine($"[BOOTSTRAP] Setting dictionary tally (slot 0) to SmallInteger 0 (OOP {zeroOop})");
+            BootstrapLog($"[BOOTSTRAP] Setting dictionary tally (slot 0) to SmallInteger 0 (OOP {zeroOop})");
             vm.PrimitiveArrayAtPut(instanceOop, 0, zeroOop);
             
             // Initialize remaining slots to nil
             var nilOop = vm.PrimitiveNil();
-            Console.WriteLine($"[BOOTSTRAP] Initializing remaining {size-1} slots to nil (OOP {nilOop})");
+            BootstrapLog($"[BOOTSTRAP] Initializing remaining {size-1} slots to nil (OOP {nilOop})");
             for (int i = 1; i < size; i++)
             {
                 vm.PrimitiveArrayAtPut(instanceOop, i, nilOop);
@@ -1438,7 +1454,7 @@ public class JsonBootstrapExecutor
         
         namedObjects[op.Result] = instanceOop;
         
-        Console.WriteLine($"[BOOTSTRAP] Created large instance '{op.Result}' of class '{op.ClassName}' with size {size} -> OOP {instanceOop}");
+        BootstrapLog($"[BOOTSTRAP] Created large instance '{op.Result}' of class '{op.ClassName}' with size {size} -> OOP {instanceOop}");
     }
     
     /// <summary>
@@ -1476,7 +1492,7 @@ public class JsonBootstrapExecutor
         // Use primitive 461 (Dictionary at:put:)
         vm.PrimitiveDictionaryAtPut(dictOop, keyOop, valueOop);
         
-        Console.WriteLine($"[BOOTSTRAP] Added {op.Key} -> {valueStr} to dictionary '{op.Dictionary}'");
+        BootstrapLog($"[BOOTSTRAP] Added {op.Key} -> {valueStr} to dictionary '{op.Dictionary}'");
     }
 }
 

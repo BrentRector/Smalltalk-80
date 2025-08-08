@@ -86,3 +86,101 @@ Any errors or warnings indicate a regression in the parser that must be fixed im
    sudo apt install -y powershell
 
 These guidelines apply to all future contributions unless otherwise specified.
+
+## Command-Line Usage
+
+This section documents the command-line options available for the Smalltalk-80 projects.
+
+### Smalltalk80.Interpreter
+
+The interpreter runs the Smalltalk-80 virtual machine and executes Smalltalk code.
+
+**Basic Usage:**
+```bash
+dotnet run --project "Smalltalk80.Interpreter" [options] [source-files...]
+```
+
+**Options:**
+
+- `--json <file>` - Load additional JSON bootstrap manifest file
+- `--skip-phase3` - Skip Phase 3 (standard library) loading for faster startup
+- `--list-phase2-classes` - List all classes created in Phase 2 and exit (implies --skip-phase3)
+- `--debug-vm` - Enable verbose VM debug output for troubleshooting
+- `--debug-bootstrap` - Enable bootstrap and Phase 3 debug output
+- `--bootstrap <phase1.json> <phase2.json>` - Use custom bootstrap files instead of defaults
+
+**Examples:**
+```bash
+# Normal interpreter startup with full bootstrap
+dotnet run --project "Smalltalk80.Interpreter"
+
+# Fast startup without standard library
+dotnet run --project "Smalltalk80.Interpreter" -- --skip-phase3
+
+# Debug VM internals
+dotnet run --project "Smalltalk80.Interpreter" -- --debug-vm
+
+# Debug bootstrap process
+dotnet run --project "Smalltalk80.Interpreter" -- --debug-bootstrap
+
+# Load custom bootstrap JSON
+dotnet run --project "Smalltalk80.Interpreter" -- --json custom_phase3.json
+
+# List Phase 2 classes for inspection
+dotnet run --project "Smalltalk80.Interpreter" -- --list-phase2-classes
+```
+
+### Smalltalk80.Compiler
+
+The compiler parses and validates Smalltalk source files, and can generate bytecode from the system image.
+
+**Basic Usage:**
+```bash
+dotnet run --project "Smalltalk80.Compiler" [options] <input-file>
+```
+
+**Options:**
+
+**General Options:**
+- `-v, --verbose` - Show detailed parsing information
+- `-t, --tree` - Display the parse tree structure
+- `-h, --help` - Show help message
+- `--validate` - Only validate syntax, don't generate output
+- `--debug-bootstrap` - Enable bootstrap and Phase 3 debug output
+
+**Bytecode Generation:**
+- `--test-bytecode` - Run bytecode generation test suite and exit
+- `--compile-phase2 [system-image] [phase2-json]` - Compile Phase 2 methods from system image to bytecode
+
+**Class Compilation:**
+- `--compile-classes` - Compile classes from system image to bootstrap JSON
+- `-c, --class <name>` - Specify a class to compile (use multiple times for multiple classes)
+- `-o, --output <file>` - Output file for compiled JSON (default: bootstrap_phase2_extracted.json)
+
+**Examples:**
+```bash
+# Validate the system image syntax
+dotnet run --project "Smalltalk80.Compiler" -- --validate "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st"
+
+# Parse with verbose output and show parse tree
+dotnet run --project "Smalltalk80.Compiler" -- -v -t "test.st"
+
+# Test bytecode generation
+dotnet run --project "Smalltalk80.Compiler" -- --test-bytecode
+
+# Compile Phase 2 methods to bytecode (updates bootstrap JSON)
+dotnet run --project "Smalltalk80.Compiler" -- --compile-phase2
+
+# Compile specific classes to JSON
+dotnet run --project "Smalltalk80.Compiler" -- --compile-classes -c Object -c Boolean -o custom_classes.json "Smalltalk-80.st"
+
+# Compile Phase 2 with custom paths
+dotnet run --project "Smalltalk80.Compiler" -- --compile-phase2 "custom/Smalltalk-80.st" "custom/phase2.json"
+```
+
+**Notes:**
+- The compiler automatically validates the Smalltalk-80 system image after each build
+- Expected validation results: 0 errors, 0 warnings, 41,402 lines of code
+- When using `--compile-phase2`, the system image path defaults to `Smalltalk80\Smalltalk-80 Source\Smalltalk-80.st`
+- Phase 2 JSON path defaults to `Bootstrap\bootstrap_phase2.json`
+- Use `--debug-vm` in the interpreter when troubleshooting bootstrap or method execution issues

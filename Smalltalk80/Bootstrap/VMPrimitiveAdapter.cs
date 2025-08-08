@@ -20,12 +20,29 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     #pragma warning restore CS0414
     private int methodDictionaryClassOop = -1;  // Cache the MethodDictionary class OOP
     
+    /// <summary>
+    /// Controls whether detailed VM debug output is printed to console.
+    /// Set to false to reduce output noise during normal operation.
+    /// </summary>
+    public static bool EnableVMDebugOutput { get; set; } = false;
+    
     public VMPrimitiveAdapter(VirtualMachine vm)
     {
         this.vm = vm;
         // Bootstrap context is only created when needed during Phase 1
         // and is deactivated after Phase 1 completes
         this.bootstrapContext = new BootstrapContext();
+    }
+    
+    /// <summary>
+    /// Helper method to conditionally output VM debug messages.
+    /// </summary>
+    private static void DebugLog(string message)
+    {
+        if (EnableVMDebugOutput)
+        {
+            Console.WriteLine(message);
+        }
     }
     
     /// <summary>
@@ -93,7 +110,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             {
                 // Start with minimal size to test capacity limits
                 instanceSize = 2; // Keys and values arrays only
-                Console.WriteLine($"[VM] Creating MethodDictionary with size {instanceSize} to test capacity");
+                DebugLog($"[VM] Creating MethodDictionary with size {instanceSize} to test capacity");
             }
             else if (className == "Dictionary" || className == "SystemDictionary" || className == "IdentityDictionary")
             {
@@ -102,7 +119,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 // Phase 1: ~28 entries, Phase 2: ~30 entries, total ~55 each for globals and classes
                 // Total: ~110 entries, need at least 110 pairs + room for growth
                 instanceSize = 257; // tally + 128 pairs (plenty for bootstrap + growth)
-                Console.WriteLine($"[VM] Creating {className} with size {instanceSize} for initial capacity");
+                DebugLog($"[VM] Creating {className} with size {instanceSize} for initial capacity");
             }
         }
         
@@ -184,7 +201,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // Always check the symbol cache first to ensure uniqueness
         if (symbolCache.TryGetValue(name, out var cachedOop))
         {
-            Console.WriteLine($"[VM] Symbol '{name}' already interned as OOP {cachedOop}");
+            DebugLog($"[VM] Symbol '{name}' already interned as OOP {cachedOop}");
             return cachedOop;
         }
         
@@ -194,7 +211,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             if (bootstrapContext.TryGetTemporarySymbol(name, out var existingOop))
             {
                 symbolCache[name] = existingOop;
-                Console.WriteLine($"[VM] Symbol '{name}' already interned as OOP {existingOop} (bootstrap)");
+                DebugLog($"[VM] Symbol '{name}' already interned as OOP {existingOop} (bootstrap)");
                 return existingOop;
             }
         }
@@ -220,7 +237,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     {
                         bootstrapContext.RegisterTemporarySymbol(name, resultOop);
                     }
-                    Console.WriteLine($"[VM] Interned symbol '{name}' via message send as OOP {resultOop}");
+                    DebugLog($"[VM] Interned symbol '{name}' via message send as OOP {resultOop}");
                     return resultOop;
                 }
             }
@@ -247,7 +264,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         {
             bootstrapContext.RegisterTemporarySymbol(name, symbol.Oop);
         }
-        Console.WriteLine($"[VM] Interned new symbol '{name}' as OOP {symbol.Oop} (direct creation)");
+        DebugLog($"[VM] Interned new symbol '{name}' as OOP {symbol.Oop} (direct creation)");
         
         return symbol.Oop;
     }
@@ -599,7 +616,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     // once proper methods are installed
                 }
                 
-                Console.WriteLine($"[VM] Dictionary at:put: installed new entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
+                DebugLog($"[VM] Dictionary at:put: installed new entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
                 break;
             }
             
@@ -619,14 +636,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 // Replace existing value
                 dict.SetField(i + 1, value);
                 installed = true;
-                Console.WriteLine($"[VM] Dictionary at:put: replaced existing entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
+                DebugLog($"[VM] Dictionary at:put: replaced existing entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
                 break;
             }
         }
         
         if (!installed)
         {
-            Console.WriteLine($"[VM] Warning: Dictionary full, could not install key OOP {keyId}");
+            DebugLog($"[VM] Warning: Dictionary full, could not install key OOP {keyId}");
         }
     }
     
@@ -638,7 +655,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         var dict = ObjectMemory.FromOop(dictId);
         if (dict == null)
         {
-            Console.WriteLine($"[VM] DictionaryAt: Dictionary OOP {dictId} not found");
+            DebugLog($"[VM] DictionaryAt: Dictionary OOP {dictId} not found");
             return -1;
         }
         
@@ -665,7 +682,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             keysArray.Fields != null && valuesArray.Fields != null)
         {
             // This is a proper MethodDictionary with separate keys and values arrays
-            Console.WriteLine($"[VM] DictionaryAt: Using MethodDictionary format with keys array OOP {keysArray.Oop} and values array OOP {valuesArray.Oop}");
+            DebugLog($"[VM] DictionaryAt: Using MethodDictionary format with keys array OOP {keysArray.Oop} and values array OOP {valuesArray.Oop}");
             
             // Search through the keys array
             for (int i = 0; i < keysArray.Fields.Length; i++)
@@ -680,17 +697,17 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 {
                     var keyName = GetSymbolString(existingKeyObj.Oop);
                     var lookingForName = GetSymbolString(keyId);
-                    Console.WriteLine($"[VM] DictionaryAt: Checking key at index {i}: #{keyName} (OOP {existingKeyObj.Oop}) vs looking for #{lookingForName} (OOP {keyId})");
+                    DebugLog($"[VM] DictionaryAt: Checking key at index {i}: #{keyName} (OOP {existingKeyObj.Oop}) vs looking for #{lookingForName} (OOP {keyId})");
                     
                     if (existingKeyObj.Oop == keyId)
                     {
                         // Found the key, get corresponding value from values array
                         if (i < valuesArray.Fields.Length && valuesArray.Fields[i] is SmalltalkObject valueObj)
                         {
-                            Console.WriteLine($"[VM] DictionaryAt: Found value OOP {valueObj.Oop} for key OOP {keyId}");
+                            DebugLog($"[VM] DictionaryAt: Found value OOP {valueObj.Oop} for key OOP {keyId}");
                             return valueObj.Oop;
                         }
-                        Console.WriteLine($"[VM] DictionaryAt: Value at index {i} not found or not a SmalltalkObject");
+                        DebugLog($"[VM] DictionaryAt: Value at index {i} not found or not a SmalltalkObject");
                         return -1;
                     }
                 }
@@ -699,7 +716,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         else
         {
             // This is a flat format dictionary (legacy)
-            Console.WriteLine($"[VM] DictionaryAt: Using flat format dictionary");
+            DebugLog($"[VM] DictionaryAt: Using flat format dictionary");
             
             // Search for the key in the dictionary (flat format: tally, key, value, key, value...)
             // Start at index 1 to skip the tally
@@ -725,7 +742,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     
                     var keyName2 = GetSymbolString(existingKeyObj.Oop);
                     var lookingForName2 = GetSymbolString(keyId);
-                    Console.WriteLine($"[VM] DictionaryAt: Checking key at slot {i}: #{keyName2} (OOP {existingKeyObj.Oop}) vs looking for #{lookingForName2} (OOP {keyId})");
+                    DebugLog($"[VM] DictionaryAt: Checking key at slot {i}: #{keyName2} (OOP {existingKeyObj.Oop}) vs looking for #{lookingForName2} (OOP {keyId})");
                 }
                 
                 if (keyMatches)
@@ -735,22 +752,22 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     if (value is int valueInt)
                     {
                         // SmallInteger value
-                        Console.WriteLine($"[VM] DictionaryAt: Found SmallInteger value {SmallIntegerValue(valueInt)} (tagged {valueInt}) for key OOP {keyId}");
+                        DebugLog($"[VM] DictionaryAt: Found SmallInteger value {SmallIntegerValue(valueInt)} (tagged {valueInt}) for key OOP {keyId}");
                         return valueInt;
                     }
                     else if (value is SmalltalkObject valueObj)
                     {
-                        Console.WriteLine($"[VM] DictionaryAt: Found value OOP {valueObj.Oop} for key OOP {keyId}");
+                        DebugLog($"[VM] DictionaryAt: Found value OOP {valueObj.Oop} for key OOP {keyId}");
                         return valueObj.Oop;
                     }
-                    Console.WriteLine($"[VM] DictionaryAt: Value at slot {i+1} is not recognized");
+                    DebugLog($"[VM] DictionaryAt: Value at slot {i+1} is not recognized");
                     return -1;
                 }
             }
         }
         
         // Key not found
-        Console.WriteLine($"[VM] DictionaryAt: Key OOP {keyId} not found in dictionary");
+        DebugLog($"[VM] DictionaryAt: Key OOP {keyId} not found in dictionary");
         return -1;
     }
     
@@ -761,7 +778,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         // For bootstrap, we'll skip actual compilation
         // Methods will be compiled later when the compiler is available
-        Console.WriteLine($"[BOOTSTRAP] Method {selector} queued for installation in class {classId}");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Method {selector} queued for installation in class {classId}");
     }
     
     /// <summary>
@@ -803,7 +820,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         else if (name == "MethodDictionary")
         {
             methodDictionaryClassOop = valueId;
-            Console.WriteLine($"[BOOTSTRAP] Cached MethodDictionary class OOP: {valueId}");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Cached MethodDictionary class OOP: {valueId}");
         }
         
         // Phase 1: Use bootstrap context
@@ -817,14 +834,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 bootstrapContext.RegisterTemporaryClass(name, valueId);
             }
             
-            Console.WriteLine($"[BOOTSTRAP] Registered temporary global '{name}' -> OOP {valueId}");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered temporary global '{name}' -> OOP {valueId}");
         }
         // After Phase 1: Register directly in Smalltalk dictionary
         else if (smalltalkDictOop > 0)
         {
             var keySymbol = PrimitiveInternSymbol(name);
             PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, valueId);
-            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary -> OOP {valueId}");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary -> OOP {valueId}");
         }
         else
         {
@@ -865,7 +882,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (bootstrapContext != null && bootstrapContext.IsActive)
         {
             var result = bootstrapContext.LookupTemporaryGlobal(name);
-            Console.WriteLine($"[VM] PrimitiveLookupGlobal('{name}'): Found in bootstrap context -> OOP {result}");
+            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in bootstrap context -> OOP {result}");
             return result;
         }
         
@@ -873,11 +890,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (smalltalkDictOop > 0)
         {
             var result = LookupInSmalltalkDictionary(name);
-            Console.WriteLine($"[VM] PrimitiveLookupGlobal('{name}'): Found in Smalltalk dict -> OOP {result}");
+            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in Smalltalk dict -> OOP {result}");
             return result;
         }
         
-        Console.WriteLine($"[VM] PrimitiveLookupGlobal('{name}'): Not found (no bootstrap context and smalltalkDictOop={smalltalkDictOop})");
+        DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Not found (no bootstrap context and smalltalkDictOop={smalltalkDictOop})");
         return -1;
     }
     
@@ -919,14 +936,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     public int PrimitiveSendMessage(int receiverId, int selectorId, int[] argumentIds)
     {
         var selectorName = GetSymbolString(selectorId);
-        Console.WriteLine($"[VM] SendMessage: receiver={receiverId}, selector=#{selectorName} (OOP {selectorId}), args=[{string.Join(",", argumentIds)}]");
+        DebugLog($"[VM] SendMessage: receiver={receiverId}, selector=#{selectorName} (OOP {selectorId}), args=[{string.Join(",", argumentIds)}]");
         
         var receiver = ObjectMemory.FromOop(receiverId);
         var selector = ObjectMemory.FromOop(selectorId);
         
         if (receiver == null || selector == null)
         {
-            Console.WriteLine($"[VM] SendMessage: Invalid receiver or selector");
+            DebugLog($"[VM] SendMessage: Invalid receiver or selector");
             return PrimitiveNil();
         }
         
@@ -934,12 +951,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         var receiverClass = receiver.ClassPointer;
         if (receiverClass == null)
         {
-            Console.WriteLine($"[VM] SendMessage: Receiver has no class");
+            DebugLog($"[VM] SendMessage: Receiver has no class");
             return PrimitiveNil();
         }
         
         var className = GetClassName(receiverClass.Oop);
-        Console.WriteLine($"[VM] SendMessage: Receiver class = {className} (OOP {receiverClass.Oop})");
+        DebugLog($"[VM] SendMessage: Receiver class = {className} (OOP {receiverClass.Oop})");
         
         // Look up the method in the class hierarchy (method inheritance)
         var currentClass = receiverClass;
@@ -951,17 +968,17 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             // Look up the method in the current class's method dictionary
             methodDictOop = GetSlot(currentClass.Oop, 1); // Method dictionary is at slot 1
             var currentClassName = GetClassName(currentClass.Oop);
-            Console.WriteLine($"[VM] SendMessage: Checking class {currentClassName} (OOP {currentClass.Oop}), method dictionary OOP = {methodDictOop}");
+            DebugLog($"[VM] SendMessage: Checking class {currentClassName} (OOP {currentClass.Oop}), method dictionary OOP = {methodDictOop}");
             
             if (methodDictOop >= 0)
             {
                 // Look up the method by selector
-                Console.WriteLine($"[VM] SendMessage: Looking up selector #{selectorName} (OOP {selectorId}) in dictionary OOP {methodDictOop}");
+                DebugLog($"[VM] SendMessage: Looking up selector #{selectorName} (OOP {selectorId}) in dictionary OOP {methodDictOop}");
                 methodOop = PrimitiveDictionaryAt(methodDictOop, selectorId);
                 
                 if (methodOop >= 0)
                 {
-                    Console.WriteLine($"[VM] SendMessage: Found method OOP {methodOop} for #{selectorName} in class {currentClassName}");
+                    DebugLog($"[VM] SendMessage: Found method OOP {methodOop} for #{selectorName} in class {currentClassName}");
                     break;
                 }
             }
@@ -972,35 +989,35 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             {
                 currentClass = ObjectMemory.FromOop(superclassOop);
                 var superclassName = GetClassName(superclassOop);
-                Console.WriteLine($"[VM] SendMessage: Method #{selectorName} not found in {currentClassName}, trying superclass {superclassName} (OOP {superclassOop})");
+                DebugLog($"[VM] SendMessage: Method #{selectorName} not found in {currentClassName}, trying superclass {superclassName} (OOP {superclassOop})");
             }
             else
             {
-                Console.WriteLine($"[VM] SendMessage: No superclass found for class {currentClassName} (OOP {currentClass.Oop})");
+                DebugLog($"[VM] SendMessage: No superclass found for class {currentClassName} (OOP {currentClass.Oop})");
                 currentClass = null;
             }
         }
         
         if (methodOop < 0)
         {
-            Console.WriteLine($"[VM] SendMessage: Method not found for selector #{selectorName} (OOP {selectorId}) in entire class hierarchy");
+            DebugLog($"[VM] SendMessage: Method not found for selector #{selectorName} (OOP {selectorId}) in entire class hierarchy");
             return PrimitiveNil();
         }
         
         var methodObj = ObjectMemory.FromOop(methodOop);
         if (methodObj == null)
         {
-            Console.WriteLine($"[VM] SendMessage: Method object not found");
+            DebugLog($"[VM] SendMessage: Method object not found");
             return PrimitiveNil();
         }
         
-        Console.WriteLine($"[VM] SendMessage: Found method OOP {methodOop} for selector #{selectorName}");
+        DebugLog($"[VM] SendMessage: Found method OOP {methodOop} for selector #{selectorName}");
         
         // Now execute the method by constructing a CompiledMethod and running it
         var compiledMethod = ExtractCompiledMethod(methodObj);
         if (compiledMethod == null)
         {
-            Console.WriteLine($"[VM] SendMessage: Could not extract CompiledMethod from OOP {methodOop}");
+            DebugLog($"[VM] SendMessage: Could not extract CompiledMethod from OOP {methodOop}");
             return PrimitiveNil();
         }
         
@@ -1015,13 +1032,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         var primitiveIndex = compiledMethod.Header.PrimitiveIndex;
         if (primitiveIndex > 0)
         {
-            Console.WriteLine($"[VM] SendMessage: Executing primitive {primitiveIndex}");
+            DebugLog($"[VM] SendMessage: Executing primitive {primitiveIndex}");
             
             // Create a context for primitive execution
             var receiverObj = ObjectMemory.FromOop(receiverId);
             if (receiverObj == null)
             {
-                Console.WriteLine($"[VM] SendMessage: Receiver OOP {receiverId} not found");
+                DebugLog($"[VM] SendMessage: Receiver OOP {receiverId} not found");
                 return PrimitiveNil();
             }
             
@@ -1054,35 +1071,35 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     // Convert result to OOP if it's a SmalltalkObject
                     if (result is SmalltalkObject resultObj)
                     {
-                        Console.WriteLine($"[VM] SendMessage: Primitive {primitiveIndex} executed successfully, result OOP {resultObj.Oop}");
+                        DebugLog($"[VM] SendMessage: Primitive {primitiveIndex} executed successfully, result OOP {resultObj.Oop}");
                         return resultObj.Oop;
                     }
                     else if (result is int intResult)
                     {
                         // Might already be an OOP
-                        Console.WriteLine($"[VM] SendMessage: Primitive {primitiveIndex} executed successfully, result {intResult}");
+                        DebugLog($"[VM] SendMessage: Primitive {primitiveIndex} executed successfully, result {intResult}");
                         return intResult;
                     }
                     else
                     {
-                        Console.WriteLine($"[VM] SendMessage: Primitive {primitiveIndex} executed but returned unexpected type: {result?.GetType().Name}");
+                        DebugLog($"[VM] SendMessage: Primitive {primitiveIndex} executed but returned unexpected type: {result?.GetType().Name}");
                         return PrimitiveNil();
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"[VM] SendMessage: Primitive {primitiveIndex} executed but stack is empty");
+                    DebugLog($"[VM] SendMessage: Primitive {primitiveIndex} executed but stack is empty");
                     return PrimitiveNil();
                 }
             }
             else
             {
-                Console.WriteLine($"[VM] SendMessage: Primitive {primitiveIndex} failed, falling back to bytecode execution");
+                DebugLog($"[VM] SendMessage: Primitive {primitiveIndex} failed, falling back to bytecode execution");
             }
         }
         
         // Execute the method using the interpreter
-        Console.WriteLine($"[VM] SendMessage: Executing method with {compiledMethod.Bytecodes.Length} bytecodes");
+        DebugLog($"[VM] SendMessage: Executing method with {compiledMethod.Bytecodes.Length} bytecodes");
         try
         {
             // Enable tracing for debugging
@@ -1097,10 +1114,10 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             for (int i = 0; i < args.Length; i++)
             {
                 temps[i] = args[i];
-                Console.WriteLine($"[VM] SendMessage: Temp[{i}] = argument OOP {argumentIds[i]}");
+                DebugLog($"[VM] SendMessage: Temp[{i}] = argument OOP {argumentIds[i]}");
             }
             
-            Console.WriteLine($"[VM] SendMessage: Executing with {tempCount} temporaries, receiver OOP {receiverId}");
+            DebugLog($"[VM] SendMessage: Executing with {tempCount} temporaries, receiver OOP {receiverId}");
             var result = interpreter.Evaluate(compiledMethod, receiver, temps);
             
             // Convert result to OOP
@@ -1123,13 +1140,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             }
             else
             {
-                Console.WriteLine($"[VM] SendMessage: Unknown result type {result.GetType()}");
+                DebugLog($"[VM] SendMessage: Unknown result type {result.GetType()}");
                 return PrimitiveNil();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[VM] SendMessage: Execution failed: {ex.Message}");
+            DebugLog($"[VM] SendMessage: Execution failed: {ex.Message}");
             return PrimitiveNil();
         }
     }
@@ -1142,7 +1159,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // CompiledMethod has 4 fields: selector, bytecode, literals, header
         if (methodObj.Fields.Length < 4)
         {
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Method object has {methodObj.Fields.Length} fields, expected at least 4");
+            DebugLog($"[VM] ExtractCompiledMethod: Method object has {methodObj.Fields.Length} fields, expected at least 4");
             return null;
         }
         
@@ -1153,11 +1170,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (bytecodesField is SmalltalkObject bytecodeFieldObj)
         {
             var fieldClassName = GetObjectClassName(bytecodeFieldObj);
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Bytecodes field is a {fieldClassName} with {bytecodeFieldObj.Fields.Length} elements");
+            DebugLog($"[VM] ExtractCompiledMethod: Bytecodes field is a {fieldClassName} with {bytecodeFieldObj.Fields.Length} elements");
         }
         else
         {
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Bytecodes field is {bytecodesField?.GetType().Name ?? "null"}");
+            DebugLog($"[VM] ExtractCompiledMethod: Bytecodes field is {bytecodesField?.GetType().Name ?? "null"}");
         }
         
         if (bytecodesField is SmalltalkObject bytecodeArray)
@@ -1171,11 +1188,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 if (field is SmalltalkObject fieldObj)
                 {
                     var desc = DescribeObject(fieldObj);
-                    Console.WriteLine($"[VM] ExtractCompiledMethod: Bytecode[{i}] = {desc}");
+                    DebugLog($"[VM] ExtractCompiledMethod: Bytecode[{i}] = {desc}");
                 }
                 else
                 {
-                    Console.WriteLine($"[VM] ExtractCompiledMethod: Bytecode[{i}] = {field} (raw)");
+                    DebugLog($"[VM] ExtractCompiledMethod: Bytecode[{i}] = {field} (raw)");
                 }
                 
                 if (field is SmalltalkObject byteObj && byteObj.Fields.Length > 0)
@@ -1239,11 +1256,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (headerField is SmalltalkObject headerFieldObj)
         {
             var headerDesc = DescribeObject(headerFieldObj);
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Header field is {headerDesc}");
+            DebugLog($"[VM] ExtractCompiledMethod: Header field is {headerDesc}");
         }
         else
         {
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Header field is {headerField} (raw)");
+            DebugLog($"[VM] ExtractCompiledMethod: Header field is {headerField} (raw)");
         }
         
         if (headerField is SmalltalkObject headerObj && headerObj.Fields.Length > 0)
@@ -1260,7 +1277,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 headerInt = parsedVal;
             }
             
-            Console.WriteLine($"[VM] ExtractCompiledMethod: Header = {FormatBlueBookHeader(headerInt)}");
+            DebugLog($"[VM] ExtractCompiledMethod: Header = {FormatBlueBookHeader(headerInt)}");
             
             // Decode Blue Book header format (16-bit word):
             // Bits 0-8: Primitive number (0 if no primitive)
@@ -1290,7 +1307,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         }
         
         // Single concise summary line
-        Console.WriteLine($"[VM] ExtractCompiledMethod: CompiledMethod with bytecodes=[{string.Join(", ", bytecodes)}], {literals.Length} literals, primitive={primitiveNumber}, args={argCount}");
+        DebugLog($"[VM] ExtractCompiledMethod: CompiledMethod with bytecodes=[{string.Join(", ", bytecodes)}], {literals.Length} literals, primitive={primitiveNumber}, args={argCount}");
         
         // Create a proper method header
         // The header encoding: bits 0-2: flag/argCount, bits 3-7: tempCount, bit 8: large context, bits 9-14: literal count
@@ -1365,7 +1382,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (bootstrapContext == null || !bootstrapContext.IsActive)
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 1 already completed or not started");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 already completed or not started");
             return;
         }
         
@@ -1373,7 +1390,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
         if (smalltalkDictOop < 0)
         {
-            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
             return;
         }
         
@@ -1386,7 +1403,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         
         // Switch to using Smalltalk dictionary
         usesSmalltalkDictionary = true;
-        Console.WriteLine("[BOOTSTRAP] Phase 1 complete. All lookups now use Smalltalk SystemDictionary.");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 complete. All lookups now use Smalltalk SystemDictionary.");
     }
     
     /// <summary>
@@ -1397,7 +1414,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (bootstrapContext == null || !bootstrapContext.IsActive)
         {
-            Console.WriteLine("[BOOTSTRAP] Bootstrap already completed or not started");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap already completed or not started");
             return;
         }
         
@@ -1405,12 +1422,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
         if (smalltalkDictOop < 0)
         {
-            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
             return;
         }
         
-        Console.WriteLine("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary...");
-        Console.WriteLine("[BOOTSTRAP] Note: Dictionary at:put: is not a primitive - using VM operations");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Note: Dictionary at:put: is not a primitive - using VM operations");
         
         // Use primitive operations to populate the dictionary
         // Dictionary's at:put: method is implemented in Smalltalk bytecode, not as a primitive
@@ -1418,12 +1435,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         {
             var keySymbol = PrimitiveInternSymbol(name);
             PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, oop);
-            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary");
         });
         
         // Switch to using Smalltalk dictionary
         usesSmalltalkDictionary = true;
-        Console.WriteLine("[BOOTSTRAP] Bootstrap complete. All lookups now use Smalltalk SystemDictionary.");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap complete. All lookups now use Smalltalk SystemDictionary.");
     }
     
     /// <summary>
@@ -1433,7 +1450,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (smalltalkDictOop < 0)
         {
-            Console.WriteLine($"[VM] LookupInSmalltalkDictionary('{name}'): smalltalkDictOop not set");
+            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): smalltalkDictOop not set");
             return -1;
         }
             
@@ -1441,7 +1458,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // to avoid circular dependency
         if (!symbolCache.TryGetValue(name, out var keySymbol))
         {
-            Console.WriteLine($"[VM] LookupInSmalltalkDictionary('{name}'): Symbol not in cache, creating new");
+            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Symbol not in cache, creating new");
             // Create symbol directly without going through PrimitiveInternSymbol
             var symbolClassOop = -1;
             
@@ -1451,11 +1468,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             if (symbolKeyForClass > 0)
             {
                 symbolClassOop = PrimitiveDictionaryAt(smalltalkDictOop, symbolKeyForClass);
-                Console.WriteLine($"[VM] LookupInSmalltalkDictionary: Found Symbol class OOP {symbolClassOop}");
+                DebugLog($"[VM] LookupInSmalltalkDictionary: Found Symbol class OOP {symbolClassOop}");
             }
             else
             {
-                Console.WriteLine($"[VM] LookupInSmalltalkDictionary: 'Symbol' key not in cache");
+                DebugLog($"[VM] LookupInSmalltalkDictionary: 'Symbol' key not in cache");
             }
             
             SmalltalkObject? symbolClass = symbolClassOop > 0 ? ObjectMemory.FromOop(symbolClassOop) : null;
@@ -1463,15 +1480,15 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             symbol.SetField(0, name);
             keySymbol = symbol.Oop;
             symbolCache[name] = keySymbol;
-            Console.WriteLine($"[VM] LookupInSmalltalkDictionary: Created symbol '{name}' with OOP {keySymbol}");
+            DebugLog($"[VM] LookupInSmalltalkDictionary: Created symbol '{name}' with OOP {keySymbol}");
         }
         else
         {
-            Console.WriteLine($"[VM] LookupInSmalltalkDictionary('{name}'): Using cached symbol OOP {keySymbol}");
+            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Using cached symbol OOP {keySymbol}");
         }
         
         var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
-        Console.WriteLine($"[VM] LookupInSmalltalkDictionary('{name}'): Dictionary lookup returned OOP {result}");
+        DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Dictionary lookup returned OOP {result}");
         return result;
     }
 }

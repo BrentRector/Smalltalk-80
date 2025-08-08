@@ -32,6 +32,7 @@ public class Program
         bool showTree = false;
         bool validateOnly = false;
         bool compileClasses = false;
+        bool enableBootstrapDebug = false;
         string? outputFile = null;
         List<string> classesToCompile = new();
 
@@ -54,6 +55,29 @@ public class Program
                 case "--compile-classes":
                     compileClasses = true;
                     break;
+                case "--debug-bootstrap":
+                    enableBootstrapDebug = true;
+                    break;
+                case "--test-bytecode":
+                    TestBytecodeGen.TestBytecodeGeneration();
+                    return 0;
+                case "--compile-phase2":
+                    var systemImagePath = @"Smalltalk80\Smalltalk-80 Source\Smalltalk-80.st";
+                    var phase2JsonPath = @"Bootstrap\bootstrap_phase2.json";
+                    
+                    // Check if next arguments are paths (don't start with -)
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                    {
+                        systemImagePath = args[++i];
+                    }
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                    {
+                        phase2JsonPath = args[++i];
+                    }
+                    
+                    var compiler = new Phase2BytecodeCompiler();
+                    compiler.CompilePhase2Methods(systemImagePath, phase2JsonPath);
+                    return 0;
                 case "-o":
                 case "--output":
                     if (i + 1 < args.Length)
@@ -107,6 +131,14 @@ public class Program
         {
             Console.Error.WriteLine($"Error: Input file '{inputFile}' does not exist.");
             return 1;
+        }
+        
+        // Set bootstrap debug output flags if requested
+        if (enableBootstrapDebug)
+        {
+            Smalltalk80.Bootstrap.JsonBootstrapExecutor.EnableBootstrapDebugOutput = true;
+            Smalltalk80.Bootstrap.Phase3Executor.EnablePhase3DebugOutput = true;
+            Console.WriteLine("✓ Bootstrap debug output enabled");
         }
 
         // Handle compile-classes mode

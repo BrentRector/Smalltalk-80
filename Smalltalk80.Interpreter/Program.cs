@@ -21,6 +21,9 @@ public class Program
             var jsonManifests = new List<string>();
             var sourceFiles = new List<string>();
             bool skipPhase3 = false;
+            bool listPhase2Classes = false;
+            bool enableVMDebug = false;
+            bool enableBootstrapDebug = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -32,6 +35,19 @@ public class Program
                 {
                     skipPhase3 = true;
                 }
+                else if (args[i] == "--list-phase2-classes")
+                {
+                    listPhase2Classes = true;
+                    skipPhase3 = true; // Always skip Phase 3 when listing Phase 2 classes
+                }
+                else if (args[i] == "--debug-vm")
+                {
+                    enableVMDebug = true;
+                }
+                else if (args[i] == "--debug-bootstrap")
+                {
+                    enableBootstrapDebug = true;
+                }
                 else if (!args[i].StartsWith("--"))
                 {
                     sourceFiles.Add(args[i]);
@@ -39,6 +55,21 @@ public class Program
             }
             
             Console.WriteLine("Initializing Virtual Machine...");
+            
+            // Set VM debug output flag
+            if (enableVMDebug)
+            {
+                Bootstrap.VMPrimitiveAdapter.EnableVMDebugOutput = true;
+                Console.WriteLine("✓ VM debug output enabled");
+            }
+            
+            // Set bootstrap debug output flags
+            if (enableBootstrapDebug)
+            {
+                Bootstrap.JsonBootstrapExecutor.EnableBootstrapDebugOutput = true;
+                Bootstrap.Phase3Executor.EnablePhase3DebugOutput = true;
+                Console.WriteLine("✓ Bootstrap debug output enabled");
+            }
             
             // Create the VM with bootstrap through Phase 3
             var vm = new VirtualMachine(skipStandardLibrary: skipPhase3);
@@ -62,6 +93,13 @@ public class Program
                         Console.WriteLine($"✗ Failed to load JSON manifest {jsonFile}: {ex.Message}");
                     }
                 }
+            }
+            
+            // If listing Phase 2 classes, do that and exit
+            if (listPhase2Classes)
+            {
+                ListPhase2Classes(vm);
+                return 0;
             }
             
             // Load Smalltalk source files if specified
@@ -347,5 +385,64 @@ public class Program
             
         // Default description
         return $"<{obj.GetType().Name}@{obj.GetHashCode():X}>";
+    }
+    
+    private static void ListPhase2Classes(VirtualMachine vm)
+    {
+        Console.WriteLine("\n=== Classes Present After Phase 2 ===");
+        
+        // Get all objects and find the ones that look like classes
+        var allObjects = ObjectMemory.Objects.ToList();
+        var classNames = new List<string>();
+        
+        // Try to get all class names by checking all objects that look like symbols
+        // and seeing if they resolve to class objects
+        var potentialClassNames = new HashSet<string>();
+        
+        // First add all known classes from both phases
+        var knownClasses = new[] {
+            // Phase 1 classes - Object is the root!
+            "Object", "Behavior", "Class", "Metaclass",
+            "CompiledMethod", "MethodDictionary",
+            "Symbol", "String", "Array", "ByteArray",
+            "Collection", "Dictionary", "SystemDictionary",
+            // Phase 2 classes - including intermediate classes
+            "UndefinedObject", "SmallInteger", "Boolean", "True", "False",
+            "ClassDescription", "Message", "MethodContext", "BlockContext",
+            "Association", "SequenceableCollection", 
+            "ArrayedCollection", "Set", "IdentityDictionary",
+            // Intermediate classes from system image hierarchy
+            "Magnitude", "Number", "Integer", "LookupKey",
+            "InstructionStream", "ContextPart"
+        };
+        
+        foreach (var name in knownClasses)
+        {
+            potentialClassNames.Add(name);
+        }
+        
+        // Check which classes actually exist
+        foreach (var className in potentialClassNames.OrderBy(n => n))
+        {
+            var oop = vm.Adapter?.PrimitiveLookupGlobal(className) ?? -1;
+            if (oop >= 0)  // Object has OOP 0, so we need >= not >
+            {
+                classNames.Add(className);
+            }
+        }
+        
+        Console.WriteLine($"\nFound {classNames.Count} classes:");
+        Console.WriteLine("------------------------");
+        foreach (var name in classNames)
+        {
+            Console.WriteLine($"  - {name}");
+        }
+        
+        // Generate the command to extract these classes
+        Console.WriteLine("\n=== Compiler Extraction Command ===");
+        Console.WriteLine("To extract these classes from the system image, run:");
+        Console.WriteLine();
+        var classArgs = string.Join(" ", classNames.Select(n => $"-c {n}"));
+        Console.WriteLine($"dotnet run --project Smalltalk80.Compiler -- --compile-classes {classArgs} -o bootstrap_phase2_complete.json \"Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st\"");
     }
 }

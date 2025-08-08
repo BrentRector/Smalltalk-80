@@ -26,15 +26,18 @@
     <Delete Files="@(GeneratedFiles)" />
   </Target>
 
-  <!-- Copy bootstrap JSON files to output directory -->
+  <!-- Copy essential bootstrap JSON files to output directory -->
   <Target Name="CopyBootstrapFiles" AfterTargets="Build">
-    <Message Text="Copying bootstrap JSON files to output directory..." Importance="high" />
+    <Message Text="Copying essential bootstrap JSON files to output directory..." Importance="high" />
     <ItemGroup>
-      <BootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\*.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap-schema.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase1.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase2.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase3.json" />
     </ItemGroup>
     <MakeDir Directories="$(OutputPath)Bootstrap" />
-    <Copy SourceFiles="@(BootstrapFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
-    <Message Text="Copied bootstrap files: @(BootstrapFiles -> '%(Filename)%(Extension)', ', ')" Importance="high" />
+    <Copy SourceFiles="@(EssentialBootstrapFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Message Text="Copied essential bootstrap files: @(EssentialBootstrapFiles -> '%(Filename)%(Extension)', ', ')" Importance="high" />
   </Target>
 
 </Project>

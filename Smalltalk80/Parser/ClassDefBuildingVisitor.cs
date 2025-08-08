@@ -234,26 +234,26 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
             var formalArgs = header.formalArg();
 
             // Debug the raw text to see what's being parsed
-            Console.WriteLine($"[DEBUG_PARSER] Method header raw text: '{header.GetText()}'");
-            Console.WriteLine($"[DEBUG_PARSER] Found {header.identifierColon().Length} keyword parts");
-            Console.WriteLine($"[DEBUG_PARSER] Found {formalArgs.Length} formal args");
+            // Console.WriteLine($"[DEBUG_PARSER] Method header raw text: '{header.GetText()}'");
+            // Console.WriteLine($"[DEBUG_PARSER] Found {header.identifierColon().Length} keyword parts");
+            // Console.WriteLine($"[DEBUG_PARSER] Found {formalArgs.Length} formal args");
 
             for (int i = 0; i < header.identifierColon().Length; i++)
             {
                 var keywordPart = header.identifierColon(i).GetText();
-                Console.WriteLine($"[DEBUG_PARSER] Keyword part {i}: '{keywordPart}'");
+                // Console.WriteLine($"[DEBUG_PARSER] Keyword part {i}: '{keywordPart}'");
                 selectorParts.Add(keywordPart);
 
                 if (i < formalArgs.Length)
                 {
                     var argName = formalArgs[i].GetText();
-                    Console.WriteLine($"[DEBUG_PARSER] Arg {i}: '{argName}'");
+                    // Console.WriteLine($"[DEBUG_PARSER] Arg {i}: '{argName}'");
                     arguments.Add(argName);
                 }
             }
 
             var selector = string.Join("", selectorParts);
-            Console.WriteLine($"[DEBUG_PARSER] Final selector: '{selector}'");
+            // Console.WriteLine($"[DEBUG_PARSER] Final selector: '{selector}'");
             return (selector, arguments);
         }
 

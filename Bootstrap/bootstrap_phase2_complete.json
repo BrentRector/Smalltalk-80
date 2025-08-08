@@ -1,0 +1,250 @@
+{
+  "phase": "2-extracted",
+  "description": "Classes extracted from system image: Object, Behavior, ClassDescription, Class, Metaclass, CompiledMethod, MethodDictionary, Symbol, String, Array, ByteArray, Collection, Dictionary, SystemDictionary, UndefinedObject, Integer, SmallInteger, Boolean, True, False, LookupKey, Association, Message, ContextPart, MethodContext, BlockContext, SequenceableCollection, ArrayedCollection, Set, IdentityDictionary",
+  "comments": [
+    "These classes were extracted from the Smalltalk-80 system image.",
+    "This Phase 2 creates the class structure without methods.",
+    "Methods should be added in Phase 3."
+  ],
+  "classes": [
+    {
+      "name": "Object",
+      "superclass": "nil",
+      "instanceVariables": [],
+      "classVariables": [
+        "DependentsFields",
+        "ErrorRecursion"
+      ]
+    },
+    {
+      "name": "Behavior",
+      "superclass": "Object",
+      "instanceVariables": [
+        "superclass",
+        "methodDict",
+        "format",
+        "subclasses"
+      ],
+      "classVariables": [
+        "SelectorsOfConflictMethods",
+        "SelectorsOfCopiedMethods",
+        "SelectorsOfDirectedMethods"
+      ]
+    },
+    {
+      "name": "ClassDescription",
+      "superclass": "Behavior",
+      "instanceVariables": [
+        "instanceVariables",
+        "organization"
+      ]
+    },
+    {
+      "name": "Class",
+      "superclass": "ClassDescription",
+      "instanceVariables": [
+        "name",
+        "classPool",
+        "sharedPools"
+      ]
+    },
+    {
+      "name": "Metaclass",
+      "superclass": "ClassDescription",
+      "instanceVariables": [
+        "thisClass"
+      ]
+    },
+    {
+      "name": "CompiledMethod",
+      "superclass": "ByteArray",
+      "instanceVariables": [],
+      "classVariables": [
+        "BytesForHeader",
+        "BytesPerLiteral",
+        "LargeFrame",
+        "SmallFrame",
+        "SpecialConstants",
+        "TempNameCache"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "MethodDictionary",
+      "superclass": "IdentityDictionary",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "Symbol",
+      "superclass": "String",
+      "instanceVariables": [],
+      "classVariables": [
+        "SingleCharSymbols",
+        "USTable"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "String",
+      "superclass": "ArrayedCollection",
+      "instanceVariables": [],
+      "classVariables": [
+        "StringBlter"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "Array",
+      "superclass": "ArrayedCollection",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "ByteArray",
+      "superclass": "ArrayedCollection",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "Collection",
+      "superclass": "Object",
+      "instanceVariables": []
+    },
+    {
+      "name": "Dictionary",
+      "superclass": "Set",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "SystemDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [],
+      "classVariables": [
+        "CachedClassNames",
+        "Frills",
+        "LowSpaceProcess",
+        "LowSpaceSemaphore",
+        "OopsLeftLimit",
+        "SpecialSelectors",
+        "SystemChanges",
+        "WordsLeftLimit"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "UndefinedObject",
+      "superclass": "Object",
+      "instanceVariables": []
+    },
+    {
+      "name": "Integer",
+      "superclass": "Number",
+      "instanceVariables": []
+    },
+    {
+      "name": "SmallInteger",
+      "superclass": "Integer",
+      "instanceVariables": [],
+      "classVariables": [
+        "Digitbuffer"
+      ]
+    },
+    {
+      "name": "Boolean",
+      "superclass": "Object",
+      "instanceVariables": []
+    },
+    {
+      "name": "True",
+      "superclass": "Boolean",
+      "instanceVariables": []
+    },
+    {
+      "name": "False",
+      "superclass": "Boolean",
+      "instanceVariables": []
+    },
+    {
+      "name": "LookupKey",
+      "superclass": "Magnitude",
+      "instanceVariables": [
+        "key"
+      ]
+    },
+    {
+      "name": "Association",
+      "superclass": "LookupKey",
+      "instanceVariables": [
+        "value"
+      ]
+    },
+    {
+      "name": "Message",
+      "superclass": "Object",
+      "instanceVariables": [
+        "selector",
+        "args"
+      ]
+    },
+    {
+      "name": "ContextPart",
+      "superclass": "InstructionStream",
+      "instanceVariables": [
+        "stackp"
+      ],
+      "classVariables": [
+        "TryPrimitiveMethods"
+      ]
+    },
+    {
+      "name": "MethodContext",
+      "superclass": "ContextPart",
+      "instanceVariables": [
+        "method",
+        "receiverMap",
+        "receiver"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "BlockContext",
+      "superclass": "ContextPart",
+      "instanceVariables": [
+        "nargs",
+        "startpc",
+        "home"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "SequenceableCollection",
+      "superclass": "Collection",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "ArrayedCollection",
+      "superclass": "SequenceableCollection",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "Set",
+      "superclass": "Collection",
+      "instanceVariables": [
+        "tally"
+      ],
+      "variableSize": true
+    },
+    {
+      "name": "IdentityDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [
+        "valueArray"
+      ],
+      "variableSize": true
+    }
+  ]
+}

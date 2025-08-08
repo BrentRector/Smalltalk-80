@@ -15,12 +15,17 @@ namespace Smalltalk80.Compiler;
 /// </summary>
 public class SimpleClassExtractor
 {
-    private readonly string systemImagePath;
+    private readonly string? systemImagePath;
     private readonly Dictionary<string, ClassInfo> classes = new();
     
     public SimpleClassExtractor(string systemImagePath)
     {
         this.systemImagePath = systemImagePath;
+    }
+    
+    public SimpleClassExtractor()
+    {
+        this.systemImagePath = null;
     }
 
     /// <summary>
@@ -28,6 +33,9 @@ public class SimpleClassExtractor
     /// </summary>
     public void ParseSystemImage()
     {
+        if (systemImagePath == null) 
+            throw new InvalidOperationException("System image path not provided");
+            
         Console.WriteLine($"Parsing system image: {systemImagePath}");
         
         string input = File.ReadAllText(systemImagePath);
@@ -162,6 +170,29 @@ public class SimpleClassExtractor
         return false;
     }
 
+    /// <summary>
+    /// Extracts methods for a specific class from the system image.
+    /// </summary>
+    public List<MethodInfo> ExtractMethodsForClass(string systemImagePath, string className)
+    {
+        var methods = new List<MethodInfo>();
+        
+        Console.WriteLine($"Extracting methods for {className} from {systemImagePath}");
+        
+        // Parse the system image
+        var input = File.ReadAllText(systemImagePath);
+        var inputStream = new AntlrInputStream(input);
+        var lexer = new Smalltalk80Lexer(inputStream);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new Smalltalk80Parser(tokens);
+        
+        var tree = parser.fileIn();
+        var visitor = new MethodExtractingVisitor(className);
+        visitor.Visit(tree);
+        
+        return visitor.ExtractedMethods;
+    }
+
     private class ClassInfo
     {
         public string Name { get; set; } = "";
@@ -170,6 +201,106 @@ public class SimpleClassExtractor
         public List<string> ClassVariables { get; set; } = new();
         public List<string> PoolDictionaries { get; set; } = new();
         public string? Category { get; set; }
+    }
+    
+    /// <summary>
+    /// Visitor that extracts methods for a specific class from the system image.
+    /// </summary>
+    private class MethodExtractingVisitor : Smalltalk80BaseVisitor<object?>
+    {
+        private readonly string targetClassName;
+        private readonly List<MethodInfo> extractedMethods = new();
+        private bool inTargetClass = false;
+        
+        public List<MethodInfo> ExtractedMethods => extractedMethods;
+        
+        public MethodExtractingVisitor(string targetClassName)
+        {
+            this.targetClassName = targetClassName;
+        }
+        
+        public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
+        {
+            // Check if this is methods for our target class
+            var className = context.className()?.GetText();
+            
+            // Handle both instance and class methods
+            if (className == targetClassName || 
+                (className + " class" == targetClassName) ||
+                (context.IDENTIFIER()?.GetText() == "class" && className == targetClassName.Replace(" class", "")))
+            {
+                inTargetClass = true;
+                Console.WriteLine($"Found methods for {targetClassName}");
+                
+                // Visit all method definitions in this chunk
+                var methods = context.methodDef();
+                foreach (var method in methods)
+                {
+                    Visit(method);
+                }
+                
+                inTargetClass = false;
+            }
+            
+            return null;
+        }
+        
+        public override object? VisitMethodDef(Smalltalk80Parser.MethodDefContext context)
+        {
+            if (!inTargetClass) return null;
+            
+            // Extract method information
+            var header = context.methodHeader();
+            var selector = ExtractSelector(header);
+            var source = context.GetText(); // Get the full method source
+            
+            // Check for primitive
+            var primitiveDecl = context.primitiveDecl();
+            bool isPrimitive = primitiveDecl != null;
+            int primitiveNumber = 0;
+            
+            if (isPrimitive && primitiveDecl != null)
+            {
+                // Extract number from primitive declaration text like "<primitive: 123>"
+                var primitiveText = primitiveDecl.GetText();
+                var match = System.Text.RegularExpressions.Regex.Match(primitiveText, @"<primitive:\s*(\d+)>");
+                if (match.Success)
+                {
+                    int.TryParse(match.Groups[1].Value, out primitiveNumber);
+                }
+            }
+            
+            var methodInfo = new MethodInfo
+            {
+                Selector = selector,
+                Source = source,
+                IsPrimitive = isPrimitive,
+                PrimitiveNumber = primitiveNumber
+            };
+            
+            extractedMethods.Add(methodInfo);
+            Console.WriteLine($"  Extracted method: {selector}");
+            
+            return null;
+        }
+        
+        private string ExtractSelector(Smalltalk80Parser.MethodHeaderContext header)
+        {
+            if (header.unarySelector() != null)
+            {
+                return header.unarySelector().GetText();
+            }
+            else if (header.binarySelector() != null)
+            {
+                return header.binarySelector().GetText();
+            }
+            else
+            {
+                // Keyword selector
+                var keywords = header.identifierColon();
+                return string.Join("", keywords.Select(k => k.GetText()));
+            }
+        }
     }
 }
 
