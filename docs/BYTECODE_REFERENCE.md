@@ -1,14 +1,14 @@
 # Smalltalk-80 Bytecode Reference
 
-This document describes the bytecode values used in our Smalltalk-80 interpreter implementation.
+This document describes the bytecode values used in our Smalltalk-80 interpreter implementation, which follows the **canonical Blue Book (Goldberg & Robson, 1983) bytecode specification**.
 
 ## Push Instructions
 
 ### Instance Variables (0-15)
-- `0`: PushReceiverVariable0 - Push instance variable 0
-- `1`: PushReceiverVariable1 - Push instance variable 1
+- `0`: PushReceiverVariable0 - Push instance variable 0 of receiver
+- `1`: PushReceiverVariable1 - Push instance variable 1 of receiver
 - ...
-- `15`: PushReceiverVariable15 - Push instance variable 15
+- `15`: PushReceiverVariable15 - Push instance variable 15 of receiver
 
 ### Temporaries/Arguments (16-31)
 - `16`: PushTemporaryVariable0 - Push temporary/argument 0
@@ -17,149 +17,104 @@ This document describes the bytecode values used in our Smalltalk-80 interpreter
 - `31`: PushTemporaryVariable15 - Push temporary/argument 15
 
 ### Literal Constants (32-63)
-- `32`: PushLiteralConstant0 - Push literal 0
-- `33`: PushLiteralConstant1 - Push literal 1
+- `32`: PushLiteralConstant0 - Push literal constant at index 0
+- `33`: PushLiteralConstant1 - Push literal constant at index 1
 - ...
-- `63`: PushLiteralConstant31 - Push literal 31
+- `63`: PushLiteralConstant31 - Push literal constant at index 31
 
 ### Literal Variables (64-95)
 - `64`: PushLiteralVariable0 - Push value from Association in literal 0
 - ...
 - `95`: PushLiteralVariable31 - Push value from Association in literal 31
 
-## Store Instructions
+## Store Instructions (DO NOT POP)
 
-### Store and Pop Instance Variables (96-103)
-- `96`: StoreAndPopReceiverVariable0 - Pop stack, store into instance variable 0
-- `97`: StoreAndPopReceiverVariable1 - Pop stack, store into instance variable 1
+### Store Into Instance Variables (96-127)
+- `96`: StoreIntoReceiverVariable0 - Store top of stack into instance variable 0 (no pop)
+- `97`: StoreIntoReceiverVariable1 - Store top of stack into instance variable 1 (no pop)
 - ...
-- `103`: StoreAndPopReceiverVariable7 - Pop stack, store into instance variable 7
+- `127`: StoreIntoReceiverVariable31 - Store top of stack into instance variable 31 (no pop)
 
-### Store and Pop Temporaries (104-111)
-- `104`: StoreAndPopTemporaryVariable0 - Pop stack, store into temporary 0
+### Store Into Temporaries (128-159)
+- `128`: StoreIntoTemporaryVariable0 - Store top of stack into temporary 0 (no pop)
 - ...
-- `111`: StoreAndPopTemporaryVariable7 - Pop stack, store into temporary 7
+- `159`: StoreIntoTemporaryVariable31 - Store top of stack into temporary 31 (no pop)
 
-## Special Push Instructions (112-119)
-- `112`: PushSelf - Push receiver (self)
-- `113`: PushTrue - Push true
-- `114`: PushFalse - Push false
-- `115`: PushNil - Push nil
-- `116`: PushMinusOne - Push -1
-- `117`: PushZero - Push 0
-- `118`: PushOne - Push 1
-- `119`: PushTwo - Push 2
+### Store Into Literal Variables (160-175)
+- `160`: StoreIntoLiteralVariable0 - Store top of stack into literal variable 0 (no pop)
+- ...
+- `175`: StoreIntoLiteralVariable15 - Store top of stack into literal variable 15 (no pop)
 
-## Return Instructions (120-125)
-- `120`: ReturnSelf - Return receiver (self)
-- `121`: ReturnTrue - Return true
-- `122`: ReturnFalse - Return false
-- `123`: ReturnNil - Return nil
-- `124`: ReturnTopFromMethod - Return top of stack from method
-- `125`: ReturnTopFromBlock - Return top of stack from block
+## Return Instructions (176-180)
+- `176`: ReturnReceiver - Return receiver (self)
+- `177`: ReturnTrue - Return constant true
+- `178`: ReturnFalse - Return constant false
+- `179`: ReturnNil - Return constant nil
+- `180`: ReturnTop - Return top of stack from method
 
-## Extended Instructions
-- `128`: ExtendedPush - Extended push (followed by descriptor byte)
-- `129`: ExtendedStore - Extended store (followed by descriptor byte)
-- `130`: ExtendedStoreAndPop - Extended store and pop (followed by descriptor byte)
+## Unused (181-191)
+- `181-191`: Reserved for future use
 
-## Send Instructions
+## Send Instructions (192-255)
 
-### Single Extended Send (131)
-- `131`: SingleExtendedSend - Send with descriptor byte
-  - Descriptor format: `aaaaalll` where `aaaa` = arg count, `lll` = literal index
+### Send Message (192-223)
+- `192`: SendMessage0 - Send message with selector at literal index 0
+- `193`: SendMessage1 - Send message with selector at literal index 1
+- ...
+- `223`: SendMessage31 - Send message with selector at literal index 31
 
-### Double Extended Send (132)
-- `132`: DoubleExtendedSend - Send with two bytes (arg count, literal index)
+### Send Super Message (224-255)
+- `224`: SendSuperMessage0 - Send super message with selector at literal index 0
+- `225`: SendSuperMessage1 - Send super message with selector at literal index 1
+- ...
+- `255`: SendSuperMessage31 - Send super message with selector at literal index 31
 
-### Arithmetic Selectors (176-191)
-- `176`: Send #+ (1 arg)
-- `177`: Send #- (1 arg)
-- `178`: Send #< (1 arg)
-- `179`: Send #> (1 arg)
-- `180`: Send #<= (1 arg)
-- `181`: Send #>= (1 arg)
-- `182`: Send #= (1 arg)
-- `183`: Send #~= (1 arg)
-- `184`: Send #* (1 arg)
-- `185`: Send #/ (1 arg)
-- `186`: Send #\\ (1 arg)
-- `187`: Send #@ (1 arg)
-- `188`: Send #bitShift: (1 arg)
-- `189`: Send #// (1 arg)
-- `190`: Send #bitAnd: (1 arg)
-- `191`: Send #bitOr: (1 arg)
+## Important Notes
 
-### Special Selectors (192-207)
-- `192`: Send #at: (1 arg)
-- `193`: Send #at:put: (2 args)
-- `194`: Send #size (0 args)
-- `195`: Send #next (0 args)
-- `196`: Send #nextPut: (1 arg)
-- `197`: Send #atEnd (0 args)
-- `198`: Send #== (1 arg)
-- `199`: Send #class (0 args)
-- `200`: Send #blockCopy: (1 arg)
-- `201`: Send #value (0 args)
-- `202`: Send #value: (1 arg)
-- `203`: Send #do: (1 arg)
-- `204`: Send #new (0 args)
-- `205`: Send #new: (1 arg)
-- `206`: Send #x (0 args)
-- `207`: Send #y (0 args)
+### Blue Book Canonical Specification
+This implementation follows the exact bytecode specification from the Blue Book (Goldberg & Robson, 1983), which is the canonical Smalltalk-80 bytecode set.
 
-### Send Literal Selector (208-255)
-- `208-223`: SendLiteral0Args0 to SendLiteral0Args15 - Send literal selector 0-15 with 0 args
-- `224-239`: SendLiteral1Args0 to SendLiteral1Args15 - Send literal selector 0-15 with 1 arg
-- `240-255`: SendLiteral2Args0 to SendLiteral2Args15 - Send literal selector 0-15 with 2 args
-
-## Jump Instructions
-
-### Short Jumps (144-151)
-- `144-151`: ShortUnconditionalJump1 to ShortUnconditionalJump8 - Jump forward 1-8 bytes
-
-### Conditional Jumps (152-159)
-- `152-159`: PopJumpFalseShort1 to PopJumpFalseShort8 - Pop, jump forward 1-8 if false
-
-### Long Jumps (160-167)
-- `160-167`: LongJump0 to LongJump7 - Long jump with offset byte
-
-### Pop Jump True Long (168-171)
-- `168-171`: PopJumpTrueLong0 to PopJumpTrueLong3 - Pop, long jump if true
-
-### Pop Jump False Long (172-175)
-- `172-175`: PopJumpFalseLong0 to PopJumpFalseLong3 - Pop, long jump if false
-
-## Stack Operations
-- `135`: PopStack - Pop and discard top of stack
-- `136`: DuplicateTop - Duplicate top of stack
-- `137`: PushActiveContext - Push the current context
+### Key Differences from Modern Implementations
+1. **Store Operations DO NOT Pop**: Unlike many modern implementations, Blue Book store operations (96-175) leave the value on the stack after storing.
+2. **No Special Push Constants**: There are no dedicated bytecodes for pushing self, true, false, nil, -1, 0, 1, 2. These are handled through:
+   - `self` is returned via bytecode 176 (ReturnReceiver)
+   - `true`, `false`, `nil` are returned via bytecodes 177-179 or stored as literals
+   - Small integers must be stored as literal constants
+3. **Dense Encoding**: All 256 bytecode values are used (except 181-191 which are reserved).
+4. **Send Operations Index Literals**: The send bytecodes (192-255) reference selectors stored in the method's literal frame.
 
 ## Example Bytecode Sequences
 
 ### Simple Accessor: `name ^name`
 ```
 0   # PushReceiverVariable0 - push instance variable 'name'
-124 # ReturnTopFromMethod - return it
+180 # ReturnTop - return top of stack
 ```
 
 ### Simple Setter: `setName: aString  name := aString`
 ```
 16  # PushTemporaryVariable0 - push argument aString
-96  # StoreAndPopReceiverVariable0 - store into instance variable 'name'
-120 # ReturnSelf - return self
+96  # StoreIntoReceiverVariable0 - store into instance variable 'name' (no pop)
+176 # ReturnReceiver - return self
 ```
 
 ### Method with Literal: `greet ^'Hello, world!'`
 ```
 32  # PushLiteralConstant0 - push literal 'Hello, world!'
-124 # ReturnTopFromMethod - return it
+180 # ReturnTop - return top of stack
 ```
 
 ### Method with Send: `double ^value * 2`
 ```
 0   # PushReceiverVariable0 - push instance variable 'value'
-119 # PushTwo - push constant 2
-184 # Send #* - multiply
-124 # ReturnTopFromMethod - return result
+33  # PushLiteralConstant1 - push literal 2
+193 # SendMessage1 - send selector at literal index 1 (#*)
+180 # ReturnTop - return result
+```
+
+### Method Using new: `Behavior>>new ^self basicNew`
+For a primitive method like this, the header contains the primitive number (70 for basicNew).
+If the primitive fails, the fallback bytecode would be:
+```
+176 # ReturnReceiver - return self (primitive should have already created the instance)
 ```

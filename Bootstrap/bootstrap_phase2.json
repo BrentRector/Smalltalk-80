@@ -323,7 +323,7 @@
         "selector": "sym_at",
         "bytecode": "bytecode_primitive",
         "literals": "literals_empty",
-        "header": 120
+        "header": 60
       }
     },
     {
@@ -333,7 +333,7 @@
         "selector": "sym_atPut",
         "bytecode": "bytecode_primitive",
         "literals": "literals_empty",
-        "header": 122
+        "header": 61
       }
     },
     {
@@ -343,7 +343,7 @@
         "selector": "sym_size",
         "bytecode": "bytecode_primitive",
         "literals": "literals_empty",
-        "header": 124
+        "header": 62
       }
     },
     {
