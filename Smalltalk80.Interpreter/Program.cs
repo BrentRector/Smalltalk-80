@@ -17,22 +17,57 @@ public class Program
 
         try
         {
+            // Parse command line arguments
+            var jsonManifests = new List<string>();
+            var sourceFiles = new List<string>();
+            bool skipPhase3 = false;
+            
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "--json" && i + 1 < args.Length)
+                {
+                    jsonManifests.Add(args[++i]);
+                }
+                else if (args[i] == "--skip-phase3")
+                {
+                    skipPhase3 = true;
+                }
+                else if (!args[i].StartsWith("--"))
+                {
+                    sourceFiles.Add(args[i]);
+                }
+            }
+            
             Console.WriteLine("Initializing Virtual Machine...");
             
-            // Create the VM with full bootstrap including Phase 3
-            var vm = new VirtualMachine(skipStandardLibrary: false);
+            // Create the VM with bootstrap through Phase 3
+            var vm = new VirtualMachine(skipStandardLibrary: skipPhase3);
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();
             
-            // Phase 1 and Phase 2 bootstraps are executed in the VirtualMachine constructor
-            // Now pretty print the VM state
-            PrettyPrintVMState(vm);
-            
-            // If additional files were specified, load them
-            if (args.Length > 0)
+            // Load additional JSON manifests if specified
+            if (jsonManifests.Count > 0)
             {
-                foreach (var file in args)
+                foreach (var jsonFile in jsonManifests)
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Loading additional JSON manifest: {jsonFile}");
+                    try
+                    {
+                        vm.LoadJsonManifest(jsonFile);
+                        Console.WriteLine($"✓ Successfully loaded JSON manifest: {jsonFile}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"✗ Failed to load JSON manifest {jsonFile}: {ex.Message}");
+                    }
+                }
+            }
+            
+            // Load Smalltalk source files if specified
+            if (sourceFiles.Count > 0)
+            {
+                foreach (var file in sourceFiles)
                 {
                     Console.WriteLine();
                     Console.WriteLine($"Loading: {file}");
@@ -46,10 +81,18 @@ public class Program
                         Console.WriteLine($"✗ Failed to load {file}: {ex.Message}");
                     }
                 }
-                
-                // Print updated state
-                Console.WriteLine();
-                Console.WriteLine("=== Updated VM State After Loading Files ===");
+            }
+            
+            // Print final VM state using proper Smalltalk object examination
+            Console.WriteLine();
+            if (vm.Adapter != null)
+            {
+                var prettyPrinter = new SmalltalkPrettyPrinter(vm.Adapter);
+                prettyPrinter.PrintSystemState();
+            }
+            else
+            {
+                Console.WriteLine("=== VM State ===");
                 PrettyPrintVMState(vm);
             }
             

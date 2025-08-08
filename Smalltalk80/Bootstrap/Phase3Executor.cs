@@ -65,6 +65,9 @@ public class Phase3Executor
         
         [JsonPropertyName("numArgs")]
         public int NumArgs { get; set; }
+        
+        [JsonPropertyName("primitive")]
+        public int Primitive { get; set; } = 0;
     }
     
     /// <summary>
@@ -289,12 +292,24 @@ public class Phase3Executor
         vm.PrimitiveSetSlot(methodOop, 2, literalsArray);
         Console.WriteLine($"[PHASE3]   - Set literals ({methodDef.Literals.Count} literals)");
         
-        // Set header (slot 3) - encode argument count and other metadata
-        // Header format: contains numArgs, numTemps, primitive index, etc.
-        // For now, create a simple integer representing the header
-        var headerValue = vm.PrimitiveInternString(methodDef.NumArgs.ToString());
-        vm.PrimitiveSetSlot(methodOop, 3, headerValue);
-        Console.WriteLine($"[PHASE3]   - Set header (numArgs: {methodDef.NumArgs})");
+        // Set header (slot 3) - Blue Book encoding (16-bit word):
+        // Bits 0-8: Primitive number (0 if no primitive)
+        // Bit 9: Large context flag (1 if > 16 temps)
+        // Bits 10-15: Number of temporaries/stack size
+        
+        int primitiveNum = methodDef.Primitive & 0x1FF; // 9 bits for primitive
+        int largeContext = 0; // We don't have large contexts yet
+        int tempCount = methodDef.NumArgs; // For now, temps = args
+        
+        // Blue Book header encoding
+        int headerValue = primitiveNum | (largeContext << 9) | (tempCount << 10);
+        
+        var headerOop = vm.PrimitiveNewSmallInteger(headerValue);
+        vm.PrimitiveSetSlot(methodOop, 3, headerOop);
+        
+        // Format the header for display
+        var headerDesc = FormatBlueBookHeader(headerValue);
+        Console.WriteLine($"[PHASE3]   - Set header: {headerDesc}");
         
         // Step 4: Retrieve or create the class's method dictionary using message sends
         var methodDictOop = vm.GetSlot(classOop, 1);
@@ -388,6 +403,37 @@ public class Phase3Executor
             testVariables[action.AssignTo] = instanceOop;
             Console.WriteLine($"[PHASE3] Created instance -> OOP {instanceOop}, assigned to '{action.AssignTo}'");
         }
+    }
+    
+    /// <summary>
+    /// Formats a Blue Book method header for display.
+    /// </summary>
+    private string FormatBlueBookHeader(int headerValue)
+    {
+        // Decode Blue Book header format (16-bit word):
+        // Bits 0-8: Primitive number (0 if no primitive)
+        // Bit 9: Large context flag
+        // Bits 10-15: Number of temporaries
+        
+        int primitiveNum = headerValue & 0x1FF;  // Lower 9 bits
+        bool largeContext = (headerValue & 0x200) != 0;  // Bit 9
+        int tempCount = (headerValue >> 10) & 0x3F;  // Bits 10-15
+        
+        var parts = new List<string>();
+        
+        if (primitiveNum > 0)
+        {
+            parts.Add($"primitive={primitiveNum}");
+        }
+        
+        parts.Add($"temps={tempCount}");
+        
+        if (largeContext)
+        {
+            parts.Add("largeContext");
+        }
+        
+        return $"0x{headerValue:X4} ({string.Join(", ", parts)})";
     }
     
     /// <summary>

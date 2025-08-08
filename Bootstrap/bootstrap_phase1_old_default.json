@@ -1,0 +1,155 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "version": "1.1",
+  "phase": "1",
+  "description": "Create raw objects and patch core pointers",
+  "comments": [
+    "Phase 1 builds the foundational object graph.",
+    "Includes ProtoObject, Object, Class, Metaclass, and UndefinedObject.",
+    "All objects are created using VM primitives — no symbolic class definitions."
+  ],
+  "operations": [
+    { "op": "createObject", "result": "ProtoObject" },
+    { "op": "createObject", "result": "Object" },
+    { "op": "createObject", "result": "Class" },
+    { "op": "createObject", "result": "Metaclass" },
+    { "op": "createObject", "result": "UndefinedObject" },
+    { "op": "createObject", "result": "Behavior" },
+    { "op": "createObject", "result": "ClassDescription" },
+    { "op": "createObject", "result": "nil" },
+    
+    { "comment": "Create minimal Array and Symbol classes for instance variables" },
+    { "op": "createObject", "result": "Array" },
+    { "op": "createObject", "result": "Symbol" },
+    
+    { "op": "createObject", "result": "ProtoObjectClass" },
+    { "op": "createObject", "result": "ObjectClass" },
+    { "op": "createObject", "result": "ClassClass" },
+    { "op": "createObject", "result": "MetaclassClass" },
+    { "op": "createObject", "result": "UndefinedObjectClass" },
+    { "op": "createObject", "result": "BehaviorClass" },
+    { "op": "createObject", "result": "ClassDescriptionClass" },
+    { "op": "createObject", "result": "ArrayClass" },
+    { "op": "createObject", "result": "SymbolClass" },
+
+    { "comment": "Set class pointers for instances" },
+    { "op": "patchPointer", "target": "ProtoObject", "slot": "class", "value": "ProtoObjectClass" },
+    { "op": "patchPointer", "target": "Object", "slot": "class", "value": "ObjectClass" },
+    { "op": "patchPointer", "target": "Class", "slot": "class", "value": "ClassClass" },
+    { "op": "patchPointer", "target": "Metaclass", "slot": "class", "value": "MetaclassClass" },
+    { "op": "patchPointer", "target": "UndefinedObject", "slot": "class", "value": "UndefinedObjectClass" },
+    { "op": "patchPointer", "target": "Behavior", "slot": "class", "value": "BehaviorClass" },
+    { "op": "patchPointer", "target": "ClassDescription", "slot": "class", "value": "ClassDescriptionClass" },
+    { "op": "patchPointer", "target": "nil", "slot": "class", "value": "UndefinedObject" },
+    { "op": "patchPointer", "target": "Array", "slot": "class", "value": "ArrayClass" },
+    { "op": "patchPointer", "target": "Symbol", "slot": "class", "value": "SymbolClass" },
+
+    { "comment": "Set class pointers for metaclasses (all metaclasses are instances of Metaclass)" },
+    { "op": "patchPointer", "target": "ProtoObjectClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "ObjectClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "ClassClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "MetaclassClass", "slot": "class", "value": "MetaclassClass" },
+    { "op": "patchPointer", "target": "UndefinedObjectClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "BehaviorClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "ClassDescriptionClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "ArrayClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "SymbolClass", "slot": "class", "value": "Metaclass" },
+
+    { "comment": "Set superclass chain for classes" },
+    { "op": "setSuperclass", "target": "ProtoObject", "value": null },
+    { "op": "setSuperclass", "target": "Object", "value": "ProtoObject" },
+    { "op": "setSuperclass", "target": "UndefinedObject", "value": "Object" },
+    { "op": "setSuperclass", "target": "Behavior", "value": "Object" },
+    { "op": "setSuperclass", "target": "ClassDescription", "value": "Behavior" },
+    { "op": "setSuperclass", "target": "Class", "value": "ClassDescription" },
+    { "op": "setSuperclass", "target": "Metaclass", "value": "ClassDescription" },
+    { "op": "setSuperclass", "target": "Array", "value": "Object" },
+    { "op": "setSuperclass", "target": "Symbol", "value": "Object" },
+
+    { "comment": "Set superclass chain for metaclasses" },
+    { "op": "setSuperclass", "target": "ProtoObjectClass", "value": "Class" },
+    { "op": "setSuperclass", "target": "ObjectClass", "value": "ProtoObjectClass" },
+    { "op": "setSuperclass", "target": "UndefinedObjectClass", "value": "ObjectClass" },
+    { "op": "setSuperclass", "target": "BehaviorClass", "value": "ObjectClass" },
+    { "op": "setSuperclass", "target": "ClassDescriptionClass", "value": "BehaviorClass" },
+    { "op": "setSuperclass", "target": "ClassClass", "value": "ClassDescriptionClass" },
+    { "op": "setSuperclass", "target": "MetaclassClass", "value": "ClassDescriptionClass" },
+    { "op": "setSuperclass", "target": "ArrayClass", "value": "ObjectClass" },
+    { "op": "setSuperclass", "target": "SymbolClass", "value": "ObjectClass" },
+
+    { "comment": "Set instance variables" },
+    { "op": "setInstanceVariables", "target": "Behavior", "value": ["superclass", "methodDict", "format"] },
+    { "op": "setInstanceVariables", "target": "ClassDescription", "value": ["instanceVariables", "organization"] },
+    { "op": "setInstanceVariables", "target": "Class", "value": ["name", "classPool", "sharedPools"] },
+    { "op": "setInstanceVariables", "target": "Metaclass", "value": ["thisClass"] },
+
+    { "comment": "Link metaclasses to their instances" },
+    { "op": "setSlot", "target": "ProtoObjectClass", "slot": "thisClass", "value": "ProtoObject" },
+    { "op": "setSlot", "target": "ObjectClass", "slot": "thisClass", "value": "Object" },
+    { "op": "setSlot", "target": "ClassClass", "slot": "thisClass", "value": "Class" },
+    { "op": "setSlot", "target": "MetaclassClass", "slot": "thisClass", "value": "Metaclass" },
+    { "op": "setSlot", "target": "UndefinedObjectClass", "slot": "thisClass", "value": "UndefinedObject" },
+    { "op": "setSlot", "target": "BehaviorClass", "slot": "thisClass", "value": "Behavior" },
+    { "op": "setSlot", "target": "ClassDescriptionClass", "slot": "thisClass", "value": "ClassDescription" },
+
+    { "comment": "Set class names" },
+    { "op": "setSlot", "target": "ProtoObject", "slot": "name", "value": "ProtoObject" },
+    { "op": "setSlot", "target": "Object", "slot": "name", "value": "Object" },
+    { "op": "setSlot", "target": "Class", "slot": "name", "value": "Class" },
+    { "op": "setSlot", "target": "Metaclass", "slot": "name", "value": "Metaclass" },
+    { "op": "setSlot", "target": "UndefinedObject", "slot": "name", "value": "UndefinedObject" },
+    { "op": "setSlot", "target": "Behavior", "slot": "name", "value": "Behavior" },
+    { "op": "setSlot", "target": "ClassDescription", "slot": "name", "value": "ClassDescription" },
+
+    { "comment": "Set categories" },
+    { "op": "setCategory", "target": "ProtoObject", "value": "Kernel-Objects" },
+    { "op": "setCategory", "target": "Object", "value": "Kernel-Objects" },
+    { "op": "setCategory", "target": "UndefinedObject", "value": "Kernel-Objects" },
+    { "op": "setCategory", "target": "Behavior", "value": "Kernel-Classes" },
+    { "op": "setCategory", "target": "ClassDescription", "value": "Kernel-Classes" },
+    { "op": "setCategory", "target": "Class", "value": "Kernel-Classes" },
+    { "op": "setCategory", "target": "Metaclass", "value": "Kernel-Classes" },
+
+    { "comment": "Create core methods for ProtoObject" },
+    { "op": "defineMethod", "target": "ProtoObject", "selector": "==", "source": "== anObject\n\t\"Primitive. Answer whether the receiver and the argument are the same object\"\n\t<primitive: 110>\n\tself primitiveFailed" },
+    { "op": "defineMethod", "target": "ProtoObject", "selector": "class", "source": "class\n\t\"Primitive. Answer the object which is the receiver's class\"\n\t<primitive: 111>\n\tself primitiveFailed" },
+    { "op": "defineMethod", "target": "ProtoObject", "selector": "doesNotUnderstand:", "source": "doesNotUnderstand: aMessage\n\t\"Handle the fact that there was an attempt to send the given message to the receiver but the receiver does not understand this message.\"\n\tself error: 'Message not understood: ', aMessage selector" },
+
+    { "comment": "Create core methods for Object" },
+    { "op": "defineMethod", "target": "Object", "selector": "isNil", "source": "isNil\n\t\"Answer whether the receiver is nil\"\n\t^false" },
+    { "op": "defineMethod", "target": "Object", "selector": "notNil", "source": "notNil\n\t\"Answer whether the receiver is not nil\"\n\t^true" },
+
+    { "comment": "Create core methods for UndefinedObject" },
+    { "op": "defineMethod", "target": "UndefinedObject", "selector": "isNil", "source": "isNil\n\t\"Answer whether the receiver is nil\"\n\t^true" },
+    { "op": "defineMethod", "target": "UndefinedObject", "selector": "notNil", "source": "notNil\n\t\"Answer whether the receiver is not nil\"\n\t^false" },
+
+    { "comment": "Create core methods for Behavior" },
+    { "op": "defineMethod", "target": "Behavior", "selector": "new", "source": "new\n\t\"Answer a new instance of the receiver\"\n\t^self basicNew" },
+    { "op": "defineMethod", "target": "Behavior", "selector": "basicNew", "source": "basicNew\n\t\"Primitive. Answer an instance of the receiver with no indexable variables\"\n\t<primitive: 70>\n\tself primitiveFailed" },
+    { "op": "defineMethod", "target": "Behavior", "selector": "basicNew:", "source": "basicNew: anInteger\n\t\"Primitive. Answer an instance of the receiver with anInteger indexable variables\"\n\t<primitive: 71>\n\tself primitiveFailed" }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "ProtoObject has no superclass",
+        "test": "ProtoObject.superclass == nil"
+      },
+      {
+        "description": "Object's superclass is ProtoObject",
+        "test": "Object.superclass == ProtoObject"
+      },
+      {
+        "description": "Metaclass class's class is Metaclass",
+        "test": "Metaclass.class.class == Metaclass"
+      },
+      {
+        "description": "nil is an instance of UndefinedObject",
+        "test": "nil.class == UndefinedObject"
+      },
+      {
+        "description": "Class hierarchy is correct",
+        "test": "Class.superclass == ClassDescription && ClassDescription.superclass == Behavior && Behavior.superclass == Object"
+      }
+    ]
+  }
+}

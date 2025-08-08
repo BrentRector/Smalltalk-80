@@ -1,0 +1,57 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "version": "2.0",
+  "phase": "test",
+  "description": "Test that Phase 1 bootstrap enables object creation via message sends",
+  "requires": ["bootstrap_phase1_complete.json"],
+  "operations": [
+    { "comment": "=== TEST OBJECT CREATION VIA MESSAGE SENDS ===" },
+    
+    { "comment": "Test SmallInteger creation" },
+    { "op": "sendMessage", 
+      "receiver": "SmallInteger", 
+      "selector": "new:", 
+      "args": [42],
+      "result": "testInt42" 
+    },
+    
+    { "comment": "Test Array creation" },
+    { "op": "sendMessage",
+      "receiver": "Array",
+      "selector": "new:",
+      "args": [10],
+      "result": "testArray10"
+    },
+    
+    { "comment": "Test Symbol creation" },
+    { "op": "sendMessage",
+      "receiver": "Symbol",
+      "selector": "new:",
+      "args": ["testSymbol"],
+      "result": "testSym"
+    },
+    
+    { "comment": "Test String creation" },
+    { "op": "sendMessage",
+      "receiver": "String",
+      "selector": "new:",
+      "args": [20],
+      "result": "testString20"
+    },
+    
+    { "comment": "Test Behavior basicNew" },
+    { "op": "sendMessage",
+      "receiver": "Object",
+      "selector": "basicNew",
+      "args": [],
+      "result": "testObject"
+    },
+    
+    { "comment": "Verify results" },
+    { "op": "assert", "target": "testInt42", "type": "SmallInteger" },
+    { "op": "assert", "target": "testArray10", "type": "Array" },
+    { "op": "assert", "target": "testSym", "type": "Symbol" },
+    { "op": "assert", "target": "testString20", "type": "String" },
+    { "op": "assert", "target": "testObject", "type": "Object" }
+  ]
+}

@@ -174,6 +174,14 @@ public static class Primitives
         [173] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
         [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
         [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
+        
+        // Object creation primitives for Phase 1 bootstrap
+        [180] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSmallInteger,
+        [181] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSymbol,
+        [182] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewString,
+        
+        // Note: Dictionary operations are not primitives in Smalltalk-80
+        // Dictionary at:put: and at: are implemented in Smalltalk bytecode
     };
 
     static Primitives()

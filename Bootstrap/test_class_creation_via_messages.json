@@ -1,0 +1,250 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "version": "2.0",
+  "phase": "test",
+  "description": "Demonstrate creating a new class entirely via message sends after minimal Phase 1",
+  "requires": ["bootstrap_phase1_minimal.json"],
+  "operations": [
+    { "comment": "=== CREATE A NEW CLASS 'Point' VIA PURE MESSAGE SENDS ===" },
+    
+    { "comment": "Step 1: Create the metaclass for Point" },
+    { "op": "sendMessage",
+      "receiver": "Metaclass",
+      "selector": "new",
+      "args": [],
+      "result": "PointClass"
+    },
+    
+    { "comment": "Step 2: Set up the metaclass" },
+    { "op": "sendMessage",
+      "receiver": "PointClass",
+      "selector": "superclass:",
+      "args": ["ObjectClass"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "MethodDictionary",
+      "selector": "new",
+      "args": [],
+      "result": "PointClassMethods"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "PointClass",
+      "selector": "methodDictionary:",
+      "args": ["PointClassMethods"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "PointClass",
+      "selector": "format:",
+      "args": [0],
+      "result": null
+    },
+    
+    { "comment": "Step 3: Create the Point class itself" },
+    { "op": "sendMessage",
+      "receiver": "PointClass",
+      "selector": "new",
+      "args": [],
+      "result": "Point"
+    },
+    
+    { "comment": "Step 4: Set up the Point class" },
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "superclass:",
+      "args": ["Object"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "MethodDictionary",
+      "selector": "new",
+      "args": [],
+      "result": "PointMethods"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "methodDictionary:",
+      "args": ["PointMethods"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "format:",
+      "args": [2],
+      "comment": "2 instance variables: x and y",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Symbol",
+      "selector": "intern:",
+      "args": ["Point"],
+      "result": "PointSymbol"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "name:",
+      "args": ["PointSymbol"],
+      "result": null
+    },
+    
+    { "comment": "Step 5: Link metaclass and class" },
+    { "op": "sendMessage",
+      "receiver": "PointClass",
+      "selector": "thisClass:",
+      "args": ["Point"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "class:",
+      "args": ["PointClass"],
+      "result": null
+    },
+    
+    { "comment": "Step 6: Create a CompiledMethod for Point>>x:y:" },
+    { "op": "sendMessage",
+      "receiver": "CompiledMethod",
+      "selector": "new",
+      "args": [],
+      "result": "setXYMethod"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Symbol",
+      "selector": "intern:",
+      "args": ["x:y:"],
+      "result": "setXYSelector"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYMethod",
+      "selector": "selector:",
+      "args": ["setXYSelector"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "ByteArray",
+      "selector": "new:",
+      "args": [6],
+      "result": "setXYBytecodes"
+    },
+    
+    { "comment": "Bytecodes: store arg1 in instVar1, store arg2 in instVar2, return self" },
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [1, 16],
+      "comment": "pushTemp: 0 (first arg)",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [2, 96],
+      "comment": "storeInstVar: 0",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [3, 17],
+      "comment": "pushTemp: 1 (second arg)",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [4, 97],
+      "comment": "storeInstVar: 1",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [5, 112],
+      "comment": "pushReceiver",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYBytecodes",
+      "selector": "at:put:",
+      "args": [6, 124],
+      "comment": "returnTop",
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYMethod",
+      "selector": "bytecodes:",
+      "args": ["setXYBytecodes"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "Array",
+      "selector": "new:",
+      "args": [0],
+      "result": "emptyLiterals"
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYMethod",
+      "selector": "literals:",
+      "args": ["emptyLiterals"],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYMethod",
+      "selector": "primitive:",
+      "args": [0],
+      "result": null
+    },
+    
+    { "op": "sendMessage",
+      "receiver": "setXYMethod",
+      "selector": "methodClass:",
+      "args": ["Point"],
+      "result": null
+    },
+    
+    { "comment": "Step 7: Install the method in Point's method dictionary" },
+    { "op": "sendMessage",
+      "receiver": "PointMethods",
+      "selector": "at:put:",
+      "args": ["setXYSelector", "setXYMethod"],
+      "result": null
+    },
+    
+    { "comment": "Step 8: Register Point globally (optional)" },
+    { "op": "registerGlobal", "name": "Point", "value": "Point" },
+    
+    { "comment": "Step 9: Test - Create an instance of Point" },
+    { "op": "sendMessage",
+      "receiver": "Point",
+      "selector": "new",
+      "args": [],
+      "result": "aPoint"
+    },
+    
+    { "comment": "Verify the Point was created successfully" },
+    { "op": "assert", "target": "Point", "type": "Class" },
+    { "op": "assert", "target": "aPoint", "type": "Point" }
+  ]
+}

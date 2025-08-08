@@ -44,6 +44,10 @@ public class JsonBootstrapExecutor
         }
         
         Console.WriteLine($"[BOOTSTRAP] Phase 1 created {namedObjects.Count} named objects");
+        
+        // Don't migrate yet - wait until after Phase 2/3 when at:put: method is available
+        // This avoids the dictionary expansion problem
+        Console.WriteLine("[BOOTSTRAP] Phase 1 complete - will migrate to Smalltalk dictionary after methods are installed");
     }
     
     /// <summary>
@@ -169,6 +173,26 @@ public class JsonBootstrapExecutor
                 
             case "definemethod":
                 ExecuteDefineMethod(operation);
+                break;
+                
+            case "sendmessage":
+                ExecuteSendMessage(operation);
+                break;
+                
+            case "assert":
+                ExecuteAssert(operation);
+                break;
+                
+            case "createinstance":
+                ExecuteCreateInstance(operation);
+                break;
+                
+            case "createlargeinstance":
+                ExecuteCreateLargeInstance(operation);
+                break;
+                
+            case "dictionaryatput":
+                ExecuteDictionaryAtPut(operation);
                 break;
                 
             default:
@@ -586,15 +610,66 @@ public class JsonBootstrapExecutor
     /// </summary>
     private void ExecuteDefineMethod(BootstrapOperation op)
     {
-        if (string.IsNullOrEmpty(op.Target) || string.IsNullOrEmpty(op.Selector) || string.IsNullOrEmpty(op.Source))
-            throw new InvalidOperationException("defineMethod requires target, selector, and source");
+        if (string.IsNullOrEmpty(op.Target) || string.IsNullOrEmpty(op.Selector))
+            throw new InvalidOperationException("defineMethod requires target and selector");
             
         if (!namedObjects.TryGetValue(op.Target, out var classOop))
             throw new InvalidOperationException($"Target class '{op.Target}' not found");
             
-        // For Phase 1, we can't actually compile methods yet
-        // Just log it for now
-        Console.WriteLine($"[BOOTSTRAP] Define method '{op.Selector}' on '{op.Target}'");
+        // Check if it's a primitive method
+        if (op.Primitive > 0)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Installing primitive method '{op.Selector}' (primitive {op.Primitive}) on '{op.Target}'");
+            
+            // Create a CompiledMethod for the primitive
+            var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
+            if (compiledMethodClassOop < 0)
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: CompiledMethod class not found, cannot install method");
+                return;
+            }
+            
+            var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+            
+            // Set selector (slot 0)
+            var selectorOop = vm.PrimitiveInternSymbol(op.Selector);
+            vm.PrimitiveSetSlot(methodOop, 0, selectorOop);
+            
+            // Set bytecode (slot 1) - empty for primitive-only methods
+            var emptyBytecodeOop = vm.PrimitiveNewByteArray(0);
+            vm.PrimitiveSetSlot(methodOop, 1, emptyBytecodeOop);
+            
+            // Set literals (slot 2) - empty array
+            var emptyLiteralsOop = vm.PrimitiveNewArray(0);
+            vm.PrimitiveSetSlot(methodOop, 2, emptyLiteralsOop);
+            
+            // Set header (slot 3) with primitive number
+            var headerOop = vm.PrimitiveNewSmallInteger(op.Primitive);
+            vm.PrimitiveSetSlot(methodOop, 3, headerOop);
+            
+            // Install in the class's method dictionary
+            var methodDictOop = vm.GetSlot(classOop, 1);
+            if (methodDictOop < 0)
+            {
+                // Create a new method dictionary
+                methodDictOop = vm.PrimitiveNewDictionary();
+                vm.PrimitiveSetSlot(classOop, 1, methodDictOop);
+            }
+            
+            // Add method to dictionary
+            vm.PrimitiveDictionaryAtPut(methodDictOop, selectorOop, methodOop);
+            Console.WriteLine($"[BOOTSTRAP] Installed method '{op.Selector}' in class '{op.Target}'");
+        }
+        else if (!string.IsNullOrEmpty(op.Source))
+        {
+            // For Phase 1, we can't actually compile methods yet
+            // Just log it for now
+            Console.WriteLine($"[BOOTSTRAP] Define method '{op.Selector}' on '{op.Target}' (source methods not yet supported)");
+        }
+        else
+        {
+            throw new InvalidOperationException("defineMethod requires either source or primitive");
+        }
     }
     
     /// <summary>
@@ -979,6 +1054,16 @@ public class JsonBootstrapExecutor
             }
         }
         
+        // Register the class in the Smalltalk SystemDictionary as well
+        var smalltalkDictOop = vm.PrimitiveLookupGlobal("Smalltalk");
+        if (smalltalkDictOop > 0)
+        {
+            // Add class to Smalltalk dictionary: Smalltalk at: #ClassName put: ClassObject
+            var keySymbol = vm.PrimitiveInternSymbol(classDef.Name);
+            vm.PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, classOop);
+            Console.WriteLine($"[BOOTSTRAP]   - Registered {classDef.Name} in Smalltalk dictionary");
+        }
+        
         // Mark variable-sized classes (Array, ByteArray, etc.)
         if (classDef.VariableSize)
         {
@@ -1110,6 +1195,251 @@ public class JsonBootstrapExecutor
         vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
         Console.WriteLine($"[BOOTSTRAP] Patched '{patch.Target}'.{patch.Slot} = {patch.Value}");
     }
+    
+    /// <summary>
+    /// Execute sendMessage operation.
+    /// </summary>
+    private void ExecuteSendMessage(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Receiver) || string.IsNullOrEmpty(op.Selector))
+            throw new InvalidOperationException("sendMessage requires receiver and selector");
+            
+        // Get receiver OOP
+        int receiverOop;
+        if (!namedObjects.TryGetValue(op.Receiver, out receiverOop))
+        {
+            throw new InvalidOperationException($"Receiver '{op.Receiver}' not found");
+        }
+        
+        // Intern the selector
+        var selectorOop = vm.PrimitiveInternSymbol(op.Selector);
+        
+        // Process arguments
+        var argOops = new List<int>();
+        if (op.Args != null)
+        {
+            foreach (var arg in op.Args)
+            {
+                int argOop;
+                
+                if (arg == null)
+                {
+                    argOop = vm.PrimitiveNil();
+                }
+                else if (arg is int intVal)
+                {
+                    argOop = vm.PrimitiveNewSmallInteger(intVal);
+                }
+                else if (arg is string strVal)
+                {
+                    // Check if it's a named object reference
+                    if (namedObjects.TryGetValue(strVal, out var namedOop))
+                    {
+                        argOop = namedOop;
+                    }
+                    else
+                    {
+                        // Treat as a literal string
+                        argOop = vm.PrimitiveInternString(strVal);
+                    }
+                }
+                else if (arg is JsonElement jsonElement)
+                {
+                    if (jsonElement.ValueKind == JsonValueKind.Number)
+                    {
+                        argOop = vm.PrimitiveNewSmallInteger(jsonElement.GetInt32());
+                    }
+                    else if (jsonElement.ValueKind == JsonValueKind.String)
+                    {
+                        var str = jsonElement.GetString()!;
+                        if (namedObjects.TryGetValue(str, out var namedOop))
+                        {
+                            argOop = namedOop;
+                        }
+                        else
+                        {
+                            argOop = vm.PrimitiveInternString(str);
+                        }
+                    }
+                    else
+                    {
+                        argOop = vm.PrimitiveNil();
+                    }
+                }
+                else
+                {
+                    argOop = vm.PrimitiveNil();
+                }
+                
+                argOops.Add(argOop);
+            }
+        }
+        
+        // Send the message
+        var resultOop = vm.PrimitiveSendMessage(receiverOop, selectorOop, argOops.ToArray());
+        
+        // Store result if named
+        if (!string.IsNullOrEmpty(op.Result))
+        {
+            namedObjects[op.Result] = resultOop;
+            Console.WriteLine($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> '{op.Result}' (OOP {resultOop})");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Sent {op.Receiver}>>{op.Selector} -> OOP {resultOop}");
+        }
+    }
+    
+    /// <summary>
+    /// Execute assert operation for testing.
+    /// </summary>
+    private void ExecuteAssert(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Target))
+            throw new InvalidOperationException("assert requires target");
+            
+        if (!namedObjects.TryGetValue(op.Target, out var targetOop))
+            throw new InvalidOperationException($"Assert failed: target '{op.Target}' not found");
+            
+        var obj = ObjectMemory.FromOop(targetOop);
+        if (obj == null)
+            throw new InvalidOperationException($"Assert failed: object at OOP {targetOop} is null");
+            
+        // If type is specified, verify it
+        if (!string.IsNullOrEmpty(op.Type))
+        {
+            // TODO: Verify the object's class matches the expected type
+            Console.WriteLine($"[BOOTSTRAP] Assert: '{op.Target}' exists (type check for '{op.Type}' not implemented)");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Assert: '{op.Target}' exists at OOP {targetOop}");
+        }
+    }
+    
+    /// <summary>
+    /// Execute createInstance operation - create an instance of a class.
+    /// </summary>
+    private void ExecuteCreateInstance(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.ClassName) || string.IsNullOrEmpty(op.Result))
+            throw new InvalidOperationException("createInstance requires class and result");
+            
+        // Look up the class
+        int classOop;
+        if (!namedObjects.TryGetValue(op.ClassName, out classOop))
+        {
+            // Try VM lookup
+            classOop = vm.PrimitiveLookupClass(op.ClassName);
+            if (classOop < 0)
+                throw new InvalidOperationException($"Class '{op.ClassName}' not found for createInstance");
+        }
+        
+        // Create instance
+        var instanceOop = vm.PrimitiveNewInstance(classOop);
+        namedObjects[op.Result] = instanceOop;
+        
+        Console.WriteLine($"[BOOTSTRAP] Created instance '{op.Result}' of class '{op.ClassName}' -> OOP {instanceOop}");
+    }
+    
+    /// <summary>
+    /// Execute createLargeInstance operation - create an instance with specific size.
+    /// </summary>
+    private void ExecuteCreateLargeInstance(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.ClassName) || string.IsNullOrEmpty(op.Result))
+            throw new InvalidOperationException("createLargeInstance requires class and result");
+            
+        int size = op.Size ?? 10; // Default size if not specified
+            
+        // Look up the class
+        int classOop;
+        if (!namedObjects.TryGetValue(op.ClassName, out classOop))
+        {
+            // Try VM lookup
+            classOop = vm.PrimitiveLookupClass(op.ClassName);
+            if (classOop < 0)
+                throw new InvalidOperationException($"Class '{op.ClassName}' not found for createLargeInstance");
+        }
+        
+        // Create instance with specific size
+        // Use PrimitiveNewArray to create a properly sized object
+        var instanceOop = vm.PrimitiveNewArray(size);
+        
+        // Set the class pointer
+        vm.PrimitiveSetClass(instanceOop, classOop);
+        
+        // Initialize slots for dictionary format
+        // Dictionary format: [tally, key1, value1, key2, value2, ...]
+        // Slot 0: tally (initially 0)
+        // Slots 1+: keys and values (initially nil)
+        if (op.ClassName == "SystemDictionary" || op.ClassName == "Dictionary")
+        {
+            // For dictionaries, slot 0 is the tally (count of entries)
+            var zeroOop = vm.PrimitiveNewSmallInteger(0);
+            Console.WriteLine($"[BOOTSTRAP] Setting dictionary tally (slot 0) to SmallInteger 0 (OOP {zeroOop})");
+            vm.PrimitiveArrayAtPut(instanceOop, 0, zeroOop);
+            
+            // Initialize remaining slots to nil
+            var nilOop = vm.PrimitiveNil();
+            Console.WriteLine($"[BOOTSTRAP] Initializing remaining {size-1} slots to nil (OOP {nilOop})");
+            for (int i = 1; i < size; i++)
+            {
+                vm.PrimitiveArrayAtPut(instanceOop, i, nilOop);
+            }
+        }
+        else
+        {
+            // For non-dictionaries, initialize all slots to nil
+            var nilOop = vm.PrimitiveNil();
+            for (int i = 0; i < size; i++)
+            {
+                vm.PrimitiveArrayAtPut(instanceOop, i, nilOop);
+            }
+        }
+        
+        namedObjects[op.Result] = instanceOop;
+        
+        Console.WriteLine($"[BOOTSTRAP] Created large instance '{op.Result}' of class '{op.ClassName}' with size {size} -> OOP {instanceOop}");
+    }
+    
+    /// <summary>
+    /// Execute dictionaryAtPut operation - add entry to a dictionary.
+    /// </summary>
+    private void ExecuteDictionaryAtPut(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Dictionary) || string.IsNullOrEmpty(op.Key) || string.IsNullOrEmpty(op.Value?.ToString()))
+            throw new InvalidOperationException("dictionaryAtPut requires dictionary, key, and value");
+            
+        // Get dictionary OOP
+        int dictOop;
+        if (!namedObjects.TryGetValue(op.Dictionary, out dictOop))
+        {
+            throw new InvalidOperationException($"Dictionary '{op.Dictionary}' not found");
+        }
+        
+        // Intern key as symbol
+        var keyOop = vm.PrimitiveInternSymbol(op.Key);
+        
+        // Get value OOP
+        var valueStr = op.Value?.ToString() ?? "";
+        if (string.IsNullOrEmpty(valueStr))
+            throw new InvalidOperationException("dictionaryAtPut requires a non-empty value");
+            
+        int valueOop;
+        if (!namedObjects.TryGetValue(valueStr, out valueOop))
+        {
+            // Try VM lookup
+            valueOop = vm.PrimitiveLookupClass(valueStr);
+            if (valueOop < 0)
+                throw new InvalidOperationException($"Value '{valueStr}' not found for dictionaryAtPut");
+        }
+        
+        // Use primitive 461 (Dictionary at:put:)
+        vm.PrimitiveDictionaryAtPut(dictOop, keyOop, valueOop);
+        
+        Console.WriteLine($"[BOOTSTRAP] Added {op.Key} -> {valueStr} to dictionary '{op.Dictionary}'");
+    }
 }
 
 /// <summary>
@@ -1208,4 +1538,11 @@ public class BootstrapOperation
     public string? Source { get; set; }
     public int? Size { get; set; }
     public string? Comment { get; set; }
+    public string? Receiver { get; set; }  // For sendMessage
+    public List<object>? Args { get; set; }  // For sendMessage
+    public string? Type { get; set; }  // For assert
+    public string? ClassName { get; set; }  // For createInstance (use ClassName instead of Class to avoid keyword)
+    public string? Dictionary { get; set; }  // For dictionaryAtPut
+    public string? Key { get; set; }  // For dictionaryAtPut
+    public int Primitive { get; set; }  // For defineMethod with primitive
 }

@@ -68,6 +68,13 @@ public interface ISmalltalkVM
     /// <param name="size">The size of the array.</param>
     /// <returns>The OOP of the created array.</returns>
     int PrimitiveNewArray(int size);
+    
+    /// <summary>
+    /// Create a new ByteArray of specified size.
+    /// </summary>
+    /// <param name="size">The size of the ByteArray.</param>
+    /// <returns>The OOP of the created ByteArray.</returns>
+    int PrimitiveNewByteArray(int size);
 
     /// <summary>
     /// Set array element at index.

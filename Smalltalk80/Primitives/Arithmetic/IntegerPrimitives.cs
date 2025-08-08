@@ -248,6 +248,9 @@ public static class IntegerPrimitives
     {
         object? y = ctx.Stack.Pop();
         object? x = ctx.Stack.Pop();
+        
+        // TODO: Look up Point class when VM reference is available in Context
+        // For now, Point will be created without a class pointer
         var point = new SmalltalkObject(null, 2);
         point.Fields[0] = x;
         point.Fields[1] = y;

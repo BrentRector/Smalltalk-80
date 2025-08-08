@@ -22,6 +22,11 @@ public sealed class VirtualMachine
     public Interpreter Interpreter { get; } = new() { ExitOnReturn = false };
     
     private VMPrimitiveAdapter? bootstrapAdapter;
+    
+    /// <summary>
+    /// Gets the bootstrap adapter for accessing VM primitives.
+    /// </summary>
+    public VMPrimitiveAdapter? Adapter => bootstrapAdapter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using JSON bootstrap.
@@ -131,6 +136,13 @@ public sealed class VirtualMachine
         
         // Dump classes after Phase 2
         DumpAllClasses("PHASE 2 CLASSES");
+        
+        // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
+        Console.WriteLine("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
+        if (bootstrapAdapter is VMPrimitiveAdapter adapter)
+        {
+            adapter.CompleteBootstrapWithMessageSends();
+        }
     }
     
     /// <summary>
@@ -140,23 +152,26 @@ public sealed class VirtualMachine
     {
         Console.WriteLine("[BOOTSTRAP] Phase 3: Message-driven class construction...");
         
-        // First check for Phase 3 JSON manifests
-        var phase3TestPath = Path.Combine(bootstrapDir, "bootstrap_phase3_test_greeter.json");
-        if (File.Exists(phase3TestPath))
+        if (bootstrapAdapter == null)
         {
-            Console.WriteLine("[BOOTSTRAP] Found Phase 3 test manifest: bootstrap_phase3_test_greeter.json");
-            var jsonContent = File.ReadAllText(phase3TestPath);
-            
-            if (bootstrapAdapter == null)
-            {
-                throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
-            }
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
+        }
+        
+        // Always load the main Phase 3 bootstrap file
+        var phase3Path = Path.Combine(bootstrapDir, "bootstrap_phase3.json");
+        if (File.Exists(phase3Path))
+        {
+            Console.WriteLine("[BOOTSTRAP] Loading Phase 3 manifest: bootstrap_phase3.json");
+            var jsonContent = File.ReadAllText(phase3Path);
             
             var phase3Executor = new Phase3Executor(bootstrapAdapter);
             phase3Executor.ExecuteManifest(jsonContent);
             
-            Console.WriteLine("[BOOTSTRAP] Phase 3 test manifest executed");
-            return;
+            Console.WriteLine("[BOOTSTRAP] Phase 3 manifest executed");
+        }
+        else
+        {
+            Console.WriteLine("[BOOTSTRAP] Warning: bootstrap_phase3.json not found");
         }
         
         // Fall back to loading Smalltalk source files
@@ -202,6 +217,29 @@ public sealed class VirtualMachine
     }
     
     /// <summary>
+    /// Loads an additional JSON manifest file (Phase 3 format).
+    /// </summary>
+    public void LoadJsonManifest(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException($"JSON manifest file not found: {filePath}");
+        }
+        
+        var jsonContent = File.ReadAllText(filePath);
+        
+        if (bootstrapAdapter == null)
+        {
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Bootstrap must be run first.");
+        }
+        
+        var phase3Executor = new Phase3Executor(bootstrapAdapter);
+        phase3Executor.ExecuteManifest(jsonContent);
+        
+        Console.WriteLine($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
+    }
+    
+    /// <summary>
     /// Loads a Smalltalk source file.
     /// </summary>
     public void LoadSourceFile(string filePath)
@@ -214,21 +252,8 @@ public sealed class VirtualMachine
         
         try
         {
-            var loader = new SmalltalkLoader(Interpreter);
-            var result = loader.LoadFile(filePath);
-            
-            if (result.Success)
-            {
-                Console.WriteLine($"Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} methods from {filePath}");
-            }
-            else
-            {
-                Console.WriteLine($"Failed to load {filePath}");
-                foreach (var error in result.Errors.Take(3))
-                {
-                    Console.WriteLine($"  Error: {error}");
-                }
-            }
+            // TODO: Implement Smalltalk source file loading
+            Console.WriteLine($"[INTERPRETER] Source file loading not yet implemented for: {Path.GetFileName(filePath)}");
         }
         catch (Exception ex)
         {
@@ -706,5 +731,4 @@ public sealed class VirtualMachine
         // For now, return just the basic globals
         return globals;
     }
-    
 }
