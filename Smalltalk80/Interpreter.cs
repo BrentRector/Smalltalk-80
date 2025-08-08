@@ -230,274 +230,28 @@ public class Interpreter
     public void Dispatch(Bytecode bytecode)
     {
         Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
-        if (bytecode >= Bytecode.PushReceiverVariable0 && bytecode <= Bytecode.PushReceiverVariable15)
+        
+        // Special handling for bytecode 10: Method Lookup
+        if ((byte)bytecode == 10)
         {
-            int index = (int)bytecode - (int)Bytecode.PushReceiverVariable0;
-            currentContext.Stack.Push(currentContext.Receiver.Fields[index]);
-        }
-        else if (bytecode >= Bytecode.PushTemporaryVariable0 && bytecode <= Bytecode.PushTemporaryVariable15)
-        {
-            int index = (int)bytecode - (int)Bytecode.PushTemporaryVariable0;
-            currentContext.Stack.Push(currentContext.Temporaries[index]);
-        }
-        else if (bytecode >= Bytecode.PushLiteralConstant0 && bytecode <= Bytecode.PushLiteralConstant31)
-        {
-            int index = (int)bytecode - (int)Bytecode.PushLiteralConstant0;
-            currentContext.Stack.Push(currentContext.Method.Literals[index]);
-        }
-        else if (bytecode >= Bytecode.PushLiteralVariable0 && bytecode <= Bytecode.PushLiteralVariable31)
-        {
-            int index = (int)bytecode - (int)Bytecode.PushLiteralVariable0;
-            var assoc = (Association)currentContext.Method.Literals[index]!;
-            currentContext.Stack.Push(assoc.Value);
-        }
-        else if (bytecode >= Bytecode.StoreAndPopReceiverVariable0 && bytecode <= Bytecode.StoreAndPopReceiverVariable7)
-        {
-            int index = (int)bytecode - (int)Bytecode.StoreAndPopReceiverVariable0;
-            currentContext.Receiver.Fields[index] = currentContext.Stack.Pop();
-        }
-        else if (bytecode >= Bytecode.StoreAndPopTemporaryVariable0 && bytecode <= Bytecode.StoreAndPopTemporaryVariable7)
-        {
-            int index = (int)bytecode - (int)Bytecode.StoreAndPopTemporaryVariable0;
-            currentContext.Temporaries[index] = currentContext.Stack.Pop()!;
-        }
-        else if ((bytecode >= Bytecode.PushSelf && bytecode <= Bytecode.PushTwo) ||
-                   (bytecode >= Bytecode.PushThree && bytecode <= Bytecode.PushTen))
-        {
-            object? constant = bytecode switch
+            // OP_LOOKUP_METHOD: Pop selector and receiver, lookup method, push result
+            var selector = currentContext.Stack.Pop() as Symbol;
+            var receiver = currentContext.Stack.Pop() as SmalltalkObject;
+            
+            if (selector != null && receiver != null && receiver.ClassPointer != null)
             {
-                Bytecode.PushSelf => currentContext.Receiver,
-                Bytecode.PushTrue => true,
-                Bytecode.PushFalse => false,
-                Bytecode.PushNil => null,
-                Bytecode.PushMinusOne => -1,
-                Bytecode.PushZero => 0,
-                Bytecode.PushOne => 1,
-                Bytecode.PushTwo => 2,
-                Bytecode.PushThree => 3,
-                Bytecode.PushFour => 4,
-                Bytecode.PushFive => 5,
-                Bytecode.PushSix => 6,
-                Bytecode.PushSeven => 7,
-                Bytecode.PushEight => 8,
-                Bytecode.PushNine => 9,
-                Bytecode.PushTen => 10,
-                _ => null
-            };
-            currentContext.Stack.Push(constant);
-        }
-        else if (bytecode >= Bytecode.ReturnSelf && bytecode <= Bytecode.ReturnNil)
-        {
-            object? value = bytecode switch
-            {
-                Bytecode.ReturnSelf => currentContext.Receiver,
-                Bytecode.ReturnTrue => true,
-                Bytecode.ReturnFalse => false,
-                Bytecode.ReturnNil => null,
-                _ => null
-            };
-            HandleReturn(value!);
-        }
-        else if (bytecode == Bytecode.ReturnTopFromMethod)
-        {
-            var returnValue = currentContext.Stack.Count > 0
-                ? currentContext.Stack.Pop()
-                : currentContext.Receiver;
-            HandleReturn(returnValue!);
-        }
-        else if (bytecode == Bytecode.ReturnTopFromBlock)
-        {
-            var returnValue = currentContext.Stack.Count > 0
-                ? currentContext.Stack.Pop()
-                : currentContext.Receiver;
-            HandleBlockReturn(returnValue!);
-        }
-        else if (bytecode == Bytecode.ExtendedStore)
-        {
-            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
-            HandleExtendedStore(descriptor, false);
-        }
-        else if (bytecode == Bytecode.ExtendedStoreAndPop)
-        {
-            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
-            HandleExtendedStore(descriptor, true);
-        }
-        else if (bytecode == Bytecode.SingleExtendedSend)
-        {
-            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
-            int argCount = descriptor >> 5;
-            int selectorIndex = descriptor & 0x1F;
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, argCount, false);
-        }
-        else if (bytecode == Bytecode.DoubleExtendedSend)
-        {
-            int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
-            int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, argCount, false);
-        }
-        else if (bytecode == Bytecode.SingleExtendedSuper)
-        {
-            byte descriptor = currentContext.Method.Bytecodes[currentContext.PC++];
-            int argCount = descriptor >> 5;
-            int selectorIndex = descriptor & 0x1F;
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, argCount, true);
-        }
-        else if (bytecode == Bytecode.DoubleExtendedSuper)
-        {
-            int argCount = currentContext.Method.Bytecodes[currentContext.PC++];
-            int selectorIndex = currentContext.Method.Bytecodes[currentContext.PC++];
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, argCount, true);
-        }
-        else if (bytecode == Bytecode.PopStack)
-        {
-            _ = currentContext.Stack.Pop();
-        }
-        else if (bytecode == Bytecode.DuplicateTop)
-        {
-            var top = currentContext.Stack.Peek();
-            currentContext.Stack.Push(top);
-        }
-        else if (bytecode == Bytecode.PushActiveContext)
-        {
-            currentContext.Stack.Push(currentContext);
-        }
-        else if (bytecode == Bytecode.JumpShort)
-        {
-            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
-            currentContext.PC += offset;
-        }
-        else if (bytecode == Bytecode.JumpLong)
-        {
-            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
-            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            short offset = (short)((high << 8) | low);
-            currentContext.PC += offset;
-        }
-        else if (bytecode == Bytecode.JumpIfFalseShort)
-        {
-            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b)
-            {
-                currentContext.PC += offset;
+                var method = receiver.ClassPointer.Lookup(selector);
+                currentContext.Stack.Push(method);
             }
-        }
-        else if (bytecode == Bytecode.JumpIfFalseLong)
-        {
-            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
-            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            short offset = (short)((high << 8) | low);
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b)
+            else
             {
-                currentContext.PC += offset;
+                throw new InvalidOperationException($"Method lookup requires Symbol selector and SmalltalkObject receiver with valid class");
             }
-        }
-        else if (bytecode == Bytecode.JumpIfTrueShort)
-        {
-            var offset = (sbyte)currentContext.Method.Bytecodes[currentContext.PC++];
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b)
-            {
-                currentContext.PC += offset;
-            }
-        }
-        else if (bytecode == Bytecode.JumpIfTrueLong)
-        {
-            byte high = currentContext.Method.Bytecodes[currentContext.PC++];
-            byte low = currentContext.Method.Bytecodes[currentContext.PC++];
-            short offset = (short)((high << 8) | low);
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b)
-            {
-                currentContext.PC += offset;
-            }
-        }
-        else if (bytecode >= Bytecode.PopJumpFalseShort1 && bytecode <= Bytecode.PopJumpFalseShort8)
-        {
-            int offset = (int)bytecode - (int)Bytecode.PopJumpFalseShort1 + 1;
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b)
-            {
-                currentContext.PC += offset;
-            }
-        }
-        else if (bytecode >= Bytecode.LongJump0 && bytecode <= Bytecode.LongJump7)
-        {
-            int high = ((int)bytecode - (int)Bytecode.LongJump0) << 8;
-            int low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int raw = high | low;
-            if ((raw & 0x400) != 0)
-            {
-                raw |= unchecked((int)0xFFFFF800);
-            }
-            currentContext.PC += raw;
-        }
-        else if (bytecode >= Bytecode.PopJumpTrueLong0 && bytecode <= Bytecode.PopJumpTrueLong3)
-        {
-            int high = ((int)bytecode - (int)Bytecode.PopJumpTrueLong0) << 8;
-            int low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int offset = high | low;
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && b)
-            {
-                currentContext.PC += offset;
-            }
-        }
-        else if (bytecode >= Bytecode.PopJumpFalseLong0 && bytecode <= Bytecode.PopJumpFalseLong3)
-        {
-            int high = ((int)bytecode - (int)Bytecode.PopJumpFalseLong0) << 8;
-            int low = currentContext.Method.Bytecodes[currentContext.PC++];
-            int offset = high | low;
-            var condObj = currentContext.Stack.Pop();
-            if (condObj is bool b && !b)
-            {
-                currentContext.PC += offset;
-            }
-        }
-        else if (bytecode >= Bytecode.SendArithmeticSelector0 && bytecode <= Bytecode.SendArithmeticSelector15)
-        {
-            int index = (int)bytecode - (int)Bytecode.SendArithmeticSelector0;
-            var selector = SpecialSelectors[index];
-            int argCount = SpecialSelectorArgCounts[index];
-            PerformSend(selector, argCount, false);
-        }
-        else if (bytecode >= Bytecode.SendSpecialSelector0 && bytecode <= Bytecode.SendSpecialSelector15)
-        {
-            int index = (int)bytecode - (int)Bytecode.SendSpecialSelector0 + 16;
-            var selector = SpecialSelectors[index];
-            int argCount = SpecialSelectorArgCounts[index];
-            PerformSend(selector, argCount, false);
-        }
-        else if (bytecode >= Bytecode.SendLiteral0Args0 && bytecode <= Bytecode.SendLiteral0Args15)
-        {
-            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral0Args0;
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, 0, false);
-        }
-        else if (bytecode >= Bytecode.SendLiteral1Arg0 && bytecode <= Bytecode.SendLiteral1Arg15)
-        {
-            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral1Arg0;
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, 1, false);
-        }
-        else if (bytecode >= Bytecode.SendLiteral2Args0 && bytecode <= Bytecode.SendLiteral2Args15)
-        {
-            int selectorIndex = (int)bytecode - (int)Bytecode.SendLiteral2Args0;
-            var selector = (Symbol)currentContext.Method.Literals[selectorIndex];
-            PerformSend(selector, 2, false);
-        }
-        else if ((byte)bytecode >= 128)
-        {
-            SendSelector((byte)bytecode);
         }
         else
         {
-            throw new NotImplementedException($"Unhandled bytecode: {bytecode}");
+            // Use the Blue Book compatible dispatcher for all other bytecodes
+            BytecodeDispatcher.Dispatch(this, (byte)bytecode);
         }
     }
 
@@ -712,7 +466,7 @@ public class Interpreter
     /// <param name="selector">The selector being invoked.</param>
     /// <param name="argCount">The number of arguments supplied.</param>
     /// <param name="superSend">Whether lookup should start in the superclass of the method class.</param>
-    private void PerformSend(Symbol selector, int argCount, bool superSend)
+    internal void PerformSend(Symbol selector, int argCount, bool superSend)
     {
         var arguments = new object?[argCount];
         for (int i = argCount - 1; i >= 0; i--)

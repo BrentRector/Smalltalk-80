@@ -18,6 +18,10 @@
     { "op": "createObject", "result": "ClassDescription" },
     { "op": "createObject", "result": "nil" },
     
+    { "comment": "Create minimal Array and Symbol classes for instance variables" },
+    { "op": "createObject", "result": "Array" },
+    { "op": "createObject", "result": "Symbol" },
+    
     { "op": "createObject", "result": "ProtoObjectClass" },
     { "op": "createObject", "result": "ObjectClass" },
     { "op": "createObject", "result": "ClassClass" },
@@ -25,6 +29,8 @@
     { "op": "createObject", "result": "UndefinedObjectClass" },
     { "op": "createObject", "result": "BehaviorClass" },
     { "op": "createObject", "result": "ClassDescriptionClass" },
+    { "op": "createObject", "result": "ArrayClass" },
+    { "op": "createObject", "result": "SymbolClass" },
 
     { "comment": "Set class pointers for instances" },
     { "op": "patchPointer", "target": "ProtoObject", "slot": "class", "value": "ProtoObjectClass" },
@@ -35,15 +41,19 @@
     { "op": "patchPointer", "target": "Behavior", "slot": "class", "value": "BehaviorClass" },
     { "op": "patchPointer", "target": "ClassDescription", "slot": "class", "value": "ClassDescriptionClass" },
     { "op": "patchPointer", "target": "nil", "slot": "class", "value": "UndefinedObject" },
+    { "op": "patchPointer", "target": "Array", "slot": "class", "value": "ArrayClass" },
+    { "op": "patchPointer", "target": "Symbol", "slot": "class", "value": "SymbolClass" },
 
     { "comment": "Set class pointers for metaclasses (all metaclasses are instances of Metaclass)" },
     { "op": "patchPointer", "target": "ProtoObjectClass", "slot": "class", "value": "Metaclass" },
     { "op": "patchPointer", "target": "ObjectClass", "slot": "class", "value": "Metaclass" },
     { "op": "patchPointer", "target": "ClassClass", "slot": "class", "value": "Metaclass" },
-    { "op": "patchPointer", "target": "MetaclassClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "MetaclassClass", "slot": "class", "value": "MetaclassClass" },
     { "op": "patchPointer", "target": "UndefinedObjectClass", "slot": "class", "value": "Metaclass" },
     { "op": "patchPointer", "target": "BehaviorClass", "slot": "class", "value": "Metaclass" },
     { "op": "patchPointer", "target": "ClassDescriptionClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "ArrayClass", "slot": "class", "value": "Metaclass" },
+    { "op": "patchPointer", "target": "SymbolClass", "slot": "class", "value": "Metaclass" },
 
     { "comment": "Set superclass chain for classes" },
     { "op": "setSuperclass", "target": "ProtoObject", "value": null },
@@ -53,6 +63,8 @@
     { "op": "setSuperclass", "target": "ClassDescription", "value": "Behavior" },
     { "op": "setSuperclass", "target": "Class", "value": "ClassDescription" },
     { "op": "setSuperclass", "target": "Metaclass", "value": "ClassDescription" },
+    { "op": "setSuperclass", "target": "Array", "value": "Object" },
+    { "op": "setSuperclass", "target": "Symbol", "value": "Object" },
 
     { "comment": "Set superclass chain for metaclasses" },
     { "op": "setSuperclass", "target": "ProtoObjectClass", "value": "Class" },
@@ -61,7 +73,9 @@
     { "op": "setSuperclass", "target": "BehaviorClass", "value": "ObjectClass" },
     { "op": "setSuperclass", "target": "ClassDescriptionClass", "value": "BehaviorClass" },
     { "op": "setSuperclass", "target": "ClassClass", "value": "ClassDescriptionClass" },
-    { "op": "setSuperclass", "target": "MetaclassClass", "value": "MetaclassClass" },
+    { "op": "setSuperclass", "target": "MetaclassClass", "value": "ClassDescriptionClass" },
+    { "op": "setSuperclass", "target": "ArrayClass", "value": "ObjectClass" },
+    { "op": "setSuperclass", "target": "SymbolClass", "value": "ObjectClass" },
 
     { "comment": "Set instance variables" },
     { "op": "setInstanceVariables", "target": "Behavior", "value": ["superclass", "methodDict", "format"] },

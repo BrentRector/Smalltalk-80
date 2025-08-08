@@ -1,37 +1,46 @@
 {
   "phase": "2",
   "description": "Messaging infrastructure with explicit object creation and ID references",
+  "comments": [
+    "IMPORTANT: Array must be created FIRST before any other classes that have instance variables.",
+    "This is because the instance variable lists are stored as Array objects, and need the Array",
+    "class to exist when they are created. Otherwise they will have no class pointer.",
+    "",
+    "IMPORTANT: String must be created BEFORE Symbol since Symbol inherits from String.",
+    "If Symbol is processed first, it won't be able to set String as its superclass."
+  ],
   "classes": [
     {
-      "name": "Symbol",
-      "superclass": "ProtoObject",
-      "instanceVariables": ["value"]
+      "name": "Array",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "variableSize": true
     },
     {
       "name": "String",
-      "superclass": "ProtoObject",
-      "instanceVariables": ["characters"]
+      "superclass": "Object",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "Symbol",
+      "superclass": "String",
+      "instanceVariables": []
     },
     {
       "name": "Message",
-      "superclass": "ProtoObject",
+      "superclass": "Object",
       "instanceVariables": ["selector", "arguments"]
     },
     {
       "name": "CompiledMethod",
-      "superclass": "ProtoObject",
+      "superclass": "Object",
       "instanceVariables": ["selector", "bytecode", "literals", "header"]
     },
     {
       "name": "MethodContext",
-      "superclass": "ProtoObject",
+      "superclass": "Object",
       "instanceVariables": ["sender", "receiver", "method", "arguments", "pc", "stackPointer"]
-    },
-    {
-      "name": "Array",
-      "superclass": "ProtoObject",
-      "instanceVariables": [],
-      "variableSize": true
     },
     {
       "name": "ByteArray",
@@ -40,9 +49,33 @@
       "variableSize": true
     },
     {
+      "name": "Behavior",
+      "superclass": "Object",
+      "instanceVariables": ["superclass", "methodDict", "format"]
+    },
+    {
+      "name": "Set",
+      "superclass": "Object",
+      "instanceVariables": ["tally"],
+      "variableSize": true
+    },
+    {
+      "name": "Dictionary", 
+      "superclass": "Set",
+      "instanceVariables": [],
+      "variableSize": true
+    },
+    {
+      "name": "IdentityDictionary",
+      "superclass": "Dictionary", 
+      "instanceVariables": ["valueArray"],
+      "variableSize": true
+    },
+    {
       "name": "MethodDictionary",
-      "superclass": "ProtoObject",
-      "instanceVariables": ["keys", "values"]
+      "superclass": "IdentityDictionary",
+      "instanceVariables": [],
+      "variableSize": true
     }
   ],
   "objects": [
@@ -103,29 +136,100 @@
       }
     },
     {
-      "id": "bytecode_returnIvar0",
-      "class": "ByteArray",
-      "elements": [0, 124]
+      "id": "sym_new",
+      "class": "Symbol",
+      "fields": {
+        "value": "new"
+      }
     },
     {
-      "id": "bytecode_returnIvar1",
+      "id": "sym_setTally",
+      "class": "Symbol",
+      "fields": {
+        "value": "setTally"
+      }
+    },
+    {
+      "id": "sym_findKeyOrNil",
+      "class": "Symbol",
+      "fields": {
+        "value": "findKeyOrNil:"
+      }
+    },
+    {
+      "id": "sym_fullCheck",
+      "class": "Symbol",
+      "fields": {
+        "value": "fullCheck"
+      }
+    },
+    {
+      "id": "sym_grow",
+      "class": "Symbol",
+      "fields": {
+        "value": "grow"
+      }
+    },
+    {
+      "id": "bytecode_returnIvar0",
       "class": "ByteArray",
-      "elements": [1, 124]
+      "elements": [0, 180]
+    },
+    {
+      "id": "bytecode_returnIvar1", 
+      "class": "ByteArray",
+      "elements": [1, 180]
     },
     {
       "id": "bytecode_returnSelf",
       "class": "ByteArray",
-      "elements": [112, 124]
+      "elements": [176]
     },
     {
       "id": "bytecode_messageDispatch",
       "class": "ByteArray",
-      "elements": [16, 17, 18, 131, 96, 124]
+      "elements": [16, 17, 18, 131, 96, 180]
     },
     {
       "id": "bytecode_primitive",
       "class": "ByteArray",
-      "elements": [112, 124]
+      "elements": [176]
+    },
+    {
+      "id": "bytecode_behavior_new",
+      "class": "ByteArray",
+      "elements": [176],
+      "comment": "new -> primitive 70 (basicNew)"
+    },
+    {
+      "id": "bytecode_dict_new",
+      "class": "ByteArray",
+      "elements": [16, 131, 0, 176],
+      "comment": "new: size -> self basicNew: size"
+    },
+    {
+      "id": "bytecode_dict_setTally",
+      "class": "ByteArray", 
+      "elements": [32, 97, 176],
+      "comment": "setTally -> tally := 0, return self"
+    },
+    {
+      "id": "bytecode_dict_atPut",
+      "class": "ByteArray",
+      "elements": [16, 17, 131, 1, 180],
+      "comment": "at:put: -> delegate to primitive, return value"
+    },
+    {
+      "id": "bytecode_dict_at",
+      "class": "ByteArray",
+      "elements": [16, 131, 2, 180],
+      "comment": "at: -> delegate to primitive"
+    },
+    {
+      "id": "bytecode_dict_fullCheck",
+      "class": "ByteArray",
+      "elements": [176],
+      "comment": "fullCheck -> return self (simplified)"
     },
     {
       "id": "literals_empty",
@@ -243,6 +347,66 @@
       }
     },
     {
+      "id": "method_dict_new",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_new",
+        "bytecode": "bytecode_dict_new",
+        "literals": "literals_empty",
+        "header": 1
+      }
+    },
+    {
+      "id": "method_dict_setTally",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_setTally",
+        "bytecode": "bytecode_dict_setTally",
+        "literals": "literals_empty",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_dict_atPut",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_atPut",
+        "bytecode": "bytecode_dict_atPut",
+        "literals": "literals_empty",
+        "header": 2
+      }
+    },
+    {
+      "id": "method_dict_at",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_at",
+        "bytecode": "bytecode_dict_at", 
+        "literals": "literals_empty",
+        "header": 1
+      }
+    },
+    {
+      "id": "method_dict_fullCheck",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_fullCheck",
+        "bytecode": "bytecode_dict_fullCheck",
+        "literals": "literals_empty",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_behavior_new",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_new",
+        "bytecode": "bytecode_behavior_new",
+        "literals": "literals_empty",
+        "header": 70
+      }
+    },
+    {
       "id": "sym_value",
       "class": "Symbol",
       "fields": {
@@ -296,6 +460,54 @@
         "keys": ["sym_at", "sym_atPut", "sym_size"],
         "values": ["method_array_at", "method_array_atPut", "method_array_size"]
       }
+    },
+    {
+      "id": "methodDict_Set",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_setTally", "sym_fullCheck"],
+        "values": ["method_dict_setTally", "method_dict_fullCheck"]
+      }
+    },
+    {
+      "id": "methodDict_Dictionary",
+      "class": "MethodDictionary", 
+      "fields": {
+        "keys": ["sym_atPut", "sym_at"],
+        "values": ["method_dict_atPut", "method_dict_at"]
+      }
+    },
+    {
+      "id": "methodDict_IdentityDictionary",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_atPut", "sym_at"],
+        "values": ["method_dict_atPut", "method_dict_at"]
+      }
+    },
+    {
+      "id": "methodDict_MethodDictionary", 
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_atPut", "sym_at"],
+        "values": ["method_dict_atPut", "method_dict_at"]
+      }
+    },
+    {
+      "id": "methodDict_BehaviorClass",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_new"],
+        "values": ["method_behavior_new"]
+      }
+    },
+    {
+      "id": "methodDict_ObjectClass",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_new"],
+        "values": ["method_behavior_new"]
+      }
     }
   ],
   "patches": [
@@ -328,6 +540,36 @@
       "target": "Array",
       "slot": "methodDict",
       "value": "methodDict_Array"
+    },
+    {
+      "target": "Set",
+      "slot": "methodDict",
+      "value": "methodDict_Set"
+    },
+    {
+      "target": "Dictionary",
+      "slot": "methodDict",
+      "value": "methodDict_Dictionary"
+    },
+    {
+      "target": "IdentityDictionary",
+      "slot": "methodDict",
+      "value": "methodDict_IdentityDictionary"
+    },
+    {
+      "target": "MethodDictionary",
+      "slot": "methodDict",
+      "value": "methodDict_MethodDictionary"
+    },
+    {
+      "target": "BehaviorClass",
+      "slot": "methodDict",
+      "value": "methodDict_BehaviorClass"
+    },
+    {
+      "target": "ObjectClass",
+      "slot": "methodDict",
+      "value": "methodDict_ObjectClass"
     }
   ]
 }

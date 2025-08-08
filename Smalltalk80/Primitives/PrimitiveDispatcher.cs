@@ -147,9 +147,12 @@ public static class Primitives
         // [149] = FileSystemPrimitives.FileExists,
         // [150] = FileSystemPrimitives.DeleteFile,
         // [151] = FileSystemPrimitives.RenameFile,
-        // [152] = FileSystemPrimitives.GetFileModificationTime,
-        // [153] = FileSystemPrimitives.GetFileModificationTime,
-        // [154] = FileSystemPrimitives.CreateDirectory,
+        
+        // Control flow primitives
+        [152] = ControlPrimitives.IfTrue,
+        [153] = ControlPrimitives.IfFalse,
+        [154] = ControlPrimitives.WhileTrue,
+        
         // [155] = FileSystemPrimitives.DeleteFile,
         // [156] = FileSystemPrimitives.IsDirectory,
         // [157] = FileSystemPrimitives.GetDirectoryEntries,
@@ -160,6 +163,17 @@ public static class Primitives
 
         // Character creation primitive temporarily disabled
         // [170] = ArrayPrimitives.CharacterFromValue,
+        
+        // Additional control primitives
+        [201] = ControlPrimitives.BlockValue,
+        
+        // Bootstrap primitives for class creation and method installation
+        [170] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateSubclass,
+        [171] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethod,
+        [172] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethodClassified,
+        [173] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
+        [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
+        [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
     };
 
     static Primitives()

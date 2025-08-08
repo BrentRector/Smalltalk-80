@@ -75,7 +75,7 @@ public static class BytecodeAssembler
             map[$"push_temp_{i}"] = (Bytecode)(16 + i);
         }
 
-        map["return"] = Bytecode.ReturnTopFromMethod;
+        map["return"] = Bytecode.ReturnTop;
         return map;
     }
 

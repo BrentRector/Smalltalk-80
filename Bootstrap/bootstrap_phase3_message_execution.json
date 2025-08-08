@@ -1,0 +1,267 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "phase": "3",
+  "description": "Message execution infrastructure - transitions from structural to behavioral",
+  "comments": [
+    "Phase 3 introduces the ability to actually execute Smalltalk methods.",
+    "It adds method lookup, message sending via perform:, and bytecode execution.",
+    "This enables the VM to run Smalltalk code dynamically."
+  ],
+  "classes": [],
+  "objects": [
+    {
+      "comment": "Symbols for new methods",
+      "id": "sym_lookupSelector",
+      "class": "Symbol",
+      "fields": { "value": "lookupSelector:" }
+    },
+    {
+      "id": "sym_perform",
+      "class": "Symbol",
+      "fields": { "value": "perform:" }
+    },
+    {
+      "id": "sym_performWithArguments",
+      "class": "Symbol",
+      "fields": { "value": "perform:withArguments:" }
+    },
+    {
+      "id": "sym_doesNotUnderstand",
+      "class": "Symbol",
+      "fields": { "value": "doesNotUnderstand:" }
+    },
+    {
+      "id": "sym_canUnderstand",
+      "class": "Symbol",
+      "fields": { "value": "canUnderstand:" }
+    },
+    {
+      "id": "sym_run",
+      "class": "Symbol",
+      "fields": { "value": "run" }
+    },
+    {
+      "id": "sym_printString",
+      "class": "Symbol",
+      "fields": { "value": "printString" }
+    },
+    
+    {
+      "comment": "Bytecode for lookupSelector: - searches methodDict",
+      "id": "bytecode_lookupSelector",
+      "class": "ByteArray",
+      "elements": [
+        1,    
+        176,  
+        16,   
+        224,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for canUnderstand: - checks if selector is in methodDict",
+      "id": "bytecode_canUnderstand",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        131, 96,
+        172, 4,
+        121,  
+        122   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for doesNotUnderstand: - error handling",
+      "id": "bytecode_doesNotUnderstand",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        224,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for perform: - single argument message send",
+      "id": "bytecode_perform",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for run - simple test method",
+      "id": "bytecode_run",
+      "class": "ByteArray",
+      "elements": [
+        32,   
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for printString - returns a string representation",
+      "id": "bytecode_printString",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        194,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Literals for methods",
+      "id": "literals_empty",
+      "class": "Array",
+      "elements": []
+    },
+    {
+      "id": "literals_lookupSelector",
+      "class": "Array",
+      "elements": ["sym_lookupSelector"]
+    },
+    {
+      "id": "literals_run",
+      "class": "Array",
+      "elements": ["#TestRun"]
+    },
+    {
+      "id": "literals_printString",
+      "class": "Array",
+      "elements": ["sym_printString"]
+    },
+    
+    {
+      "comment": "CompiledMethods for Class",
+      "id": "method_class_lookupSelector",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_lookupSelector",
+        "bytecode": "bytecode_lookupSelector",
+        "literals": "literals_lookupSelector",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_class_canUnderstand",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_canUnderstand",
+        "bytecode": "bytecode_canUnderstand",
+        "literals": "literals_empty",
+        "header": 0
+      }
+    },
+    
+    {
+      "comment": "CompiledMethods for Object",
+      "id": "method_object_perform",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_perform",
+        "bytecode": "bytecode_perform",
+        "literals": "literals_empty",
+        "header": 183
+      }
+    },
+    {
+      "id": "method_object_performWithArguments",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_performWithArguments",
+        "bytecode": "literals_empty",
+        "literals": "literals_empty",
+        "header": 184
+      }
+    },
+    {
+      "id": "method_object_doesNotUnderstand",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_doesNotUnderstand",
+        "bytecode": "bytecode_doesNotUnderstand",
+        "literals": "literals_empty",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_object_run",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_run",
+        "bytecode": "bytecode_run",
+        "literals": "literals_run",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_object_printString",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_printString",
+        "bytecode": "bytecode_printString",
+        "literals": "literals_printString",
+        "header": 0
+      }
+    },
+    
+    {
+      "comment": "Method dictionaries with new methods",
+      "id": "methodDict_Class_Phase3",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_lookupSelector", "sym_canUnderstand"],
+        "values": ["method_class_lookupSelector", "method_class_canUnderstand"]
+      }
+    },
+    {
+      "id": "methodDict_Object_Phase3",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_perform", "sym_performWithArguments", "sym_doesNotUnderstand", "sym_run", "sym_printString"],
+        "values": ["method_object_perform", "method_object_performWithArguments", "method_object_doesNotUnderstand", "method_object_run", "method_object_printString"]
+      }
+    }
+  ],
+  "patches": [
+    {
+      "comment": "Install method dictionaries",
+      "target": "Class",
+      "slot": "methodDict",
+      "value": "methodDict_Class_Phase3"
+    },
+    {
+      "target": "Behavior",
+      "slot": "methodDict",
+      "value": "methodDict_Class_Phase3"
+    },
+    {
+      "target": "Object",
+      "slot": "methodDict",
+      "value": "methodDict_Object_Phase3"
+    }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "Object has perform: method",
+        "test": "Object.methodDict.includes(#perform:)"
+      },
+      {
+        "description": "Class can lookup selectors",
+        "test": "Class.methodDict.includes(#lookupSelector:)"
+      },
+      {
+        "description": "Object can handle doesNotUnderstand:",
+        "test": "Object.methodDict.includes(#doesNotUnderstand:)"
+      }
+    ]
+  }
+}

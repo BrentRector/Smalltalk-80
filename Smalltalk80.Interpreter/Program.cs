@@ -19,8 +19,8 @@ public class Program
         {
             Console.WriteLine("Initializing Virtual Machine...");
             
-            // Create the VM with bootstrap only (no standard library for now)
-            var vm = new VirtualMachine(skipStandardLibrary: true);
+            // Create the VM with full bootstrap including Phase 3
+            var vm = new VirtualMachine(skipStandardLibrary: false);
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();

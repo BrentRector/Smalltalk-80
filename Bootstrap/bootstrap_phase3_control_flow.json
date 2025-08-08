@@ -1,0 +1,402 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "phase": "3",
+  "description": "Control flow infrastructure - adds BlockClosure, method lookup, and conditional execution",
+  "comments": [
+    "Phase 3 Part B: Control flow and block execution",
+    "Defines bytecode 10 for method lookup",
+    "Implements ifTrue:, whileTrue: control structures",
+    "Adds BlockClosure for deferred execution"
+  ],
+  "classes": [
+    {
+      "name": "BlockClosure",
+      "superclass": "Object",
+      "instanceVariables": ["method", "outerContext", "copiedValues"],
+      "classVariables": [],
+      "category": "Kernel-Methods"
+    },
+    {
+      "name": "MethodContext", 
+      "superclass": "Object",
+      "instanceVariables": ["sender", "receiver", "method", "arguments", "pc", "stackPointer", "stack", "temporaries"],
+      "classVariables": [],
+      "category": "Kernel-Methods"
+    }
+  ],
+  "objects": [
+    {
+      "comment": "Symbols for control flow methods",
+      "id": "sym_ifTrue",
+      "class": "Symbol",
+      "fields": { "value": "ifTrue:" }
+    },
+    {
+      "id": "sym_ifFalse",
+      "class": "Symbol", 
+      "fields": { "value": "ifFalse:" }
+    },
+    {
+      "id": "sym_ifTrueIfFalse",
+      "class": "Symbol",
+      "fields": { "value": "ifTrue:ifFalse:" }
+    },
+    {
+      "id": "sym_whileTrue",
+      "class": "Symbol",
+      "fields": { "value": "whileTrue:" }
+    },
+    {
+      "id": "sym_whileFalse",
+      "class": "Symbol",
+      "fields": { "value": "whileFalse:" }
+    },
+    {
+      "id": "sym_value",
+      "class": "Symbol",
+      "fields": { "value": "value" }
+    },
+    {
+      "id": "sym_valueWithArguments",
+      "class": "Symbol",
+      "fields": { "value": "value:withArguments:" }
+    },
+    {
+      "id": "sym_lessThan",
+      "class": "Symbol",
+      "fields": { "value": "<" }
+    },
+    {
+      "id": "sym_greaterThan",
+      "class": "Symbol",
+      "fields": { "value": ">" }
+    },
+    {
+      "id": "sym_equals",
+      "class": "Symbol",
+      "fields": { "value": "=" }
+    },
+    
+    {
+      "comment": "Bytecode for method lookup - opcode 10",
+      "id": "bytecode_lookupMethod",
+      "class": "ByteArray",
+      "elements": [
+        10,   
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for ifTrue: - uses primitive 152",
+      "id": "bytecode_ifTrue",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        135, 152,
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for ifFalse: - uses primitive 153",
+      "id": "bytecode_ifFalse",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        135, 153,
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for whileTrue: - uses primitive 154",
+      "id": "bytecode_whileTrue",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        135, 154,
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for BlockClosure>>value - uses primitive 201",
+      "id": "bytecode_blockValue",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Bytecode for < comparison - uses primitive 3",
+      "id": "bytecode_lessThan",
+      "class": "ByteArray",
+      "elements": [
+        112,  
+        16,   
+        176,  
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Sample block: [ 'Hello' ]",
+      "id": "bytecode_helloBlock",
+      "class": "ByteArray",
+      "elements": [
+        33,   
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Sample block: [ counter := counter + 1 ]",
+      "id": "bytecode_incrementBlock",
+      "class": "ByteArray",
+      "elements": [
+        64,   
+        118,  
+        176,  
+        129, 64,
+        124   
+      ]
+    },
+    
+    {
+      "comment": "Literals for methods",
+      "id": "literals_empty",
+      "class": "Array",
+      "elements": []
+    },
+    {
+      "id": "literals_hello",
+      "class": "Array",
+      "elements": ["#Hello"]
+    },
+    {
+      "id": "literals_counter",
+      "class": "Array",
+      "elements": ["#counter"]
+    },
+    
+    {
+      "comment": "CompiledMethods for Boolean",
+      "id": "method_boolean_ifTrue",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_ifTrue",
+        "bytecode": "bytecode_ifTrue",
+        "literals": "literals_empty",
+        "header": 152
+      }
+    },
+    {
+      "id": "method_boolean_ifFalse",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_ifFalse",
+        "bytecode": "bytecode_ifFalse",
+        "literals": "literals_empty",
+        "header": 153
+      }
+    },
+    
+    {
+      "comment": "CompiledMethods for BlockClosure",
+      "id": "method_block_value",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_value",
+        "bytecode": "bytecode_blockValue",
+        "literals": "literals_empty",
+        "header": 201
+      }
+    },
+    {
+      "id": "method_block_whileTrue",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_whileTrue",
+        "bytecode": "bytecode_whileTrue",
+        "literals": "literals_empty",
+        "header": 154
+      }
+    },
+    
+    {
+      "comment": "CompiledMethods for Integer",
+      "id": "method_integer_lessThan",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_lessThan",
+        "bytecode": "bytecode_lessThan",
+        "literals": "literals_empty",
+        "header": 3
+      }
+    },
+    
+    {
+      "comment": "Sample BlockClosure objects",
+      "id": "helloBlock",
+      "class": "BlockClosure",
+      "fields": {
+        "method": "method_helloBlock",
+        "outerContext": "nil",
+        "copiedValues": "literals_empty"
+      }
+    },
+    {
+      "id": "incrementBlock",
+      "class": "BlockClosure",
+      "fields": {
+        "method": "method_incrementBlock",
+        "outerContext": "nil",
+        "copiedValues": "literals_empty"
+      }
+    },
+    
+    {
+      "comment": "CompiledMethod for hello block",
+      "id": "method_helloBlock",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_value",
+        "bytecode": "bytecode_helloBlock",
+        "literals": "literals_hello",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_incrementBlock",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_value",
+        "bytecode": "bytecode_incrementBlock",
+        "literals": "literals_counter",
+        "header": 0
+      }
+    },
+    
+    {
+      "comment": "Method dictionaries with control flow methods",
+      "id": "methodDict_Boolean_Phase3",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_ifTrue", "sym_ifFalse"],
+        "values": ["method_boolean_ifTrue", "method_boolean_ifFalse"]
+      }
+    },
+    {
+      "id": "methodDict_BlockClosure_Phase3",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_value", "sym_whileTrue"],
+        "values": ["method_block_value", "method_block_whileTrue"]
+      }
+    },
+    {
+      "id": "methodDict_Integer_Phase3",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_lessThan"],
+        "values": ["method_integer_lessThan"]
+      }
+    },
+    
+    {
+      "comment": "Sample run method that uses control flow",
+      "id": "bytecode_run",
+      "class": "ByteArray",
+      "elements": [
+        113,  
+        137,  
+        16,   
+        225,  
+        135, 152,
+        115,  
+        129, 64,
+        137,  
+        64,   
+        32,   
+        178,  
+        172, 8,
+        64,   
+        118,  
+        176,  
+        129, 64,
+        163, 240,
+        120   
+      ]
+    },
+    {
+      "id": "literals_run",
+      "class": "Array",
+      "elements": ["helloBlock", "#counter", 3]
+    },
+    {
+      "id": "method_run",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "#run",
+        "bytecode": "bytecode_run",
+        "literals": "literals_run",
+        "header": 0
+      }
+    }
+  ],
+  "patches": [
+    {
+      "comment": "Install method dictionaries",
+      "target": "Boolean",
+      "slot": "methodDict",
+      "value": "methodDict_Boolean_Phase3"
+    },
+    {
+      "target": "True",
+      "slot": "methodDict",
+      "value": "methodDict_Boolean_Phase3"
+    },
+    {
+      "target": "False",
+      "slot": "methodDict",
+      "value": "methodDict_Boolean_Phase3"
+    },
+    {
+      "target": "BlockClosure",
+      "slot": "methodDict",
+      "value": "methodDict_BlockClosure_Phase3"
+    },
+    {
+      "target": "Integer",
+      "slot": "methodDict",
+      "value": "methodDict_Integer_Phase3"
+    },
+    {
+      "target": "SmallInteger",
+      "slot": "methodDict",
+      "value": "methodDict_Integer_Phase3"
+    }
+  ],
+  "validation": {
+    "checkpoints": [
+      {
+        "description": "Boolean has ifTrue: method",
+        "test": "Boolean.methodDict.includes(#ifTrue:)"
+      },
+      {
+        "description": "BlockClosure has value method",
+        "test": "BlockClosure.methodDict.includes(#value)"
+      },
+      {
+        "description": "Integer has < method",
+        "test": "Integer.methodDict.includes(#<)"
+      }
+    ]
+  }
+}

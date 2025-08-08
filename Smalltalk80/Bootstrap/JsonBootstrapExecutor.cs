@@ -97,6 +97,16 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
+    /// Execute Phase 3 bootstrap from JSON content.
+    /// </summary>
+    public void ExecutePhase3(string jsonContent)
+    {
+        // Phase 3 uses a different executor for message-driven bootstrap
+        var phase3Executor = new Phase3Executor(vm);
+        phase3Executor.ExecuteManifest(jsonContent);
+    }
+    
+    /// <summary>
     /// Execute a single bootstrap operation.
     /// </summary>
     private void ExecuteOperation(BootstrapOperation operation)
@@ -691,7 +701,7 @@ public class JsonBootstrapExecutor
             vm.PrimitiveSetClass(arrayOop, byteArrayClassOop);
         }
         
-        // Store bytes
+        // Store bytes as SmallInteger objects
         for (int i = 0; i < elements.Count; i++)
         {
             int value = 0;
@@ -703,7 +713,9 @@ public class JsonBootstrapExecutor
             {
                 value = intValue;
             }
-            vm.PrimitiveArrayAtPut(arrayOop, i, value);
+            // Create a SmallInteger object for the byte value
+            var smallIntOop = vm.PrimitiveNewSmallInteger(value);
+            vm.PrimitiveArrayAtPut(arrayOop, i, smallIntOop);
         }
         
         return arrayOop;
@@ -798,7 +810,9 @@ public class JsonBootstrapExecutor
                 {
                     header = intValue;
                 }
-                vm.PrimitiveSetSlot(methodOop, 3, header);
+                // Create a SmallInteger object for the header
+                var headerOop = vm.PrimitiveNewSmallInteger(header);
+                vm.PrimitiveSetSlot(methodOop, 3, headerOop);
             }
         }
         
@@ -925,19 +939,45 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Create a class defined in Phase 2.
+    /// Create or update a class defined in Phase 2.
     /// </summary>
     private void CreatePhase2Class(Phase2ClassDefinition classDef)
     {
         if (string.IsNullOrEmpty(classDef.Name))
             throw new InvalidOperationException("Class definition requires a name");
             
-        Console.WriteLine($"[BOOTSTRAP] Creating class '{classDef.Name}'");
+        // Check if the class already exists (from Phase 1)
+        int classOop = vm.PrimitiveLookupClass(classDef.Name);
+        int metaclassOop = 0;
+        var metaclassName = $"{classDef.Name}Class";
+        bool isNewClass = classOop < 0;
         
-        // Create the class object
-        var classOop = vm.PrimitiveNewClass();
-        namedObjects[classDef.Name] = classOop;
-        vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
+        if (isNewClass)
+        {
+            // Class doesn't exist, create it
+            Console.WriteLine($"[BOOTSTRAP] Creating class '{classDef.Name}'");
+            classOop = vm.PrimitiveNewClass();
+            namedObjects[classDef.Name] = classOop;
+            vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
+            
+            // Create the metaclass
+            metaclassOop = vm.PrimitiveNewMetaclass();
+            namedObjects[metaclassName] = metaclassOop;
+            vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
+        }
+        else
+        {
+            // Class exists, enhance it
+            Console.WriteLine($"[BOOTSTRAP] Enhancing existing class '{classDef.Name}'");
+            namedObjects[classDef.Name] = classOop;
+            
+            // Get the existing metaclass
+            metaclassOop = vm.PrimitiveLookupClass(metaclassName);
+            if (metaclassOop > 0)
+            {
+                namedObjects[metaclassName] = metaclassOop;
+            }
+        }
         
         // Mark variable-sized classes (Array, ByteArray, etc.)
         if (classDef.VariableSize)
@@ -947,50 +987,75 @@ public class JsonBootstrapExecutor
             vm.PrimitiveSetSlot(classOop, 2, 2); // 2 = words indexable
         }
         
-        // Create the metaclass
-        var metaclassName = $"{classDef.Name}Class";
-        var metaclassOop = vm.PrimitiveNewMetaclass();
-        namedObjects[metaclassName] = metaclassOop;
-        vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
-        
-        // Set class pointer for the class
-        vm.PrimitiveSetClass(classOop, metaclassOop);
-        
-        // Set metaclass's class to Metaclass
-        // First try namedObjects, then look it up from VM
-        int metaclassClassOop = 0;
-        if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
+        // Set class pointers only for new classes (existing ones already have them)
+        if (isNewClass)
         {
-            // Found in named objects
-        }
-        else
-        {
-            // Try to get it from the VM's global registry
-            metaclassClassOop = vm.PrimitiveLookupClass("Metaclass");
-        }
-        
-        if (metaclassClassOop > 0)
-        {
-            vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
-        }
-        else
-        {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+            // Set class pointer for the class
+            vm.PrimitiveSetClass(classOop, metaclassOop);
+            
+            // Set metaclass's class to Metaclass
+            // First try namedObjects, then look it up from VM
+            int metaclassClassOop = 0;
+            if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
+            {
+                // Found in named objects
+            }
+            else
+            {
+                // Try to get it from the VM's global registry
+                metaclassClassOop = vm.PrimitiveLookupClass("Metaclass");
+            }
+            
+            if (metaclassClassOop > 0)
+            {
+                vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
+            }
+            else
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+            }
         }
         
         // Set superclass if specified
         if (!string.IsNullOrEmpty(classDef.Superclass))
         {
-            if (namedObjects.TryGetValue(classDef.Superclass, out var superclassOop))
+            // Try namedObjects first, then lookup from VM
+            int superclassOop = 0;
+            if (namedObjects.TryGetValue(classDef.Superclass, out superclassOop))
+            {
+                // Found in named objects
+            }
+            else
+            {
+                // Try to look up from VM (for classes created in Phase 1)
+                superclassOop = vm.PrimitiveLookupClass(classDef.Superclass);
+            }
+            
+            if (superclassOop > 0)
             {
                 vm.PrimitiveSetSlot(classOop, 0, superclassOop); // Slot 0 is superclass
                 
                 // Set metaclass superclass to superclass's metaclass
                 var superMetaclassName = $"{classDef.Superclass}Class";
-                if (namedObjects.TryGetValue(superMetaclassName, out var superMetaclassOop))
+                int superMetaclassOop = 0;
+                if (namedObjects.TryGetValue(superMetaclassName, out superMetaclassOop))
+                {
+                    // Found in named objects
+                }
+                else
+                {
+                    // Try to look up from VM
+                    superMetaclassOop = vm.PrimitiveLookupClass(superMetaclassName);
+                }
+                
+                if (superMetaclassOop > 0)
                 {
                     vm.PrimitiveSetSlot(metaclassOop, 0, superMetaclassOop);
                 }
+            }
+            else
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: Superclass '{classDef.Superclass}' not found for '{classDef.Name}'");
             }
         }
         
@@ -1021,8 +1086,13 @@ public class JsonBootstrapExecutor
             
         if (!namedObjects.TryGetValue(patch.Target, out var targetOop))
         {
-            Console.WriteLine($"[BOOTSTRAP] Warning: Patch target '{patch.Target}' not found");
-            return;
+            // Try to look up from VM (for classes created in Phase 1)
+            targetOop = vm.PrimitiveLookupClass(patch.Target);
+            if (targetOop < 0)
+            {
+                Console.WriteLine($"[BOOTSTRAP] Warning: Patch target '{patch.Target}' not found");
+                return;
+            }
         }
         
         // Determine the slot index

@@ -134,13 +134,32 @@ public sealed class VirtualMachine
     }
     
     /// <summary>
-    /// Executes Phase 3 bootstrap: Standard library loading.
+    /// Executes Phase 3 bootstrap: Standard library loading or JSON manifest execution.
     /// </summary>
     private void ExecutePhase3Bootstrap(string bootstrapDir)
     {
-        Console.WriteLine("[BOOTSTRAP] Phase 3: Standard library loading...");
+        Console.WriteLine("[BOOTSTRAP] Phase 3: Message-driven class construction...");
         
-        // Look for HeadlessStandardLibrary.st first, then StandardLibrary.st
+        // First check for Phase 3 JSON manifests
+        var phase3TestPath = Path.Combine(bootstrapDir, "bootstrap_phase3_test_greeter.json");
+        if (File.Exists(phase3TestPath))
+        {
+            Console.WriteLine("[BOOTSTRAP] Found Phase 3 test manifest: bootstrap_phase3_test_greeter.json");
+            var jsonContent = File.ReadAllText(phase3TestPath);
+            
+            if (bootstrapAdapter == null)
+            {
+                throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
+            }
+            
+            var phase3Executor = new Phase3Executor(bootstrapAdapter);
+            phase3Executor.ExecuteManifest(jsonContent);
+            
+            Console.WriteLine("[BOOTSTRAP] Phase 3 test manifest executed");
+            return;
+        }
+        
+        // Fall back to loading Smalltalk source files
         var libraryDir = Path.GetDirectoryName(bootstrapDir) ?? "";
         var headlessLibraryPath = Path.Combine(libraryDir, "HeadlessStandardLibrary.st");
         var standardLibraryPath = Path.Combine(libraryDir, "StandardLibrary.st");
@@ -412,8 +431,8 @@ public sealed class VirtualMachine
         var oop = obj.Oop;
         var fieldCount = obj.Fields.Length;
         
-        // Use objName if available (it's already properly formatted), otherwise use className
-        var displayName = objName ?? className;
+        // Use objName if available (it's already properly formatted), otherwise show as instance of className
+        var displayName = objName ?? $"a {className}";
         Console.WriteLine($"{indent}🔸 {objectType} #{oop}: {displayName} ({fieldCount} fields)");
         
         // Show class pointer info
@@ -580,7 +599,11 @@ public sealed class VirtualMachine
                     }
                 }
             }
-            return $"SmalltalkObject #{fieldObj.Oop}: {fieldClassName}";
+            
+            // For non-global objects, show them more clearly
+            // Use "a/an" article for instances
+            string article = "aeiouAEIOU".Contains(fieldClassName[0]) ? "an" : "a";
+            return $"{article} {fieldClassName} @ #{fieldObj.Oop}";
         }
         
         if (field is string str)

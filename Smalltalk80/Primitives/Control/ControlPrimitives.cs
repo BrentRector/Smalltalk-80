@@ -186,6 +186,123 @@ public static class ControlPrimitives
     }
 
     /// <summary>
+    /// Primitive 152: Implements ifTrue: for Boolean objects.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    public static bool IfTrue(Context ctx)
+    {
+        // Pop the block argument
+        if (ctx.Stack.Pop() is not BlockContext block)
+            return false;
+            
+        // Pop the receiver (should be a Boolean)
+        var receiver = ctx.Stack.Pop();
+        
+        // Check if receiver is true
+        if (receiver is bool boolValue && boolValue)
+        {
+            // Execute the block
+            var exec = BlockContext.Create(block.HomeContext, block.StartPC, 0, Array.Empty<object?>(), ctx);
+            var interpreter = new Interpreter { ExitOnReturn = false };
+            var result = interpreter.Evaluate(exec);
+            ctx.Stack.Push(result);
+        }
+        else
+        {
+            // Push nil if false
+            ctx.Stack.Push(null);
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// Primitive 153: Implements ifFalse: for Boolean objects.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    public static bool IfFalse(Context ctx)
+    {
+        // Pop the block argument
+        if (ctx.Stack.Pop() is not BlockContext block)
+            return false;
+            
+        // Pop the receiver (should be a Boolean)
+        var receiver = ctx.Stack.Pop();
+        
+        // Check if receiver is false
+        if (receiver is bool boolValue && !boolValue)
+        {
+            // Execute the block
+            var exec = BlockContext.Create(block.HomeContext, block.StartPC, 0, Array.Empty<object?>(), ctx);
+            var interpreter = new Interpreter { ExitOnReturn = false };
+            var result = interpreter.Evaluate(exec);
+            ctx.Stack.Push(result);
+        }
+        else
+        {
+            // Push nil if true
+            ctx.Stack.Push(null);
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// Primitive 154: Implements whileTrue: for BlockClosure objects.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    public static bool WhileTrue(Context ctx)
+    {
+        // Pop the action block
+        if (ctx.Stack.Pop() is not BlockContext actionBlock)
+            return false;
+            
+        // Pop the condition block (receiver)
+        if (ctx.Stack.Pop() is not BlockContext conditionBlock)
+            return false;
+        
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        object? lastResult = null;
+        
+        while (true)
+        {
+            // Evaluate the condition block
+            var condExec = BlockContext.Create(conditionBlock.HomeContext, conditionBlock.StartPC, 0, Array.Empty<object?>(), ctx);
+            var condition = interpreter.Evaluate(condExec);
+            
+            // Check if condition is true
+            if (condition is not bool boolValue || !boolValue)
+                break;
+                
+            // Execute the action block
+            var actionExec = BlockContext.Create(actionBlock.HomeContext, actionBlock.StartPC, 0, Array.Empty<object?>(), ctx);
+            lastResult = interpreter.Evaluate(actionExec);
+        }
+        
+        // Push the last result or nil
+        ctx.Stack.Push(lastResult);
+        return true;
+    }
+    
+    /// <summary>
+    /// Primitive 201: Implements value for BlockClosure objects.
+    /// </summary>
+    /// <param name="ctx">The execution context.</param>
+    public static bool BlockValue(Context ctx)
+    {
+        // The receiver should be a BlockContext
+        if (ctx.Stack.Pop() is not BlockContext block)
+            return false;
+            
+        // Execute the block with no arguments
+        var exec = BlockContext.Create(block.HomeContext, block.StartPC, 0, Array.Empty<object?>(), ctx);
+        var interpreter = new Interpreter { ExitOnReturn = false };
+        var result = interpreter.Evaluate(exec);
+        ctx.Stack.Push(result);
+        return true;
+    }
+
+    /// <summary>
     /// Waits on a semaphore, suspending the active process if necessary.
     /// </summary>
     /// <param name="ctx">The execution context.</param>

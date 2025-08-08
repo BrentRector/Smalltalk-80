@@ -26,6 +26,14 @@ public interface ISmalltalkVM
     int PrimitiveNewInstance(int classId);
 
     /// <summary>
+    /// Get slot value at a specific index.
+    /// </summary>
+    /// <param name="objectId">The OOP of the object.</param>
+    /// <param name="slotIndex">The 0-based slot index.</param>
+    /// <returns>The OOP of the value at the slot, or -1 if not found.</returns>
+    int GetSlot(int objectId, int slotIndex);
+    
+    /// <summary>
     /// Set slot value at a specific index.
     /// </summary>
     /// <param name="objectId">The OOP of the object.</param>
@@ -47,6 +55,13 @@ public interface ISmalltalkVM
     /// <returns>The OOP of the interned symbol.</returns>
     int PrimitiveInternSymbol(string name);
 
+    /// <summary>
+    /// Create a SmallInteger object.
+    /// </summary>
+    /// <param name="value">The integer value.</param>
+    /// <returns>The OOP of the created SmallInteger.</returns>
+    int PrimitiveNewSmallInteger(int value);
+    
     /// <summary>
     /// Create a new array.
     /// </summary>
@@ -75,6 +90,14 @@ public interface ISmalltalkVM
     /// <param name="keyId">The OOP of the key.</param>
     /// <param name="valueId">The OOP of the value.</param>
     void PrimitiveDictionaryAtPut(int dictId, int keyId, int valueId);
+    
+    /// <summary>
+    /// Look up a value in a dictionary by key.
+    /// </summary>
+    /// <param name="dictId">The OOP of the dictionary.</param>
+    /// <param name="keyId">The OOP of the key.</param>
+    /// <returns>The OOP of the value, or -1 if not found.</returns>
+    int PrimitiveDictionaryAt(int dictId, int keyId);
 
     /// <summary>
     /// Compile and install a method in a class.
@@ -116,6 +139,15 @@ public interface ISmalltalkVM
     /// <param name="value">The string value to intern.</param>
     /// <returns>The OOP of the interned string.</returns>
     int PrimitiveInternString(string value);
+    
+    /// <summary>
+    /// Send a message to an object.
+    /// </summary>
+    /// <param name="receiverId">The OOP of the receiver object.</param>
+    /// <param name="selectorId">The OOP of the selector symbol.</param>
+    /// <param name="argumentIds">The OOPs of the arguments.</param>
+    /// <returns>The OOP of the result.</returns>
+    int PrimitiveSendMessage(int receiverId, int selectorId, int[] argumentIds);
     
     /// <summary>
     /// Execute bytecode with receiver and arguments.
