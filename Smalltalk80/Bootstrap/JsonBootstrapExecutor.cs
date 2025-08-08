@@ -907,23 +907,61 @@ public class JsonBootstrapExecutor
             return vm.PrimitiveNewDictionary();
         }
         
-        // Create the dictionary object
-        var dictOop = vm.PrimitiveNewInstance(methodDictClassOop);
+        // MethodDictionary uses parallel arrays structure:
+        // Slot 0: tally
+        // Slots 1..n: keys  
+        // Last slot: valueArray (for the values)
+        
+        int keysCount = 0;
+        if (objDef.Fields != null && objDef.Fields.TryGetValue("keys", out var keysValue))
+        {
+            if (keysValue is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.Array)
+            {
+                keysCount = jsonElem.GetArrayLength();
+            }
+        }
+        
+        // Size needs to be: 1 (tally) + keysCount + 1 (valueArray)
+        int size = Math.Max(16, keysCount + 2); // Minimum size 16 for method dictionary
+        
+        // Create an array with the proper size, then change its class
+        var dictOop = vm.PrimitiveNewArray(size);
+        vm.PrimitiveSetClass(dictOop, methodDictClassOop);
+        
+        // Initialize tally to actual count
+        var tallyOop = vm.PrimitiveNewSmallInteger(keysCount);
+        vm.PrimitiveSetSlot(dictOop, 0, tallyOop);
+        
+        // Initialize all slots to nil
+        var nilOop = vm.PrimitiveNil();
+        for (int i = 1; i < size; i++)
+        {
+            vm.PrimitiveSetSlot(dictOop, i, nilOop);
+        }
         
         if (objDef.Fields != null)
         {
-            // Set keys array (slot 0)
-            if (objDef.Fields.TryGetValue("keys", out var keysValue))
+            // Create and populate keys and values arrays
+            if (objDef.Fields.TryGetValue("keys", out var keysVal) && 
+                objDef.Fields.TryGetValue("values", out var valuesVal))
             {
-                var keysOop = CreateArrayFromValue(keysValue);
-                vm.PrimitiveSetSlot(dictOop, 0, keysOop);
-            }
-            
-            // Set values array (slot 1)
-            if (objDef.Fields.TryGetValue("values", out var valuesValue))
-            {
-                var valuesOop = CreateArrayFromValue(valuesValue);
-                vm.PrimitiveSetSlot(dictOop, 1, valuesOop);
+                var keysArray = CreateArrayFromValue(keysVal);
+                var valuesArray = CreateArrayFromValue(valuesVal);
+                
+                // Copy keys into the base slots (1..keysCount)
+                for (int i = 0; i < keysCount; i++)
+                {
+                    var keyOop = vm.GetSlot(keysArray, i);
+                    if (keyOop < 0)
+                    {
+                        Console.WriteLine($"[BOOTSTRAP] Warning: Could not get key at index {i} from keys array");
+                        continue;
+                    }
+                    vm.PrimitiveSetSlot(dictOop, i + 1, keyOop);
+                }
+                
+                // Set the valueArray in the last slot
+                vm.PrimitiveSetSlot(dictOop, size - 1, valuesArray);
             }
         }
         

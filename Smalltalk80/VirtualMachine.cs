@@ -402,23 +402,8 @@ public sealed class VirtualMachine
             return null;
             
         // Try to look up the class name from the bootstrap adapter's global registry
-        if (bootstrapAdapter != null)
-        {
-            var globals = bootstrapAdapter.GetGlobals();
-            foreach (var (name, oop) in globals)
-            {
-                if (oop == obj.ClassPointer.Oop)
-                {
-                    // Convert naming convention: "FooClass" -> "Foo class" for metaclasses
-                    if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
-                    {
-                        var baseName = name.Substring(0, name.Length - 5);
-                        return $"{baseName} class";
-                    }
-                    return name;
-                }
-            }
-        }
+        // Since we can't iterate globals anymore, we'll just use the OOP-based identifier
+        // This is a limitation of the new API, but acceptable for debugging output
             
         // Since we no longer have SystemDictionary, we'll identify classes by their OOP
         // This is a simplified approach - in a full implementation we'd have a name table
@@ -431,19 +416,9 @@ public sealed class VirtualMachine
     private void DumpSmalltalkObject(SmalltalkObject obj, string indent, string objectType)
     {
         // Check if this object is itself a globally named object
+        // Note: With the new API, we can't enumerate globals to find the name
+        // This is a limitation but acceptable for debugging output
         string? objName = null;
-        if (bootstrapAdapter != null)
-        {
-            var globals = bootstrapAdapter.GetGlobals();
-            foreach (var (name, globalOop) in globals)
-            {
-                if (globalOop == obj.Oop)
-                {
-                    objName = name;
-                    break;
-                }
-            }
-        }
         
         // Convert naming convention: "FooClass" -> "Foo class"
         if (objName != null && objName.EndsWith("Class") && objName != "Class" && objName != "Metaclass")
@@ -515,23 +490,8 @@ public sealed class VirtualMachine
             var classPointerName = GetObjectClassName(obj.ClassPointer);
             
             // Check if the class pointer itself is registered as a metaclass
-            if (bootstrapAdapter != null)
-            {
-                var globals = bootstrapAdapter.GetGlobals();
-                foreach (var (name, globalOop) in globals)
-                {
-                    if (globalOop == obj.ClassPointer.Oop)
-                    {
-                        // Found the class pointer in globals
-                        if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
-                        {
-                            // It's a metaclass (e.g., SymbolClass)
-                            isClass = true;
-                            break;
-                        }
-                    }
-                }
-            }
+            // Note: Without the ability to enumerate globals, we can't determine this
+            // This is a limitation of the new API
             
             if (!isClass && classPointerName == "Metaclass")
             {
@@ -606,24 +566,8 @@ public sealed class VirtualMachine
             }
             
             // Check if this object itself is registered as a class
-            if (bootstrapAdapter != null)
-            {
-                var globals = bootstrapAdapter.GetGlobals();
-                foreach (var (name, globalOop) in globals)
-                {
-                    if (globalOop == fieldObj.Oop)
-                    {
-                        // Convert naming convention: "FooClass" -> "Foo class"
-                        var displayName = name;
-                        if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
-                        {
-                            var baseName = name.Substring(0, name.Length - 5);
-                            displayName = $"{baseName} class";
-                        }
-                        return $"{displayName} (OOP #{fieldObj.Oop})";
-                    }
-                }
-            }
+            // Note: Without the ability to enumerate globals, we can't find the name
+            // This is a limitation of the new API
             
             // For non-global objects, show them more clearly
             // Use "a/an" article for instances

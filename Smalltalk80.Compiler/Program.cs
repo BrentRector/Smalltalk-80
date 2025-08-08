@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
 using Antlr4.Runtime;
@@ -30,6 +31,9 @@ public class Program
         bool verbose = false;
         bool showTree = false;
         bool validateOnly = false;
+        bool compileClasses = false;
+        string? outputFile = null;
+        List<string> classesToCompile = new();
 
         // Parse command line arguments
         for (int i = 0; i < args.Length; i++)
@@ -46,6 +50,33 @@ public class Program
                     break;
                 case "--validate":
                     validateOnly = true;
+                    break;
+                case "--compile-classes":
+                    compileClasses = true;
+                    break;
+                case "-o":
+                case "--output":
+                    if (i + 1 < args.Length)
+                    {
+                        outputFile = args[++i];
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Error: --output requires a file path");
+                        return 1;
+                    }
+                    break;
+                case "-c":
+                case "--class":
+                    if (i + 1 < args.Length)
+                    {
+                        classesToCompile.Add(args[++i]);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Error: --class requires a class name");
+                        return 1;
+                    }
                     break;
                 case "-h":
                 case "--help":
@@ -76,6 +107,22 @@ public class Program
         {
             Console.Error.WriteLine($"Error: Input file '{inputFile}' does not exist.");
             return 1;
+        }
+
+        // Handle compile-classes mode
+        if (compileClasses)
+        {
+            if (classesToCompile.Count == 0)
+            {
+                Console.Error.WriteLine("Error: --compile-classes requires at least one --class specification");
+                return 1;
+            }
+            if (outputFile == null)
+            {
+                outputFile = "bootstrap_phase2_extracted.json";
+            }
+            // Use the simpler class extractor for now
+            return ClassExtractorCLI.ExtractClasses(inputFile, outputFile, classesToCompile.ToArray());
         }
 
         try
@@ -157,14 +204,22 @@ public class Program
         Console.WriteLine("Usage: Smalltalk80.Compiler [options] <input-file>");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -v, --verbose    Show detailed parsing information");
-        Console.WriteLine("  -t, --tree       Display the parse tree");
-        Console.WriteLine("  --validate       Only validate syntax, don't generate output");
-        Console.WriteLine("  -h, --help       Show this help message");
+        Console.WriteLine("  -v, --verbose         Show detailed parsing information");
+        Console.WriteLine("  -t, --tree            Display the parse tree");
+        Console.WriteLine("  --validate            Only validate syntax, don't generate output");
+        Console.WriteLine("  --compile-classes     Compile classes from system image to bootstrap JSON");
+        Console.WriteLine("  -c, --class <name>    Specify a class to compile (use multiple times for multiple classes)");
+        Console.WriteLine("  -o, --output <file>   Output file for compiled JSON (default: bootstrap_phase3_compiled.json)");
+        Console.WriteLine("  -h, --help            Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  Smalltalk80.Compiler StandardLibrary.st");
-        Console.WriteLine("  Smalltalk80.Compiler --validate \"Smalltalk-80 Source\\Smalltalk-80.st\"");
+        Console.WriteLine("  # Validate the system image");
+        Console.WriteLine("  Smalltalk80.Compiler --validate \"Smalltalk-80.st\"");
+        Console.WriteLine();
+        Console.WriteLine("  # Compile Object and Collection classes to JSON");
+        Console.WriteLine("  Smalltalk80.Compiler --compile-classes -c Object -c Collection -o phase3.json \"Smalltalk-80.st\"");
+        Console.WriteLine();
+        Console.WriteLine("  # Parse and show tree structure");
         Console.WriteLine("  Smalltalk80.Compiler -v -t test.st");
     }
 

@@ -15,7 +15,9 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     private readonly Dictionary<string, int> symbolCache = new(); // Keep a symbol cache even after bootstrap
     private int? nilOop = null;
     private int smalltalkDictOop = -1;
-    private bool usesSmalltalkDictionary = false;
+    #pragma warning disable CS0414 // Field is assigned but its value is never used
+    private bool usesSmalltalkDictionary = false; // Track when we switch to Smalltalk dictionary (for debugging)
+    #pragma warning restore CS0414
     private int methodDictionaryClassOop = -1;  // Cache the MethodDictionary class OOP
     
     public VMPrimitiveAdapter(VirtualMachine vm)
