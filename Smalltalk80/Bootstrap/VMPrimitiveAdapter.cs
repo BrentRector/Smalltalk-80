@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Smalltalk80.Bootstrap;
 
@@ -12,6 +13,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     private readonly VirtualMachine vm;
     private readonly Dictionary<string, int> globals = new();
     private readonly Dictionary<string, int> classes = new();
+    private int? nilOop = null;
     
     public VMPrimitiveAdapter(VirtualMachine vm)
     {
@@ -52,9 +54,35 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (classObj == null)
             throw new InvalidOperationException($"Class with OOP {classId} not found");
             
-        // For now, create a basic instance with no fields
-        // In a full implementation, we'd look at the class's instance size
-        var instance = new SmalltalkObject(classObj, 0);
+        // Determine instance size from the class's instance variables
+        // Look at slot 3 (instanceVariables) to count fields
+        int instanceSize = 0;
+        var instVarsField = classObj.GetField(3);
+        if (instVarsField is SmalltalkObject instVarsArray)
+        {
+            instanceSize = instVarsArray.Fields.Length;
+        }
+        
+        // For CompiledMethod, we know it has 4 fields: selector, bytecode, literals, header
+        // This is a simplified approach - a full implementation would calculate from class hierarchy
+        if (classes.ContainsValue(classId))
+        {
+            var className = classes.FirstOrDefault(x => x.Value == classId).Key;
+            if (className == "CompiledMethod")
+            {
+                instanceSize = 4; // selector, bytecode, literals, header
+            }
+            else if (className == "MethodContext")
+            {
+                instanceSize = 6; // sender, receiver, method, arguments, pc, stackPointer
+            }
+            else if (className == "Message")
+            {
+                instanceSize = 2; // selector, arguments
+            }
+        }
+        
+        var instance = new SmalltalkObject(classObj, instanceSize);
         return instance.Oop;
     }
     
@@ -70,7 +98,9 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (slotIndex < 0 || slotIndex >= obj.Fields.Length)
             throw new ArgumentOutOfRangeException(nameof(slotIndex), $"Slot index {slotIndex} out of range for object with {obj.Fields.Length} slots");
             
-        var value = valueId == 0 ? null : ObjectMemory.FromOop(valueId);
+        // OOP 0 is a valid object (ProtoObject), so we need to handle it
+        // Only use null if we explicitly want to set nil (which would be represented differently)
+        var value = ObjectMemory.FromOop(valueId);
         obj.SetField(slotIndex, value);
     }
     
@@ -85,6 +115,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             
         var classObj = ObjectMemory.FromOop(classId);
         obj.ClassPointer = classObj;
+        
+        // Debug: verify the class was set
+        if (obj.ClassPointer != classObj)
+        {
+            Console.WriteLine($"[WARNING] Failed to set class pointer for OOP {objectId} to OOP {classId}");
+        }
     }
     
     /// <summary>
@@ -94,7 +130,20 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         // For now, create a simple string object to represent the symbol
         // In a full implementation, symbols would be properly interned
-        var symbol = new SmalltalkObject(null, 1);
+        // Get the Symbol class if it exists
+        var symbolClassOop = PrimitiveLookupClass("Symbol");
+        SmalltalkObject? symbolClass = null;
+        if (symbolClassOop < 0)
+        {
+            // Symbol class doesn't exist yet, try the metaclass
+            symbolClassOop = PrimitiveLookupClass("SymbolClass");
+        }
+        if (symbolClassOop > 0)
+        {
+            symbolClass = ObjectMemory.FromOop(symbolClassOop);
+        }
+        
+        var symbol = new SmalltalkObject(symbolClass, 1);
         symbol.SetField(0, name);
         return symbol.Oop;
     }
@@ -104,7 +153,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public int PrimitiveNewArray(int size)
     {
-        var array = new SmalltalkObject(null, size);
+        // Get the Array class if it exists
+        var arrayClassOop = PrimitiveLookupClass("Array");
+        SmalltalkObject? arrayClass = arrayClassOop > 0 ? ObjectMemory.FromOop(arrayClassOop) : null;
+        
+        var array = new SmalltalkObject(arrayClass, size);
         return array.Oop;
     }
     
@@ -165,8 +218,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public int PrimitiveNil()
     {
-        // Return 0 as the nil OOP
-        return 0;
+        // Create nil object if it doesn't exist yet
+        if (nilOop == null)
+        {
+            // nil is a special singleton instance with no fields
+            var nil = new SmalltalkObject(null, 0);
+            nilOop = nil.Oop;
+        }
+        return nilOop.Value;
     }
     
     /// <summary>
@@ -207,7 +266,20 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     public int PrimitiveInternString(string value)
     {
         // Create a string object
-        var str = new SmalltalkObject(null, 1);
+        // Get the String class if it exists
+        var stringClassOop = PrimitiveLookupClass("String");
+        SmalltalkObject? stringClass = null;
+        if (stringClassOop < 0)
+        {
+            // String class doesn't exist yet, try the metaclass
+            stringClassOop = PrimitiveLookupClass("StringClass");
+        }
+        if (stringClassOop > 0)
+        {
+            stringClass = ObjectMemory.FromOop(stringClassOop);
+        }
+        
+        var str = new SmalltalkObject(stringClass, 1);
         str.SetField(0, value);
         return str.Oop;
     }
@@ -218,5 +290,21 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     public int ExecuteBytecode(int receiverId, byte[] bytecode, int[] argumentIds)
     {
         throw new NotImplementedException("ExecuteBytecode is not used in Phase 1 bootstrap");
+    }
+    
+    /// <summary>
+    /// Get the registered globals dictionary.
+    /// </summary>
+    public Dictionary<string, int> GetGlobals()
+    {
+        return new Dictionary<string, int>(globals);
+    }
+    
+    /// <summary>
+    /// Get the registered classes dictionary.
+    /// </summary>
+    public Dictionary<string, int> GetClasses()
+    {
+        return new Dictionary<string, int>(classes);
     }
 }

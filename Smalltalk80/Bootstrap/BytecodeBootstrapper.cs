@@ -76,6 +76,9 @@ public class BytecodeBootstrapper
     /// </summary>
     private void LoadStage2File(string filename)
     {
+        // TODO: Reimplement when parser infrastructure is ready
+        throw new NotImplementedException("LoadStage2File requires ParserService which is being reworked");
+        /*
         var source = File.ReadAllText(filename);
         var fileNode = ParserService.ParseFileIn(source);
         
@@ -96,6 +99,7 @@ public class BytecodeBootstrapper
                     break;
             }
         }
+        */
     }
     
     /// <summary>

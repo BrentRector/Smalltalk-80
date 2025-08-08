@@ -75,11 +75,12 @@ public static class Primitives
         [60] = ObjectPrimitives.At,
         [61] = ObjectPrimitives.AtPut,
         [62] = ObjectPrimitives.Size,
-        [63] = ArrayPrimitives.StringAt,
-        [64] = ArrayPrimitives.StringAtPut,
-        [65] = ArrayPrimitives.Next,
-        [66] = ArrayPrimitives.NextPut,
-        [67] = ArrayPrimitives.AtEnd,
+        // Array primitives temporarily disabled
+        // [63] = ArrayPrimitives.StringAt,
+        // [64] = ArrayPrimitives.StringAtPut,
+        // [65] = ArrayPrimitives.Next,
+        // [66] = ArrayPrimitives.NextPut,
+        // [67] = ArrayPrimitives.AtEnd,
         [68] = StorageManagementPrimitives.ObjectAt,
         [69] = StorageManagementPrimitives.ObjectAtPut,
         [70] = StorageManagementPrimitives.New,
@@ -135,30 +136,30 @@ public static class Primitives
         // Additional object primitives
         [139] = ObjectPrimitives.NextObject,
 
-        // File system primitives
-        [142] = FileSystemPrimitives.OpenStream,
-        [143] = FileSystemPrimitives.CloseStream,
-        [144] = FileSystemPrimitives.ReadNextChar,
-        [145] = FileSystemPrimitives.WriteChar,
-        [146] = FileSystemPrimitives.GetFileSize,
-        [147] = FileSystemPrimitives.SetPosition,
-        [148] = FileSystemPrimitives.GetFileSizeByName,
-        [149] = FileSystemPrimitives.FileExists,
-        [150] = FileSystemPrimitives.DeleteFile,
-        [151] = FileSystemPrimitives.RenameFile,
-        [152] = FileSystemPrimitives.GetFileModificationTime,
-        [153] = FileSystemPrimitives.GetFileModificationTime,
-        [154] = FileSystemPrimitives.CreateDirectory,
-        [155] = FileSystemPrimitives.DeleteFile,
-        [156] = FileSystemPrimitives.IsDirectory,
-        [157] = FileSystemPrimitives.GetDirectoryEntries,
+        // File system primitives temporarily disabled
+        // [142] = FileSystemPrimitives.OpenStream,
+        // [143] = FileSystemPrimitives.CloseStream,
+        // [144] = FileSystemPrimitives.ReadNextChar,
+        // [145] = FileSystemPrimitives.WriteChar,
+        // [146] = FileSystemPrimitives.GetFileSize,
+        // [147] = FileSystemPrimitives.SetPosition,
+        // [148] = FileSystemPrimitives.GetFileSizeByName,
+        // [149] = FileSystemPrimitives.FileExists,
+        // [150] = FileSystemPrimitives.DeleteFile,
+        // [151] = FileSystemPrimitives.RenameFile,
+        // [152] = FileSystemPrimitives.GetFileModificationTime,
+        // [153] = FileSystemPrimitives.GetFileModificationTime,
+        // [154] = FileSystemPrimitives.CreateDirectory,
+        // [155] = FileSystemPrimitives.DeleteFile,
+        // [156] = FileSystemPrimitives.IsDirectory,
+        // [157] = FileSystemPrimitives.GetDirectoryEntries,
 
-        // String comparison primitives
-        [158] = ArrayPrimitives.StringEquals,
-        [159] = ArrayPrimitives.StringLessThan,
+        // String comparison primitives temporarily disabled
+        // [158] = ArrayPrimitives.StringEquals,
+        // [159] = ArrayPrimitives.StringLessThan,
 
-        // Character creation primitive
-        [170] = ArrayPrimitives.CharacterFromValue,
+        // Character creation primitive temporarily disabled
+        // [170] = ArrayPrimitives.CharacterFromValue,
     };
 
     static Primitives()

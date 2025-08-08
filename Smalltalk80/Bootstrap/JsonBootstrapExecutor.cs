@@ -47,6 +47,56 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
+    /// Execute Phase 2 bootstrap from JSON content.
+    /// </summary>
+    public void ExecutePhase2(string jsonContent)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
+        
+        var phase2 = JsonSerializer.Deserialize<Phase2ManifestConfig>(jsonContent, options);
+        if (phase2 == null)
+            throw new InvalidOperationException("Failed to parse Phase 2 bootstrap JSON");
+            
+        Console.WriteLine($"[BOOTSTRAP] Phase 2: {phase2.Description}");
+        
+        // First, create all classes
+        if (phase2.Classes != null)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Creating {phase2.Classes.Count} classes");
+            foreach (var classDef in phase2.Classes)
+            {
+                CreatePhase2Class(classDef);
+            }
+        }
+        
+        // Then, create all objects with explicit IDs
+        if (phase2.Objects != null)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
+            foreach (var objDef in phase2.Objects)
+            {
+                CreatePhase2Object(objDef);
+            }
+        }
+        
+        // Finally, apply patches to wire everything together
+        if (phase2.Patches != null)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Applying {phase2.Patches.Count} patches");
+            foreach (var patch in phase2.Patches)
+            {
+                ApplyPhase2Patch(patch);
+            }
+        }
+        
+        Console.WriteLine($"[BOOTSTRAP] Phase 2 complete: Created messaging infrastructure");
+    }
+    
+    /// <summary>
     /// Execute a single bootstrap operation.
     /// </summary>
     private void ExecuteOperation(BootstrapOperation operation)
@@ -95,6 +145,22 @@ public class JsonBootstrapExecutor
                 ExecuteInstallMethod(operation);
                 break;
                 
+            case "setinstancevariables":
+                ExecuteSetInstanceVariables(operation);
+                break;
+                
+            case "setslot":
+                ExecuteSetSlot(operation);
+                break;
+                
+            case "setcategory":
+                ExecuteSetCategory(operation);
+                break;
+                
+            case "definemethod":
+                ExecuteDefineMethod(operation);
+                break;
+                
             default:
                 if (!string.IsNullOrEmpty(operation.Op))
                     Console.WriteLine($"[BOOTSTRAP] Warning: Unknown operation '{operation.Op}'");
@@ -113,7 +179,9 @@ public class JsonBootstrapExecutor
         int oop;
         
         // Determine what type of object to create based on the name
-        if (op.Result.EndsWith("Class") || op.Result == "Metaclass")
+        // Naming convention: FooClass is the metaclass for class Foo
+        // But "Class" and "Metaclass" themselves are regular classes, not metaclasses!
+        if (op.Result.EndsWith("Class") && op.Result != "Class" && op.Result != "Metaclass")
         {
             // It's a metaclass
             oop = vm.PrimitiveNewMetaclass();
@@ -153,17 +221,34 @@ public class JsonBootstrapExecutor
             throw new InvalidOperationException($"Target object '{op.Target}' not found");
             
         int valueOop = 0;
-        if (!string.IsNullOrEmpty(op.Value))
+        string? valueStr = null;
+        
+        if (op.Value == null)
         {
-            if (!namedObjects.TryGetValue(op.Value, out valueOop))
-                throw new InvalidOperationException($"Value object '{op.Value}' not found");
+            // Value is null, keep valueOop as 0
+        }
+        else if (op.Value is string str)
+        {
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        
+        if (!string.IsNullOrEmpty(valueStr))
+        {
+            if (!namedObjects.TryGetValue(valueStr, out valueOop))
+            {
+                throw new InvalidOperationException($"Value object '{valueStr}' not found");
+            }
         }
         
         // Handle special slot names
         if (op.Slot == "class")
         {
             vm.PrimitiveSetClass(targetOop, valueOop);
-            Console.WriteLine($"[BOOTSTRAP] Set class of '{op.Target}' to '{op.Value}'");
+            Console.WriteLine($"[BOOTSTRAP] Set class of '{op.Target}' (OOP {targetOop}) to '{op.Value}' (OOP {valueOop})");
         }
         else if (int.TryParse(op.Slot, out var slotIndex))
         {
@@ -188,14 +273,43 @@ public class JsonBootstrapExecutor
             throw new InvalidOperationException($"Target object '{op.Target}' not found");
             
         int superclassOop = 0;
-        if (!string.IsNullOrEmpty(op.Value) && op.Value != "null")
+        string? valueStr = null;
+        
+        if (op.Value is string str && str != "null")
         {
-            if (!namedObjects.TryGetValue(op.Value, out superclassOop))
-                throw new InvalidOperationException($"Superclass '{op.Value}' not found");
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        
+        if (!string.IsNullOrEmpty(valueStr) && valueStr != "null")
+        {
+            if (!namedObjects.TryGetValue(valueStr, out superclassOop))
+                throw new InvalidOperationException($"Superclass '{valueStr}' not found");
+        }
+        else
+        {
+            // For null/nil superclass, we always want to set actual null
+            // (not the nil object which is an instance of UndefinedObject)
+            superclassOop = -1;
         }
         
         // Superclass is at slot 0
-        vm.PrimitiveSetSlot(targetOop, 0, superclassOop);
+        if (superclassOop == -1)
+        {
+            // Special case: actually set null for ProtoObject's superclass
+            var obj = ObjectMemory.FromOop(targetOop);
+            if (obj != null)
+            {
+                obj.SetField(0, null);
+            }
+        }
+        else
+        {
+            vm.PrimitiveSetSlot(targetOop, 0, superclassOop);
+        }
         Console.WriteLine($"[BOOTSTRAP] Set superclass of '{op.Target}' to '{op.Value ?? "nil"}'");
     }
     
@@ -204,11 +318,25 @@ public class JsonBootstrapExecutor
     /// </summary>
     private void ExecuteRegisterGlobal(BootstrapOperation op)
     {
-        if (string.IsNullOrEmpty(op.Name) || string.IsNullOrEmpty(op.Value))
+        if (string.IsNullOrEmpty(op.Name) || op.Value == null)
             throw new InvalidOperationException("registerGlobal requires name and value");
             
-        if (!namedObjects.TryGetValue(op.Value, out var valueOop))
-            throw new InvalidOperationException($"Value object '{op.Value}' not found");
+        string? valueStr = null;
+        if (op.Value is string str)
+        {
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        else
+        {
+            throw new InvalidOperationException("registerGlobal value must be a string");
+        }
+            
+        if (!namedObjects.TryGetValue(valueStr!, out var valueOop))
+            throw new InvalidOperationException($"Value object '{valueStr}' not found");
             
         vm.PrimitiveRegisterGlobal(op.Name, valueOop);
     }
@@ -218,12 +346,26 @@ public class JsonBootstrapExecutor
     /// </summary>
     private void ExecuteCreateSymbol(BootstrapOperation op)
     {
-        if (string.IsNullOrEmpty(op.Result) || string.IsNullOrEmpty(op.Value))
+        if (string.IsNullOrEmpty(op.Result) || op.Value == null)
             throw new InvalidOperationException("createSymbol requires result and value");
             
-        var oop = vm.PrimitiveInternSymbol(op.Value);
+        string? valueStr = null;
+        if (op.Value is string str)
+        {
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        else
+        {
+            throw new InvalidOperationException("createSymbol value must be a string");
+        }
+            
+        var oop = vm.PrimitiveInternSymbol(valueStr!);
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created symbol '{op.Value}' -> OOP {oop}");
+        Console.WriteLine($"[BOOTSTRAP] Created symbol '{valueStr}' -> OOP {oop}");
     }
     
     /// <summary>
@@ -231,12 +373,26 @@ public class JsonBootstrapExecutor
     /// </summary>
     private void ExecuteCreateString(BootstrapOperation op)
     {
-        if (string.IsNullOrEmpty(op.Result) || string.IsNullOrEmpty(op.Value))
+        if (string.IsNullOrEmpty(op.Result) || op.Value == null)
             throw new InvalidOperationException("createString requires result and value");
             
-        var oop = vm.PrimitiveInternString(op.Value);
+        string? valueStr = null;
+        if (op.Value is string str)
+        {
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        else
+        {
+            throw new InvalidOperationException("createString value must be a string");
+        }
+            
+        var oop = vm.PrimitiveInternString(valueStr!);
         namedObjects[op.Result] = oop;
-        Console.WriteLine($"[BOOTSTRAP] Created string '{op.Value}' -> OOP {oop}");
+        Console.WriteLine($"[BOOTSTRAP] Created string '{valueStr}' -> OOP {oop}");
     }
     
     /// <summary>
@@ -279,6 +435,611 @@ public class JsonBootstrapExecutor
             
         vm.PrimitiveInstallMethod(classOop, op.Selector, op.Source);
     }
+    
+    /// <summary>
+    /// Execute setInstanceVariables operation.
+    /// </summary>
+    private void ExecuteSetInstanceVariables(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Target) || op.Value == null)
+            throw new InvalidOperationException("setInstanceVariables requires target and value");
+            
+        if (!namedObjects.TryGetValue(op.Target, out var targetOop))
+            throw new InvalidOperationException($"Target object '{op.Target}' not found");
+            
+        // Value should be an array of strings
+        if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+        {
+            var varNames = new List<string>();
+            foreach (var element in jsonElement.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                    varNames.Add(element.GetString() ?? "");
+            }
+            
+            // Store instance variable names in slot 3 (for classes)
+            // This is a simplification - we'd need to create a proper array object
+            var namesArray = vm.PrimitiveNewArray(varNames.Count);
+            for (int i = 0; i < varNames.Count; i++)
+            {
+                var symbolOop = vm.PrimitiveInternSymbol(varNames[i]);
+                vm.PrimitiveArrayAtPut(namesArray, i, symbolOop);
+            }
+            vm.PrimitiveSetSlot(targetOop, 3, namesArray);
+            
+            Console.WriteLine($"[BOOTSTRAP] Set instance variables of '{op.Target}' to [{string.Join(", ", varNames)}]");
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: setInstanceVariables value must be an array");
+        }
+    }
+    
+    /// <summary>
+    /// Execute setSlot operation by name.
+    /// </summary>
+    private void ExecuteSetSlot(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Target) || string.IsNullOrEmpty(op.Slot))
+            throw new InvalidOperationException("setSlot requires target and slot");
+            
+        if (!namedObjects.TryGetValue(op.Target, out var targetOop))
+            throw new InvalidOperationException($"Target object '{op.Target}' not found");
+            
+        // Map slot names to indices based on class structure
+        int slotIndex = GetSlotIndex(op.Target, op.Slot);
+        if (slotIndex < 0)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: Unknown slot '{op.Slot}' for '{op.Target}'");
+            return;
+        }
+        
+        // Get the value to store
+        int valueOop = 0;
+        string? valueStr = null;
+        
+        if (op.Value is string str)
+        {
+            valueStr = str;
+        }
+        else if (op.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+        {
+            valueStr = jsonElement.GetString();
+        }
+        
+        if (!string.IsNullOrEmpty(valueStr))
+        {
+            if (namedObjects.TryGetValue(valueStr, out valueOop))
+            {
+                // It's a reference to another object
+            }
+            else
+            {
+                // It's a literal string - create a symbol
+                valueOop = vm.PrimitiveInternSymbol(valueStr);
+            }
+        }
+        
+        vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
+        Console.WriteLine($"[BOOTSTRAP] Set slot '{op.Slot}' of '{op.Target}' to '{op.Value}'");
+    }
+    
+    /// <summary>
+    /// Get the slot index for a named slot.
+    /// </summary>
+    private int GetSlotIndex(string className, string slotName)
+    {
+        // Based on the standard Smalltalk-80 class layout
+        // Classes (8 slots): [0] superclass, [1] methodDict, [2] format, 
+        //                    [3] instanceVariables, [4] organization, [5] name,
+        //                    [6] classPool, [7] sharedPools
+        // Metaclasses (6 slots): [0] superclass, [1] methodDict, [2] format,
+        //                        [3] instanceVariables, [4] organization, [5] thisClass
+        
+        // Special handling for Class and Metaclass which are themselves metaclasses
+        // but need to be treated as classes for slot purposes
+        bool isMetaclass = className.EndsWith("Class") && className != "Class" && className != "Metaclass";
+        
+        return slotName.ToLower() switch
+        {
+            "superclass" => 0,
+            "methoddict" => 1,
+            "format" => 2,
+            "instancevariables" => 3,
+            "organization" => 4,
+            "name" when !isMetaclass => 5,
+            "thisclass" when isMetaclass => 5,
+            "classpool" when !isMetaclass => 6,
+            "sharedpools" when !isMetaclass => 7,
+            _ => -1
+        };
+    }
+    
+    /// <summary>
+    /// Execute setCategory operation.
+    /// </summary>
+    private void ExecuteSetCategory(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Target) || op.Value == null)
+            throw new InvalidOperationException("setCategory requires target and value");
+            
+        if (!namedObjects.TryGetValue(op.Target, out var targetOop))
+            throw new InvalidOperationException($"Target object '{op.Target}' not found");
+            
+        // Category is typically stored in the organization slot (4)
+        // For now, just log it
+        Console.WriteLine($"[BOOTSTRAP] Set category of '{op.Target}' to '{op.Value}'");
+    }
+    
+    /// <summary>
+    /// Execute defineMethod operation.
+    /// </summary>
+    private void ExecuteDefineMethod(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Target) || string.IsNullOrEmpty(op.Selector) || string.IsNullOrEmpty(op.Source))
+            throw new InvalidOperationException("defineMethod requires target, selector, and source");
+            
+        if (!namedObjects.TryGetValue(op.Target, out var classOop))
+            throw new InvalidOperationException($"Target class '{op.Target}' not found");
+            
+        // For Phase 1, we can't actually compile methods yet
+        // Just log it for now
+        Console.WriteLine($"[BOOTSTRAP] Define method '{op.Selector}' on '{op.Target}'");
+    }
+    
+    /// <summary>
+    /// Create an object with explicit ID from Phase 2 manifest.
+    /// </summary>
+    private void CreatePhase2Object(Phase2ObjectDefinition objDef)
+    {
+        if (string.IsNullOrEmpty(objDef.Id))
+            throw new InvalidOperationException("Object definition requires an id");
+            
+        if (string.IsNullOrEmpty(objDef.ClassName))
+            throw new InvalidOperationException($"Object '{objDef.Id}' requires a class");
+            
+        int oop = 0;
+        
+        // Handle different object types
+        switch (objDef.ClassName.ToLower())
+        {
+            case "symbol":
+                // Symbol with value field
+                if (objDef.Fields != null && objDef.Fields.TryGetValue("value", out var symbolValue))
+                {
+                    oop = vm.PrimitiveInternSymbol(symbolValue?.ToString() ?? "");
+                }
+                break;
+                
+            case "string":
+                // String with characters field
+                if (objDef.Fields != null && objDef.Fields.TryGetValue("characters", out var stringValue))
+                {
+                    oop = vm.PrimitiveInternString(stringValue?.ToString() ?? "");
+                }
+                break;
+                
+            case "bytearray":
+                // ByteArray with elements
+                if (objDef.Elements != null)
+                {
+                    oop = CreateByteArray(objDef.Elements);
+                }
+                break;
+                
+            case "array":
+                // Array with elements (references to other objects)
+                if (objDef.Elements != null)
+                {
+                    oop = CreateArrayWithReferences(objDef.Elements);
+                }
+                break;
+                
+            case "compiledmethod":
+                // CompiledMethod with selector, bytecode, literals, header
+                oop = CreateCompiledMethodFromDefinition(objDef);
+                break;
+                
+            case "methoddictionary":
+                // MethodDictionary with keys and values arrays
+                oop = CreateMethodDictionary(objDef);
+                break;
+                
+            default:
+                // Generic object creation
+                if (namedObjects.TryGetValue(objDef.ClassName, out var classOop))
+                {
+                    oop = vm.PrimitiveNewInstance(classOop);
+                    // Set fields if any
+                    if (objDef.Fields != null)
+                    {
+                        SetObjectFields(oop, objDef.Fields);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
+                }
+                break;
+        }
+        
+        if (oop > 0)
+        {
+            namedObjects[objDef.Id] = oop;
+            Console.WriteLine($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{objDef.ClassName}' -> OOP {oop}");
+        }
+    }
+    
+    /// <summary>
+    /// Create a ByteArray from elements.
+    /// </summary>
+    private int CreateByteArray(List<object> elements)
+    {
+        // Get ByteArray class
+        var byteArrayClassOop = vm.PrimitiveLookupClass("ByteArray");
+        if (byteArrayClassOop < 0)
+        {
+            // Create as regular array if ByteArray class doesn't exist
+            byteArrayClassOop = vm.PrimitiveLookupClass("Array");
+        }
+        
+        var arrayOop = vm.PrimitiveNewArray(elements.Count);
+        
+        // Set class if found
+        if (byteArrayClassOop > 0)
+        {
+            vm.PrimitiveSetClass(arrayOop, byteArrayClassOop);
+        }
+        
+        // Store bytes
+        for (int i = 0; i < elements.Count; i++)
+        {
+            int value = 0;
+            if (elements[i] is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.Number)
+            {
+                value = jsonElem.GetInt32();
+            }
+            else if (elements[i] is int intValue)
+            {
+                value = intValue;
+            }
+            vm.PrimitiveArrayAtPut(arrayOop, i, value);
+        }
+        
+        return arrayOop;
+    }
+    
+    /// <summary>
+    /// Create an Array with references to other objects.
+    /// </summary>
+    private int CreateArrayWithReferences(List<object> elements)
+    {
+        var arrayOop = vm.PrimitiveNewArray(elements.Count);
+        
+        for (int i = 0; i < elements.Count; i++)
+        {
+            int elementOop = 0;
+            
+            if (elements[i] is string refId)
+            {
+                // It's a reference to another object
+                if (namedObjects.TryGetValue(refId, out elementOop))
+                {
+                    // Found the referenced object
+                }
+                else
+                {
+                    Console.WriteLine($"[BOOTSTRAP] Warning: Referenced object '{refId}' not found");
+                }
+            }
+            else if (elements[i] is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.String)
+            {
+                var refIdStr = jsonElem.GetString();
+                if (!string.IsNullOrEmpty(refIdStr) && namedObjects.TryGetValue(refIdStr, out elementOop))
+                {
+                    // Found the referenced object
+                }
+            }
+            
+            vm.PrimitiveArrayAtPut(arrayOop, i, elementOop);
+        }
+        
+        return arrayOop;
+    }
+    
+    /// <summary>
+    /// Create a CompiledMethod from object definition.
+    /// </summary>
+    private int CreateCompiledMethodFromDefinition(Phase2ObjectDefinition objDef)
+    {
+        // Get the CompiledMethod class
+        var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
+        if (compiledMethodClassOop < 0)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: CompiledMethod class not found");
+            return 0;
+        }
+        
+        // Create the method object
+        var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+        
+        if (objDef.Fields != null)
+        {
+            // Set selector (slot 0)
+            if (objDef.Fields.TryGetValue("selector", out var selectorRef))
+            {
+                var selectorOop = ResolveReference(selectorRef);
+                vm.PrimitiveSetSlot(methodOop, 0, selectorOop);
+            }
+            
+            // Set bytecode (slot 1)
+            if (objDef.Fields.TryGetValue("bytecode", out var bytecodeRef))
+            {
+                var bytecodeOop = ResolveReference(bytecodeRef);
+                vm.PrimitiveSetSlot(methodOop, 1, bytecodeOop);
+            }
+            
+            // Set literals (slot 2)
+            if (objDef.Fields.TryGetValue("literals", out var literalsRef))
+            {
+                var literalsOop = ResolveReference(literalsRef);
+                vm.PrimitiveSetSlot(methodOop, 2, literalsOop);
+            }
+            
+            // Set header (slot 3)
+            if (objDef.Fields.TryGetValue("header", out var headerValue))
+            {
+                int header = 0;
+                if (headerValue is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.Number)
+                {
+                    header = jsonElem.GetInt32();
+                }
+                else if (headerValue is int intValue)
+                {
+                    header = intValue;
+                }
+                vm.PrimitiveSetSlot(methodOop, 3, header);
+            }
+        }
+        
+        return methodOop;
+    }
+    
+    /// <summary>
+    /// Create a MethodDictionary from object definition.
+    /// </summary>
+    private int CreateMethodDictionary(Phase2ObjectDefinition objDef)
+    {
+        // Get the MethodDictionary class
+        var methodDictClassOop = vm.PrimitiveLookupClass("MethodDictionary");
+        if (methodDictClassOop < 0)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: MethodDictionary class not found, using generic dictionary");
+            return vm.PrimitiveNewDictionary();
+        }
+        
+        // Create the dictionary object
+        var dictOop = vm.PrimitiveNewInstance(methodDictClassOop);
+        
+        if (objDef.Fields != null)
+        {
+            // Set keys array (slot 0)
+            if (objDef.Fields.TryGetValue("keys", out var keysValue))
+            {
+                var keysOop = CreateArrayFromValue(keysValue);
+                vm.PrimitiveSetSlot(dictOop, 0, keysOop);
+            }
+            
+            // Set values array (slot 1)
+            if (objDef.Fields.TryGetValue("values", out var valuesValue))
+            {
+                var valuesOop = CreateArrayFromValue(valuesValue);
+                vm.PrimitiveSetSlot(dictOop, 1, valuesOop);
+            }
+        }
+        
+        return dictOop;
+    }
+    
+    /// <summary>
+    /// Create an array from a value (could be list of references).
+    /// </summary>
+    private int CreateArrayFromValue(object value)
+    {
+        if (value is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.Array)
+        {
+            var items = new List<object>();
+            foreach (var element in jsonElem.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    items.Add(element.GetString()!);
+                }
+                else if (element.ValueKind == JsonValueKind.Number)
+                {
+                    items.Add(element.GetInt32());
+                }
+            }
+            return CreateArrayWithReferences(items);
+        }
+        else if (value is List<object> list)
+        {
+            return CreateArrayWithReferences(list);
+        }
+        
+        // Single value - create array with one element
+        return CreateArrayWithReferences(new List<object> { value });
+    }
+    
+    /// <summary>
+    /// Resolve a reference to an object by ID.
+    /// </summary>
+    private int ResolveReference(object reference)
+    {
+        if (reference is string refId)
+        {
+            if (namedObjects.TryGetValue(refId, out var oop))
+            {
+                return oop;
+            }
+            Console.WriteLine($"[BOOTSTRAP] Warning: Reference '{refId}' not found");
+        }
+        else if (reference is JsonElement jsonElem)
+        {
+            if (jsonElem.ValueKind == JsonValueKind.String)
+            {
+                var refIdStr = jsonElem.GetString();
+                if (!string.IsNullOrEmpty(refIdStr) && namedObjects.TryGetValue(refIdStr, out var oop))
+                {
+                    return oop;
+                }
+            }
+            else if (jsonElem.ValueKind == JsonValueKind.Number)
+            {
+                return jsonElem.GetInt32();
+            }
+        }
+        else if (reference is int intValue)
+        {
+            return intValue;
+        }
+        
+        return 0;
+    }
+    
+    /// <summary>
+    /// Set fields on an object from a dictionary.
+    /// </summary>
+    private void SetObjectFields(int objectOop, Dictionary<string, object> fields)
+    {
+        foreach (var (fieldName, fieldValue) in fields)
+        {
+            // Map field name to slot index based on class structure
+            // For now, we'll use numeric indices if provided
+            if (int.TryParse(fieldName, out var slotIndex))
+            {
+                var valueOop = ResolveReference(fieldValue);
+                vm.PrimitiveSetSlot(objectOop, slotIndex, valueOop);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Create a class defined in Phase 2.
+    /// </summary>
+    private void CreatePhase2Class(Phase2ClassDefinition classDef)
+    {
+        if (string.IsNullOrEmpty(classDef.Name))
+            throw new InvalidOperationException("Class definition requires a name");
+            
+        Console.WriteLine($"[BOOTSTRAP] Creating class '{classDef.Name}'");
+        
+        // Create the class object
+        var classOop = vm.PrimitiveNewClass();
+        namedObjects[classDef.Name] = classOop;
+        vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
+        
+        // Mark variable-sized classes (Array, ByteArray, etc.)
+        if (classDef.VariableSize)
+        {
+            // Set format field to indicate variable size
+            // Format slot (2) encodes instance spec
+            vm.PrimitiveSetSlot(classOop, 2, 2); // 2 = words indexable
+        }
+        
+        // Create the metaclass
+        var metaclassName = $"{classDef.Name}Class";
+        var metaclassOop = vm.PrimitiveNewMetaclass();
+        namedObjects[metaclassName] = metaclassOop;
+        vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
+        
+        // Set class pointer for the class
+        vm.PrimitiveSetClass(classOop, metaclassOop);
+        
+        // Set metaclass's class to Metaclass
+        // First try namedObjects, then look it up from VM
+        int metaclassClassOop = 0;
+        if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
+        {
+            // Found in named objects
+        }
+        else
+        {
+            // Try to get it from the VM's global registry
+            metaclassClassOop = vm.PrimitiveLookupClass("Metaclass");
+        }
+        
+        if (metaclassClassOop > 0)
+        {
+            vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
+        }
+        else
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+        }
+        
+        // Set superclass if specified
+        if (!string.IsNullOrEmpty(classDef.Superclass))
+        {
+            if (namedObjects.TryGetValue(classDef.Superclass, out var superclassOop))
+            {
+                vm.PrimitiveSetSlot(classOop, 0, superclassOop); // Slot 0 is superclass
+                
+                // Set metaclass superclass to superclass's metaclass
+                var superMetaclassName = $"{classDef.Superclass}Class";
+                if (namedObjects.TryGetValue(superMetaclassName, out var superMetaclassOop))
+                {
+                    vm.PrimitiveSetSlot(metaclassOop, 0, superMetaclassOop);
+                }
+            }
+        }
+        
+        // Set instance variables
+        if (classDef.InstanceVariables != null && classDef.InstanceVariables.Count > 0)
+        {
+            var varsArray = vm.PrimitiveNewArray(classDef.InstanceVariables.Count);
+            for (int i = 0; i < classDef.InstanceVariables.Count; i++)
+            {
+                var symbolOop = vm.PrimitiveInternSymbol(classDef.InstanceVariables[i]);
+                vm.PrimitiveArrayAtPut(varsArray, i, symbolOop);
+            }
+            vm.PrimitiveSetSlot(classOop, 3, varsArray); // Slot 3 is instanceVariables
+        }
+        
+        // Set class name
+        var nameSymbol = vm.PrimitiveInternSymbol(classDef.Name);
+        vm.PrimitiveSetSlot(classOop, 5, nameSymbol); // Slot 5 is name
+    }
+    
+    /// <summary>
+    /// Apply a patch operation in Phase 2.
+    /// </summary>
+    private void ApplyPhase2Patch(Phase2Patch patch)
+    {
+        if (string.IsNullOrEmpty(patch.Target) || string.IsNullOrEmpty(patch.Slot))
+            throw new InvalidOperationException("Patch requires target and slot");
+            
+        if (!namedObjects.TryGetValue(patch.Target, out var targetOop))
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: Patch target '{patch.Target}' not found");
+            return;
+        }
+        
+        // Determine the slot index
+        int slotIndex = GetSlotIndex(patch.Target, patch.Slot);
+        if (slotIndex < 0)
+        {
+            Console.WriteLine($"[BOOTSTRAP] Warning: Unknown slot '{patch.Slot}' for '{patch.Target}'");
+            return;
+        }
+        
+        // Resolve the value reference
+        int valueOop = ResolveReference(patch.Value ?? 0);
+        
+        // Apply the patch
+        vm.PrimitiveSetSlot(targetOop, slotIndex, valueOop);
+        Console.WriteLine($"[BOOTSTRAP] Patched '{patch.Target}'.{patch.Slot} = {patch.Value}");
+    }
 }
 
 /// <summary>
@@ -294,6 +1055,75 @@ public class BootstrapConfig
 }
 
 /// <summary>
+/// Phase 2 bootstrap configuration.
+/// </summary>
+public class Phase2BootstrapConfig
+{
+    public string? Phase { get; set; }
+    public List<Phase2ClassDefinition>? Classes { get; set; }
+    public List<Phase2Patch>? Patches { get; set; }
+}
+
+/// <summary>
+/// Phase 2 manifest configuration with explicit objects.
+/// </summary>
+public class Phase2ManifestConfig
+{
+    public string? Phase { get; set; }
+    public string? Description { get; set; }
+    public List<Phase2ClassDefinition>? Classes { get; set; }
+    public List<Phase2ObjectDefinition>? Objects { get; set; }
+    public List<Phase2Patch>? Patches { get; set; }
+}
+
+/// <summary>
+/// Object definition for Phase 2 manifest.
+/// </summary>
+public class Phase2ObjectDefinition
+{
+    public string? Id { get; set; }
+    [JsonPropertyName("class")]
+    public string? ClassName { get; set; }
+    public Dictionary<string, object>? Fields { get; set; }
+    public List<object>? Elements { get; set; } // For arrays
+}
+
+/// <summary>
+/// Class definition for Phase 2.
+/// </summary>
+public class Phase2ClassDefinition
+{
+    public string? Name { get; set; }
+    public string? Superclass { get; set; }
+    public List<string>? InstanceVariables { get; set; }
+    public List<Phase2MethodDefinition>? Methods { get; set; }
+    public bool VariableSize { get; set; }
+}
+
+/// <summary>
+/// Method definition for Phase 2.
+/// </summary>
+public class Phase2MethodDefinition
+{
+    public string? Selector { get; set; }
+    public string? Source { get; set; }
+    public List<int>? Bytecode { get; set; }
+    public List<string>? Literals { get; set; }
+    public int? Primitive { get; set; }
+    public string? Comment { get; set; }
+}
+
+/// <summary>
+/// Patch operation for Phase 2.
+/// </summary>
+public class Phase2Patch
+{
+    public string? Target { get; set; }
+    public string? Slot { get; set; }
+    public object? Value { get; set; }
+}
+
+/// <summary>
 /// A single bootstrap operation.
 /// </summary>
 public class BootstrapOperation
@@ -302,7 +1132,7 @@ public class BootstrapOperation
     public string? Result { get; set; }
     public string? Target { get; set; }
     public string? Slot { get; set; }
-    public string? Value { get; set; }
+    public object? Value { get; set; }  // Changed to object? to handle null, string, or array
     public string? Name { get; set; }
     public string? Selector { get; set; }
     public string? Source { get; set; }

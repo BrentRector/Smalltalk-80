@@ -930,13 +930,9 @@ public class Interpreter
     /// <returns>The True or False singleton object.</returns>
     private static SmalltalkObject? ConvertBooleanToSmalltalkObject(bool value)
     {
-        var className = value ? "True" : "False";
-        if (SystemDictionary.TryGetClass(className, out var booleanClass))
-        {
-            // Create an instance of True or False
-            return new SmalltalkObject(booleanClass, 0);
-        }
-        return null;
+        // TODO: Return proper true/false singleton from object memory
+        // For now, create a minimal object
+        return new SmalltalkObject(null, 0);
     }
 
     /// <summary>
@@ -946,16 +942,11 @@ public class Interpreter
     /// <returns>A SmallInteger object.</returns>
     private static SmalltalkObject? ConvertIntegerToSmalltalkObject(int value)
     {
-        if (SystemDictionary.TryGetClass("SmallInteger", out var smallIntegerClass))
-        {
-            // Create a SmallInteger with 1 field to store the value
-            // Note: In canonical Smalltalk-80, SmallInteger values are encoded in the object pointer
-            // For our implementation, we'll use a field to store the value
-            var smallInteger = new SmalltalkObject(smallIntegerClass, 1);
-            smallInteger.SetField(0, value);
-            return smallInteger;
-        }
-        return null;
+        // TODO: Look up SmallInteger class from object memory
+        // For now, create untyped object with value
+        var obj = new SmalltalkObject(null, 1);
+        obj.SetField(0, value);
+        return obj;
     }
 
     /// <summary>
@@ -965,13 +956,11 @@ public class Interpreter
     /// <returns>A Float object.</returns>
     private static SmalltalkObject? ConvertFloatToSmalltalkObject(double value)
     {
-        if (SystemDictionary.TryGetClass("Float", out var floatClass))
-        {
-            var floatObject = new SmalltalkObject(floatClass, 1);
-            floatObject.SetField(0, value);
-            return floatObject;
-        }
-        return null;
+        // TODO: Look up Float class from object memory
+        // For now, create untyped object with value
+        var obj = new SmalltalkObject(null, 1);
+        obj.SetField(0, value);
+        return obj;
     }
 
     /// <summary>
@@ -981,13 +970,11 @@ public class Interpreter
     /// <returns>A Character object.</returns>
     private static SmalltalkObject? ConvertCharacterToSmalltalkObject(char value)
     {
-        if (SystemDictionary.TryGetClass("Character", out var characterClass))
-        {
-            var characterObject = new SmalltalkObject(characterClass, 1);
-            characterObject.SetField(0, value);
-            return characterObject;
-        }
-        return null;
+        // TODO: Look up Character class from object memory
+        // For now, create untyped object with value
+        var obj = new SmalltalkObject(null, 1);
+        obj.SetField(0, value);
+        return obj;
     }
 
     /// <summary>
@@ -997,18 +984,11 @@ public class Interpreter
     /// <returns>A String object.</returns>
     private static SmalltalkObject? ConvertStringToSmalltalkObject(string value)
     {
-        if (SystemDictionary.TryGetClass("String", out var stringClass))
-        {
-            // Create a string object with enough fields to hold all characters
-            var stringObject = new SmalltalkObject(stringClass, value.Length);
-            // Store each character as a Character object in the fields
-            for (int i = 0; i < value.Length; i++)
-            {
-                stringObject.SetField(i, ConvertCharacterToSmalltalkObject(value[i]));
-            }
-            return stringObject;
-        }
-        return null;
+        // TODO: Look up String class from object memory
+        // For now, store string directly in single field
+        var obj = new SmalltalkObject(null, 1);
+        obj.SetField(0, value);
+        return obj;
     }
 
     /// <summary>

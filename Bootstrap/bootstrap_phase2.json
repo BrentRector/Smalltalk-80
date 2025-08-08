@@ -1,666 +1,333 @@
 {
-  "$schema": "./bootstrap-schema.json",
-  "version": "2.0",
   "phase": "2",
-  "description": "Build class hierarchy and install core methods via message sends",
-  "comments": [
-    "Phase 2 uses only message sending to build the class hierarchy",
-    "Assumes Phase 1 has provided: CompiledMethod class, Smalltalk global, basic message sending",
-    "Methods are created via CompiledMethod>>newWithSelector:bytecodes:",
-    "All operations are concrete message sends with explicit bytecode arrays"
-  ],
-  "messages": [
+  "description": "Messaging infrastructure with explicit object creation and ID references",
+  "classes": [
     {
-      "comment": "─── Class Hierarchy ─────────────────────────────────────────────",
-      "receiver": "Object",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["ProtoObject", ""],
-      "resultName": "ProtoObjectClass"
+      "name": "Symbol",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["value"]
     },
     {
-      "receiver": "ProtoObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Object", ""],
-      "resultName": "ObjectClass"
+      "name": "String",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["characters"]
     },
     {
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Behavior", "methodDict"],
-      "resultName": "BehaviorClass"
+      "name": "Message",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["selector", "arguments"]
     },
     {
-      "receiver": "BehaviorClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["ClassDescription", "format"],
-      "resultName": "ClassDescriptionClass"
+      "name": "CompiledMethod",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["selector", "bytecode", "literals", "header"]
     },
     {
-      "receiver": "ClassDescriptionClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Class", "superclass methodDict format instanceVariables name"],
-      "resultName": "ClassClass"
+      "name": "MethodContext",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["sender", "receiver", "method", "arguments", "pc", "stackPointer"]
     },
     {
-      "receiver": "ClassClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Metaclass", "thisClass"],
-      "resultName": "MetaclassClass"
+      "name": "Array",
+      "superclass": "ProtoObject",
+      "instanceVariables": [],
+      "variableSize": true
     },
     {
-      "comment": "─── MethodDict Allocation ───────────────────────────────────────",
-      "receiver": "ProtoObjectClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "ProtoObjectMethodDict"
+      "name": "ByteArray",
+      "superclass": "Array",
+      "instanceVariables": [],
+      "variableSize": true
     },
     {
-      "receiver": "ObjectClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "ObjectMethodDict"
-    },
-    {
-      "receiver": "BehaviorClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "BehaviorMethodDict"
-    },
-    {
-      "receiver": "ClassDescriptionClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "ClassDescriptionMethodDict"
-    },
-    {
-      "receiver": "ClassClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "ClassMethodDict"
-    },
-    {
-      "receiver": "MetaclassClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "MetaclassMethodDict"
-    },
-    {
-      "comment": "─── ProtoObject Methods ─────────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["==", [16, 17, 182, 135]],
-      "resultName": "EqualsMethod"
-    },
-    {
-      "receiver": "ProtoObjectMethodDict",
-      "selector": "at:put:",
-      "arguments": ["==", "EqualsMethod"]
-    },
-    {
-      "comment": "─── Object Methods ──────────────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["initialize", [124]],
-      "resultName": "InitializeMethod"
-    },
-    {
-      "receiver": "ObjectMethodDict",
-      "selector": "at:put:",
-      "arguments": ["initialize", "InitializeMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["class", [16, 135]],
-      "resultName": "ClassMethod"
-    },
-    {
-      "receiver": "ObjectMethodDict",
-      "selector": "at:put:",
-      "arguments": ["class", "ClassMethod"]
-    },
-    {
-      "comment": "─── Behavior Methods ────────────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["methodDict", [16, 135]],
-      "resultName": "MethodDictGetter"
-    },
-    {
-      "receiver": "BehaviorMethodDict",
-      "selector": "at:put:",
-      "arguments": ["methodDict", "MethodDictGetter"]
-    },
-    {
-      "comment": "─── ClassDescription Methods ────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["format", [16, 135]],
-      "resultName": "FormatGetter"
-    },
-    {
-      "receiver": "ClassDescriptionMethodDict",
-      "selector": "at:put:",
-      "arguments": ["format", "FormatGetter"]
-    },
-    {
-      "comment": "─── Class Methods ───────────────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["superclass", [16, 135]],
-      "resultName": "SuperclassGetter"
-    },
-    {
-      "receiver": "ClassMethodDict",
-      "selector": "at:put:",
-      "arguments": ["superclass", "SuperclassGetter"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["name", [16, 135]],
-      "resultName": "NameGetter"
-    },
-    {
-      "receiver": "ClassMethodDict",
-      "selector": "at:put:",
-      "arguments": ["name", "NameGetter"]
-    },
-    {
-      "comment": "─── Metaclass Methods ───────────────────────────────────────────",
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["thisClass", [16, 135]],
-      "resultName": "ThisClassGetter"
-    },
-    {
-      "receiver": "MetaclassMethodDict",
-      "selector": "at:put:",
-      "arguments": ["thisClass", "ThisClassGetter"]
-    },
-    {
-      "comment": "─── Global Bindings ─────────────────────────────────────────────",
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["ProtoObject", "ProtoObjectClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Object", "ObjectClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Behavior", "BehaviorClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["ClassDescription", "ClassDescriptionClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Class", "ClassClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Metaclass", "MetaclassClass"]
-    },
-    {
-      "comment": "─── Additional Core Classes ─────────────────────────────────────",
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["UndefinedObject", ""],
-      "resultName": "UndefinedObjectClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["UndefinedObject", "UndefinedObjectClass"]
-    },
-    {
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Boolean", ""],
-      "resultName": "BooleanClass"
-    },
-    {
-      "receiver": "BooleanClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["True", ""],
-      "resultName": "TrueClass"
-    },
-    {
-      "receiver": "BooleanClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["False", ""],
-      "resultName": "FalseClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Boolean", "BooleanClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["True", "TrueClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["False", "FalseClass"]
-    },
-    {
-      "comment": "─── Boolean Methods ─────────────────────────────────────────────",
-      "receiver": "TrueClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "TrueMethodDict"
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["ifTrue:", [16, 201, 124]],
-      "resultName": "TrueIfTrueMethod"
-    },
-    {
-      "receiver": "TrueMethodDict",
-      "selector": "at:put:",
-      "arguments": ["ifTrue:", "TrueIfTrueMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["ifFalse:", [123]],
-      "resultName": "TrueIfFalseMethod"
-    },
-    {
-      "receiver": "TrueMethodDict",
-      "selector": "at:put:",
-      "arguments": ["ifFalse:", "TrueIfFalseMethod"]
-    },
-    {
-      "receiver": "FalseClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "FalseMethodDict"
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["ifTrue:", [123]],
-      "resultName": "FalseIfTrueMethod"
-    },
-    {
-      "receiver": "FalseMethodDict",
-      "selector": "at:put:",
-      "arguments": ["ifTrue:", "FalseIfTrueMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:bytecodes:",
-      "arguments": ["ifFalse:", [16, 201, 124]],
-      "resultName": "FalseIfFalseMethod"
-    },
-    {
-      "receiver": "FalseMethodDict",
-      "selector": "at:put:",
-      "arguments": ["ifFalse:", "FalseIfFalseMethod"]
-    },
-    {
-      "comment": "─── Number Hierarchy ────────────────────────────────────────────",
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Magnitude", ""],
-      "resultName": "MagnitudeClass"
-    },
-    {
-      "receiver": "MagnitudeClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Number", ""],
-      "resultName": "NumberClass"
-    },
-    {
-      "receiver": "NumberClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Integer", ""],
-      "resultName": "IntegerClass"
-    },
-    {
-      "receiver": "IntegerClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["SmallInteger", ""],
-      "resultName": "SmallIntegerClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Magnitude", "MagnitudeClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Number", "NumberClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Integer", "IntegerClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["SmallInteger", "SmallIntegerClass"]
-    },
-    {
-      "comment": "─── SmallInteger Primitive Methods ─────────────────────────────",
-      "receiver": "SmallIntegerClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "SmallIntegerMethodDict"
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["+", 1, [112, 16, 176, 124]],
-      "resultName": "PlusMethod"
-    },
-    {
-      "receiver": "SmallIntegerMethodDict",
-      "selector": "at:put:",
-      "arguments": ["+", "PlusMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["-", 2, [112, 16, 177, 124]],
-      "resultName": "MinusMethod"
-    },
-    {
-      "receiver": "SmallIntegerMethodDict",
-      "selector": "at:put:",
-      "arguments": ["-", "MinusMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["*", 9, [112, 16, 184, 124]],
-      "resultName": "MultiplyMethod"
-    },
-    {
-      "receiver": "SmallIntegerMethodDict",
-      "selector": "at:put:",
-      "arguments": ["*", "MultiplyMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["<", 3, [112, 16, 178, 124]],
-      "resultName": "LessThanMethod"
-    },
-    {
-      "receiver": "SmallIntegerMethodDict",
-      "selector": "at:put:",
-      "arguments": ["<", "LessThanMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["=", 7, [112, 16, 182, 124]],
-      "resultName": "EqualsMethod"
-    },
-    {
-      "receiver": "SmallIntegerMethodDict",
-      "selector": "at:put:",
-      "arguments": ["=", "EqualsMethod"]
-    },
-    {
-      "comment": "─── Collection Hierarchy ────────────────────────────────────────",
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Collection", ""],
-      "resultName": "CollectionClass"
-    },
-    {
-      "receiver": "CollectionClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["SequenceableCollection", ""],
-      "resultName": "SequenceableCollectionClass"
-    },
-    {
-      "receiver": "SequenceableCollectionClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["ArrayedCollection", ""],
-      "resultName": "ArrayedCollectionClass"
-    },
-    {
-      "receiver": "ArrayedCollectionClass",
-      "selector": "variableSubclass:instanceVariableNames:",
-      "arguments": ["Array", ""],
-      "resultName": "ArrayClass"
-    },
-    {
-      "receiver": "ArrayedCollectionClass",
-      "selector": "variableByteSubclass:instanceVariableNames:",
-      "arguments": ["String", ""],
-      "resultName": "StringClass"
-    },
-    {
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Symbol", ""],
-      "resultName": "SymbolClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Collection", "CollectionClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["SequenceableCollection", "SequenceableCollectionClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["ArrayedCollection", "ArrayedCollectionClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Array", "ArrayClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["String", "StringClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Symbol", "SymbolClass"]
-    },
-    {
-      "comment": "─── Array Primitive Methods ─────────────────────────────────────",
-      "receiver": "ArrayClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "ArrayMethodDict"
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["at:", 60, [112, 209, 124]],
-      "resultName": "AtMethod"
-    },
-    {
-      "receiver": "ArrayMethodDict",
-      "selector": "at:put:",
-      "arguments": ["at:", "AtMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["at:put:", 61, [112, 209, 124]],
-      "resultName": "AtPutMethod"
-    },
-    {
-      "receiver": "ArrayMethodDict",
-      "selector": "at:put:",
-      "arguments": ["at:put:", "AtPutMethod"]
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["size", 62, [112, 209, 124]],
-      "resultName": "SizeMethod"
-    },
-    {
-      "receiver": "ArrayMethodDict",
-      "selector": "at:put:",
-      "arguments": ["size", "SizeMethod"]
-    },
-    {
-      "comment": "─── Dictionary Hierarchy ────────────────────────────────────────",
-      "receiver": "CollectionClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Set", "tally array"],
-      "resultName": "SetClass"
-    },
-    {
-      "receiver": "SetClass",
-      "selector": "variableSubclass:instanceVariableNames:",
-      "arguments": ["Dictionary", ""],
-      "resultName": "DictionaryClass"
-    },
-    {
-      "receiver": "DictionaryClass",
-      "selector": "variableSubclass:instanceVariableNames:",
-      "arguments": ["IdentityDictionary", ""],
-      "resultName": "IdentityDictionaryClass"
-    },
-    {
-      "receiver": "IdentityDictionaryClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["MethodDictionary", ""],
-      "resultName": "MethodDictionaryClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Set", "SetClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Dictionary", "DictionaryClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["IdentityDictionary", "IdentityDictionaryClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["MethodDictionary", "MethodDictionaryClass"]
-    },
-    {
-      "comment": "─── Supporting Classes ──────────────────────────────────────────",
-      "receiver": "MagnitudeClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["LookupKey", "key"],
-      "resultName": "LookupKeyClass"
-    },
-    {
-      "receiver": "LookupKeyClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["Association", "value"],
-      "resultName": "AssociationClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["LookupKey", "LookupKeyClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["Association", "AssociationClass"]
-    },
-    {
-      "comment": "─── Execution Machinery ─────────────────────────────────────────",
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["BlockContext", "nargs startpc home"],
-      "resultName": "BlockContextClass"
-    },
-    {
-      "receiver": "ObjectClass",
-      "selector": "subclass:instanceVariableNames:",
-      "arguments": ["CompiledMethod", ""],
-      "resultName": "CompiledMethodClass"
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["BlockContext", "BlockContextClass"]
-    },
-    {
-      "receiver": "Smalltalk",
-      "selector": "at:put:",
-      "arguments": ["CompiledMethod", "CompiledMethodClass"]
-    },
-    {
-      "comment": "─── BlockContext Methods ────────────────────────────────────────",
-      "receiver": "BlockContextClass",
-      "selector": "methodDict",
-      "arguments": [],
-      "resultName": "BlockContextMethodDict"
-    },
-    {
-      "receiver": "CompiledMethod",
-      "selector": "newWithSelector:primitive:bytecodes:",
-      "arguments": ["value", 81, [112, 209, 124]],
-      "resultName": "ValueMethod"
-    },
-    {
-      "receiver": "BlockContextMethodDict",
-      "selector": "at:put:",
-      "arguments": ["value", "ValueMethod"]
+      "name": "MethodDictionary",
+      "superclass": "ProtoObject",
+      "instanceVariables": ["keys", "values"]
     }
   ],
-  "validation": {
-    "checkpoints": [
-      {
-        "description": "Core class hierarchy established",
-        "test": "Class superclass == ClassDescription and: [ClassDescription superclass == Behavior]"
-      },
-      {
-        "description": "ProtoObject methods installed",
-        "test": "ProtoObject methodDict includesKey: #=="
-      },
-      {
-        "description": "Object methods installed",
-        "test": "(Object methodDict includesKey: #initialize) and: [(Object methodDict includesKey: #class)]"
-      },
-      {
-        "description": "Boolean control flow works",
-        "test": "(True methodDict includesKey: #ifTrue:) and: [(False methodDict includesKey: #ifFalse:)]"
-      },
-      {
-        "description": "SmallInteger arithmetic works",
-        "test": "(SmallInteger methodDict includesKey: #+) and: [(SmallInteger methodDict includesKey: #<)]"
-      },
-      {
-        "description": "All classes registered in Smalltalk",
-        "test": "(Smalltalk includesKey: #Object) and: [(Smalltalk includesKey: #Array)]"
+  "objects": [
+    {
+      "id": "sym_selector",
+      "class": "Symbol",
+      "fields": {
+        "value": "selector"
       }
-    ]
-  }
+    },
+    {
+      "id": "sym_arguments",
+      "class": "Symbol",
+      "fields": {
+        "value": "arguments"
+      }
+    },
+    {
+      "id": "sym_executeWithReceiver",
+      "class": "Symbol",
+      "fields": {
+        "value": "executeWith:receiver:"
+      }
+    },
+    {
+      "id": "sym_sendToWith",
+      "class": "Symbol",
+      "fields": {
+        "value": "send:to:with:"
+      }
+    },
+    {
+      "id": "sym_printString",
+      "class": "Symbol",
+      "fields": {
+        "value": "printString"
+      }
+    },
+    {
+      "id": "sym_at",
+      "class": "Symbol",
+      "fields": {
+        "value": "at:"
+      }
+    },
+    {
+      "id": "sym_atPut",
+      "class": "Symbol",
+      "fields": {
+        "value": "at:put:"
+      }
+    },
+    {
+      "id": "sym_size",
+      "class": "Symbol",
+      "fields": {
+        "value": "size"
+      }
+    },
+    {
+      "id": "bytecode_returnIvar0",
+      "class": "ByteArray",
+      "elements": [0, 124]
+    },
+    {
+      "id": "bytecode_returnIvar1",
+      "class": "ByteArray",
+      "elements": [1, 124]
+    },
+    {
+      "id": "bytecode_returnSelf",
+      "class": "ByteArray",
+      "elements": [112, 124]
+    },
+    {
+      "id": "bytecode_messageDispatch",
+      "class": "ByteArray",
+      "elements": [16, 17, 18, 131, 96, 124]
+    },
+    {
+      "id": "bytecode_primitive",
+      "class": "ByteArray",
+      "elements": [112, 124]
+    },
+    {
+      "id": "literals_empty",
+      "class": "Array",
+      "elements": []
+    },
+    {
+      "id": "literals_selector",
+      "class": "Array",
+      "elements": ["sym_selector"]
+    },
+    {
+      "id": "literals_arguments",
+      "class": "Array",
+      "elements": ["sym_arguments"]
+    },
+    {
+      "id": "literals_value",
+      "class": "Array",
+      "elements": ["sym_value"]
+    },
+    {
+      "id": "literals_send",
+      "class": "Array",
+      "elements": ["Message", "CompiledMethod", "sym_executeWithReceiver"]
+    },
+    {
+      "id": "method_message_selector",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_selector",
+        "bytecode": "bytecode_returnIvar0",
+        "literals": "literals_selector",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_message_arguments",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_arguments",
+        "bytecode": "bytecode_returnIvar1",
+        "literals": "literals_arguments",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_compiledmethod_execute",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_executeWithReceiver",
+        "bytecode": "bytecode_primitive",
+        "literals": "literals_empty",
+        "header": 166
+      }
+    },
+    {
+      "id": "method_methodcontext_send",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_sendToWith",
+        "bytecode": "bytecode_messageDispatch",
+        "literals": "literals_send",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_symbol_printString",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_printString",
+        "bytecode": "bytecode_returnIvar0",
+        "literals": "literals_value",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_string_printString",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_printString",
+        "bytecode": "bytecode_returnSelf",
+        "literals": "literals_empty",
+        "header": 0
+      }
+    },
+    {
+      "id": "method_array_at",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_at",
+        "bytecode": "bytecode_primitive",
+        "literals": "literals_empty",
+        "header": 120
+      }
+    },
+    {
+      "id": "method_array_atPut",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_atPut",
+        "bytecode": "bytecode_primitive",
+        "literals": "literals_empty",
+        "header": 122
+      }
+    },
+    {
+      "id": "method_array_size",
+      "class": "CompiledMethod",
+      "fields": {
+        "selector": "sym_size",
+        "bytecode": "bytecode_primitive",
+        "literals": "literals_empty",
+        "header": 124
+      }
+    },
+    {
+      "id": "sym_value",
+      "class": "Symbol",
+      "fields": {
+        "value": "value"
+      }
+    },
+    {
+      "id": "methodDict_Message",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_selector", "sym_arguments"],
+        "values": ["method_message_selector", "method_message_arguments"]
+      }
+    },
+    {
+      "id": "methodDict_CompiledMethod",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_executeWithReceiver"],
+        "values": ["method_compiledmethod_execute"]
+      }
+    },
+    {
+      "id": "methodDict_MethodContext",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_sendToWith"],
+        "values": ["method_methodcontext_send"]
+      }
+    },
+    {
+      "id": "methodDict_Symbol",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_printString"],
+        "values": ["method_symbol_printString"]
+      }
+    },
+    {
+      "id": "methodDict_String",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_printString"],
+        "values": ["method_string_printString"]
+      }
+    },
+    {
+      "id": "methodDict_Array",
+      "class": "MethodDictionary",
+      "fields": {
+        "keys": ["sym_at", "sym_atPut", "sym_size"],
+        "values": ["method_array_at", "method_array_atPut", "method_array_size"]
+      }
+    }
+  ],
+  "patches": [
+    {
+      "target": "Message",
+      "slot": "methodDict",
+      "value": "methodDict_Message"
+    },
+    {
+      "target": "CompiledMethod",
+      "slot": "methodDict",
+      "value": "methodDict_CompiledMethod"
+    },
+    {
+      "target": "MethodContext",
+      "slot": "methodDict",
+      "value": "methodDict_MethodContext"
+    },
+    {
+      "target": "Symbol",
+      "slot": "methodDict",
+      "value": "methodDict_Symbol"
+    },
+    {
+      "target": "String",
+      "slot": "methodDict",
+      "value": "methodDict_String"
+    },
+    {
+      "target": "Array",
+      "slot": "methodDict",
+      "value": "methodDict_Array"
+    }
+  ]
 }

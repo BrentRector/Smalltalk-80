@@ -61,7 +61,7 @@
     { "op": "setSuperclass", "target": "BehaviorClass", "value": "ObjectClass" },
     { "op": "setSuperclass", "target": "ClassDescriptionClass", "value": "BehaviorClass" },
     { "op": "setSuperclass", "target": "ClassClass", "value": "ClassDescriptionClass" },
-    { "op": "setSuperclass", "target": "MetaclassClass", "value": "ClassDescriptionClass" },
+    { "op": "setSuperclass", "target": "MetaclassClass", "value": "MetaclassClass" },
 
     { "comment": "Set instance variables" },
     { "op": "setInstanceVariables", "target": "Behavior", "value": ["superclass", "methodDict", "format"] },

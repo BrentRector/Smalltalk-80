@@ -6,6 +6,7 @@ using System.Text;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Smalltalk80;
+using Smalltalk80.Bootstrap;
 using Smalltalk80.Generated;
 using Smalltalk80.Parser;
 
@@ -19,6 +20,8 @@ public sealed class VirtualMachine
     /// Gets the interpreter instance executing methods for this VM.
     /// </summary>
     public Interpreter Interpreter { get; } = new() { ExitOnReturn = false };
+    
+    private VMPrimitiveAdapter? bootstrapAdapter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using JSON bootstrap.
@@ -88,14 +91,15 @@ public sealed class VirtualMachine
         
         // Parse and execute JSON bootstrap operations
         var jsonContent = File.ReadAllText(phase1Path);
-        var bootstrapExecutor = new JsonBootstrapExecutor(new VMPrimitiveAdapter(this));
+        bootstrapAdapter = new VMPrimitiveAdapter(this);
+        var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
         bootstrapExecutor.ExecutePhase1(jsonContent);
         
         Console.WriteLine($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
         Console.WriteLine("[BOOTSTRAP] Phase 1 complete: VM primitives executed");
         
         // Dump classes after Phase 1
-        DumpAllClasses("PHASE 1 CLASSES");
+        // DumpAllClasses("PHASE 1 CLASSES");  // Commented out - Phase 1 is solid
     }
     
     /// <summary>
@@ -108,13 +112,22 @@ public sealed class VirtualMachine
         var phase2Path = Path.Combine(bootstrapDir, "bootstrap_phase2.json");
         if (!File.Exists(phase2Path))
         {
-            throw new FileNotFoundException($"Phase 2 bootstrap file not found: {phase2Path}");
+            Console.WriteLine($"[BOOTSTRAP] Phase 2 file not found at {phase2Path}, skipping Phase 2");
+            return;
         }
         
-        // TODO: Parse JSON and execute message sends to build class hierarchy
-        // For now, the Phase 1 bootstrap includes the basic class structure
+        // Parse and execute Phase 2 bootstrap operations
+        var jsonContent = File.ReadAllText(phase2Path);
+        if (bootstrapAdapter == null)
+        {
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
+        }
         
-        Console.WriteLine("[BOOTSTRAP] Phase 2 complete: Class hierarchy constructed");
+        var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
+        bootstrapExecutor.ExecutePhase2(jsonContent);
+        
+        Console.WriteLine($"[BOOTSTRAP] Phase 2 complete: Messaging infrastructure created");
+        Console.WriteLine($"[BOOTSTRAP] Total objects in VM: {ObjectMemory.Objects.Count}");
         
         // Dump classes after Phase 2
         DumpAllClasses("PHASE 2 CLASSES");
@@ -344,6 +357,25 @@ public sealed class VirtualMachine
         if (obj.ClassPointer == null)
             return null;
             
+        // Try to look up the class name from the bootstrap adapter's global registry
+        if (bootstrapAdapter != null)
+        {
+            var globals = bootstrapAdapter.GetGlobals();
+            foreach (var (name, oop) in globals)
+            {
+                if (oop == obj.ClassPointer.Oop)
+                {
+                    // Convert naming convention: "FooClass" -> "Foo class" for metaclasses
+                    if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
+                    {
+                        var baseName = name.Substring(0, name.Length - 5);
+                        return $"{baseName} class";
+                    }
+                    return name;
+                }
+            }
+        }
+            
         // Since we no longer have SystemDictionary, we'll identify classes by their OOP
         // This is a simplified approach - in a full implementation we'd have a name table
         return $"Class#{obj.ClassPointer.Oop}";
@@ -354,16 +386,46 @@ public sealed class VirtualMachine
     /// </summary>
     private void DumpSmalltalkObject(SmalltalkObject obj, string indent, string objectType)
     {
+        // Check if this object is itself a globally named object
+        string? objName = null;
+        if (bootstrapAdapter != null)
+        {
+            var globals = bootstrapAdapter.GetGlobals();
+            foreach (var (name, globalOop) in globals)
+            {
+                if (globalOop == obj.Oop)
+                {
+                    objName = name;
+                    break;
+                }
+            }
+        }
+        
+        // Convert naming convention: "FooClass" -> "Foo class"
+        if (objName != null && objName.EndsWith("Class") && objName != "Class" && objName != "Metaclass")
+        {
+            var baseName = objName.Substring(0, objName.Length - 5);
+            objName = $"{baseName} class";
+        }
+        
         var className = GetObjectClassName(obj) ?? "(unknown class)";
         var oop = obj.Oop;
         var fieldCount = obj.Fields.Length;
         
-        Console.WriteLine($"{indent}🔸 {objectType} #{oop}: {className} ({fieldCount} fields)");
+        // Use objName if available (it's already properly formatted), otherwise use className
+        var displayName = objName ?? className;
+        Console.WriteLine($"{indent}🔸 {objectType} #{oop}: {displayName} ({fieldCount} fields)");
         
         // Show class pointer info
         if (obj.ClassPointer != null)
         {
-            Console.WriteLine($"{indent}  📋 Class: {className} @ {obj.ClassPointer.GetHashCode():X8}");
+            var classInfo = className;
+            if (objName != null && className.StartsWith("Class#"))
+            {
+                // Try to get the actual class name
+                classInfo = GetObjectClassName(obj) ?? className;
+            }
+            Console.WriteLine($"{indent}  📋 Class: {classInfo} @ OOP#{obj.ClassPointer.Oop}");
         }
         else
         {
@@ -376,11 +438,15 @@ public sealed class VirtualMachine
             Console.WriteLine($"{indent}  📦 Fields:");
             int maxFields = Math.Min(fieldCount, 5); // Limit to first 5 fields
             
+            // Get field names based on the object type
+            var fieldNames = GetFieldNamesForObject(obj, objName ?? className);
+            
             for (int i = 0; i < maxFields; i++)
             {
                 var field = obj.Fields[i];
                 string fieldDesc = DescribeFieldValue(field, indent + "    ");
-                Console.WriteLine($"{indent}    [{i}] = {fieldDesc}");
+                string fieldName = (fieldNames != null && i < fieldNames.Count) ? fieldNames[i] : "?";
+                Console.WriteLine($"{indent}    [{i} - {fieldName}] = {fieldDesc}");
             }
             
             if (fieldCount > maxFields)
@@ -388,6 +454,86 @@ public sealed class VirtualMachine
                 Console.WriteLine($"{indent}    ... and {fieldCount - maxFields} more fields");
             }
         }
+    }
+    
+    /// <summary>
+    /// Gets field names for a given object based on its class.
+    /// </summary>
+    private List<string>? GetFieldNamesForObject(SmalltalkObject obj, string displayName)
+    {
+        // Check if this object IS a class (has a metaclass as its class)
+        bool isClass = false;
+        bool isMetaclass = false;
+        
+        if (obj.ClassPointer != null)
+        {
+            // Get the name of this object's class
+            var classPointerName = GetObjectClassName(obj.ClassPointer);
+            
+            // Check if the class pointer itself is registered as a metaclass
+            if (bootstrapAdapter != null)
+            {
+                var globals = bootstrapAdapter.GetGlobals();
+                foreach (var (name, globalOop) in globals)
+                {
+                    if (globalOop == obj.ClassPointer.Oop)
+                    {
+                        // Found the class pointer in globals
+                        if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
+                        {
+                            // It's a metaclass (e.g., SymbolClass)
+                            isClass = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!isClass && classPointerName == "Metaclass")
+            {
+                // This object is a metaclass itself
+                isMetaclass = true;
+            }
+        }
+        
+        // If it's a class object, return class field names
+        if (isClass)
+        {
+            return new List<string>
+            {
+                "superclass", "methodDict", "format", "instanceVariables",
+                "organization", "name", "classPool", "sharedPools"
+            };
+        }
+        
+        // If it's a metaclass object, return metaclass field names
+        if (isMetaclass || displayName?.EndsWith(" class") == true)
+        {
+            return new List<string>
+            {
+                "superclass", "methodDict", "format", "instanceVariables",
+                "organization", "thisClass"
+            };
+        }
+        
+        // Otherwise, it's an instance - get field names based on its class
+        var className = GetObjectClassName(obj) ?? displayName;
+        
+        return className switch
+        {
+            // Instance field names
+            "Symbol" => new List<string> { "value" },
+            "String" => new List<string> { "characters" },
+            "Message" => new List<string> { "selector", "arguments" },
+            "CompiledMethod" => new List<string> { "selector", "bytecode", "literals", "header" },
+            "MethodContext" => new List<string> { "sender", "receiver", "method", "arguments", "pc", "stackPointer" },
+            "MethodDictionary" => new List<string> { "keys", "values" },
+            
+            // Arrays are variable-sized
+            "Array" or "ByteArray" => null,
+            
+            _ => null
+        };
     }
     
     /// <summary>
@@ -401,6 +547,39 @@ public sealed class VirtualMachine
         if (field is SmalltalkObject fieldObj)
         {
             var fieldClassName = GetObjectClassName(fieldObj) ?? "(unknown)";
+            
+            // Special handling for Symbol and String objects to show their value
+            if (fieldClassName == "Symbol" || fieldClassName == "String")
+            {
+                // Try to get the value from the first field
+                if (fieldObj.Fields.Length > 0 && fieldObj.Fields[0] is string value)
+                {
+                    if (fieldClassName == "Symbol")
+                        return $"#{value}";
+                    else
+                        return $"\"{value}\"";
+                }
+            }
+            
+            // Check if this object itself is registered as a class
+            if (bootstrapAdapter != null)
+            {
+                var globals = bootstrapAdapter.GetGlobals();
+                foreach (var (name, globalOop) in globals)
+                {
+                    if (globalOop == fieldObj.Oop)
+                    {
+                        // Convert naming convention: "FooClass" -> "Foo class"
+                        var displayName = name;
+                        if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
+                        {
+                            var baseName = name.Substring(0, name.Length - 5);
+                            displayName = $"{baseName} class";
+                        }
+                        return $"{displayName} (OOP #{fieldObj.Oop})";
+                    }
+                }
+            }
             return $"SmalltalkObject #{fieldObj.Oop}: {fieldClassName}";
         }
         
