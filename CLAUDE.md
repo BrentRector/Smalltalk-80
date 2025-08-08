@@ -48,6 +48,28 @@ Any errors or warnings indicate a regression in the parser that must be fixed im
   - Ensuring all class descriptions, instance variables, and key methods are documented
 - **File System Implementation**: The file system has been completely implemented with modern File and FileDirectory classes that bridge to C# file system primitives (142-157). The FileStream class has been updated to work with these new classes instead of the original Alto-specific FilePage class. All file I/O operations now use primitive-based implementations.
 
+## Folder Organization Guidelines
+
+**Repository Structure and File Management:**
+
+- **Core Implementation**: All interpreter code belongs in the `Smalltalk80/` directory
+- **Test Files**: Test classes go in the `Testing/` directory with `.st` extensions
+- **Documentation**: Keep all documentation files in the `docs/` directory
+- **Build Artifacts**: The `bin/` and `obj/` directories contain build outputs - never commit these
+- **Temporary Files**: Use the `temp/` directory for temporary files, logs, and test outputs:
+  - **Log files**: All `*.log` files should be moved to `temp/` to keep the root clean
+  - **Test outputs**: Files like `test_output.txt`, `test_output.log` belong in `temp/`
+  - **Parse results**: Parser validation logs and system image parse outputs go in `temp/`
+  - **Debug files**: Temporary debug files and experimental outputs belong in `temp/`
+- **Archive Directory**: The `old_duplicates_backup/` directory contains archived duplicate files - avoid modifying
+- **Scripts**: PowerShell and other utility scripts belong in the `scripts/` directory
+
+**File Cleanup Protocol:**
+- Move all log files and test outputs to the `temp/` directory immediately after creation
+- Keep the repository root clean of temporary artifacts
+- Use descriptive names for temporary files with timestamps when appropriate
+- Regularly clean out obsolete files from the `temp/` directory
+
 ## PowerShell Installation (Reference)
 
 - **Installing powershell**: This will have been done when setting up the Environment:
