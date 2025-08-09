@@ -1,69 +1,253 @@
 {
-  "phase": "2-bytecode-enabled", 
-  "description": "Phase 2 with compiled bytecode methods from Smalltalk-80 system image",
+  "phase": "2-critical-methods",
+  "description": "Phase 2 with critical methods for message-based class installation",
   "comments": [
-    "This Phase 2 contains compiled bytecode methods and essential class hierarchy",
-    "Includes full numeric hierarchy, execution contexts, and basic collections",
-    "Methods use Blue Book bytecode with primitives where appropriate"
+    "This Phase 2 adds the 8 critical methods needed for message-based class installation",
+    "Methods are added to Phase 1 classes: CompiledMethod, Class, MethodDictionary, SystemDictionary",
+    "These enable Phase 3 to install classes via message sends instead of compile:"
   ],
   "classes": [
     {
-      "name": "ClassDescription",
-      "superclass": "Behavior",
-      "instanceVariables": ["instanceVariables", "organization"],
+      "name": "CompiledMethod",
+      "superclass": "Object",
+      "instanceVariables": ["selector", "bytecode", "literals", "header"],
       "methods": [
         {
-          "selector": "name",
-          "bytecode": [176]
+          "selector": "header:",
+          "bytecode": [16, 99, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set header (field 3): pushTemp: 0, popIntoRcvrVariable: 3, returnTop"
         },
         {
-          "selector": "isMeta",
-          "bytecode": [178, 180]
+          "selector": "bytecodes:",
+          "bytecode": [16, 97, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set bytecode (field 1): pushTemp: 0, popIntoRcvrVariable: 1, returnTop"
+        },
+        {
+          "selector": "literals:",
+          "bytecode": [16, 98, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set literals (field 2): pushTemp: 0, popIntoRcvrVariable: 2, returnTop"
+        },
+        {
+          "selector": "selector:",
+          "bytecode": [16, 96, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set selector (field 0): pushTemp: 0, popIntoRcvrVariable: 0, returnTop"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new",
+          "bytecode": [112, 208, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": ["basicNew"],
+          "comment": "pushReceiver, send: basicNew, returnTop"
+        }
+      ]
+    },
+    {
+      "name": "Class", 
+      "superclass": "Behavior",
+      "instanceVariables": ["name"],
+      "methods": [
+        {
+          "selector": "methodDictionary",
+          "bytecode": [1, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return methodDict (field 1): pushRcvrVariable: 1, returnTop"
+        },
+        {
+          "selector": "methodDictionary:",
+          "bytecode": [16, 97, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set methodDict (field 1): pushTemp: 0, popIntoRcvrVariable: 1, returnTop"
+        },
+        {
+          "selector": "name",
+          "bytecode": [3, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return name (field 3 in Class): pushRcvrVariable: 3, returnTop"
+        },
+        {
+          "selector": "name:",
+          "bytecode": [16, 99, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set name (field 3): pushTemp: 0, popIntoRcvrVariable: 3, returnTop"
+        },
+        {
+          "selector": "superclass:",
+          "bytecode": [16, 96, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set superclass (field 0): pushTemp: 0, popIntoRcvrVariable: 0, returnTop"
+        }
+      ]
+    },
+    {
+      "name": "Behavior",
+      "superclass": "Object",
+      "instanceVariables": ["superclass", "methodDict", "format"],
+      "methods": [
+        {
+          "selector": "methodDictionary",
+          "bytecode": [1, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return methodDict (field 1): pushRcvrVariable: 1, returnTop"
+        },
+        {
+          "selector": "methodDictionary:",
+          "bytecode": [16, 97, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set methodDict (field 1): pushTemp: 0, popIntoRcvrVariable: 1, returnTop"
+        },
+        {
+          "selector": "superclass",
+          "bytecode": [0, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return superclass (field 0): pushRcvrVariable: 0, returnTop"
+        },
+        {
+          "selector": "superclass:",
+          "bytecode": [16, 96, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set superclass (field 0): pushTemp: 0, popIntoRcvrVariable: 0, returnTop"
+        },
+        {
+          "selector": "new",
+          "bytecode": [112, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitive": 70,
+          "comment": "Primitive 70: allocate new instance"
+        },
+        {
+          "selector": "basicNew",
+          "bytecode": [112, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitive": 70,
+          "comment": "Primitive 70: allocate new instance"
+        }
+      ]
+    },
+    {
+      "name": "MethodDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "at:put:",
+          "bytecode": [112, 16, 17, 133, 0, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "literals": ["at:put:"],
+          "comment": "pushReceiver, pushTemp: 0, pushTemp: 1, singleExtendedSuperSend: at:put:, returnTop"
+        }
+      ]
+    },
+    {
+      "name": "SystemDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "at:put:",
+          "bytecode": [112, 16, 17, 133, 0, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "literals": ["at:put:"],
+          "comment": "pushReceiver, pushTemp: 0, pushTemp: 1, singleExtendedSuperSend: at:put:, returnTop"
+        }
+      ]
+    },
+    {
+      "name": "Dictionary",
+      "superclass": "Collection",
+      "instanceVariables": ["tally"],
+      "methods": [
+        {
+          "selector": "at:put:",
+          "bytecode": [16, 17, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitive": 61,
+          "comment": "Primitive 61: dictionary at:put:"
         }
       ]
     },
     {
       "name": "UndefinedObject",
-      "superclass": "Object", 
+      "superclass": "Object",
       "instanceVariables": [],
       "methods": [
         {
           "selector": "release",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
-          "selector": "deepCopy", 
-          "bytecode": [176]
+          "selector": "deepCopy",
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
           "selector": "shallowCopy",
-          "bytecode": [176], 
+          "bytecode": [176],
           "argumentCount": 0,
           "temporaryCount": 0
         },
         {
           "selector": "printOn:",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "storeOn:",
           "bytecode": [176],
-          "argumentCount": 1, 
+          "argumentCount": 1,
           "temporaryCount": 0
         },
         {
           "selector": "isNil",
-          "bytecode": [177, 180]        },
+          "bytecode": [177, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
         {
-          "selector": "notNil", 
-          "bytecode": [178, 180]        },
+          "selector": "notNil",
+          "bytecode": [178, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
         {
           "selector": "addDependent:",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "new",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         }
       ]
     },
@@ -74,42 +258,98 @@
       "methods": [
         {
           "selector": "&",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "eqv:",
-          "bytecode": [176]
+          "bytecode": [0, 16, 192, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["=="]
         },
         {
           "selector": "not",
-          "bytecode": [64, 180],
+          "bytecode": [176],
           "argumentCount": 0,
-          "temporaryCount": 0,
-          "literals": ["selfsubclassResponsibility"]
+          "temporaryCount": 0
         },
         {
           "selector": "xor:",
-          "bytecode": [176]
+          "bytecode": [0, 16, 192, 193, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["==", "not"]
         },
         {
-          "selector": "|", 
-          "bytecode": [176]
+          "selector": "|",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:ifTrue:",
+          "bytecode": [64, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "literals": ["subclassResponsibility"]
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue:ifFalse:",
+          "bytecode": [64, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "literals": ["subclassResponsibility"]
+        },
+        {
+          "selector": "or:",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "deepCopy",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
           "selector": "shallowCopy",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
           "selector": "storeOn:",
-          "bytecode": [176]
+          "bytecode": [64, 176],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["aStream"]
         },
         {
           "selector": "new",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 0,
+          "temporaryCount": 0
         }
       ]
     },
@@ -120,36 +360,134 @@
       "methods": [
         {
           "selector": "&",
-          "bytecode": [16, 180]        },
+          "bytecode": [16, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
         {
           "selector": "not",
-          "bytecode": [178, 180]        },
+          "bytecode": [178, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
         {
           "selector": "|",
-          "bytecode": [177, 180]        },
+          "bytecode": [0, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [64, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["value"]
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [179, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:ifTrue:",
+          "bytecode": [17, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [64, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["value"]
+        },
+        {
+          "selector": "ifTrue:ifFalse:",
+          "bytecode": [16, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "or:",
+          "bytecode": [0, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
         {
           "selector": "printOn:",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         }
       ]
     },
     {
       "name": "False",
-      "superclass": "Boolean", 
+      "superclass": "Boolean",
       "instanceVariables": [],
       "methods": [
         {
           "selector": "&",
-          "bytecode": [178, 180]        },
+          "bytecode": [0, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
         {
           "selector": "not",
-          "bytecode": [177, 180]        },
+          "bytecode": [177, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
         {
           "selector": "|",
-          "bytecode": [16, 180]        },
+          "bytecode": [16, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [0, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [64, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["value"]
+        },
+        {
+          "selector": "ifFalse:ifTrue:",
+          "bytecode": [16, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [179, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue:ifFalse:",
+          "bytecode": [17, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "or:",
+          "bytecode": [64, 180],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["value"]
+        },
         {
           "selector": "printOn:",
-          "bytecode": [176]
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
         }
       ]
     },
@@ -163,7 +501,7 @@
           "bytecode": [64, 180],
           "argumentCount": 1,
           "temporaryCount": 0,
-          "literals": ["selfsubclassResponsibility"]
+          "literals": ["subclassResponsibility"]
         },
         {
           "selector": "<=",
@@ -177,7 +515,7 @@
           "bytecode": [64, 180],
           "argumentCount": 1,
           "temporaryCount": 0,
-          "literals": ["selfsubclassResponsibility"]
+          "literals": ["subclassResponsibility"]
         },
         {
           "selector": ">",
@@ -194,18 +532,39 @@
           "literals": ["<", "not"]
         },
         {
+          "selector": "between:and:",
+          "bytecode": [64, 176],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "literals": ["max"]
+        },
+        {
           "selector": "hash",
           "bytecode": [64, 180],
           "argumentCount": 0,
           "temporaryCount": 0,
-          "literals": ["selfsubclassResponsibility"]
+          "literals": ["subclassResponsibility"]
         },
         {
           "selector": "hashMappedBy:",
           "bytecode": [64, 180],
           "argumentCount": 1,
           "temporaryCount": 0,
-          "literals": ["selfhash"]
+          "literals": ["hash"]
+        },
+        {
+          "selector": "max:",
+          "bytecode": [64, 176],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [">"]
+        },
+        {
+          "selector": "min:",
+          "bytecode": [64, 176],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["<"]
         }
       ]
     },
@@ -216,378 +575,81 @@
       "methods": [
         {
           "selector": "<",
-          "bytecode": [0, 16, 64, 192, 180],
+          "bytecode": [0, 64, 193, 180],
           "argumentCount": 1,
           "temporaryCount": 0,
           "literals": ["key", "<"]
         },
         {
           "selector": "=",
-          "bytecode": [0, 16, 64, 192, 180],
+          "bytecode": [64, 176],
           "argumentCount": 1,
           "temporaryCount": 0,
-          "literals": ["key", "="]
+          "literals": ["key"]
         },
         {
           "selector": "hash",
-          "bytecode": [0, 64, 180],
+          "bytecode": [64, 180],
           "argumentCount": 0,
           "temporaryCount": 0,
           "literals": ["hash"]
         },
         {
+          "selector": "hashMappedBy:",
+          "bytecode": [176],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
           "selector": "key",
-          "bytecode": [0, 180]
+          "bytecode": [0, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
           "selector": "key:",
-          "bytecode": [16, 96, 176]
+          "bytecode": [16, 96, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "printOn:",
-          "bytecode": [176]
+          "bytecode": [64, 176],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["aStream"]
         }
       ]
     },
     {
       "name": "Association",
-      "superclass": "LookupKey", 
+      "superclass": "LookupKey",
       "instanceVariables": ["key", "value"],
       "methods": [
         {
+          "selector": "key:value:",
+          "bytecode": [16, 96, 17, 97, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0
+        },
+        {
           "selector": "value",
-          "bytecode": [1, 180]
+          "bytecode": [1, 180],
+          "argumentCount": 0,
+          "temporaryCount": 0
         },
         {
           "selector": "value:",
-          "bytecode": [16, 97, 176]
+          "bytecode": [16, 97, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0
         },
         {
           "selector": "printOn:",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "Number",
-      "superclass": "Magnitude",
-      "instanceVariables": [],
-      "methods": [
-        {
-          "selector": "*",
-          "bytecode": [176]
-        },
-        {
-          "selector": "+",
-          "bytecode": [176]
-        },
-        {
-          "selector": "-",
-          "bytecode": [176]
-        },
-        {
-          "selector": "/",
-          "bytecode": [176]
-        },
-        {
-          "selector": "negated",
-          "bytecode": [32, 0, 193, 180],
-          "literals": ["0", "-"]
-        },
-        {
-          "selector": "even",
-          "bytecode": [0, 32, 193, 34, 195, 180],
-          "literals": ["2", "\\", "0", "="]
-        },
-        {
-          "selector": "negative",
-          "bytecode": [0, 32, 193, 180],
-          "literals": ["0", "<"]
-        },
-        {
-          "selector": "positive",
-          "bytecode": [0, 32, 193, 180],
-          "literals": ["0", ">="]
-        },
-        {
-          "selector": "strictlyPositive",
-          "bytecode": [0, 32, 193, 180],
-          "literals": ["0", ">"]
-        },
-        {
-          "selector": "squared",
-          "bytecode": [0, 0, 192, 180],
-          "literals": ["*"]
-        }
-      ]
-    },
-    {
-      "name": "Integer",
-      "superclass": "Number", 
-      "instanceVariables": [],
-      "methods": [
-        {
-          "selector": "even",
-          "bytecode": [176]
-        },
-        {
-          "selector": "isInteger",
-          "bytecode": [177, 180]
-        },
-        {
-          "selector": "//",
-          "bytecode": [176]
-        },
-        {
-          "selector": "\\",
-          "bytecode": [176]
-        },
-        {
-          "selector": "ceiling",
-          "bytecode": [176]
-        },
-        {
-          "selector": "floor",
-          "bytecode": [176]
-        },
-        {
-          "selector": "rounded",
-          "bytecode": [176]
-        },
-        {
-          "selector": "truncated",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "SmallInteger",
-      "superclass": "Integer",
-      "instanceVariables": [],
-      "methods": [
-        {
-          "selector": "*",
-          "primitive": 9,
-          "bytecode": [176]
-        },
-        {
-          "selector": "+",
-          "primitive": 1,
-          "bytecode": [176]
-        },
-        {
-          "selector": "-",
-          "primitive": 2,
-          "bytecode": [176]
-        },
-        {
-          "selector": "/",
-          "primitive": 10,
-          "bytecode": [176]
-        },
-        {
-          "selector": "<",
-          "primitive": 3,
-          "bytecode": [176]
-        },
-        {
-          "selector": "=",
-          "primitive": 7,
-          "bytecode": [176]
-        },
-        {
-          "selector": ">",
-          "primitive": 4,
-          "bytecode": [176]
-        },
-        {
-          "selector": "bitAnd:",
-          "primitive": 14,
-          "bytecode": [176]
-        },
-        {
-          "selector": "bitOr:",
-          "primitive": 15,
-          "bytecode": [176]
-        },
-        {
-          "selector": "bitShift:",
-          "primitive": 17,
-          "bytecode": [176]
-        },
-        {
-          "selector": "deepCopy",
-          "bytecode": [176]
-        },
-        {
-          "selector": "shallowCopy",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "Message",
-      "superclass": "Object",
-      "instanceVariables": ["selector", "args"],
-      "methods": [
-        {
-          "selector": "selector",
-          "bytecode": [0, 180]
-        },
-        {
-          "selector": "arguments",
-          "bytecode": [1, 180]
-        },
-        {
-          "selector": "printOn:",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "InstructionStream",
-      "superclass": "Object",
-      "instanceVariables": ["sender", "pc"],
-      "methods": [
-        {
-          "selector": "pc",
-          "bytecode": [1, 180]
-        },
-        {
-          "selector": "method",
-          "bytecode": [176]
-        },
-        {
-          "selector": "nextByte",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "ContextPart",
-      "superclass": "InstructionStream",
-      "instanceVariables": ["sender", "pc", "stackp"],
-      "methods": [
-        {
-          "selector": "sender",
-          "bytecode": [0, 180]
-        },
-        {
-          "selector": "pc",
-          "bytecode": [1, 180]
-        },
-        {
-          "selector": "receiver",
-          "bytecode": [176]
-        },
-        {
-          "selector": "method",
-          "bytecode": [176]
-        },
-        {
-          "selector": "home",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "MethodContext",
-      "superclass": "ContextPart",
-      "instanceVariables": ["sender", "pc", "stackp", "method", "receiverMap", "receiver"],
-      "methods": [
-        {
-          "selector": "receiver",
-          "bytecode": [5, 180]
-        },
-        {
-          "selector": "method",
-          "bytecode": [3, 180]
-        },
-        {
-          "selector": "home",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "BlockContext", 
-      "superclass": "ContextPart",
-      "instanceVariables": ["sender", "pc", "stackp", "nargs", "startpc", "home"],
-      "methods": [
-        {
-          "selector": "home",
-          "bytecode": [5, 180]
-        },
-        {
-          "selector": "value",
-          "bytecode": [176]
-        },
-        {
-          "selector": "printOn:",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "SequenceableCollection",
-      "superclass": "Collection",
-      "instanceVariables": [],
-      "methods": [
-        {
-          "selector": "size",
-          "bytecode": [176]
-        },
-        {
-          "selector": "first",
-          "bytecode": [33, 64, 180],
-          "literals": ["1", "at:"]
-        },
-        {
-          "selector": "last",
-          "bytecode": [0, 64, 0, 65, 192, 180],
-          "literals": ["size", "at:"]
-        }
-      ]
-    },
-    {
-      "name": "ArrayedCollection",
-      "superclass": "SequenceableCollection",
-      "instanceVariables": [],
-      "methods": [
-        {
-          "selector": "size",
-          "primitive": 62,
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "Set",
-      "superclass": "Collection", 
-      "instanceVariables": ["tally"],
-      "methods": [
-        {
-          "selector": "size",
-          "bytecode": [0, 180]
-        },
-        {
-          "selector": "includes:",
-          "bytecode": [176]
-        }
-      ]
-    },
-    {
-      "name": "IdentityDictionary",
-      "superclass": "Dictionary",
-      "instanceVariables": ["tally", "valueArray"],
-      "methods": [
-        {
-          "selector": "at:put:",
-          "bytecode": [176]
-        },
-        {
-          "selector": "at:ifAbsent:",
-          "bytecode": [176]
+          "bytecode": [64, 65, 176],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": ["aStream", "nextPutAll:"]
         }
       ]
     }

@@ -134,8 +134,11 @@ public sealed class VirtualMachine
         JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Messaging infrastructure created");
         JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Total objects in VM: {ObjectMemory.Objects.Count}");
         
-        // Dump classes after Phase 2
-        DumpAllClasses("PHASE 2 CLASSES");
+        // Dump classes after Phase 2 (only if bootstrap debug is enabled)
+        if (JsonBootstrapExecutor.EnableBootstrapDebugOutput)
+        {
+            DumpAllClasses("PHASE 2 CLASSES");
+        }
         
         // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");

@@ -20,10 +20,15 @@ public class Program
             // Parse command line arguments
             var jsonManifests = new List<string>();
             var sourceFiles = new List<string>();
+            var classesToPrint = new List<string>();
             bool skipPhase3 = false;
             bool listPhase2Classes = false;
             bool enableVMDebug = false;
             bool enableBootstrapDebug = false;
+            bool useEnhancedPrinter = false;
+            bool showBytecode = true;
+            bool showMnemonics = true;
+            bool testCriticalMethods = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -47,6 +52,27 @@ public class Program
                 else if (args[i] == "--debug-bootstrap")
                 {
                     enableBootstrapDebug = true;
+                }
+                else if (args[i] == "--print-class" && i + 1 < args.Length)
+                {
+                    classesToPrint.Add(args[++i]);
+                    useEnhancedPrinter = true;
+                }
+                else if (args[i] == "--enhanced-print")
+                {
+                    useEnhancedPrinter = true;
+                }
+                else if (args[i] == "--no-bytecode")
+                {
+                    showBytecode = false;
+                }
+                else if (args[i] == "--no-mnemonics")
+                {
+                    showMnemonics = false;
+                }
+                else if (args[i] == "--test-critical-methods")
+                {
+                    testCriticalMethods = true;
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -102,6 +128,14 @@ public class Program
                 return 0;
             }
             
+            // If testing critical methods, do that
+            if (testCriticalMethods)
+            {
+                // Suppress the Phase 2 dump for testing
+                TestCriticalMethods.RunTests(vm);
+                return 0;
+            }
+            
             // Load Smalltalk source files if specified
             if (sourceFiles.Count > 0)
             {
@@ -125,8 +159,20 @@ public class Program
             Console.WriteLine();
             if (vm.Adapter != null)
             {
-                var prettyPrinter = new SmalltalkPrettyPrinter(vm.Adapter);
-                prettyPrinter.PrintSystemState();
+                if (useEnhancedPrinter)
+                {
+                    var enhancedPrinter = new SmalltalkPrettyPrinterEnhanced(vm.Adapter, showBytecode, showMnemonics);
+                    if (classesToPrint.Count > 0)
+                    {
+                        enhancedPrinter.SetClassFilter(classesToPrint.ToArray());
+                    }
+                    enhancedPrinter.PrintSystemState();
+                }
+                else
+                {
+                    var prettyPrinter = new SmalltalkPrettyPrinter(vm.Adapter);
+                    prettyPrinter.PrintSystemState();
+                }
             }
             else
             {

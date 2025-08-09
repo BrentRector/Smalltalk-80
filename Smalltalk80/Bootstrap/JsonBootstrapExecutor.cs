@@ -1213,6 +1213,224 @@ public class JsonBootstrapExecutor
         // Set class name
         var nameSymbol = vm.PrimitiveInternSymbol(classDef.Name);
         vm.PrimitiveSetSlot(classOop, 5, nameSymbol); // Slot 5 is name
+        
+        // Install methods from Phase 2 definition
+        if (classDef.Methods != null && classDef.Methods.Count > 0)
+        {
+            BootstrapLog($"[BOOTSTRAP] Installing {classDef.Methods.Count} methods on '{classDef.Name}'");
+            
+            // Get or create the method dictionary
+            var methodDictOop = vm.GetSlot(classOop, 1); // Slot 1 is methodDict
+            if (methodDictOop <= 0)
+            {
+                // Create a new method dictionary
+                var methodDictClassOop = vm.PrimitiveLookupClass("MethodDictionary");
+                if (methodDictClassOop > 0)
+                {
+                    // Create MethodDictionary as a variable-sized object
+                    methodDictOop = vm.PrimitiveNewArray(32); // Initial size
+                    vm.PrimitiveSetClass(methodDictOop, methodDictClassOop);
+                    
+                    // Initialize tally to 0
+                    var zeroOop = vm.PrimitiveNewSmallInteger(0);
+                    vm.PrimitiveArrayAtPut(methodDictOop, 0, zeroOop);
+                    
+                    // Initialize remaining slots to nil
+                    var nilOop = vm.PrimitiveNil();
+                    for (int i = 1; i < 32; i++)
+                    {
+                        vm.PrimitiveArrayAtPut(methodDictOop, i, nilOop);
+                    }
+                }
+                else
+                {
+                    // Fall back to basic dictionary
+                    methodDictOop = vm.PrimitiveNewDictionary();
+                }
+                vm.PrimitiveSetSlot(classOop, 1, methodDictOop);
+                BootstrapLog($"[BOOTSTRAP]   - Created new method dictionary for '{classDef.Name}'");
+            }
+            
+            // Install each method
+            foreach (var methodDef in classDef.Methods)
+            {
+                if (string.IsNullOrEmpty(methodDef.Selector))
+                    continue;
+                    
+                // Get the CompiledMethod class
+                var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
+                if (compiledMethodClassOop < 0)
+                {
+                    BootstrapLog($"[BOOTSTRAP] Warning: CompiledMethod class not found, skipping method '{methodDef.Selector}'");
+                    continue;
+                }
+                
+                // Create the method object
+                var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+                
+                // Set selector (slot 0)
+                var selectorOop = vm.PrimitiveInternSymbol(methodDef.Selector);
+                vm.PrimitiveSetSlot(methodOop, 0, selectorOop);
+                
+                // Set bytecode (slot 1)
+                if (methodDef.Bytecode != null && methodDef.Bytecode.Count > 0)
+                {
+                    var bytecodeOop = vm.PrimitiveNewByteArray(methodDef.Bytecode.Count);
+                    for (int i = 0; i < methodDef.Bytecode.Count; i++)
+                    {
+                        // Store each byte as a SmallInteger
+                        var byteOop = vm.PrimitiveNewSmallInteger(methodDef.Bytecode[i]);
+                        vm.PrimitiveArrayAtPut(bytecodeOop, i, byteOop);
+                    }
+                    vm.PrimitiveSetSlot(methodOop, 1, bytecodeOop);
+                }
+                else
+                {
+                    // Empty bytecode for primitive-only methods
+                    var emptyBytecodeOop = vm.PrimitiveNewByteArray(0);
+                    vm.PrimitiveSetSlot(methodOop, 1, emptyBytecodeOop);
+                }
+                
+                // Set literals (slot 2)
+                if (methodDef.Literals != null && methodDef.Literals.Count > 0)
+                {
+                    var literalsOop = vm.PrimitiveNewArray(methodDef.Literals.Count);
+                    for (int i = 0; i < methodDef.Literals.Count; i++)
+                    {
+                        var literalOop = vm.PrimitiveInternSymbol(methodDef.Literals[i]);
+                        vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
+                    }
+                    vm.PrimitiveSetSlot(methodOop, 2, literalsOop);
+                }
+                else
+                {
+                    var emptyLiteralsOop = vm.PrimitiveNewArray(0);
+                    vm.PrimitiveSetSlot(methodOop, 2, emptyLiteralsOop);
+                }
+                
+                // Set header (slot 3) - encode primitive if present
+                int headerValue = 0;
+                if (methodDef.Primitive.HasValue && methodDef.Primitive.Value > 0)
+                {
+                    headerValue = methodDef.Primitive.Value;
+                }
+                var headerOop = vm.PrimitiveNewSmallInteger(headerValue);
+                vm.PrimitiveSetSlot(methodOop, 3, headerOop);
+                
+                // Add method to dictionary
+                vm.PrimitiveDictionaryAtPut(methodDictOop, selectorOop, methodOop);
+                BootstrapLog($"[BOOTSTRAP]   - Installed method '{methodDef.Selector}' (bytecode length: {methodDef.Bytecode?.Count ?? 0}, primitive: {methodDef.Primitive ?? 0})");
+            }
+        }
+        
+        // Install class methods on the metaclass
+        if (classDef.ClassMethods != null && classDef.ClassMethods.Count > 0)
+        {
+            BootstrapLog($"[BOOTSTRAP] Installing {classDef.ClassMethods.Count} class methods on '{classDef.Name}' metaclass");
+            
+            // Get or create the metaclass method dictionary
+            var metaclassMethodDictOop = vm.GetSlot(metaclassOop, 1); // Slot 1 is methodDict
+            if (metaclassMethodDictOop <= 0)
+            {
+                // Create a new method dictionary
+                var methodDictClassOop = vm.PrimitiveLookupClass("MethodDictionary");
+                if (methodDictClassOop > 0)
+                {
+                    // Create MethodDictionary as a variable-sized object
+                    metaclassMethodDictOop = vm.PrimitiveNewArray(32); // Initial size
+                    vm.PrimitiveSetClass(metaclassMethodDictOop, methodDictClassOop);
+                    
+                    // Initialize tally to 0
+                    var zeroOop = vm.PrimitiveNewSmallInteger(0);
+                    vm.PrimitiveArrayAtPut(metaclassMethodDictOop, 0, zeroOop);
+                    
+                    // Initialize remaining slots to nil
+                    var nilOop = vm.PrimitiveNil();
+                    for (int i = 1; i < 32; i++)
+                    {
+                        vm.PrimitiveArrayAtPut(metaclassMethodDictOop, i, nilOop);
+                    }
+                }
+                else
+                {
+                    // Fall back to basic dictionary
+                    metaclassMethodDictOop = vm.PrimitiveNewDictionary();
+                }
+                vm.PrimitiveSetSlot(metaclassOop, 1, metaclassMethodDictOop);
+                BootstrapLog($"[BOOTSTRAP]   - Created new method dictionary for '{classDef.Name}' metaclass");
+            }
+            
+            // Install each class method
+            foreach (var methodDef in classDef.ClassMethods)
+            {
+                if (string.IsNullOrEmpty(methodDef.Selector))
+                    continue;
+                    
+                // Get the CompiledMethod class
+                var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
+                if (compiledMethodClassOop < 0)
+                {
+                    BootstrapLog($"[BOOTSTRAP] Warning: CompiledMethod class not found, skipping class method '{methodDef.Selector}'");
+                    continue;
+                }
+                
+                // Create the method object
+                var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+                
+                // Set selector (slot 0)
+                var selectorOop = vm.PrimitiveInternSymbol(methodDef.Selector);
+                vm.PrimitiveSetSlot(methodOop, 0, selectorOop);
+                
+                // Set bytecode (slot 1)
+                if (methodDef.Bytecode != null && methodDef.Bytecode.Count > 0)
+                {
+                    var bytecodeOop = vm.PrimitiveNewByteArray(methodDef.Bytecode.Count);
+                    for (int i = 0; i < methodDef.Bytecode.Count; i++)
+                    {
+                        // Store each byte as a SmallInteger
+                        var byteOop = vm.PrimitiveNewSmallInteger(methodDef.Bytecode[i]);
+                        vm.PrimitiveArrayAtPut(bytecodeOop, i, byteOop);
+                    }
+                    vm.PrimitiveSetSlot(methodOop, 1, bytecodeOop);
+                }
+                else
+                {
+                    // Empty bytecode for primitive-only methods
+                    var emptyBytecodeOop = vm.PrimitiveNewByteArray(0);
+                    vm.PrimitiveSetSlot(methodOop, 1, emptyBytecodeOop);
+                }
+                
+                // Set literals (slot 2)
+                if (methodDef.Literals != null && methodDef.Literals.Count > 0)
+                {
+                    var literalsOop = vm.PrimitiveNewArray(methodDef.Literals.Count);
+                    for (int i = 0; i < methodDef.Literals.Count; i++)
+                    {
+                        var literalOop = vm.PrimitiveInternSymbol(methodDef.Literals[i]);
+                        vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
+                    }
+                    vm.PrimitiveSetSlot(methodOop, 2, literalsOop);
+                }
+                else
+                {
+                    var emptyLiteralsOop = vm.PrimitiveNewArray(0);
+                    vm.PrimitiveSetSlot(methodOop, 2, emptyLiteralsOop);
+                }
+                
+                // Set header (slot 3) - encode primitive if present
+                int headerValue = 0;
+                if (methodDef.Primitive.HasValue && methodDef.Primitive.Value > 0)
+                {
+                    headerValue = methodDef.Primitive.Value;
+                }
+                var headerOop = vm.PrimitiveNewSmallInteger(headerValue);
+                vm.PrimitiveSetSlot(methodOop, 3, headerOop);
+                
+                // Add method to dictionary
+                vm.PrimitiveDictionaryAtPut(metaclassMethodDictOop, selectorOop, methodOop);
+                BootstrapLog($"[BOOTSTRAP]   - Installed class method '{methodDef.Selector}' (bytecode length: {methodDef.Bytecode?.Count ?? 0}, primitive: {methodDef.Primitive ?? 0})");
+            }
+        }
     }
     
     /// <summary>
@@ -1551,6 +1769,7 @@ public class Phase2ClassDefinition
     public string? Superclass { get; set; }
     public List<string>? InstanceVariables { get; set; }
     public List<Phase2MethodDefinition>? Methods { get; set; }
+    public List<Phase2MethodDefinition>? ClassMethods { get; set; }
     public bool VariableSize { get; set; }
 }
 
@@ -1564,6 +1783,8 @@ public class Phase2MethodDefinition
     public List<int>? Bytecode { get; set; }
     public List<string>? Literals { get; set; }
     public int? Primitive { get; set; }
+    public int ArgumentCount { get; set; }
+    public int TemporaryCount { get; set; }
     public string? Comment { get; set; }
 }
 

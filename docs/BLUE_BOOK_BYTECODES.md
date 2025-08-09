@@ -39,10 +39,28 @@ This document contains the **canonical Smalltalk-80 bytecode specification** fro
 
 ### Send Operations (192-255)
 
-| Range | Operation | Description |
-|-------|-----------|-------------|
-| 192-223 | `sendMessage: n` | Send message with selector at literal index n |
-| 224-255 | `sendSuperMessage: n` | Send super message with selector at literal index n |
+**🔹 Format: 11xx_xxxx — All send bytecodes start with 11 in the high bits.**
+
+#### Literal Sends (192-255)
+These bytecodes reference selectors stored in the literal frame.
+
+| Bytecode Name | Range | Binary Format | Arguments | Selector Source |
+|---------------|-------|---------------|-----------|-----------------|
+| `sendLiteralSelector0Args` | 192-207 | 11000000-11001111 | 0 | Literal frame |
+| `sendLiteralSelector1Arg` | 208-223 | 11010000-11011111 | 1 | Literal frame |  
+| `sendLiteralSelector2Args` | 224-239 | 11100000-11101111 | 2 | Literal frame |
+| `sendLiteralSelectorNArgs` | 240-255 | 11110000-11111111 | N | Literal frame |
+
+**Encoding:**
+- **Bits 6-7**: Argument count (00=0, 01=1, 10=2, 11=N args)
+- **Bits 2-5**: Literal frame index (0-15)
+- **Bits 0-1**: Unused/reserved
+
+**Examples:**
+- `192` (11000000): Send selector at literal[0] with 0 arguments
+- `208` (11010000): Send selector at literal[0] with 1 argument
+- `209` (11010001): Send selector at literal[1] with 1 argument
+- `224` (11100000): Send selector at literal[0] with 2 arguments
 
 ## Important Notes
 
@@ -55,7 +73,9 @@ This document contains the **canonical Smalltalk-80 bytecode specification** fro
 
 3. **Dense Encoding**: The Blue Book uses all 256 bytecode values with no gaps (except 181-191 which are explicitly marked as unused).
 
-4. **Send Operations**: The send operations (192-255) reference selectors stored in the method's literal frame. The bytecode value minus the base (192 or 224) gives the literal index.
+4. **Send Operations**: The send operations (192-255) encode both the argument count and selector index directly in the bytecode value. There are no separate "super send" bytecodes - super sends are handled through extended bytecodes or compiler-generated code.
+
+5. **Literal Frame Limitation**: Send bytecodes can only reference selectors in the first 16 positions (0-15) of the literal frame due to 4-bit encoding.
 
 ## Migration from Non-Canonical Implementations
 
@@ -63,9 +83,11 @@ Many modern Smalltalk implementations have diverged from this specification:
 - Squeak/Pharo use different encodings with special push bytecodes
 - Some implementations use "pop and store" operations instead of separate store operations
 - Extended bytecode sets go beyond 256 values
+- Some add dedicated "super send" bytecode ranges
 
 To implement a Blue Book compatible interpreter:
 1. Use this exact bytecode mapping
 2. Implement store operations that don't pop
 3. Handle special constants through literals or return bytecodes
-4. Ensure send operations correctly index into the literal frame
+4. Ensure send operations correctly decode argument count and selector index from the bytecode value
+5. Limit literal frame selector references to indices 0-15 for send bytecodes

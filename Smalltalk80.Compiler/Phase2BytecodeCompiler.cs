@@ -235,14 +235,17 @@ namespace Smalltalk80.Compiler
                                         var methodObj = new Dictionary<string, object>
                                         {
                                             ["selector"] = method.Selector,
-                                            ["bytecode"] = method.Bytecode,
+                                            ["bytecode"] = method.Bytecode.Select(b => (int)b).ToList(),
                                             ["argumentCount"] = method.ArgumentCount,
                                             ["temporaryCount"] = method.TemporaryCount
                                         };
                                         
                                         if (method.Literals.Length > 0)
                                         {
-                                            methodObj["literals"] = method.Literals.Select(ConvertLiteral).ToArray();
+                                            // Convert literals to simple string format for Phase 2
+                                            methodObj["literals"] = method.Literals.Select(l => 
+                                                l is Symbol sym ? sym.Value : l?.ToString() ?? "nil"
+                                            ).ToList();
                                         }
                                         
                                         if (method.IsPrimitive)
@@ -281,14 +284,17 @@ namespace Smalltalk80.Compiler
                                 var methodObj = new Dictionary<string, object>
                                 {
                                     ["selector"] = method.Selector,
-                                    ["bytecode"] = method.Bytecode,
+                                    ["bytecode"] = method.Bytecode.Select(b => (int)b).ToList(),
                                     ["argumentCount"] = method.ArgumentCount,
                                     ["temporaryCount"] = method.TemporaryCount
                                 };
                                 
                                 if (method.Literals.Length > 0)
                                 {
-                                    methodObj["literals"] = method.Literals.Select(ConvertLiteral).ToArray();
+                                    // Convert literals to simple string format for Phase 2
+                                    methodObj["literals"] = method.Literals.Select(l => 
+                                        l is Symbol sym ? sym.Value : l?.ToString() ?? "nil"
+                                    ).ToList();
                                 }
                                 
                                 if (method.IsPrimitive)

@@ -85,35 +85,15 @@ public static class BytecodeDispatcher
         Handlers[179] = (interpreter, opcode) => HandleReturnNil(interpreter);
         Handlers[180] = (interpreter, opcode) => HandleReturnTop(interpreter);
 
-        // Extended bytecodes (non-Blue Book extensions)
-        Handlers[131] = HandleSingleExtendedSend;
-        Handlers[132] = HandleDoubleExtendedSend;
-        Handlers[133] = HandleSingleExtendedSuper;
-        Handlers[134] = HandleDoubleExtendedSuper;
-        Handlers[135] = HandlePopStack;
-        Handlers[136] = HandleDuplicateTop;
-        Handlers[137] = HandlePushActiveContext;
+        // Bytecodes 131-191 are not part of the canonical Blue Book specification
+        // They remain mapped to HandleUnknownBytecode to throw errors if encountered
 
-        // Jump bytecodes (non-Blue Book extensions)
-        Handlers[138] = HandleJumpShort;
-        Handlers[139] = HandleJumpLong;
-        Handlers[140] = HandleJumpIfFalseShort;
-        Handlers[141] = HandleJumpIfFalseLong;
-        Handlers[142] = HandleJumpIfTrueShort;
-        Handlers[143] = HandleJumpIfTrueLong;
-
-        // Send message bytecodes (192-223)
-        for (int i = 192; i <= 223; i++)
+        // Send literal selector bytecodes (192-255)
+        // Blue Book canonical encoding: bits 6-7 = arg count, bits 2-5 = selector index
+        for (int i = 192; i <= 255; i++)
         {
-            int index = i - 192; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleSendMessage(interpreter, index);
-        }
-
-        // Send super message bytecodes (224-255)
-        for (int i = 224; i <= 255; i++)
-        {
-            int index = i - 224; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleSendSuperMessage(interpreter, index);
+            int bytecode = i; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, bytecode);
         }
     }
 
@@ -211,18 +191,65 @@ public static class BytecodeDispatcher
     }
 
     // Additional placeholder handlers - full implementation would include all bytecodes
-    private static void HandleDoubleExtendedSend(Interpreter interpreter, byte opcode) { }
-    private static void HandleSingleExtendedSuper(Interpreter interpreter, byte opcode) { }
-    private static void HandleDoubleExtendedSuper(Interpreter interpreter, byte opcode) { }
-    private static void HandlePopStack(Interpreter interpreter, byte opcode) { }
-    private static void HandleDuplicateTop(Interpreter interpreter, byte opcode) { }
-    private static void HandlePushActiveContext(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpShort(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpLong(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpIfFalseShort(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpIfFalseLong(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpIfTrueShort(Interpreter interpreter, byte opcode) { }
-    private static void HandleJumpIfTrueLong(Interpreter interpreter, byte opcode) { }
+    private static void HandleDoubleExtendedSend(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended send bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleSingleExtendedSuper(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleDoubleExtendedSuper(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandlePopStack(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Pop();
+    }
+    private static void HandleDuplicateTop(Interpreter interpreter, byte opcode)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Peek();
+        context.Stack.Push(value);
+    }
+    private static void HandlePushActiveContext(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Push(interpreter.CurrentContext);
+    }
+    private static void HandleJumpShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfFalseShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfFalseLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfTrueShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfTrueLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
     private static void HandlePushLiteralConstant(Interpreter interpreter, int index)
     {
         var context = interpreter.CurrentContext;
@@ -273,19 +300,43 @@ public static class BytecodeDispatcher
         interpreter.HandleReturn(null!);
     }
 
-    private static void HandleSendMessage(Interpreter interpreter, int index)
+    private static void HandleSendLiteralSelector(Interpreter interpreter, int bytecode)
     {
         var context = interpreter.CurrentContext;
-        var selector = (Symbol)context.Method.Literals[index];
-        // Determine argument count from selector - this is a simplification
-        interpreter.PerformSend(selector, 0, false);
+        // Blue Book canonical encoding:
+        // Bits 6-7: Argument count (00=0, 01=1, 10=2, 11=N args)
+        // Bits 2-5: Literal frame index (0-15)
+        // Bits 0-1: Unused/reserved
+        
+        var argCount = (bytecode >> 6) & 0x3; // Extract bits 6-7
+        var selectorIndex = (bytecode >> 2) & 0xF; // Extract bits 2-5
+        
+        if (selectorIndex >= context.Method.Literals.Length)
+        {
+            throw new InvalidOperationException($"Selector index {selectorIndex} out of bounds for literal frame (size: {context.Method.Literals.Length})");
+        }
+        
+        if (!(context.Method.Literals[selectorIndex] is Symbol selector))
+        {
+            throw new InvalidOperationException($"Literal at index {selectorIndex} is not a Symbol: {context.Method.Literals[selectorIndex]?.GetType()}");
+        }
+        
+        // Handle special case for 11xx_xxxx (bits 6-7 = 11) - variable argument count
+        if (argCount == 3) // 11 binary
+        {
+            // For now, treat as 0 arguments - proper implementation would need more context
+            // TODO: Implement variable argument count handling
+            argCount = 0;
+        }
+        
+        interpreter.PerformSend(selector, argCount, false);
     }
 
-    private static void HandleSendSuperMessage(Interpreter interpreter, int index)
+    // Blue Book does not have separate super send bytecodes in the 192-255 range
+    // Super sends are handled through extended bytecodes or compiler-generated patterns
+    // This method is no longer used but kept for reference
+    private static void HandleSendSuperMessage_Obsolete(Interpreter interpreter, int index)
     {
-        var context = interpreter.CurrentContext;
-        var selector = (Symbol)context.Method.Literals[index];
-        // Determine argument count from selector - this is a simplification  
-        interpreter.PerformSend(selector, 0, true);
+        throw new InvalidOperationException("Super send bytecodes are not part of the canonical Blue Book 192-255 range");
     }
 }
