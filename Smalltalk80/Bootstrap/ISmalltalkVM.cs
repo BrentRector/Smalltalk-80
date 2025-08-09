@@ -85,6 +85,14 @@ public interface ISmalltalkVM
     void PrimitiveArrayAtPut(int arrayId, int index, int valueId);
 
     /// <summary>
+    /// Store a raw byte value in a ByteArray at the specified index.
+    /// </summary>
+    /// <param name="byteArrayId">The OOP of the ByteArray.</param>
+    /// <param name="index">The 0-based index.</param>
+    /// <param name="value">The byte value to store (0-255).</param>
+    void PrimitiveByteArrayAtPut(int byteArrayId, int index, byte value);
+
+    /// <summary>
     /// Create a new dictionary.
     /// </summary>
     /// <returns>The OOP of the created dictionary.</returns>

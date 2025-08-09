@@ -1,0 +1,11 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+√ Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+Showing 0 filtered classes (of 33 total)
+

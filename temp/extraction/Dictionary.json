@@ -1,0 +1,606 @@
+{
+  "ClassName": "Dictionary",
+  "Superclass": "Set",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Unordered",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:anAssociation|indexelement|index_selffindKeyOrNil:anAssociationkey.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:anAssociation]ifFalse:[elementvalue:anAssociationvalue].^anAssociation!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selffindKeyOrNil"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "associationAt:",
+      "Source": "associationAt:key^selfassociationAt:keyifAbsent:[selferrorKeyNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "associationAt:ifAbsent:",
+      "Source": "associationAt:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^selfbasicAt:index!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "associations",
+      "Source": "associations|aCollectionkey|aCollection_OrderedCollectionnew:selfsize.selfassociationsDo:[:key|aCollectionadd:key].^aCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "aCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "associationsDo:",
+      "Source": "associationsDo:aBlocksuperdo:aBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "asSortedCollection",
+      "Source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.selfassociationsDo:[:association|aSortedCollectionadd:association].^aSortedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at:key^selfat:keyifAbsent:[selferrorKeyNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "at:ifAbsent:",
+      "Source": "at:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^(selfbasicAt:index)value!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:keyput:anObject|indexelement|index_selffindKeyOrNil:key.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:(Associationkey:keyvalue:anObject)]ifFalse:[elementvalue:anObject].^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "indexelement"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_Bagnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "declare:from:",
+      "Source": "declare:keyfrom:aDictionary(selfincludesKey:key)ifTrue:[^self].(aDictionaryincludesKey:key)ifTrue:[selfadd:(aDictionaryassociationAt:key).aDictionaryremoveKey:key]ifFalse:[selfat:keyput:nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlocksuperdo:[:assoc|aBlockvalue:assocvalue]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "assocvalue"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "errorKeyNotFound",
+      "Source": "errorKeyNotFoundselferror:\u0027key not found\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorValueNotFound",
+      "Source": "errorValueNotFoundselferror:\u0027value not found\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "findKey:ifAbsent:",
+      "Source": "findKey:keyifAbsent:aBlock|index|index_selffindKeyOrNil:key.(selfbasicAt:index)==nilifTrue:[^aBlockvalue].^index!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "findKeyOrNil:",
+      "Source": "findKeyOrNil:key|locationlengthprobepass|length_selfbasicSize.pass_1.location_keyhash\\\\length\u002B1.[(probe_selfbasicAt:location)==nilor:[probekey=key]]whileFalse:[(location_location\u002B1)\u003ElengthifTrue:[location_1.pass_pass\u002B1.pass\u003E2ifTrue:[^selfgrowfindKeyOrNil:key]]].^location!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 88 81 60 06 87 6A 20 88 81 60 07 87 6A 48 46 BA 20 B0 88 81 60 03 87 6A 89 00 08 49 88 81 60 0A 87 D3 7D 4B C6 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "location"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "length"
+        },
+        {
+          "Value": "pass"
+        },
+        {
+          "Value": "keyhash"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "probe"
+        },
+        {
+          "Value": "nilor"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow|newSelf|newSelf_selfspeciesnew:selfbasicSize\u002BselfgrowSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "includes:",
+      "Source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 04 42 43 B6 7D D1 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "eachifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "includesAssociation:",
+      "Source": "includesAssociation:anAssociation^superincludes:anAssociation!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "includesKey:",
+      "Source": "includesKey:key|index|index_selffindKeyOrNil:key.^(selfbasicAt:index)~~nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selffindKeyOrNil"
+        }
+      ]
+    },
+    {
+      "Selector": "inspect",
+      "Source": "inspectInspectorViewopen:(DictionaryInspectorinspect:self)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "keyAtValue:",
+      "Source": "keyAtValue:value^selfkeyAtValue:valueifAbsent:[selferrorValueNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "keyAtValue:ifAbsent:",
+      "Source": "keyAtValue:valueifAbsent:exceptionBlockselfassociationsDo:[:association|value==associationvalueifTrue:[^associationkey]].^exceptionBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfassociationsDo"
+        }
+      ]
+    },
+    {
+      "Selector": "keys",
+      "Source": "keys|aSetkey|aSet_Setnew:selfsize.selfkeysDo:[:key|aSetadd:key].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "aSet"
+        }
+      ]
+    },
+    {
+      "Selector": "keysDo:",
+      "Source": "keysDo:aBlockselfassociationsDo:[:association|aBlockvalue:associationkey]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "associationkey"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf:anObject|count|count_0.selfdo:[:each|anObject=eachifTrue:[count_count\u002B1]].^count!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPutAll:selfclassname,\u0027 (\u0027.selfassociationsDo:[:element|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B0 88 69 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "rehash",
+      "Source": "rehash|newSelf|newSelf_selfspeciesnew:selfbasicSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "remove:",
+      "Source": "remove:anObjectselfshouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:anObjectifAbsent:exceptionBlockselfshouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfshouldNotImplement"
+        }
+      ]
+    },
+    {
+      "Selector": "removeAssociation:",
+      "Source": "removeAssociation:anAssociation^selfremoveAssociation:anAssociationifAbsent:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeAssociation:ifAbsent:",
+      "Source": "removeAssociation:anAssociationifAbsent:anExceptionBlock^superremove:anAssociationifAbsent:anExceptionBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anExceptionBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "removeKey:",
+      "Source": "removeKey:key^selfremoveKey:keyifAbsent:[selferrorKeyNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeKey:ifAbsent:",
+      "Source": "removeKey:keyifAbsent:aBlock|indexelement|index_selffindKey:keyifAbsent:[^aBlockvalue].element_selfbasicAt:index.selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^element!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "indexelement"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "select:",
+      "Source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfassociationsDo:[:each|(aBlockvalue:eachvalue)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfassociationsDo"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStream|noneYet|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new)\u0027.noneYet_true.selfassociationsDo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 add: \u0027.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "values",
+      "Source": "values|aBag|aBag_Bagnew.selfdo:[:value|aBagadd:value].^aBag!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 37,
+    "SuccessfullyCompiled": 37,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:14:13.4905828Z"
+  }
+}

@@ -29,6 +29,14 @@ public class SimpleClassExtractor
     }
 
     /// <summary>
+    /// Gets a specific class by name.
+    /// </summary>
+    public ClassInfo? GetClass(string className)
+    {
+        return classes.ContainsKey(className) ? classes[className] : null;
+    }
+    
+    /// <summary>
     /// Parse the system image and extract class information.
     /// </summary>
     public void ParseSystemImage()
@@ -193,14 +201,16 @@ public class SimpleClassExtractor
         return visitor.ExtractedMethods;
     }
 
-    private class ClassInfo
+    public class ClassInfo
     {
         public string Name { get; set; } = "";
+        public string ClassName => Name; // Alias for compatibility
         public string Superclass { get; set; } = "";
         public List<string> InstanceVariables { get; set; } = new();
         public List<string> ClassVariables { get; set; } = new();
         public List<string> PoolDictionaries { get; set; } = new();
         public string? Category { get; set; }
+        public string? Comment { get; set; }
     }
     
     /// <summary>
@@ -211,6 +221,7 @@ public class SimpleClassExtractor
         private readonly string targetClassName;
         private readonly List<MethodInfo> extractedMethods = new();
         private bool inTargetClass = false;
+        private bool isClassMethod = false;
         
         public List<MethodInfo> ExtractedMethods => extractedMethods;
         
@@ -223,14 +234,17 @@ public class SimpleClassExtractor
         {
             // Check if this is methods for our target class
             var className = context.className()?.GetText();
+            var classKeyword = context.IDENTIFIER()?.GetText();
+            
+            // Determine if we're looking at class methods
+            bool isClassSide = classKeyword == "class";
             
             // Handle both instance and class methods
-            if (className == targetClassName || 
-                (className + " class" == targetClassName) ||
-                (context.IDENTIFIER()?.GetText() == "class" && className == targetClassName.Replace(" class", "")))
+            if (className == targetClassName)
             {
                 inTargetClass = true;
-                Console.WriteLine($"Found methods for {targetClassName}");
+                isClassMethod = isClassSide;
+                Console.WriteLine($"Found {(isClassMethod ? "class" : "instance")} methods for {targetClassName}");
                 
                 // Visit all method definitions in this chunk
                 var methods = context.methodDef();
@@ -240,6 +254,7 @@ public class SimpleClassExtractor
                 }
                 
                 inTargetClass = false;
+                isClassMethod = false;
             }
             
             return null;
@@ -275,11 +290,12 @@ public class SimpleClassExtractor
                 Selector = selector,
                 Source = source,
                 IsPrimitive = isPrimitive,
-                PrimitiveNumber = primitiveNumber
+                PrimitiveNumber = primitiveNumber,
+                IsClassMethod = isClassMethod
             };
             
             extractedMethods.Add(methodInfo);
-            Console.WriteLine($"  Extracted method: {selector}");
+            Console.WriteLine($"  Extracted {(isClassMethod ? "class" : "instance")} method: {selector}");
             
             return null;
         }
@@ -296,7 +312,7 @@ public class SimpleClassExtractor
             }
             else
             {
-                // Keyword selector
+                // Keyword selector - concatenate keyword parts without spaces
                 var keywords = header.identifierColon();
                 return string.Join("", keywords.Select(k => k.GetText()));
             }

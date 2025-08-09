@@ -54,21 +54,25 @@ public static class BytecodeTable
             ops[104 + i] = new Stack.StoreAndPopTemporaryVariableOperation(i);
         }
 
-        // 112-119: push constants
+        // 112-119: push receiver and special constants (canonical Blue Book)
         ops[112] = new Stack.PushSelfOperation();
-        ops[113] = new Stack.PushConstantOperation(true);
-        ops[114] = new Stack.PushConstantOperation(false);
-        ops[115] = new Stack.PushConstantOperation(null);
-        ops[116] = new Stack.PushConstantOperation(-1);
-        ops[117] = new Stack.PushConstantOperation(0);
-        ops[118] = new Stack.PushConstantOperation(1);
-        ops[119] = new Stack.PushConstantOperation(2);
+        // 113-119 are NOT push true/false/nil in canonical Blue Book!
+        // Those must be accessed via literal frame (32-63)
+        // These are actually undefined in canonical Blue Book
+        ops[113] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[114] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[115] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[116] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[117] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[118] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[119] = new NoOpOperation(); // Not defined in canonical Blue Book
 
-        // 120-123: return constants
+        // 120-123: return operations (canonical Blue Book)
         ops[120] = new Return.ReturnConstantOperation(Return.ReturnConstantOperation.Kind.Self);
-        ops[121] = new Return.ReturnConstantOperation(Return.ReturnConstantOperation.Kind.True);
-        ops[122] = new Return.ReturnConstantOperation(Return.ReturnConstantOperation.Kind.False);
-        ops[123] = new Return.ReturnConstantOperation(Return.ReturnConstantOperation.Kind.Nil);
+        // 121-123 are NOT returnTrue/False/Nil in canonical Blue Book!
+        ops[121] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[122] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[123] = new NoOpOperation(); // Not defined in canonical Blue Book
 
         // 124-125: return stack top from message or block
         ops[124] = new Return.ReturnTopOperation(isBlock: false);

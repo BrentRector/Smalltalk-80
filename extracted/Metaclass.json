@@ -1,0 +1,416 @@
+{
+  "ClassName": "Metaclass",
+  "Superclass": "ClassDescription",
+  "InstanceVariables": [
+    "thisClass"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "addClassVarName:",
+      "Source": "addClassVarName:aString^thisClassaddClassVarName:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addInstVarName:",
+      "Source": "addInstVarName:aString|fullString|fullString_aString.selfinstVarNamesdo:[:aString2|fullString_aString2,\u0027 \u0027,fullString].selfinstanceVariableNames:fullString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 69 6A 40 7C",
+      "Literals": [
+        {
+          "Value": "selfinstVarNamesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "classPool",
+      "Source": "classPool^thisClassclassPool!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisClassclassPool"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|copyt|t_thisClass.thisClass_nil.copy_supercopy.thisClass_t.^copy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 88 81 60 00 87 69 21 88 60 69 42 88 81 60 03 87 69 40 88 60 69 43 7C",
+      "Literals": [
+        {
+          "Value": "t"
+        },
+        "nil",
+        {
+          "Value": "supercopy"
+        },
+        {
+          "Value": "copy"
+        }
+      ]
+    },
+    {
+      "Selector": "copyForValidation",
+      "Source": "copyForValidation^supercopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "supercopy"
+        }
+      ]
+    },
+    {
+      "Selector": "definition",
+      "Source": "definition|aStreamnames|aStream_WriteStreamon:(Stringnew:300).selfprintOn:aStream.aStreamnextPutAll:\u0027\r\n\tinstanceVariableNames: \u0027\u0027\u0027.names_selfinstVarNames.1to:namessizedo:[:i|aStreamnextPutAll:(namesat:i);space].aStreamnextPut:$\u0027.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn:moveSource:toFile:",
+      "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexsuperfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.(methodDictincludesKey:#initialize)ifTrue:[aFileStreamcr.aFileStreamcr.aFileStreamnextChunkPut:thisClassname,\u0027 initialize\u0027.aFileStreamcr]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "moveSourcetoFile"
+        }
+      ]
+    },
+    {
+      "Selector": "instanceVariableNames:",
+      "Source": "instanceVariableNames:instVarString|newMetainvalidok|newMeta_selfcopyForValidation.invalid_newMetasubclassOf:superclassoldClass:selfinstanceVariableNames:instVarStringvariable:falsewords:truepointers:trueifBad:[^false].invalidifTrue:[ok_newMetavalidateFrom:selfin:SmalltalkinstanceVariableNames:truemethods:true.SmalltalkchangeschangeClass:self.^ok]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "selfcopyForValidation"
+        },
+        {
+          "Value": "newMeta"
+        },
+        {
+          "Value": "newMetasubclassOf"
+        },
+        {
+          "Value": "invalid"
+        }
+      ]
+    },
+    {
+      "Selector": "instHasMultipleSuperclasses",
+      "Source": "instHasMultipleSuperclasses^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isMeta",
+      "Source": "isMeta^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "isObsolete",
+      "Source": "isObsolete^thisClass==nilor:[thisClass~~(Smalltalkat:thisClassnameifAbsent:[nil])]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "name",
+      "Source": "namethisClass==nilifTrue:[^\u0027a Metaclass\u0027]ifFalse:[^thisClassname,\u0027 class\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "name:inEnvironment:subclassOf:and:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+      "Source": "name:newNameinEnvironment:environsubclassOf:supand:othersinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:\u0027Class names must be capitalized\u0027.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,\u0027 already exists!!  Proceed will store over it\u0027.wasPresent_false.oldClass_selfnewNamed:newNameotherSupers:others]]ifFalse:[oldClass_selfnewNamed:newNameotherSupers:others].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassesdo:[:sup|supremoveSubclass:oldClass;addSubclass:newClass].wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].invalidFieldsifTrue:[newClasscopyMethods.newClassclasscopyMethods].^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environsubclassOf"
+        }
+      ]
+    },
+    {
+      "Selector": "name:inEnvironment:subclassOf:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+      "Source": "name:newNameinEnvironment:environsubclassOf:supinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:\u0027Class names must be capitalized\u0027.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,\u0027 already exists!!  Proceed will store over it\u0027.wasPresent_false.oldClass_selfnewNamed:newName]]ifFalse:[oldClass_selfnewNamed:newName].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassremoveSubclass:oldClass.newClasssuperclassaddSubclass:newClass.wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environsubclassOf"
+        }
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "newthisClass==nilifTrue:[^thisClass_supernew]ifFalse:[selferror:\u0027A Metaclass should only have one instance!!\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "newNamed:",
+      "Source": "newNamed:aSymbol^(MetaclasssubclassOf:self)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "newNamed:otherSupers:",
+      "Source": "newNamed:aSymbolotherSupers:others^(MetaclassForMultipleInheritancesubclassOf:selfand:others)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "others"
+        }
+      ]
+    },
+    {
+      "Selector": "nonTrivial",
+      "Source": "nonTrivial^selfinstVarNamessize\u003E0or:[methodDictsize\u003E0or:[selfcommentsize\u003E0]]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 21 B3 89 00 0C 44 21 B3 89 00 04 45 21 B3 7D E2 7D E2 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "selfinstVarNamessize"
+        },
+        {
+          "Value": "methodDictsize"
+        },
+        {
+          "Value": "selfcommentsize"
+        }
+      ]
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoletethisClass_nil.superobsolete!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 68 41 7C",
+      "Literals": [
+        "nil",
+        {
+          "Value": "superobsolete"
+        }
+      ]
+    },
+    {
+      "Selector": "removeInstVarName:",
+      "Source": "removeInstVarName:aString|newArraynewString|(selfinstVarNamesincludes:aString)ifFalse:[selferror:aString,\u0027 is not one of my instance variables\u0027].newArray_selfinstVarNamescopyWithout:aString.newString_\u0027\u0027.newArraydo:[:aString2|newString_aString2,\u0027 \u0027,newString].selfinstanceVariableNames:newString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": "selfinstVarNamesincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "scopeHas:ifTrue:",
+      "Source": "scopeHas:nameifTrue:assocBlock^thisClassscopeHas:nameifTrue:assocBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "assocBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "soleInstance",
+      "Source": "soleInstance^thisClass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "subclasses",
+      "Source": "subclasses|temp|self==ClassclassifTrue:[temp_thisClasssubclassescopy.tempremove:Objectclass.^tempcollect:[:aSubClass|aSubClassclass]].thisClass==nilifTrue:[^Setnew]ifFalse:[^thisClasssubclassescollect:[:aSubClass|aSubClassclass]]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 41 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ClassclassifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassOf:",
+      "Source": "subclassOf:superMetasuperclass_superMeta.methodDict_MethodDictionarynew.format_superMetaformat.instanceVariables_nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 88 81 60 02 87 69 43 88 81 60 04 87 69 25 88 81 60 06 87 7C",
+      "Literals": [
+        {
+          "Value": "superMeta"
+        },
+        {
+          "Value": "MethodDictionarynew"
+        },
+        {
+          "Value": "methodDict"
+        },
+        {
+          "Value": "superMetaformat"
+        },
+        {
+          "Value": "format"
+        },
+        "nil",
+        {
+          "Value": "instanceVariables"
+        }
+      ]
+    },
+    {
+      "Selector": "superclass:",
+      "Source": "superclass:superMetasuperclass_superMeta!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "superMeta"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "subclassOf:",
+      "Source": "subclassOf:superMeta^selfnewsubclassOf:superMeta!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 26,
+    "SuccessfullyCompiled": 26,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:32:43.3687142Z"
+  }
+}

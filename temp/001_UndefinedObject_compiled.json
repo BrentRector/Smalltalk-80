@@ -1,0 +1,155 @@
+{
+  "phase": "3",
+  "className": "UndefinedObject",
+  "superclass": "Object",
+  "comment": "I describe the behavior of my sole instance, nil. nil represents a prior value for variables that have not been initialized, or for results which are meaningless.",
+  "instanceVariables": [],
+  "classVariables": [],
+  "poolDictionaries": [],
+  "category": "Kernel-Objects",
+  "methods": [
+    {
+      "selector": "isNil",
+      "source": "isNil\n\t\u0022Answer true since the receiver is nil.\u0022\n\t^true",
+      "bytecodes": [
+        177
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": "testing"
+    },
+    {
+      "selector": "notNil",
+      "source": "notNil\n\t\u0022Answer false since the receiver is nil.\u0022\n\t^false",
+      "bytecodes": [
+        178
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": "testing"
+    },
+    {
+      "selector": "ifNil:",
+      "source": "ifNil: aBlock\n\t\u0022Since the receiver is nil, evaluate aBlock.\u0022\n\t^aBlock value",
+      "bytecodes": [
+        16,
+        201,
+        124
+      ],
+      "literals": [
+        "value"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": "testing"
+    },
+    {
+      "selector": "ifNotNil:",
+      "source": "ifNotNil: aBlock\n\t\u0022Since the receiver is nil, answer nil.\u0022\n\t^nil",
+      "bytecodes": [
+        179
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": "testing"
+    },
+    {
+      "selector": "ifNil:ifNotNil:",
+      "source": "ifNil: nilBlock ifNotNil: notNilBlock\n\t\u0022Since the receiver is nil, evaluate nilBlock.\u0022\n\t^nilBlock value",
+      "bytecodes": [
+        16,
+        201,
+        124
+      ],
+      "literals": [
+        "value"
+      ],
+      "primitive": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "category": "testing"
+    },
+    {
+      "selector": "printOn:",
+      "source": "printOn: aStream\n\t\u0022Print \u0027nil\u0027 on the stream.\u0022\n\taStream nextPutAll: \u0027nil\u0027",
+      "bytecodes": [
+        16,
+        33,
+        224,
+        135,
+        120
+      ],
+      "literals": [
+        "nextPutAll:",
+        "nil"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": "printing"
+    },
+    {
+      "selector": "storeOn:",
+      "source": "storeOn: aStream\n\t\u0022Store the receiver as \u0027nil\u0027 on the stream.\u0022\n\taStream nextPutAll: \u0027nil\u0027",
+      "bytecodes": [
+        16,
+        33,
+        224,
+        135,
+        120
+      ],
+      "literals": [
+        "nextPutAll:",
+        "nil"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": "storing"
+    },
+    {
+      "selector": "deepCopy",
+      "source": "deepCopy\n\t\u0022Answer nil.\u0022\n\t^nil",
+      "bytecodes": [
+        179
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": "copying"
+    },
+    {
+      "selector": "shallowCopy",
+      "source": "shallowCopy\n\t\u0022Answer nil.\u0022\n\t^nil",
+      "bytecodes": [
+        179
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": "copying"
+    },
+    {
+      "selector": "veryDeepCopy",
+      "source": "veryDeepCopy\n\t\u0022Answer nil.\u0022\n\t^nil",
+      "bytecodes": [
+        179
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": "copying"
+    }
+  ],
+  "classMethods": []
+}

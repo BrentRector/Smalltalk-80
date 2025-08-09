@@ -1,0 +1,1852 @@
+{
+  "ClassName": "Behavior",
+  "Superclass": "Object",
+  "InstanceVariables": [
+    "superclass",
+    "methodDict",
+    "format",
+    "subclasses"
+  ],
+  "ClassVariables": [
+    "SelectorsOfConflictMethods",
+    "SelectorsOfCopiedMethods",
+    "SelectorsOfDirectedMethods"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "accumulateInstVarNames: traversedClasses:",
+      "Source": "accumulateInstVarNames:namestraversedClasses:classSetselfsuperclassesdo:[:each|eachaccumulateInstVarNames:namestraversedClasses:classSet].(classSetincludes:self)ifFalse:[namesaddAll:selfinstVarNames.classSetadd:self]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classSetselfsuperclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "addSelector: withMethod:",
+      "Source": "addSelector:selectorwithMethod:compiledMethod|wasThere|wasThere_methodDictincludesKey:selector.methodDictat:selectorput:compiledMethod.selfflushCache.((SelectorsOfConflictMethodsat:selectorifAbsent:[Arraynew])includes:self)ifTrue:[selfremoveClass:selfselector:selectorin:SelectorsOfConflictMethods].((SelectorsOfCopiedMethodsat:selectorifAbsent:[Arraynew])includes:self)ifTrue:[selfremoveClass:selfselector:selectorin:SelectorsOfCopiedMethods].wasThereifTrue:[selfcheckChangeSelector:selector]ifFalse:[selfsubclassesdo:[:sub|subcheckSuperAddSelector:selector]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "compiledMethod"
+        },
+        {
+          "Value": "wasThere"
+        }
+      ]
+    },
+    {
+      "Selector": "addSelectorUnchecked: withMethod:",
+      "Source": "addSelectorUnchecked:selectorwithMethod:compiledMethodmethodDictat:selectorput:compiledMethod.selfflushCache!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "compiledMethodmethodDictat"
+        }
+      ]
+    },
+    {
+      "Selector": "addSubclass:",
+      "Source": "addSubclass:aSubclass(aSubclasssuperclassesincludes:self)ifTrue:[subclasses==nilifTrue:[subclasses_Setwith:aSubclass]ifFalse:[subclassesadd:aSubclass]]ifFalse:[selferror:aSubclassname,\u0027 is not my subclass\u0027]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "self"
+        },
+        {
+          "Value": "aSubclasssuperclassesincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "allAccessesTo:",
+      "Source": "allAccessesTo:instVarName|coll|coll_OrderedCollectionnew.CursorexecuteshowWhile:[(selfwithAllSuperclassesreverse),selfallSubclassesdo:[:class|(classwhichSelectorsAccess:instVarName)do:[:sel|sel~~#DoItifTrue:[colladd:classname,\u0027 \u0027,sel]]]].^coll!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "CursorexecuteshowWhile"
+        }
+      ]
+    },
+    {
+      "Selector": "allCallsOn:",
+      "Source": "allCallsOn:aLiteral|aSortedCollectionspecial|aSortedCollection_SortedCollectionnew.special_SmalltalkhasSpecialSelector:aLiteralifTrueSetByte:[:byte].(selfwithAllSuperclassesreverse),selfallSubclassesdo:[:class|(classwhichSelectorsReferTo:aLiteralspecial:specialbyte:byte)do:[:sel|sel~~#DoItifTrue:[aSortedCollectionadd:classname,\u0027 \u0027,sel]].(classclasswhichSelectorsReferTo:aLiteralspecial:specialbyte:byte)do:[:sel|sel~~#DoItifTrue:[aSortedCollectionadd:classclassname,\u0027 \u0027,sel]].].^aSortedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        },
+        {
+          "Value": "aSortedCollection"
+        },
+        {
+          "Value": "SmalltalkhasSpecialSelector"
+        },
+        {
+          "Value": "special"
+        }
+      ]
+    },
+    {
+      "Selector": "allClassVarNames",
+      "Source": "allClassVarNames^superclassallClassVarNames!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "superclassallClassVarNames"
+        }
+      ]
+    },
+    {
+      "Selector": "allDynamicSuperclasses",
+      "Source": "allDynamicSuperclasses|temp|superclass==nilifTrue:[^OrderedCollectionnew]ifFalse:[temp_superclassallDynamicSuperclasses.tempaddFirst:superclass.^temp]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 41 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "allInstances",
+      "Source": "allInstances|aCollection|aCollection_OrderedCollectionnew.selfallInstancesDo:[:x|x==aCollectionifFalse:[aCollectionadd:x]].^aCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "selfallInstancesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "allInstancesDo:",
+      "Source": "allInstancesDo:aBlock|instnext|inst_selfsomeInstance.inst==nilifFalse:[[next_instnextInstance.aBlockvalue:inst.next==nil]whileFalse:[inst_next]].nilclass==selfifTrue:[aBlockvalue:nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 6A 42 43 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfsomeInstance"
+        },
+        {
+          "Value": "inst"
+        },
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "allInstVarNames",
+      "Source": "allInstVarNames|names|names_OrderedCollectionnew.selfaccumulateInstVarNames:namestraversedClasses:Setnew.^names!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "selfaccumulateInstVarNames"
+        }
+      ]
+    },
+    {
+      "Selector": "allSelectors",
+      "Source": "allSelectors|aSet|aSet_Setnew.selfwithAllSuperclassesdo:[:each|aSetaddAll:eachselectors].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "selfwithAllSuperclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "allSharedPools",
+      "Source": "allSharedPools^superclassallSharedPools!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "superclassallSharedPools"
+        }
+      ]
+    },
+    {
+      "Selector": "allSubclasses",
+      "Source": "allSubclasses|coll|coll_OrderedCollectionnew.colladdAll:selfsubclasses.selfsubclassesdo:[:eachSubclass|colladdAll:eachSubclassallSubclasses].^coll!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "colladdAll"
+        }
+      ]
+    },
+    {
+      "Selector": "allSubclassesDo:",
+      "Source": "allSubclassesDo:aBlockselfsubclassesdo:[:cl|aBlockvalue:cl.clallSubclassesDo:aBlock]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 69 42 7C",
+      "Literals": [
+        {
+          "Value": "cl"
+        },
+        {
+          "Value": "aBlockvalue"
+        },
+        {
+          "Value": "clallSubclassesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "allSubInstancesDo:",
+      "Source": "allSubInstancesDo:aBlockselfallSubclassesDo:[:sub|suballInstancesDo:aBlock]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "suballInstancesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "allSuperclasses",
+      "Source": "allSuperclasses|coll|coll_OrderedCollectionnew.selfallSuperclassesInto:coll.^coll!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "selfallSuperclassesInto"
+        }
+      ]
+    },
+    {
+      "Selector": "allSuperclassesInto:",
+      "Source": "allSuperclassesInto:orderedCollection|mysupers|mysupers_selfsuperclasses.mysupersdo:[:each|eachallSuperclassesInto:orderedCollection].mysupersreverseDo:[:each|(orderedCollectionincludes:each)ifFalse:[orderedCollectionaddFirst:each]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfsuperclasses"
+        },
+        {
+          "Value": "mysupersdo"
+        }
+      ]
+    },
+    {
+      "Selector": "allVarNamesSelect:",
+      "Source": "allVarNamesSelect:selectBlock|set|set_selfclassPoolkeysselect:selectBlock.selfsharedPoolsdo:[:pool|setaddAll:(poolkeysselect:selectBlock)].superclass==nilifTrue:[setaddAll:(Smalltalkkeysselect:selectBlock)]ifFalse:[setaddAll:(superclassallVarNamesSelect:selectBlock)].^set!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfclassPoolkeysselect"
+        }
+      ]
+    },
+    {
+      "Selector": "basicNew",
+      "Source": "basicNew\u003Cprimitive: 70\u003EselfisVariableifTrue:[^selfbasicNew:0].selfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 70,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "basicNew:",
+      "Source": "basicNew:anInteger\u003Cprimitive: 71\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 71,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllAccessesTo:",
+      "Source": "browseAllAccessesTo:instanceVariableBrowserViewopenListBrowserOn:(selfallAccessesTo:instanceVariable)label:instanceVariableinitialSelection:instanceVariable!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "instanceVariable"
+        },
+        {
+          "Value": "selfallAccessesTo"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllCallsOn:",
+      "Source": "browseAllCallsOn:aSymbol|labelkey|(aSymbolisMemberOf:Association)ifTrue:[key_aSymbolkey.label_\u0027Users of \u0027,key]ifFalse:[key_aSymbol.label_\u0027Senders of \u0027,key].^BrowserViewopenListBrowserOn:(selfallCallsOn:aSymbol)label:label,\u0027 from \u0027,selfnameinitialSelection:keyasSymbolkeywordsfirst!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "Association"
+        },
+        {
+          "Value": "aSymbolisMemberOf"
+        }
+      ]
+    },
+    {
+      "Selector": "canUnderstand:",
+      "Source": "canUnderstand:selector(selfincludesSelector:selector)ifTrue:[^true].superclass==nilifTrue:[^false].^superclasscanUnderstand:selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "selector"
+        },
+        {
+          "Value": "selfincludesSelector"
+        }
+      ]
+    },
+    {
+      "Selector": "checkChangeSelector:",
+      "Source": "checkChangeSelector:selector|descrclassesclass|(SelectorsOfCopiedMethodsat:selectorifAbsent:[Arraynew])do:[:class|(classinheritsFrom:self)ifTrue:[(classcheckMethodFor:selector)ifFalse:[Transcriptcr;show:\u0027conflicting methods for \u0027,selector,\u0027 in \u0027,classname]]].(SelectorsOfDirectedMethodsat:selectorifAbsent:[Arraynew])do:[:class|(classinheritsFrom:self)ifTrue:[(classcompoundSelectorsMatching:selector)do:[:sel|classremoveSelectorUnchecked:sel].selfremoveClass:classselector:selectorin:SelectorsOfDirectedMethods]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 89 00 02 42 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "selectorifAbsent:"
+        },
+        {
+          "Value": "SelectorsOfCopiedMethodsat"
+        },
+        {
+          "Value": "Arraynew"
+        }
+      ]
+    },
+    {
+      "Selector": "checkMethodFor:",
+      "Source": "checkMethodFor:selector|descrunmovedcopyOKlocalcopiedconflict|local_methodDictincludesKey:selector.copied_(SelectorsOfCopiedMethodsat:selectorifAbsent:[Arraynew])includes:self.conflict_(SelectorsOfConflictMethodsat:selectorifAbsent:[Arraynew])includes:self.local\u0026copiednot\u0026conflictnotifTrue:[^true].descr_selfsuperMethodDescriptionAt:selector.descrisMethodNotImplementedifTrue:[selfremoveSelectorUnchecked:selector.^true].descrisConflictingMethodsifTrue:[selfcompileConflictCodeFor:selector.^false].conflictifTrue:[selfremoveSelectorUnchecked:selector.selfremoveClass:selfselector:selectorin:SelectorsOfConflictMethods].descr=(selfdynamicMethodDescriptionAt:selector)ifFalse:[unmoved_selfunmovedVarsFrom:descrwhichClass.copyOK_true.descrmethodfieldsToucheddo:[:field|copyOK_copyOK\u0026(unmovedat:field)].copyOKifTrue:[selfaddSelectorUnchecked:descrselectorwithMethod:descrmethod]ifFalse:[selfcompileUnchecked:descrsourceCode].selfinsertClass:selfselector:selectorin:SelectorsOfCopiedMethods].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "methodDictincludesKey"
+        },
+        {
+          "Value": "local"
+        }
+      ]
+    },
+    {
+      "Selector": "checkSuperAddSelector:",
+      "Source": "checkSuperAddSelector:selector|local|local_selfincludesSelector:selector.selfhasMultipleSuperclassesifFalse:[localifTrue:[^self].^selfsubclassesdo:[:sub|subcheckSuperAddSelector:selector]].(selfcheckMethodFor:selector)ifFalse:[Transcriptcr;show:\u0027conflicting methods for \u0027,selector,\u0027 in \u0027,selfname].localifTrue:[^self].^selfsubclassesdo:[:sub|subcheckSuperAddSelector:selector]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfincludesSelector"
+        }
+      ]
+    },
+    {
+      "Selector": "classVarNames",
+      "Source": "classVarNames^Setnew!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        }
+      ]
+    },
+    {
+      "Selector": "compile: notifying: trailer:",
+      "Source": "compile:codenotifying:requestortrailer:bytes^selfcompile:codenotifying:requestortrailer:bytesifFail:[^nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "requestortrailer"
+        }
+      ]
+    },
+    {
+      "Selector": "compile: notifying: trailer: ifFail:",
+      "Source": "compile:codenotifying:requestortrailer:bytesifFail:failBlock|methodNodeselector|methodNode_selfcompilerClassnewcompile:codein:selfnotifying:requestorifFail:failBlock.selector_methodNodeselector.selfaddSelector:selectorwithMethod:(methodNodegenerate:bytes).^selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "requestortrailer"
+        }
+      ]
+    },
+    {
+      "Selector": "compileAll",
+      "Source": "compileAll^selfcompileAllFrom:self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "compileAllFrom:",
+      "Source": "compileAllFrom:oldClassselfselectorsdo:[:sel|selfrecompile:selfrom:oldClass]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "selfrom:"
+        },
+        {
+          "Value": "selfrecompile"
+        },
+        {
+          "Value": "oldClass"
+        }
+      ]
+    },
+    {
+      "Selector": "compileAllSubclasses",
+      "Source": "compileAllSubclassesselfallSubclassesdo:[:aSubclass|aSubclasscompileAll]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 40 7D",
+      "Literals": [
+        {
+          "Value": "aSubclasscompileAll"
+        }
+      ]
+    },
+    {
+      "Selector": "compileBroadcastCodeFor:",
+      "Source": "compileBroadcastCodeFor:selector|implementorsstrmkeywordsargNames|implementors_selfwithAllSuperclassesselect:[:each|eachincludesSelector:selector].argNames_Arraynew:selectornumArgs.1to:argNamessizedo:[:i|argNamesat:iput:\u0027arg\u0027,iprintString].strm_WriteStreamon:(Stringnew:500).strmnextPutAll:\u0027all.\u0027.argNamessize=0ifTrue:[strmnextPutAll:selector]ifFalse:[keywords_selectorkeywords.1to:argNamessizedo:[:i|strmnextPutAll:(keywordsat:i);space;nextPutAll:(argNamesat:i);space]].implementorsdo:[:each|strmcr;tab;nextPutAll:\u0027self \u0027;nextPutAll:eachname;nextPut:$..argNamessize=0ifTrue:[strmnextPutAll:selector]ifFalse:[keywords_selectorkeywords.1to:argNamessizedo:[:i|strmnextPutAll:(keywordsat:i);space;nextPutAll:(argNamesat:i);space]].strmnextPut:$.].selfcompileUnchecked:strmcontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfwithAllSuperclassesselect"
+        },
+        {
+          "Value": "implementors"
+        }
+      ]
+    },
+    {
+      "Selector": "compileConflictCodeFor:",
+      "Source": "compileConflictCodeFor:selector|classes|classes_SelectorsOfConflictMethodsat:selectorifAbsent:[Arraynew].(classesincludes:selfname)ifTrue:[^self].selfcompile:(selfconflictCodeFor:selector)classified:\u0027conflicting inherited methods\u0027notifying:nil.selfinsertClass:selfselector:selectorin:SelectorsOfConflictMethods!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "SelectorsOfConflictMethodsat"
+        }
+      ]
+    },
+    {
+      "Selector": "compiledMethodAt:",
+      "Source": "compiledMethodAt:selector^methodDictat:selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "compilerClass",
+      "Source": "compilerClass^Compiler!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Compiler"
+        }
+      ]
+    },
+    {
+      "Selector": "compileUnchecked:",
+      "Source": "compileUnchecked:code|selectormethodNode|methodNode_selfcompilerClassnewcompile:codein:selfnotifying:nilifFail:[^nil].selector_methodNodeselector.selfaddSelectorUnchecked:selectorwithMethod:(methodNodegenerate:#(000)).^selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfcompilerClassnewcompile"
+        },
+        {
+          "Value": "methodNode"
+        }
+      ]
+    },
+    {
+      "Selector": "compoundSelectorsMatching:",
+      "Source": "compoundSelectorsMatching:simple^selfselectorsselect:[:sel|selisCompoundand:[selselectorPart=simple]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "conflictCodeFor:",
+      "Source": "conflictCodeFor:sel|codeparser|code_(selfdynamicMethodDescriptionAt:sel)sourceCode.(parser_selfparserClassnew)parseSelector:code.^(codecopyFrom:1to:(parserendOfLastTokenmin:codesize)),(Stringwith:Charactercr),\u0027\t^self conflictingInheritanceError\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 88 81 60 02 87 7C",
+      "Literals": [
+        {
+          "Value": "sel"
+        },
+        {
+          "Value": "selfdynamicMethodDescriptionAt"
+        },
+        {
+          "Value": "code"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|myCopysavedSubclasses|savedSubclasses_subclasses.subclasses_nil.myCopy_selfshallowCopy.subclasses_savedSubclasses.^myCopymethodDictionary:methodDictcopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "03 88 81 60 00 87 69 21 88 63 69 42 88 81 60 03 87 69 40 88 63 69 44 7C",
+      "Literals": [
+        {
+          "Value": "savedSubclasses"
+        },
+        "nil",
+        {
+          "Value": "selfshallowCopy"
+        },
+        {
+          "Value": "myCopy"
+        },
+        {
+          "Value": "myCopymethodDictionary"
+        }
+      ]
+    },
+    {
+      "Selector": "copyMethods",
+      "Source": "copyMethods|noConflicts|noConflicts_true.selfallSelectorsdo:[:selector|noConflicts_noConflicts\u0026(selfcheckMethodFor:selector)].noConflictsifFalse:[Transcriptcr;show:selfname,\u0027 has conflicting inherited methods\r\n  -- consult browser for their names\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 68 69 41 7C",
+      "Literals": [
+        true,
+        {
+          "Value": "selfallSelectorsdo"
+        }
+      ]
+    },
+    {
+      "Selector": "crossReference",
+      "Source": "crossReference^selfselectorsasSortedCollectionasArraycollect:[:x|Arraywith:(Stringwith:Charactercr),xwith:(selfwhichSelectorsReferTo:x)]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "decompile:",
+      "Source": "decompile:selector^selfdecompilerClassnewdecompile:selectorin:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "decompilerClass",
+      "Source": "decompilerClass^Decompiler!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Decompiler"
+        }
+      ]
+    },
+    {
+      "Selector": "defaultSelectorForMethod:",
+      "Source": "defaultSelectorForMethod:aMethod|aStream|aStream_WriteStreamon:(Stringnew:16).aStreamnextPutAll:\u0027unboundMethod\u0027.1to:aMethodnumArgsdo:[:i|aStreamnextPutAll:\u0027with:\u0027].^aStreamcontentsasSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "dynamicMethodDescriptionAt:",
+      "Source": "dynamicMethodDescriptionAt:selector(methodDictincludesKey:selector)ifTrue:[^MethodDescriptionwhichClass:selfselector:selector].superclass==nilifTrue:[^MethodDescriptionmakeMethodNotImplemented].^superclassdynamicMethodDescriptionAt:selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "selector"
+        },
+        {
+          "Value": "methodDictincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "dynamicSuperclass",
+      "Source": "dynamicSuperclass^superclass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "evaluatorClass",
+      "Source": "evaluatorClass^Compiler!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Compiler"
+        }
+      ]
+    },
+    {
+      "Selector": "flushCache",
+      "Source": "flushCache\u003Cprimitive: 89\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 89,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "format",
+      "Source": "format^format!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "format: variable: words: pointers:",
+      "Source": "format:nInstVarsvariable:isVarwords:isWordspointers:isPointersformat_nInstVars\u002B(isVarifTrue:[4096]ifFalse:[0])\u002B(isWordsifTrue:[8192]ifFalse:[0])\u002B(isPointersifTrue:[-16384]ifFalse:[0])!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "isVarwords"
+        }
+      ]
+    },
+    {
+      "Selector": "hasMethods",
+      "Source": "hasMethods^methodDictsize\u003E0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 B3 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "methodDictsize"
+        }
+      ]
+    },
+    {
+      "Selector": "hasMultipleSuperclasses",
+      "Source": "hasMultipleSuperclasses^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "includesSelector:",
+      "Source": "includesSelector:aSymbol^methodDictincludesKey:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "inheritsFrom:",
+      "Source": "inheritsFrom:aClassselfsuperclassesdo:[:each|(each==aClassor:[eachinheritsFrom:aClass])ifTrue:[^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 06 42 43 C6 44 E1 7D",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "eachinheritsFrom:"
+        },
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "aClassor"
+        },
+        {
+          "Value": "aClass"
+        }
+      ]
+    },
+    {
+      "Selector": "insertClass: selector: in:",
+      "Source": "insertClass:aClassselector:selectorin:aDictionary|previous|previous_aDictionaryat:selectorifAbsent:[Arraynew].(previousincludes:aClass)ifFalse:[aDictionaryat:selectorput:(previouscopyWith:aClass)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selectorin"
+        }
+      ]
+    },
+    {
+      "Selector": "instanceCount",
+      "Source": "instanceCount|count|count_0.selfallInstancesDo:[:x|count_count\u002B1].^count!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 68 69 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfallInstancesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "instSize",
+      "Source": "instSize^formatbitAnd:255!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "instVarNames",
+      "Source": "instVarNames|mySizesuperSize|mySize_selfinstSize.superSize_superclass==nilifTrue:[0]ifFalse:[superclassinstSize].mySize=superSizeifTrue:[^#()].^(superSize\u002B1to:mySize)collect:[:i|\u0027inst\u0027,iprintString]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 69 00 43 C6 88 81 60 04 87 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfinstSize"
+        },
+        {
+          "Value": "mySize"
+        },
+        {
+          "Value": "nilifTrue"
+        },
+        {
+          "Value": "superSize"
+        }
+      ]
+    },
+    {
+      "Selector": "isBits",
+      "Source": "isBits^formatnoMask:-16384!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isBytes",
+      "Source": "isBytes^formatnoMask:8192!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isFixed",
+      "Source": "isFixed^selfisVariablenot!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisVariablenot"
+        }
+      ]
+    },
+    {
+      "Selector": "isPointers",
+      "Source": "isPointers^selfisBitsnot!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisBitsnot"
+        }
+      ]
+    },
+    {
+      "Selector": "isVariable",
+      "Source": "isVariable^(formatbitAnd:4096)~=0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isWords",
+      "Source": "isWords^selfisBytesnot!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisBytesnot"
+        }
+      ]
+    },
+    {
+      "Selector": "kindOfSubclass",
+      "Source": "kindOfSubclassselfisVariableifTrue:[selfisBitsifTrue:[selfisBytesifTrue:[^\u0027 variableByteSubclass: \u0027]ifFalse:[^\u0027 variableWordSubclass: \u0027]]ifFalse:[^\u0027 variableSubclass: \u0027]]ifFalse:[^\u0027 subclass: \u0027]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 42 7D 89 00 03 21 7D 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "ifFalse:"
+        },
+        " variableWordSubclass: ",
+        {
+          "Value": "selfisBytesifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "methodDescriptionAt:",
+      "Source": "methodDescriptionAt:selector|localcopiedconflict|local_methodDictincludesKey:selector.copied_(SelectorsOfCopiedMethodsat:selectorifAbsent:[Arraynew])includes:self.conflict_(SelectorsOfConflictMethodsat:selectorifAbsent:[Arraynew])includes:self.local\u0026copiednot\u0026conflictnotifTrue:[^MethodDescriptionwhichClass:selfselector:selector].^selfsuperMethodDescriptionAt:selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "methodDictincludesKey"
+        },
+        {
+          "Value": "local"
+        }
+      ]
+    },
+    {
+      "Selector": "methodDictionary:",
+      "Source": "methodDictionary:aDictionarymethodDict_aDictionary!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        }
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "new\u003Cprimitive: 70\u003EselfisVariableifTrue:[^selfnew:0].selfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 70,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "new:",
+      "Source": "new:anInteger\u003Cprimitive: 71\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 71,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoletemethodDict_MethodDictionarynew.selfsuperclassesdo:[:each|eachremoveSubclass:self].selfremoveFromInheritanceTables!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 68 41 7C",
+      "Literals": [
+        {
+          "Value": "MethodDictionarynew"
+        },
+        {
+          "Value": "selfsuperclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "parserClass",
+      "Source": "parserClass^selfcompilerClasspreferredParserClass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfcompilerClasspreferredParserClass"
+        }
+      ]
+    },
+    {
+      "Selector": "poolHas: ifTrue:",
+      "Source": "poolHas:varNameifTrue:assocBlock^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "assocBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "printHierarchy",
+      "Source": "printHierarchy|aStreamindexsupers|index_0.aStream_WriteStreamon:(Stringnew:16).selfallDynamicSuperclassesreverseDo:[:aClass|aStreamcrtab:index.index_index\u002B1.aStreamnextPutAll:aClassname.aStreamspace.aStreamprint:aClassinstVarNames.supers_aClasssuperclasses.superssize\u003E1ifTrue:[aStreamnextPutAll:\u0027  [also a \u0027.(superscopyFrom:2to:superssize)do:[:s|aStreamspace;nextPutAll:sname;space;print:sallInstVarNames].aStreamnextPut:$]]].aStreamcr.selfprintSubclassesOn:aStreamcallingSuperclass:selfdynamicSuperclasslevel:index.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 01 87 69 42 88 81 60 03 87 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "printMethodChunk: on: moveSource: toFile:",
+      "Source": "printMethodChunk:selectoron:aFileStreammoveSource:moveSourcetoFile:fileIndex|position|aFileStreamcr;cr.moveSourceifTrue:[position_aFileStreamposition].aFileStreamnextChunkPut:(selfsourceMethodAt:selector)asString.moveSourceifTrue:[(selfcompiledMethodAt:selector)setSourcePosition:positioninFile:fileIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamaStreamnextPutAll:\u0027a descendent of \u0027.superclassprintOn:aStream!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "printSubclassesOn: callingSuperclass: level:",
+      "Source": "printSubclassesOn:aStreamcallingSuperclass:whichSuperlevel:level|subssupers|aStreamcrtab:level.aStreamnextPutAll:selfname.aStreamspace;print:selfinstVarNames.supers_selfsuperclasses.superssize\u003E1ifTrue:[aStreamnextPutAll:\u0027  [also a\u0027.(superscopyWithout:whichSuper)do:[:s|aStreamspace;nextPutAll:sname;space;print:sallInstVarNames].aStreamnextPut:$]].subs_selfsubclasses.self==ClassifTrue:[aStreamcrtab:level\u002B1;nextPutAll:\u0027... all the Metaclasses ...\u0027.subs_subsreject:[:sub|subisMeta]].(subsasSortedCollection:[:x:y|xname\u003Cyname])do:[:sub|subprintSubclassesOn:aStreamcallingSuperclass:selflevel:level\u002B1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "whichSuperlevel"
+        }
+      ]
+    },
+    {
+      "Selector": "recompile:",
+      "Source": "recompile:selector^selfrecompile:selectorfrom:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "recompile: from:",
+      "Source": "recompile:selectorfrom:oldClass|methodtrailermethodNode|method_oldClasscompiledMethodAt:selector.trailer_(methodsize-2to:methodsize)collect:[:i|methodat:i].methodNode_selfcompilerClassnewcompile:(oldClasssourceCodeAt:selector)in:selfnotifying:nilifFail:[].methodNode==nilifTrue:[^selfrecompile:selector].selector==methodNodeselectorifFalse:[selferror:\u0027selector changed!!\u0027].selfaddSelector:selectorwithMethod:(methodNodegenerate:trailer).!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "oldClass"
+        },
+        {
+          "Value": "methodtrailermethodNode"
+        },
+        {
+          "Value": "method"
+        }
+      ]
+    },
+    {
+      "Selector": "removeClass: selector: in:",
+      "Source": "removeClass:aClassselector:selectorin:aDictionary|list|list_(aDictionaryat:selector)copyWithout:aClass.listsize=0ifTrue:[aDictionaryremoveKey:selector]ifFalse:[aDictionaryat:selectorput:list]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selectorin"
+        }
+      ]
+    },
+    {
+      "Selector": "removeFromInheritanceTable:",
+      "Source": "removeFromInheritanceTable:table|keyslist|keys_tablekeys.keysdo:[:key|list_(tableat:key)copyWithout:self.listsize=0ifTrue:[tableremoveKey:key]ifFalse:[tableat:keyput:list]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 7C",
+      "Literals": [
+        {
+          "Value": "tablekeys"
+        },
+        {
+          "Value": "keys"
+        },
+        {
+          "Value": "keysdo"
+        }
+      ]
+    },
+    {
+      "Selector": "removeFromInheritanceTables",
+      "Source": "removeFromInheritanceTablesselfremoveFromInheritanceTable:SelectorsOfConflictMethods.selfremoveFromInheritanceTable:SelectorsOfCopiedMethods.selfremoveFromInheritanceTable:SelectorsOfDirectedMethods!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfremoveFromInheritanceTable"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSelector:",
+      "Source": "removeSelector:selectormethodDictremoveKey:selector.selfflushCache.selfcheckChangeSelector:selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 69 42 7C",
+      "Literals": [
+        {
+          "Value": "selector"
+        },
+        {
+          "Value": "selfflushCache"
+        },
+        {
+          "Value": "selfcheckChangeSelector"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSelectorSimply:",
+      "Source": "removeSelectorSimply:selectormethodDictremoveKey:selectorifAbsent:[^self].selfflushCache!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selectorifAbsent"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSelectorUnchecked:",
+      "Source": "removeSelectorUnchecked:selectormethodDictremoveKey:selector.selfflushCache!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 7C",
+      "Literals": [
+        {
+          "Value": "selector"
+        },
+        {
+          "Value": "selfflushCache"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSubclass:",
+      "Source": "removeSubclass:aSubclasssubclasses==nilifFalse:[subclassesremove:aSubclassifAbsent:[].subclassesisEmptyifTrue:[subclasses_nil]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "scopeHas: ifTrue:",
+      "Source": "scopeHas:varNameifTrue:assocBlock|assoc|selfwithAllSuperclassesdo:[:sup|(suppoolHas:varNameifTrue:assocBlock)ifTrue:[^true]].assoc_SmalltalkassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "assocBlock"
+        },
+        {
+          "Value": "assoc"
+        },
+        {
+          "Value": "selfwithAllSuperclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "selectorAtMethod: setClass:",
+      "Source": "selectorAtMethod:methodsetClass:classResultBlock|sel|sel_methodDictkeyAtValue:methodifAbsent:[superclass==nilifTrue:[classResultBlockvalue:self.^selfdefaultSelectorForMethod:method].sel_superclassselectorAtMethod:methodsetClass:classResultBlock.sel==(selfdefaultSelectorForMethod:method)ifTrue:[classResultBlockvalue:self].^sel].classResultBlockvalue:self.^sel!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "classResultBlock"
+        },
+        {
+          "Value": "sel"
+        }
+      ]
+    },
+    {
+      "Selector": "selectors",
+      "Source": "selectors^methodDictkeys!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "methodDictkeys"
+        }
+      ]
+    },
+    {
+      "Selector": "sharedPools",
+      "Source": "sharedPools^Setnew!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        }
+      ]
+    },
+    {
+      "Selector": "showVariableMenu: collect:",
+      "Source": "showVariableMenu:generatorBlockcollect:valueBlock|eachClassaStreamlinescountlastLinevariablesindex|aStream_WriteStreamon:(Stringnew:200).lines_OrderedCollectionnew.count_0.lastLine_0.variables_OrderedCollectionnew.selfwithAllSuperclassesreverseDo:[:eachClass|count=lastLineifFalse:[linesadd:count.lastLine_count].(generatorBlockvalue:eachClass)do:[:var|aStreamnextPutAll:((valueBlockvalue:var)contractTo:20);cr.variablesaddLast:var.count_count\u002B1]].variablesisEmptyifTrue:[^nil].aStreamskip:-1.index_(PopUpMenulabels:aStreamcontentslines:lines)startUp.^index=0ifTrue:[nil]ifFalse:[variablesat:index]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "valueBlock"
+        },
+        {
+          "Value": "eachClassaStreamlinescountlastLinevariablesindex"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "someInstance",
+      "Source": "someInstance\u003Cprimitive: 77\u003E^nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 77,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "sourceCodeAt:",
+      "Source": "sourceCodeAt:messageSelector^selfsourceCodeForMethod:(methodDictat:messageSelector)at:messageSelector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "sourceCodeForMethod: at:",
+      "Source": "sourceCodeForMethod:methodat:messageSelector|newSourceindex|SensorleftShiftDownifTrue:[newSource_(selfdecompilerClassnewdecompile:messageSelectorin:selfmethod:method)decompileString]ifFalse:[newSource_methodgetSource.newSource==nilifTrue:[newSource_(selfdecompilerClassnewdecompile:messageSelectorin:selfmethod:method)decompileString]ifFalse:[((newSourceat:newSourcesize)isSeparator)ifTrue:[index_newSourcesize.[((newSourceat:index)isSeparator)and:[index\u003E1]]whileTrue:[index_index-1].newSource_newSourcecopyFrom:1to:index]]].^newSource!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "messageSelector"
+        },
+        {
+          "Value": "newSourceindex"
+        },
+        {
+          "Value": "SensorleftShiftDownifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "sourceCodeTemplate",
+      "Source": "sourceCodeTemplate^\u0027message selector and argument names\r\n\t\u0022comment stating purpose of message\u0022\r\n\r\n\t| temporary variable names |\r\n\tstatements\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "message selector and argument names\r\n\t\u0022comment stating purpose of message\u0022\r\n\r\n\t| temporary variable names |\r\n\tstatements"
+      ]
+    },
+    {
+      "Selector": "sourceMethodAt:",
+      "Source": "sourceMethodAt:selector^(selfsourceCodeAt:selector)asTextmakeSelectorBoldIn:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "sourceTextAt:",
+      "Source": "sourceTextAt:selector|newSourcemethod|method_methodDictat:selector.SensorleftShiftDownifTrue:[newSource_selfdecompilerClassnewdecompile:selectorin:selfmethod:method]ifFalse:[newSource_methodgetSource.newSource==nilifTrue:[newSource_selfdecompilerClassnewdecompile:selectorin:selfmethod:method]].^newSourceasText!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "methodDictat"
+        },
+        {
+          "Value": "method"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassDefinerClass",
+      "Source": "subclassDefinerClass^Compiler!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Compiler"
+        }
+      ]
+    },
+    {
+      "Selector": "subclasses",
+      "Source": "subclassessubclasses==nilifTrue:[^Setnew]ifFalse:[^subclassescopy]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassInstVarNames",
+      "Source": "subclassInstVarNames|vars|vars_Setnew.selfallSubclassesdo:[:aSubclass|varsaddAll:aSubclassinstVarNames].^vars!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "selfallSubclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "superclass",
+      "Source": "superclass^superclass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "superclass:",
+      "Source": "superclass:aClass(aClassisKindOf:Behavior)ifTrue:[superclass_aClass]ifFalse:[selferror:\u0027superclass must be a class-describing object\u0027]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "Behavior"
+        },
+        {
+          "Value": "aClassisKindOf"
+        }
+      ]
+    },
+    {
+      "Selector": "superclasses",
+      "Source": "superclassessuperclass==nilifTrue:[^#()].selfhasMultipleSuperclassesifTrue:[^(Arraywith:superclass),selfclassotherSuperclasses].^Arraywith:superclass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "superMethodDescriptionAt:",
+      "Source": "superMethodDescriptionAt:selector|descrresult|result_MethodDescriptionmakeMethodNotImplemented.selfsuperclassesdo:[:each|descr_eachmethodDescriptionAt:selector.descrisMethodNotImplementedifFalse:[resultisMethodNotImplementedifTrue:[result_descr]ifFalse:[result=descrifFalse:[^MethodDescriptionmakeConflictingMethods]]]].^result!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 7C",
+      "Literals": [
+        {
+          "Value": "MethodDescriptionmakeMethodNotImplemented"
+        },
+        {
+          "Value": "result"
+        },
+        {
+          "Value": "selfsuperclassesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "tryCopyingCodeFor:",
+      "Source": "tryCopyingCodeFor:selector|classPartwhichClasssimpleSelectordescr|selectorisCompoundifFalse:[^#NotFound].classPart_selectorclassPart.simpleSelector_selectorselectorPart.classPart==#allifTrue:[selfcompileBroadcastCodeFor:simpleSelector.selfinsertClass:selfselector:simpleSelectorin:SelectorsOfDirectedMethods.^#OK].classPart==#superifTrue:[descr_selfsuperMethodDescriptionAt:simpleSelector]ifFalse:[whichClass_Smalltalkat:classPart.selfisMetaifTrue:[whichClass_whichClassclass].(selfinheritsFrom:whichClass)ifFalse:[^#HierarchyViolation].descr_whichClassmethodDescriptionAt:simpleSelector].descrisBadifTrue:[^#NotFound].selfcompileUnchecked:classPart,\u0027.\u0027,descrsourceCode.selfinsertClass:selfselector:simpleSelectorin:SelectorsOfDirectedMethods.^#OK!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selectorisCompoundifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "unmovedVarsFrom:",
+      "Source": "unmovedVarsFrom:sup|allInstVarNamessupNames|allInstVarNames_selfallInstVarNames.supNames_supallInstVarNames.^((1to:supinstSize)collect:[:i|(supNamesat:i)=(allInstVarNamesat:i)])!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 88 81 60 06 87 6A 47 88 81 60 08 87 6A 20 49 E1 89 00 03 4A D3 7D E2 D3 4B B6 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "collect:"
+        },
+        {
+          "Value": "i"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "selfallInstVarNames"
+        },
+        {
+          "Value": "allInstVarNames"
+        },
+        {
+          "Value": "supallInstVarNames"
+        },
+        {
+          "Value": "supNames"
+        },
+        {
+          "Value": "supinstSize"
+        },
+        {
+          "Value": "supNamesat"
+        },
+        {
+          "Value": "allInstVarNamesat"
+        }
+      ]
+    },
+    {
+      "Selector": "updateInheritanceTable: oldSelf:",
+      "Source": "updateInheritanceTable:tableoldSelf:oldSelftabledo:[:array|1to:arraysizedo:[:i|(arrayat:i)==oldSelfifTrue:[arrayat:iput:self]]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "oldSelftabledo"
+        }
+      ]
+    },
+    {
+      "Selector": "updateInheritanceTables:",
+      "Source": "updateInheritanceTables:oldSelfselfupdateInheritanceTable:SelectorsOfConflictMethodsoldSelf:oldSelf.selfupdateInheritanceTable:SelectorsOfCopiedMethodsoldSelf:oldSelf.selfupdateInheritanceTable:SelectorsOfDirectedMethodsoldSelf:oldSelf!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "SelectorsOfConflictMethodsoldSelf"
+        }
+      ]
+    },
+    {
+      "Selector": "whichClassIncludesSelector:",
+      "Source": "whichClassIncludesSelector:aSymbol(methodDictincludesKey:aSymbol)ifTrue:[^self].superclass==nilifTrue:[^nil].^superclasswhichClassIncludesSelector:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aSymbol"
+        },
+        {
+          "Value": "methodDictincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "whichSelectorsAccess:",
+      "Source": "whichSelectorsAccess:instVarName|instVarIndex|instVarIndex_selfallInstVarNamesindexOf:instVarNameifAbsent:[^Setnew].^methodDictkeysselect:[:sel|((methodDictat:sel)readsField:instVarIndex)or:[(methodDictat:sel)writesField:instVarIndex]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfallInstVarNamesindexOf"
+        }
+      ]
+    },
+    {
+      "Selector": "whichSelectorsReferTo:",
+      "Source": "whichSelectorsReferTo:literal|special|special_SmalltalkhasSpecialSelector:literalifTrueSetByte:[:byte].^selfwhichSelectorsReferTo:literalspecial:specialbyte:byte!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "SmalltalkhasSpecialSelector"
+        }
+      ]
+    },
+    {
+      "Selector": "whichSelectorsReferTo: special: byte:",
+      "Source": "whichSelectorsReferTo:literalspecial:specialFlagbyte:specialByte|whomethodmethodArrayindexarraySize|who_OrderedCollectionnew.methodArray_methodDictmethodArray.arraySize_methodArraysize.index_0.[(index_index\u002B1)\u003C=arraySize]whileTrue:[(method_methodArrayat:index)==nilifFalse:[((methodrefersToLiteral:literal)or:[specialFlagand:[methodscanFor:specialByte]])ifTrue:[whoadd:(methodDictbasicAt:index)]]].^who!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "specialFlagbyte"
+        }
+      ]
+    },
+    {
+      "Selector": "withAllSubclasses",
+      "Source": "withAllSubclasses|subs|subs_selfallSubclasses.subsaddFirst:self.^subs!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "selfallSubclasses"
+        },
+        {
+          "Value": "subsaddFirst"
+        }
+      ]
+    },
+    {
+      "Selector": "withAllSuperclasses",
+      "Source": "withAllSuperclasses|subs|subs_selfallSuperclasses.subsaddFirst:self.^subs!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "selfallSuperclasses"
+        },
+        {
+          "Value": "subsaddFirst"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "init",
+      "Source": "initSelectorsOfConflictMethods_IdentityDictionarynew.SelectorsOfCopiedMethods_IdentityDictionarynew.SelectorsOfDirectedMethods_IdentityDictionarynew!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 68 40 88 81 60 01 87 68 40 88 81 60 02 87 7C",
+      "Literals": [
+        {
+          "Value": "IdentityDictionarynew"
+        },
+        {
+          "Value": "SelectorsOfCopiedMethods"
+        },
+        {
+          "Value": "SelectorsOfDirectedMethods"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 116,
+    "SuccessfullyCompiled": 116,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T17:32:58.9570456Z"
+  }
+}

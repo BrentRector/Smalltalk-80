@@ -1,0 +1,124 @@
+{
+  "ClassName": "LookupKey",
+  "Superclass": "Magnitude",
+  "InstanceVariables": [
+    "key"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "\u003C",
+      "Source": "\u003CaLookupKey^key\u003CaLookupKeykey!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 41 B2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "aLookupKeykey"
+        }
+      ]
+    },
+    {
+      "Selector": "=",
+      "Source": "=aLookupKeyselfspecies=aLookupKeyspeciesifTrue:[^key=aLookupKeykey]ifFalse:[^false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aLookupKeyspeciesifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash^keyhash!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "keyhash"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^keyhashMappedBy:map!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "key",
+      "Source": "key^key!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "key:",
+      "Source": "key:anObjectkey_anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamkeyprintOn:aStream!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStream"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "key:",
+      "Source": "key:aKey^selfnewkey:aKey!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 8,
+    "SuccessfullyCompiled": 8,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:14:22.4926207Z"
+  }
+}

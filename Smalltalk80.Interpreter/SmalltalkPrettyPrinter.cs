@@ -337,34 +337,33 @@ public class SmalltalkPrettyPrinter
     /// </summary>
     private int CountMethodsInDictionary(SmalltalkObject methodDict)
     {
-        // Method dictionaries can have various structures
-        // Try to count non-null entries
+        // Method dictionaries use alternating key-value pairs after the tally
+        // Structure: [tally, key1, value1, key2, value2, ...]
+        // Keys are selectors (Symbols) at odd indices, values are CompiledMethods at even indices
         int count = 0;
         
-        foreach (var field in methodDict.Fields)
-        {
-            if (field is SmalltalkObject obj && IsCompiledMethod(obj))
-            {
-                count++;
-            }
-        }
+        // Get nil for comparison
+        var nilOop = vm.PrimitiveNil();
         
-        // If we didn't find methods directly, it might use parallel arrays
-        if (count == 0 && methodDict.Fields.Length >= 2)
+        // Values are at even indices starting from 2: [tally@0, key@1, value@2, key@3, value@4, ...]
+        for (int i = 2; i < methodDict.Fields.Length; i += 2)
         {
-            // Look for a values array
-            foreach (var field in methodDict.Fields)
+            var value = methodDict.Fields[i];
+            
+            // Skip if nil or null
+            if (value == null)
+                continue;
+                
+            if (value is SmalltalkObject valueObj)
             {
-                if (field is SmalltalkObject array && array.Fields.Length > 0)
+                // Skip if it's nil
+                if (valueObj.Oop == nilOop)
+                    continue;
+                    
+                // Check if it's a CompiledMethod
+                if (IsCompiledMethod(valueObj))
                 {
-                    foreach (var item in array.Fields)
-                    {
-                        if (item is SmalltalkObject method && IsCompiledMethod(method))
-                        {
-                            count++;
-                        }
-                    }
-                    if (count > 0) break;
+                    count++;
                 }
             }
         }

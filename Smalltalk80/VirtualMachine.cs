@@ -160,67 +160,57 @@ public sealed class VirtualMachine
             throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
         }
         
-        // Always load the main Phase 3 bootstrap file
-        var phase3Path = Path.Combine(bootstrapDir, "bootstrap_phase3.json");
-        if (File.Exists(phase3Path))
-        {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading Phase 3 manifest: bootstrap_phase3.json");
-            var jsonContent = File.ReadAllText(phase3Path);
+        // Look for numbered Phase 3 class files (###_ClassName.json pattern)
+        var phase3Files = Directory.GetFiles(bootstrapDir, "*_*.json")
+            .Where(f => Path.GetFileName(f).Length > 4 && 
+                       char.IsDigit(Path.GetFileName(f)[0]) &&
+                       char.IsDigit(Path.GetFileName(f)[1]) &&
+                       char.IsDigit(Path.GetFileName(f)[2]) &&
+                       Path.GetFileName(f)[3] == '_')
+            .OrderBy(f => f)
+            .ToList();
             
+        if (phase3Files.Count > 0)
+        {
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Found {phase3Files.Count} Phase 3 class files");
             var phase3Executor = new Phase3Executor(bootstrapAdapter);
-            phase3Executor.ExecuteManifest(jsonContent);
             
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3 manifest executed");
-        }
-        else
-        {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: bootstrap_phase3.json not found");
-        }
-        
-        // Fall back to loading Smalltalk source files
-        var libraryDir = Path.GetDirectoryName(bootstrapDir) ?? "";
-        var headlessLibraryPath = Path.Combine(libraryDir, "HeadlessStandardLibrary.st");
-        var standardLibraryPath = Path.Combine(libraryDir, "StandardLibrary.st");
-        
-        string libraryPath = "";
-        if (File.Exists(headlessLibraryPath))
-        {
-            libraryPath = headlessLibraryPath;
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Using HeadlessStandardLibrary.st");
-        }
-        else if (File.Exists(standardLibraryPath))
-        {
-            libraryPath = standardLibraryPath;
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Using StandardLibrary.st");
-        }
-        else
-        {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] No standard library found - continuing with bootstrap classes only");
-            return;
-        }
-        
-        // Load standard library via SmalltalkLoader
-        var loader = new SmalltalkLoader(Interpreter);
-        var result = loader.LoadFile(libraryPath);
-        
-        if (result.Success)
-        {
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Loaded {result.ClassesLoaded} classes and {result.MethodsLoaded} methods");
-        }
-        else
-        {
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Warning: Failed to load some parts of standard library");
-            foreach (var error in result.Errors.Take(3))
+            foreach (var file in phase3Files)
             {
-                Console.WriteLine($"  Error: {error}");
+                var fileName = Path.GetFileName(file);
+                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Loading Phase 3 class: {fileName}");
+                
+                try
+                {
+                    var jsonContent = File.ReadAllText(file);
+                    phase3Executor.ExecuteClassManifest(jsonContent);
+                }
+                catch (Exception ex)
+                {
+                    JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Error loading {fileName}: {ex.Message}");
+                }
             }
+            
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 3 class loading complete");
         }
-        
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3 complete: Standard library processed");
+        else
+        {
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] No Phase 3 class files found - running with Phase 2 classes only");
+        }
     }
     
     /// <summary>
-    /// Loads an additional JSON manifest file (Phase 3 format).
+    /// Detects whether the JSON content represents a single-class manifest or multi-class manifest.
+    /// </summary>
+    private static bool IsSingleClassManifest(string jsonContent)
+    {
+        // Single-class manifests have "className" property, multi-class manifests have "classes" array
+        return jsonContent.Contains("\"className\"") && !jsonContent.Contains("\"classes\"");
+    }
+    
+    /// <summary>
+    /// Loads a JSON manifest file for Phase 3 bootstrap.
+    /// Automatically detects single-class vs multi-class manifest format.
     /// </summary>
     public void LoadJsonManifest(string filePath)
     {
@@ -237,7 +227,16 @@ public sealed class VirtualMachine
         }
         
         var phase3Executor = new Phase3Executor(bootstrapAdapter);
-        phase3Executor.ExecuteManifest(jsonContent);
+        
+        // Detect manifest format and call appropriate method
+        if (IsSingleClassManifest(jsonContent))
+        {
+            phase3Executor.ExecuteClassManifest(jsonContent);
+        }
+        else
+        {
+            phase3Executor.ExecuteManifest(jsonContent);
+        }
         
         JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
     }

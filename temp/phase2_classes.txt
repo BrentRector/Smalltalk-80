@@ -1,0 +1,36 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+û Virtual Machine created
+
+
+=== Classes Present After Phase 2 ===
+
+Found 20 classes:
+------------------------
+  - Array
+  - Association
+  - Behavior
+  - Boolean
+  - ByteArray
+  - Class
+  - Collection
+  - CompiledMethod
+  - Dictionary
+  - False
+  - LookupKey
+  - Magnitude
+  - Metaclass
+  - MethodDictionary
+  - Object
+  - String
+  - Symbol
+  - SystemDictionary
+  - True
+  - UndefinedObject
+
+=== Compiler Extraction Command ===
+To extract these classes from the system image, run:
+
+dotnet run --project Smalltalk80.Compiler -- --compile-classes -c Array -c Association -c Behavior -c Boolean -c ByteArray -c Class -c Collection -c CompiledMethod -c Dictionary -c False -c LookupKey -c Magnitude -c Metaclass -c MethodDictionary -c Object -c String -c Symbol -c SystemDictionary -c True -c UndefinedObject -o bootstrap_phase2_complete.json "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st"

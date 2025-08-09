@@ -1,0 +1,530 @@
+{
+  "ClassName": "Symbol",
+  "Superclass": "String",
+  "InstanceVariables": [],
+  "ClassVariables": [
+    "SingleCharSymbols",
+    "USTable"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Collections-Text",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "=anObject^self==anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        }
+      ]
+    },
+    {
+      "Selector": "asString",
+      "Source": "asString|newString|newString_Stringnew:selfsize.1to:selfsizedo:[:index|newStringat:indexput:(selfat:index)].^newString!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "Stringnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSymbol",
+      "Source": "asSymbol!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:anIntegerput:anObjectselferrorNoModification!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectselferrorNoModification"
+        }
+      ]
+    },
+    {
+      "Selector": "classPart",
+      "Source": "classPart|i|i_selfindexOf:$.ifAbsent:[selferror:\u0027class part not found\u0027].^(selfcopyFrom:1to:i-1)asSymbol!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfindexOf"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNoModification",
+      "Source": "errorNoModificationselferror:\u0027symbols can not be modified.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash\u003Cprimitive: 75\u003E^self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 75,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^mapnewHashFor:selfhash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isCompound",
+      "Source": "isCompound^selfincludes:$.!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isInfix",
+      "Source": "isInfix^(selfat:1)isLetternot!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isKeyword",
+      "Source": "isKeywordselfsize\u003C=1ifTrue:[^false].^(selfat:selfsize)=$:!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 03 23 7D 7D E1 68 44 D2 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfsize"
+        },
+        false,
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "isLiteral",
+      "Source": "isLiteral^ScannerisLiteralSymbol:self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "keywords",
+      "Source": "keywords|resultaStreamilchar|result_WriteStreamon:(Arraynew:10).aStream_WriteStreamon:(Stringnew:16).i_1.l_selfsize.[i\u003C=l]whileTrue:[char_selfat:i.aStreamnextPut:char.(char=$:or:[i=l])ifTrue:[resultnextPut:aStreamcontents.aStreamreset].i_i\u002B1].^resultcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "result"
+        }
+      ]
+    },
+    {
+      "Selector": "numArgs",
+      "Source": "numArgs|lenni|len_selfsize.n_(selfat:1)isLetterifTrue:[0]ifFalse:[1].i_1.[(i_i\u002B1)\u003C=len]whileTrue:[(selfat:i)=$:ifTrue:[n_n\u002B1]].^n!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "48 88 81 60 09 87 69 4A 89 00 02 21 7D 89 00 02 22 7D F0 88 81 60 0B 87 69 22 88 81 60 06 87 69 89 00 0B 46 22 B0 88 81 60 06 87 49 B4 7D 89 00 03 4A D6 7D 2C B6 89 00 09 4B 22 B0 88 81 60 0B 87 7D F5 7C",
+      "Literals": [
+        {
+          "Value": "isLetterifTrue:ifFalse:"
+        },
+        0,
+        1,
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:ifTrue:"
+        },
+        {
+          "Value": "i"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "len"
+        },
+        {
+          "Value": "selfat"
+        },
+        {
+          "Value": "n"
+        },
+        ":"
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamaStreamnextPutAll:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "replaceFrom:to:with:startingAt:",
+      "Source": "replaceFrom:startto:stopwith:replacementstartingAt:repStartselferrorNoModification!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "selectorPart",
+      "Source": "selectorPart^(selfcopyFrom:(selfindexOf:$.)\u002B1to:selfsize)asSymbol!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "shallowCopy",
+      "Source": "shallowCopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "species",
+      "Source": "species^String!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "String"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamselfisLiteralifTrue:[aStreamnextPut:$#.aStreamnextPutAll:self]ifFalse:[superstoreOn:aStream.aStreamnextPutAll:\u0027 asSymbol\u0027]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 40 7D 69 41 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextPut"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "string:",
+      "Source": "string:aString1to:aStringsizedo:[:j|superat:jput:(aStringat:j)].^self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStringsizedo"
+        }
+      ]
+    },
+    {
+      "Selector": "stringhash",
+      "Source": "stringhash^superhash!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "superhash"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "correctMessage:",
+      "Source": "correctMessage:unknown|lccandidatesscorebestScoreguesshasColonnArgssmallerlarger|lc_unknownfirstasLowercase.hasColon_unknownlast=$:.unknownfirstisLetterifFalse:[^nil].nArgs_(unknownselect:[:char|char=$:])size.candidates_OrderedCollectionnew.smaller_unknownsize-4.larger_unknownsize\u002B4.SymbolallInstancesDo:[:each|(((eachat:1)=lcand:[eachsizebetween:smallerand:larger])and:[(eachlast=$:)=hasColonand:[eachnumArgs=nArgs]])ifTrue:[candidatesadd:each]].bestScore_0.candidatesdo:[:each|(score_eachspellAgainst:unknown)\u003EbestScoreifTrue:[bestScore_score.guess_each]].bestScore\u003E50ifFalse:[^false].(selfconfirm:\u0027Confirm correction to \u0027,guess)ifTrue:[^guessasSymbol]ifFalse:[^nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 6A 43 24 B6 88 81 60 05 87 6A 46 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "unknownfirstasLowercase"
+        },
+        {
+          "Value": "lc"
+        },
+        {
+          "Value": "unknownlast"
+        },
+        ":",
+        {
+          "Value": "hasColon"
+        },
+        {
+          "Value": "unknownfirstisLetterifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "hasInterned:ifTrue:",
+      "Source": "hasInterned:aStringifTrue:symBlock|viascii|aStringsize=1ifTrue:[(ascii_(aStringat:1)asciiValue)\u003C128ifTrue:[symBlockvalue:(SingleCharSymbolsat:ascii\u002B1).^true]].v_USTableat:aStringstringhash\\\\USTablesize\u002B1.1to:vsizedo:[:i|(vat:i)==nilifFalse:[aStringsize=(vat:i)sizeifTrue:[aString=(vat:i)ifTrue:[symBlockvalue:(vat:i).^true]]]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "48 49 E0 4A E0 22 B6 89 00 08 4B 88 81 60 0C 87 D4 7D 26 B2 89 00 02 4D 7D 4C 22 B0 83 63 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "="
+        },
+        1,
+        {
+          "Value": "ifTrue:ifTrue:SingleCharSymbolsat:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "\u003C"
+        },
+        128,
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "symBlock"
+        },
+        {
+          "Value": "viascii"
+        },
+        {
+          "Value": "aStringsize"
+        },
+        {
+          "Value": "aStringat"
+        },
+        {
+          "Value": "ascii"
+        },
+        {
+          "Value": "symBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initialize|av|v_Arraynew:128.a_Stringnew:1.1to:128do:[:i|aat:1put:i-1.vat:iput:aasSymbol].SingleCharSymbols_v!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "Arraynew"
+        },
+        {
+          "Value": "v"
+        }
+      ]
+    },
+    {
+      "Selector": "intern:",
+      "Source": "intern:aString|symindex|selfhasInterned:aStringifTrue:[:sym|^sym].sym_(aStringisMemberOf:Symbol)ifTrue:[aString]ifFalse:[(Symbolnew:aStringsize)string:aString].index_aStringstringhash\\\\USTablesize\u002B1.USTableat:indexput:((USTableat:index)copyWith:sym).^sym!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfhasInterned"
+        }
+      ]
+    },
+    {
+      "Selector": "internCharacter:",
+      "Source": "internCharacter:aCharacter|ascii|(ascii_aCharacterasciiValue)\u003C128ifTrue:[^SingleCharSymbolsat:ascii\u002B1].^selfintern:(Stringwith:aCharacter)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 88 69 21 B2 89 00 03 47 7D 7D D3 25 B0 E2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        128,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "ascii"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "aCharacterasciiValue"
+        },
+        {
+          "Value": "SingleCharSymbolsat"
+        }
+      ]
+    },
+    {
+      "Selector": "rehash",
+      "Source": "rehash|sym|USTable_USTablecollect:[:sym|Arraynew:0].SymbolallInstancesDo:[:sym|selfintern:sym]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "USTablecollect"
+        },
+        {
+          "Value": "USTable"
+        }
+      ]
+    },
+    {
+      "Selector": "table",
+      "Source": "table^USTable!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "USTable"
+        }
+      ]
+    },
+    {
+      "Selector": "table:",
+      "Source": "table:newArray^USTable_newArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 81 60 00 87 7C",
+      "Literals": [
+        {
+          "Value": "USTable"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 31,
+    "SuccessfullyCompiled": 31,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:09:44.1177767Z"
+  }
+}

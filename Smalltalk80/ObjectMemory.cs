@@ -11,6 +11,15 @@ public static class ObjectMemory
 
     /// <summary>Gets a read-only view of all registered objects.</summary>
     public static IReadOnlyList<SmalltalkObject> Objects => objects;
+    
+    /// <summary>The singleton nil object (instance of UndefinedObject).</summary>
+    public static SmalltalkObject? NilObject { get; set; }
+    
+    /// <summary>The singleton true object (instance of True).</summary>
+    public static SmalltalkObject? TrueObject { get; set; }
+    
+    /// <summary>The singleton false object (instance of False).</summary>
+    public static SmalltalkObject? FalseObject { get; set; }
 
     /// <summary>
     /// Registers a new object with the object table assigning it an <c>oop</c> value.

@@ -1,0 +1,218 @@
+{
+  "ClassName": "ByteArray",
+  "Superclass": "ArrayedCollection",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Arrayed",
+  "InstanceMethods": [
+    {
+      "Selector": "asString",
+      "Source": "asString^(Stringnew:selfsize)replaceFrom:1to:selfsizewithByteArray:selfstartingAt:1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "defaultElement",
+      "Source": "defaultElement^0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "doubleWordAt:",
+      "Source": "doubleWordAt:i|b0b1b2w|b0_selfat:i.b1_selfat:i\u002B1.b2_selfat:i\u002B2.w_selfat:i\u002B3.b2=0ifFalse:[w_(b2bitShift:8)\u002Bw].b1=0ifFalse:[w_(b1bitShift:16)\u002Bw].b0=0ifFalse:[w_(b0bitShift:24)\u002Bw].^w!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfat"
+        },
+        {
+          "Value": "b0"
+        }
+      ]
+    },
+    {
+      "Selector": "doubleWordAt:put:",
+      "Source": "doubleWordAt:iput:value|w|w_valuetruncated.selfat:iput:(wdigitAt:4).selfat:i\u002B1put:(wdigitAt:3).selfat:i\u002B2put:(wdigitAt:2).selfat:i\u002B3put:(wdigitAt:1)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "value"
+        },
+        {
+          "Value": "w"
+        }
+      ]
+    },
+    {
+      "Selector": "packBits:into:",
+      "Source": "packBits:fieldSizeinto:byteArray^selfpackBits:fieldSizestartBit:8-fieldSizeinto:byteArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "byteArray"
+        }
+      ]
+    },
+    {
+      "Selector": "packBits:startBit:into:",
+      "Source": "packBits:fieldSizestartBit:fieldStartinto:byteArray|unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht|fieldsPerWord_16//fieldSize.ht_selfsize//fieldsPerWord.unpackedForm_Formnewextent:fieldsPerWord*8@htoffset:0@0bits:self.packedForm_Formnewextent:16@htoffset:0@0bits:byteArray.bitBlt_BitBltdestForm:packedFormsourceForm:unpackedFormhalftoneForm:nilcombinationRule:FormoverdestOrigin:0@0sourceOrigin:0@0extent:fieldSize@htclipRect:(0@0corner:16@ht).sourceX_fieldStart.destX_0.fieldsPerWordtimesRepeat:[bitBltsourceX:sourceX;destX:destX;copyBits.sourceX_sourceX\u002B8.destX_destX\u002BfieldSize].^byteArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fieldStartinto"
+        }
+      ]
+    },
+    {
+      "Selector": "primReplaceFrom:to:with:startingAt:",
+      "Source": "primReplaceFrom:startto:stopwith:replacementstartingAt:repStart\u003Cprimitive: 105\u003EsuperreplaceFrom:startto:stopwith:replacementstartingAt:repStart!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "replaceFrom:to:with:startingAt:",
+      "Source": "replaceFrom:startto:stopwith:replacementstartingAt:repStart(replacementisKindOf:ByteArray)ifTrue:[selfprimReplaceFrom:startto:stopwith:replacementstartingAt:repStart]ifFalse:[superreplaceFrom:startto:stopwith:replacementstartingAt:repStart]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "replaceFrom:to:withString:startingAt:",
+      "Source": "replaceFrom:startto:stopwithString:aStringstartingAt:repStart|indexrepOff|\u003Cprimitive: 105\u003ErepOff_repStart-start.index_start-1.[(index_index\u002B1)\u003C=stop]whileTrue:[selfat:indexput:(aStringat:repOff\u002Bindex)asInteger]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwithString"
+        }
+      ]
+    },
+    {
+      "Selector": "unpackBits:into:",
+      "Source": "unpackBits:fieldSizeinto:byteArray|unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht|fieldsPerWord_16//fieldSize.ht_selfsize//2.unpackedForm_Formnewextent:fieldsPerWord*8@htoffset:0@0bits:byteArray.packedForm_Formnewextent:16@htoffset:0@0bits:self.bitBlt_BitBltdestForm:unpackedFormsourceForm:packedFormhalftoneForm:nilcombinationRule:FormoverdestOrigin:0@0sourceOrigin:0@0extent:fieldSize@htclipRect:unpackedFormboundingBox.sourceX_0.destX_8-fieldSize.fieldsPerWordtimesRepeat:[bitBltsourceX:sourceX;destX:destX;copyBits.sourceX_sourceX\u002BfieldSize.destX_destX\u002B8].^byteArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "byteArray"
+        },
+        {
+          "Value": "unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht"
+        },
+        {
+          "Value": "fieldsPerWord"
+        }
+      ]
+    },
+    {
+      "Selector": "wordAt:",
+      "Source": "wordAt:i|j|j_i\u002Bi.^((selfat:j-1)bitShift:8)\u002B(selfat:j)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 10 B0 88 69 6A 46 D1 23 B1 25 BC 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "j"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "bitShift:"
+        },
+        8,
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "wordAt:put:",
+      "Source": "wordAt:iput:v|j|j_i\u002Bi.selfat:j-1put:((vbitShift:-8)bitAnd:8r377).selfat:jput:(vbitAnd:8r377)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "v"
+        },
+        {
+          "Value": "j"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 12,
+    "SuccessfullyCompiled": 12,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T20:54:02.3644192Z"
+  }
+}

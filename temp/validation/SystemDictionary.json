@@ -1,0 +1,1210 @@
+{
+  "ClassName": "SystemDictionary",
+  "Superclass": "Dictionary",
+  "InstanceVariables": [],
+  "ClassVariables": [
+    "CachedClassNames",
+    "Frills",
+    "LowSpaceProcess",
+    "LowSpaceSemaphore",
+    "OopsLeftLimit",
+    "SpecialSelectors",
+    "SystemChanges",
+    "WordsLeftLimit"
+  ],
+  "PoolDictionaries": [],
+  "Category": "System-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "allBehaviorsDo:",
+      "Source": "allBehaviorsDo:aBlockaBlockvalue:Object.ObjectallSubclassesDo:aBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Object"
+        },
+        {
+          "Value": "ObjectallSubclassesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "allCallsOn:",
+      "Source": "allCallsOn:aLiteral|aSortedCollectionspecial|aSortedCollection_SortedCollectionnew.special_selfhasSpecialSelector:aLiteralifTrueSetByte:[:byte].CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|(classwhichSelectorsReferTo:aLiteralspecial:specialbyte:byte)do:[:sel|sel~~#DoItifTrue:[aSortedCollectionadd:classname,\u0027 \u0027,sel]]]].^aSortedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        },
+        {
+          "Value": "aSortedCollection"
+        },
+        {
+          "Value": "selfhasSpecialSelector"
+        },
+        {
+          "Value": "special"
+        }
+      ]
+    },
+    {
+      "Selector": "allCallsOn:and:",
+      "Source": "allCallsOn:firstLiteraland:secondLiteral|aCollectionsecondArrayfirstSpecialsecondSpecial|aCollection_SortedCollectionnew.firstSpecial_selfhasSpecialSelector:firstLiteralifTrueSetByte:[:firstByte].secondSpecial_selfhasSpecialSelector:secondLiteralifTrueSetByte:[:secondByte].CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|secondArray_classwhichSelectorsReferTo:secondLiteralspecial:secondSpecialbyte:secondByte.((classwhichSelectorsReferTo:firstLiteralspecial:firstSpecialbyte:firstByte)select:[:aSel|(secondArrayincludes:aSel)])do:[:sel|aCollectionadd:classname,\u0027 \u0027,sel]]].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "secondLiteral"
+        },
+        {
+          "Value": "aCollectionsecondArrayfirstSpecialsecondSpecial"
+        },
+        {
+          "Value": "aCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "allClassesDo:",
+      "Source": "allClassesDo:aBlock(selfclassNamescollect:[:name|Smalltalkat:name])do:aBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 D0 43 E1 7C",
+      "Literals": [
+        {
+          "Value": "name"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "selfclassNamescollect"
+        },
+        {
+          "Value": "Smalltalkat"
+        }
+      ]
+    },
+    {
+      "Selector": "allClassesImplementing:",
+      "Source": "allClassesImplementing:aSelector|aCollection|aCollection_ReadWriteStreamon:Arraynew.selfallBehaviorsDo:[:class|(classincludesSelector:aSelector)ifTrue:[aCollectionnextPut:class]].^aCollectioncontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "ReadWriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "allImplementedMessages",
+      "Source": "allImplementedMessages|aSet|aSet_Setnew:(SymbolinstanceCount*1.5)truncated.CursorexecuteshowWhile:[selfallBehaviorsDo:[:cl|clselectorsdo:[:aSelector|aSetadd:aSelector]]].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        }
+      ]
+    },
+    {
+      "Selector": "allImplementorsOf:",
+      "Source": "allImplementorsOf:aSelector|aCollection|aCollection_SortedCollectionnew.CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|(classincludesSelector:aSelector)ifTrue:[aCollectionadd:classname,\u0027 \u0027,aSelector]]].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        },
+        {
+          "Value": "CursorexecuteshowWhile"
+        }
+      ]
+    },
+    {
+      "Selector": "allSelect:",
+      "Source": "allSelect:aBlock|aCollection|aCollection_SortedCollectionnew.CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|classselectorsdo:[:sel|(aBlockvalue:(classcompiledMethodAt:sel))ifTrue:[aCollectionadd:classname,\u0027 \u0027,sel]]]].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        },
+        {
+          "Value": "CursorexecuteshowWhile"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:aKeyput:anObject|indexelement|index_selffindKeyOrNil:aKey.element_selfbasicAt:index.element==nilifTrue:[selfvalueAtNewKey:aKeyput:anObjectatIndex:indexdeclareFrom:Undeclared]ifFalse:[elementvalue:anObject].^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "indexelement"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllCallsOn:",
+      "Source": "browseAllCallsOn:aSymbol|labelkey|(aSymbolisMemberOf:Association)ifTrue:[key_aSymbolkey.label_\u0027Users of \u0027,key]ifFalse:[key_aSymbol.label_\u0027Senders of \u0027,key].^BrowserViewopenListBrowserOn:(selfallCallsOn:aSymbol)label:labelinitialSelection:keyasSymbolkeywordsfirst!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "Association"
+        },
+        {
+          "Value": "aSymbolisMemberOf"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllCallsOn:and:",
+      "Source": "browseAllCallsOn:literal1and:literal2BrowserViewopenListBrowserOn:(selfallCallsOn:literal1and:literal2)label:literal1printString,literal2printString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "literal2BrowserViewopenListBrowserOn"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllImplementorsOf:",
+      "Source": "browseAllImplementorsOf:selectorBrowserViewopenListBrowserOn:(selfallImplementorsOf:selector)label:\u0027Implementors of \u0027,selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "selector"
+        },
+        {
+          "Value": "selfallImplementorsOf"
+        }
+      ]
+    },
+    {
+      "Selector": "browseAllSelect:",
+      "Source": "browseAllSelect:aBlockBrowserViewopenListBrowserOn:(selfallSelect:aBlock)label:\u0027selected messages\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "selfallSelect"
+        }
+      ]
+    },
+    {
+      "Selector": "browseChangedMessages",
+      "Source": "browseChangedMessagesBrowserViewopenListBrowserOn:SystemChangeschangedMessageListlabel:\u0027Changed Messages\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "changes",
+      "Source": "changes^SystemChanges!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "SystemChanges"
+        }
+      ]
+    },
+    {
+      "Selector": "classNames",
+      "Source": "classNamesCachedClassNames==nilifTrue:[^selfnewClassNames].^CachedClassNames!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "collectPointersTo:",
+      "Source": "collectPointersTo:anObject|someme|some_OrderedCollectionnew.me_thisContext.selfpointersTo:anObjectdo:[:obj|(obj~~me)\u0026(obj~~some)ifTrue:[someadd:obj]].me_nil.^someasArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 88 81 60 03 87 6A 44 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "some"
+        },
+        {
+          "Value": "thisContext"
+        },
+        {
+          "Value": "me"
+        },
+        {
+          "Value": "selfpointersTo"
+        }
+      ]
+    },
+    {
+      "Selector": "condenseChanges",
+      "Source": "condenseChanges|ffileName|f_Diskfile:\u0027ST80.temp\u0027.ftimeStamp.SmalltalkallBehaviorsDo:[:class|classmoveChangesTo:f].fclose.freadOnly.fileName_(SourceFilesat:2)name.(SourceFilesat:2)close.SourceFilesat:2put:f.DiskremoveKey:fileName.ffilerename:fileName!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "Diskfile"
+        },
+        {
+          "Value": "f"
+        }
+      ]
+    },
+    {
+      "Selector": "copyChangesTo:",
+      "Source": "copyChangesTo:newFileName|oldNamenewFile|SourceFiles==nilifTrue:[^self].oldName_(SourceFilesat:2)name.oldNamelast=$.ifTrue:[oldName_oldNamecopyFrom:1to:oldNamesize-1].(newFileNamesameAs:oldName)ifFalse:[Transcriptcr;show:\u0027Copying \u0027,oldName,\u0027 to \u0027,newFileName,\u0027...\u0027.(SourceFilesat:2)close;readOnly;reset.newFile_FileStreamfileNamed:newFileName.CursorwriteshowWhile:[newFilenextPutAll:(SourceFilesat:2)].newFilereadOnly.SourceFilesat:2put:newFile.Transcriptshow:\u0027 done\u0027;cr]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "copyright",
+      "Source": "copyright^\u0027Copyright (c) 1983 Xerox Corp.  All rights reserved.\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "Copyright (c) 1983 Xerox Corp.  All rights reserved."
+      ]
+    },
+    {
+      "Selector": "core",
+      "Source": "core|nnobjectsnwordsisBytesname|nobjects_nwords_0.SmalltalkallBehaviorsDo:[:class|classisVariableifTrue:[n_0.isBytes_classisBytes.classallInstancesDo:[:inst|n_n\u002B1.nwords_nwords\u002B(isBytesifTrue:[instbasicSize\u002B1//2]ifFalse:[instbasicSize])]]ifFalse:[n_classisMetaifTrue:[1]ifFalse:[classinstanceCount]].nobjects_nobjects\u002Bn.nwords_nwords\u002B(classinstSize\u002B2*n)].^Arraywith:nobjectswith:nwords!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 01 87 88 81 60 02 87 69 43 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "nwords"
+        },
+        {
+          "Value": "nobjects"
+        },
+        {
+          "Value": "SmalltalkallBehaviorsDo"
+        }
+      ]
+    },
+    {
+      "Selector": "coreLeft",
+      "Source": "coreLeft\u003Cprimitive: 112\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 112,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "coreLeftLimit",
+      "Source": "coreLeftLimit^WordsLeftLimit!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "WordsLeftLimit"
+        }
+      ]
+    },
+    {
+      "Selector": "coreLeftLimit:",
+      "Source": "coreLeftLimit:newLimitWordsLeftLimit_newLimit.selfresetLowSpaceSignal.^newLimit!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 69 40 7C",
+      "Literals": [
+        {
+          "Value": "newLimit"
+        },
+        {
+          "Value": "selfresetLowSpaceSignal"
+        }
+      ]
+    },
+    {
+      "Selector": "exitToDebugger",
+      "Source": "exitToDebugger\u003Cprimitive: 114\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 114,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "flushClassNameCache",
+      "Source": "flushClassNameCacheCachedClassNames_nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "forgetDoIts",
+      "Source": "forgetDoItsSmalltalkallBehaviorsDo:[:class|classremoveSelectorSimply:#DoIt;removeSelectorSimply:#DoItIn:]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 43 7D 88 69 D0 6A 11 22 E1 7C",
+      "Literals": [
+        {
+          "Value": "DoIt"
+        },
+        {
+          "Value": "removeSelectorSimply:"
+        },
+        {
+          "Value": "DoItIn:"
+        },
+        {
+          "Value": "classremoveSelectorSimply"
+        }
+      ]
+    },
+    {
+      "Selector": "frills",
+      "Source": "frills^Frills!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Frills"
+        }
+      ]
+    },
+    {
+      "Selector": "frills:",
+      "Source": "frills:aBoolean^Frills_aBoolean!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 81 60 00 87 7C",
+      "Literals": [
+        {
+          "Value": "Frills"
+        }
+      ]
+    },
+    {
+      "Selector": "getImagePrefix",
+      "Source": "getImagePrefix|defaultnewPrefixprompt|SourceFiles==nilifTrue:[^\u0027snapshot\u0027].prompt_\u0027Enter name for image file:\u0027.default_\u0027snapshot\u0027.newPrefix_\u0027\u0027.FillInTheBlankrequest:promptdisplayAt:SensorcursorPointcentered:trueaction:[:newPrefix|]initialAnswer:default.[newPrefixisEmptyor:[(DiskisLegalFileName:newPrefix,\u0027.changes\u0027)not]]whileTrue:[newPrefixisEmptyifTrue:[^newPrefix].FillInTheBlankrequest:promptdisplayAt:SensorcursorPointcentered:trueaction:[:newPrefix|]initialAnswer:default.(newPrefixsize\u003E2and:[(newPrefixcopyFrom:newPrefixsize-2to:newPrefixsize)sameAs:\u0027.im\u0027])ifTrue:[newPrefix_newPrefixcopyFrom:1to:newPrefixsize-3].prompt_\u0027Illegal file name: \u0027,newPrefix,\u0027\r\nEnter name for image file:\u0027.default_DiskcheckName:newPrefix,\u0027.changes\u0027fixErrors:true.default_defaultcopyFrom:1to:defaultsize-8].^newPrefix!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "hasSpecialSelector:ifTrueSetByte:",
+      "Source": "hasSpecialSelector:aLiteralifTrueSetByte:aBlock1to:selfspecialSelectorSizedo:[:index|(selfspecialSelectorAt:index)==aLiteralifTrue:[aBlockvalue:index\u002B16rAF.^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aBlock1to"
+        }
+      ]
+    },
+    {
+      "Selector": "install",
+      "Source": "installCompiledMethodinitialize.SmallIntegerinitialize.LargePositiveIntegerinitialize.LargeNegativeIntegerinitialize.DisplayScreencurrentDisplay:Display.CursorcurrentCursor:CursorcurrentCursor.InputSensorinstall.LowSpaceProcess==nilifFalse:[LowSpaceProcessterminate].LowSpaceSemaphore_Semaphorenew.LowSpaceProcess_[selflowSpaceNotificationLoop]newProcess.LowSpaceProcesspriority:ProcessorlowIOPriority.LowSpaceProcessresume.selfresetSpaceLimits.!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 68 41 68 42 68 43 7C",
+      "Literals": [
+        {
+          "Value": "SmallIntegerinitialize"
+        },
+        {
+          "Value": "LargePositiveIntegerinitialize"
+        },
+        {
+          "Value": "LargeNegativeIntegerinitialize"
+        },
+        {
+          "Value": "DisplayScreencurrentDisplay"
+        }
+      ]
+    },
+    {
+      "Selector": "logChange:",
+      "Source": "logChange:aStringOrText|aFileStreamaString|SourceFiles==nilifTrue:[^self].(aStringisMemberOf:Text)ifTrue:[aString_aStringOrTextstring]ifFalse:[aString_aStringOrText].(aStringisMemberOf:String)ifFalse:[selferror:\u0027cant log this change\u0027].(aStringfindFirst:[:char|charisSeparatornot])=0ifTrue:[^self].aFileStream_SourceFilesat:2.aFileStreamsetToEnd;readWrite.aFileStreamcr;cr;nextChunkPut:aString.aFileStreamreadOnly!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "lowSpaceNotificationLoop",
+      "Source": "lowSpaceNotificationLoop[true]whileTrue:[LowSpaceSemaphorewait.ScheduledControllersinterruptName:\u0027Space is Low\u0027.selfresetSpaceLimits]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 21 7D 89 00 04 42 68 43 7D E0 68 44 7C",
+      "Literals": [
+        {
+          "Value": "whileTrue:"
+        },
+        true,
+        {
+          "Value": "LowSpaceSemaphorewait"
+        },
+        {
+          "Value": "ScheduledControllersinterruptName"
+        },
+        {
+          "Value": "selfresetSpaceLimits"
+        }
+      ]
+    },
+    {
+      "Selector": "newChanges:",
+      "Source": "newChanges:aChangeSetSystemChanges_aChangeSet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aChangeSet"
+        }
+      ]
+    },
+    {
+      "Selector": "newClassNames",
+      "Source": "newClassNames|names|names_OrderedCollectionnew:selfsize.selfdo:[:cl|(clisKindOf:Class)ifTrue:[namesadd:clname]].^CachedClassNames_namesasSortedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "newSourceFile:without:",
+      "Source": "newSourceFile:verswithout:setOfClasses|oldFilenewFileclass|oldFile_SourceFilesat:1.newFile_Diskfile:vers,\u0027.sources\u0027.newFiletimeStamp.SmalltalkclassNamesdo:[:className|class_Smalltalkat:className.(setOfClassesincludes:class)ifFalse:[classfileOutOn:newFilemoveSource:truetoFile:1.newFilenextPut:12asCharacter]].newFileshorten;readOnly.SourceFilesat:1put:newFile.SourceFilesat:2put:(Diskfile:vers,\u0027.changes\u0027).(SourceFilesat:2)shorten;readOnly!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "setOfClasses"
+        },
+        {
+          "Value": "oldFilenewFileclass"
+        },
+        {
+          "Value": "oldFile"
+        }
+      ]
+    },
+    {
+      "Selector": "noChanges",
+      "Source": "noChangesSystemChangesinitialize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "oopsLeft",
+      "Source": "oopsLeft\u003Cprimitive: 115\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 115,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "oopsLeftLimit",
+      "Source": "oopsLeftLimit^OopsLeftLimit!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "OopsLeftLimit"
+        }
+      ]
+    },
+    {
+      "Selector": "oopsLeftLimit:",
+      "Source": "oopsLeftLimit:newLimitOopsLeftLimit_newLimit.selfresetLowSpaceSignal.^newLimit!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 69 40 7C",
+      "Literals": [
+        {
+          "Value": "newLimit"
+        },
+        {
+          "Value": "selfresetLowSpaceSignal"
+        }
+      ]
+    },
+    {
+      "Selector": "pointersTo:do:",
+      "Source": "pointersTo:anObjectdo:aBlock|meclassobjmethodifixedSize|me_thisContext.SmalltalkallBehaviorsDo:[:class|classisBitsifTrue:[class==CompiledMethodifTrue:[classallInstancesDo:[:method|1to:methodnumLiterals\u002B1do:[:i|(methodobjectAt:i)==anObjectifTrue:[aBlockvalue:method]]]]]ifFalse:[fixedSize_classinstSize.classallInstancesDo:[:obj|1to:(fixedSize\u002BobjbasicSize)do:[:i|((objinstVarAt:i)==anObjectand:[obj~~me])ifTrue:[aBlockvalue:obj]]]]].me_nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "meclassobjmethodifixedSize"
+        },
+        {
+          "Value": "me"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPutAll:selfclassname,\u0027 keys (\u0027.selfkeysDo:[:key|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].keyprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B0 88 69 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "quit",
+      "Source": "quitselfreleaseExternalViews.selfquitPrimitive!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfquitPrimitive"
+        }
+      ]
+    },
+    {
+      "Selector": "quitPrimitive",
+      "Source": "quitPrimitive\u003Cprimitive: 113\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 113,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "recompileAllFrom:",
+      "Source": "recompileAllFrom:firstName|class|SmalltalkforgetDoIts.selfallClassesDo:[:class|classname\u003E=firstNameifTrue:[Transcriptshow:classname;cr.classcompileAll]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "SmalltalkforgetDoIts"
+        },
+        {
+          "Value": "selfallClassesDo"
+        }
+      ]
+    },
+    {
+      "Selector": "recompileCallsOn:",
+      "Source": "recompileCallsOn:aLiteral|special|special_selfhasSpecialSelector:aLiteralifTrueSetByte:[:byte].CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|(classwhichSelectorsReferTo:aLiteralspecial:specialbyte:byte)do:[:sel|sel~~#DoItifTrue:[classrecompile:sel]]]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfhasSpecialSelector"
+        }
+      ]
+    },
+    {
+      "Selector": "recompileMethodsForWhich:",
+      "Source": "recompileMethodsForWhich:aBlockCursorexecuteshowWhile:[selfallBehaviorsDo:[:class|classselectorsdo:[:sel|(aBlockvalue:(classcompiledMethodAt:sel))ifTrue:[Transcriptshow:classname,\u0027 \u0027,sel;cr.classrecompile:sel]]]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 42 7D C7 43 E1 7C",
+      "Literals": [
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "selfallBehaviorsDo"
+        },
+        {
+          "Value": "classselectorsdo"
+        }
+      ]
+    },
+    {
+      "Selector": "recover:",
+      "Source": "recover:nCharacters|changes|changes_SourceFilesat:2.changessetToEnd;skip:nCharactersnegated.(Diskfile:\u0027st80.recent\u0027)nextPutAll:changes;close;edit!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "SourceFilesat"
+        }
+      ]
+    },
+    {
+      "Selector": "releaseExternalViews",
+      "Source": "releaseExternalViewsSourceFiles==nilifFalse:[SourceFilesdo:[:t|t==nilifFalse:[tclose]]].Disk==nilifFalse:[Diskclose].FileDirectoryreleaseExternalReferences!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "removeClassNamed:",
+      "Source": "removeClassNamed:className|class|class_selfat:classNameasSymbolifAbsent:[^self].classsubclassesdo:[:subclass|selfremoveClassNamed:subclassname].SystemChangesremoveClass:class.SystemOrganizationremoveElement:className.selfremoveKey:classNameasSymbol.selfflushClassNameCache.classobsolete.!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "renameClass:as:",
+      "Source": "renameClass:aClassas:newName|oldref|SystemOrganizationclassify:newNameunder:aClasscategory.SystemOrganizationremoveElement:aClassname.SystemChangesrenameClass:aClassas:newName.oldref_selfremoveKey:aClassname.oldrefkey:newName.(UndeclaredincludesKey:newName)ifTrue:[selfat:newNameput:aClass]ifFalse:[selfadd:oldref].selfflushClassNameCache!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "newName"
+        },
+        {
+          "Value": "oldref"
+        },
+        {
+          "Value": "SystemOrganizationclassify"
+        }
+      ]
+    },
+    {
+      "Selector": "renameSystemFiles:",
+      "Source": "renameSystemFiles:newVersion|oldFileoldNameoldVersionfile|oldFile_SourceFilesat:1.oldName_oldFilename.oldVersion_oldNamecopyFrom:1to:(oldNameindexOf:$.)-1.(SourceFilesat:1)close.SourceFilesat:1put:nil.(SourceFilesat:2)close.SourceFilesat:2put:nil.#(\u0027.sources\u0027\u0027.changes\u0027\u0027.im\u0027)do:[:ext|(Diskfile:oldVersion,ext)filerename:newVersion,ext].1to:2do:[:i|file_Diskfile:newVersion,(#(\u0027.sources\u0027\u0027.changes\u0027)at:i).filereadOnly.SourceFilesat:iput:file]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "SourceFilesat"
+        },
+        {
+          "Value": "oldFile"
+        }
+      ]
+    },
+    {
+      "Selector": "resetLowSpaceSignal",
+      "Source": "resetLowSpaceSignalselfsignal:LowSpaceSemaphoreatOopsLeft:OopsLeftLimitwordsLeft:WordsLeftLimit!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "OopsLeftLimitwordsLeft"
+        }
+      ]
+    },
+    {
+      "Selector": "resetSpaceLimits",
+      "Source": "resetSpaceLimitsOopsLeftLimit_selfoopsLeft//4.WordsLeftLimit_selfcoreLeft//4.selfresetLowSpaceSignal!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 BD 68 43 21 BD 88 81 60 04 87 68 45 7C",
+      "Literals": [
+        {
+          "Value": "//"
+        },
+        4,
+        {
+          "Value": "selfoopsLeft"
+        },
+        {
+          "Value": "selfcoreLeft"
+        },
+        {
+          "Value": "WordsLeftLimit"
+        },
+        {
+          "Value": "selfresetLowSpaceSignal"
+        }
+      ]
+    },
+    {
+      "Selector": "saveAs:thenQuit:",
+      "Source": "saveAs:imagePrefixthenQuit:quitIfTrueDisk==nilifFalse:[(imagePrefixsameAs:\u0027snapshot\u0027)ifFalse:[selfcopyChangesTo:imagePrefix,\u0027.changes\u0027]].^selfsnapshotAs:imagePrefixthenQuit:quitIfTrue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "quitIfTrueDisk"
+        },
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "showMenuThenBrowse:",
+      "Source": "showMenuThenBrowse:selectorCollection|aStreammenuindex|selectorCollectionisEmptyifTrue:[^Transcriptcr;show:\u0027No messages sent.\u0027].aStream_WriteStreamon:(Stringnew:200).selectorCollectiondo:[:sel|aStreamnextPutAll:(selcontractTo:20);cr].aStreamskip:-1.index_(PopUpMenulabels:aStreamcontents)startUp.index\u003E0ifTrue:[SmalltalkbrowseAllImplementorsOf:(selectorCollectionat:index)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selectorCollectionisEmptyifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "shutdown",
+      "Source": "shutdownselfcoreLeftLimit:0.selfoopsLeftLimit:0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 69 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfoopsLeftLimit"
+        }
+      ]
+    },
+    {
+      "Selector": "signal:atOopsLeft:wordsLeft:",
+      "Source": "signal:aSemaphoreatOopsLeft:numOopswordsLeft:numWords\u003Cprimitive: 116\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "numOopswordsLeft"
+        }
+      ]
+    },
+    {
+      "Selector": "snapshot",
+      "Source": "snapshotselfsnapshotAs:\u0027snapshot\u0027thenQuit:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "snapshotAs:thenQuit:",
+      "Source": "snapshotAs:imageFilePrefixthenQuit:quitIfTrue|heightjustSnapped|Cursorexecuteshow.selflogChange:\u0027\u0027\u0027----SNAPSHOT----\u0027\u0027\u0027.Disk==nilifFalse:[(FileStreamfileNamed:imageFilePrefix,\u0027.im\u0027)beSnapshotFile;readWrite;close].selfreleaseExternalViews.Transcriptcr;show:\u0027Snapshot at: \u0027,TimedateAndTimeNowprintString.height_Displayheight.DisplayScreendisplayHeight:(heightmin:100).DelaypreSnapshot.Cursorwaitshow.justSnapped_selfsnapshotPrimitiveisNil.justSnapped\u0026quitIfTrueifTrue:[selfquitPrimitive]ifFalse:[DelaypostSnapshot.DisplayScreendisplayHeight:height.selfinstall].Cursornormalshow.^justSnapped!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 69 44 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "quitIfTrue"
+        },
+        {
+          "Value": "heightjustSnapped"
+        },
+        {
+          "Value": "Cursorexecuteshow"
+        },
+        {
+          "Value": "selflogChange"
+        }
+      ]
+    },
+    {
+      "Selector": "snapshotPrimitive",
+      "Source": "snapshotPrimitive\u003Cprimitive: 97\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 97,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "specialNargsAt:",
+      "Source": "specialNargsAt:anInteger^SpecialSelectorsat:anInteger*2!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "specialSelectorAt:",
+      "Source": "specialSelectorAt:anInteger^SpecialSelectorsat:anInteger*2-1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "specialSelectors",
+      "Source": "specialSelectors^SpecialSelectors!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "SpecialSelectors"
+        }
+      ]
+    },
+    {
+      "Selector": "specialSelectorSize",
+      "Source": "specialSelectorSize^SpecialSelectorssize//2!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 BD 7C",
+      "Literals": [
+        {
+          "Value": "//"
+        },
+        2,
+        {
+          "Value": "SpecialSelectorssize"
+        }
+      ]
+    },
+    {
+      "Selector": "timeStamp:",
+      "Source": "timeStamp:aStream|dateTime|dateTime_TimedateAndTimeNow.aStreamnextPutAll:\u0027From \u0027,Smalltalkversion,\u0027 on \u0027,(dateTimeat:1)printString,\u0027 at \u0027,(dateTimeat:2)printString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "TimedateAndTimeNow"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "valueAtNewKey:put:atIndex:declareFrom:",
+      "Source": "valueAtNewKey:aKeyput:anObjectatIndex:indexdeclareFrom:aDictionary(aDictionaryincludesKey:aKey)ifTrue:[selfatNewIndex:indexput:((aDictionaryassociationAt:aKey)value:anObject).aDictionaryremoveKey:aKey]ifFalse:[selfatNewIndex:indexput:(Associationkey:aKeyvalue:anObject)].selfflushClassNameCache!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectatIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "version",
+      "Source": "version^\u0027Smalltalk-80, version 2, of April 1, 1983\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "Smalltalk-80, version 2, of April 1, 1983"
+      ]
+    },
+    {
+      "Selector": "versionName",
+      "Source": "versionName^\u0027Smalltalk-80\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "Smalltalk-80"
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "initialize",
+      "Source": "initializeProjectcurrentnoChanges!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 71,
+    "SuccessfullyCompiled": 71,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T20:54:00.8195878Z"
+  }
+}

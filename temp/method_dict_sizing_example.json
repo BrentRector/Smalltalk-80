@@ -1,0 +1,50 @@
+{
+  "description": "Example Phase 1 operations with proper method dictionary sizing",
+  "comment": "This shows how Phase 1 could be enhanced to create appropriately sized method dictionaries",
+  "example_operations": [
+    { "comment": "=== ENHANCED CLASS CREATION WITH METHOD DICTIONARY SIZING ===" },
+    
+    { "comment": "-- Create Object class with properly sized method dictionaries --" },
+    { "op": "createObject", "result": "Object" },
+    { "op": "createObject", "result": "ObjectClass" },
+    { "op": "setClass", "object": "Object", "class": "ObjectClass" },
+    { "op": "setClass", "object": "ObjectClass", "class": "Metaclass" },
+    { "op": "setSuperclass", "class": "Object", "superclass": "nil" },
+    { "op": "createMethodDictionary", "class": "Object", "capacity": 80, "comment": "Size for ~50 instance methods + buffer" },
+    { "op": "createMethodDictionary", "class": "ObjectClass", "capacity": 25, "comment": "Size for ~15 class methods + buffer" },
+    
+    { "comment": "-- Create Symbol class with properly sized method dictionaries --" },
+    { "op": "createObject", "result": "Symbol" },
+    { "op": "createObject", "result": "SymbolClass" },
+    { "op": "setClass", "object": "Symbol", "class": "SymbolClass" },
+    { "op": "setClass", "object": "SymbolClass", "class": "Metaclass" },
+    { "op": "setSuperclass", "class": "Symbol", "superclass": "String" },
+    { "op": "createMethodDictionary", "class": "Symbol", "capacity": 50, "comment": "Size for 23 instance methods + buffer" },
+    { "op": "createMethodDictionary", "class": "SymbolClass", "capacity": 15, "comment": "Size for 8 class methods + buffer" },
+    
+    { "comment": "-- Create Dictionary class with properly sized method dictionaries --" },
+    { "op": "createObject", "result": "Dictionary" },
+    { "op": "createObject", "result": "DictionaryClass" },
+    { "op": "setClass", "object": "Dictionary", "class": "DictionaryClass" },
+    { "op": "setClass", "object": "DictionaryClass", "class": "Metaclass" },
+    { "op": "setSuperclass", "class": "Dictionary", "superclass": "Collection" },
+    { "op": "createMethodDictionary", "class": "Dictionary", "capacity": 65, "comment": "Size for ~35 instance methods + buffer" },
+    { "op": "createMethodDictionary", "class": "DictionaryClass", "capacity": 10, "comment": "Size for ~5 class methods + buffer" }
+  ],
+  
+  "implementation_notes": [
+    "The createMethodDictionary operation would need to be added to JsonBootstrapExecutor",
+    "This operation would create a dictionary with the specified capacity using VM primitives",
+    "The dictionary would be installed in slot 1 (methodDict) of the target class",
+    "Phase 2 and Phase 3 would then have properly sized dictionaries to work with",
+    "This eliminates the need for dictionary replacement during method installation"
+  ],
+  
+  "benefits": [
+    "No more 'Dictionary full' errors during method installation",
+    "Proper method counts in pretty printer output",
+    "Better performance - no dictionary replacement needed",
+    "Cleaner separation of concerns - sizing happens during class creation",
+    "Easier to maintain - sizes are specified declaratively"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "ClassName": "MethodDictionary",
+  "Superclass": "IdentityDictionary",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "methodArray",
+      "Source": "methodArray^valueArray!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "valueArray"
+        }
+      ]
+    },
+    {
+      "Selector": "removeKey:ifAbsent:",
+      "Source": "removeKey:keyifAbsent:errorBlockselfbecome:(selfcopyremoveDangerouslyKey:keyifAbsent:[^errorBlockvalue])!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "errorBlockselfbecome"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 2,
+    "SuccessfullyCompiled": 2,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T20:53:59.1932061Z"
+  }
+}

@@ -1,0 +1,947 @@
+{
+  "poolDictionaries": [],
+  "category": "Collections-Unordered",
+  "methods": [
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "selffindKeyOrNil"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "add:",
+      "Source": "add:anAssociation|indexelement|index_selffindKeyOrNil:anAssociationkey.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:anAssociation]ifFalse:[elementvalue:anAssociationvalue].^anAssociation!",
+      "BytecodeHex": "40 88 81 60 01 87 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        129,
+        96,
+        1,
+        135,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "associationAt:",
+      "Source": "associationAt:key^selfassociationAt:keyifAbsent:[selferrorKeyNotFound]!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "associationAt: ifAbsent:",
+      "Source": "associationAt:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^selfbasicAt:index!",
+      "BytecodeHex": "41 42 E0 42 E0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        65,
+        66,
+        224,
+        66,
+        224,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "aCollection"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "associations",
+      "Source": "associations|aCollectionkey|aCollection_OrderedCollectionnew:selfsize.selfassociationsDo:[:key|aCollectionadd:key].^aCollection!",
+      "BytecodeHex": "40 88 81 60 01 87 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        129,
+        96,
+        1,
+        135,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "aBlock"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "associationsDo:",
+      "Source": "associationsDo:aBlocksuperdo:aBlock!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "asSortedCollection",
+      "Source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.selfassociationsDo:[:association|aSortedCollectionadd:association].^aSortedCollection!",
+      "BytecodeHex": "40 88 68 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        104,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "at:",
+      "Source": "at:key^selfat:keyifAbsent:[selferrorKeyNotFound]!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "at: ifAbsent:",
+      "Source": "at:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^(selfbasicAt:index)value!",
+      "BytecodeHex": "41 42 E0 42 E0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        65,
+        66,
+        224,
+        66,
+        224,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "indexelement"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "at: put:",
+      "Source": "at:keyput:anObject|indexelement|index_selffindKeyOrNil:key.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:(Associationkey:keyvalue:anObject)]ifFalse:[elementvalue:anObject].^anObject!",
+      "BytecodeHex": "41 42 E0 43 E0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        65,
+        66,
+        224,
+        67,
+        224,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_Bagnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "BytecodeHex": "40 88 69 6A 41 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        64,
+        136,
+        105,
+        106,
+        65,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "declare: from:",
+      "Source": "declare:keyfrom:aDictionary(selfincludesKey:key)ifTrue:[^self].(aDictionaryincludesKey:key)ifTrue:[selfadd:(aDictionaryassociationAt:key).aDictionaryremoveKey:key]ifFalse:[selfat:keyput:nil]!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "assocvalue"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "do:",
+      "Source": "do:aBlocksuperdo:[:assoc|aBlockvalue:assocvalue]!",
+      "BytecodeHex": "89 00 02 41 7D D0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        137,
+        0,
+        2,
+        65,
+        125,
+        208,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "errorKeyNotFound",
+      "Source": "errorKeyNotFoundselferror:'key not found'!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "errorValueNotFound",
+      "Source": "errorValueNotFoundselferror:'value not found'!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "findKey: ifAbsent:",
+      "Source": "findKey:keyifAbsent:aBlock|index|index_selffindKeyOrNil:key.(selfbasicAt:index)==nilifTrue:[^aBlockvalue].^index!",
+      "BytecodeHex": "41 42 E0 42 E0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        65,
+        66,
+        224,
+        66,
+        224,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        1,
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "+"
+        },
+        {
+          "Value": "location"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "length"
+        },
+        {
+          "Value": "pass"
+        },
+        {
+          "Value": "keyhash"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "probe"
+        },
+        {
+          "Value": "nilor"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "findKeyOrNil:",
+      "Source": "findKeyOrNil:key|locationlengthprobepass|length_selfbasicSize.pass_1.location_keyhash\\\\length+1.[(probe_selfbasicAt:location)==nilor:[probekey=key]]whileFalse:[(location_location+1)>lengthifTrue:[location_1.pass_pass+1.pass>2ifTrue:[^selfgrowfindKeyOrNil:key]]].^location!",
+      "BytecodeHex": "45 88 81 60 06 87 6A 20 88 81 60 07 87 6A 48 46 BA 20 B0 88 81 60 03 87 6A 89 00 08 49 88 81 60 0A 87 D3 7D 4B C6 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        69,
+        136,
+        129,
+        96,
+        6,
+        135,
+        106,
+        32,
+        136,
+        129,
+        96,
+        7,
+        135,
+        106,
+        72,
+        70,
+        186,
+        32,
+        176,
+        136,
+        129,
+        96,
+        3,
+        135,
+        106,
+        137,
+        0,
+        8,
+        73,
+        136,
+        129,
+        96,
+        10,
+        135,
+        211,
+        125,
+        75,
+        198,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "grow",
+      "Source": "grow|newSelf|newSelf_selfspeciesnew:selfbasicSize+selfgrowSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "BytecodeHex": "40 88 68 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        104,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "eachifTrue"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "includes:",
+      "Source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!",
+      "BytecodeHex": "89 00 04 42 43 B6 7D D1 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        137,
+        0,
+        4,
+        66,
+        67,
+        182,
+        125,
+        209,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "includesAssociation:",
+      "Source": "includesAssociation:anAssociation^superincludes:anAssociation!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "selffindKeyOrNil"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "includesKey:",
+      "Source": "includesKey:key|index|index_selffindKeyOrNil:key.^(selfbasicAt:index)~~nil!",
+      "BytecodeHex": "40 88 69 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        105,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "inspect",
+      "Source": "inspectInspectorViewopen:(DictionaryInspectorinspect:self)!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "keyAtValue:",
+      "Source": "keyAtValue:value^selfkeyAtValue:valueifAbsent:[selferrorValueNotFound]!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfassociationsDo"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "keyAtValue: ifAbsent:",
+      "Source": "keyAtValue:valueifAbsent:exceptionBlockselfassociationsDo:[:association|value==associationvalueifTrue:[^associationkey]].^exceptionBlockvalue!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "aSet"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "keys",
+      "Source": "keys|aSetkey|aSet_Setnew:selfsize.selfkeysDo:[:key|aSetadd:key].^aSet!",
+      "BytecodeHex": "40 88 81 60 01 87 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        129,
+        96,
+        1,
+        135,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "associationkey"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "keysDo:",
+      "Source": "keysDo:aBlockselfassociationsDo:[:association|aBlockvalue:associationkey]!",
+      "BytecodeHex": "89 00 02 41 7D D0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        137,
+        0,
+        2,
+        65,
+        125,
+        208,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf:anObject|count|count_0.selfdo:[:each|anObject=eachifTrue:[count_count+1]].^count!",
+      "BytecodeHex": "20 88 69 6A 41 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        32,
+        136,
+        105,
+        106,
+        65,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "+"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition+selfmaxPrint.aStreamnextPutAll:selfclassname,' ('.selfassociationsDo:[:element|aStreamposition>tooManyifTrue:[aStreamnextPutAll:'...etc...)'.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "BytecodeHex": "41 42 B0 88 69 6A 43 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        65,
+        66,
+        176,
+        136,
+        105,
+        106,
+        67,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "rehash",
+      "Source": "rehash|newSelf|newSelf_selfspeciesnew:selfbasicSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "BytecodeHex": "40 88 68 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        136,
+        104,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "remove:",
+      "Source": "remove:anObjectselfshouldNotImplement!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfshouldNotImplement"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "remove: ifAbsent:",
+      "Source": "remove:anObjectifAbsent:exceptionBlockselfshouldNotImplement!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "removeAssociation:",
+      "Source": "removeAssociation:anAssociation^selfremoveAssociation:anAssociationifAbsent:[selferrorNotFound]!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "anExceptionBlock"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "removeAssociation: ifAbsent:",
+      "Source": "removeAssociation:anAssociationifAbsent:anExceptionBlock^superremove:anAssociationifAbsent:anExceptionBlock!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "removeKey:",
+      "Source": "removeKey:key^selfremoveKey:keyifAbsent:[selferrorKeyNotFound]!",
+      "BytecodeHex": "70 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        112,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "indexelement"
+        },
+        {
+          "Value": "index"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "removeKey: ifAbsent:",
+      "Source": "removeKey:keyifAbsent:aBlock|indexelement|index_selffindKey:keyifAbsent:[^aBlockvalue].element_selfbasicAt:index.selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^element!",
+      "BytecodeHex": "41 42 E0 43 E0 7C",
+      "TemporaryCount": 0,
+      "Bytecode": [
+        65,
+        66,
+        224,
+        67,
+        224,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfassociationsDo"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "select:",
+      "Source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfassociationsDo:[:each|(aBlockvalue:eachvalue)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "BytecodeHex": "40 88 69 6A 41 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        64,
+        136,
+        105,
+        106,
+        65,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 1,
+      "Literals": [
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStream|noneYet|aStreamnextPutAll:'(('.aStreamnextPutAll:selfclassname.aStreamnextPutAll:' new)'.noneYet_true.selfassociationsDo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:' add: '.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:'; yourself'].aStreamnextPut:$)!",
+      "BytecodeHex": "40 7C",
+      "TemporaryCount": 1,
+      "Bytecode": [
+        64,
+        124
+      ]
+    },
+    {
+      "IsClassMethod": false,
+      "ArgumentCount": 0,
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ],
+      "Category": null,
+      "PrimitiveNumber": 0,
+      "IsPrimitive": false,
+      "Selector": "values",
+      "Source": "values|aBag|aBag_Bagnew.selfdo:[:value|aBagadd:value].^aBag!",
+      "BytecodeHex": "40 88 68 69 41 7C",
+      "TemporaryCount": 2,
+      "Bytecode": [
+        64,
+        136,
+        104,
+        105,
+        65,
+        124
+      ]
+    }
+  ],
+  "instanceVariables": [],
+  "failedMethods": [],
+  "superclass": "Set",
+  "statistics": {
+    "compilationFailed": 0,
+    "totalMethods": 37,
+    "instanceMethods": 37,
+    "compiledSuccessfully": 37,
+    "classMethods": 0
+  },
+  "classVariables": [],
+  "className": "Dictionary"
+}

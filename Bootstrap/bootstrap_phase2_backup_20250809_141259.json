@@ -1,0 +1,5468 @@
+{
+  "phase": "2-critical-methods",
+  "description": "Phase 2 with critical methods for message-based class installation",
+  "comments": [
+    "This Phase 2 adds the 8 critical methods needed for message-based class installation",
+    "Methods are added to Phase 1 classes: CompiledMethod, Class, MethodDictionary, SystemDictionary",
+    "These enable Phase 3 to install classes via message sends instead of compile:"
+  ],
+  "classes": [
+    {
+      "name": "CompiledMethod",
+      "superclass": "Object",
+      "instanceVariables": [
+        "selector",
+        "bytecode",
+        "literals",
+        "header"
+      ],
+      "methods": [
+        {
+          "selector": "needsStack: encoder:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            68,
+            176,
+            118,
+            176,
+            210,
+            69,
+            180,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "encoder",
+            "newMethodnewNumLitsextraByteslargeBit",
+            "|",
+            "selfnumTemps",
+            "newStackSize",
+            "SmallFrameifTrue"
+          ]
+        },
+        {
+          "selector": "endPC",
+          "bytecode": [
+            64,
+            33,
+            210,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selflastbetween",
+            "124",
+            "and:"
+          ]
+        },
+        {
+          "selector": "flags",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "frameSize",
+          "bytecode": [
+            137,
+            64,
+            124,
+            137,
+            65,
+            124,
+            153,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "LargeFrame",
+            "SmallFrame"
+          ]
+        },
+        {
+          "selector": "initialPC",
+          "bytecode": [
+            64,
+            65,
+            184,
+            66,
+            176,
+            118,
+            176,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfnumLiterals",
+            "BytesPerLiteral",
+            "BytesForHeader"
+          ]
+        },
+        {
+          "selector": "numArgs",
+          "bytecode": [
+            64,
+            136,
+            104,
+            33,
+            180,
+            137,
+            16,
+            124,
+            152,
+            0,
+            135,
+            16,
+            34,
+            178,
+            137,
+            117,
+            124,
+            152,
+            0,
+            135,
+            67,
+            196,
+            118,
+            177,
+            188,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfflags",
+            "4",
+            "7",
+            "selfliteralAt",
+            "selfnumLiterals"
+          ]
+        },
+        {
+          "selector": "numLiterals",
+          "bytecode": [
+            137,
+            117,
+            124,
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfheaderbitAnd"
+          ]
+        },
+        {
+          "selector": "numStack",
+          "bytecode": [
+            137,
+            117,
+            124,
+            137,
+            64,
+            65,
+            177,
+            66,
+            177,
+            124,
+            153,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfframeSize",
+            "selfnumTemps",
+            "selfnumArgs"
+          ]
+        },
+        {
+          "selector": "numTemps",
+          "bytecode": [
+            137,
+            117,
+            124,
+            137,
+            64,
+            124,
+            153,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfnumTempsField"
+          ]
+        },
+        {
+          "selector": "numTempsField",
+          "bytecode": [
+            64,
+            33,
+            189,
+            34,
+            190,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfheader",
+            "128",
+            "31"
+          ]
+        },
+        {
+          "selector": "primitive",
+          "bytecode": [
+            32,
+            137,
+            117,
+            124,
+            137,
+            65,
+            194,
+            118,
+            177,
+            124,
+            35,
+            244,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "7",
+            "selfliteralAt",
+            "selfnumLiterals",
+            "255",
+            "ifTrue: ifFalse: bitAnd:"
+          ]
+        },
+        {
+          "selector": "returnField",
+          "bytecode": [
+            32,
+            137,
+            65,
+            137,
+            66,
+            124,
+            154,
+            0,
+            0,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "6",
+            "selferror",
+            "selfnumTempsField"
+          ]
+        },
+        {
+          "selector": "isQuick",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isReturnField",
+          "bytecode": [
+            64,
+            33,
+            182,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfflags",
+            "6"
+          ]
+        },
+        {
+          "selector": "isReturnSelf",
+          "bytecode": [
+            64,
+            33,
+            182,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfflags",
+            "5"
+          ]
+        },
+        {
+          "selector": "needsLargeFrame",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "storeOn:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "symbolic",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfisQuickifTrue"
+          ]
+        },
+        {
+          "selector": "who",
+          "bytecode": [
+            137,
+            64,
+            193,
+            193,
+            66,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "classselectorsdo",
+            "sel",
+            "classcompiledMethodAt",
+            "|"
+          ]
+        },
+        {
+          "selector": "header",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "literalAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "literalAt: put:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "value"
+          ]
+        },
+        {
+          "selector": "literals",
+          "bytecode": [
+            64,
+            136,
+            98,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Arraynew"
+          ]
+        },
+        {
+          "selector": "objectAt:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 68
+        },
+        {
+          "selector": "objectAt: put:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "value"
+          ],
+          "primitive": 69
+        },
+        {
+          "selector": "refersToLiteral:",
+          "bytecode": [
+            64,
+            136,
+            99,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfobjectAt"
+          ]
+        },
+        {
+          "selector": "fieldsTouched",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfisReturnFieldifTrue"
+          ]
+        },
+        {
+          "selector": "messages",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Setnew",
+            "aSet",
+            "InstructionStreamon",
+            "scanner"
+          ]
+        },
+        {
+          "selector": "readsField:",
+          "bytecode": [
+            137,
+            64,
+            118,
+            176,
+            65,
+            182,
+            124,
+            65,
+            34,
+            180,
+            137,
+            67,
+            124,
+            193,
+            118,
+            177,
+            152,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfreturnField",
+            "varIndex",
+            "16",
+            "selfscanFor"
+          ]
+        },
+        {
+          "selector": "readsRef:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfliteralsindexOf"
+          ]
+        },
+        {
+          "selector": "scanFor:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1
+        },
+        {
+          "selector": "scanLongLoad:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "InstructionStreamon"
+          ]
+        },
+        {
+          "selector": "scanLongStore:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "InstructionStreamon"
+          ]
+        },
+        {
+          "selector": "writesField:",
+          "bytecode": [
+            137,
+            122,
+            124,
+            64,
+            33,
+            180,
+            137,
+            66,
+            64,
+            176,
+            118,
+            177,
+            211,
+            137,
+            121,
+            124,
+            137,
+            68,
+            124,
+            192,
+            118,
+            177,
+            154,
+            0,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "field",
+            "8",
+            "selfscanFor",
+            "and:",
+            "selfscanLongStore"
+          ]
+        },
+        {
+          "selector": "writesRef:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfliteralsindexOf"
+          ]
+        },
+        {
+          "selector": "cacheTempNames:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "Associationkey"
+          ]
+        },
+        {
+          "selector": "fileIndex",
+          "bytecode": [
+            64,
+            33,
+            210,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selflastbetween",
+            "124",
+            "and:"
+          ]
+        },
+        {
+          "selector": "getSource",
+          "bytecode": [
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFiles",
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "putSource: class: category: inFile:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "classcategory"
+          ]
+        },
+        {
+          "selector": "putSource: inFile:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            68,
+            213,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fileIndex",
+            "fileremoteString",
+            "|",
+            "SourceFiles",
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "setSourcePosition: inFile:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            64,
+            210,
+            35,
+            179,
+            137,
+            68,
+            124,
+            152,
+            0,
+            135,
+            69,
+            119,
+            177,
+            136,
+            166,
+            135,
+            135,
+            71,
+            136,
+            168,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fileIndex",
+            "indexhiBytemiddleBytelowByte",
+            "|",
+            "4",
+            "selferror",
+            "selfsize",
+            "index",
+            "positionbitShift",
+            "middleByte"
+          ]
+        },
+        {
+          "selector": "setTempNamesIfCached:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "initialize",
+          "bytecode": [
+            32,
+            135,
+            33,
+            136,
+            162,
+            135,
+            135,
+            67,
+            117,
+            212,
+            136,
+            165,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "12",
+            "32",
+            "LargeFrame",
+            "selfnewMethod",
+            "header:",
+            "BytesForHeader"
+          ]
+        },
+        {
+          "selector": "newBytes: flags: nTemps: nStack: nLits:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "flagsnTemps"
+          ]
+        },
+        {
+          "selector": "newMethod: header:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "headerWord"
+          ],
+          "primitive": 79
+        },
+        {
+          "selector": "toReturnField:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "toReturnSelf",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new",
+          "bytecode": [
+            112,
+            208,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "basicNew"
+          ],
+          "comment": "pushReceiver, send: basicNew, returnTop"
+        }
+      ]
+    },
+    {
+      "name": "Class",
+      "superclass": "Behavior",
+      "instanceVariables": [
+        "name"
+      ],
+      "methods": [
+        {
+          "selector": "declare:",
+          "bytecode": [
+            64,
+            193,
+            136,
+            162,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "ScannernewscanFieldNames",
+            "varString",
+            "newVars"
+          ]
+        },
+        {
+          "selector": "obsolete",
+          "bytecode": [
+            137,
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "instancenilFields"
+          ]
+        },
+        {
+          "selector": "removeFromSystem",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "sharing:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            135,
+            68,
+            197,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfsharedPools",
+            "oldPools",
+            "Setnew",
+            "sharedPools",
+            "ScannernewscanFieldNames",
+            "poolString"
+          ]
+        },
+        {
+          "selector": "superclass: methodDict: format: name: organization: instVarNames: classPool: sharedPools:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "mdformat"
+          ]
+        },
+        {
+          "selector": "validateFrom: in: instanceVariableNames: methods:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "environinstanceVariableNames"
+          ]
+        },
+        {
+          "selector": "classPool",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "name",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "hasMultipleSuperclasses",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfclassinstHasMultipleSuperclasses"
+          ]
+        },
+        {
+          "selector": "isObsolete",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfclassisObsolete"
+          ]
+        },
+        {
+          "selector": "hasMethods",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "copy",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfclasscopynewsuperclass"
+          ]
+        },
+        {
+          "selector": "copyForValidation",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "rename:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            194,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStringasSymbol",
+            "SmalltalkincludesKey",
+            "newName"
+          ]
+        },
+        {
+          "selector": "addInstVarName:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfnameinEnvironment"
+          ]
+        },
+        {
+          "selector": "removeInstVarName:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfinstVarNamesincludes",
+            "aString"
+          ]
+        },
+        {
+          "selector": "addClassVarName:",
+          "bytecode": [
+            137,
+            64,
+            124,
+            193,
+            34,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selferror",
+            "aString",
+            " class variable name should be capitalized; proceed to include anyway.",
+            ","
+          ]
+        },
+        {
+          "selector": "allClassVarNames",
+          "bytecode": [
+            0,
+            64,
+            209,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "classVarNames",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfclassPoolkeys"
+          ]
+        },
+        {
+          "selector": "initialize",
+          "bytecode": [
+            112,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "removeClassVarName:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStringasSymbol",
+            "aSymbol",
+            "classPoolincludesKey"
+          ]
+        },
+        {
+          "selector": "addSharedPool:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfsharedPoolsincludes",
+            "aDictionary"
+          ]
+        },
+        {
+          "selector": "allSharedPools",
+          "bytecode": [
+            0,
+            64,
+            209,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "removeSharedPool:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfsharedPoolsincludes",
+            "aDictionary"
+          ]
+        },
+        {
+          "selector": "sharedPools",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "compileAllFrom:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "otherClass",
+            "selfclasscompileAllFrom"
+          ]
+        },
+        {
+          "selector": "poolHas: ifTrue:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "assocBlock",
+            "assocpool",
+            "|",
+            "assoc"
+          ]
+        },
+        {
+          "selector": "subclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fclassVariableNames"
+          ]
+        },
+        {
+          "selector": "subclass: otherSupers: instanceVariableNames: classVariableNames: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "othersinstanceVariableNames"
+          ]
+        },
+        {
+          "selector": "variableByteSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fclassVariableNames"
+          ]
+        },
+        {
+          "selector": "variableSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fclassVariableNames"
+          ]
+        },
+        {
+          "selector": "variableWordSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "fclassVariableNames"
+          ]
+        },
+        {
+          "selector": "fileOut",
+          "bytecode": [
+            64,
+            136,
+            193,
+            136,
+            193,
+            136,
+            34,
+            211,
+            135,
+            68,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Transcriptrefresh",
+            "cr",
+            "Filing out class:",
+            "show:",
+            "Diskfile"
+          ]
+        },
+        {
+          "selector": "fileOutOn: moveSource: toFile:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "moveSourcetoFile"
+          ]
+        },
+        {
+          "selector": "printOut",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "removeFromChanges",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "getSuperclasses:",
+          "bytecode": [
+            64,
+            193,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "ScannernewscanTokens",
+            "superNames"
+          ]
+        },
+        {
+          "selector": "named: superclasses: instanceVariableNames: classVariableNames: category:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "newSuperNamesinstanceVariableNames"
+          ]
+        },
+        {
+          "selector": "template:",
+          "bytecode": [
+            32,
+            16,
+            209,
+            34,
+            209,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "NameOfSuperclass subclass: #NameOfClass\r\n\tinstanceVariableNames: ''instVarName1 instVarName2''\r\n\tclassVariableNames: ''ClassVarName1 ClassVarName2''\r\n\tpoolDictionaries: ''''\r\n\tcategory: ''",
+            ",",
+            "''"
+          ]
+        }
+      ],
+      "instanceMethodCount": 36,
+      "classMethodCount": 3
+    },
+    {
+      "name": "Behavior",
+      "superclass": "Object",
+      "instanceVariables": [
+        "superclass",
+        "methodDict",
+        "format"
+      ],
+      "methods": [
+        {
+          "selector": "obsolete",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "MethodDictionarynew",
+            "selfsuperclassesdo"
+          ]
+        },
+        {
+          "selector": "format",
+          "bytecode": [
+            2,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "instSize",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isBits",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isBytes",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isFixed",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisVariablenot"
+          ]
+        },
+        {
+          "selector": "isPointers",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisBitsnot"
+          ]
+        },
+        {
+          "selector": "isVariable",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isWords",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisBytesnot"
+          ]
+        },
+        {
+          "selector": "copy",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            123,
+            136,
+            160,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            135,
+            65,
+            136,
+            160,
+            135,
+            135,
+            68,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "subclasses",
+            "savedSubclasses",
+            "selfshallowCopy",
+            "myCopy",
+            "myCopymethodDictionary"
+          ]
+        },
+        {
+          "selector": "printHierarchy",
+          "bytecode": [
+            117,
+            136,
+            160,
+            135,
+            135,
+            65,
+            136,
+            162,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "index",
+            "WriteStreamon",
+            "aStream"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "addSubclass:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aSubclasssuperclassesincludes",
+            "self"
+          ]
+        },
+        {
+          "selector": "removeSubclass:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifFalse"
+          ]
+        },
+        {
+          "selector": "superclass:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aClassisKindOf",
+            "Behavior"
+          ]
+        },
+        {
+          "selector": "addSelector: withMethod:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "compiledMethod",
+            "wasThere",
+            "|"
+          ]
+        },
+        {
+          "selector": "addSelectorUnchecked: withMethod:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "compiledMethodmethodDictat"
+          ]
+        },
+        {
+          "selector": "methodDictionary:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aDictionary"
+          ]
+        },
+        {
+          "selector": "removeSelector:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selector",
+            "selfflushCache",
+            "selfcheckChangeSelector"
+          ]
+        },
+        {
+          "selector": "removeSelectorUnchecked:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selector",
+            "selfflushCache"
+          ]
+        },
+        {
+          "selector": "tryCopyingCodeFor:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selectorisCompoundifFalse"
+          ]
+        },
+        {
+          "selector": "basicNew",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisVariableifTrue"
+          ],
+          "primitive": 70
+        },
+        {
+          "selector": "basicNew:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 71
+        },
+        {
+          "selector": "new",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisVariableifTrue"
+          ],
+          "primitive": 70
+        },
+        {
+          "selector": "new:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 71
+        },
+        {
+          "selector": "allDynamicSuperclasses",
+          "bytecode": [
+            0,
+            64,
+            209,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "allSubclasses",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "colladdAll"
+          ]
+        },
+        {
+          "selector": "allSuperclasses",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "selfallSuperclassesInto"
+          ]
+        },
+        {
+          "selector": "allSuperclassesInto:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfsuperclasses",
+            "mysupersdo"
+          ]
+        },
+        {
+          "selector": "dynamicSuperclass",
+          "bytecode": [
+            0,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "hasMultipleSuperclasses",
+          "bytecode": [
+            122,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "subclasses",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "superclass",
+          "bytecode": [
+            0,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "superclasses",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "withAllSubclasses",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallSubclasses",
+            "subsaddFirst"
+          ]
+        },
+        {
+          "selector": "withAllSuperclasses",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallSuperclasses",
+            "subsaddFirst"
+          ]
+        },
+        {
+          "selector": "allSelectors",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Setnew",
+            "selfwithAllSuperclassesdo"
+          ]
+        },
+        {
+          "selector": "checkChangeSelector:",
+          "bytecode": [
+            64,
+            137,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SelectorsOfCopiedMethodsat",
+            "Arraynew",
+            "selectorifAbsent:"
+          ]
+        },
+        {
+          "selector": "checkSuperAddSelector:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfincludesSelector"
+          ]
+        },
+        {
+          "selector": "compiledMethodAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "dynamicMethodDescriptionAt:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "methodDictincludesKey",
+            "selector"
+          ]
+        },
+        {
+          "selector": "methodDescriptionAt:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "methodDictincludesKey",
+            "local"
+          ]
+        },
+        {
+          "selector": "selectorAtMethod: setClass:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "classResultBlock",
+            "sel",
+            "|"
+          ]
+        },
+        {
+          "selector": "selectors",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "methodDictkeys"
+          ]
+        },
+        {
+          "selector": "sourceCodeAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "sourceCodeForMethod: at:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "messageSelector",
+            "newSourceindex",
+            "|",
+            "SensorleftShiftDownifTrue"
+          ]
+        },
+        {
+          "selector": "sourceMethodAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "superMethodDescriptionAt:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "MethodDescriptionmakeMethodNotImplemented",
+            "result",
+            "selfsuperclassesdo"
+          ]
+        },
+        {
+          "selector": "allClassVarNames",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "superclassallClassVarNames"
+          ]
+        },
+        {
+          "selector": "allInstances",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "selfallInstancesDo"
+          ]
+        },
+        {
+          "selector": "allInstVarNames",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "selfaccumulateInstVarNames"
+          ]
+        },
+        {
+          "selector": "allSharedPools",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "superclassallSharedPools"
+          ]
+        },
+        {
+          "selector": "allVarNamesSelect:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfclassPoolkeysselect"
+          ]
+        },
+        {
+          "selector": "classVarNames",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Setnew"
+          ]
+        },
+        {
+          "selector": "instanceCount",
+          "bytecode": [
+            117,
+            136,
+            104,
+            135,
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallInstancesDo"
+          ]
+        },
+        {
+          "selector": "instVarNames",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            0,
+            66,
+            211,
+            136,
+            164,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfinstSize",
+            "mySize",
+            "nilifTrue",
+            "==",
+            "superSize"
+          ]
+        },
+        {
+          "selector": "sharedPools",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Setnew"
+          ]
+        },
+        {
+          "selector": "someInstance",
+          "bytecode": [
+            123,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitive": 77
+        },
+        {
+          "selector": "subclassInstVarNames",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Setnew",
+            "selfallSubclassesdo"
+          ]
+        },
+        {
+          "selector": "inheritsFrom:",
+          "bytecode": [
+            137,
+            64,
+            65,
+            210,
+            67,
+            212,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "each",
+            "aClassor",
+            "==",
+            "aClass",
+            "eachinheritsFrom:"
+          ]
+        },
+        {
+          "selector": "kindOfSubclass",
+          "bytecode": [
+            137,
+            64,
+            137,
+            33,
+            124,
+            153,
+            0,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfisBytesifTrue",
+            " variableWordSubclass: "
+          ]
+        },
+        {
+          "selector": "canUnderstand:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfincludesSelector",
+            "selector"
+          ]
+        },
+        {
+          "selector": "hasMethods",
+          "bytecode": [
+            64,
+            117,
+            179,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "methodDictsize"
+          ]
+        },
+        {
+          "selector": "includesSelector:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "scopeHas: ifTrue:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "assocBlock",
+            "assoc",
+            "|",
+            "selfwithAllSuperclassesdo"
+          ]
+        },
+        {
+          "selector": "whichClassIncludesSelector:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "methodDictincludesKey",
+            "aSymbol"
+          ]
+        },
+        {
+          "selector": "whichSelectorsAccess:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallInstVarNamesindexOf"
+          ]
+        },
+        {
+          "selector": "whichSelectorsReferTo:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SmalltalkhasSpecialSelector"
+          ]
+        },
+        {
+          "selector": "whichSelectorsReferTo: special: byte:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "specialFlagbyte"
+          ]
+        },
+        {
+          "selector": "compile: notifying: trailer:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "requestortrailer"
+          ]
+        },
+        {
+          "selector": "compile: notifying: trailer: ifFail:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "requestortrailer"
+          ]
+        },
+        {
+          "selector": "compileAll",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "compileAllFrom:",
+          "bytecode": [
+            137,
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfrecompile",
+            "oldClass",
+            "selfrom:"
+          ]
+        },
+        {
+          "selector": "compileAllSubclasses",
+          "bytecode": [
+            137,
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aSubclasscompileAll"
+          ]
+        },
+        {
+          "selector": "compileBroadcastCodeFor:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfwithAllSuperclassesselect",
+            "implementors"
+          ]
+        },
+        {
+          "selector": "compilerClass",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Compiler"
+          ]
+        },
+        {
+          "selector": "compileUnchecked:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfcompilerClassnewcompile",
+            "methodNode"
+          ]
+        },
+        {
+          "selector": "decompile:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "decompilerClass",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Decompiler"
+          ]
+        },
+        {
+          "selector": "evaluatorClass",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Compiler"
+          ]
+        },
+        {
+          "selector": "parserClass",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfcompilerClasspreferredParserClass"
+          ]
+        },
+        {
+          "selector": "poolHas: ifTrue:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "assocBlock"
+          ]
+        },
+        {
+          "selector": "recompile:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "recompile: from:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "oldClass",
+            "methodtrailermethodNode",
+            "|",
+            "method"
+          ]
+        },
+        {
+          "selector": "sourceCodeTemplate",
+          "bytecode": [
+            32,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "message selector and argument names\r\n\t\"comment stating purpose of message\"\r\n\r\n\t| temporary variable names |\r\n\tstatements"
+          ]
+        },
+        {
+          "selector": "subclassDefinerClass",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Compiler"
+          ]
+        },
+        {
+          "selector": "allAccessesTo:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "CursorexecuteshowWhile"
+          ]
+        },
+        {
+          "selector": "allCallsOn:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SortedCollectionnew",
+            "aSortedCollection",
+            "SmalltalkhasSpecialSelector",
+            "special"
+          ]
+        },
+        {
+          "selector": "allInstancesDo:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            65,
+            66,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfsomeInstance",
+            "inst",
+            "nilifFalse",
+            "=="
+          ]
+        },
+        {
+          "selector": "allSubclassesDo:",
+          "bytecode": [
+            137,
+            64,
+            193,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlockvalue",
+            "cl",
+            "clallSubclassesDo"
+          ]
+        },
+        {
+          "selector": "allSubInstancesDo:",
+          "bytecode": [
+            137,
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "suballInstancesDo",
+            "aBlock"
+          ]
+        },
+        {
+          "selector": "browseAllAccessesTo:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfallAccessesTo",
+            "instanceVariable"
+          ]
+        },
+        {
+          "selector": "browseAllCallsOn:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aSymbolisMemberOf",
+            "Association"
+          ]
+        },
+        {
+          "selector": "crossReference",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "showVariableMenu: collect:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "valueBlock",
+            "eachClassaStreamlinescountlastLinevariablesindex",
+            "|",
+            "aStream"
+          ]
+        },
+        {
+          "selector": "printMethodChunk: on: moveSource: toFile:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aFileStreammoveSource"
+          ]
+        },
+        {
+          "selector": "accumulateInstVarNames: traversedClasses:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "classSetselfsuperclassesdo"
+          ]
+        },
+        {
+          "selector": "checkMethodFor:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "methodDictincludesKey",
+            "local"
+          ]
+        },
+        {
+          "selector": "compileConflictCodeFor:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SelectorsOfConflictMethodsat"
+          ]
+        },
+        {
+          "selector": "compoundSelectorsMatching:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "conflictCodeFor:",
+          "bytecode": [
+            64,
+            193,
+            136,
+            162,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfdynamicMethodDescriptionAt",
+            "sel",
+            "code"
+          ]
+        },
+        {
+          "selector": "copyMethods",
+          "bytecode": [
+            121,
+            136,
+            104,
+            135,
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallSelectorsdo"
+          ]
+        },
+        {
+          "selector": "defaultSelectorForMethod:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "WriteStreamon"
+          ]
+        },
+        {
+          "selector": "flushCache",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 89
+        },
+        {
+          "selector": "format: variable: words: pointers:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "isVarwords"
+          ]
+        },
+        {
+          "selector": "insertClass: selector: in:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selectorin"
+          ]
+        },
+        {
+          "selector": "printSubclassesOn: callingSuperclass: level:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "whichSuperlevel"
+          ]
+        },
+        {
+          "selector": "removeClass: selector: in:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selectorin"
+          ]
+        },
+        {
+          "selector": "removeFromInheritanceTable:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "tablekeys",
+            "keys",
+            "keysdo"
+          ]
+        },
+        {
+          "selector": "removeFromInheritanceTables",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfremoveFromInheritanceTable"
+          ]
+        },
+        {
+          "selector": "removeSelectorSimply:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selectorifAbsent"
+          ]
+        },
+        {
+          "selector": "sourceTextAt:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "methodDictat",
+            "method"
+          ]
+        },
+        {
+          "selector": "unmovedVarsFrom:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            135,
+            118,
+            68,
+            213,
+            137,
+            70,
+            199,
+            216,
+            199,
+            73,
+            182,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfallInstVarNames",
+            "allInstVarNames",
+            "supallInstVarNames",
+            "supNames",
+            "supinstSize",
+            "to:",
+            "supNamesat",
+            "i",
+            "collect:",
+            "allInstVarNamesat"
+          ]
+        },
+        {
+          "selector": "updateInheritanceTable: oldSelf:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "oldSelftabledo"
+          ]
+        },
+        {
+          "selector": "updateInheritanceTables:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "SelectorsOfConflictMethodsoldSelf"
+          ]
+        },
+        {
+          "selector": "init",
+          "bytecode": [
+            64,
+            135,
+            64,
+            136,
+            161,
+            135,
+            135,
+            64,
+            136,
+            162,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "IdentityDictionarynew",
+            "SelectorsOfCopiedMethods",
+            "SelectorsOfDirectedMethods"
+          ]
+        }
+      ],
+      "instanceMethodCount": 115,
+      "classMethodCount": 1
+    },
+    {
+      "name": "MethodDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "methodArray",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "valueArray"
+          ]
+        },
+        {
+          "selector": "removeKey: ifAbsent:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "errorBlockselfbecome"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SystemDictionary",
+      "superclass": "Dictionary",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "install",
+          "bytecode": [
+            64,
+            135,
+            65,
+            135,
+            66,
+            135,
+            67,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "SmallIntegerinitialize",
+            "LargePositiveIntegerinitialize",
+            "LargeNegativeIntegerinitialize",
+            "DisplayScreencurrentDisplay"
+          ]
+        },
+        {
+          "selector": "at: put:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObject",
+            "indexelement",
+            "|",
+            "index"
+          ]
+        },
+        {
+          "selector": "valueAtNewKey: put: atIndex: declareFrom:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObjectatIndex"
+          ]
+        },
+        {
+          "selector": "allBehaviorsDo:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "Object",
+            "ObjectallSubclassesDo"
+          ]
+        },
+        {
+          "selector": "allClassesDo:",
+          "bytecode": [
+            64,
+            193,
+            66,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfclassNamescollect",
+            "name",
+            "Smalltalkat",
+            "|"
+          ]
+        },
+        {
+          "selector": "pointersTo: do:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock",
+            "meclassobjmethodifixedSize",
+            "|",
+            "me"
+          ]
+        },
+        {
+          "selector": "browseAllCallsOn:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aSymbolisMemberOf",
+            "Association"
+          ]
+        },
+        {
+          "selector": "browseAllCallsOn: and:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "literal2BrowserViewopenListBrowserOn"
+          ]
+        },
+        {
+          "selector": "browseAllImplementorsOf:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfallImplementorsOf",
+            "selector"
+          ]
+        },
+        {
+          "selector": "browseAllSelect:",
+          "bytecode": [
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfallSelect",
+            "aBlock"
+          ]
+        },
+        {
+          "selector": "browseChangedMessages",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "showMenuThenBrowse:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selectorCollectionisEmptyifTrue"
+          ]
+        },
+        {
+          "selector": "allCallsOn:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SortedCollectionnew",
+            "aSortedCollection",
+            "selfhasSpecialSelector",
+            "special"
+          ]
+        },
+        {
+          "selector": "allCallsOn: and:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "secondLiteral",
+            "aCollectionsecondArrayfirstSpecialsecondSpecial",
+            "|",
+            "aCollection"
+          ]
+        },
+        {
+          "selector": "allClassesImplementing:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "ReadWriteStreamon"
+          ]
+        },
+        {
+          "selector": "allImplementedMessages",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Setnew"
+          ]
+        },
+        {
+          "selector": "allImplementorsOf:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SortedCollectionnew",
+            "CursorexecuteshowWhile"
+          ]
+        },
+        {
+          "selector": "allSelect:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SortedCollectionnew",
+            "CursorexecuteshowWhile"
+          ]
+        },
+        {
+          "selector": "collectPointersTo:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            163,
+            135,
+            135,
+            68,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "some",
+            "thisContext",
+            "me",
+            "selfpointersTo"
+          ]
+        },
+        {
+          "selector": "classNames",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "selector": "flushClassNameCache",
+          "bytecode": [
+            123
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "newClassNames",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew"
+          ]
+        },
+        {
+          "selector": "recompileAllFrom:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SmalltalkforgetDoIts",
+            "selfallClassesDo"
+          ]
+        },
+        {
+          "selector": "recompileCallsOn:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfhasSpecialSelector"
+          ]
+        },
+        {
+          "selector": "recompileMethodsForWhich:",
+          "bytecode": [
+            137,
+            64,
+            193,
+            66,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfallBehaviorsDo",
+            "class",
+            "classselectorsdo",
+            "|"
+          ]
+        },
+        {
+          "selector": "changes",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "SystemChanges"
+          ]
+        },
+        {
+          "selector": "logChange:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFiles",
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "newChanges:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aChangeSet"
+          ]
+        },
+        {
+          "selector": "noChanges",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "recover:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFilesat"
+          ]
+        },
+        {
+          "selector": "removeClassNamed:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfat"
+          ]
+        },
+        {
+          "selector": "renameClass: as:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "newName",
+            "oldref",
+            "|",
+            "SystemOrganizationclassify"
+          ]
+        },
+        {
+          "selector": "core",
+          "bytecode": [
+            117,
+            136,
+            160,
+            135,
+            136,
+            161,
+            135,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "nwords",
+            "nobjects",
+            "SmalltalkallBehaviorsDo"
+          ]
+        },
+        {
+          "selector": "coreLeft",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 112
+        },
+        {
+          "selector": "coreLeftLimit",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "WordsLeftLimit"
+          ]
+        },
+        {
+          "selector": "coreLeftLimit:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            135,
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "newLimit",
+            "selfresetLowSpaceSignal"
+          ]
+        },
+        {
+          "selector": "frills",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Frills"
+          ]
+        },
+        {
+          "selector": "frills:",
+          "bytecode": [
+            16,
+            136,
+            160,
+            135,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "Frills"
+          ]
+        },
+        {
+          "selector": "oopsLeft",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 115
+        },
+        {
+          "selector": "oopsLeftLimit",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "OopsLeftLimit"
+          ]
+        },
+        {
+          "selector": "oopsLeftLimit:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            135,
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "newLimit",
+            "selfresetLowSpaceSignal"
+          ]
+        },
+        {
+          "selector": "resetLowSpaceSignal",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "OopsLeftLimitwordsLeft"
+          ]
+        },
+        {
+          "selector": "resetSpaceLimits",
+          "bytecode": [
+            64,
+            33,
+            189,
+            135,
+            66,
+            33,
+            189,
+            136,
+            163,
+            135,
+            135,
+            68,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfoopsLeft",
+            "4",
+            "selfcoreLeft",
+            "WordsLeftLimit",
+            "selfresetLowSpaceSignal"
+          ]
+        },
+        {
+          "selector": "signal: atOopsLeft: wordsLeft:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "numOopswordsLeft"
+          ],
+          "primitive": 116
+        },
+        {
+          "selector": "hasSpecialSelector: ifTrueSetByte:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock1to"
+          ]
+        },
+        {
+          "selector": "specialNargsAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "specialSelectorAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "specialSelectorSize",
+          "bytecode": [
+            64,
+            119,
+            189,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "SpecialSelectorssize"
+          ]
+        },
+        {
+          "selector": "copyChangesTo:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFiles",
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "getImagePrefix",
+          "bytecode": [
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFiles",
+            "nilifTrue",
+            "=="
+          ]
+        },
+        {
+          "selector": "quit",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfquitPrimitive"
+          ]
+        },
+        {
+          "selector": "saveAs: thenQuit:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "quitIfTrueDisk",
+            "nilifFalse",
+            "=="
+          ]
+        },
+        {
+          "selector": "shutdown",
+          "bytecode": [
+            117,
+            135,
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfoopsLeftLimit"
+          ]
+        },
+        {
+          "selector": "snapshot",
+          "bytecode": [
+            122
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "snapshotAs: thenQuit:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            135,
+            68,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "quitIfTrue",
+            "heightjustSnapped",
+            "|",
+            "Cursorexecuteshow",
+            "selflogChange"
+          ]
+        },
+        {
+          "selector": "copyright",
+          "bytecode": [
+            32,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Copyright (c) 1983 Xerox Corp.  All rights reserved."
+          ]
+        },
+        {
+          "selector": "timeStamp:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "TimedateAndTimeNow",
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "version",
+          "bytecode": [
+            32,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Smalltalk-80, version 2, of April 1, 1983"
+          ]
+        },
+        {
+          "selector": "versionName",
+          "bytecode": [
+            32,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "Smalltalk-80"
+          ]
+        },
+        {
+          "selector": "condenseChanges",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Diskfile",
+            "f"
+          ]
+        },
+        {
+          "selector": "forgetDoIts",
+          "bytecode": [
+            137,
+            64,
+            193,
+            136,
+            34,
+            211,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "classremoveSelectorSimply",
+            "DoIt",
+            "DoItIn:",
+            "removeSelectorSimply:"
+          ]
+        },
+        {
+          "selector": "newSourceFile: without:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "setOfClasses",
+            "oldFilenewFileclass",
+            "|",
+            "oldFile"
+          ]
+        },
+        {
+          "selector": "renameSystemFiles:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "SourceFilesat",
+            "oldFile"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            64,
+            65,
+            176,
+            136,
+            105,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStreamposition",
+            "selfmaxPrint",
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "exitToDebugger",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 114
+        },
+        {
+          "selector": "lowSpaceNotificationLoop",
+          "bytecode": [
+            137,
+            121,
+            137,
+            64,
+            135,
+            65,
+            210,
+            135,
+            67,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "LowSpaceSemaphorewait",
+            "ScheduledControllersinterruptName",
+            "whileTrue:",
+            "selfresetSpaceLimits"
+          ]
+        },
+        {
+          "selector": "quitPrimitive",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 113
+        },
+        {
+          "selector": "releaseExternalViews",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "nilifFalse"
+          ]
+        },
+        {
+          "selector": "snapshotPrimitive",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "primitive": 97
+        },
+        {
+          "selector": "specialSelectors",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "SpecialSelectors"
+          ]
+        },
+        {
+          "selector": "initialize",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        }
+      ]
+    },
+    {
+      "name": "Dictionary",
+      "superclass": "Collection",
+      "instanceVariables": [
+        "tally"
+      ],
+      "methods": [
+        {
+          "selector": "associationAt:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "associationAt: ifAbsent:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock",
+            "index",
+            "|"
+          ]
+        },
+        {
+          "selector": "associations",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "OrderedCollectionnew",
+            "aCollection"
+          ]
+        },
+        {
+          "selector": "at:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "at: ifAbsent:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock",
+            "index",
+            "|"
+          ]
+        },
+        {
+          "selector": "at: put:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObject",
+            "indexelement",
+            "|",
+            "index"
+          ]
+        },
+        {
+          "selector": "keyAtValue:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "keyAtValue: ifAbsent:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "exceptionBlockselfassociationsDo"
+          ]
+        },
+        {
+          "selector": "keys",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Setnew",
+            "aSet"
+          ]
+        },
+        {
+          "selector": "values",
+          "bytecode": [
+            64,
+            136,
+            104,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "Bagnew",
+            "selfdo"
+          ]
+        },
+        {
+          "selector": "includes:",
+          "bytecode": [
+            137,
+            64,
+            65,
+            182,
+            194,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObject",
+            "eachifTrue",
+            "true"
+          ]
+        },
+        {
+          "selector": "occurrencesOf:",
+          "bytecode": [
+            117,
+            136,
+            105,
+            135,
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfdo"
+          ]
+        },
+        {
+          "selector": "add:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selffindKeyOrNil",
+            "index"
+          ]
+        },
+        {
+          "selector": "declare: from:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aDictionary"
+          ]
+        },
+        {
+          "selector": "grow",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfspeciesnew"
+          ]
+        },
+        {
+          "selector": "remove:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "remove: ifAbsent:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "exceptionBlockselfshouldNotImplement"
+          ]
+        },
+        {
+          "selector": "collect:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "Bagnew",
+            "selfdo"
+          ]
+        },
+        {
+          "selector": "do:",
+          "bytecode": [
+            137,
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlockvalue",
+            "assocvalue"
+          ]
+        },
+        {
+          "selector": "select:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfspeciesnew",
+            "selfassociationsDo"
+          ]
+        },
+        {
+          "selector": "asSortedCollection",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "SortedCollectionnew"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            64,
+            65,
+            176,
+            136,
+            105,
+            135,
+            66,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStreamposition",
+            "selfmaxPrint",
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "storeOn:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "includesAssociation:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "includesKey:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selffindKeyOrNil"
+          ]
+        },
+        {
+          "selector": "removeAssociation:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "removeAssociation: ifAbsent:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anExceptionBlock"
+          ]
+        },
+        {
+          "selector": "removeKey:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "removeKey: ifAbsent:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            67,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock",
+            "indexelement",
+            "|",
+            "index"
+          ]
+        },
+        {
+          "selector": "associationsDo:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock"
+          ]
+        },
+        {
+          "selector": "keysDo:",
+          "bytecode": [
+            137,
+            64,
+            193,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlockvalue",
+            "associationkey"
+          ]
+        },
+        {
+          "selector": "inspect",
+          "bytecode": [
+            112,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "errorKeyNotFound",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "errorValueNotFound",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "findKey: ifAbsent:",
+          "bytecode": [
+            64,
+            65,
+            210,
+            65,
+            210,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aBlock",
+            "index",
+            "|"
+          ]
+        },
+        {
+          "selector": "findKeyOrNil:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            118,
+            136,
+            162,
+            135,
+            135,
+            67,
+            65,
+            186,
+            118,
+            176,
+            136,
+            164,
+            135,
+            135,
+            137,
+            69,
+            136,
+            166,
+            135,
+            196,
+            71,
+            216,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "literals": [
+            "selfbasicSize",
+            "length",
+            "pass",
+            "keyhash",
+            "location",
+            "selfbasicAt",
+            "probe",
+            "nilor",
+            "=="
+          ]
+        },
+        {
+          "selector": "rehash",
+          "bytecode": [
+            64,
+            136,
+            104,
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 1,
+          "literals": [
+            "selfspeciesnew"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UndefinedObject",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "release",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "deepCopy",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "shallowCopy",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "storeOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "isNil",
+          "bytecode": [
+            121,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "notNil",
+          "bytecode": [
+            122,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "addDependent:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "new",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        }
+      ],
+      "instanceMethodCount": 8,
+      "classMethodCount": 1
+    },
+    {
+      "name": "Boolean",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "&",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "eqv:",
+          "bytecode": [
+            112,
+            16,
+            208,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "=="
+          ]
+        },
+        {
+          "selector": "not",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "xor:",
+          "bytecode": [
+            112,
+            16,
+            208,
+            193,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "==",
+            "not"
+          ]
+        },
+        {
+          "selector": "|",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse: ifTrue:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "trueAlternativeBlockselfsubclassResponsibility"
+          ]
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue: ifFalse:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "falseAlternativeBlockselfsubclassResponsibility"
+          ]
+        },
+        {
+          "selector": "or:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "deepCopy",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "shallowCopy",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "storeOn:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aStream"
+          ]
+        },
+        {
+          "selector": "new",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        }
+      ],
+      "instanceMethodCount": 14,
+      "classMethodCount": 1
+    },
+    {
+      "name": "True",
+      "superclass": "Boolean",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "&",
+          "bytecode": [
+            16,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "not",
+          "bytecode": [
+            122,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "|",
+          "bytecode": [
+            112,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "alternativeBlockvalue"
+          ]
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [
+            123,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse: ifTrue:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "trueAlternativeBlock"
+          ]
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "alternativeBlockvalue"
+          ]
+        },
+        {
+          "selector": "ifTrue: ifFalse:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "falseAlternativeBlock"
+          ]
+        },
+        {
+          "selector": "or:",
+          "bytecode": [
+            112,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        }
+      ],
+      "instanceMethodCount": 10,
+      "classMethodCount": 0
+    },
+    {
+      "name": "False",
+      "superclass": "Boolean",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "&",
+          "bytecode": [
+            112,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "not",
+          "bytecode": [
+            121,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "|",
+          "bytecode": [
+            16,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "and:",
+          "bytecode": [
+            112,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifFalse:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "alternativeBlockvalue"
+          ]
+        },
+        {
+          "selector": "ifFalse: ifTrue:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "trueAlternativeBlock"
+          ]
+        },
+        {
+          "selector": "ifTrue:",
+          "bytecode": [
+            123,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "ifTrue: ifFalse:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "falseAlternativeBlock"
+          ]
+        },
+        {
+          "selector": "or:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "alternativeBlockvalue"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        }
+      ],
+      "instanceMethodCount": 10,
+      "classMethodCount": 0
+    },
+    {
+      "name": "Magnitude",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "methods": [
+        {
+          "selector": "<",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfsubclassResponsibility"
+          ]
+        },
+        {
+          "selector": "<=",
+          "bytecode": [
+            112,
+            16,
+            179,
+            192,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "not"
+          ]
+        },
+        {
+          "selector": "=",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfsubclassResponsibility"
+          ]
+        },
+        {
+          "selector": ">",
+          "bytecode": [
+            16,
+            112,
+            178,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": ">=",
+          "bytecode": [
+            112,
+            16,
+            178,
+            192,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "not"
+          ]
+        },
+        {
+          "selector": "between: and:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "max"
+          ]
+        },
+        {
+          "selector": "hash",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "selfsubclassResponsibility"
+          ]
+        },
+        {
+          "selector": "hashMappedBy:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "selfhash"
+          ]
+        },
+        {
+          "selector": "max:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aMagnitudeifTrue"
+          ]
+        },
+        {
+          "selector": "min:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aMagnitudeifTrue"
+          ]
+        }
+      ],
+      "instanceMethodCount": 10,
+      "classMethodCount": 0
+    },
+    {
+      "name": "LookupKey",
+      "superclass": "Magnitude",
+      "instanceVariables": [
+        "key"
+      ],
+      "methods": [
+        {
+          "selector": "<",
+          "bytecode": [
+            0,
+            64,
+            178,
+            124
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aLookupKeykey"
+          ]
+        },
+        {
+          "selector": "=",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aLookupKeyspeciesifTrue"
+          ]
+        },
+        {
+          "selector": "hash",
+          "bytecode": [
+            64,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": [
+            "keyhash"
+          ]
+        },
+        {
+          "selector": "hashMappedBy:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "key",
+          "bytecode": [
+            0,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "key:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObject"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aStream"
+          ]
+        },
+        {
+          "selector": "key:",
+          "bytecode": [
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0
+        }
+      ]
+    },
+    {
+      "name": "Association",
+      "superclass": "LookupKey",
+      "instanceVariables": [
+        "key",
+        "value"
+      ],
+      "methods": [
+        {
+          "selector": "key: value:",
+          "bytecode": [
+            64,
+            136,
+            161,
+            135,
+            135,
+            66,
+            136,
+            97,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aKey",
+            "anObjectkey",
+            "anObject"
+          ]
+        },
+        {
+          "selector": "value",
+          "bytecode": [
+            1,
+            124
+          ],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "value:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "anObject"
+          ]
+        },
+        {
+          "selector": "printOn:",
+          "bytecode": [
+            64,
+            135,
+            65,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "aStream",
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "selector": "key: value:",
+          "bytecode": [
+            64,
+            176
+          ],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "literals": [
+            "newValue"
+          ]
+        }
+      ],
+      "instanceMethodCount": 4,
+      "classMethodCount": 1
+    }
+  ]
+}

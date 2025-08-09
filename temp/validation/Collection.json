@@ -1,0 +1,519 @@
+{
+  "ClassName": "Collection",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Abstract",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:newObjectselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addAll:",
+      "Source": "addAll:aCollectionaCollectiondo:[:each|selfadd:each].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfadd"
+        }
+      ]
+    },
+    {
+      "Selector": "asBag",
+      "Source": "asBag|aBag|aBag_Bagnew.selfdo:[:each|aBagadd:each].^aBag!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "asOrderedCollection",
+      "Source": "asOrderedCollection|anOrderedCollection|anOrderedCollection_OrderedCollectionnew:selfsize.selfdo:[:each|anOrderedCollectionaddLast:each].^anOrderedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSet",
+      "Source": "asSet|aSet|aSet_Setnew:selfsize.selfdo:[:each|aSetadd:each].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSortedCollection",
+      "Source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionaddAll:self.^aSortedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSortedCollection:",
+      "Source": "asSortedCollection:aBlock|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionsortBlock:aBlock.aSortedCollectionaddAll:self.^aSortedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "detect:",
+      "Source": "detect:aBlock^selfdetect:aBlockifNone:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "detect:ifNone:",
+      "Source": "detect:aBlockifNone:exceptionBlockselfdo:[:each|(aBlockvalue:each)ifTrue:[^each]].^exceptionBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlockselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "emptyCheck",
+      "Source": "emptyCheckselfisEmptyifTrue:[selferrorEmptyCollection]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorEmptyCollection",
+      "Source": "errorEmptyCollectionselferror:\u0027this collection is empty\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNoMatch",
+      "Source": "errorNoMatchselferror:\u0027collection sizes do not match\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNotFound",
+      "Source": "errorNotFoundselferror:\u0027Object is not in the collection.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNotKeyed",
+      "Source": "errorNotKeyedselferror:selfclassname,\u0027s do not respond to keyed accessing messages.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "growSize",
+      "Source": "growSizeselfbasicSize\u003E=selfmaxSizeifTrue:[selferror:\u0027unable to grow this collection\u0027].^(selfbasicSizemax:2)min:selfmaxSize-selfbasicSize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfmaxSizeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "includes:",
+      "Source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 04 42 43 B6 7D D1 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "eachifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "inject:into:",
+      "Source": "inject:thisValueinto:binaryBlock|nextValue|nextValue_thisValue.selfdo:[:each|nextValue_binaryBlockvalue:nextValuevalue:each].^nextValue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "binaryBlock"
+        },
+        {
+          "Value": "nextValue"
+        }
+      ]
+    },
+    {
+      "Selector": "isEmpty",
+      "Source": "isEmpty^selfsize=0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "selfsize"
+        }
+      ]
+    },
+    {
+      "Selector": "maxPrint",
+      "Source": "maxPrint^5000!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        5000
+      ]
+    },
+    {
+      "Selector": "maxSize",
+      "Source": "maxSize^65486!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        65486
+      ]
+    },
+    {
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf:anObject|tally|tally_0.selfdo:[:each|anObject=eachifTrue:[tally_tally\u002B1]].^tally!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPutAll:selfclassname,\u0027 (\u0027.selfdo:[:element|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B0 88 69 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "reject:",
+      "Source": "reject:aBlock^selfselect:[:element|(aBlockvalue:element)==false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:",
+      "Source": "remove:oldObject^selfremove:oldObjectifAbsent:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:oldObjectifAbsent:anExceptionBlockselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anExceptionBlockselfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "removeAll:",
+      "Source": "removeAll:aCollectionaCollectiondo:[:each|selfremove:each].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfremove"
+        }
+      ]
+    },
+    {
+      "Selector": "select:",
+      "Source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|(aBlockvalue:each)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size|tally|tally_0.selfdo:[:each|tally_tally\u002B1].^tally!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 68 69 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStream|noneYet|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new)\u0027.noneYet_true.selfdo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 add: \u0027.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "with:",
+      "Source": "with:anObject|newCollection|newCollection_selfnew.newCollectionadd:anObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfnew"
+        },
+        {
+          "Value": "newCollectionadd"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:",
+      "Source": "with:firstObjectwith:secondObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "secondObject"
+        },
+        {
+          "Value": "newCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObjectwith:fourthObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.newCollectionadd:fourthObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 35,
+    "SuccessfullyCompiled": 35,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T20:54:03.9326484Z"
+  }
+}

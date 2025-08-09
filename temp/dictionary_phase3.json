@@ -1,0 +1,588 @@
+{
+  "phase": "3",
+  "className": "Dictionary",
+  "superclass": "Set",
+  "comment": "",
+  "instanceVariables": [],
+  "classVariables": [],
+  "poolDictionaries": [],
+  "category": "Collections-Unordered",
+  "methods": [
+    {
+      "selector": "associationAt:",
+      "source": "associationAt:key^selfassociationAt:keyifAbsent:[selferrorKeyNotFound]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "associationAt: ifAbsent:",
+      "source": "associationAt:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^selfbasicAt:index!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        65,
+        194,
+        176
+      ],
+      "literals": [
+        "aBlock",
+        "index",
+        "|"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "associations",
+      "source": "associations|aCollectionkey|aCollection_OrderedCollectionnew:selfsize.selfassociationsDo:[:key|aCollectionadd:key].^aCollection!",
+      "bytecodes": [
+        64,
+        161,
+        176
+      ],
+      "literals": [
+        "OrderedCollectionnew",
+        "aCollection"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "at:",
+      "source": "at:key^selfat:keyifAbsent:[selferrorKeyNotFound]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "at: ifAbsent:",
+      "source": "at:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^(selfbasicAt:index)value!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        65,
+        194,
+        176
+      ],
+      "literals": [
+        "aBlock",
+        "index",
+        "|"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "at: put:",
+      "source": "at:keyput:anObject|indexelement|index_selffindKeyOrNil:key.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:(Associationkey:keyvalue:anObject)]ifFalse:[elementvalue:anObject].^anObject!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        67,
+        194,
+        176
+      ],
+      "literals": [
+        "anObject",
+        "indexelement",
+        "|",
+        "index"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "keyAtValue:",
+      "source": "keyAtValue:value^selfkeyAtValue:valueifAbsent:[selferrorValueNotFound]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "keyAtValue: ifAbsent:",
+      "source": "keyAtValue:valueifAbsent:exceptionBlockselfassociationsDo:[:association|value==associationvalueifTrue:[^associationkey]].^exceptionBlockvalue!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "exceptionBlockselfassociationsDo"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "keys",
+      "source": "keys|aSetkey|aSet_Setnew:selfsize.selfkeysDo:[:key|aSetadd:key].^aSet!",
+      "bytecodes": [
+        64,
+        161,
+        176
+      ],
+      "literals": [
+        "Setnew",
+        "aSet"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "values",
+      "source": "values|aBag|aBag_Bagnew.selfdo:[:value|aBagadd:value].^aBag!",
+      "bytecodes": [
+        64,
+        128,
+        65,
+        176
+      ],
+      "literals": [
+        "Bagnew",
+        "selfdo"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "includes:",
+      "source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "occurrencesOf:",
+      "source": "occurrencesOf:anObject|count|count_0.selfdo:[:each|anObject=eachifTrue:[count_count\u002B1]].^count!",
+      "bytecodes": [
+        32,
+        129,
+        65,
+        176
+      ],
+      "literals": [
+        0,
+        "selfdo"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "add:",
+      "source": "add:anAssociation|indexelement|index_selffindKeyOrNil:anAssociationkey.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:anAssociation]ifFalse:[elementvalue:anAssociationvalue].^anAssociation!",
+      "bytecodes": [
+        64,
+        161,
+        176
+      ],
+      "literals": [
+        "selffindKeyOrNil",
+        "index"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "declare: from:",
+      "source": "declare:keyfrom:aDictionary(selfincludesKey:key)ifTrue:[^self].(aDictionaryincludesKey:key)ifTrue:[selfadd:(aDictionaryassociationAt:key).aDictionaryremoveKey:key]ifFalse:[selfat:keyput:nil]!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "aDictionary"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "grow",
+      "source": "grow|newSelf|newSelf_selfspeciesnew:selfbasicSize\u002BselfgrowSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "bytecodes": [
+        64,
+        128,
+        176
+      ],
+      "literals": [
+        "selfspeciesnew"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "remove:",
+      "source": "remove:anObjectselfshouldNotImplement!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "remove: ifAbsent:",
+      "source": "remove:anObjectifAbsent:exceptionBlockselfshouldNotImplement!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "exceptionBlockselfshouldNotImplement"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "collect:",
+      "source": "collect:aBlock|newCollection|newCollection_Bagnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "bytecodes": [
+        64,
+        129,
+        65,
+        176
+      ],
+      "literals": [
+        "Bagnew",
+        "selfdo"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "do:",
+      "source": "do:aBlocksuperdo:[:assoc|aBlockvalue:assocvalue]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "select:",
+      "source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfassociationsDo:[:each|(aBlockvalue:eachvalue)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "bytecodes": [
+        64,
+        129,
+        65,
+        176
+      ],
+      "literals": [
+        "selfspeciesnew",
+        "selfassociationsDo"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "asSortedCollection",
+      "source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.selfassociationsDo:[:association|aSortedCollectionadd:association].^aSortedCollection!",
+      "bytecodes": [
+        64,
+        128,
+        176
+      ],
+      "literals": [
+        "SortedCollectionnew"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "printOn:",
+      "source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPutAll:selfclassname,\u0027 (\u0027.selfassociationsDo:[:element|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        129,
+        67,
+        176
+      ],
+      "literals": [
+        "aStreamposition",
+        "selfmaxPrint",
+        "\u002B",
+        "aStreamnextPutAll"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "storeOn:",
+      "source": "storeOn:aStream|noneYet|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new)\u0027.noneYet_true.selfassociationsDo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 add: \u0027.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "aStreamnextPutAll"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "includesAssociation:",
+      "source": "includesAssociation:anAssociation^superincludes:anAssociation!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "includesKey:",
+      "source": "includesKey:key|index|index_selffindKeyOrNil:key.^(selfbasicAt:index)~~nil!",
+      "bytecodes": [
+        64,
+        129,
+        176
+      ],
+      "literals": [
+        "selffindKeyOrNil"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 1,
+      "category": ""
+    },
+    {
+      "selector": "removeAssociation:",
+      "source": "removeAssociation:anAssociation^selfremoveAssociation:anAssociationifAbsent:[selferrorNotFound]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "removeAssociation: ifAbsent:",
+      "source": "removeAssociation:anAssociationifAbsent:anExceptionBlock^superremove:anAssociationifAbsent:anExceptionBlock!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "anExceptionBlock"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "removeKey:",
+      "source": "removeKey:key^selfremoveKey:keyifAbsent:[selferrorKeyNotFound]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "removeKey: ifAbsent:",
+      "source": "removeKey:keyifAbsent:aBlock|indexelement|index_selffindKey:keyifAbsent:[^aBlockvalue].element_selfbasicAt:index.selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^element!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        67,
+        194,
+        176
+      ],
+      "literals": [
+        "aBlock",
+        "indexelement",
+        "|",
+        "index"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "associationsDo:",
+      "source": "associationsDo:aBlocksuperdo:aBlock!",
+      "bytecodes": [
+        64,
+        176
+      ],
+      "literals": [
+        "aBlock"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "keysDo:",
+      "source": "keysDo:aBlockselfassociationsDo:[:association|aBlockvalue:associationkey]!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "inspect",
+      "source": "inspectInspectorViewopen:(DictionaryInspectorinspect:self)!",
+      "bytecodes": [
+        0,
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "errorKeyNotFound",
+      "source": "errorKeyNotFoundselferror:\u0027key not found\u0027!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "errorValueNotFound",
+      "source": "errorValueNotFoundselferror:\u0027value not found\u0027!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "findKey: ifAbsent:",
+      "source": "findKey:keyifAbsent:aBlock|index|index_selffindKeyOrNil:key.(selfbasicAt:index)==nilifTrue:[^aBlockvalue].^index!",
+      "bytecodes": [
+        64,
+        65,
+        194,
+        65,
+        194,
+        176
+      ],
+      "literals": [
+        "aBlock",
+        "index",
+        "|"
+      ],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "findKeyOrNil:",
+      "source": "findKeyOrNil:key|locationlengthprobepass|length_selfbasicSize.pass_1.location_keyhash\\\\length\u002B1.[(probe_selfbasicAt:location)==nilor:[probekey=key]]whileFalse:[(location_location\u002B1)\u003ElengthifTrue:[location_1.pass_pass\u002B1.pass\u003E2ifTrue:[^selfgrowfindKeyOrNil:key]]].^location!",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "rehash",
+      "source": "rehash|newSelf|newSelf_selfspeciesnew:selfbasicSize.selfassociationsDo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "bytecodes": [
+        64,
+        128,
+        176
+      ],
+      "literals": [
+        "selfspeciesnew"
+      ],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 1,
+      "category": ""
+    }
+  ],
+  "classMethods": []
+}

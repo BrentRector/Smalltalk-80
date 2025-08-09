@@ -29,6 +29,7 @@ public class Program
             bool showBytecode = true;
             bool showMnemonics = true;
             bool testCriticalMethods = false;
+            bool testUndefinedObject = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -73,6 +74,10 @@ public class Program
                 else if (args[i] == "--test-critical-methods")
                 {
                     testCriticalMethods = true;
+                }
+                else if (args[i] == "--test-undefined-object")
+                {
+                    testUndefinedObject = true;
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -133,6 +138,13 @@ public class Program
             {
                 // Suppress the Phase 2 dump for testing
                 TestCriticalMethods.RunTests(vm);
+                return 0;
+            }
+            
+            // If testing UndefinedObject, do that
+            if (testUndefinedObject)
+            {
+                TestUndefinedObject.RunTests(vm);
                 return 0;
             }
             

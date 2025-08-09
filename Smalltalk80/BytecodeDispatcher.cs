@@ -287,17 +287,43 @@ public static class BytecodeDispatcher
 
     private static void HandleReturnTrue(Interpreter interpreter)
     {
-        interpreter.HandleReturn(true);
+        // Return the Smalltalk true singleton object
+        if (ObjectMemory.TrueObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.TrueObject);
+        }
+        else
+        {
+            // Debug: log the issue
+            Console.WriteLine("[BYTECODE] WARNING: True singleton not found in ObjectMemory.TrueObject");
+            throw new InvalidOperationException("True singleton not found - ensure Phase 2 bootstrap creates it");
+        }
     }
 
     private static void HandleReturnFalse(Interpreter interpreter)
     {
-        interpreter.HandleReturn(false);
+        // Return the Smalltalk false singleton object
+        if (ObjectMemory.FalseObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.FalseObject);
+        }
+        else
+        {
+            throw new InvalidOperationException("False singleton not found - ensure Phase 2 bootstrap creates it");
+        }
     }
 
     private static void HandleReturnNil(Interpreter interpreter)
     {
-        interpreter.HandleReturn(null!);
+        // Return the Smalltalk nil singleton object
+        if (ObjectMemory.NilObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.NilObject);
+        }
+        else
+        {
+            throw new InvalidOperationException("Nil singleton not found - ensure Phase 2 bootstrap creates it");
+        }
     }
 
     private static void HandleSendLiteralSelector(Interpreter interpreter, int bytecode)

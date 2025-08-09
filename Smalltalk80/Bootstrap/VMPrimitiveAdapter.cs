@@ -134,15 +134,25 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         var obj = ObjectMemory.FromOop(objectId);
         if (obj == null)
+        {
+            DebugLog($"[VM] GetSlot: Object OOP {objectId} not found");
             return -1;
+        }
             
         if (slotIndex < 0 || slotIndex >= obj.Fields.Length)
+        {
+            DebugLog($"[VM] GetSlot: Slot {slotIndex} out of range for object OOP {objectId} with {obj.Fields.Length} slots");
             return -1;
+        }
             
         var value = obj.Fields[slotIndex];
         if (value is SmalltalkObject smalltalkObj)
+        {
+            DebugLog($"[VM] GetSlot: Object OOP {objectId} slot {slotIndex} contains SmalltalkObject OOP {smalltalkObj.Oop}");
             return smalltalkObj.Oop;
-            
+        }
+        
+        DebugLog($"[VM] GetSlot: Object OOP {objectId} slot {slotIndex} contains {value?.GetType().Name ?? "null"}, returning -1");
         return -1;
     }
     
@@ -172,6 +182,9 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             value = ObjectMemory.FromOop(valueId);
         }
         obj.SetField(slotIndex, value);
+        
+        // Debug: log what was set
+        DebugLog($"[VM] SetSlot: Object OOP {objectId} slot {slotIndex} <- value OOP {valueId} (stored as {value?.GetType().Name ?? "null"})");
     }
     
     /// <summary>
@@ -476,6 +489,22 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             byteArray.SetField(i, (byte)0);
         }
         return byteArray.Oop;
+    }
+    
+    /// <summary>
+    /// Set a byte value in a ByteArray.
+    /// </summary>
+    public void PrimitiveByteArrayAtPut(int byteArrayOop, int index, byte value)
+    {
+        var byteArray = ObjectMemory.FromOop(byteArrayOop);
+        if (byteArray == null)
+            throw new InvalidOperationException($"ByteArray with OOP {byteArrayOop} not found");
+            
+        if (index < 0 || index >= byteArray.Fields.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), $"Index {index} out of range for ByteArray with {byteArray.Fields.Length} bytes");
+            
+        // Store the byte directly
+        byteArray.SetField(index, value);
     }
     
     /// <summary>
@@ -1120,6 +1149,16 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             DebugLog($"[VM] SendMessage: Executing with {tempCount} temporaries, receiver OOP {receiverId}");
             var result = interpreter.Evaluate(compiledMethod, receiver, temps);
             
+            // Debug: log what was returned
+            if (result is SmalltalkObject debugObj)
+            {
+                DebugLog($"[VM] SendMessage: Method returned SmalltalkObject with OOP {debugObj.Oop}");
+            }
+            else
+            {
+                DebugLog($"[VM] SendMessage: Method returned {result?.GetType().Name ?? "null"}: {result}");
+            }
+            
             // Convert result to OOP
             if (result == null)
             {
@@ -1216,6 +1255,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 {
                     // Direct int already logged above
                     bytecodes[i] = (byte)directIntVal;
+                }
+                else if (field is byte directByte)
+                {
+                    // Direct byte value stored in ByteArray
+                    bytecodes[i] = directByte;
                 }
                 else
                 {

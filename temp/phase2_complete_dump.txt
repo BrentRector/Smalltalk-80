@@ -1,0 +1,160 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+Γ£ô Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+Total objects in memory: 2969
+
+Found Smalltalk SystemDictionary at OOP 84
+
+Classes registered in Smalltalk: 33
+
+Class: Array
+  Superclass: Object
+  Methods: 6
+
+Class: Association
+  Superclass: LookupKey
+  Methods: 4
+  Instance Variables: key, value
+
+Class: AssociationClass
+  Superclass: LookupKeyClass
+  Methods: 1
+
+Class: Behavior
+  Superclass: Object
+  Methods: 15
+  Instance Variables: superclass, methodDict, format
+
+Class: BehaviorClass
+  Superclass: ObjectClass
+  Methods: 1
+
+Class: Boolean
+  Superclass: nil
+  Methods: 14
+
+Class: BooleanClass
+  Superclass: nil
+  Methods: 1
+
+Class: ByteArray
+  Superclass: Array
+  Methods: 12
+
+Class: Class
+  Superclass: Behavior
+  Methods: 15
+  Instance Variables: name
+
+Class: ClassClass
+  Superclass: BehaviorClass
+  Methods: 3
+
+Class: Collection
+  Superclass: Object
+  Methods: 15
+
+Class: CollectionClass
+  Superclass: ObjectClass
+  Methods: 4
+
+Class: CompiledMethod
+  Superclass: Object
+  Methods: 15
+  Instance Variables: selector, bytecode, literals, header
+
+Class: CompiledMethodClass
+  Superclass: ObjectClass
+  Methods: 5
+
+Class: Dictionary
+  Superclass: Collection
+  Methods: 15
+  Instance Variables: tally
+
+Class: False
+  Superclass: Boolean
+  Methods: 10
+
+Class: LookupKey
+  Superclass: Magnitude
+  Methods: 7
+  Instance Variables: key
+
+Class: LookupKeyClass
+  Superclass: MagnitudeClass
+  Methods: 1
+
+Class: Magnitude
+  Superclass: nil
+  Methods: 10
+
+Class: Metaclass
+  Superclass: Behavior
+  Methods: 15
+  Instance Variables: thisClass
+
+Class: MetaclassClass
+  Superclass: BehaviorClass
+  Methods: 1
+
+Class: MethodDictionary
+  Superclass: Dictionary
+  Methods: 2
+
+Class: Object
+  Superclass: nil
+  Methods: 15
+
+Class: ObjectClass
+  Superclass: Class
+  Methods: 6
+
+Class: String
+  Superclass: Object
+  Methods: 15
+
+Class: StringClass
+  Superclass: ObjectClass
+  Methods: 3
+
+Class: Symbol
+  Superclass: String
+  Methods: 15
+
+Class: SymbolClass
+  Superclass: StringClass
+  Methods: 8
+
+Class: SystemDictionary
+  Superclass: Dictionary
+  Methods: 15
+
+Class: SystemDictionaryClass
+  Superclass: DictionaryClass
+  Methods: 1
+
+Class: True
+  Superclass: Boolean
+  Methods: 10
+
+Class: UndefinedObject
+  Superclass: nil
+  Methods: 8
+
+Class: UndefinedObjectClass
+  Superclass: nil
+  Methods: 1
+
+=== Smalltalk Dictionary Statistics ===
+Total entries: 41
+  Classes: 33
+  Symbols: 0
+  Other objects: 8
+

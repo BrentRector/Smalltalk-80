@@ -1,0 +1,101 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+Γ£ô Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+Total objects in memory: 1916
+
+Found Smalltalk SystemDictionary at OOP 84
+
+Classes registered in Smalltalk: 20
+
+Class: Array
+  Superclass: Object
+
+Class: Association
+  Superclass: LookupKey
+  Methods: 4
+  Instance Variables: key, value
+
+Class: Behavior
+  Superclass: Object
+  Methods: 116
+  Instance Variables: superclass, methodDict, format
+
+Class: Boolean
+  Superclass: nil
+  Methods: 15
+
+Class: ByteArray
+  Superclass: Array
+
+Class: Class
+  Superclass: Behavior
+  Methods: 39
+  Instance Variables: name
+
+Class: Collection
+  Superclass: Object
+
+Class: CompiledMethod
+  Superclass: Object
+  Methods: 48
+  Instance Variables: selector, bytecode, literals, header
+
+Class: CompiledMethodClass
+  Superclass: ObjectClass
+  Methods: 1
+
+Class: Dictionary
+  Superclass: Collection
+  Methods: 37
+  Instance Variables: tally
+
+Class: False
+  Superclass: Boolean
+  Methods: 10
+
+Class: LookupKey
+  Superclass: Magnitude
+  Methods: 7
+  Instance Variables: key
+
+Class: Magnitude
+  Superclass: nil
+  Methods: 10
+
+Class: MethodDictionary
+  Superclass: Dictionary
+  Methods: 2
+
+Class: Object
+  Superclass: nil
+
+Class: String
+  Superclass: Object
+
+Class: Symbol
+  Superclass: String
+
+Class: SystemDictionary
+  Superclass: Dictionary
+  Methods: 71
+
+Class: True
+  Superclass: Boolean
+  Methods: 10
+
+Class: UndefinedObject
+  Superclass: nil
+  Methods: 9
+
+=== Smalltalk Dictionary Statistics ===
+Total entries: 41
+  Classes: 20
+  Symbols: 0
+  Other objects: 21
+

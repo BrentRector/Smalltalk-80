@@ -1,0 +1,335 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+√ Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+Showing 1 filtered classes (of 33 total)
+
+================================================================================
+Class: Class
+================================================================================
+  Superclass: Behavior
+  Instance Variables: name
+
+  Methods (36):
+  ----------------------------------------------------------------------------
+  addClassVarName:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aString, #,, # class variable name should be capitalized; proceed to include anyway., #selferror]
+    Bytecode (10 bytes):
+      0000: pushActiveContext
+      0001: pushRcvrVariable: 0
+      0002: pushRcvrVariable: 3
+      0003: pushLiteralVariable: #selferror
+      0004: returnTopFromBlock
+      0005: returnTopFromBlock
+      0006: send: #aString args: 0
+      0007: pushConstant: # class variable name should be capitalized; proceed to include anyway.
+      0008: send: #, args: 1
+      0009: returnTop
+
+  addInstVarName:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfnameinEnvironment]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #selfnameinEnvironment
+      0001: returnTop
+
+  addSharedPool:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aDictionary, #selfsharedPoolsincludes]
+    Bytecode (3 bytes):
+      0000: pushLiteralVariable: #selfsharedPoolsincludes
+      0001: send: #aDictionary args: 0
+      0002: returnTop
+
+  allClassVarNames
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#==, #superclass, #nilifTrue]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #superclass
+      0001: pushLiteralVariable: #nilifTrue
+      0002: sendSpecial: ==
+      0003: returnTop
+
+  allSharedPools
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#==, #superclass, #nilifTrue]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #superclass
+      0001: pushLiteralVariable: #nilifTrue
+      0002: sendSpecial: ==
+      0003: returnTop
+
+  classPool
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#nilifTrue]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #nilifTrue
+      0001: returnTop
+
+  classVarNames
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfclassPoolkeys]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #selfclassPoolkeys
+      0001: returnTop
+
+  compileAllFrom:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#otherClass, #selfclasscompileAllFrom]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #otherClass
+      0001: popIntoTemp: 1
+      0002: pushLiteralVariable: #selfclasscompileAllFrom
+      0003: returnTop
+
+  copy
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfclasscopynewsuperclass]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #selfclasscopynewsuperclass
+      0001: duplicate
+      0002: popIntoTemp: 0
+      0003: returnTop
+
+  copyForValidation
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  declare:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#varString, #ScannernewscanFieldNames, #newVars]
+    Bytecode (8 bytes):
+      0000: pushLiteralVariable: #ScannernewscanFieldNames
+      0001: send: #varString args: 0
+      0002: duplicate
+      0003: extStoreTemp: 32
+      0005: pushRcvrVariable: 2
+      0006: pop
+      0007: returnTop
+
+  fileOut
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#cr, #show:, #Filing out class:, #Transcriptrefresh, #Diskfile]
+    Bytecode (18 bytes):
+      0000: pushLiteralVariable: #Transcriptrefresh
+      0001: duplicate
+      0002: popIntoTemp: 1
+      0003: popIntoTemp: 2
+      0004: pushTemp: 1
+      0005: send: #cr args: 0
+      0006: popIntoTemp: 2
+      0007: pushTemp: 1
+      0008: send: #cr args: 0
+      0009: popIntoTemp: 2
+      0010: pushTemp: 1
+      0011: pushConstant: #Filing out class:
+      0012: send: #show: args: 1
+      0013: popIntoTemp: 2
+      0014: pushLiteralVariable: #Diskfile
+      0015: duplicate
+      0016: popIntoTemp: 0
+      0017: returnTop
+
+  fileOutOn:moveSource:toFile:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#moveSourcetoFile]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #moveSourcetoFile
+      0001: returnTop
+
+  hasMethods
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  hasMultipleSuperclasses
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfclassinstHasMultipleSuperclasses]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #selfclassinstHasMultipleSuperclasses
+      0001: returnTop
+
+  initialize
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  isObsolete
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfclassisObsolete]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #selfclassisObsolete
+      0001: returnTop
+
+  name
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#nilifTrue]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #nilifTrue
+      0001: returnTop
+
+  obsolete
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#instancenilFields]
+    Bytecode (5 bytes):
+      0000: pushActiveContext
+      0001: pushRcvrVariable: 0
+      0002: pushRcvrVariable: 2
+      0003: pushLiteralVariable: #instancenilFields
+      0004: returnTopFromBlock
+
+  poolHas:ifTrue:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#|, #assocBlock, #assocpool, #assoc]
+    Bytecode (6 bytes):
+      0000: pushLiteralVariable: #assocBlock
+      0001: pushLiteralVariable: #assocpool
+      0002: send: #| args: 1
+      0003: pushLiteralVariable: #assoc
+      0004: send: #| args: 1
+      0005: returnTop
+
+  printOut
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  removeClassVarName:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aSymbol, #aStringasSymbol, #classPoolincludesKey]
+    Bytecode (10 bytes):
+      0000: pushLiteralVariable: #aStringasSymbol
+      0001: duplicate
+      0002: extStoreTemp: 32
+      0004: pushRcvrVariable: 0
+      0005: pop
+      0006: popIntoTemp: 2
+      0007: pushLiteralVariable: #classPoolincludesKey
+      0008: send: #aSymbol args: 0
+      0009: returnTop
+
+  removeFromChanges
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  removeFromSystem
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (1 bytes):
+      0000: returnTop
+
+  removeInstVarName:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aString, #selfinstVarNamesincludes]
+    Bytecode (3 bytes):
+      0000: pushLiteralVariable: #selfinstVarNamesincludes
+      0001: send: #aString args: 0
+      0002: returnTop
+
+  removeSharedPool:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aDictionary, #selfsharedPoolsincludes]
+    Bytecode (3 bytes):
+      0000: pushLiteralVariable: #selfsharedPoolsincludes
+      0001: send: #aDictionary args: 0
+      0002: returnTop
+
+  rename:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#newName, #aStringasSymbol, #SmalltalkincludesKey]
+    Bytecode (7 bytes):
+      0000: pushLiteralVariable: #aStringasSymbol
+      0001: duplicate
+      0002: popIntoTemp: 1
+      0003: popIntoTemp: 2
+      0004: pushLiteralVariable: #SmalltalkincludesKey
+      0005: send: #newName args: 0
+      0006: returnTop
+
+  sharedPools
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#nilifTrue]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #nilifTrue
+      0001: returnTop
+
+  sharing:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#poolString, #selfsharedPools, #oldPools, #Setnew, #ScannernewscanFieldNames]
+    Bytecode (14 bytes):
+      0000: pushLiteralVariable: #selfsharedPools
+      0001: duplicate
+      0002: extStoreTemp: 32
+      0004: pushRcvrVariable: 2
+      0005: pop
+      0006: popIntoTemp: 2
+      0007: pushLiteralVariable: #Setnew
+      0008: duplicate
+      0009: popIntoRcvrVariable: 2
+      0010: popIntoTemp: 2
+      0011: pushLiteralVariable: #ScannernewscanFieldNames
+      0012: send: #poolString args: 0
+      0013: returnTop
+
+  subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#fclassVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #fclassVariableNames
+      0001: returnTop
+
+  subclass:otherSupers:instanceVariableNames:classVariableNames:category:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#othersinstanceVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #othersinstanceVariableNames
+      0001: returnTop
+
+  superclass:methodDict:format:name:organization:instVarNames:classPool:sharedPools:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#mdformat]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #mdformat
+      0001: returnTop
+
+  validateFrom:in:instanceVariableNames:methods:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#environinstanceVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #environinstanceVariableNames
+      0001: returnTop
+
+  variableByteSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#fclassVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #fclassVariableNames
+      0001: returnTop
+
+  variableSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#fclassVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #fclassVariableNames
+      0001: returnTop
+
+  variableWordSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#fclassVariableNames]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #fclassVariableNames
+      0001: returnTop
+
+

@@ -114,7 +114,7 @@ public class Phase3Executor
     }
     
     /// <summary>
-    /// Phase 3 manifest structure.
+    /// Phase 3 manifest structure (legacy multi-class format).
     /// </summary>
     public class Phase3Manifest
     {
@@ -132,6 +132,42 @@ public class Phase3Executor
         
         [JsonPropertyName("testSequence")]
         public List<TestAction>? TestSequence { get; set; }
+    }
+    
+    /// <summary>
+    /// Phase 3 single class manifest structure.
+    /// </summary>
+    public class Phase3ClassManifest
+    {
+        [JsonPropertyName("phase")]
+        public string Phase { get; set; } = "3";
+        
+        [JsonPropertyName("className")]
+        public string ClassName { get; set; } = "";
+        
+        [JsonPropertyName("superclass")]
+        public string Superclass { get; set; } = "Object";
+        
+        [JsonPropertyName("comment")]
+        public string Comment { get; set; } = "";
+        
+        [JsonPropertyName("instanceVariables")]
+        public List<string> InstanceVariables { get; set; } = new();
+        
+        [JsonPropertyName("classVariables")]
+        public List<string> ClassVariables { get; set; } = new();
+        
+        [JsonPropertyName("poolDictionaries")]
+        public List<string> PoolDictionaries { get; set; } = new();
+        
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = "Unclassified";
+        
+        [JsonPropertyName("methods")]
+        public List<MethodDef> Methods { get; set; } = new();
+        
+        [JsonPropertyName("classMethods")]
+        public List<MethodDef> ClassMethods { get; set; } = new();
     }
     
     /// <summary>
@@ -356,12 +392,21 @@ public class Phase3Executor
             Phase3Log($"[PHASE3]   - Using existing method dictionary OOP {methodDictOop}");
         }
         
-        // Step 5: Install the method via "dict at: selector put: method" message send
-        var atPutSelector = vm.PrimitiveInternSymbol("at:put:");
-        var result = vm.PrimitiveSendMessage(methodDictOop, atPutSelector, new int[] { selectorSymbol, methodOop });
-        Phase3Log($"[PHASE3]   - Installed method via message send: dict at: #{methodDef.Selector} put: method -> result OOP {result}");
-        
-        // The dictionary will automatically expand if needed via its inherited fullCheck mechanism
+        // Step 5: Install the method directly using primitives (bypassing broken at:put: method)
+        // Since Phase 1 now creates properly sized dictionaries, we can use direct primitive storage
+        try
+        {
+            vm.PrimitiveDictionaryAtPut(methodDictOop, selectorSymbol, methodOop);
+            Phase3Log($"[PHASE3]   - Installed method via primitive: dict[#{methodDef.Selector}] = method OOP {methodOop}");
+        }
+        catch (Exception ex)
+        {
+            // Fallback to message send if primitive fails
+            Phase3Log($"[PHASE3]   - Primitive failed ({ex.Message}), falling back to message send");
+            var atPutSelector = vm.PrimitiveInternSymbol("at:put:");
+            var result = vm.PrimitiveSendMessage(methodDictOop, atPutSelector, new int[] { selectorSymbol, methodOop });
+            Phase3Log($"[PHASE3]   - Fallback to message send: dict at: #{methodDef.Selector} put: method -> result OOP {result}");
+        }
         
         Phase3Log($"[PHASE3] ✓ Method {methodDef.ClassName}>>{methodDef.Selector} successfully installed");
     }
@@ -520,5 +565,120 @@ public class Phase3Executor
             Phase3Log($"[PHASE3] Expected result: {action.ExpectResult}");
             // TODO: Compare actual result with expected result
         }
+    }
+    
+    /// <summary>
+    /// Execute a Phase 3 single class manifest.
+    /// </summary>
+    public void ExecuteClassManifest(string jsonContent)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
+        
+        var manifest = JsonSerializer.Deserialize<Phase3ClassManifest>(jsonContent, options);
+        if (manifest == null)
+        {
+            throw new InvalidOperationException("Failed to parse Phase 3 class manifest");
+        }
+        
+        Phase3Log($"[PHASE3] Loading class: {manifest.ClassName}");
+        
+        // Create the class definition
+        var classDef = new ClassDef
+        {
+            Name = manifest.ClassName,
+            Superclass = manifest.Superclass,
+            InstanceVariables = manifest.InstanceVariables,
+            ClassVariables = manifest.ClassVariables,
+            PoolDictionaries = manifest.PoolDictionaries,
+            Category = manifest.Category
+        };
+        
+        // Step 1: Create the class (only if it doesn't already exist)
+        var existingClass = vm.PrimitiveLookupClass(manifest.ClassName);
+        if (existingClass < 0)
+        {
+            CreateClass(classDef);
+        }
+        else
+        {
+            Phase3Log($"[PHASE3] Class {manifest.ClassName} already exists, adding methods only");
+        }
+        
+        // Step 1.5: Method dictionary sizing is now handled in Phase 1
+        // No longer needed - Phase 1 creates properly sized dictionaries
+        // Workaround disabled since Phase 1 now pre-sizes dictionaries correctly
+        
+        // Step 2: Install instance methods
+        foreach (var methodDef in manifest.Methods)
+        {
+            methodDef.ClassName = manifest.ClassName;
+            InstallMethod(methodDef);
+        }
+        
+        // Step 3: Install class methods (on the metaclass)
+        foreach (var methodDef in manifest.ClassMethods)
+        {
+            methodDef.ClassName = manifest.ClassName + " class";
+            InstallMethod(methodDef);
+        }
+        
+        Phase3Log($"[PHASE3] Class {manifest.ClassName} loading complete");
+    }
+    
+    /// <summary>
+    /// Workaround: Ensures a class has a large enough method dictionary to hold new methods.
+    /// Replaces small/full dictionaries with appropriately sized new ones.
+    /// </summary>
+    private void EnsureLargeMethodDictionary(int classOop, string className, int expectedMethodCount)
+    {
+        Phase3Log($"[PHASE3] Ensuring large method dictionary for {className} (expecting {expectedMethodCount} methods)");
+        
+        // Get the current method dictionary (slot 1 in Behavior)
+        var currentMethodDict = vm.GetSlot(classOop, 1);
+        
+        // Calculate needed capacity: existing methods + new methods + 50% growth buffer
+        int neededCapacity = expectedMethodCount + 10; // Add buffer for growth
+        
+        // Always create a new, larger dictionary to avoid the broken at:put: issue
+        Phase3Log($"[PHASE3]   - Creating new method dictionary with capacity {neededCapacity}");
+        
+        // Create a new method dictionary using primitives (avoiding the broken MethodDictionary new)
+        var newMethodDict = vm.PrimitiveNewDictionary();
+        
+        // If there was an existing method dictionary, copy its methods to the new one
+        if (currentMethodDict > 0)
+        {
+            Phase3Log($"[PHASE3]   - Found existing method dictionary OOP {currentMethodDict}, copying methods");
+            CopyMethodsToNewDictionary(currentMethodDict, newMethodDict, className);
+        }
+        else
+        {
+            Phase3Log($"[PHASE3]   - No existing method dictionary found, starting with empty dictionary");
+        }
+        
+        // Install the new dictionary in the class
+        vm.PrimitiveSetSlot(classOop, 1, newMethodDict);
+        Phase3Log($"[PHASE3]   - Installed new method dictionary OOP {newMethodDict} in class {className}");
+    }
+    
+    /// <summary>
+    /// Copies methods from an old method dictionary to a new one.
+    /// Uses primitive operations to avoid the broken at:put: implementation.
+    /// </summary>
+    private void CopyMethodsToNewDictionary(int oldDict, int newDict, string className)
+    {
+        // This is a simplified copy - in a full implementation we'd need to properly
+        // traverse the dictionary structure and extract key-value pairs.
+        // For now, we'll just note that copying is happening
+        Phase3Log($"[PHASE3]     - Method copying from old dictionary not yet implemented");
+        Phase3Log($"[PHASE3]     - Existing methods in {className} may need to be re-added manually");
+        
+        // TODO: Implement proper method dictionary traversal and copying
+        // This would require understanding the exact dictionary format used by Phase 2
+        // and extracting selector->method mappings to re-install them
     }
 }

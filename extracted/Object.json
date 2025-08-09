@@ -1,0 +1,1204 @@
+{
+  "ClassName": "Object",
+  "Superclass": "nil",
+  "InstanceVariables": [],
+  "ClassVariables": [
+    "DependentsFields",
+    "ErrorRecursion"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Objects",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "=anObject^self==anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        }
+      ]
+    },
+    {
+      "Selector": "==",
+      "Source": "==anObject\u003Cprimitive: 110\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 110,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "~=",
+      "Source": "~=anObject^self=anObject==false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B6 22 C6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "=="
+        },
+        false
+      ]
+    },
+    {
+      "Selector": "~~",
+      "Source": "~~anObject^(self==anObject)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 C6 D1 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "addDependent:",
+      "Source": "addDependent:anObject(DependentsFieldsat:selfifAbsent:[selfsetDependents])add:anObject.^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 89 00 02 42 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "selfifAbsent:"
+        },
+        {
+          "Value": "DependentsFieldsat"
+        },
+        {
+          "Value": "selfsetDependents"
+        }
+      ]
+    },
+    {
+      "Selector": "asOop",
+      "Source": "asOop\u003Cprimitive: 75\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 75,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at:index\u003Cprimitive: 60\u003EindexisIntegerifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfat:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 60,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "indexisIntegerifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:indexput:value\u003Cprimitive: 61\u003EindexisIntegerifTrue:[(index\u003E=1and:[index\u003C=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfat:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "basicAt:",
+      "Source": "basicAt:index\u003Cprimitive: 60\u003E(indexisKindOf:Integer)ifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 60,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "Integer"
+        },
+        {
+          "Value": "indexisKindOf"
+        }
+      ]
+    },
+    {
+      "Selector": "basicAt:put:",
+      "Source": "basicAt:indexput:value\u003Cprimitive: 61\u003E(indexisKindOf:Integer)ifTrue:[(index\u003E=1and:[index\u003C=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "basicInspect",
+      "Source": "basicInspectInspectorViewopen:(Inspectorinspect:self)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "basicSize",
+      "Source": "basicSize\u003Cprimitive: 62\u003E^0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 62,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "become:",
+      "Source": "become:otherObject\u003Cprimitive: 72\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 72,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "breakDependents",
+      "Source": "breakDependentsDependentsFieldsremoveKey:selfifAbsent:[]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 20 7D",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "broadcast:",
+      "Source": "broadcast:aSymbolselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbol]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "broadcast:with:",
+      "Source": "broadcast:aSymbolwith:anObjectselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbolwith:anObject]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "~~"
+        },
+        {
+          "Value": "anObjectselfdependents"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "changed",
+      "Source": "changedselfchanged:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "changed:",
+      "Source": "changed:aParameterselfdependentsdo:[:aDependent|aDependentupdate:aParameter]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "aParameter"
+        },
+        {
+          "Value": "aDependentupdate"
+        }
+      ]
+    },
+    {
+      "Selector": "changeRequest",
+      "Source": "changeRequestselfdependentsdo:[:dep|depupdateRequestifFalse:[^false]].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "false"
+        },
+        {
+          "Value": "depupdateRequestifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "changeRequestFrom:",
+      "Source": "changeRequestFrom:requestorselfdependentsdo:[:dep|(dep==requestoror:[depupdateRequest])ifFalse:[^false]].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 05 42 43 C6 D1 7D",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "depupdateRequest"
+        },
+        {
+          "Value": "dep"
+        },
+        {
+          "Value": "requestoror"
+        }
+      ]
+    },
+    {
+      "Selector": "class",
+      "Source": "class\u003Cprimitive: 111\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 111,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "confirm:",
+      "Source": "confirm:aString|answer|answer_false.BinaryChoicemessage:aStringdisplayAt:SensorcursorPointcentered:trueifTrue:[answer_true]ifFalse:[answer_false].^answer!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 41 7C",
+      "Literals": [
+        false,
+        {
+          "Value": "BinaryChoicemessage"
+        }
+      ]
+    },
+    {
+      "Selector": "conflictingInheritanceError",
+      "Source": "conflictingInheritanceErrorselferror:\u0027Conflicting methods due to multiple inheritance\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy^selfshallowCopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfshallowCopy"
+        }
+      ]
+    },
+    {
+      "Selector": "deepCopy",
+      "Source": "deepCopy|newObjectclassindex|class_selfclass.(class==Object)ifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index\u003E0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index)deepCopy.index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index\u003E0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index)deepCopy.index_index-1].^newObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 88 81 60 03 87 69 43 44 C6 89 00 03 70 7D 7D E1 69 45 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfclass"
+        },
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "Object"
+        },
+        {
+          "Value": "classisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "dependents",
+      "Source": "dependents^DependentsFieldsat:selfifAbsent:[OrderedCollectionnew]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "doesNotUnderstand:",
+      "Source": "doesNotUnderstand:aMessage|statusgripe|status_selfclasstryCopyingCodeFor:aMessageselector.status==#OKifTrue:[^selfperform:aMessageselectorwithArguments:aMessagearguments].gripe_status==#HierarchyViolationifTrue:[aMessageselectorclassPart,\u0027 is not one of my superclasses: \u0027]ifFalse:[\u0027Message not understood: \u0027].NotifierViewopenContext:thisContextlabel:gripe,aMessageselectorcontents:thisContextshortStack.^selfperform:aMessageselectorwithArguments:aMessagearguments!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfclasstryCopyingCodeFor"
+        },
+        {
+          "Value": "status"
+        }
+      ]
+    },
+    {
+      "Selector": "error:",
+      "Source": "error:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "errorImproperStore",
+      "Source": "errorImproperStoreselferror:\u0027Improper store into indexable object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNonIntegerIndex",
+      "Source": "errorNonIntegerIndexselferror:\u0027only integers should be used as indices\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorSubscriptBounds:",
+      "Source": "errorSubscriptBounds:indexselferror:\u0027subscript is out of bounds: \u0027,indexprintString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 42 E1 7C",
+      "Literals": [
+        "subscript is out of bounds: ",
+        {
+          "Value": ","
+        },
+        {
+          "Value": "indexprintString"
+        }
+      ]
+    },
+    {
+      "Selector": "forkEmergencyEvaluatorAt:",
+      "Source": "forkEmergencyEvaluatorAt:priority|streamchar|[Displaywhite:(0@0extent:1024@36).\u0027EMERGENCY EVALUATOR (priority \u0027,priorityprintString,\u0027) -- type an expression terminated by ESC\u0027displayAt:50@0.Displayreverse:(0@0extent:1024@36).stream_WriteStreamon:Stringnew.[[SensorkeyboardPressed]whileFalse.(char_Sensorkeyboard)=160asCharacter]whileFalse:[char=CharacterbackspaceifTrue:[streamskip:-1.Displayblack:(0@18extent:1024@18)]ifFalse:[streamnextPut:char].streamcontentsdisplayAt:50@18].Displayblack:(0@0extent:1024@18).(Compilerevaluate:streamcontents)printStringdisplayAt:50@0]forkAt:priority!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 45 7D 21 BB 23 24 BB E2 7C",
+      "Literals": [
+        {
+          "Value": "@"
+        },
+        0,
+        {
+          "Value": "extent:"
+        },
+        1024,
+        36,
+        {
+          "Value": "Displaywhite"
+        }
+      ]
+    },
+    {
+      "Selector": "halt",
+      "Source": "haltNotifierViewopenContext:thisContextlabel:\u0027Halt encountered.\u0027contents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 42 E1 7C",
+      "Literals": [
+        "Halt encountered.",
+        {
+          "Value": "contents:"
+        },
+        {
+          "Value": "thisContextshortStack"
+        }
+      ]
+    },
+    {
+      "Selector": "halt:",
+      "Source": "halt:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash\u003Cprimitive: 75\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 75,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^mapnewHashFor:selfhash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "inspect",
+      "Source": "inspectselfbasicInspect!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "instVarAt:",
+      "Source": "instVarAt:index\u003Cprimitive: 73\u003E^selfbasicAt:index-selfclassinstSize!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 73,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "instVarAt:put:",
+      "Source": "instVarAt:anIntegerput:anObject\u003Cprimitive: 74\u003E^selfbasicAt:anInteger-selfclassinstSizeput:anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "isInteger",
+      "Source": "isInteger^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isKindOf:",
+      "Source": "isKindOf:aClassselfclass==aClassifTrue:[^true]ifFalse:[^selfclassinheritsFrom:aClass]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "isLiteral",
+      "Source": "isLiteral^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isMemberOf:",
+      "Source": "isMemberOf:aClass^selfclass==aClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 10 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfclass"
+        }
+      ]
+    },
+    {
+      "Selector": "isNil",
+      "Source": "isNil^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "mustBeBoolean",
+      "Source": "mustBeBooleanselferror:\u0027NonBoolean receiver--proceed for truth.\u0027.^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "nextInstance",
+      "Source": "nextInstance\u003Cprimitive: 78\u003E^nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 78,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "nilFields",
+      "Source": "nilFieldsselfclassisPointersifFalse:[^self].1to:selfbasicSizedo:[:index|selfbasicAt:indexput:nil].1to:selfclassinstSizedo:[:index|selfinstVarAt:indexput:nil].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 70 7D 7D 69 20 42 E1 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "selfbasicSizedo"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:",
+      "Source": "notify:aStringNotifierViewopenContext:thisContextlabel:\u0027Notifier\u0027contents:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "notNil",
+      "Source": "notNil^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "perform:",
+      "Source": "perform:aSymbol\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraynew:0)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 83,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "perform:with:",
+      "Source": "perform:aSymbolwith:anObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:anObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:with:with:",
+      "Source": "perform:aSymbolwith:firstObjectwith:secondObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:with:with:with:",
+      "Source": "perform:aSymbolwith:firstObjectwith:secondObjectwith:thirdObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObjectwith:thirdObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:withArguments:",
+      "Source": "perform:selectorwithArguments:anArray\u003Cprimitive: 84\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anArray"
+        }
+      ]
+    },
+    {
+      "Selector": "primitiveError:",
+      "Source": "primitiveError:aString|contextkey|Transcriptcr.Transcriptshow:\u0027**System Error Handling Failed** \u0027.Transcriptshow:aString.Transcriptcr.context_thisContextsendersender.3timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]].[Transcriptshow:\u0027**type \u003Cs\u003E for more stack; anything else restarts scheduler**\u0027.Transcriptcr.key_Sensorkeyboard.key=$s|(key=$S)]whileTrue:[5timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]]].ScheduledControllerssearchForActiveController!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "Transcriptcr"
+        },
+        {
+          "Value": "Transcriptshow"
+        }
+      ]
+    },
+    {
+      "Selector": "primitiveFailed",
+      "Source": "primitiveFailedselferror:\u0027a primitive has failed\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|title|title_selfclassname.aStreamnextPutAll:((titleat:1)isVowelifTrue:[\u0027an \u0027]ifFalse:[\u0027a \u0027]),title!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfclassname"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "printString",
+      "Source": "printString|aStream|aStream_WriteStreamon:(Stringnew:16).selfprintOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "readFromString:",
+      "Source": "readFromString:aString^selfreadFrom:(ReadStreamon:aString)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "release",
+      "Source": "releaseselfbreakDependents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeDependent:",
+      "Source": "removeDependent:anObject|dependents|dependents_DependentsFieldsat:selfifAbsent:[^anObject].dependentsremove:anObjectifAbsent:[].dependentsisEmptyifTrue:[selfbreakDependents].^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "DependentsFieldsat"
+        }
+      ]
+    },
+    {
+      "Selector": "respondsTo:",
+      "Source": "respondsTo:aSymbol^selfclasscanUnderstand:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "setDependents",
+      "Source": "setDependents|dependents|dependents_OrderedCollectionnew.DependentsFieldsadd:(Associationkey:selfvalue:dependents).^dependents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "DependentsFieldsadd"
+        }
+      ]
+    },
+    {
+      "Selector": "shallowCopy",
+      "Source": "shallowCopy|classnewObjectindex|class_selfclass.class==ObjectifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index\u003E0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index).index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index\u003E0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index).index_index-1].^newObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 69 42 43 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfclass"
+        },
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "ObjectifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "shouldNotImplement",
+      "Source": "shouldNotImplementselferror:\u0027This message is not appropriate for this object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "size",
+      "Source": "size\u003Cprimitive: 62\u003E^0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 62,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "species",
+      "Source": "species^selfclass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclass"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamaStreamnextPut:$(.selfclassisVariableifTrue:[aStreamnextPutAll:\u0027(\u0027,selfclassname,\u0027 basicNew: \u0027;store:selfbasicSize;nextPutAll:\u0027) \u0027]ifFalse:[aStreamnextPutAll:selfclassname,\u0027 basicNew\u0027].1to:selfclassinstSizedo:[:i|aStreamnextPutAll:\u0027 instVarAt: \u0027;store:i;nextPutAll:\u0027 put: \u0027;store:(selfinstVarAt:i);nextPut:$;].1to:selfbasicSizedo:[:i|aStreamnextPutAll:\u0027 basicAt: \u0027;store:i;nextPutAll:\u0027 put: \u0027;store:(selfbasicAt:i);nextPut:$;].aStreamnextPutAll:\u0027 yourself)\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 69 41 7C",
+      "Literals": [
+        "(",
+        {
+          "Value": "selfclassisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "storeString",
+      "Source": "storeString|aStream|aStream_WriteStreamon:(Stringnew:16).selfstoreOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassResponsibility",
+      "Source": "subclassResponsibilityselferror:\u0027My subclass should have overridden one of my messages.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "tryPrimitive0",
+      "Source": "tryPrimitive0\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 7,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "primitiveFail"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive1:",
+      "Source": "tryPrimitive1:arg1\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 7,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "primitiveFail"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive2:with:",
+      "Source": "tryPrimitive2:arg1with:arg2\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive3:with:with:",
+      "Source": "tryPrimitive3:arg1with:arg2with:arg3\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2with"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive4:with:with:with:",
+      "Source": "tryPrimitive4:arg1with:arg2with:arg3with:arg4\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2with"
+        }
+      ]
+    },
+    {
+      "Selector": "update:",
+      "Source": "update:aParameter^self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "updateRequest",
+      "Source": "updateRequest^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "yourself",
+      "Source": "yourself!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "howToModifyPrimitives",
+      "Source": "howToModifyPrimitivesselferror:\u0027comment only\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initialize(selfconfirm:\u0027Do you really want to initialize\r\nclass Object?  It will reset all dependents.\u0027)ifTrue:[selfinitializeDependentsFields.selfinitializeErrorRecursion]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 89 00 04 42 68 43 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfconfirm"
+        },
+        {
+          "Value": "selfinitializeDependentsFields"
+        },
+        {
+          "Value": "selfinitializeErrorRecursion"
+        }
+      ]
+    },
+    {
+      "Selector": "initializeDependentsFields",
+      "Source": "initializeDependentsFieldsDependentsFields_IdentityDictionarynew:4!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "IdentityDictionarynew"
+        }
+      ]
+    },
+    {
+      "Selector": "initializeErrorRecursion",
+      "Source": "initializeErrorRecursionErrorRecursion_false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "readFrom:",
+      "Source": "readFrom:aStream|object|object_Compilerevaluate:aStream.(objectisKindOf:self)ifFalse:[selferror:selfname,\u0027 expected\u0027].^object!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "Compilerevaluate"
+        }
+      ]
+    },
+    {
+      "Selector": "whatIsAPrimitive",
+      "Source": "whatIsAPrimitiveselferror:\u0027comment only\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 84,
+    "SuccessfullyCompiled": 84,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:32:34.0251497Z"
+  }
+}

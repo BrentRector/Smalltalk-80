@@ -1,0 +1,928 @@
+{
+  "ClassName": "CompiledMethod",
+  "Superclass": "ByteArray",
+  "InstanceVariables": [],
+  "ClassVariables": [
+    "BytesForHeader",
+    "BytesPerLiteral",
+    "LargeFrame",
+    "SmallFrame",
+    "SpecialConstants",
+    "TempNameCache"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Methods",
+  "InstanceMethods": [
+    {
+      "Selector": "cacheTempNames:",
+      "Source": "cacheTempNames:namesTempNameCache_Associationkey:selfvalue:names!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Associationkey"
+        }
+      ]
+    },
+    {
+      "Selector": "endPC",
+      "Source": "endPC(selflastbetween:120and:124)ifTrue:[^selfsize].^selfsize-3!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "and:"
+        },
+        124,
+        {
+          "Value": "selflastbetween"
+        }
+      ]
+    },
+    {
+      "Selector": "fieldsTouched",
+      "Source": "fieldsTouched|scanneraSet|selfisReturnFieldifTrue:[^Setwith:selfreturnField\u002B1].selfisReturnSelfifTrue:[^Setnew].aSet_Setnew.scanner_InstructionStreamon:self.scannerscanFor:[:x|scanneraddFieldIndexTo:aSet.false].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisReturnFieldifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "fileIndex",
+      "Source": "fileIndex(selflastbetween:120and:124)ifTrue:[selferror:\u0027Somehow a method does not have a file index.\u0027].^selflast//64\u002B1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "and:"
+        },
+        124,
+        {
+          "Value": "selflastbetween"
+        }
+      ]
+    },
+    {
+      "Selector": "flags",
+      "Source": "flags^(selfheaderbitShift:-12)bitAnd:7!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "frameSize",
+      "Source": "frameSizeselfneedsLargeFrameifTrue:[^LargeFrame]ifFalse:[^SmallFrame]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 41 7D 7D 89 00 03 42 7D 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "LargeFrame"
+        },
+        {
+          "Value": "SmallFrame"
+        }
+      ]
+    },
+    {
+      "Selector": "getSource",
+      "Source": "getSource|endhighBytepositionsource|SourceFiles==nilifTrue:[^nil].CursorreadshowWhile:[end_selfsize.highByte_selfat:end.position_highBytebitAnd:63.position_position*256\u002B(selfat:end-1).position_position*256\u002B(selfat:end-2).position=0ifTrue:[source_nil]ifFalse:[source_(RemoteStringnewFileNumber:(highBytebitShift:-6)\u002B1position:position)string]].^source!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "header",
+      "Source": "header^selfobjectAt:1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "initialPC",
+      "Source": "initialPC^selfnumLiterals*BytesPerLiteral\u002BBytesForHeader\u002B1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 44 B8 45 B0 22 B0 7C",
+      "Literals": [
+        {
+          "Value": "*"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "selfnumLiterals"
+        },
+        {
+          "Value": "BytesPerLiteral"
+        },
+        {
+          "Value": "BytesForHeader"
+        }
+      ]
+    },
+    {
+      "Selector": "isQuick",
+      "Source": "isQuick^selfflagsbetween:5and:6!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isReturnField",
+      "Source": "isReturnField^selfflags=6!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        6,
+        {
+          "Value": "selfflags"
+        }
+      ]
+    },
+    {
+      "Selector": "isReturnSelf",
+      "Source": "isReturnSelf^selfflags=5!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        5,
+        {
+          "Value": "selfflags"
+        }
+      ]
+    },
+    {
+      "Selector": "literalAt:",
+      "Source": "literalAt:index^selfobjectAt:index\u002B1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "literalAt:put:",
+      "Source": "literalAt:indexput:value^selfobjectAt:index\u002B1put:value!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "literals",
+      "Source": "literals|literalsnumberLiteralsindex|literals_Arraynew:(numberLiterals_selfnumLiterals).index_0.[(index_index\u002B1)\u003C=numberLiterals]whileTrue:[literalsat:indexput:(selfobjectAt:index\u002B1)].^literals!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "Arraynew"
+        },
+        {
+          "Value": "literals"
+        }
+      ]
+    },
+    {
+      "Selector": "messages",
+      "Source": "messages|scanneraSet|aSet_Setnew.scanner_InstructionStreamon:self.scannerscanFor:[:x|scanneraddSelectorTo:aSet.false].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 69 42 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "aSet"
+        },
+        {
+          "Value": "InstructionStreamon"
+        },
+        {
+          "Value": "scanner"
+        }
+      ]
+    },
+    {
+      "Selector": "needsLargeFrame",
+      "Source": "needsLargeFrame^selfheaderallMask:64!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "needsStack:encoder:",
+      "Source": "needsStack:newStackSizeencoder:encoder|newMethodnewNumLitsextraByteslargeBit|(selfnumTemps\u002BnewStackSize\u002B1)\u003C=SmallFrameifTrue:[^self].(selfnumTemps\u002BnewStackSize\u002B1)\u003ELargeFrameifTrue:[^selferror:\u0027Stack (including temps) is too deep\u0027].newMethod_CompiledMethodnewBytes:selfendPC-selfinitialPC\u002B1flags:selfflagsnTemps:selfnumTempsnStack:newStackSizenLits:selfnumLiterals.1to:selfnumLiteralsdo:[:index|newMethodliteralAt:indexput:(selfliteralAt:index)].extraBytes_0.selfinitialPCto:selfsizedo:[:index|newMethodat:index\u002BextraBytesput:(selfat:index)].selfbecome:newMethod!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 45 E0 46 47 B0 22 B0 E0 48 B4 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "encoder"
+        },
+        {
+          "Value": "newMethodnewNumLitsextraByteslargeBit"
+        },
+        {
+          "Value": "selfnumTemps"
+        },
+        {
+          "Value": "newStackSize"
+        },
+        {
+          "Value": "SmallFrameifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "numArgs",
+      "Source": "numArgs|flags|(flags_selfflags)\u003C=4ifTrue:[^flags].flags\u003C7ifTrue:[^0].^((selfliteralAt:selfnumLiterals-1)bitShift:-8)bitAnd:31!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "4B 88 68 21 B4 89 00 03 10 7D 7D E2 69 10 24 B2 89 00 03 25 7D 7D E2 69 4C D6 28 B1 BC 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        4,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "\u003C"
+        },
+        7,
+        0,
+        {
+          "Value": "selfnumLiterals"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "bitShift:"
+        },
+        8,
+        {
+          "Value": "selfflags"
+        },
+        {
+          "Value": "selfliteralAt"
+        }
+      ]
+    },
+    {
+      "Selector": "numLiterals",
+      "Source": "numLiteralsselfisQuickifTrue:[^0].^selfheaderbitAnd:63!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 20 7D 7D 69 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfheaderbitAnd"
+        }
+      ]
+    },
+    {
+      "Selector": "numStack",
+      "Source": "numStackselfisQuickifTrue:[^0]ifFalse:[^selfframeSize-selfnumTemps-selfnumArgs]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 20 7D 7D 89 00 07 43 44 B1 45 B1 7D 7D E1 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "selfframeSize"
+        },
+        {
+          "Value": "selfnumTemps"
+        },
+        {
+          "Value": "selfnumArgs"
+        }
+      ]
+    },
+    {
+      "Selector": "numTemps",
+      "Source": "numTempsselfisQuickifTrue:[^0]ifFalse:[^selfnumTempsField]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 20 7D 7D 89 00 03 42 7D 7D E1 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "selfnumTempsField"
+        }
+      ]
+    },
+    {
+      "Selector": "numTempsField",
+      "Source": "numTempsField^selfheader//128bitAnd:31!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 21 BD 23 BE 7C",
+      "Literals": [
+        {
+          "Value": "//"
+        },
+        128,
+        {
+          "Value": "bitAnd:"
+        },
+        31,
+        {
+          "Value": "selfheader"
+        }
+      ]
+    },
+    {
+      "Selector": "objectAt:",
+      "Source": "objectAt:index\u003Cprimitive: 68\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 68,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "objectAt:put:",
+      "Source": "objectAt:indexput:value\u003Cprimitive: 69\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "primitive",
+      "Source": "primitiveselfflags\u003C7ifTrue:[^0]ifFalse:[^(selfliteralAt:selfnumLiterals-1)bitAnd:255]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 03 22 7D 7D 89 00 06 47 D3 25 B1 7D 7D 26 83 61 7C",
+      "Literals": [
+        7,
+        {
+          "Value": "ifTrue:ifFalse:bitAnd:"
+        },
+        0,
+        {
+          "Value": "selfnumLiterals"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        255,
+        {
+          "Value": "selfliteralAt"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamaStreamnextPutAll:\u0027a CompiledMethod\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "putSource:class:category:inFile:",
+      "Source": "putSource:sourceStrclass:classcategory:catNameinFile:fileIndex|fileremoteString|SourceFiles==nilifTrue:[^self].file_SourceFilesat:fileIndex.filesetToEnd;readWriteShorten.classprintCategoryChunk:catNameon:file.filecr.remoteString_RemoteStringnewString:sourceStronFileNumber:fileIndextoFile:file.filenextChunkPut:\u0027 \u0027;readOnly.selfsetSourcePosition:remoteStringpositioninFile:fileIndex!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classcategory"
+        }
+      ]
+    },
+    {
+      "Selector": "putSource:inFile:",
+      "Source": "putSource:sourceStrinFile:fileIndex|fileremoteString|SourceFiles==nilifTrue:[^self].file_SourceFilesat:fileIndex.filesetToEnd;readWriteShorten.filecr;nextPut:$!!;nextChunkPut:\u0027Behavior method\u0027;cr.remoteString_RemoteStringnewString:sourceStronFileNumber:fileIndextoFile:file.filenextChunkPut:\u0027 \u0027;readOnly.selfsetSourcePosition:remoteStringpositioninFile:fileIndex!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 43 E0 44 E0 45 C6 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "fileIndex"
+        },
+        {
+          "Value": "fileremoteString"
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "readsField:",
+      "Source": "readsField:varIndexselfisReturnFieldifTrue:[^selfreturnField\u002B1=varIndex].varIndex\u003C=16ifTrue:[^selfscanFor:varIndex-1].^selfscanLongLoad:varIndex-1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 07 48 21 B0 46 B6 7D 7D 69 46 24 B4 89 00 03 49 7D 7D D6 21 B1 E5 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "="
+        },
+        {
+          "Value": "\u003C="
+        },
+        16,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "varIndex"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "selfreturnField"
+        },
+        {
+          "Value": "selfscanFor"
+        }
+      ]
+    },
+    {
+      "Selector": "readsRef:",
+      "Source": "readsRef:literalAssociation|lit|lit_selfliteralsindexOf:literalAssociationifAbsent:[^false].lit\u003C=32ifTrue:[^selfscanFor:64\u002Blit-1].^selfscanLongLoad:192\u002Blit-1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfliteralsindexOf"
+        }
+      ]
+    },
+    {
+      "Selector": "refersToLiteral:",
+      "Source": "refersToLiteral:literal|flagsheadernumLiteralsPlus1index|header_selfobjectAt:1.flags_(headerbitShift:-12)bitAnd:7.(flags=6or:[flags=5])ifTrue:[^false].numLiteralsPlus1_(headerbitAnd:63)\u002B1.index_1.[(index_index\u002B1)\u003C=numLiteralsPlus1]whileTrue:[literal==(selfobjectAt:index)ifTrue:[index\u003CnumLiteralsPlus1ifTrue:[^true].^(literalisMemberOf:Association)notor:[(selfreadsRef:literal)or:[selfwritesRef:literal]]]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfobjectAt"
+        },
+        {
+          "Value": "header"
+        }
+      ]
+    },
+    {
+      "Selector": "returnField",
+      "Source": "returnFieldselfflags~=6ifTrue:[selferror:\u0027only meaningful for quick-return\u0027]ifFalse:[^selfnumTempsField]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 02 42 7D 89 00 03 43 7D 7D F1 7C",
+      "Literals": [
+        6,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "selferror"
+        },
+        {
+          "Value": "selfnumTempsField"
+        }
+      ]
+    },
+    {
+      "Selector": "scanFor:",
+      "Source": "scanFor:byte|instr|^(InstructionStreamon:self)scanFor:[:instr|instr=byte]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "scanLongLoad:",
+      "Source": "scanLongLoad:extension|scanner|scanner_InstructionStreamon:self.^scannerscanFor:[:instr|instr=128and:[scannerfollowingByte=extension]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "InstructionStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "scanLongStore:",
+      "Source": "scanLongStore:extension|scanner|scanner_InstructionStreamon:self.^scannerscanFor:[:instr|(instrbetween:129and:130)and:[scannerfollowingByte=extension]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "InstructionStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "setSourcePosition:inFile:",
+      "Source": "setSourcePosition:positioninFile:fileIndex|indexhiBytemiddleBytelowByte|fileIndex\u003E4ifTrue:[^selferror:\u0027invalid file number\u0027].index_selfsize-2.middleByte_positionbitShift:-8.hiByte_middleBytebitShift:-8.middleByte_middleBytebitAnd:255.lowByte_positionbitAnd:255.hiByte\u003E62ifTrue:[Transcriptshow:\u0027Source file is getting full!!!!\u0027;cr].selfat:index\u002B2put:fileIndex-1*64\u002BhiByte.selfat:index\u002B1put:middleByte.selfat:indexput:lowByte!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 47 E0 46 E0 22 B3 89 00 03 48 7D 7D E3 69 49 25 B1 88 81 60 0A 87 69 4B 88 81 60 0C 87 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "\u003E"
+        },
+        4,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "-"
+        },
+        2,
+        {
+          "Value": "fileIndex"
+        },
+        {
+          "Value": "indexhiBytemiddleBytelowByte"
+        },
+        {
+          "Value": "selferror"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "positionbitShift"
+        },
+        {
+          "Value": "middleByte"
+        }
+      ]
+    },
+    {
+      "Selector": "setTempNamesIfCached:",
+      "Source": "setTempNamesIfCached:aBlockTempNameCache==nilifTrue:[^self].TempNameCachekey==selfifTrue:[aBlockvalue:TempNameCachevalue]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStream|noneYetindex|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 newMethod: \u0027.aStreamstore:selfsize-selfinitialPC\u002B1.aStreamnextPutAll:\u0027 header: \u0027.aStreamstore:selfheader.aStreamnextPut:$).noneYet_selfstoreElementsFrom:selfinitialPCto:selfendPCon:aStream.1to:selfnumLiteralsdo:[:index|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 literalAt: \u0027.aStreamstore:index.aStreamnextPutAll:\u0027 put: \u0027.aStreamstore:(selfliteralAt:index)].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "symbolic",
+      "Source": "symbolic|aStream|selfisQuickifTrue:[selfisReturnSelfifTrue:[^\u0027Quick return self\u0027].^\u0027Quick return field \u0027,selfreturnFieldprintString,\u0027 (0-based)\u0027].aStream_WriteStreamon:(Stringnew:1000).selfprimitive\u003E0ifTrue:[aStreamnextPutAll:\u0027\u003Cprimitive: \u0027.aStreamprint:selfprimitive.aStreamnextPut:$\u003E.aStreamcr].(InstructionPrinteron:self)printInstructionsOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisQuickifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "who",
+      "Source": "whoSmalltalkallBehaviorsDo:[:class|classselectorsdo:[:sel|(classcompiledMethodAt:sel)==selfifTrue:[^Arraywith:classwith:sel]]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 42 7D D0 D0 43 E1 7C",
+      "Literals": [
+        {
+          "Value": "sel"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "classselectorsdo"
+        },
+        {
+          "Value": "classcompiledMethodAt"
+        }
+      ]
+    },
+    {
+      "Selector": "writesField:",
+      "Source": "writesField:fieldselfisQuickifTrue:[^false].(field\u003C=8and:[selfscanFor:96\u002Bfield-1])ifTrue:[^true]ifFalse:[^selfscanLongStore:field-1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 28 7D 7D 69 47 21 B4 89 00 02 49 7D 47 B0 25 B1 E2 89 00 03 2A 7D 7D 89 00 03 4B 7D 7D D7 25 B1 F6 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        8,
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "field"
+        },
+        false,
+        {
+          "Value": "selfscanFor"
+        },
+        true,
+        {
+          "Value": "selfscanLongStore"
+        }
+      ]
+    },
+    {
+      "Selector": "writesRef:",
+      "Source": "writesRef:ref|lit|lit_selfliteralsindexOf:refifAbsent:[^false].^selfscanLongStore:192\u002Blit-1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfliteralsindexOf"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "initialize",
+      "Source": "initializeSmallFrame_12.LargeFrame_32.BytesForHeader_(selfnewMethod:0header:0)size.BytesPerLiteral_(selfnewMethod:0header:1)size-BytesForHeader.!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 68 21 88 81 60 04 87 68 45 23 E2 88 81 60 06 87 7C",
+      "Literals": [
+        12,
+        32,
+        {
+          "Value": "header:"
+        },
+        0,
+        {
+          "Value": "LargeFrame"
+        },
+        {
+          "Value": "selfnewMethod"
+        },
+        {
+          "Value": "BytesForHeader"
+        }
+      ]
+    },
+    {
+      "Selector": "newBytes:flags:nTemps:nStack:nLits:",
+      "Source": "newBytes:numberOfBytesflags:flagsnTemps:numberTempsnStack:stackSpacenLits:numberLiterals|flagBits|flags\u003E=4ifTrue:[flagBits_flags-8]ifFalse:[flagBits_flags].^selfnewMethod:numberOfBytes\u002B3header:flagBits*4096\u002B(numberTemps*128)\u002B(numberTemps\u002BstackSpace\u003ESmallFrameifTrue:[64]ifFalse:[0])\u002BnumberLiterals!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "flagsnTemps"
+        }
+      ]
+    },
+    {
+      "Selector": "newMethod:header:",
+      "Source": "newMethod:numberOfBytesheader:headerWord\u003Cprimitive: 79\u003E^selfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "headerWord"
+        }
+      ]
+    },
+    {
+      "Selector": "toReturnField:",
+      "Source": "toReturnField:field^selfnewBytes:0flags:6nTemps:fieldnStack:0nLits:0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "toReturnSelf",
+      "Source": "toReturnSelf^selfnewBytes:0flags:5nTemps:0nStack:0nLits:0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 48,
+    "SuccessfullyCompiled": 48,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:09:50.4078733Z"
+  }
+}

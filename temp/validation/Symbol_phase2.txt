@@ -1,0 +1,256 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+√ Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+Showing 1 filtered classes (of 33 total)
+
+================================================================================
+Class: Symbol
+================================================================================
+  Superclass: String
+
+  Methods (23):
+  ----------------------------------------------------------------------------
+  =
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#==]
+    Bytecode (4 bytes):
+      0000: pushReceiver
+      0001: pushTemp: 0
+      0002: sendSpecial: ==
+      0003: returnTop
+
+  asString
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#Stringnew]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #Stringnew
+      0001: duplicate
+      0002: popIntoTemp: 0
+      0003: returnTop
+
+  asSymbol
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  at:put:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#anObjectselferrorNoModification]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #anObjectselferrorNoModification
+      0001: returnTop
+
+  classPart
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#selfindexOf]
+    Bytecode (4 bytes):
+      0000: pushLiteralVariable: #selfindexOf
+      0001: duplicate
+      0002: popIntoTemp: 0
+      0003: returnTop
+
+  copy
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  errorNoModification
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  hash
+    Args: 23, Temps: 4, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  hashMappedBy:
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  isCompound
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  isInfix
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  isKeyword
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#1, #ifTrue:, #selfsize, #False, #selfat]
+    Bytecode (12 bytes):
+      0000: pushConstant: #1
+      0001: pushActiveContext
+      0002: pushRcvrVariable: 0
+      0003: pushRcvrVariable: 3
+      0004: pushConstant: #False
+      0005: returnTopFromBlock
+      0006: returnTopFromBlock
+      0007: send: #ifTrue: args: 1
+      0008: popIntoTemp: 0
+      0009: pushLiteralVariable: #selfat
+      0010: send: #selfsize args: 0
+      0011: returnTop
+
+  isLiteral
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  keywords
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#WriteStreamon, #result]
+    Bytecode (7 bytes):
+      0000: pushLiteralVariable: #WriteStreamon
+      0001: duplicate
+      0002: extStoreTemp: 32
+      0004: pushRcvrVariable: 1
+      0005: pop
+      0006: returnTop
+
+  numArgs
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#isLetterifTrue:ifFalse:, #0, #1, #+, #<=, #whileTrue:ifTrue:, #i, #=, #selfsize, #len, #selfat, #n, #:]
+    Bytecode (68 bytes):
+      0000: pushLiteralVariable: #selfsize
+      0001: duplicate
+      0002: extStoreTemp: 32
+      0004: pushRcvrVariable: 9
+      0005: pop
+      0006: popIntoTemp: 1
+      0007: pushLiteralVariable: #selfat
+      0008: pushActiveContext
+      0009: pushRcvrVariable: 0
+      0010: pushRcvrVariable: 2
+      0011: pushConstant: #0
+      0012: returnTopFromBlock
+      0013: pushActiveContext
+      0014: pushRcvrVariable: 0
+      0015: pushRcvrVariable: 2
+      0016: pushConstant: #1
+      0017: returnTopFromBlock
+      0018: send: #isLetterifTrue:ifFalse: args: 2
+      0019: duplicate
+      0020: extStoreTemp: 32
+      0022: pushRcvrVariable: 11
+      0023: pop
+      0024: popIntoTemp: 1
+      0025: pushConstant: #1
+      0026: duplicate
+      0027: extStoreTemp: 32
+      0029: pushRcvrVariable: 6
+      0030: pop
+      0031: popIntoTemp: 1
+      0032: pushActiveContext
+      0033: pushRcvrVariable: 0
+      0034: pushRcvrVariable: 11
+      0035: pushLiteralVariable: #i
+      0036: pushConstant: #1
+      0037: sendArithmetic: +
+      0038: duplicate
+      0039: extStoreTemp: 32
+      0041: pushRcvrVariable: 6
+      0042: pop
+      0043: pushLiteralVariable: #len
+      0044: sendArithmetic: <=
+      0045: returnTopFromBlock
+      0046: pushActiveContext
+      0047: pushRcvrVariable: 0
+      0048: pushRcvrVariable: 3
+      0049: pushLiteralVariable: #selfat
+      0050: send: #i args: 0
+      0051: returnTopFromBlock
+      0052: pushConstant: #:
+      0053: sendArithmetic: =
+      0054: pushActiveContext
+      0055: pushRcvrVariable: 0
+      0056: pushRcvrVariable: 9
+      0057: pushLiteralVariable: #n
+      0058: pushConstant: #1
+      0059: sendArithmetic: +
+      0060: duplicate
+      0061: extStoreTemp: 32
+      0063: pushRcvrVariable: 11
+      0064: pop
+      0065: returnTopFromBlock
+      0066: send: #whileTrue:ifTrue: args: 2
+      0067: returnTop
+
+  printOn:
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  replaceFrom:to:with:startingAt:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#stopwith]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #stopwith
+      0001: returnTop
+
+  selectorPart
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  shallowCopy
+    Args: 1, Temps: 0, Primitive: 0
+    Bytecode (2 bytes):
+      0000: pushReceiver
+      0001: returnTop
+
+  species
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#String]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #String
+      0001: returnTop
+
+  storeOn:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aStreamnextPut, #aStreamnextPutAll]
+    Bytecode (8 bytes):
+      0000: pushActiveContext
+      0001: pushRcvrVariable: 0
+      0002: pushRcvrVariable: 2
+      0003: pushLiteralVariable: #aStreamnextPut
+      0004: returnTopFromBlock
+      0005: popIntoTemp: 1
+      0006: pushLiteralVariable: #aStreamnextPutAll
+      0007: returnTop
+
+  string:
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#aStringsizedo]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #aStringsizedo
+      0001: returnTop
+
+  stringhash
+    Args: 1, Temps: 0, Primitive: 0
+    Literals: [#superhash]
+    Bytecode (2 bytes):
+      0000: pushLiteralVariable: #superhash
+      0001: returnTop
+
+

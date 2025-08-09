@@ -1,0 +1,630 @@
+{
+  "ClassName": "Class",
+  "Superclass": "ClassDescription",
+  "InstanceVariables": [
+    "name",
+    "classPool",
+    "sharedPools"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "addClassVarName:",
+      "Source": "addClassVarName:aStringaStringfirstisLowercaseifTrue:[^selferror:aString,\u0027 class variable name should be capitalized; proceed to include anyway.\u0027].selfwithAllSubclassesdo:[:subclass|subclasspoolHas:aStringasSymbolifTrue:[:ignored|^selferror:aString,\u0027 is already used as a variable name in \u0027,subclassname]].classPool_selfclassPool.classPooladd:(Associationkey:aStringasSymbolvalue:nil)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 43 7D 7D D0 22 E1 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": ","
+        },
+        " class variable name should be capitalized; proceed to include anyway.",
+        {
+          "Value": "selferror"
+        }
+      ]
+    },
+    {
+      "Selector": "addInstVarName:",
+      "Source": "addInstVarName:aStringsuperclassclassname:selfnameinEnvironment:SmalltalksubclassOf:superclassinstanceVariableNames:selfinstanceVariablesString,aStringvariable:selfisVariablewords:selfisWordspointers:selfisPointersclassVariableNames:selfclassVariablesStringpoolDictionaries:selfsharedPoolsStringcategory:selfcategorycomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfnameinEnvironment"
+        }
+      ]
+    },
+    {
+      "Selector": "addSharedPool:",
+      "Source": "addSharedPool:aDictionary(selfsharedPoolsincludes:aDictionary)ifTrue:[^selferror:\u0027The dictionary is already in my pool\u0027].sharedPools==nilifTrue:[sharedPools_Setwith:aDictionary]ifFalse:[sharedPoolsadd:aDictionary]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        },
+        {
+          "Value": "selfsharedPoolsincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "allClassVarNames",
+      "Source": "allClassVarNames|aSet|superclass==nilifTrue:[^selfclassVarNames]ifFalse:[aSet_superclassallClassVarNames.aSetaddAll:selfclassVarNames.^aSet]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "superclass"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "allSharedPools",
+      "Source": "allSharedPools|aSet|superclass==nilifTrue:[^selfsharedPoolscopy]ifFalse:[aSet_superclassallSharedPools.aSetaddAll:selfsharedPools.^aSet]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "superclass"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "classPool",
+      "Source": "classPoolclassPool==nilifTrue:[^Dictionarynew]ifFalse:[^classPool]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "classVarNames",
+      "Source": "classVarNames^selfclassPoolkeys!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassPoolkeys"
+        }
+      ]
+    },
+    {
+      "Selector": "compileAllFrom:",
+      "Source": "compileAllFrom:otherClasssupercompileAllFrom:otherClass.selfclasscompileAllFrom:otherClassclass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 7C",
+      "Literals": [
+        {
+          "Value": "otherClass"
+        },
+        {
+          "Value": "selfclasscompileAllFrom"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|newClass|newClass_selfclasscopynewsuperclass:superclassmethodDict:methodDictcopyformat:formatname:nameorganization:organizationcopyinstVarNames:instanceVariablescopyclassPool:classPoolcopysharedPools:sharedPools.ClassinstSizeto:selfclassinstSizedo:[:offset|newClassinstVarAt:offsetput:(selfinstVarAt:offset)].^newClass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfclasscopynewsuperclass"
+        }
+      ]
+    },
+    {
+      "Selector": "copyForValidation",
+      "Source": "copyForValidation^selfclasscopynewsuperclass:superclassmethodDict:methodDictcopyformat:formatname:nameorganization:organizationinstVarNames:instanceVariablescopyclassPool:classPoolsharedPools:sharedPools!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "declare:",
+      "Source": "declare:varString|newVarsconflictsassocclass|newVars_(ScannernewscanFieldNames:varString)collect:[:x|xasSymbol].newVarsdo:[:var|varfirstisLowercaseifTrue:[selferror:var,\u0027 class variable name should be capitalized; proceed to include anyway.\u0027]].conflicts_false.classPool==nilifFalse:[(classPoolkeysreject:[:x|newVarsincludes:x])do:[:var|selfremoveClassVarName:var]].(newVarsreject:[:var|selfclassPoolincludesKey:var])do:[:var|(selfscopeHas:varifTrue:[:ignored|ignored])ifTrue:[selferror:var,\u0027 is defined elsewhere\u0027.conflicts_true]].newVarssize\u003E0ifTrue:[classPool_selfclassPool.newVarsdo:[:var|classPooldeclare:varfrom:Undeclared]].^conflicts!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 88 81 60 02 87 7C",
+      "Literals": [
+        {
+          "Value": "varString"
+        },
+        {
+          "Value": "ScannernewscanFieldNames"
+        },
+        {
+          "Value": "newVars"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOut",
+      "Source": "fileOut|fileStream|Transcriptrefresh;cr;cr;show:\u0027Filing out class:\u0027.fileStream_Diskfile:selfname,\u0027.st\u0027.fileStreamtimeStamp.selffileOutOn:fileStreammoveSource:falsetoFile:0.fileStreamshorten;close.selfremoveFromChanges.!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 88 69 6A 11 D0 6A 11 D0 6A 11 22 E1 6A 44 88 68 7C",
+      "Literals": [
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "show:"
+        },
+        "Filing out class:",
+        {
+          "Value": "Transcriptrefresh"
+        },
+        {
+          "Value": "Diskfile"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn: moveSource: toFile:",
+      "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexTranscriptcr;show:name.superfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.selfclassnonTrivialifTrue:[aFileStreamcr;nextPutAll:\u0027\u0022-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- \u0022!!\u0027;cr;cr.selfclassfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "moveSourcetoFile"
+        }
+      ]
+    },
+    {
+      "Selector": "hasMethods",
+      "Source": "hasMethods^superhasMethodsor:[selfclasshasMethods]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hasMultipleSuperclasses",
+      "Source": "hasMultipleSuperclasses^selfclassinstHasMultipleSuperclasses!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassinstHasMultipleSuperclasses"
+        }
+      ]
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initialize^self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isObsolete",
+      "Source": "isObsolete^selfclassisObsolete!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassisObsolete"
+        }
+      ]
+    },
+    {
+      "Selector": "name",
+      "Source": "namename==nilifTrue:[^supername]ifFalse:[^name]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoleteselfisPointersifTrue:[selfallInstancesDo:[:instance|instancenilFields]].(\u0027AnObsolete*\u0027match:name)ifFalse:[name_\u0027AnObsolete\u0027,name].classPool_Dictionarynew.selfclassobsolete.superobsolete!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 40 7D",
+      "Literals": [
+        {
+          "Value": "instancenilFields"
+        }
+      ]
+    },
+    {
+      "Selector": "poolHas: ifTrue:",
+      "Source": "poolHas:varNameifTrue:assocBlock|assocpool|assoc_selfclassPoolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true].selfsharedPoolsdo:[:pool|assoc_poolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "assocBlock"
+        },
+        {
+          "Value": "assocpool"
+        },
+        {
+          "Value": "assoc"
+        }
+      ]
+    },
+    {
+      "Selector": "printOut",
+      "Source": "printOutselffileOut!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeClassVarName:",
+      "Source": "removeClassVarName:aString|anAssocaSymbol|aSymbol_aStringasSymbol.(classPoolincludesKey:aSymbol)ifFalse:[^selferror:aString,\u0027 is not a class variable\u0027].anAssoc_classPoolassociationAt:aSymbol.selfwithAllSubclassesdo:[:subclass|(Arraywith:subclasswith:subclassclass)do:[:classOrMeta|(classOrMetawhichSelectorsReferTo:(classPoolassociationAt:aSymbol))isEmptyifFalse:[^selferror:aString,\u0027 is still used in code of class \u0027,classOrMetaname]]].classPoolremoveKey:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 00 87 6A 42 D0 7C",
+      "Literals": [
+        {
+          "Value": "aSymbol"
+        },
+        {
+          "Value": "aStringasSymbol"
+        },
+        {
+          "Value": "classPoolincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "removeFromChanges",
+      "Source": "removeFromChangesSmalltalkchangesremoveClassChanges:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeFromSystem",
+      "Source": "removeFromSystemSmalltalkremoveClassNamed:selfname.!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeInstVarName:",
+      "Source": "removeInstVarName:aString|newInstVarString|(selfinstVarNamesincludes:aString)ifFalse:[selferror:aString,\u0027 is not one of my instance variables\u0027].newInstVarString_\u0027\u0027.(selfinstVarNamescopyWithout:aString)do:[:varName|newInstVarString_newInstVarString,\u0027 \u0027,varName].superclassclassname:selfnameinEnvironment:SmalltalksubclassOf:superclassinstanceVariableNames:newInstVarStringvariable:selfisVariablewords:selfisWordspointers:selfisPointersclassVariableNames:selfclassVariablesStringpoolDictionaries:selfsharedPoolsStringcategory:selfcategorycomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": "selfinstVarNamesincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSharedPool:",
+      "Source": "removeSharedPool:aDictionary|satisfiedSetworkingSetaSubclass|(selfsharedPoolsincludes:aDictionary)ifFalse:[^selferror:\u0027the dictionary is not in my pool\u0027].(selfallSuperclassesselect:[:class|classsharedPoolsincludes:aDictionary])isEmptyifFalse:[sharedPoolsremove:aDictionary.sharedPoolsisEmptyifTrue:[sharedPools_nil].^self].workingSet_selfsubclassesasOrderedCollection.satisfiedSet_Setnew.[workingSetisEmpty]whileFalse:[aSubclass_workingSetremoveFirst.(aSubclasssharedPoolsincludes:aDictionary)ifFalse:[satisfiedSetadd:aSubclass.workingSetaddAll:aSubclasssubclasses]].satisfiedSetadd:self.satisfiedSetdo:[:aSubclass|aDictionaryassociationsDo:[:aGlobal|(aSubclasswhichSelectorsReferTo:aGlobal)isEmptyifFalse:[^selferror:aGlobalkey,\u0027 is still used in code of class \u0027,aSubclassname]]].sharedPoolsremove:aDictionary.sharedPoolsisEmptyifTrue:[sharedPools_nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        },
+        {
+          "Value": "selfsharedPoolsincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "rename:",
+      "Source": "rename:aString|newName|newName_aStringasSymbol.(SmalltalkincludesKey:newName)ifTrue:[^selferror:newName,\u0027 already exists\u0027].SmalltalkrenameClass:selfas:newName.name_newName.selfcomment:selfcomment.selfclasscomment:selfclasscomment!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 69 6A 42 D0 7C",
+      "Literals": [
+        {
+          "Value": "newName"
+        },
+        {
+          "Value": "aStringasSymbol"
+        },
+        {
+          "Value": "SmalltalkincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "sharedPools",
+      "Source": "sharedPoolssharedPools==nilifTrue:[^Setnew]ifFalse:[^sharedPools]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "sharing:",
+      "Source": "sharing:poolString|oldPoolspoolNamepool|oldPools_selfsharedPools.sharedPools_Setnew.(ScannernewscanFieldNames:poolString)do:[:poolName|sharedPoolsadd:(Smalltalkat:poolNameasSymbol)].sharedPoolsisEmptyifTrue:[sharedPools_nil].oldPoolsdetect:[:pool|(selfsharedPoolsincludes:pool)not]ifNone:[^false].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 6A 43 88 62 6A 44 D0 7C",
+      "Literals": [
+        {
+          "Value": "poolString"
+        },
+        {
+          "Value": "selfsharedPools"
+        },
+        {
+          "Value": "oldPools"
+        },
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "ScannernewscanFieldNames"
+        }
+      ]
+    },
+    {
+      "Selector": "subclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Source": "subclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "subclass: otherSupers: instanceVariableNames: classVariableNames: category:",
+      "Source": "subclass:totherSupers:othersinstanceVariableNames:fclassVariableNames:dcategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfand:othersinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:\u0027\u0027category:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "othersinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "superclass: methodDict: format: name: organization: instVarNames: classPool: sharedPools:",
+      "Source": "superclass:supmethodDict:mdformat:ftname:nmorganization:orginstVarNames:nilOrArrayclassPool:poolsharedPools:poolSetsuperclass_sup.methodDict_md.format_ft.name_nm.organization_org.instanceVariables_nilOrArray.classPool_pool.sharedPools_poolSet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "mdformat"
+        }
+      ]
+    },
+    {
+      "Selector": "validateFrom: in: instanceVariableNames: methods:",
+      "Source": "validateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethodssupervalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.self~~oldClassifTrue:[environat:nameput:self.selfupdateInheritanceTables:oldClass.oldClassobsolete]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableByteSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Source": "variableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with named fields\u0027].(selfisVariableand:[selfisWords])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with word fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:falsepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Source": "variableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisBitsifTrue:[^selferror:\u0027cannot make a pointer subclass of a class with non-pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableWordSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Source": "variableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a word subclass of a class with named fields\u0027].selfisBytesifTrue:[^selferror:\u0027cannot make a word subclass of a class with byte fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a word subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "getSuperclasses:",
+      "Source": "getSuperclasses:superNames|supers|supers_(ScannernewscanTokens:superNames)collect:[:each|Smalltalkat:each].supersdo:[:each|(eachisKindOf:Behavior)ifFalse:[selferror:\u0027superclass must be a class-describing object\u0027]].^supers!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 88 69 7C",
+      "Literals": [
+        {
+          "Value": "superNames"
+        },
+        {
+          "Value": "ScannernewscanTokens"
+        }
+      ]
+    },
+    {
+      "Selector": "named: superclasses: instanceVariableNames: classVariableNames: category:",
+      "Source": "named:newClassNamesuperclasses:newSuperNamesinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat|newClasssupersfirstSuperotherSupersfork|supers_selfgetSuperclasses:newSuperNames.superssize=1ifTrue:[^supersfirstsubclass:newClassNameinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamespoolDictionaries:\u0027\u0027category:cat].newClass_supersfirstsubclass:newClassNameotherSupers:(superscopyFrom:2to:superssize)instanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat.^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "newSuperNamesinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "template:",
+      "Source": "template:category^\u0027NameOfSuperclass subclass: #NameOfClass\r\n\tinstanceVariableNames: \u0027\u0027instVarName1 instVarName2\u0027\u0027\r\n\tclassVariableNames: \u0027\u0027ClassVarName1 ClassVarName2\u0027\u0027\r\n\tpoolDictionaries: \u0027\u0027\u0027\u0027\r\n\tcategory: \u0027\u0027\u0027,category,\u0027\u0027\u0027\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 10 E1 22 E1 7C",
+      "Literals": [
+        "NameOfSuperclass subclass: #NameOfClass\r\n\tinstanceVariableNames: \u0027\u0027instVarName1 instVarName2\u0027\u0027\r\n\tclassVariableNames: \u0027\u0027ClassVarName1 ClassVarName2\u0027\u0027\r\n\tpoolDictionaries: \u0027\u0027\u0027\u0027\r\n\tcategory: \u0027\u0027",
+        {
+          "Value": ","
+        },
+        "\u0027\u0027"
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 39,
+    "SuccessfullyCompiled": 39,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T17:32:58.1507052Z"
+  }
+}

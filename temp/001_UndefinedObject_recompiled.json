@@ -1,0 +1,123 @@
+{
+  "phase": "3",
+  "className": "UndefinedObject",
+  "superclass": "Object",
+  "comment": "I describe the behavior of my sole instance, nil. nil represents a prior value for variables that have not been initialized, or for results which are meaningless.",
+  "instanceVariables": [],
+  "classVariables": [],
+  "poolDictionaries": [],
+  "category": "Kernel-Objects",
+  "methods": [
+    {
+      "selector": "release",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "deepCopy",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "shallowCopy",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "printOn:",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "storeOn:",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "isNil",
+      "source": "",
+      "bytecodes": [
+        121,
+        124
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "notNil",
+      "source": "",
+      "bytecodes": [
+        122,
+        124
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "addDependent:",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    },
+    {
+      "selector": "new",
+      "source": "",
+      "bytecodes": [
+        176
+      ],
+      "literals": [],
+      "primitive": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "category": ""
+    }
+  ],
+  "classMethods": []
+}

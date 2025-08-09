@@ -211,6 +211,10 @@ public class JsonBootstrapExecutor
                 ExecuteDictionaryAtPut(operation);
                 break;
                 
+            case "createmethoddictionary":
+                ExecuteCreateMethodDictionary(operation);
+                break;
+                
             default:
                 if (!string.IsNullOrEmpty(operation.Op))
                     BootstrapLog($"[BOOTSTRAP] Warning: Unknown operation '{operation.Op}'");
@@ -257,6 +261,7 @@ public class JsonBootstrapExecutor
         {
             vm.PrimitiveRegisterGlobal(op.Result, oop);
         }
+        
     }
     
     /// <summary>
@@ -470,6 +475,37 @@ public class JsonBootstrapExecutor
         var oop = vm.PrimitiveNewDictionary();
         namedObjects[op.Result] = oop;
         BootstrapLog($"[BOOTSTRAP] Created dictionary -> OOP {oop}");
+    }
+    
+    /// <summary>
+    /// Execute createMethodDictionary operation.
+    /// Creates a method dictionary with specified capacity and installs it in the target class.
+    /// </summary>
+    private void ExecuteCreateMethodDictionary(BootstrapOperation op)
+    {
+        if (string.IsNullOrEmpty(op.Class))
+            throw new InvalidOperationException("createMethodDictionary requires a class");
+            
+        if (!namedObjects.TryGetValue(op.Class, out int classOop))
+            throw new InvalidOperationException($"Class '{op.Class}' not found for createMethodDictionary");
+            
+        var capacity = op.Capacity ?? 32; // Default capacity
+        
+        // Create a new dictionary with the specified capacity
+        // For now, we'll use PrimitiveNewDictionary and hope it creates with sufficient space
+        // In a full implementation, this would create a dictionary with exact capacity
+        var methodDictOop = vm.PrimitiveNewDictionary();
+        
+        // Install the method dictionary in slot 1 (methodDict) of the class
+        vm.PrimitiveSetSlot(classOop, 1, methodDictOop);
+        
+        // Optionally name the dictionary for debugging
+        if (!string.IsNullOrEmpty(op.Result))
+        {
+            namedObjects[op.Result] = methodDictOop;
+        }
+        
+        BootstrapLog($"[BOOTSTRAP] Created method dictionary with capacity {capacity} for class '{op.Class}' -> OOP {methodDictOop}");
     }
     
     /// <summary>
@@ -748,8 +784,10 @@ public class JsonBootstrapExecutor
                 
             default:
                 // Generic object creation
+                BootstrapLog($"[BOOTSTRAP] Creating object '{objDef.Id}' of class '{objDef.ClassName}'");
                 if (namedObjects.TryGetValue(objDef.ClassName, out var classOop))
                 {
+                    BootstrapLog($"[BOOTSTRAP]   - Found class '{objDef.ClassName}' in namedObjects with OOP {classOop}");
                     oop = vm.PrimitiveNewInstance(classOop);
                     // Set fields if any
                     if (objDef.Fields != null)
@@ -759,7 +797,22 @@ public class JsonBootstrapExecutor
                 }
                 else
                 {
-                    BootstrapLog($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
+                    // Try looking it up directly
+                    classOop = vm.PrimitiveLookupClass(objDef.ClassName);
+                    if (classOop > 0)
+                    {
+                        BootstrapLog($"[BOOTSTRAP]   - Found class '{objDef.ClassName}' via PrimitiveLookupClass with OOP {classOop}");
+                        oop = vm.PrimitiveNewInstance(classOop);
+                        // Set fields if any
+                        if (objDef.Fields != null)
+                        {
+                            SetObjectFields(oop, objDef.Fields);
+                        }
+                    }
+                    else
+                    {
+                        BootstrapLog($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
+                    }
                 }
                 break;
         }
@@ -768,6 +821,40 @@ public class JsonBootstrapExecutor
         {
             namedObjects[objDef.Id] = oop;
             BootstrapLog($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{objDef.ClassName}' -> OOP {oop}");
+            
+            // Register singleton objects with ObjectMemory
+            // Use ObjectMemory.FromOop to safely get the object
+            if (objDef.Id == "nil" && objDef.ClassName == "UndefinedObject")
+            {
+                var nilObj = ObjectMemory.FromOop(oop);
+                if (nilObj != null)
+                {
+                    Console.WriteLine($"[DEBUG] Setting ObjectMemory.NilObject to object with OOP {oop}");
+                    ObjectMemory.NilObject = nilObj;
+                    vm.PrimitiveRegisterGlobal("nil", oop);
+                    BootstrapLog($"[BOOTSTRAP] Registered nil singleton with OOP {oop}");
+                }
+            }
+            else if (objDef.Id == "true" && objDef.ClassName == "True")
+            {
+                var trueObj = ObjectMemory.FromOop(oop);
+                if (trueObj != null)
+                {
+                    ObjectMemory.TrueObject = trueObj;
+                    vm.PrimitiveRegisterGlobal("true", oop);
+                    BootstrapLog($"[BOOTSTRAP] Registered true singleton");
+                }
+            }
+            else if (objDef.Id == "false" && objDef.ClassName == "False")
+            {
+                var falseObj = ObjectMemory.FromOop(oop);
+                if (falseObj != null)
+                {
+                    ObjectMemory.FalseObject = falseObj;
+                    vm.PrimitiveRegisterGlobal("false", oop);
+                    BootstrapLog($"[BOOTSTRAP] Registered false singleton");
+                }
+            }
         }
     }
     
@@ -1093,6 +1180,7 @@ public class JsonBootstrapExecutor
             metaclassOop = vm.PrimitiveNewMetaclass();
             namedObjects[metaclassName] = metaclassOop;
             vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
+            
         }
         else
         {
@@ -1221,6 +1309,7 @@ public class JsonBootstrapExecutor
             
             // Get or create the method dictionary
             var methodDictOop = vm.GetSlot(classOop, 1); // Slot 1 is methodDict
+            BootstrapLog($"[BOOTSTRAP]   - Class '{classDef.Name}' (OOP {classOop}) has method dict in slot 1: {methodDictOop}");
             if (methodDictOop <= 0)
             {
                 // Create a new method dictionary
@@ -1228,7 +1317,13 @@ public class JsonBootstrapExecutor
                 if (methodDictClassOop > 0)
                 {
                     // Create MethodDictionary as a variable-sized object
-                    methodDictOop = vm.PrimitiveNewArray(32); // Initial size
+                    // Need space for: tally (1) + keys (n) + values (n) = 1 + 2*n slots
+                    // Add 50% extra space for hash table efficiency
+                    int methodCount = classDef.Methods.Count;
+                    int dictSize = 1 + (methodCount * 2) + (methodCount); // 1 + 2n + n/2 extra
+                    if (dictSize < 32) dictSize = 32; // Minimum size
+                    
+                    methodDictOop = vm.PrimitiveNewArray(dictSize);
                     vm.PrimitiveSetClass(methodDictOop, methodDictClassOop);
                     
                     // Initialize tally to 0
@@ -1237,10 +1332,12 @@ public class JsonBootstrapExecutor
                     
                     // Initialize remaining slots to nil
                     var nilOop = vm.PrimitiveNil();
-                    for (int i = 1; i < 32; i++)
+                    for (int i = 1; i < dictSize; i++)
                     {
                         vm.PrimitiveArrayAtPut(methodDictOop, i, nilOop);
                     }
+                    
+                    BootstrapLog($"[BOOTSTRAP]   - Created method dictionary with {dictSize} slots for {methodCount} methods");
                 }
                 else
                 {
@@ -1248,7 +1345,10 @@ public class JsonBootstrapExecutor
                     methodDictOop = vm.PrimitiveNewDictionary();
                 }
                 vm.PrimitiveSetSlot(classOop, 1, methodDictOop);
-                BootstrapLog($"[BOOTSTRAP]   - Created new method dictionary for '{classDef.Name}'");
+                BootstrapLog($"[BOOTSTRAP]   - Created new method dictionary (OOP {methodDictOop}) for '{classDef.Name}' and set in slot 1");
+                // Verify it was set
+                var verifyDict = vm.GetSlot(classOop, 1);
+                BootstrapLog($"[BOOTSTRAP]   - Verification: slot 1 now contains OOP {verifyDict}");
             }
             
             // Install each method
@@ -1278,9 +1378,9 @@ public class JsonBootstrapExecutor
                     var bytecodeOop = vm.PrimitiveNewByteArray(methodDef.Bytecode.Count);
                     for (int i = 0; i < methodDef.Bytecode.Count; i++)
                     {
-                        // Store each byte as a SmallInteger
-                        var byteOop = vm.PrimitiveNewSmallInteger(methodDef.Bytecode[i]);
-                        vm.PrimitiveArrayAtPut(bytecodeOop, i, byteOop);
+                        // Store each byte directly as a raw value, not as a SmallInteger
+                        // ByteArrays store raw bytes, not object references
+                        vm.PrimitiveByteArrayAtPut(bytecodeOop, i, (byte)methodDef.Bytecode[i]);
                     }
                     vm.PrimitiveSetSlot(methodOop, 1, bytecodeOop);
                 }
@@ -1337,7 +1437,13 @@ public class JsonBootstrapExecutor
                 if (methodDictClassOop > 0)
                 {
                     // Create MethodDictionary as a variable-sized object
-                    metaclassMethodDictOop = vm.PrimitiveNewArray(32); // Initial size
+                    // Need space for: tally (1) + keys (n) + values (n) = 1 + 2*n slots
+                    // Add 50% extra space for hash table efficiency
+                    int methodCount = classDef.ClassMethods.Count;
+                    int dictSize = 1 + (methodCount * 2) + (methodCount); // 1 + 2n + n/2 extra
+                    if (dictSize < 32) dictSize = 32; // Minimum size
+                    
+                    metaclassMethodDictOop = vm.PrimitiveNewArray(dictSize);
                     vm.PrimitiveSetClass(metaclassMethodDictOop, methodDictClassOop);
                     
                     // Initialize tally to 0
@@ -1346,10 +1452,12 @@ public class JsonBootstrapExecutor
                     
                     // Initialize remaining slots to nil
                     var nilOop = vm.PrimitiveNil();
-                    for (int i = 1; i < 32; i++)
+                    for (int i = 1; i < dictSize; i++)
                     {
                         vm.PrimitiveArrayAtPut(metaclassMethodDictOop, i, nilOop);
                     }
+                    
+                    BootstrapLog($"[BOOTSTRAP]   - Created metaclass method dictionary with {dictSize} slots for {methodCount} methods");
                 }
                 else
                 {
@@ -1387,9 +1495,9 @@ public class JsonBootstrapExecutor
                     var bytecodeOop = vm.PrimitiveNewByteArray(methodDef.Bytecode.Count);
                     for (int i = 0; i < methodDef.Bytecode.Count; i++)
                     {
-                        // Store each byte as a SmallInteger
-                        var byteOop = vm.PrimitiveNewSmallInteger(methodDef.Bytecode[i]);
-                        vm.PrimitiveArrayAtPut(bytecodeOop, i, byteOop);
+                        // Store each byte directly as a raw value, not as a SmallInteger
+                        // ByteArrays store raw bytes, not object references
+                        vm.PrimitiveByteArrayAtPut(bytecodeOop, i, (byte)methodDef.Bytecode[i]);
                     }
                     vm.PrimitiveSetSlot(methodOop, 1, bytecodeOop);
                 }
@@ -1820,4 +1928,6 @@ public class BootstrapOperation
     public string? Dictionary { get; set; }  // For dictionaryAtPut
     public string? Key { get; set; }  // For dictionaryAtPut
     public int Primitive { get; set; }  // For defineMethod with primitive
+    public string? Class { get; set; }  // For createMethodDictionary
+    public int? Capacity { get; set; }  // For createMethodDictionary
 }

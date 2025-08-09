@@ -1,0 +1,431 @@
+CompiledMethod>>messages not found in dump
+CompiledMethod>>needsLargeFrame not found in dump
+CompiledMethod>>needsStack: encoder: not found in dump
+CompiledMethod>>numArgs not found in dump
+CompiledMethod>>numLiterals not found in dump
+CompiledMethod>>numStack not found in dump
+CompiledMethod>>numTemps not found in dump
+CompiledMethod>>numTempsField not found in dump
+CompiledMethod>>objectAt: not found in dump
+CompiledMethod>>objectAt: put: not found in dump
+CompiledMethod>>primitive not found in dump
+CompiledMethod>>printOn: not found in dump
+CompiledMethod>>putSource: class: category: inFile: not found in dump
+CompiledMethod>>putSource: inFile: not found in dump
+CompiledMethod>>readsField: not found in dump
+CompiledMethod>>readsRef: not found in dump
+CompiledMethod>>refersToLiteral: not found in dump
+CompiledMethod>>returnField not found in dump
+CompiledMethod>>scanFor: not found in dump
+CompiledMethod>>scanLongLoad: not found in dump
+CompiledMethod>>scanLongStore: not found in dump
+CompiledMethod>>setSourcePosition: inFile: not found in dump
+CompiledMethod>>setTempNamesIfCached: not found in dump
+CompiledMethod>>storeOn: not found in dump
+CompiledMethod>>symbolic not found in dump
+CompiledMethod>>who not found in dump
+CompiledMethod>>writesField: not found in dump
+CompiledMethod>>writesRef: not found in dump
+CompiledMethod class>>initialize not found in dump
+CompiledMethod class>>newBytes: flags: nTemps: nStack: nLits: not found in dump
+CompiledMethod class>>newMethod: header: not found in dump
+CompiledMethod class>>toReturnField: not found in dump
+CompiledMethod class>>toReturnSelf not found in dump
+Class>>allClassVarNames has incorrect bytecode (expected 4 bytes, got 2)
+Class>>allSharedPools has incorrect bytecode (expected 4 bytes, got 2)
+Class>>initialize not found in dump
+Class>>isObsolete not found in dump
+Class>>name not found in dump
+Class>>obsolete not found in dump
+Class>>poolHas: ifTrue: not found in dump
+Class>>printOut not found in dump
+Class>>removeClassVarName: not found in dump
+Class>>removeFromChanges not found in dump
+Class>>removeFromSystem not found in dump
+Class>>removeInstVarName: not found in dump
+Class>>removeSharedPool: not found in dump
+Class>>rename: not found in dump
+Class>>sharedPools not found in dump
+Class>>sharing: not found in dump
+Class>>subclass: instanceVariableNames: classVariableNames: poolDictionaries: category: not found in dump
+Class>>subclass: otherSupers: instanceVariableNames: classVariableNames: category: not found in dump
+Class>>superclass: methodDict: format: name: organization: instVarNames: classPool: sharedPools: not found in dump
+Class>>validateFrom: in: instanceVariableNames: methods: not found in dump
+Class>>variableByteSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category: not found in dump
+Class>>variableSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category: not found in dump
+Class>>variableWordSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category: not found in dump
+Class class>>getSuperclasses: not found in dump
+Class class>>named: superclasses: instanceVariableNames: classVariableNames: category: not found in dump
+Class class>>template: not found in dump
+Behavior>>allSubInstancesDo: not found in dump
+Behavior>>allSuperclasses not found in dump
+Behavior>>allSuperclassesInto: not found in dump
+Behavior>>allVarNamesSelect: not found in dump
+Behavior>>basicNew not found in dump
+Behavior>>basicNew: not found in dump
+Behavior>>browseAllAccessesTo: not found in dump
+Behavior>>browseAllCallsOn: not found in dump
+Behavior>>canUnderstand: not found in dump
+Behavior>>checkChangeSelector: not found in dump
+Behavior>>checkMethodFor: not found in dump
+Behavior>>checkSuperAddSelector: not found in dump
+Behavior>>classVarNames not found in dump
+Behavior>>compile: notifying: trailer: not found in dump
+Behavior>>compile: notifying: trailer: ifFail: not found in dump
+Behavior>>compileAll not found in dump
+Behavior>>compileAllFrom: not found in dump
+Behavior>>compileAllSubclasses not found in dump
+Behavior>>compileBroadcastCodeFor: not found in dump
+Behavior>>compileConflictCodeFor: not found in dump
+Behavior>>compiledMethodAt: not found in dump
+Behavior>>compilerClass not found in dump
+Behavior>>compileUnchecked: not found in dump
+Behavior>>compoundSelectorsMatching: not found in dump
+Behavior>>conflictCodeFor: not found in dump
+Behavior>>copy not found in dump
+Behavior>>copyMethods not found in dump
+Behavior>>crossReference not found in dump
+Behavior>>decompile: not found in dump
+Behavior>>decompilerClass not found in dump
+Behavior>>defaultSelectorForMethod: not found in dump
+Behavior>>dynamicMethodDescriptionAt: not found in dump
+Behavior>>dynamicSuperclass not found in dump
+Behavior>>evaluatorClass not found in dump
+Behavior>>flushCache not found in dump
+Behavior>>format not found in dump
+Behavior>>format: variable: words: pointers: not found in dump
+Behavior>>hasMethods not found in dump
+Behavior>>hasMultipleSuperclasses not found in dump
+Behavior>>includesSelector: not found in dump
+Behavior>>inheritsFrom: not found in dump
+Behavior>>insertClass: selector: in: not found in dump
+Behavior>>instanceCount not found in dump
+Behavior>>instSize not found in dump
+Behavior>>instVarNames not found in dump
+Behavior>>isBits not found in dump
+Behavior>>isBytes not found in dump
+Behavior>>isFixed not found in dump
+Behavior>>isPointers not found in dump
+Behavior>>isVariable not found in dump
+Behavior>>isWords not found in dump
+Behavior>>kindOfSubclass not found in dump
+Behavior>>methodDescriptionAt: not found in dump
+Behavior>>methodDictionary: not found in dump
+Behavior>>new not found in dump
+Behavior>>new: not found in dump
+Behavior>>obsolete not found in dump
+Behavior>>parserClass not found in dump
+Behavior>>poolHas: ifTrue: not found in dump
+Behavior>>printHierarchy not found in dump
+Behavior>>printMethodChunk: on: moveSource: toFile: not found in dump
+Behavior>>printOn: not found in dump
+Behavior>>printSubclassesOn: callingSuperclass: level: not found in dump
+Behavior>>recompile: not found in dump
+Behavior>>recompile: from: not found in dump
+Behavior>>removeClass: selector: in: not found in dump
+Behavior>>removeFromInheritanceTable: not found in dump
+Behavior>>removeFromInheritanceTables not found in dump
+Behavior>>removeSelector: not found in dump
+Behavior>>removeSelectorSimply: not found in dump
+Behavior>>removeSelectorUnchecked: not found in dump
+Behavior>>removeSubclass: not found in dump
+Behavior>>scopeHas: ifTrue: not found in dump
+Behavior>>selectorAtMethod: setClass: not found in dump
+Behavior>>selectors not found in dump
+Behavior>>sharedPools not found in dump
+Behavior>>showVariableMenu: collect: not found in dump
+Behavior>>someInstance not found in dump
+Behavior>>sourceCodeAt: not found in dump
+Behavior>>sourceCodeForMethod: at: not found in dump
+Behavior>>sourceCodeTemplate not found in dump
+Behavior>>sourceMethodAt: not found in dump
+Behavior>>sourceTextAt: not found in dump
+Behavior>>subclassDefinerClass not found in dump
+Behavior>>subclasses not found in dump
+Behavior>>subclassInstVarNames not found in dump
+Behavior>>superclass not found in dump
+Behavior>>superclass: not found in dump
+Behavior>>superclasses not found in dump
+Behavior>>superMethodDescriptionAt: not found in dump
+Behavior>>tryCopyingCodeFor: not found in dump
+Behavior>>unmovedVarsFrom: not found in dump
+Behavior>>updateInheritanceTable: oldSelf: not found in dump
+Behavior>>updateInheritanceTables: not found in dump
+Behavior>>whichClassIncludesSelector: not found in dump
+Behavior>>whichSelectorsAccess: not found in dump
+Behavior>>whichSelectorsReferTo: not found in dump
+Behavior>>whichSelectorsReferTo: special: byte: not found in dump
+Behavior>>withAllSubclasses not found in dump
+Behavior>>withAllSuperclasses not found in dump
+Behavior class>>init not found in dump
+SystemDictionary>>classNames not found in dump
+SystemDictionary>>collectPointersTo: not found in dump
+SystemDictionary>>condenseChanges not found in dump
+SystemDictionary>>copyChangesTo: not found in dump
+SystemDictionary>>copyright not found in dump
+SystemDictionary>>core not found in dump
+SystemDictionary>>coreLeft not found in dump
+SystemDictionary>>coreLeftLimit not found in dump
+SystemDictionary>>coreLeftLimit: not found in dump
+SystemDictionary>>exitToDebugger not found in dump
+SystemDictionary>>flushClassNameCache not found in dump
+SystemDictionary>>forgetDoIts not found in dump
+SystemDictionary>>frills not found in dump
+SystemDictionary>>frills: not found in dump
+SystemDictionary>>getImagePrefix not found in dump
+SystemDictionary>>hasSpecialSelector: ifTrueSetByte: not found in dump
+SystemDictionary>>install not found in dump
+SystemDictionary>>logChange: not found in dump
+SystemDictionary>>lowSpaceNotificationLoop not found in dump
+SystemDictionary>>newChanges: not found in dump
+SystemDictionary>>newClassNames not found in dump
+SystemDictionary>>newSourceFile: without: not found in dump
+SystemDictionary>>noChanges not found in dump
+SystemDictionary>>oopsLeft not found in dump
+SystemDictionary>>oopsLeftLimit not found in dump
+SystemDictionary>>oopsLeftLimit: not found in dump
+SystemDictionary>>pointersTo: do: not found in dump
+SystemDictionary>>printOn: not found in dump
+SystemDictionary>>quit not found in dump
+SystemDictionary>>quitPrimitive not found in dump
+SystemDictionary>>recompileAllFrom: not found in dump
+SystemDictionary>>recompileCallsOn: not found in dump
+SystemDictionary>>recompileMethodsForWhich: not found in dump
+SystemDictionary>>recover: not found in dump
+SystemDictionary>>releaseExternalViews not found in dump
+SystemDictionary>>removeClassNamed: not found in dump
+SystemDictionary>>renameClass: as: not found in dump
+SystemDictionary>>renameSystemFiles: not found in dump
+SystemDictionary>>resetLowSpaceSignal not found in dump
+SystemDictionary>>resetSpaceLimits not found in dump
+SystemDictionary>>saveAs: thenQuit: not found in dump
+SystemDictionary>>showMenuThenBrowse: not found in dump
+SystemDictionary>>shutdown not found in dump
+SystemDictionary>>signal: atOopsLeft: wordsLeft: not found in dump
+SystemDictionary>>snapshot not found in dump
+SystemDictionary>>snapshotAs: thenQuit: not found in dump
+SystemDictionary>>snapshotPrimitive not found in dump
+SystemDictionary>>specialNargsAt: not found in dump
+SystemDictionary>>specialSelectorAt: not found in dump
+SystemDictionary>>specialSelectors not found in dump
+SystemDictionary>>specialSelectorSize not found in dump
+SystemDictionary>>timeStamp: not found in dump
+SystemDictionary>>valueAtNewKey: put: atIndex: declareFrom: not found in dump
+SystemDictionary>>version not found in dump
+SystemDictionary>>versionName not found in dump
+SystemDictionary class>>initialize not found in dump
+Dictionary>>add: has incorrect bytecode (expected 7 bytes, got 2)
+Dictionary>>do: has incorrect bytecode (expected 7 bytes, got 2)
+Dictionary>>findKeyOrNil: not found in dump
+Dictionary>>grow not found in dump
+Dictionary>>includes: not found in dump
+Dictionary>>includesAssociation: not found in dump
+Dictionary>>includesKey: not found in dump
+Dictionary>>inspect not found in dump
+Dictionary>>keyAtValue: not found in dump
+Dictionary>>keyAtValue: ifAbsent: not found in dump
+Dictionary>>keys not found in dump
+Dictionary>>keysDo: not found in dump
+Dictionary>>occurrencesOf: not found in dump
+Dictionary>>printOn: not found in dump
+Dictionary>>rehash not found in dump
+Dictionary>>remove: not found in dump
+Dictionary>>remove: ifAbsent: not found in dump
+Dictionary>>removeAssociation: not found in dump
+Dictionary>>removeAssociation: ifAbsent: not found in dump
+Dictionary>>removeKey: not found in dump
+Dictionary>>removeKey: ifAbsent: not found in dump
+Dictionary>>select: not found in dump
+Dictionary>>storeOn: not found in dump
+Dictionary>>values not found in dump
+UndefinedObject>>addDependent: has incorrect bytecode (expected 2 bytes, got 8)
+UndefinedObject>>printOn: has incorrect bytecode (expected 2 bytes, got 8)
+UndefinedObject>>storeOn: has incorrect bytecode (expected 2 bytes, got 14)
+UndefinedObject class>>new not found in dump
+Boolean>>storeOn: has incorrect bytecode (expected 2 bytes, got 14)
+Boolean class>>new not found in dump
+True>>& has incorrect bytecode (expected 2 bytes, got 2)
+True>>and: has incorrect bytecode (expected 2 bytes, got 2)
+True>>ifFalse: has incorrect bytecode (expected 2 bytes, got 2)
+True>>ifTrue: has incorrect bytecode (expected 2 bytes, got 2)
+True>>not has incorrect bytecode (expected 2 bytes, got 2)
+True>>printOn: has incorrect bytecode (expected 2 bytes, got 8)
+False>>| has incorrect bytecode (expected 2 bytes, got 2)
+False>>ifFalse: has incorrect bytecode (expected 2 bytes, got 2)
+False>>ifTrue: has incorrect bytecode (expected 2 bytes, got 2)
+False>>not has incorrect bytecode (expected 2 bytes, got 2)
+False>>or: has incorrect bytecode (expected 2 bytes, got 2)
+False>>printOn: has incorrect bytecode (expected 2 bytes, got 8)
+Magnitude>>< has incorrect bytecode (expected 2 bytes, got 4)
+Magnitude>>hash has incorrect bytecode (expected 2 bytes, got 15)
+Magnitude>>hashMappedBy: has incorrect bytecode (expected 2 bytes, got 12)
+LookupKey>>hash has incorrect bytecode (expected 2 bytes, got 15)
+LookupKey>>hashMappedBy: has incorrect bytecode (expected 2 bytes, got 12)
+LookupKey>>printOn: has incorrect bytecode (expected 2 bytes, got 8)
+LookupKey class>>key: not found in dump
+Association>>printOn: has incorrect bytecode (expected 4 bytes, got 8)
+Association class>>key: value: not found in dump
+Object>>= has incorrect bytecode (expected 4 bytes, got 2)
+Object>>at: has incorrect bytecode (expected 2 bytes, got 2)
+Object>>at: put: has incorrect bytecode (expected 2 bytes, got 6)
+Object>>broadcast: with: not found in dump
+Object>>changed not found in dump
+Object>>changed: not found in dump
+Object>>changeRequest not found in dump
+Object>>changeRequestFrom: not found in dump
+Object>>class not found in dump
+Object>>confirm: not found in dump
+Object>>conflictingInheritanceError not found in dump
+Object>>copy not found in dump
+Object>>deepCopy not found in dump
+Object>>dependents not found in dump
+Object>>doesNotUnderstand: not found in dump
+Object>>error: not found in dump
+Object>>errorImproperStore not found in dump
+Object>>errorNonIntegerIndex not found in dump
+Object>>errorSubscriptBounds: not found in dump
+Object>>forkEmergencyEvaluatorAt: not found in dump
+Object>>halt not found in dump
+Object>>halt: not found in dump
+Object>>hash not found in dump
+Object>>hashMappedBy: not found in dump
+Object>>inspect not found in dump
+Object>>instVarAt: not found in dump
+Object>>instVarAt: put: not found in dump
+Object>>isInteger not found in dump
+Object>>isKindOf: not found in dump
+Object>>isLiteral not found in dump
+Object>>isMemberOf: not found in dump
+Object>>isNil not found in dump
+Object>>mustBeBoolean not found in dump
+Object>>nextInstance not found in dump
+Object>>nilFields not found in dump
+Object>>notify: not found in dump
+Object>>notNil not found in dump
+Object>>perform: not found in dump
+Object>>perform: with: not found in dump
+Object>>perform: with: with: not found in dump
+Object>>perform: with: with: with: not found in dump
+Object>>perform: withArguments: not found in dump
+Object>>primitiveError: not found in dump
+Object>>primitiveFailed not found in dump
+Object>>printOn: not found in dump
+Object>>printString not found in dump
+Object>>readFromString: not found in dump
+Object>>release not found in dump
+Object>>removeDependent: not found in dump
+Object>>respondsTo: not found in dump
+Object>>setDependents not found in dump
+Object>>shallowCopy not found in dump
+Object>>shouldNotImplement not found in dump
+Object>>size not found in dump
+Object>>species not found in dump
+Object>>storeOn: not found in dump
+Object>>storeString not found in dump
+Object>>subclassResponsibility not found in dump
+Object>>tryPrimitive0 not found in dump
+Object>>tryPrimitive1: not found in dump
+Object>>tryPrimitive2: with: not found in dump
+Object>>tryPrimitive3: with: with: not found in dump
+Object>>tryPrimitive4: with: with: with: not found in dump
+Object>>update: not found in dump
+Object>>updateRequest not found in dump
+Object>>yourself not found in dump
+Object class>>howToModifyPrimitives not found in dump
+Object class>>initialize not found in dump
+Object class>>initializeDependentsFields not found in dump
+Object class>>initializeErrorRecursion not found in dump
+Object class>>readFrom: not found in dump
+Object class>>whatIsAPrimitive not found in dump
+Metaclass>>addClassVarName: has incorrect bytecode (expected 2 bytes, got 10)
+Metaclass>>addInstVarName: has incorrect bytecode (expected 6 bytes, got 2)
+Metaclass>>copy has incorrect bytecode (expected 24 bytes, got 4)
+Metaclass>>copyForValidation has incorrect bytecode (expected 2 bytes, got 2)
+Metaclass>>newNamed: not found in dump
+Metaclass>>newNamed: otherSupers: not found in dump
+Metaclass>>nonTrivial not found in dump
+Metaclass>>obsolete not found in dump
+Metaclass>>removeInstVarName: not found in dump
+Metaclass>>scopeHas: ifTrue: not found in dump
+Metaclass>>soleInstance not found in dump
+Metaclass>>subclasses not found in dump
+Metaclass>>subclassOf: not found in dump
+Metaclass>>superclass: not found in dump
+Metaclass class>>subclassOf: not found in dump
+Symbol>>= has incorrect bytecode (expected 4 bytes, got 2)
+Symbol>>asString has incorrect bytecode (expected 4 bytes, got 2)
+Symbol>>at: put: has incorrect bytecode (expected 2 bytes, got 6)
+Symbol>>copy has incorrect bytecode (expected 2 bytes, got 4)
+Symbol>>hash has incorrect bytecode (expected 2 bytes, got 15)
+Symbol>>hashMappedBy: has incorrect bytecode (expected 2 bytes, got 12)
+Symbol>>isLiteral has incorrect bytecode (expected 2 bytes, got 15)
+Symbol>>printOn: not found in dump
+Symbol>>replaceFrom: to: with: startingAt: not found in dump
+Symbol>>selectorPart not found in dump
+Symbol>>shallowCopy not found in dump
+Symbol>>species not found in dump
+Symbol>>storeOn: not found in dump
+Symbol>>string: not found in dump
+Symbol>>stringhash not found in dump
+Symbol class>>correctMessage: not found in dump
+Symbol class>>hasInterned: ifTrue: not found in dump
+Symbol class>>initialize not found in dump
+Symbol class>>intern: not found in dump
+Symbol class>>internCharacter: not found in dump
+Symbol class>>rehash not found in dump
+Symbol class>>table not found in dump
+Symbol class>>table: not found in dump
+String>>< has incorrect bytecode (expected 2 bytes, got 4)
+String>><= has incorrect bytecode (expected 2 bytes, got 5)
+String>>> has incorrect bytecode (expected 2 bytes, got 4)
+String>>>= has incorrect bytecode (expected 2 bytes, got 5)
+String>>at: put: has incorrect bytecode (expected 2 bytes, got 6)
+String>>basicAt: not found in dump
+String>>basicAt: put: not found in dump
+String>>compare: not found in dump
+String>>contractTo: not found in dump
+String>>copyUpTo: not found in dump
+String>>deepCopy not found in dump
+String>>displayAt: not found in dump
+String>>displayOn: at: not found in dump
+String>>findString: startingAt: not found in dump
+String>>hash not found in dump
+String>>hashMappedBy: not found in dump
+String>>isLiteral not found in dump
+String>>match: not found in dump
+String>>oldRunDecodeOn: not found in dump
+String>>oldRunEncoded not found in dump
+String>>primReplaceFrom: to: with: startingAt: not found in dump
+String>>printOn: not found in dump
+String>>replaceFrom: to: with: startingAt: not found in dump
+String>>replaceFrom: to: withByteArray: startingAt: not found in dump
+String>>sameAs: not found in dump
+String>>size not found in dump
+String>>spellAgainst: not found in dump
+String>>storeOn: not found in dump
+String>>string not found in dump
+String>>stringhash not found in dump
+String>>withCRs not found in dump
+String class>>example not found in dump
+String class>>fromString: not found in dump
+String class>>readFrom: not found in dump
+Collection>>errorNotKeyed not found in dump
+Collection>>growSize not found in dump
+Collection>>includes: not found in dump
+Collection>>inject: into: not found in dump
+Collection>>isEmpty not found in dump
+Collection>>maxPrint not found in dump
+Collection>>maxSize not found in dump
+Collection>>occurrencesOf: not found in dump
+Collection>>printOn: not found in dump
+Collection>>reject: not found in dump
+Collection>>remove: not found in dump
+Collection>>remove: ifAbsent: not found in dump
+Collection>>removeAll: not found in dump
+Collection>>select: not found in dump
+Collection>>size not found in dump
+Collection>>storeOn: not found in dump
+Collection class>>with: not found in dump
+Collection class>>with: with: not found in dump
+Collection class>>with: with: with: not found in dump
+Collection class>>with: with: with: with: not found in dump

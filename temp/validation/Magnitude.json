@@ -1,0 +1,164 @@
+{
+  "ClassName": "Magnitude",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Numeric-Magnitudes",
+  "InstanceMethods": [
+    {
+      "Selector": "\u003C",
+      "Source": "\u003CaMagnitude^selfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003C=",
+      "Source": "\u003C=aMagnitude^(self\u003EaMagnitude)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B3 D1 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "=",
+      "Source": "=aMagnitude^selfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003E",
+      "Source": "\u003EaMagnitude^aMagnitude\u003Cself!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 70 B2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003E=",
+      "Source": "\u003E=aMagnitude^(self\u003CaMagnitude)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B2 D1 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "between:and:",
+      "Source": "between:minand:max^self\u003E=minand:[self\u003C=max]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "max"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash^selfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^selfhash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfhash"
+        }
+      ]
+    },
+    {
+      "Selector": "max:",
+      "Source": "max:aMagnitudeself\u003EaMagnitudeifTrue:[^self]ifFalse:[^aMagnitude]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aMagnitudeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "min:",
+      "Source": "min:aMagnitudeself\u003CaMagnitudeifTrue:[^self]ifFalse:[^aMagnitude]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aMagnitudeifTrue"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 10,
+    "SuccessfullyCompiled": 10,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T20:54:11.9822765Z"
+  }
+}
