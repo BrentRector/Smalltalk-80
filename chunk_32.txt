@@ -1,0 +1,2386 @@
+CHUNK 32/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=Smalltalk80/BytecodeDispatcher.cs sha256=2b010d47a93dddff281e44a8390de29505a93183b3cffa60c03abba48d04221d lines=535
+---
+`$lang
+// file: Smalltalk80/BytecodeDispatcher.cs
+using System;
+
+/// <summary>
+/// Optimized bytecode dispatcher using a lookup table for better performance.
+/// </summary>
+public static class BytecodeDispatcher
+{
+    /// <summary>
+    /// Delegate for bytecode operation handlers.
+    /// </summary>
+    /// <param name="interpreter">The interpreter instance.</param>
+    /// <param name="opcode">The bytecode opcode.</param>
+    private delegate void BytecodeHandler(Interpreter interpreter, byte opcode);
+
+    /// <summary>
+    /// Lookup table mapping bytecode values to handler methods.
+    /// </summary>
+    private static readonly BytecodeHandler[] Handlers = new BytecodeHandler[256];
+
+    /// <summary>
+    /// Initializes the bytecode handler lookup table.
+    /// </summary>
+    static BytecodeDispatcher()
+    {
+        // Initialize all handlers to the unknown bytecode handler
+        for (int i = 0; i < 256; i++)
+        {
+            Handlers[i] = HandleUnknownBytecode;
+        }
+
+        // Receiver variable push bytecodes (0-15)
+        for (int i = 0; i <= 15; i++)
+        {
+            int index = i; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandlePushReceiverVariable(interpreter, index);
+        }
+
+        // Temporary variable push bytecodes (16-31)
+        for (int i = 16; i <= 31; i++)
+        {
+            int index = i - 16; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandlePushTemporaryVariable(interpreter, index);
+        }
+
+        // Literal constant push bytecodes (32-63)
+        for (int i = 32; i <= 63; i++)
+        {
+            int index = i - 32; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandlePushLiteralConstant(interpreter, index);
+        }
+
+        // Literal variable push bytecodes (64-95)
+        for (int i = 64; i <= 95; i++)
+        {
+            int index = i - 64; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandlePushLiteralVariable(interpreter, index);
+        }
+
+        // Store and pop receiver variables (96-103)
+        for (int i = 96; i <= 103; i++)
+        {
+            int index = i - 96; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandleStoreAndPopReceiverVariable(interpreter, index);
+        }
+
+        // Store and pop temporary variables (104-111)
+        for (int i = 104; i <= 111; i++)
+        {
+            int index = i - 104; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandleStoreAndPopTemporaryVariable(interpreter, index);
+        }
+
+        // Push receiver (self) - bytecode 112
+        Handlers[112] = (interpreter, opcode) => HandlePushReceiver(interpreter);
+
+        // Bytecodes 113-119 are undefined in canonical Blue Book
+        // 120-127 are return operations and will be handled below
+
+        // Return operations (120-125)
+        Handlers[120] = (interpreter, opcode) => HandleReturnReceiver(interpreter);
+        // 121-123 are undefined in canonical Blue Book
+        Handlers[124] = (interpreter, opcode) => HandleReturnTop(interpreter);
+        Handlers[125] = (interpreter, opcode) => HandleReturnTopFromBlock(interpreter);
+
+        // Extended operations (128-137)
+        Handlers[128] = (interpreter, opcode) => HandleExtendedPush(interpreter, opcode);
+        Handlers[129] = (interpreter, opcode) => HandleExtendedStore(interpreter, opcode);
+        Handlers[130] = (interpreter, opcode) => HandleExtendedStoreAndPop(interpreter, opcode);
+        Handlers[131] = (interpreter, opcode) => HandleSingleExtendedSend(interpreter, opcode);
+        Handlers[132] = (interpreter, opcode) => HandleDoubleExtendedSend(interpreter, opcode);
+        Handlers[133] = (interpreter, opcode) => HandleSingleExtendedSuperSend(interpreter, opcode);
+        Handlers[134] = (interpreter, opcode) => HandleDoubleExtendedSuperSend(interpreter, opcode);
+        Handlers[135] = (interpreter, opcode) => HandlePopStack(interpreter, opcode);
+        Handlers[136] = (interpreter, opcode) => HandleDuplicateTop(interpreter, opcode);
+        Handlers[137] = (interpreter, opcode) => HandlePushActiveContext(interpreter, opcode);
+
+        // Jump operations (144-175)
+        for (int i = 144; i <= 151; i++)
+        {
+            int offset = i - 143; // Jump offset 1-8
+            Handlers[i] = (interpreter, opcode) => HandleShortUnconditionalJump(interpreter, offset);
+        }
+        
+        for (int i = 152; i <= 159; i++)
+        {
+            int offset = i - 151; // Jump offset 1-8
+            Handlers[i] = (interpreter, opcode) => HandleShortConditionalJump(interpreter, offset, false);
+        }
+        
+        for (int i = 160; i <= 167; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongUnconditionalJump(interpreter, opcode);
+        }
+        
+        for (int i = 168; i <= 171; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpTrue(interpreter, opcode);
+        }
+        
+        for (int i = 172; i <= 175; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpFalse(interpreter, opcode);
+        }
+
+        // Send operations (176-255) - Blue Book specification
+        // 176-191: Send literal selector with 0 args
+        for (int i = 176; i <= 191; i++)
+        {
+            int index = i - 176; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 0);
+        }
+        
+        // 192-207: Send literal selector with 1 arg
+        for (int i = 192; i <= 207; i++)
+        {
+            int index = i - 192; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 1);
+        }
+        
+        // 208-223: Send literal selector with 2 args
+        for (int i = 208; i <= 223; i++)
+        {
+            int index = i - 208; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
+        }
+        
+        // 224-239: Send arithmetic selector (+, -, <, >, etc.)
+        for (int i = 224; i <= 239; i++)
+        {
+            int selectorIndex = i - 224; // Arithmetic selector 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendArithmeticSelector(interpreter, selectorIndex);
+        }
+        
+        // 240-255: Send special selector (at:, at:put:, size, etc.)
+        for (int i = 240; i <= 255; i++)
+        {
+            int selectorIndex = i - 240; // Special selector 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendCommonSelector(interpreter, selectorIndex);
+        }
+    }
+
+    /// <summary>
+    /// Dispatches a bytecode to its appropriate handler.
+    /// </summary>
+    /// <param name="interpreter">The interpreter instance.</param>
+    /// <param name="opcode">The bytecode to dispatch.</param>
+    public static void Dispatch(Interpreter interpreter, byte opcode)
+    {
+        Handlers[opcode](interpreter, opcode);
+    }
+
+    // Handler method implementations would go here
+    // For brevity, I'm showing just a few examples:
+
+    private static void HandlePushReceiverVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Push(context.Receiver.Fields[index]);
+    }
+
+    private static void HandlePushTemporaryVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Push(context.Temporaries[index]);
+    }
+
+    private static void HandlePushReceiver(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Push(context.Receiver);
+    }
+
+    private static void HandleStoreAndPopReceiverVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        context.Receiver.Fields[index] = value;
+    }
+
+    private static void HandleStoreAndPopTemporaryVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        context.Temporaries[index] = value;
+    }
+
+    private static void HandleReturnTopFromBlock(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        interpreter.HandleReturn(value ?? throw new InvalidOperationException("Cannot return null"));
+    }
+
+    private static void HandleExtendedStore(Interpreter interpreter, byte opcode)
+    {
+        // Extended store implementation would go here
+        throw new NotImplementedException("Extended store not yet implemented");
+    }
+
+    private static void HandleExtendedStoreAndPop(Interpreter interpreter, byte opcode)
+    {
+        // Extended store and pop implementation would go here
+        throw new NotImplementedException("Extended store and pop not yet implemented");
+    }
+
+    private static void HandleSingleExtendedSuperSend(Interpreter interpreter, byte opcode)
+    {
+        // Single extended super send implementation would go here
+        throw new NotImplementedException("Single extended super send not yet implemented");
+    }
+
+    private static void HandleDoubleExtendedSuperSend(Interpreter interpreter, byte opcode)
+    {
+        // Double extended super send implementation would go here
+        throw new NotImplementedException("Double extended super send not yet implemented");
+    }
+
+    private static void HandleLongUnconditionalJump(Interpreter interpreter, byte opcode)
+    {
+        var context = interpreter.CurrentContext;
+        int offset = ((opcode & 0x07) << 8) + context.Method.Bytecodes[context.PC++];
+        context.PC += offset;
+    }
+
+    private static void HandleLongConditionalJumpTrue(Interpreter interpreter, byte opcode)
+    {
+        // Long conditional jump on true implementation would go here
+        throw new NotImplementedException("Long conditional jump on true not yet implemented");
+    }
+
+    private static void HandleLongConditionalJumpFalse(Interpreter interpreter, byte opcode)
+    {
+        // Long conditional jump on false implementation would go here
+        throw new NotImplementedException("Long conditional jump on false not yet implemented");
+    }
+
+    private static void HandleSendArithmeticSelector(Interpreter interpreter, int selectorIndex)
+    {
+        // Send arithmetic selector implementation would go here
+        throw new NotImplementedException("Send arithmetic selector not yet implemented");
+    }
+
+    private static void HandleSendCommonSelector(Interpreter interpreter, int selectorIndex)
+    {
+        // Send common selector implementation would go here
+        throw new NotImplementedException("Send common selector not yet implemented");
+    }
+
+    private static void HandleSendLiteralSelector(Interpreter interpreter, int index, int argCount)
+    {
+        var context = interpreter.CurrentContext;
+        
+        // Get the selector from the literal frame
+        if (index >= context.Method.Literals.Length)
+        {
+            throw new InvalidOperationException($"Selector index {index} out of bounds for literal frame (size: {context.Method.Literals.Length})");
+        }
+        
+        var literal = context.Method.Literals[index];
+        
+        if (literal == null)
+        {
+            throw new InvalidOperationException($"Literal at index {index} is null");
+        }
+        
+        // The literal IS the selector - just use it directly
+        // The interpreter's PerformSend should handle Smalltalk objects
+        interpreter.PerformSendWithObject(literal, argCount, false);
+    }
+
+    private static void HandleReturnReceiver(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        interpreter.HandleReturn(context.Receiver);
+    }
+    
+    private static void HandleReturnTop(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        var topValue = context.Stack.Pop();
+        interpreter.HandleReturn(topValue ?? throw new InvalidOperationException("Cannot return null value"));
+    }
+
+    private static void HandleUnknownBytecode(Interpreter interpreter, byte opcode)
+    {
+        throw new NotImplementedException($"Unknown bytecode: {opcode}");
+    }
+
+    // Additional handler methods would be implemented here following the same pattern
+    // This provides a foundation that's much faster than the current if/else chain
+
+    private static void HandleExtendedPush(Interpreter interpreter, byte opcode)
+    {
+        // Implementation for extended push operations
+        var context = interpreter.CurrentContext;
+        byte descriptor = context.Method.Bytecodes[context.PC++];
+        // Handle extended push based on descriptor
+    }
+
+    private static void HandleSingleExtendedSend(Interpreter interpreter, byte opcode)
+    {
+        // Implementation for single extended send
+        var context = interpreter.CurrentContext;
+        byte descriptor = context.Method.Bytecodes[context.PC++];
+        int argCount = descriptor >> 5;
+        int selectorIndex = descriptor & 0x1F;
+        var selector = (Symbol)context.Method.Literals[selectorIndex];
+        // Perform send
+    }
+
+    private static void HandleShortUnconditionalJump(Interpreter interpreter, int offset)
+    {
+        interpreter.CurrentContext.PC += offset;
+    }
+
+    private static void HandleShortConditionalJump(Interpreter interpreter, int offset, bool jumpOnTrue)
+    {
+        var context = interpreter.CurrentContext;
+        var condObj = context.Stack.Pop();
+        if (condObj is bool b && b == jumpOnTrue)
+        {
+            context.PC += offset;
+        }
+    }
+
+    private static void HandleSendArithmetic(Interpreter interpreter, int index)
+    {
+        // Implementation for arithmetic message sends
+        // Uses the special selector table from the interpreter
+    }
+
+    private static void HandleSendLiteral(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var selector = (Symbol)context.Method.Literals[index];
+        // Determine argument count and perform send
+    }
+
+    // Additional placeholder handlers - full implementation would include all bytecodes
+    private static void HandleDoubleExtendedSend(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended send bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleSingleExtendedSuper(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleDoubleExtendedSuper(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandlePopStack(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Pop();
+    }
+    private static void HandleDuplicateTop(Interpreter interpreter, byte opcode)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Peek();
+        context.Stack.Push(value);
+    }
+    private static void HandlePushActiveContext(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Push(interpreter.CurrentContext);
+    }
+    private static void HandleJumpShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfFalseShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfFalseLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfTrueShort(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandleJumpIfTrueLong(Interpreter interpreter, byte opcode)
+    {
+        // Non-canonical extension - should not be used in Blue Book VM
+        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
+    }
+    private static void HandlePushLiteralConstant(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Push(context.Method.Literals[index]);
+    }
+
+    private static void HandlePushLiteralVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var assoc = (Association)context.Method.Literals[index]!;
+        context.Stack.Push(assoc.Value);
+    }
+
+    private static void HandleStoreIntoReceiverVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Peek(); // Blue Book store doesn't pop
+        context.Receiver.Fields[index] = value;
+    }
+
+    private static void HandleStoreIntoTemporaryVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Peek(); // Blue Book store doesn't pop
+        context.Temporaries[index] = value;
+    }
+
+    private static void HandleStoreIntoLiteralVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Peek(); // Blue Book store doesn't pop
+        var assoc = (Association)context.Method.Literals[index]!;
+        assoc.Value = value;
+    }
+
+    private static void HandleReturnTrue(Interpreter interpreter)
+    {
+        // Return the Smalltalk true singleton object
+        if (ObjectMemory.TrueObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.TrueObject);
+        }
+        else
+        {
+            // Debug: log the issue
+            Console.WriteLine("[BYTECODE] WARNING: True singleton not found in ObjectMemory.TrueObject");
+            throw new InvalidOperationException("True singleton not found - ensure Phase 2 bootstrap creates it");
+        }
+    }
+
+    private static void HandleReturnFalse(Interpreter interpreter)
+    {
+        // Return the Smalltalk false singleton object
+        if (ObjectMemory.FalseObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.FalseObject);
+        }
+        else
+        {
+            throw new InvalidOperationException("False singleton not found - ensure Phase 2 bootstrap creates it");
+        }
+    }
+
+    private static void HandleReturnNil(Interpreter interpreter)
+    {
+        // Return the Smalltalk nil singleton object
+        if (ObjectMemory.NilObject != null)
+        {
+            interpreter.HandleReturn(ObjectMemory.NilObject);
+        }
+        else
+        {
+            throw new InvalidOperationException("Nil singleton not found - ensure Phase 2 bootstrap creates it");
+        }
+    }
+
+    private static void HandleSendLiteralSelector(Interpreter interpreter, int bytecode)
+    {
+        var context = interpreter.CurrentContext;
+        // Blue Book canonical encoding:
+        // Bits 6-7: Argument count (00=0, 01=1, 10=2, 11=N args)
+        // Bits 2-5: Literal frame index (0-15)
+        // Bits 0-1: Unused/reserved
+        
+        var argCount = (bytecode >> 6) & 0x3; // Extract bits 6-7
+        var selectorIndex = (bytecode >> 2) & 0xF; // Extract bits 2-5
+        
+        if (selectorIndex >= context.Method.Literals.Length)
+        {
+            throw new InvalidOperationException($"Selector index {selectorIndex} out of bounds for literal frame (size: {context.Method.Literals.Length})");
+        }
+        
+        if (!(context.Method.Literals[selectorIndex] is Symbol selector))
+        {
+            throw new InvalidOperationException($"Literal at index {selectorIndex} is not a Symbol: {context.Method.Literals[selectorIndex]?.GetType()}");
+        }
+        
+        // Handle special case for 11xx_xxxx (bits 6-7 = 11) - variable argument count
+        if (argCount == 3) // 11 binary
+        {
+            // For now, treat as 0 arguments - proper implementation would need more context
+            // TODO: Implement variable argument count handling
+            argCount = 0;
+        }
+        
+        interpreter.PerformSend(selector, argCount, false);
+    }
+
+    // Blue Book does not have separate super send bytecodes in the 192-255 range
+    // Super sends are handled through extended bytecodes or compiler-generated patterns
+    // This method is no longer used but kept for reference
+    private static void HandleSendSuperMessage_Obsolete(Interpreter interpreter, int index)
+    {
+        throw new InvalidOperationException("Super send bytecodes are not part of the canonical Blue Book 192-255 range");
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/BytecodeTable.cs sha256=7e8c7511cf5f3ec0a7a23f6bcf8529d36084a966645c87025726c3cb29442805 lines=189
+---
+`$lang
+// file: Smalltalk80/ByteCodes/BytecodeTable.cs
+using System;
+using System.Collections.Generic;
+
+namespace Smalltalk80.ByteCodes;
+
+/// <summary>
+///     Provides access to executable implementations for all 256 Smalltalk-80
+///     bytecodes defined by the interpreter documentation.
+/// </summary>
+public static class BytecodeTable
+{
+    /// <summary>
+    ///     Map from bytecode value to the operation that implements it.
+    /// </summary>
+    public static IReadOnlyList<IBytecodeOperation> Operations { get; } = CreateTable();
+
+    private static IReadOnlyList<IBytecodeOperation> CreateTable()
+    {
+        var ops = new IBytecodeOperation[256];
+
+        // 0-15: push receiver variable
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[i] = new Stack.PushReceiverVariableOperation(i);
+        }
+
+        // 16-31: push temporary location
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[16 + i] = new Stack.PushTemporaryVariableOperation(i);
+        }
+
+        // 32-63: push literal constant
+        for (byte i = 0; i < 32; i++)
+        {
+            ops[32 + i] = new Stack.PushLiteralConstantOperation(i);
+        }
+
+        // 64-95: push literal variable
+        for (byte i = 0; i < 32; i++)
+        {
+            ops[64 + i] = new Stack.PushLiteralVariableOperation(i);
+        }
+
+        // 96-103: store and pop receiver variable
+        for (byte i = 0; i < 8; i++)
+        {
+            ops[96 + i] = new Stack.StoreAndPopReceiverVariableOperation(i);
+        }
+
+        // 104-111: store and pop temporary variable
+        for (byte i = 0; i < 8; i++)
+        {
+            ops[104 + i] = new Stack.StoreAndPopTemporaryVariableOperation(i);
+        }
+
+        // 112-119: push receiver and special constants (canonical Blue Book)
+        ops[112] = new Stack.PushSelfOperation();
+        // 113-119 are NOT push true/false/nil in canonical Blue Book!
+        // Those must be accessed via literal frame (32-63)
+        // These are actually undefined in canonical Blue Book
+        ops[113] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[114] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[115] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[116] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[117] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[118] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[119] = new NoOpOperation(); // Not defined in canonical Blue Book
+
+        // 120-123: return operations (canonical Blue Book)
+        ops[120] = new Return.ReturnConstantOperation(Return.ReturnConstantOperation.Kind.Self);
+        // 121-123 are NOT returnTrue/False/Nil in canonical Blue Book!
+        ops[121] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[122] = new NoOpOperation(); // Not defined in canonical Blue Book
+        ops[123] = new NoOpOperation(); // Not defined in canonical Blue Book
+
+        // 124-125: return stack top from message or block
+        ops[124] = new Return.ReturnTopOperation(isBlock: false);
+        ops[125] = new Return.ReturnTopOperation(isBlock: true);
+
+        // 126-127 unused
+        ops[126] = new NoOpOperation();
+        ops[127] = new NoOpOperation();
+
+        // 128: extended push
+        ops[128] = new Stack.ExtendedPushOperation();
+
+        // 129: extended store
+        ops[129] = new Stack.ExtendedStoreOperation(popAfter: false);
+
+        // 130: extended store and pop
+        ops[130] = new Stack.ExtendedStoreOperation(popAfter: true);
+
+        // 131: single extended send
+        ops[131] = new Send.SingleExtendedSendOperation(superSend: false);
+
+        // 132: double extended send
+        ops[132] = new Send.DoubleExtendedSendOperation(superSend: false);
+
+        // 133: single extended super
+        ops[133] = new Send.SingleExtendedSendOperation(superSend: true);
+
+        // 134: double extended super
+        ops[134] = new Send.DoubleExtendedSendOperation(superSend: true);
+
+        // 135: pop stack
+        ops[135] = new Stack.PopStackOperation();
+
+        // 136: duplicate stack top
+        ops[136] = new Stack.DuplicateTopOperation();
+
+        // 137: push active context
+        ops[137] = new Stack.PushActiveContextOperation();
+
+        // 138-143: unused
+        for (byte i = 138; i <= 143; i++)
+        {
+            ops[i] = new NoOpOperation();
+        }
+
+        // 144-151: short jumps
+        for (byte i = 0; i < 8; i++)
+        {
+            ops[144 + i] = new Jump.ShortJumpOperation((byte)(i + 1));
+        }
+
+        // 152-159: pop and jump on false short
+        for (byte i = 0; i < 8; i++)
+        {
+            ops[152 + i] = new Jump.PopJumpFalseShortOperation((byte)(i + 1));
+        }
+
+        // 160-167: long jump
+        for (byte i = 0; i < 8; i++)
+        {
+            ops[160 + i] = new Jump.LongJumpOperation(i);
+        }
+
+        // 168-171: pop and jump on true long
+        for (byte i = 0; i < 4; i++)
+        {
+            ops[168 + i] = new Jump.PopJumpLongOperation(true, i);
+        }
+
+        // 172-175: pop and jump on false long
+        for (byte i = 0; i < 4; i++)
+        {
+            ops[172 + i] = new Jump.PopJumpLongOperation(false, i);
+        }
+
+        // 176-191: send literal selector with 0 args (Blue Book)
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[176 + i] = new Send.LiteralSelectorSendOperation(i, 0);
+        }
+
+        // 192-207: send literal selector with 1 arg (Blue Book)
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[192 + i] = new Send.LiteralSelectorSendOperation(i, 1);
+        }
+
+        // 208-223: send literal selector with 2 args (Blue Book)
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[208 + i] = new Send.LiteralSelectorSendOperation(i, 2);
+        }
+
+        // 224-239: send arithmetic selector (+, -, <, >, etc.)
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[224 + i] = new Send.ArithmeticSelectorSendOperation(i);
+        }
+
+        // 240-255: send special selector (at:, at:put:, size, etc.)
+        for (byte i = 0; i < 16; i++)
+        {
+            ops[240 + i] = new Send.SpecialSelectorSendOperation(i);
+        }
+
+        return ops;
+    }
+
+    private sealed class NoOpOperation : IBytecodeOperation
+    {
+        public void Execute(Interpreter interpreter, byte opcode) { }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/IBytecodeOperation.cs sha256=b466bec535f3370f2bb6da075fc2095cc83c4ca8b28eb1ad9d61374735ef68ea lines=17
+---
+`$lang
+// file: Smalltalk80/ByteCodes/IBytecodeOperation.cs
+using System;
+
+namespace Smalltalk80.ByteCodes;
+
+/// <summary>
+///     Represents a runnable Smalltalk-80 bytecode instruction.
+/// </summary>
+public interface IBytecodeOperation
+{
+    /// <summary>
+    ///     Executes the operation using the provided <see cref="Interpreter"/>.
+    /// </summary>
+    /// <param name="interpreter">The interpreter executing the bytecode.</param>
+    /// <param name="opcode">The raw opcode value.</param>
+    void Execute(Interpreter interpreter, byte opcode);
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Jump/LongJumpOperation.cs sha256=4c783aa5d7e40bd16c350d1b2477219ed25d640d7a92405fdf6c7e2ae4096739 lines=28
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Jump/LongJumpOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Jump;
+
+/// <summary>
+///     Performs an unconditional long jump using a descriptor byte for the low
+///     bits of the offset.
+/// </summary>
+public sealed class LongJumpOperation : IBytecodeOperation
+{
+    private readonly byte highBits;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="LongJumpOperation"/> class.
+    /// </summary>
+    /// <param name="highBits">The high-order bits encoded in the opcode.</param>
+    public LongJumpOperation(byte highBits) => this.highBits = highBits;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        byte low = ctx.Method.Bytecodes[ctx.PC++];
+        int offset = ((highBits + 4) << 8) | low;
+        ctx.PC += offset;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Jump/PopJumpFalseShortOperation.cs sha256=81375f0dd87bd134a3c50bb15c1eba27c5f43ac1fc13151a6d49300e026d5104 lines=29
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Jump/PopJumpFalseShortOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Jump;
+
+/// <summary>
+///     Pops a value and performs a short jump if it is <c>false</c>.
+/// </summary>
+public sealed class PopJumpFalseShortOperation : IBytecodeOperation
+{
+    private readonly byte offset;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="PopJumpFalseShortOperation"/> class.
+    /// </summary>
+    /// <param name="offset">The bytecode offset to jump by when the value is <c>false</c>.</param>
+    public PopJumpFalseShortOperation(byte offset) => this.offset = offset;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var value = ctx.Stack.Pop();
+        if (value is bool b && !b)
+        {
+            ctx.PC += offset;
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Jump/PopJumpLongOperation.cs sha256=abc32edfade4f97ad9dafd96f9f11392272b107043b285dd27b7634da8cdeb09 lines=38
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Jump/PopJumpLongOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Jump;
+
+/// <summary>
+///     Pops a value and performs a long jump if it matches the specified boolean
+///     condition.
+/// </summary>
+public sealed class PopJumpLongOperation : IBytecodeOperation
+{
+    private readonly bool whenTrue;
+    private readonly byte highBits;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="PopJumpLongOperation"/> class.
+    /// </summary>
+    /// <param name="whenTrue">Whether to jump when the value is <c>true</c>.</param>
+    /// <param name="highBits">The high-order bits encoded in the opcode.</param>
+    public PopJumpLongOperation(bool whenTrue, byte highBits)
+    {
+        this.whenTrue = whenTrue;
+        this.highBits = highBits;
+    }
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        byte low = ctx.Method.Bytecodes[ctx.PC++];
+        int offset = (highBits << 8) | low;
+        var value = ctx.Stack.Pop();
+        if (value is bool b && b == whenTrue)
+        {
+            ctx.PC += offset;
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Jump/ShortJumpOperation.cs sha256=7f23571302a793447ec47a168f62e0125aa3fcae698f7b6053f87691bd643e2c lines=24
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Jump/ShortJumpOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Jump;
+
+/// <summary>
+///     Performs an unconditional short jump forward by a fixed offset.
+/// </summary>
+public sealed class ShortJumpOperation : IBytecodeOperation
+{
+    private readonly byte offset;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ShortJumpOperation"/> class.
+    /// </summary>
+    /// <param name="offset">The bytecode offset to jump by.</param>
+    public ShortJumpOperation(byte offset) => this.offset = offset;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.PC += offset;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Return/ReturnConstantOperation.cs sha256=be949d837fad8862384f5f6b3d4757c449a879dd012bb22b3cdd678dc8ac8a4e lines=52
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Return/ReturnConstantOperation.cs
+using System;
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Return;
+
+/// <summary>
+///     Returns a fixed constant from the current method.
+/// </summary>
+public sealed class ReturnConstantOperation : IBytecodeOperation
+{
+    /// <summary>
+    ///     Distinguishes which constant value should be returned.
+    /// </summary>
+    public enum Kind
+    {
+        /// <summary>Return the current message receiver.</summary>
+        Self,
+
+        /// <summary>Return the boolean constant <c>true</c>.</summary>
+        True,
+
+        /// <summary>Return the boolean constant <c>false</c>.</summary>
+        False,
+
+        /// <summary>Return the value <c>nil</c>.</summary>
+        Nil
+    }
+
+    private readonly Kind kind;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ReturnConstantOperation"/>
+    ///     class.
+    /// </summary>
+    /// <param name="kind">The constant to return.</param>
+    public ReturnConstantOperation(Kind kind) => this.kind = kind;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        object? value = kind switch
+        {
+            Kind.Self => interpreter.CurrentContext.Receiver,
+            Kind.True => true,
+            Kind.False => false,
+            _ => null
+        };
+
+        interpreter.ReturnFrom(value!);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Return/ReturnTopOperation.cs sha256=830a5b92cc9561d65eae5b216f1cb17a9835757b0b7613ebe5f2e96df766d1df lines=35
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Return/ReturnTopOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Return;
+
+/// <summary>
+///     Returns the top of stack either from a method or from a block.
+/// </summary>
+public sealed class ReturnTopOperation : IBytecodeOperation
+{
+    private readonly bool isBlock;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ReturnTopOperation"/> class.
+    /// </summary>
+    /// <param name="isBlock">Whether the return originates from a block.</param>
+    public ReturnTopOperation(bool isBlock) => this.isBlock = isBlock;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var value = ctx.Stack.Count > 0 ? ctx.Stack.Pop() : ctx.Receiver;
+        if (isBlock)
+        {
+            // Non-local return unwinds to the block's caller.
+            if (ctx is global::BlockContext blk && blk.Sender != blk.HomeContext)
+            {
+                throw new global::NonLocalReturnException(value!, blk.HomeContext.Sender);
+            }
+        }
+
+        interpreter.ReturnFrom(value!);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Send/ArithmeticSelectorSendOperation.cs sha256=c9260b3fe0e29eae1a0c60659b2473ae3fa9d7176c4485aca6ffb2a805af76d4 lines=24
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Send/ArithmeticSelectorSendOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Send;
+
+/// <summary>
+///     Sends one of the arithmetic selectors defined in the interpreter's special table.
+/// </summary>
+public sealed class ArithmeticSelectorSendOperation : IBytecodeOperation
+{
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ArithmeticSelectorSendOperation"/> class.
+    /// </summary>
+    /// <param name="index">The selector table index.</param>
+    public ArithmeticSelectorSendOperation(byte index)
+    {
+    }
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.Dispatch((Bytecode)opcode);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Send/DoubleExtendedSendOperation.cs sha256=5690c181d8cdc978fbc4689864820a73f875b2f00d17faad50e94c343f080a26 lines=24
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Send/DoubleExtendedSendOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Send;
+
+/// <summary>
+///     Sends a message using two extension bytes that specify argument count and selector index.
+/// </summary>
+public sealed class DoubleExtendedSendOperation : IBytecodeOperation
+{
+    private readonly bool superSend;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="DoubleExtendedSendOperation"/> class.
+    /// </summary>
+    /// <param name="superSend">Whether the send should start lookup in the superclass.</param>
+    public DoubleExtendedSendOperation(bool superSend) => this.superSend = superSend;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.Dispatch((Bytecode)opcode);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Send/LiteralSelectorSendOperation.cs sha256=f0bf8beebaf72fd9f2a2b186d0d392f6fe0c3b0ce73cb68cff4c17cc50178921 lines=30
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Send/LiteralSelectorSendOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Send;
+
+/// <summary>
+///     Sends a selector taken from the method's literal frame with a fixed number of arguments.
+/// </summary>
+public sealed class LiteralSelectorSendOperation : IBytecodeOperation
+{
+    private readonly byte index;
+    private readonly int argCount;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="LiteralSelectorSendOperation"/> class.
+    /// </summary>
+    /// <param name="index">The selector literal index.</param>
+    /// <param name="argCount">The number of message arguments.</param>
+    public LiteralSelectorSendOperation(byte index, int argCount)
+    {
+        this.index = index;
+        this.argCount = argCount;
+    }
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.Dispatch((Bytecode)opcode);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Send/SingleExtendedSendOperation.cs sha256=a56bade70278ad3f01cd9e69cd336aad33163281d657cc339cea2963a47064ea lines=25
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Send/SingleExtendedSendOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Send;
+
+/// <summary>
+///     Sends a message using a single descriptor byte that encodes both the
+///     selector index and argument count.
+/// </summary>
+public sealed class SingleExtendedSendOperation : IBytecodeOperation
+{
+    private readonly bool superSend;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SingleExtendedSendOperation"/> class.
+    /// </summary>
+    /// <param name="superSend">Whether the send should start lookup in the superclass.</param>
+    public SingleExtendedSendOperation(bool superSend) => this.superSend = superSend;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.Dispatch((Bytecode)opcode);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Send/SpecialSelectorSendOperation.cs sha256=829d95e444ea1a2b3a61345d76db7034a9d1edfa386ced7a45b3e0608afcc6a3 lines=24
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Send/SpecialSelectorSendOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Send;
+
+/// <summary>
+///     Sends one of the special selectors that are implicitly known to the interpreter.
+/// </summary>
+public sealed class SpecialSelectorSendOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SpecialSelectorSendOperation"/> class.
+    /// </summary>
+    /// <param name="index">The selector table index.</param>
+    public SpecialSelectorSendOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.Dispatch((Bytecode)opcode);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/DuplicateTopOperation.cs sha256=c8f3700f52b495686b82fc4f08c937878092ec40ea6a84cce4d974cf2067030c lines=18
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/DuplicateTopOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Duplicates the top stack element.
+/// </summary>
+public sealed class DuplicateTopOperation : IBytecodeOperation
+{
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var top = ctx.Stack.Peek();
+        ctx.Stack.Push(top);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/ExtendedPushOperation.cs sha256=ccef6c00cdb8db507f63f25f17e67e3370aeb0ab756b5b77cf157c07cd15439a lines=40
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/ExtendedPushOperation.cs
+using System;
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Performs an extended push which can access up to sixty-four receiver
+///     variables, temporary locations, literal constants or literal variables.
+/// </summary>
+public sealed class ExtendedPushOperation : IBytecodeOperation
+{
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var descriptor = ctx.Method.Bytecodes[ctx.PC++];
+        var type = descriptor >> 6;
+        var index = descriptor & 0x3F;
+
+        switch (type)
+        {
+            case 0:
+                ctx.Stack.Push(ctx.Receiver.Fields[index]);
+                break;
+            case 1:
+                ctx.Stack.Push(ctx.Temporaries[index]);
+                break;
+            case 2:
+                ctx.Stack.Push(ctx.Method.Literals[index]);
+                break;
+            case 3:
+                var assoc = (global::Association)ctx.Method.Literals[index]!;
+                ctx.Stack.Push(assoc.Value);
+                break;
+            default:
+                throw new InvalidOperationException($"Invalid extended push type {type}");
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/ExtendedStoreOperation.cs sha256=ee022b4eacdefc7fc41a3a1618e5c6aad762effee568cb0922d02a05febbd5f6 lines=52
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/ExtendedStoreOperation.cs
+using System;
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Stores the stack top into a variable described by an extended descriptor.
+/// </summary>
+public sealed class ExtendedStoreOperation : IBytecodeOperation
+{
+    private readonly bool popAfter;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ExtendedStoreOperation"/> class.
+    /// </summary>
+    /// <param name="popAfter">Whether to pop the value after storing.</param>
+    public ExtendedStoreOperation(bool popAfter) => this.popAfter = popAfter;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var descriptor = ctx.Method.Bytecodes[ctx.PC++];
+        var type = descriptor >> 6;
+        var index = descriptor & 0x3F;
+        var value = ctx.Stack.Peek();
+
+        switch (type)
+        {
+            case 0:
+                ctx.Receiver.Fields[index] = value;
+                break;
+            case 1:
+                ctx.Temporaries[index] = value!;
+                break;
+            case 2:
+                throw new InvalidOperationException("Cannot store into a literal constant");
+            case 3:
+                var assoc = (global::Association)ctx.Method.Literals[index]!;
+                assoc.Value = value;
+                break;
+            default:
+                throw new InvalidOperationException($"Invalid extended store type {type}");
+        }
+
+        if (popAfter)
+        {
+            _ = ctx.Stack.Pop();
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PopStackOperation.cs sha256=2fe0140a7a582a0aebc259469dff4f1ebe39b46b5fcf8fe4afd76a79013078ae lines=16
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PopStackOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Removes the top object from the evaluation stack.
+/// </summary>
+public sealed class PopStackOperation : IBytecodeOperation
+{
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        _ = interpreter.CurrentContext.Stack.Pop();
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushActiveContextOperation.cs sha256=0a56afdf7a2e7095218d4e0ec1e906dcde06695c7be00f4e99a37cb1d856bdb5 lines=16
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushActiveContextOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes a reference to the currently active context onto the stack.
+/// </summary>
+public sealed class PushActiveContextOperation : IBytecodeOperation
+{
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Push(interpreter.CurrentContext);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushConstantOperation.cs sha256=48a9fb2c8562f60bea6fd6613690a83bf8d27411f2077bed802c03a6d1a066ac lines=25
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushConstantOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes a constant value onto the evaluation stack.
+/// </summary>
+public sealed class PushConstantOperation : IBytecodeOperation
+{
+    private readonly object? constant;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="PushConstantOperation"/>
+    ///     class.
+    /// </summary>
+    /// <param name="constant">The constant value to push.</param>
+    public PushConstantOperation(object? constant) => this.constant = constant;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Push(constant);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushLiteralConstantOperation.cs sha256=736df29ab1e7c7d10f5323cc0335252905f74810249aa6170bbd9ccfa7603508 lines=26
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushLiteralConstantOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes a literal constant from the method's literal frame.
+/// </summary>
+public sealed class PushLiteralConstantOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="PushLiteralConstantOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based literal index.</param>
+    public PushLiteralConstantOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        ctx.Stack.Push(ctx.Method.Literals[index]);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushLiteralVariableOperation.cs sha256=1b48c0ede0c334c62d46c6eb789f43b17a7fb2cc709cb5d55f6f50776ea6d417 lines=28
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushLiteralVariableOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes the value of an <see cref="Association"/> stored in the method's
+///     literal frame.
+/// </summary>
+public sealed class PushLiteralVariableOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="PushLiteralVariableOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based literal index.</param>
+    public PushLiteralVariableOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        var assoc = (global::Association)ctx.Method.Literals[index]!;
+        ctx.Stack.Push(assoc.Value);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushReceiverVariableOperation.cs sha256=f888ef495214c6e9c1c4f114aee9ec34b216a8810d9d1a384ab16188a2f69c22 lines=27
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushReceiverVariableOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes the value of one of the receiver's instance variables onto the
+///     evaluation stack.
+/// </summary>
+public sealed class PushReceiverVariableOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="PushReceiverVariableOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based instance variable index.</param>
+    public PushReceiverVariableOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        ctx.Stack.Push(ctx.Receiver.Fields[index]);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushSelfOperation.cs sha256=ec13a0800949bb3cc09fbeadf90d48ce5a82adeb391cf39ef0f1d4e8714a3e5c lines=16
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushSelfOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes the current method receiver onto the evaluation stack.
+/// </summary>
+public sealed class PushSelfOperation : IBytecodeOperation
+{
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        interpreter.CurrentContext.Stack.Push(interpreter.CurrentContext.Receiver);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/PushTemporaryVariableOperation.cs sha256=99cd7562ae8a410d4b79eed36e063d5c1e06f6385e67883d90727c2ed5612308 lines=26
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/PushTemporaryVariableOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Pushes the value of a temporary variable onto the evaluation stack.
+/// </summary>
+public sealed class PushTemporaryVariableOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="PushTemporaryVariableOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based temporary index.</param>
+    public PushTemporaryVariableOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        ctx.Stack.Push(ctx.Temporaries[index]);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/StoreAndPopReceiverVariableOperation.cs sha256=06c3b64b911594c0dbf6a85545e6e950da2910e8b820d0eee14fb44564453245 lines=27
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/StoreAndPopReceiverVariableOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Stores the stack top into one of the receiver's instance variables and
+///     removes the value from the stack.
+/// </summary>
+public sealed class StoreAndPopReceiverVariableOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="StoreAndPopReceiverVariableOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based instance variable index.</param>
+    public StoreAndPopReceiverVariableOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        ctx.Receiver.Fields[index] = ctx.Stack.Pop();
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ByteCodes/Stack/StoreAndPopTemporaryVariableOperation.cs sha256=faea2a353865890ad3db41ba78f42a1449060c10e6a4140863476a5d75bb6e7f lines=27
+---
+`$lang
+// file: Smalltalk80/ByteCodes/Stack/StoreAndPopTemporaryVariableOperation.cs
+using Smalltalk80;
+
+namespace Smalltalk80.ByteCodes.Stack;
+
+/// <summary>
+///     Stores the stack top into a temporary variable and removes the value from
+///     the stack.
+/// </summary>
+public sealed class StoreAndPopTemporaryVariableOperation : IBytecodeOperation
+{
+    private readonly byte index;
+
+    /// <summary>
+    ///     Initializes a new instance of the
+    ///     <see cref="StoreAndPopTemporaryVariableOperation"/> class.
+    /// </summary>
+    /// <param name="index">The zero-based temporary index.</param>
+    public StoreAndPopTemporaryVariableOperation(byte index) => this.index = index;
+
+    /// <inheritdoc />
+    public void Execute(Interpreter interpreter, byte opcode)
+    {
+        var ctx = interpreter.CurrentContext;
+        ctx.Temporaries[index] = ctx.Stack.Pop()!;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/CompiledMethod.cs sha256=84a9cc995c5e0682102ad042ce2bf144d9d120596271681449c12b56f93ea293 lines=53
+---
+`$lang
+// file: Smalltalk80/CompiledMethod.cs
+using System;
+
+/// <summary>
+///     Represents a method that has been compiled to bytecode.
+/// </summary>
+public sealed class CompiledMethod
+{
+    /// <summary>
+    ///     Gets or sets the raw header information describing this method.
+    /// </summary>
+    public MethodHeader Header { get; init; }
+
+    /// <summary>
+    ///     Gets the bytecodes that make up the body of the method.
+    /// </summary>
+    public required byte[] Bytecodes { get; init; } = Array.Empty<byte>();
+    
+    /// <summary>
+    ///     Gets the bytecodes (alias for Bytecodes for compatibility).
+    /// </summary>
+    public byte[] Bytecode => Bytecodes;
+
+    /// <summary>
+    ///     Gets the literal objects referenced by the method.
+    /// </summary>
+    public required object[] Literals { get; init; } = Array.Empty<object>();
+
+    /// <summary>
+    ///     Gets the number of temporary variables used by the method.
+    /// </summary>
+    public int TemporariesCount { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the method calls a primitive.
+    /// </summary>
+    public bool HasPrimitive { get; init; }
+
+    /// <summary>
+    ///     If <see cref="HasPrimitive"/> is <c>true</c>, contains the index of
+    ///     the primitive routine to invoke.
+    /// </summary>
+    public int PrimitiveIndex { get; init; }
+
+    /// <summary>
+    ///     Optional comment describing the method's purpose.
+    /// </summary>
+    public string? Comment { get; init; }
+    
+    /// <summary>
+    ///     Optional selector name for method tracing purposes.
+    /// </summary>
+    public string? SelectorName { get; init; }
+}
+`
+
+FILE path=Smalltalk80/Context.cs sha256=cc6fec61db58bca66736b0bee0aceaa4f1fa4a6c7ae554a3ad38067e20eb775f lines=74
+---
+`$lang
+// file: Smalltalk80/Context.cs
+using System;
+using System.Collections.Generic;
+
+/// <summary>
+///     Represents an execution context for a Smalltalk method.
+/// </summary>
+public class Context
+{
+    /// <summary>
+    ///     Gets or sets the sending context. This will be <c>null</c> for the
+    ///     top-level context.
+    /// </summary>
+    public Context? Sender { get; init; }
+
+    /// <summary>
+    ///     Gets the compiled method being executed.
+    /// </summary>
+    public required CompiledMethod Method { get; init; }
+
+    /// <summary>
+    ///     Gets the receiver object for the method.
+    /// </summary>
+    public SmalltalkObject Receiver { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the array of argument values passed to the method.
+    /// </summary>
+    public required object?[] Arguments { get; init; } = Array.Empty<object?>();
+
+    /// <summary>
+    ///     Gets the storage for temporary variables defined by the method.
+    /// </summary>
+    public required object?[] Temporaries { get; init; }
+
+    /// <summary>
+    ///     Gets the evaluation stack used while executing the method.
+    /// </summary>
+    public required Stack<object?> Stack { get; init; }
+
+    /// <summary>
+    ///     Gets or sets the program counter within the method.
+    /// </summary>
+    public int PC { get; set; }
+
+    /// <summary>
+    ///     Creates a new execution context for sending a message.
+    /// </summary>
+    /// <param name="selector">The selector of the method to invoke.</param>
+    /// <param name="argCount">The number of arguments being sent.</param>
+    /// <param name="sender">The calling context.</param>
+    /// <returns>A newly initialized <see cref="Context"/>.</returns>
+    public static Context CreateFor(Symbol selector, int argCount, Context sender)
+    {
+        var cls = sender.Receiver.ClassPointer ??
+                  throw new InvalidOperationException("Receiver has no class pointer");
+        var method = cls.Lookup(selector) ??
+                     throw new InvalidOperationException($"Method {selector} not found");
+
+        var args = new object?[argCount];
+        for (int i = argCount - 1; i >= 0; i--) {
+            args[i] = sender.Stack.Pop();
+        }
+
+        return new MethodContext {
+            Sender = sender,
+            Method = method,
+            Receiver = sender.Receiver,
+            Arguments = args,
+            Temporaries = new object?[method.TemporariesCount],
+            Stack = new Stack<object?>(),
+            PC = 0
+        };
+    }
+}
+`
+
+FILE path=Smalltalk80/Generated/Smalltalk80BaseVisitor.cs sha256=6754bcffe8d3d887719cd47c28fc9f4e32b5d887bbe15f901621dfd486cf4e72 lines=660
+---
+`$lang
+// file: Smalltalk80/Generated/Smalltalk80BaseVisitor.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     ANTLR Version: 4.13.2
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+
+// Unreachable code detected
+#pragma warning disable 0162
+// The variable '...' is assigned but its value is never used
+#pragma warning disable 0219
+// Missing XML comment for publicly visible type or member '...'
+#pragma warning disable 1591
+// Ambiguous reference in cref attribute
+#pragma warning disable 419
+
+namespace Smalltalk80.Generated {
+using Antlr4.Runtime.Misc;
+using Antlr4.Runtime.Tree;
+using IToken = Antlr4.Runtime.IToken;
+using ParserRuleContext = Antlr4.Runtime.ParserRuleContext;
+
+/// <summary>
+/// This class provides an empty implementation of <see cref="ISmalltalk80Visitor{Result}"/>,
+/// which can be extended to create a visitor which only needs to handle a subset
+/// of the available methods.
+/// </summary>
+/// <typeparam name="Result">The return type of the visit operation.</typeparam>
+[System.CodeDom.Compiler.GeneratedCode("ANTLR", "4.13.2")]
+[System.Diagnostics.DebuggerNonUserCode]
+[System.CLSCompliant(false)]
+public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<Result>, ISmalltalk80Visitor<Result> {
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.identifierColon"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitIdentifierColon([NotNull] Smalltalk80Parser.IdentifierColonContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.fileIn"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitFileIn([NotNull] Smalltalk80Parser.FileInContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressionEntry"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitExpressionEntry([NotNull] Smalltalk80Parser.ExpressionEntryContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statementsEntry"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitStatementsEntry([NotNull] Smalltalk80Parser.StatementsEntryContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodEntry"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodEntry([NotNull] Smalltalk80Parser.MethodEntryContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classEntry"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassEntry([NotNull] Smalltalk80Parser.ClassEntryContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.chunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitChunk([NotNull] Smalltalk80Parser.ChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressionChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitExpressionChunk([NotNull] Smalltalk80Parser.ExpressionChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classDefChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassDefChunk([NotNull] Smalltalk80Parser.ClassDefChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classHeader"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassHeader([NotNull] Smalltalk80Parser.ClassHeaderContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.subclassKind"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitSubclassKind([NotNull] Smalltalk80Parser.SubclassKindContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primitiveDecl"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classBody"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassBody([NotNull] Smalltalk80Parser.ClassBodyContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classSlotSpec"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassSlotSpec([NotNull] Smalltalk80Parser.ClassSlotSpecContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.categoryDecl"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitCategoryDecl([NotNull] Smalltalk80Parser.CategoryDeclContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classCommentChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassDefinitionChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMetaclassDefinitionChunk([NotNull] Smalltalk80Parser.MetaclassDefinitionChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassCommentChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMetaclassCommentChunk([NotNull] Smalltalk80Parser.MetaclassCommentChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodDef"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodDef([NotNull] Smalltalk80Parser.MethodDefContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodBody"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodBody([NotNull] Smalltalk80Parser.MethodBodyContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodBodyNoBang"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodBodyNoBang([NotNull] Smalltalk80Parser.MethodBodyNoBangContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodCategoryChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodCategoryChunk([NotNull] Smalltalk80Parser.MethodCategoryChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodHeader"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMethodHeader([NotNull] Smalltalk80Parser.MethodHeaderContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.formalArg"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitFormalArg([NotNull] Smalltalk80Parser.FormalArgContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.temporaries"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitTemporaries([NotNull] Smalltalk80Parser.TemporariesContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.temporaryName"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitTemporaryName([NotNull] Smalltalk80Parser.TemporaryNameContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitStatements([NotNull] Smalltalk80Parser.StatementsContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statement"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitStatement([NotNull] Smalltalk80Parser.StatementContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.returnStatement"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitReturnStatement([NotNull] Smalltalk80Parser.ReturnStatementContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressionStatement"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitExpressionStatement([NotNull] Smalltalk80Parser.ExpressionStatementContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expression"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitExpression([NotNull] Smalltalk80Parser.ExpressionContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.assignmentExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitAssignmentExpr([NotNull] Smalltalk80Parser.AssignmentExprContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.cascadeExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitCascadeExpr([NotNull] Smalltalk80Parser.CascadeExprContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMessageExpr([NotNull] Smalltalk80Parser.MessageExprContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageBase"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMessageBase([NotNull] Smalltalk80Parser.MessageBaseContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.negativeNumber"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitNegativeNumber([NotNull] Smalltalk80Parser.NegativeNumberContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messagePart"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitMessagePart([NotNull] Smalltalk80Parser.MessagePartContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryMessage"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitUnaryMessage([NotNull] Smalltalk80Parser.UnaryMessageContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryMessage"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitBinaryMessage([NotNull] Smalltalk80Parser.BinaryMessageContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordMessage"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitKeywordMessage([NotNull] Smalltalk80Parser.KeywordMessageContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordPart"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitKeywordPart([NotNull] Smalltalk80Parser.KeywordPartContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.nonKeywordExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitNonKeywordExpr([NotNull] Smalltalk80Parser.NonKeywordExprContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.block"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitBlock([NotNull] Smalltalk80Parser.BlockContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.blockArgs"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitBlockArgs([NotNull] Smalltalk80Parser.BlockArgsContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.argumentName"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitArgumentName([NotNull] Smalltalk80Parser.ArgumentNameContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.blockTemps"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitBlockTemps([NotNull] Smalltalk80Parser.BlockTempsContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.parenthesizedExpr"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitParenthesizedExpr([NotNull] Smalltalk80Parser.ParenthesizedExprContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unarySelector"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitUnarySelector([NotNull] Smalltalk80Parser.UnarySelectorContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binarySelector"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitBinarySelector([NotNull] Smalltalk80Parser.BinarySelectorContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.variable"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitVariable([NotNull] Smalltalk80Parser.VariableContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.literal"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitLiteral([NotNull] Smalltalk80Parser.LiteralContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.numberLiteral"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitNumberLiteral([NotNull] Smalltalk80Parser.NumberLiteralContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.stringConst"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitStringConst([NotNull] Smalltalk80Parser.StringConstContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.characterLiteral"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitCharacterLiteral([NotNull] Smalltalk80Parser.CharacterLiteralContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.byteArrayLiteral"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitByteArrayLiteral([NotNull] Smalltalk80Parser.ByteArrayLiteralContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayLiteral"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitArrayLiteral([NotNull] Smalltalk80Parser.ArrayLiteralContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.arrayElement"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitArrayElement([NotNull] Smalltalk80Parser.ArrayElementContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolConst"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitSymbolConst([NotNull] Smalltalk80Parser.SymbolConstContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.symbolName"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitSymbolName([NotNull] Smalltalk80Parser.SymbolNameContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSymbolSelector"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitKeywordSymbolSelector([NotNull] Smalltalk80Parser.KeywordSymbolSelectorContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.separatorChunk"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitSeparatorChunk([NotNull] Smalltalk80Parser.SeparatorChunkContext context) { return VisitChildren(context); }
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.className"/>.
+	/// <para>
+	/// The default implementation returns the result of calling <see cref="AbstractParseTreeVisitor{Result}.VisitChildren(IRuleNode)"/>
+	/// on <paramref name="context"/>.
+	/// </para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	public virtual Result VisitClassName([NotNull] Smalltalk80Parser.ClassNameContext context) { return VisitChildren(context); }
+}
+} // namespace Smalltalk80.Generated
+
+`

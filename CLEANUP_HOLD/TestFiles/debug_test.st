@@ -1,2 +1,0 @@
-Object>>testMethod
-^42!

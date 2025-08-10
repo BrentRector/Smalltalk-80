@@ -1,0 +1,3887 @@
+CHUNK 9/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+ce": "asOop<primitive: 75>selfprimitiveFailed!",
+          "literals": [
+            "selfprimitiveFailed"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 60,
+          "selector": "at:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "at:index<primitive: 60>indexisIntegerifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfat:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+          "literals": [
+            "indexisIntegerifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "at:put:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "at:indexput:value<primitive: 61>indexisIntegerifTrue:[(index>=1and:[index<=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfat:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+          "literals": [
+            "value"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 60,
+          "selector": "basicAt:",
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "basicAt:index<primitive: 60>(indexisKindOf:Integer)ifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+          "literals": [
+            "Integer",
+            "indexisKindOf"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "basicAt:put:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "basicAt:indexput:value<primitive: 61>(indexisKindOf:Integer)ifTrue:[(index>=1and:[index<=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+          "literals": [
+            "value"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "basicInspect",
+          "temporaryCount": 0,
+          "source": "basicInspectInspectorViewopen:(Inspectorinspect:self)!"
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 62,
+          "selector": "basicSize",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "basicSize<primitive: 62>^0!"
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 72,
+          "selector": "become:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "become:otherObject<primitive: 72>selfprimitiveFailed!",
+          "literals": [
+            "selfprimitiveFailed"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "breakDependents",
+          "bytecode": [
+            137,
+            0,
+            2,
+            32,
+            125
+          ],
+          "temporaryCount": 0,
+          "source": "breakDependentsDependentsFieldsremoveKey:selfifAbsent:[]!",
+          "literals": [
+            "nil"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "broadcast:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "broadcast:aSymbolselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbol]]!",
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "broadcast:with:",
+          "bytecode": [
+            65,
+            66,
+            224,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "broadcast:aSymbolwith:anObjectselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbolwith:anObject]]!",
+          "literals": [
+            "~~",
+            "anObjectselfdependents",
+            "nilifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "changed",
+          "temporaryCount": 0,
+          "source": "changedselfchanged:self!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "changed:",
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            208,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "changed:aParameterselfdependentsdo:[:aDependent|aDependentupdate:aParameter]!",
+          "literals": [
+            "aParameter",
+            "aDependentupdate"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "changeRequest",
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            208,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "changeRequestselfdependentsdo:[:dep|depupdateRequestifFalse:[^false]].^true!",
+          "literals": [
+            "false",
+            "depupdateRequestifFalse"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "changeRequestFrom:",
+          "bytecode": [
+            137,
+            0,
+            5,
+            66,
+            67,
+            198,
+            209,
+            125
+          ],
+          "temporaryCount": 0,
+          "source": "changeRequestFrom:requestorselfdependentsdo:[:dep|(dep==requestoror:[depupdateRequest])ifFalse:[^false]].^true!",
+          "literals": [
+            "==",
+            "depupdateRequest",
+            "dep",
+            "requestoror"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 111,
+          "selector": "class",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "class<primitive: 111>selfprimitiveFailed!",
+          "literals": [
+            "selfprimitiveFailed"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "confirm:",
+          "bytecode": [
+            32,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "confirm:aString|answer|answer_false.BinaryChoicemessage:aStringdisplayAt:SensorcursorPointcentered:trueifTrue:[answer_true]ifFalse:[answer_false].^answer!",
+          "literals": [
+            "False",
+            "BinaryChoicemessage"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "conflictingInheritanceError",
+          "temporaryCount": 0,
+          "source": "conflictingInheritanceErrorselferror:'Conflicting methods due to multiple inheritance'!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "copy",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "copy^selfshallowCopy!",
+          "literals": [
+            "selfshallowCopy"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "deepCopy",
+          "bytecode": [
+            66,
+            136,
+            129,
+            96,
+            3,
+            135,
+            105,
+            67,
+            68,
+            198,
+            137,
+            0,
+            3,
+            112,
+            125,
+            125,
+            225,
+            105,
+            69,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "deepCopy|newObjectclassindex|class_selfclass.(class==Object)ifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index>0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index)deepCopy.index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index>0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index)deepCopy.index_index-1].^newObject!",
+          "literals": [
+            "==",
+            "ifTrue:",
+            "selfclass",
+            "class",
+            "Object",
+            "classisVariableifTrue"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "dependents",
+          "temporaryCount": 0,
+          "source": "dependents^DependentsFieldsat:selfifAbsent:[OrderedCollectionnew]!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "doesNotUnderstand:",
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "doesNotUnderstand:aMessage|statusgripe|status_selfclasstryCopyingCodeFor:aMessageselector.status==#OKifTrue:[^selfperform:aMessageselectorwithArguments:aMessagearguments].gripe_status==#HierarchyViolationifTrue:[aMessageselectorclassPart,' is not one of my superclasses: ']ifFalse:['Message not understood: '].NotifierViewopenContext:thisContextlabel:gripe,aMessageselectorcontents:thisContextshortStack.^selfperform:aMessageselectorwithArguments:aMessagearguments!",
+          "literals": [
+            "selfclasstryCopyingCodeFor",
+            "status"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "error:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "error:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+          "literals": [
+            "thisContextlabel"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorImproperStore",
+          "temporaryCount": 0,
+          "source": "errorImproperStoreselferror:'Improper store into indexable object'!"
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorNonIntegerIndex",
+          "temporaryCount": 0,
+          "source": "errorNonIntegerIndexselferror:'only integers should be used as indices'!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "errorSubscriptBounds:",
+          "bytecode": [
+            32,
+            66,
+            225,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "errorSubscriptBounds:indexselferror:'subscript is out of bounds: ',indexprintString!",
+          "literals": [
+            "subscript is out of bounds: ",
+            ",",
+            "indexprintString"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "forkEmergencyEvaluatorAt:",
+          "bytecode": [
+            137,
+            0,
+            2,
+            69,
+            125,
+            33,
+            187,
+            35,
+            36,
+            187,
+            226,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "forkEmergencyEvaluatorAt:priority|streamchar|[Displaywhite:(0@0extent:1024@36).'EMERGENCY EVALUATOR (priority ',priorityprintString,') -- type an expression terminated by ESC'displayAt:50@0.Displayreverse:(0@0extent:1024@36).stream_WriteStreamon:Stringnew.[[SensorkeyboardPressed]whileFalse.(char_Sensorkeyboard)=160asCharacter]whileFalse:[char=CharacterbackspaceifTrue:[streamskip:-1.Displayblack:(0@18extent:1024@18)]ifFalse:[streamnextPut:char].streamcontentsdisplayAt:50@18].Displayblack:(0@0extent:1024@18).(Compilerevaluate:streamcontents)printStringdisplayAt:50@0]forkAt:priority!",
+          "literals": [
+            "@",
+            "0",
+            "extent:",
+            "1024",
+            "36",
+            "Displaywhite"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "halt",
+          "bytecode": [
+            32,
+            66,
+            225,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "haltNotifierViewopenContext:thisContextlabel:'Halt encountered.'contents:thisContextshortStack!",
+          "literals": [
+            "Halt encountered.",
+            "contents:",
+            "thisContextshortStack"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "halt:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "halt:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+          "literals": [
+            "thisContextlabel"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 75,
+          "selector": "hash",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "hash<primitive: 75>selfprimitiveFailed!",
+          "literals": [
+            "selfprimitiveFailed"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "hashMappedBy:",
+          "temporaryCount": 0,
+          "source": "hashMappedBy:map^mapnewHashFor:selfhash!"
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "inspect",
+          "temporaryCount": 0,
+          "source": "inspectselfbasicInspect!"
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 73,
+          "selector": "instVarAt:",
+          "bytecode": [
+            112,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "instVarAt:index<primitive: 73>^selfbasicAt:index-selfclassinstSize!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "instVarAt:put:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "instVarAt:anIntegerput:anObject<primitive: 74>^selfbasicAt:anInteger-selfclassinstSizeput:anObject!",
+          "literals": [
+            "anObject"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "isInteger",
+          "temporaryCount": 0,
+          "source": "isInteger^false!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "isKindOf:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "isKindOf:aClassselfclass==aClassifTrue:[^true]ifFalse:[^selfclassinheritsFrom:aClass]!",
+          "literals": [
+            "aClassifTrue"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "isLiteral",
+          "temporaryCount": 0,
+          "source": "isLiteral^false!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "isMemberOf:",
+          "bytecode": [
+            65,
+            16,
+            198,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "isMemberOf:aClass^selfclass==aClass!",
+          "literals": [
+            "==",
+            "selfclass"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "isNil",
+          "temporaryCount": 0,
+          "source": "isNil^false!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "mustBeBoolean",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "mustBeBooleanselferror:'NonBoolean receiver--proceed for truth.'.^true!",
+          "literals": [
+            "True"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 78,
+          "selector": "nextInstance",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "nextInstance<primitive: 78>^nil!",
+          "literals": [
+            "nil"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "nilFields",
+          "bytecode": [
+            137,
+            0,
+            3,
+            112,
+            125,
+            125,
+            105,
+            32,
+            66,
+            225,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "nilFieldsselfclassisPointersifFalse:[^self].1to:selfbasicSizedo:[:index|selfbasicAt:indexput:nil].1to:selfclassinstSizedo:[:index|selfinstVarAt:indexput:nil].!",
+          "literals": [
+            "1",
+            "to:",
+            "selfbasicSizedo"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "notify:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "notify:aStringNotifierViewopenContext:thisContextlabel:'Notifier'contents:aString!",
+          "literals": [
+            "thisContextlabel"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "notNil",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "notNil^true!",
+          "literals": [
+            "True"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 83,
+          "selector": "perform:",
+          "bytecode": [
+            112,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "perform:aSymbol<primitive: 83>^selfperform:aSymbolwithArguments:(Arraynew:0)!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "perform:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "perform:aSymbolwith:anObject<primitive: 83>^selfperform:aSymbolwithArguments:(Arraywith:anObject)!",
+          "literals": [
+            "anObject"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "perform:with:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "perform:aSymbolwith:firstObjectwith:secondObject<primitive: 83>^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObject)!",
+          "literals": [
+            "firstObjectwith"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "perform:with:with:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "perform:aSymbolwith:firstObjectwith:secondObjectwith:thirdObject<primitive: 83>^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObjectwith:thirdObject)!",
+          "literals": [
+            "firstObjectwith"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "perform:withArguments:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "perform:selectorwithArguments:anArray<primitive: 84>selfprimitiveFailed!",
+          "literals": [
+            "anArray"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "primitiveError:",
+          "bytecode": [
+            64,
+            106,
+            65,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "primitiveError:aString|contextkey|Transcriptcr.Transcriptshow:'**System Error Handling Failed** '.Transcriptshow:aString.Transcriptcr.context_thisContextsendersender.3timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]].[Transcriptshow:'**type <s> for more stack; anything else restarts scheduler**'.Transcriptcr.key_Sensorkeyboard.key=$s|(key=$S)]whileTrue:[5timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]]].ScheduledControllerssearchForActiveController!",
+          "literals": [
+            "Transcriptcr",
+            "Transcriptshow"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "primitiveFailed",
+          "temporaryCount": 0,
+          "source": "primitiveFailedselferror:'a primitive has failed'!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "printOn:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "printOn:aStream|title|title_selfclassname.aStreamnextPutAll:((titleat:1)isVowelifTrue:['an ']ifFalse:['a ']),title!",
+          "literals": [
+            "selfclassname",
+            "aStreamnextPutAll"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "printString",
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "printString|aStream|aStream_WriteStreamon:(Stringnew:16).selfprintOn:aStream.^aStreamcontents!",
+          "literals": [
+            "WriteStreamon"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "readFromString:",
+          "temporaryCount": 0,
+          "source": "readFromString:aString^selfreadFrom:(ReadStreamon:aString)!"
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "release",
+          "temporaryCount": 0,
+          "source": "releaseselfbreakDependents!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "removeDependent:",
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "removeDependent:anObject|dependents|dependents_DependentsFieldsat:selfifAbsent:[^anObject].dependentsremove:anObjectifAbsent:[].dependentsisEmptyifTrue:[selfbreakDependents].^anObject!",
+          "literals": [
+            "DependentsFieldsat"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "respondsTo:",
+          "temporaryCount": 0,
+          "source": "respondsTo:aSymbol^selfclasscanUnderstand:aSymbol!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "setDependents",
+          "bytecode": [
+            64,
+            136,
+            104,
+            105,
+            65,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "setDependents|dependents|dependents_OrderedCollectionnew.DependentsFieldsadd:(Associationkey:selfvalue:dependents).^dependents!",
+          "literals": [
+            "OrderedCollectionnew",
+            "DependentsFieldsadd"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "shallowCopy",
+          "bytecode": [
+            65,
+            136,
+            129,
+            96,
+            2,
+            135,
+            105,
+            66,
+            67,
+            198,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "shallowCopy|classnewObjectindex|class_selfclass.class==ObjectifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index>0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index).index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index>0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index).index_index-1].^newObject!",
+          "literals": [
+            "==",
+            "selfclass",
+            "class",
+            "ObjectifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "shouldNotImplement",
+          "temporaryCount": 0,
+          "source": "shouldNotImplementselferror:'This message is not appropriate for this object'!"
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 62,
+          "selector": "size",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "size<primitive: 62>^0!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "species",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "species^selfclass!",
+          "literals": [
+            "selfclass"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "storeOn:",
+          "bytecode": [
+            32,
+            105,
+            65,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "storeOn:aStreamaStreamnextPut:$(.selfclassisVariableifTrue:[aStreamnextPutAll:'(',selfclassname,' basicNew: ';store:selfbasicSize;nextPutAll:') ']ifFalse:[aStreamnextPutAll:selfclassname,' basicNew'].1to:selfclassinstSizedo:[:i|aStreamnextPutAll:' instVarAt: ';store:i;nextPutAll:' put: ';store:(selfinstVarAt:i);nextPut:$;].1to:selfbasicSizedo:[:i|aStreamnextPutAll:' basicAt: ';store:i;nextPutAll:' put: ';store:(selfbasicAt:i);nextPut:$;].aStreamnextPutAll:' yourself)'!",
+          "literals": [
+            "(",
+            "selfclassisVariableifTrue"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "storeString",
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "storeString|aStream|aStream_WriteStreamon:(Stringnew:16).selfstoreOn:aStream.^aStreamcontents!",
+          "literals": [
+            "WriteStreamon"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "subclassResponsibility",
+          "temporaryCount": 0,
+          "source": "subclassResponsibilityselferror:'My subclass should have overridden one of my messages.'!"
+        },
+        {
+          "argumentCount": 0,
+          "primitive": 7,
+          "selector": "tryPrimitive0",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "tryPrimitive0<primitive: 007>^#primitiveFail!",
+          "literals": [
+            "primitiveFail"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "primitive": 7,
+          "selector": "tryPrimitive1:",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "tryPrimitive1:arg1<primitive: 007>^#primitiveFail!",
+          "literals": [
+            "primitiveFail"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "tryPrimitive2:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "tryPrimitive2:arg1with:arg2<primitive: 007>^#primitiveFail!",
+          "literals": [
+            "arg2"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "tryPrimitive3:with:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "tryPrimitive3:arg1with:arg2with:arg3<primitive: 007>^#primitiveFail!",
+          "literals": [
+            "arg2with"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "tryPrimitive4:with:with:with:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "tryPrimitive4:arg1with:arg2with:arg3with:arg4<primitive: 007>^#primitiveFail!",
+          "literals": [
+            "arg2with"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "update:",
+          "temporaryCount": 0,
+          "source": "update:aParameter^self!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "updateRequest",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "updateRequest^true!",
+          "literals": [
+            "True"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "yourself",
+          "temporaryCount": 0,
+          "source": "yourself!"
+        }
+      ]
+    },
+    {
+      "name": "ClassDescription",
+      "classVariables": [],
+      "instanceVariables": [
+        "instanceVariables",
+        "organization"
+      ],
+      "classMethods": [],
+      "superclass": "Behavior",
+      "methods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "addInstVarName:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "category",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "String",
+            "catisKindOf"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "selector": "category:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "selector": "classVariablesString",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "=",
+            "ifTrue:",
+            "",
+            "selforganizationclassComment",
+            "aStringsize",
+            "StringreadFromString"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            68,
+            136,
+            104,
+            105,
+            69,
+            33,
+            182,
+            137,
+            0,
+            3,
+            35,
+            125,
+            125,
+            226,
+            105,
+            70,
+            124
+          ],
+          "selector": "comment",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "=",
+            "ifTrue:",
+            "aString",
+            "aStringsize",
+            "selforganizationclassComment"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            68,
+            33,
+            182,
+            137,
+            0,
+            2,
+            69,
+            125,
+            211,
+            226,
+            124
+          ],
+          "selector": "comment:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "=",
+            "ifTrue:ifFalse:",
+            ",",
+            " comment:\r\n''This class has not yet been commented.  A proper comment should include the purpose of the class and the type and purpose of each instance variable.\r\n''",
+            "selforganizationclassComment",
+            "aStringsize",
+            "selfname"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            69,
+            136,
+            104,
+            105,
+            70,
+            33,
+            182,
+            137,
+            0,
+            5,
+            71,
+            36,
+            227,
+            125,
+            125,
+            137,
+            0,
+            3,
+            16,
+            125,
+            125,
+            242,
+            124
+          ],
+          "selector": "commentTemplate",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "heading"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "compile:classified:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "headingnotifying"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "compile:classified:notifying:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "requestortrailer"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "compile:notifying:trailer:ifFail:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "classselfcopy"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copy:from:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "classclassified"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copy:from:classified:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "classselfcopyAll"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copyAll:from:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "classclassified"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copyAll:from:classified:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "catfrom:",
+            "selfcopyCategory",
+            "aClass"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            66,
+            224,
+            124
+          ],
+          "selector": "copyAllCategoriesFrom:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "classselfcopyCategory"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copyCategory:from:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aClassclassified"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copyCategory:from:classified:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "selector": "definition",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorCategoryName",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "DiskcheckName",
+            "fileName"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "fileOutCategory:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreammoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutCategory:on:moveSource:toFile:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreamselffileOutChangedMessages"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutChangedMessages:on:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreammoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutChangedMessages:on:moveSource:toFile:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aStringfileName"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutMessage:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "fileName",
+            "fileStream"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "selector": "fileOutMessage:fileName:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreammoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutMessage:on:moveSource:toFile:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreammoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutOn:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "moveSourcetoFile"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "fileOutOn:moveSource:toFile:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "nextPut:",
+            "aFileStreamcr",
+            "!",
+            "aFileStreamnextChunkPut"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            105,
+            66,
+            136,
+            106,
+            105,
+            18,
+            35,
+            196,
+            105,
+            68,
+            124
+          ],
+          "selector": "fileOutOrganizationOn:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "instanceVariablesString",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "nilifTrue"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "instVarNames",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "isMeta",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "ifFalse:",
+            " variableWordSubclass: ",
+            "selfisBytesifTrue"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            137,
+            0,
+            2,
+            66,
+            125,
+            137,
+            0,
+            3,
+            33,
+            125,
+            125,
+            224,
+            124
+          ],
+          "selector": "kindOfSubclass",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "==",
+            "SourceFiles",
+            "nilifFalse"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            65,
+            66,
+            198,
+            124
+          ],
+          "selector": "logOrganizationChange",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "methodsFor:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selforganizationmoveChangedCommentToFile"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "moveChangesTo:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "name",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "nil",
+            "superobsolete"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            32,
+            104,
+            65,
+            124
+          ],
+          "selector": "obsolete",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "nilifTrue"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "organization",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "cr",
+            "nextPut:",
+            "aFileStreamaFileStreamcr",
+            "!",
+            "aFileStreamnextChunkPut"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            66,
+            136,
+            105,
+            106,
+            17,
+            208,
+            106,
+            17,
+            35,
+            196,
+            106,
+            68,
+            124
+          ],
+          "selector": "printCategoryChunk:on:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aFileStreammoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "printMethodChunk:on:moveSource:toFile:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfname"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "printOn:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aString"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "printOutCategory:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aString"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "printOutMessage:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aStringasSymbol",
+            "selforganizationlistAtCategoryNamed"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "selector": "removeCategory:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "removeInstVarName:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aSymbol",
+            "methodDictincludesKey"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "selector": "removeSelector:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selforganization"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "reorganize",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "selector": "sharedPoolsString",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "selfname"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "storeOn:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "oldClassinstanceVariableNames"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "subclassOf:oldClass:instanceVariableNames:variable:words:pointers:ifBad:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "superclassesString",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "==",
+            "oldClasssomeInstance",
+            "nilifTrue"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            65,
+            66,
+            198,
+            124
+          ],
+          "selector": "updateInstancesFrom:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "environinstanceVariableNames"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "validateFrom:in:instanceVariableNames:methods:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aSelector",
+            "selfincludesSelector"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "selector": "whichCategoryIncludesSelector:",
+          "argumentCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Metaclass",
+      "classVariables": [],
+      "instanceVariables": [
+        "thisClass"
+      ],
+      "classMethods": [
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "subclassOf:",
+          "temporaryCount": 0,
+          "source": "subclassOf:superMeta^selfnewsubclassOf:superMeta!"
+        }
+      ],
+      "superclass": "ClassDescription",
+      "methods": [
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "addClassVarName:",
+          "temporaryCount": 0,
+          "source": "addClassVarName:aString^thisClassaddClassVarName:aString!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "addInstVarName:",
+          "bytecode": [
+            16,
+            136,
+            105,
+            106,
+            64,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "addInstVarName:aString|fullString|fullString_aString.selfinstVarNamesdo:[:aString2|fullString_aString2,' ',fullString].selfinstanceVariableNames:fullString!",
+          "literals": [
+            "selfinstVarNamesdo"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "classPool",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "classPool^thisClassclassPool!",
+          "literals": [
+            "thisClassclassPool"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "copy",
+          "bytecode": [
+            0,
+            136,
+            129,
+            96,
+            0,
+            135,
+            105,
+            33,
+            136,
+            96,
+            105,
+            66,
+            136,
+            129,
+            96,
+            3,
+            135,
+            105,
+            64,
+            136,
+            96,
+            105,
+            67,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "copy|copyt|t_thisClass.thisClass_nil.copy_supercopy.thisClass_t.^copy!",
+          "literals": [
+            "t",
+            "nil",
+            "supercopy",
+            "copy"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "copyForValidation",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "copyForValidation^supercopy!",
+          "literals": [
+            "supercopy"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "definition",
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "definition|aStreamnames|aStream_WriteStreamon:(Stringnew:300).selfprintOn:aStream.aStreamnextPutAll:'\r\n\tinstanceVariableNames: '''.names_selfinstVarNames.1to:namessizedo:[:i|aStreamnextPutAll:(namesat:i);space].aStreamnextPut:$'.^aStreamcontents!",
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "fileOutOn:moveSource:toFile:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexsuperfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.(methodDictincludesKey:#initialize)ifTrue:[aFileStreamcr.aFileStreamcr.aFileStreamnextChunkPut:thisClassname,' initialize'.aFileStreamcr]!",
+          "literals": [
+            "moveSourcetoFile"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "instanceVariableNames:",
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            106,
+            66,
+            136,
+            129,
+            96,
+            3,
+            135,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "instanceVariableNames:instVarString|newMetainvalidok|newMeta_selfcopyForValidation.invalid_newMetasubclassOf:superclassoldClass:selfinstanceVariableNames:instVarStringvariable:falsewords:truepointers:trueifBad:[^false].invalidifTrue:[ok_newMetavalidateFrom:selfin:SmalltalkinstanceVariableNames:truemethods:true.SmalltalkchangeschangeClass:self.^ok]!",
+          "literals": [
+            "selfcopyForValidation",
+            "newMeta",
+            "newMetasubclassOf",
+            "invalid"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "instHasMultipleSuperclasses",
+          "temporaryCount": 0,
+          "source": "instHasMultipleSuperclasses^false!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "isMeta",
+          "bytecode": [
+            32,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "isMeta^true!",
+          "literals": [
+            "True"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "isObsolete",
+          "temporaryCount": 0,
+          "source": "isObsolete^thisClass==nilor:[thisClass~~(Smalltalkat:thisClassnameifAbsent:[nil])]!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "name",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "namethisClass==nilifTrue:[^'a Metaclass']ifFalse:[^thisClassname,' class']!",
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "name:inEnvironment:subclassOf:and:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "name:newNameinEnvironment:environsubclassOf:supand:othersinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:'Class names must be capitalized'.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,' already exists!!  Proceed will store over it'.wasPresent_false.oldClass_selfnewNamed:newNameotherSupers:others]]ifFalse:[oldClass_selfnewNamed:newNameotherSupers:others].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassesdo:[:sup|supremoveSubclass:oldClass;addSubclass:newClass].wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].invalidFieldsifTrue:[newClasscopyMethods.newClassclasscopyMethods].^newClass!",
+          "literals": [
+            "environsubclassOf"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "name:inEnvironment:subclassOf:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "name:newNameinEnvironment:environsubclassOf:supinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:'Class names must be capitalized'.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,' already exists!!  Proceed will store over it'.wasPresent_false.oldClass_selfnewNamed:newName]]ifFalse:[oldClass_selfnewNamed:newName].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassremoveSubclass:oldClass.newClasssuperclassaddSubclass:newClass.wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].^newClass!",
+          "literals": [
+            "environsubclassOf"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "new",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "newthisClass==nilifTrue:[^thisClass_supernew]ifFalse:[selferror:'A Metaclass should only have one instance!!']!",
+          "literals": [
+            "nilifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "newNamed:",
+          "temporaryCount": 0,
+          "source": "newNamed:aSymbol^(MetaclasssubclassOf:self)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "newNamed:otherSupers:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "newNamed:aSymbolotherSupers:others^(MetaclassForMultipleInheritancesubclassOf:selfand:others)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!",
+          "literals": [
+            "others"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "nonTrivial",
+          "bytecode": [
+            67,
+            33,
+            179,
+            137,
+            0,
+            12,
+            68,
+            33,
+            179,
+            137,
+            0,
+            4,
+            69,
+            33,
+            179,
+            125,
+            226,
+            125,
+            226,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "nonTrivial^selfinstVarNamessize>0or:[methodDictsize>0or:[selfcommentsize>0]]!",
+          "literals": [
+            ">",
+            "0",
+            "or:",
+            "selfinstVarNamessize",
+            "methodDictsize",
+            "selfcommentsize"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "selector": "obsolete",
+          "bytecode": [
+            32,
+            104,
+            65,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "obsoletethisClass_nil.superobsolete!",
+          "literals": [
+            "nil",
+            "superobsolete"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "removeInstVarName:",
+          "bytecode": [
+            65,
+            208,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "removeInstVarName:aString|newArraynewString|(selfinstVarNamesincludes:aString)ifFalse:[selferror:aString,' is not one of my instance variables'].newArray_selfinstVarNamescopyWithout:aString.newString_''.newArraydo:[:aString2|newString_aString2,' ',newString].selfinstanceVariableNames:newString!",
+          "literals": [
+            "aString",
+            "selfinstVarNamesincludes"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "scopeHas:ifTrue:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "scopeHas:nameifTrue:assocBlock^thisClassscopeHas:nameifTrue:assocBlock!",
+          "literals": [
+            "assocBlock"
+          ]
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            0,
+            124
+          ],
+          "selector": "soleInstance",
+          "temporaryCount": 0,
+          "source": "soleInstance^thisClass!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "subclasses",
+          "bytecode": [
+            112,
+            65,
+            198,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "subclasses|temp|self==ClassclassifTrue:[temp_thisClasssubclassescopy.tempremove:Objectclass.^tempcollect:[:aSubClass|aSubClassclass]].thisClass==nilifTrue:[^Setnew]ifFalse:[^thisClasssubclassescollect:[:aSubClass|aSubClassclass]]!",
+          "literals": [
+            "==",
+            "ClassclassifTrue"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "subclassOf:",
+          "bytecode": [
+            64,
+            105,
+            65,
+            136,
+            129,
+            96,
+            2,
+            135,
+            105,
+            67,
+            136,
+            129,
+            96,
+            4,
+            135,
+            105,
+            37,
+            136,
+            129,
+            96,
+            6,
+            135,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "subclassOf:superMetasuperclass_superMeta.methodDict_MethodDictionarynew.format_superMetaformat.instanceVariables_nil!",
+          "literals": [
+            "superMeta",
+            "MethodDictionarynew",
+            "methodDict",
+            "superMetaformat",
+            "format",
+            "nil",
+            "instanceVariables"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "superclass:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "superclass:superMetasuperclass_superMeta!",
+          "literals": [
+            "superMeta"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ClassOrganizer",
+      "classVariables": [
+        "Default"
+      ],
+      "instanceVariables": [
+        "globalComment",
+        "categoryArray",
+        "categoryStops",
+        "elementArray"
+      ],
+      "classMethods": [
+        {
+          "literals": [
+            "Default"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "defaultProtocol",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "asSymbol"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "initialize",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "supernewsetDefaultList"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "new",
+          "argumentCount": 0
+        }
+      ],
+      "superclass": "Object",
+      "methods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "addCategory:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "heading",
+            "nextHeading",
+            "nextIndexelements",
+            "categoryArrayindexOf"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            66,
+            209,
+            67,
+            224,
+            68,
+            224,
+            124
+          ],
+          "selector": "addCategory:before:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "=",
+            "and:",
+            "&",
+            "ifTrue:",
+            "categoryArraysize",
+            "categoryArrayfirst",
+            "Default",
+            "elementArraysize",
+            "Arraynew"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            70,
+            33,
+            182,
+            137,
+            0,
+            8,
+            71,
+            72,
+            182,
+            73,
+            36,
+            182,
+            227,
+            125,
+            226,
+            137,
+            0,
+            3,
+            74,
+            125,
+            125,
+            229,
+            104,
+            1,
+            124
+          ],
+          "selector": "categories",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "Arraynew",
+            "newCategories"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "categories:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfnumberOfCategoryOfElement"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "selector": "categoryOfElement:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "ScannernewscanTokens",
+            "scanner"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "changeFromString:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "nilifTrue"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "classComment",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "ifTrue:ifFalse:aStringonFileNumber:",
+            "nil",
+            "RemoteStringnewString"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            137,
+            0,
+            4,
+            35,
+            136,
+            96,
+            125,
+            137,
+            0,
+            4,
+            68,
+            136,
+            96,
+            125,
+            34,
+            131,
+            97,
+            124
+          ],
+          "selector": "classComment:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "heading",
+            "catNamecatIndexelemIndexrealHeading",
+            "realHeading"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            67,
+            224,
+            124
+          ],
+          "selector": "classify:under:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "headingaCollectiondo"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "classifyAll:under:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "==",
+            "nil"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            0,
+            33,
+            198,
+            124
+          ],
+          "selector": "hasNoComment",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "includesElement:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "categoryArrayindexOf"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "selector": "listAtCategoryNamed:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "=",
+            "ifTrue:ifFalse:",
+            "index",
+            "-",
+            "+",
+            "categoryStopsat",
+            "firstIndex"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            16,
+            33,
+            182,
+            137,
+            0,
+            2,
+            33,
+            125,
+            137,
+            0,
+            5,
+            70,
+            211,
+            33,
+            177,
+            125,
+            33,
+            176,
+            242,
+            136,
+            129,
+            96,
+            7,
+            135,
+            124
+          ],
+          "selector": "listAtCategoryNumber:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "sourceIndex"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "moveChangedCommentToFile:numbered:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "+",
+            "<=",
+            "whileTrue:ifTrue:",
+            ">",
+            "categoryIndex",
+            "whileTrue:",
+            "=",
+            "elementIndex",
+            "elementArraysize",
+            "categoryStopsat",
+            "elementArrayat"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            6,
+            135,
+            106,
+            33,
+            136,
+            129,
+            96,
+            9,
+            135,
+            106,
+            137,
+            0,
+            11,
+            73,
+            32,
+            176,
+            136,
+            129,
+            96,
+            9,
+            135,
+            74,
+            180,
+            125,
+            137,
+            0,
+            27,
+            137,
+            0,
+            5,
+            73,
+            214,
+            75,
+            179,
+            125,
+            137,
+            0,
+            9,
+            70,
+            32,
+            176,
+            136,
+            129,
+            96,
+            6,
+            135,
+            125,
+            231,
+            106,
+            16,
+            217,
+            76,
+            182,
+            125,
+            137,
+            0,
+            3,
+            70,
+            125,
+            125,
+            244,
+            124
+          ],
+          "selector": "numberOfCategoryOfElement:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "to:",
+            "elementIndex",
+            "categoryArraysizedo",
+            "lastStop"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            3,
+            135,
+            106,
+            33,
+            68,
+            226,
+            136,
+            129,
+            96,
+            5,
+            135,
+            124
+          ],
+          "selector": "printOn:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "sourceIndexmoveSource"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "putCommentOnFile:numbered:moveSource:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "categoryArrayindexOf",
+            "index"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "removeCategory:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "categoryIndex",
+            "elementIndex",
+            "nextStop",
+            "WriteStreamon",
+            "newElements"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            2,
+            135,
+            106,
+            33,
+            136,
+            129,
+            96,
+            3,
+            135,
+            106,
+            33,
+            136,
+            129,
+            96,
+            4,
+            135,
+            106,
+            69,
+            136,
+            129,
+            96,
+            6,
+            135,
+            124
+          ],
+          "selector": "removeElement:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "keptCategories"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "removeEmptyCategories",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "|",
+            "newName",
+            "isymbol",
+            "i"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            67,
+            224,
+            124
+          ],
+          "selector": "renameCategory:to:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "aStreamnextChunk"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "scanFrom:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "Arraynew"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            136,
+            99,
+            136,
+            98,
+            136,
+            97,
+            124
+          ],
+          "selector": "setDefaultList",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "setDefaultList:",
+          "argumentCount": 1
+        }
+      ]
+    },
+    {
+      "name": "SequenceableCollection",
+      "classVariables": [],
+      "instanceVariables": [],
+      "classMethods": [],
+      "superclass": "Collection",
+      "methods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": ",",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "=",
+            "selfsize",
+            "size",
+            "otherCollectionsizeifFalse"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            65,
+            136,
+            129,
+            96,
+            2,
+            135,
+            67,
+            182,
+            124
+          ],
+          "selector": "=",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "Arraynew"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "selector": "asArray",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "anObjectanIntervaldo"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "atAll:put:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "+",
+            "<=",
+            "whileTrue:indexput:",
+            "index",
+            "selfsize",
+            "size",
+            "selfat"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            5,
+            135,
+            106,
+            70,
+            136,
+            129,
+            96,
+            7,
+            135,
+            106,
+            137,
+            0,
+            11,
+            69,
+            34,
+            176,
+            136,
+            129,
+            96,
+            5,
+            135,
+            71,
+            180,
+            125,
+            137,
+            0,
+            2,
+            72,
+            125,
+            16,
+            244,
+            124
+          ],
+          "selector": "atAllPut:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "collect:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "stop",
+            "newSize"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "selector": "copyFrom:to:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "newSubstring",
+            "aStringstartSearchcurrentIndex",
+            "aString"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            67,
+            224,
+            124
+          ],
+          "selector": "copyReplaceAll:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "stopwith"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "copyReplaceFrom:to:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfspeciesnew"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "selector": "copyWith:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "selector": "copyWithout:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "+",
+            "<=",
+            "whileTrue:selfat:",
+            "index",
+            "selfsize",
+            "length",
+            "aBlockvalue"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            5,
+            135,
+            106,
+            70,
+            136,
+            129,
+            96,
+            7,
+            135,
+            106,
+            137,
+            0,
+            11,
+            69,
+            34,
+            176,
+            136,
+            129,
+            96,
+            5,
+            135,
+            71,
+            180,
+            125,
+            137,
+            0,
+            2,
+            72,
+            125,
+            69,
+            244,
+            124
+          ],
+          "selector": "do:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorOutOfBounds",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "+",
+            "<=",
+            "whileTrue:ifTrue:",
+            "selfat:",
+            "selfsize",
+            "aBlockvalue"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            105,
+            106,
+            137,
+            0,
+            8,
+            17,
+            34,
+            176,
+            136,
+            105,
+            70,
+            180,
+            125,
+            137,
+            0,
+            4,
+            71,
+            17,
+            229,
+            125,
+            137,
+            0,
+            3,
+            17,
+            125,
+            125,
+            244,
+            124
+          ],
+          "selector": "findFirst:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "+",
+            "-",
+            ">=",
+            "whileTrue:ifTrue:",
+            "selfat:",
+            "selfsize",
+            "aBlockvalue"
+          ],
+          "temporaryCount": 2,
+          "bytecode": [
+            70,
+            33,
+            176,
+            136,
+            105,
+            106,
+            137,
+            0,
+            8,
+            17,
+            33,
+            177,
+            136,
+            105,
+            33,
+            181,
+            125,
+            137,
+            0,
+            4,
+            71,
+            17,
+            229,
+            125,
+            137,
+            0,
+            3,
+            17,
+            125,
+            125,
+            244,
+            124
+          ],
+          "selector": "findLast:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfat"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "first",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "selfspeciesnew"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "selector": "grow",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "indexOf:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "exceptionBlock"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "indexOf:ifAbsent:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "anIndex"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "indexOfSubCollection:startingAt:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "anIndexifAbsent"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "indexOfSubCollection:startingAt:ifAbsent:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfat"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "last",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "mappedBy:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "anExceptionBlockselfshouldNotImplement"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "remove:ifAbsent:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "stopwith"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "replaceFrom:to:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "stopwith"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "replaceFrom:to:with:startingAt:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "reverse",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "by:do:selfat:",
+            "aBlockvalue",
+            "index"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            137,
+            0,
+            2,
+            66,
+            125,
+            67,
+            131,
+            97,
+            124
+          ],
+          "selector": "reverseDo:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "WriteStreamon",
+            "aStream"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "selector": "select:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "shallowCopy",
+          "argumentCount": 0
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "size",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "|",
+            "anotherIndex",
+            "element"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "selector": "swap:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "~=",
+            "aBlock",
+            "otherCollection",
+            "selfsize",
+            "aSequenceableCollectionsizeifTrue"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            66,
+            67,
+            224,
+            68,
+            224,
+            69,
+            183,
+            124
+          ],
+          "selector": "with:do:",
+          "argumentCount": 1
+        }
+      ]
+    },
+    {
+      "name": "ArrayedCollection",
+      "classVariables": [],
+      "instanceVariables": [],
+      "classMethods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "new",
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "value"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "new:withAll:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "selfnew"
+          ],
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "selector": "with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "|",
+            "secondObject",
+            "newCollection"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "selector": "with:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "secondObjectwith"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "with:with:with:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "secondObjectwith"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "with:with:with:with:",
+          "argumentCount": 1
+        }
+      ],
+      "superclass": "SequenceableCollection",
+      "methods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "add:",
+          "argumentCount": 1
+        },
+        {
+          "literals": [
+            "nil"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "defaultElement",
+          "argumentCount": 0
+        },
+        {
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfbasicSize"
+          ],
+          "selector": "size",
+          "primitiveNumber": 62,
+          "temporaryCount": 0,
+          "argumentCount": 0
+        },
+        {
+          "literals": [
+            "lastIndexon"
+          ],
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "selector": "storeElementsFrom:to:on:",
+          "argumentCount": 1
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "storeOn:",
+          "argumentCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Array",
+      "classVariables": [],
+      "instanceVariables": [],
+      "classMethods": [],
+      "superclass": "ArrayedCollection",
+      "methods": [
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asArray",
+          "temporaryCount": 0,
+          "source": "asArray^self!"
+        },
+        {
+          "argumentCount": 0,
+          "selector": "hash",
+          "bytecode": [
+            32,
+            137,
+            0,
+            3,
+            34,
+            125,
+            125,
+            225,
+            104,
+            70,
+            211,
+            213,
+            70,
+            176,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "hashselfsize=0ifTrue:[^17171].^(selfat:1)hash+(selfat:selfsize)hash!",
+          "literals": [
+            "0",
+            "ifTrue:",
+            "17171",
+            "hash",
+            "+",
+            "selfsize",
+            "selfat"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "hashMappedBy:",
+          "bytecode": [
+            32,
+            137,
+            0,
+            3,
+            67,
+            125,
+            125,
+            225,
+            105,
+            68,
+            210,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "hashMappedBy:mapselfsize=0ifTrue:[^selfhash].^(selffirsthashMappedBy:map)+(selflasthashMappedBy:map)!",
+          "literals": [
+            "0",
+            "ifTrue:",
+            "map",
+            "selfhash",
+            "selffirsthashMappedBy"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "isLiteral",
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            137,
+            0,
+            3,
+            34,
+            125,
+            125,
+            224,
+            105,
+            35,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "isLiteralselfdetect:[:element|elementisLiteralnot]ifNone:[^true].^false!",
+          "literals": [
+            "ifNone:",
+            "elementisLiteralnot",
+            "True",
+            "False"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "printOn:",
+          "bytecode": [
+            65,
+            66,
+            176,
+            136,
+            105,
+            106,
+            67,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "printOn:aStream|tooMany|tooMany_aStreamposition+selfmaxPrint.aStreamnextPut:$(.selfdo:[:element|aStreamposition>tooManyifTrue:[aStreamnextPutAll:'...etc...)'.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+          "literals": [
+            "+",
+            "aStreamposition",
+            "selfmaxPrint",
+            "aStreamnextPut"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "storeOn:",
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            136,
+            105,
+            106,
+            17,
+            34,
+            196,
+            106,
+            67,
+            124
+          ],
+          "temporaryCount": 2,
+          "source": "storeOn:aStreamselfisLiteralifTrue:[aStreamnextPut:$#;nextPut:$(.selfdo:[:element|elementprintOn:aStream.aStreamspace].aStreamnextPut:$)]ifFalse:[superstoreOn:aStream]!",
+          "literals": [
+            "nextPut:",
+            "aStreamnextPut",
+            "(",
+            "selfdo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ByteArray",
+      "classVariables": [],
+      "instanceVariables": [],
+      "classMethods": [],
+      "superclass": "ArrayedCollection",
+      "methods": [
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asString",
+          "temporaryCount": 0,
+          "source": "asString^(Stringnew:selfsize)replaceFrom:1to:selfsizewithByteArray:selfstartingAt:1!"
+        },
+        {
+          "argumentCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "selector": "defaultElement",
+          "temporaryCount": 0,
+          "source": "defaultElement^0!"
+        },
+        {
+          "argumentCount": 1,
+          "selector": "doubleWordAt:",
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "temporaryCount": 1,
+          "source": "doubleWordAt:i|b0b1b2w|b0_selfat:i.b1_selfat:i+1.b2_selfat:i+2.w_selfat:i+3.b2=0ifFalse:[w_(b2bitShift:8)+w].b1=0ifFalse:[w_(b1bitShift:16)+w].b0=0ifFalse:[w_(b0bitShift:24)+w].^w!",
+          "literals": [
+            "selfat",
+            "b0"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "doubleWordAt:put:",
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "doubleWordAt:iput:value|w|w_valuetruncated.selfat:iput:(wdigitAt:4).selfat:i+1put:(wdigitAt:3).selfat:i+2put:(wdigitAt:2).selfat:i+3put:(wdigitAt:1)!",
+          "literals": [
+            "|",
+            "value",
+            "w"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "packBits:into:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "packBits:fieldSizeinto:byteArray^selfpackBits:fieldSizestartBit:8-fieldSizeinto:byteArray!",
+          "literals": [
+            "byteArray"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "packBits:startBit:into:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "packBits:fieldSizestartBit:fieldStartinto:byteArray|unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht|fieldsPerWord_16//fieldSize.ht_selfsize//fieldsPerWord.unpackedForm_Formnewextent:fieldsPerWord*8@htoffset:0@0bits:self.packedForm_Formnewextent:16@htoffset:0@0bits:byteArray.bitBlt_BitBltdestForm:packedFormsourceForm:unpackedFormhalftoneForm:nilcombinationRule:FormoverdestOrigin:0@0sourceOrigin:0@0extent:fieldSize@htclipRect:(0@0corner:16@ht).sourceX_fieldStart.destX_0.fieldsPerWordtimesRepeat:[bitBltsourceX:sourceX;destX:destX;copyBits.sourceX_sourceX+8.destX_destX+fieldSize].^byteArray!",
+          "literals": [
+            "fieldStartinto"
+          ]
+        },
+        {
+          "argumentCount": 1,
+          "selector": "primReplaceFrom:to:with:startingAt:",
+          "bytecode": [
+            64,
+            124
+          ],
+          "temporaryCount": 0,
+          "source": "primReplaceFrom:startto:stopwith:replacementstartingAt:repStart<primitive: 105>superreplaceFrom:startto:stopwith:replace

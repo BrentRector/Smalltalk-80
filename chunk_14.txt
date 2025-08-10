@@ -1,0 +1,1954 @@
+CHUNK 14/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+: 105>superreplaceFrom:startto:stopwith:replacementstartingAt:repStart!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwith"
+          ],
+          "selector": "replaceFrom:to:with:startingAt:",
+          "argumentCount": 1,
+          "source": "replaceFrom:startto:stopwith:replacementstartingAt:repStart(replacementisKindOf:ByteArray)ifTrue:[selfprimReplaceFrom:startto:stopwith:replacementstartingAt:repStart]ifFalse:[superreplaceFrom:startto:stopwith:replacementstartingAt:repStart]!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwithString"
+          ],
+          "selector": "replaceFrom:to:withString:startingAt:",
+          "argumentCount": 1,
+          "source": "replaceFrom:startto:stopwithString:aStringstartingAt:repStart|indexrepOff|<primitive: 105>repOff_repStart-start.index_start-1.[(index_index+1)<=stop]whileTrue:[selfat:indexput:(aStringat:repOff+index)asInteger]!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            67,
+            224,
+            124
+          ],
+          "literals": [
+            "|",
+            "byteArray",
+            "unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht",
+            "fieldsPerWord"
+          ],
+          "selector": "unpackBits:into:",
+          "argumentCount": 1,
+          "source": "unpackBits:fieldSizeinto:byteArray|unpackedFormpackedFormsourceXdestXbitBltfieldsPerWordht|fieldsPerWord_16//fieldSize.ht_selfsize//2.unpackedForm_Formnewextent:fieldsPerWord*8@htoffset:0@0bits:byteArray.packedForm_Formnewextent:16@htoffset:0@0bits:self.bitBlt_BitBltdestForm:unpackedFormsourceForm:packedFormhalftoneForm:nilcombinationRule:FormoverdestOrigin:0@0sourceOrigin:0@0extent:fieldSize@htclipRect:unpackedFormboundingBox.sourceX_0.destX_8-fieldSize.fieldsPerWordtimesRepeat:[bitBltsourceX:sourceX;destX:destX;copyBits.sourceX_sourceX+fieldSize.destX_destX+8].^byteArray!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            16,
+            16,
+            176,
+            136,
+            105,
+            106,
+            70,
+            209,
+            35,
+            177,
+            37,
+            188,
+            124
+          ],
+          "literals": [
+            "+",
+            "j",
+            "-",
+            "1",
+            "bitShift:",
+            "8",
+            "selfat"
+          ],
+          "selector": "wordAt:",
+          "argumentCount": 1,
+          "source": "wordAt:i|j|j_i+i.^((selfat:j-1)bitShift:8)+(selfat:j)!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "literals": [
+            "|",
+            "v",
+            "j"
+          ],
+          "selector": "wordAt:put:",
+          "argumentCount": 1,
+          "source": "wordAt:iput:v|j|j_i+i.selfat:j-1put:((vbitShift:-8)bitAnd:8r377).selfat:jput:(vbitAnd:8r377)!"
+        }
+      ]
+    },
+    {
+      "name": "String",
+      "classVariables": [
+        "StringBlter"
+      ],
+      "instanceVariables": [],
+      "classMethods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            66,
+            225,
+            124
+          ],
+          "literals": [
+            "this is some text",
+            "displayOn:",
+            "Displayat"
+          ],
+          "selector": "example",
+          "argumentCount": 0,
+          "source": "example'this is some text'displayOn:Displayat:SensorwaitButton!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "literals": [
+            "selfnew"
+          ],
+          "selector": "fromString:",
+          "argumentCount": 1,
+          "source": "fromString:aString|newString|newString_selfnew:aStringsize.aStringsizedo:[:i|newStringat:iput:(aStringat:i)].^newString!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "WriteStreamon",
+            "outStream"
+          ],
+          "selector": "readFrom:",
+          "argumentCount": 1,
+          "source": "readFrom:inStream|outStreamchardone|outStream_WriteStreamon:(Stringnew:16).inStreamskipTo:$'.done_false.[doneor:[inStreamatEnd]]whileFalse:[char_inStreamnext.char=$'ifTrue:[char_inStreamnext.char=$'ifTrue:[outStreamnextPut:char]ifFalse:[done_true]]ifFalse:[outStreamnextPut:char]].^outStreamcontents!"
+        }
+      ],
+      "superclass": "ArrayedCollection",
+      "methods": [
+        {
+          "argumentCount": 1,
+          "source": "<aString^(selfcompare:aString)=1!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "<"
+        },
+        {
+          "argumentCount": 1,
+          "source": "<=aString^(selfcompare:aString)<=2!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "<="
+        },
+        {
+          "argumentCount": 1,
+          "source": ">aString^(selfcompare:aString)=3!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": ">"
+        },
+        {
+          "argumentCount": 1,
+          "source": ">=aString^(selfcompare:aString)>=2!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": ">="
+        },
+        {
+          "argumentCount": 0,
+          "source": "asDisplayText^DisplayTexttext:selfasText!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asDisplayText"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asFileName^DiskcheckName:selffixErrors:true!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asFileName"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "WriteStreamon"
+          ],
+          "selector": "asLowercase",
+          "argumentCount": 0,
+          "source": "asLowercase|aStream|aStream_WriteStreamon:(Stringnew:selfsize).selfdo:[:aCharacter|aStreamnextPut:aCharacterasLowercase].^aStreamcontents!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asNumber^NumberreadFromString:self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asNumber"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asParagraph^ParagraphwithText:selfasText!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asParagraph"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asString^self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asString"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asSymbol^Symbolintern:self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asSymbol"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asText^TextfromString:self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asText"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "WriteStreamon"
+          ],
+          "selector": "asUppercase",
+          "argumentCount": 0,
+          "source": "asUppercase|aStream|aStream_WriteStreamon:(Stringnew:selfsize).selfdo:[:aCharacter|aStreamnextPut:aCharacterasUppercase].^aStreamcontents!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "primitive": 63,
+          "selector": "at:",
+          "argumentCount": 1,
+          "source": "at:index<primitive: 63>^Charactervalue:(superat:index)!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aCharacter"
+          ],
+          "selector": "at:put:",
+          "argumentCount": 1,
+          "source": "at:indexput:aCharacter<primitive: 64>(aCharacterisKindOf:Character)ifTrue:[selferrorNonIntegerIndex]ifFalse:[selferror:'Strings only store Characters']!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "primitive": 63,
+          "selector": "basicAt:",
+          "argumentCount": 1,
+          "source": "basicAt:index<primitive: 63>^Charactervalue:(superat:index)!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aCharacter"
+          ],
+          "selector": "basicAt:put:",
+          "argumentCount": 1,
+          "source": "basicAt:indexput:aCharacter<primitive: 64>(aCharacterisKindOf:Character)ifTrue:[selferrorNonIntegerIndex]ifFalse:[selferror:'Strings only store Characters']!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            65,
+            136,
+            129,
+            96,
+            2,
+            135,
+            106,
+            67,
+            136,
+            129,
+            96,
+            4,
+            135,
+            106,
+            66,
+            69,
+            178,
+            124
+          ],
+          "literals": [
+            "<",
+            "selfsize",
+            "mylen",
+            "ssize",
+            "len",
+            "lenifTrue"
+          ],
+          "selector": "compare:",
+          "argumentCount": 1,
+          "source": "compare:s|ilenendResultu1u2mylen|mylen_selfsize.len_ssize.mylen<lenifTrue:[len_mylen.endResult_1]ifFalse:[endResult_mylen=lenifTrue:[2]ifFalse:[3]].i_0.[(i_i+1)<=len]whileTrue:[u1_selfat:i.u2_sat:i.u1=u2ifFalse:[u1_u1asUppercase.u2_u2asUppercase.u1=u2ifFalse:[^u1<u2ifTrue:[1]ifFalse:[3]]]].^endResult!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            65,
+            66,
+            179,
+            124
+          ],
+          "literals": [
+            ">",
+            "selfsize",
+            "charCountifTrue"
+          ],
+          "selector": "contractTo:",
+          "argumentCount": 1,
+          "source": "contractTo:charCount|half|selfsize>charCountifTrue:[half_charCount//2.^selfcopyReplaceFrom:halfto:selfsize-(charCount-half)+2with:'...']!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "literals": [
+            "selfindexOf"
+          ],
+          "selector": "copyUpTo:",
+          "argumentCount": 1,
+          "source": "copyUpTo:aCharacter|index|index_selfindexOf:aCharacterifAbsent:[^self].^selfcopyFrom:1to:index-1!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfshallowCopy"
+          ],
+          "selector": "deepCopy",
+          "argumentCount": 0,
+          "source": "deepCopy^selfshallowCopy!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aPoint"
+          ],
+          "selector": "displayAt:",
+          "argumentCount": 1,
+          "source": "displayAt:aPointselfasDisplayTextdisplayAt:aPoint!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aPointselfasDisplayTextdisplayOn"
+          ],
+          "selector": "displayOn:at:",
+          "argumentCount": 1,
+          "source": "displayOn:aDisplayMediumat:aPointselfasDisplayTextdisplayOn:aDisplayMediumat:aPoint!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            67,
+            224,
+            124
+          ],
+          "literals": [
+            "|",
+            "start",
+            "aCharacterindex",
+            "subStringisEmptyifTrue"
+          ],
+          "selector": "findString:startingAt:",
+          "argumentCount": 1,
+          "source": "findString:subStringstartingAt:start|aCharacterindex|subStringisEmptyifTrue:[^0].aCharacter_subStringfirst.startto:selfsize-subStringsize+1do:[:startIndex|(selfat:startIndex)=aCharacterifTrue:[index_1.[(selfat:startIndex+index-1)=(subStringat:index)]whileTrue:[index=subStringsizeifTrue:[^startIndex].index_index+1]]].^0!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            76,
+            136,
+            129,
+            96,
+            13,
+            135,
+            136,
+            129,
+            96,
+            14,
+            135,
+            33,
+            180,
+            137,
+            0,
+            36,
+            78,
+            33,
+            182,
+            137,
+            0,
+            7,
+            37,
+            136,
+            129,
+            96,
+            13,
+            135,
+            125,
+            137,
+            0,
+            15,
+            78,
+            38,
+            182,
+            137,
+            0,
+            5,
+            79,
+            40,
+            231,
+            125,
+            125,
+            42,
+            184,
+            226,
+            125,
+            244,
+            105,
+            43,
+            125,
+            125,
+            226,
+            124
+          ],
+          "literals": [
+            "<=",
+            "2",
+            "ifTrue:",
+            "=",
+            "ifTrue:ifFalse:",
+            "3",
+            "1",
+            "asciiValuebitAnd:",
+            "127",
+            "*",
+            "106",
+            "21845",
+            "selfsize",
+            "m",
+            "l",
+            "selfat"
+          ],
+          "selector": "hash",
+          "argumentCount": 0,
+          "source": "hash|lm|(l_m_selfsize)<=2ifTrue:[l=2ifTrue:[m_3]ifFalse:[l=1ifTrue:[^((selfat:1)asciiValuebitAnd:127)*106].^21845]].^(selfat:1)asciiValue*48+((selfat:(m-1))asciiValue+l)!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfhash"
+          ],
+          "selector": "hashMappedBy:",
+          "argumentCount": 1,
+          "source": "hashMappedBy:map^selfhash!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "literals": [
+            "True"
+          ],
+          "selector": "isLiteral",
+          "argumentCount": 0,
+          "source": "isLiteral^true!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "ReadStreamon",
+            "pattern"
+          ],
+          "selector": "match:",
+          "argumentCount": 1,
+          "source": "match:text|patternscanningptbacktextStreamstartScan|pattern_ReadStreamon:self.textStream_ReadStreamon:text.scanning_false.[patternatEnd]whileFalse:[p_patternnext.p=$*ifTrue:[patternatEndifTrue:[^true].scanning_true.startScan_patternposition]ifFalse:[textStreamatEndifTrue:[^false].t_textStreamnext.(tasUppercase=pasUppercaseor:[p=$#])ifFalse:[scanningifFalse:[^false].back_startScan-patternposition.patternskip:back.textStreamskip:back+1]].(scanningand:[patternatEndand:[textStreamatEndnot]])ifTrue:[back_startScan-patternposition.patternskip:back.textStreamskip:back+1]].^textStreamatEnd!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            129,
+            96,
+            3,
+            135,
+            106,
+            70,
+            136,
+            129,
+            96,
+            7,
+            135,
+            106,
+            137,
+            0,
+            4,
+            67,
+            71,
+            181,
+            125,
+            137,
+            0,
+            8,
+            72,
+            211,
+            136,
+            129,
+            96,
+            9,
+            135,
+            125,
+            211,
+            37,
+            176,
+            226,
+            124
+          ],
+          "literals": [
+            "0",
+            ">=",
+            "whileFalse:",
+            "index",
+            "+",
+            "1",
+            "selfsize",
+            "size",
+            "selfat",
+            "byte"
+          ],
+          "selector": "oldRunDecodeOn:",
+          "argumentCount": 1,
+          "source": "oldRunDecodeOn:decodedStream|indexsizebytecountbitsValue|index_0.size_selfsize.[index>=size]whileFalse:[byte_(selfat:(index_index+1)).byteasInteger==0ifTrue:[count_(selfat:(index_index+1))asInteger.count=0ifTrue:[decodedStreamnextPut:byte]ifFalse:[bitsValue_(selfat:(index_index+1)).[(count_count-1)>=0]whileTrue:[decodedStreamnextPut:bitsValue]]]ifFalse:[decodedStreamnextPut:byte]].^decodedStreamcontents!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "WriteStreamon",
+            "stream"
+          ],
+          "selector": "oldRunEncoded",
+          "argumentCount": 0,
+          "source": "oldRunEncoded|streamcountpreviousBytebyte|stream_WriteStreamon:(Stringnew:selfsize).count_0.previousByte_selfat:1.2to:selfsizedo:[:i|byte_selfat:i.(byte=previousByteand:[count<255])ifTrue:[count_count+1]ifFalse:[count>0ifTrue:[streamnextPut:(Charactervalue:0);nextPut:(Charactervalue:count+1);nextPut:previousByte.count_0]ifFalse:[streamnextPut:previousByte.previousByteasInteger=0ifTrue:[streamnextPut:previousByte]].previousByte_byte]].count>0ifTrue:[streamnextPut:(Charactervalue:0);nextPut:(Charactervalue:count+1);nextPut:previousByte]ifFalse:[streamnextPut:previousByte.previousByteasInteger=0ifTrue:[streamnextPut:previousByte]].^streamcontents!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwith"
+          ],
+          "selector": "primReplaceFrom:to:with:startingAt:",
+          "argumentCount": 1,
+          "source": "primReplaceFrom:startto:stopwith:replacementstartingAt:repStart<primitive: 105>superreplaceFrom:startto:stopwith:replacementstartingAt:repStart!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "printOn:aStream^selfstoreOn:aStream!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "printOn:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwith"
+          ],
+          "selector": "replaceFrom:to:with:startingAt:",
+          "argumentCount": 1,
+          "source": "replaceFrom:startto:stopwith:replacementstartingAt:repStart(replacementisKindOf:String)ifTrue:[selfprimReplaceFrom:startto:stopwith:replacementstartingAt:repStart]ifFalse:[superreplaceFrom:startto:stopwith:replacementstartingAt:repStart]!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwithByteArray"
+          ],
+          "selector": "replaceFrom:to:withByteArray:startingAt:",
+          "argumentCount": 1,
+          "source": "replaceFrom:startto:stopwithByteArray:aByteArraystartingAt:repStart|indexrepOffcharacterTable|<primitive: 105>repOff_repStart-start.characterTable_CharactercharacterTable.index_start-1.[(index_index+1)<=stop]whileTrue:[selfat:indexput:(characterTableat:(aByteArrayat:repOff+index)+1)]!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "sameAs:aString^(selfcompare:aString)=2!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "sameAs:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "primitive": 62,
+          "literals": [
+            "selfbasicSize"
+          ],
+          "selector": "size",
+          "argumentCount": 0,
+          "source": "size<primitive: 62>^selfbasicSize!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            106,
+            66,
+            136,
+            129,
+            96,
+            3,
+            135,
+            106,
+            68,
+            136,
+            129,
+            96,
+            5,
+            135,
+            124
+          ],
+          "literals": [
+            "selfsize",
+            "size1",
+            "aStringsize",
+            "size2",
+            "size1max",
+            "maxLen"
+          ],
+          "selector": "spellAgainst:",
+          "argumentCount": 1,
+          "source": "spellAgainst:aString|i1i2size1size2scoremaxLen|size1_selfsize.size2_aStringsize.maxLen_size1max:size2.score_0.i1_i2_1.[i1<=size1and:[i2<=size2]]whileTrue:[(selfat:i1)=(aStringat:i2)ifTrue:[score_score+1.i1_i1+1.i2_i2+1]ifFalse:[(i2<size2and:[(selfat:i1)=(aStringat:i2+1)])ifTrue:[i2_i2+1]ifFalse:[(i1<size1and:[(selfat:i1+1)=(aStringat:i2)])ifTrue:[i1_i1+1]ifFalse:[i1_i1+1.i2_i2+1]]]].score=maxLenifTrue:[^100]ifFalse:[^100*score//maxLen]!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aStreamnextPut"
+          ],
+          "selector": "storeOn:",
+          "argumentCount": 1,
+          "source": "storeOn:aStream|ilengthx|aStreamnextPut:$'.i_0.length_selfsize.[(i_i+1)<=length]whileTrue:[aStreamnextPut:(x_selfat:i).x==$'ifTrue:[aStreamnextPut:x]].aStreamnextPut:$'!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "string^self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "string"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfhash"
+          ],
+          "selector": "stringhash",
+          "argumentCount": 0,
+          "source": "stringhash^selfhash!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "withCRs^selfcollect:[:char|char=$\\ifTrue:[Charactercr]ifFalse:[char]]!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "withCRs"
+        }
+      ]
+    },
+    {
+      "name": "Symbol",
+      "classVariables": [
+        "SingleCharSymbols",
+        "USTable"
+      ],
+      "instanceVariables": [],
+      "classMethods": [
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            65,
+            136,
+            129,
+            96,
+            2,
+            135,
+            106,
+            67,
+            36,
+            182,
+            136,
+            129,
+            96,
+            5,
+            135,
+            106,
+            70,
+            124
+          ],
+          "literals": [
+            "=",
+            "unknownfirstasLowercase",
+            "lc",
+            "unknownlast",
+            ":",
+            "hasColon",
+            "unknownfirstisLetterifFalse"
+          ],
+          "selector": "correctMessage:",
+          "argumentCount": 1,
+          "source": "correctMessage:unknown|lccandidatesscorebestScoreguesshasColonnArgssmallerlarger|lc_unknownfirstasLowercase.hasColon_unknownlast=$:.unknownfirstisLetterifFalse:[^nil].nArgs_(unknownselect:[:char|char=$:])size.candidates_OrderedCollectionnew.smaller_unknownsize-4.larger_unknownsize+4.SymbolallInstancesDo:[:each|(((eachat:1)=lcand:[eachsizebetween:smallerand:larger])and:[(eachlast=$:)=hasColonand:[eachnumArgs=nArgs]])ifTrue:[candidatesadd:each]].bestScore_0.candidatesdo:[:each|(score_eachspellAgainst:unknown)>bestScoreifTrue:[bestScore_score.guess_each]].bestScore>50ifFalse:[^false].(selfconfirm:'Confirm correction to ',guess)ifTrue:[^guessasSymbol]ifFalse:[^nil]!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            72,
+            73,
+            224,
+            74,
+            224,
+            34,
+            182,
+            137,
+            0,
+            8,
+            75,
+            136,
+            129,
+            96,
+            12,
+            135,
+            212,
+            125,
+            38,
+            178,
+            137,
+            0,
+            2,
+            77,
+            125,
+            76,
+            34,
+            176,
+            131,
+            99,
+            124
+          ],
+          "literals": [
+            "|",
+            "=",
+            "1",
+            "ifTrue:ifTrue:SingleCharSymbolsat:",
+            "asciiValue",
+            "<",
+            "128",
+            "+",
+            "symBlock",
+            "viascii",
+            "aStringsize",
+            "aStringat",
+            "ascii",
+            "symBlockvalue"
+          ],
+          "selector": "hasInterned:ifTrue:",
+          "argumentCount": 1,
+          "source": "hasInterned:aStringifTrue:symBlock|viascii|aStringsize=1ifTrue:[(ascii_(aStringat:1)asciiValue)<128ifTrue:[symBlockvalue:(SingleCharSymbolsat:ascii+1).^true]].v_USTableat:aStringstringhash\\\\USTablesize+1.1to:vsizedo:[:i|(vat:i)==nilifFalse:[aStringsize=(vat:i)sizeifTrue:[aString=(vat:i)ifTrue:[symBlockvalue:(vat:i).^true]]]].^false!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "Arraynew",
+            "v"
+          ],
+          "selector": "initialize",
+          "argumentCount": 0,
+          "source": "initialize|av|v_Arraynew:128.a_Stringnew:1.1to:128do:[:i|aat:1put:i-1.vat:iput:aasSymbol].SingleCharSymbols_v!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfhasInterned"
+          ],
+          "selector": "intern:",
+          "argumentCount": 1,
+          "source": "intern:aString|symindex|selfhasInterned:aStringifTrue:[:sym|^sym].sym_(aStringisMemberOf:Symbol)ifTrue:[aString]ifFalse:[(Symbolnew:aStringsize)string:aString].index_aStringstringhash\\\\USTablesize+1.USTableat:indexput:((USTableat:index)copyWith:sym).^sym!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            70,
+            136,
+            105,
+            33,
+            178,
+            137,
+            0,
+            3,
+            71,
+            125,
+            125,
+            211,
+            37,
+            176,
+            226,
+            124
+          ],
+          "literals": [
+            "<",
+            "128",
+            "ifTrue:",
+            "ascii",
+            "+",
+            "1",
+            "aCharacterasciiValue",
+            "SingleCharSymbolsat"
+          ],
+          "selector": "internCharacter:",
+          "argumentCount": 1,
+          "source": "internCharacter:aCharacter|ascii|(ascii_aCharacterasciiValue)<128ifTrue:[^SingleCharSymbolsat:ascii+1].^selfintern:(Stringwith:aCharacter)!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "USTablecollect",
+            "USTable"
+          ],
+          "selector": "rehash",
+          "argumentCount": 0,
+          "source": "rehash|sym|USTable_USTablecollect:[:sym|Arraynew:0].SymbolallInstancesDo:[:sym|selfintern:sym]!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "USTable"
+          ],
+          "selector": "table",
+          "argumentCount": 0,
+          "source": "table^USTable!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            16,
+            136,
+            129,
+            96,
+            0,
+            135,
+            124
+          ],
+          "literals": [
+            "USTable"
+          ],
+          "selector": "table:",
+          "argumentCount": 1,
+          "source": "table:newArray^USTable_newArray!"
+        }
+      ],
+      "superclass": "String",
+      "methods": [
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            16,
+            198,
+            124
+          ],
+          "literals": [
+            "=="
+          ],
+          "selector": "=",
+          "argumentCount": 1,
+          "source": "=anObject^self==anObject!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "Stringnew"
+          ],
+          "selector": "asString",
+          "argumentCount": 0,
+          "source": "asString|newString|newString_Stringnew:selfsize.1to:selfsizedo:[:index|newStringat:indexput:(selfat:index)].^newString!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "asSymbol!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "asSymbol"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "anObjectselferrorNoModification"
+          ],
+          "selector": "at:put:",
+          "argumentCount": 1,
+          "source": "at:anIntegerput:anObjectselferrorNoModification!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "selfindexOf"
+          ],
+          "selector": "classPart",
+          "argumentCount": 0,
+          "source": "classPart|i|i_selfindexOf:$.ifAbsent:[selferror:'class part not found'].^(selfcopyFrom:1to:i-1)asSymbol!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "copy!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "copy"
+        },
+        {
+          "argumentCount": 1,
+          "source": "errorNoModificationselferror:'symbols can not be modified.'!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorNoModification"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "primitive": 75,
+          "selector": "hash",
+          "argumentCount": 0,
+          "source": "hash<primitive: 75>^self!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "hashMappedBy:map^mapnewHashFor:selfhash!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "hashMappedBy:"
+        },
+        {
+          "argumentCount": 0,
+          "source": "isCompound^selfincludes:$.!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "isCompound"
+        },
+        {
+          "argumentCount": 0,
+          "source": "isInfix^(selfat:1)isLetternot!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "isInfix"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            32,
+            137,
+            0,
+            3,
+            35,
+            125,
+            125,
+            225,
+            104,
+            68,
+            210,
+            124
+          ],
+          "literals": [
+            "1",
+            "ifTrue:",
+            "selfsize",
+            "False",
+            "selfat"
+          ],
+          "selector": "isKeyword",
+          "argumentCount": 0,
+          "source": "isKeywordselfsize<=1ifTrue:[^false].^(selfat:selfsize)=$:!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "isLiteral^ScannerisLiteralSymbol:self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "isLiteral"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            129,
+            96,
+            1,
+            135,
+            124
+          ],
+          "literals": [
+            "WriteStreamon",
+            "result"
+          ],
+          "selector": "keywords",
+          "argumentCount": 0,
+          "source": "keywords|resultaStreamilchar|result_WriteStreamon:(Arraynew:10).aStream_WriteStreamon:(Stringnew:16).i_1.l_selfsize.[i<=l]whileTrue:[char_selfat:i.aStreamnextPut:char.(char=$:or:[i=l])ifTrue:[resultnextPut:aStreamcontents.aStreamreset].i_i+1].^resultcontents!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            72,
+            136,
+            129,
+            96,
+            9,
+            135,
+            105,
+            74,
+            137,
+            0,
+            2,
+            33,
+            125,
+            137,
+            0,
+            2,
+            34,
+            125,
+            240,
+            136,
+            129,
+            96,
+            11,
+            135,
+            105,
+            34,
+            136,
+            129,
+            96,
+            6,
+            135,
+            105,
+            137,
+            0,
+            11,
+            70,
+            34,
+            176,
+            136,
+            129,
+            96,
+            6,
+            135,
+            73,
+            180,
+            125,
+            137,
+            0,
+            3,
+            74,
+            214,
+            125,
+            44,
+            182,
+            137,
+            0,
+            9,
+            75,
+            34,
+            176,
+            136,
+            129,
+            96,
+            11,
+            135,
+            125,
+            245,
+            124
+          ],
+          "literals": [
+            "isLetterifTrue:ifFalse:",
+            "0",
+            "1",
+            "+",
+            "<=",
+            "whileTrue:ifTrue:",
+            "i",
+            "=",
+            "selfsize",
+            "len",
+            "selfat",
+            "n",
+            ":"
+          ],
+          "selector": "numArgs",
+          "argumentCount": 0,
+          "source": "numArgs|lenni|len_selfsize.n_(selfat:1)isLetterifTrue:[0]ifFalse:[1].i_1.[(i_i+1)<=len]whileTrue:[(selfat:i)=$:ifTrue:[n_n+1]].^n!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "printOn:aStreamaStreamnextPutAll:self!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "printOn:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "stopwith"
+          ],
+          "selector": "replaceFrom:to:with:startingAt:",
+          "argumentCount": 1,
+          "source": "replaceFrom:startto:stopwith:replacementstartingAt:repStartselferrorNoModification!"
+        },
+        {
+          "argumentCount": 0,
+          "source": "selectorPart^(selfcopyFrom:(selfindexOf:$.)+1to:selfsize)asSymbol!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "selectorPart"
+        },
+        {
+          "argumentCount": 0,
+          "source": "shallowCopy!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "shallowCopy"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "String"
+          ],
+          "selector": "species",
+          "argumentCount": 0,
+          "source": "species^String!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            137,
+            0,
+            2,
+            64,
+            125,
+            105,
+            65,
+            124
+          ],
+          "literals": [
+            "aStreamnextPut",
+            "aStreamnextPutAll"
+          ],
+          "selector": "storeOn:",
+          "argumentCount": 1,
+          "source": "storeOn:aStreamselfisLiteralifTrue:[aStreamnextPut:$#.aStreamnextPutAll:self]ifFalse:[superstoreOn:aStream.aStreamnextPutAll:' asSymbol']!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aStringsizedo"
+          ],
+          "selector": "string:",
+          "argumentCount": 1,
+          "source": "string:aString1to:aStringsizedo:[:j|superat:jput:(aStringat:j)].^self!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "superhash"
+          ],
+          "selector": "stringhash",
+          "argumentCount": 0,
+          "source": "stringhash^superhash!"
+        }
+      ]
+    },
+    {
+      "methods": [
+        {
+          "argumentCount": 1,
+          "source": "add:newObjectselfsubclassResponsibility!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "add:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            208,
+            124
+          ],
+          "literals": [
+            "each",
+            "selfadd"
+          ],
+          "selector": "addAll:",
+          "argumentCount": 1,
+          "source": "addAll:aCollectionaCollectiondo:[:each|selfadd:each].^aCollection!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            64,
+            136,
+            104,
+            105,
+            65,
+            124
+          ],
+          "literals": [
+            "Bagnew",
+            "selfdo"
+          ],
+          "selector": "asBag",
+          "argumentCount": 0,
+          "source": "asBag|aBag|aBag_Bagnew.selfdo:[:each|aBagadd:each].^aBag!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "OrderedCollectionnew"
+          ],
+          "selector": "asOrderedCollection",
+          "argumentCount": 0,
+          "source": "asOrderedCollection|anOrderedCollection|anOrderedCollection_OrderedCollectionnew:selfsize.selfdo:[:each|anOrderedCollectionaddLast:each].^anOrderedCollection!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "Setnew"
+          ],
+          "selector": "asSet",
+          "argumentCount": 0,
+          "source": "asSet|aSet|aSet_Setnew:selfsize.selfdo:[:each|aSetadd:each].^aSet!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            104,
+            124
+          ],
+          "literals": [
+            "SortedCollectionnew"
+          ],
+          "selector": "asSortedCollection",
+          "argumentCount": 0,
+          "source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionaddAll:self.^aSortedCollection!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            136,
+            105,
+            124
+          ],
+          "literals": [
+            "SortedCollectionnew"
+          ],
+          "selector": "asSortedCollection:",
+          "argumentCount": 1,
+          "source": "asSortedCollection:aBlock|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionsortBlock:aBlock.aSortedCollectionaddAll:self.^aSortedCollection!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            64,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "literals": [
+            "selfspeciesnew",
+            "selfdo"
+          ],
+          "selector": "collect:",
+          "argumentCount": 1,
+          "source": "collect:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "detect:aBlock^selfdetect:aBlockifNone:[selferrorNotFound]!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "detect:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "exceptionBlockselfdo"
+          ],
+          "selector": "detect:ifNone:",
+          "argumentCount": 1,
+          "source": "detect:aBlockifNone:exceptionBlockselfdo:[:each|(aBlockvalue:each)ifTrue:[^each]].^exceptionBlockvalue!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "do:aBlockselfsubclassResponsibility!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "do:"
+        },
+        {
+          "argumentCount": 1,
+          "source": "emptyCheckselfisEmptyifTrue:[selferrorEmptyCollection]!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "emptyCheck"
+        },
+        {
+          "argumentCount": 1,
+          "source": "errorEmptyCollectionselferror:'this collection is empty'!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorEmptyCollection"
+        },
+        {
+          "argumentCount": 1,
+          "source": "errorNoMatchselferror:'collection sizes do not match'!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorNoMatch"
+        },
+        {
+          "argumentCount": 1,
+          "source": "errorNotFoundselferror:'Object is not in the collection.'!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorNotFound"
+        },
+        {
+          "argumentCount": 1,
+          "source": "errorNotKeyedselferror:selfclassname,'s do not respond to keyed accessing messages.'!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "errorNotKeyed"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "selfmaxSizeifTrue"
+          ],
+          "selector": "growSize",
+          "argumentCount": 0,
+          "source": "growSizeselfbasicSize>=selfmaxSizeifTrue:[selferror:'unable to grow this collection'].^(selfbasicSizemax:2)min:selfmaxSize-selfbasicSize!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            137,
+            0,
+            4,
+            66,
+            67,
+            182,
+            125,
+            209,
+            124
+          ],
+          "literals": [
+            "=",
+            "true",
+            "anObject",
+            "eachifTrue"
+          ],
+          "selector": "includes:",
+          "argumentCount": 1,
+          "source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "literals": [
+            "|",
+            "binaryBlock",
+            "nextValue"
+          ],
+          "selector": "inject:into:",
+          "argumentCount": 1,
+          "source": "inject:thisValueinto:binaryBlock|nextValue|nextValue_thisValue.selfdo:[:each|nextValue_binaryBlockvalue:nextValuevalue:each].^nextValue!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            66,
+            33,
+            182,
+            124
+          ],
+          "literals": [
+            "=",
+            "0",
+            "selfsize"
+          ],
+          "selector": "isEmpty",
+          "argumentCount": 0,
+          "source": "isEmpty^selfsize=0!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "literals": [
+            "5000"
+          ],
+          "selector": "maxPrint",
+          "argumentCount": 0,
+          "source": "maxPrint^5000!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            32,
+            124
+          ],
+          "literals": [
+            "65486"
+          ],
+          "selector": "maxSize",
+          "argumentCount": 0,
+          "source": "maxSize^65486!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "literals": [
+            "0",
+            "selfdo"
+          ],
+          "selector": "occurrencesOf:",
+          "argumentCount": 1,
+          "source": "occurrencesOf:anObject|tally|tally_0.selfdo:[:each|anObject=eachifTrue:[tally_tally+1]].^tally!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            65,
+            66,
+            176,
+            136,
+            105,
+            106,
+            67,
+            124
+          ],
+          "literals": [
+            "+",
+            "aStreamposition",
+            "selfmaxPrint",
+            "aStreamnextPutAll"
+          ],
+          "selector": "printOn:",
+          "argumentCount": 1,
+          "source": "printOn:aStream|tooMany|tooMany_aStreamposition+selfmaxPrint.aStreamnextPutAll:selfclassname,' ('.selfdo:[:element|aStreamposition>tooManyifTrue:[aStreamnextPutAll:'...etc...)'.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!"
+        },
+        {
+          "argumentCount": 1,
+          "source": "reject:aBlock^selfselect:[:element|(aBlockvalue:element)==false]!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "reject:"
+        },
+        {
+          "argumentCount": 1,
+          "source": "remove:oldObject^selfremove:oldObjectifAbsent:[selferrorNotFound]!",
+          "temporaryCount": 0,
+          "bytecode": [
+            112,
+            124
+          ],
+          "selector": "remove:"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "anExceptionBlockselfsubclassResponsibility"
+          ],
+          "selector": "remove:ifAbsent:",
+          "argumentCount": 1,
+          "source": "remove:oldObjectifAbsent:anExceptionBlockselfsubclassResponsibility!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            137,
+            0,
+            2,
+            65,
+            125,
+            208,
+            124
+          ],
+          "literals": [
+            "each",
+            "selfremove"
+          ],
+          "selector": "removeAll:",
+          "argumentCount": 1,
+          "source": "removeAll:aCollectionaCollectiondo:[:each|selfremove:each].^aCollection!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            64,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "literals": [
+            "selfspeciesnew",
+            "selfdo"
+          ],
+          "selector": "select:",
+          "argumentCount": 1,
+          "source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|(aBlockvalue:each)ifTrue:[newCollectionadd:each]].^newCollection!"
+        },
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            32,
+            136,
+            104,
+            105,
+            65,
+            124
+          ],
+          "literals": [
+            "0",
+            "selfdo"
+          ],
+          "selector": "size",
+          "argumentCount": 0,
+          "source": "size|tally|tally_0.selfdo:[:each|tally_tally+1].^tally!"
+        },
+        {
+          "temporaryCount": 1,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "aStreamnextPutAll"
+          ],
+          "selector": "storeOn:",
+          "argumentCount": 1,
+          "source": "storeOn:aStream|noneYet|aStreamnextPutAll:'(('.aStreamnextPutAll:selfclassname.aStreamnextPutAll:' new)'.noneYet_true.selfdo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:' add: '.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:'; yourself'].aStreamnextPut:$)!"
+        }
+      ],
+      "classMethods": [
+        {
+          "temporaryCount": 2,
+          "bytecode": [
+            64,
+            136,
+            105,
+            106,
+            65,
+            124
+          ],
+          "literals": [
+            "selfnew",
+            "newCollectionadd"
+          ],
+          "selector": "with:",
+          "argumentCount": 1,
+          "source": "with:anObject|newCollection|newCollection_selfnew.newCollectionadd:anObject.^newCollection!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            65,
+            66,
+            224,
+            66,
+            224,
+            124
+          ],
+          "literals": [
+            "|",
+            "secondObject",
+            "newCollection"
+          ],
+          "selector": "with:with:",
+          "argumentCount": 1,
+          "source": "with:firstObjectwith:secondObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.^newCollection!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "secondObjectwith"
+          ],
+          "selector": "with:with:with:",
+          "argumentCount": 1,
+          "source": "with:firstObjectwith:secondObjectwith:thirdObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.^newCollection!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "literals": [
+            "secondObjectwith"
+          ],
+          "selector": "with:with:with:with:",
+          "argumentCount": 1,
+          "source": "with:firstObjectwith:secondObjectwith:thirdObjectwith:fourthObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.newCollectionadd:fourthObject.^newCollection!"
+        }
+      ],
+      "name": "Collection",
+      "superclass": "Object",
+      "instanceVariables": []
+    }
+  ]
+}
+
+`

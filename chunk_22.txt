@@ -1,0 +1,2728 @@
+CHUNK 22/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=extracted/False.json sha256=51a484f1ff802bb1926ec1483762de03bb7549689cb563bf48786df728bdcef4 lines=138
+---
+`$lang
+// file: extracted/False.json
+{
+  "ClassName": "False",
+  "Superclass": "Boolean",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Objects",
+  "InstanceMethods": [
+    {
+      "Selector": "\u0026",
+      "Source": "\u0026alternativeObject^self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "|",
+      "Source": "|aBoolean^aBoolean!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "and:",
+      "Source": "and:alternativeBlock^self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "ifFalse:",
+      "Source": "ifFalse:alternativeBlock^alternativeBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "alternativeBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "ifFalse:ifTrue:",
+      "Source": "ifFalse:falseAlternativeBlockifTrue:trueAlternativeBlock^falseAlternativeBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "trueAlternativeBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "ifTrue:",
+      "Source": "ifTrue:alternativeBlock^nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "ifTrue:ifFalse:",
+      "Source": "ifTrue:trueAlternativeBlockifFalse:falseAlternativeBlock^falseAlternativeBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "falseAlternativeBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "not",
+      "Source": "not^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "or:",
+      "Source": "or:alternativeBlock^alternativeBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "alternativeBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamaStreamnextPutAll:\u0027false\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 10,
+    "SuccessfullyCompiled": 10,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:50.1411519Z"
+  }
+}
+`
+
+FILE path=extracted/LookupKey.json sha256=ce21a303e0a1d984dd1734912ba9e7e53f2586b0b6b484dc6d195a8ce7c1b9e9 lines=124
+---
+`$lang
+// file: extracted/LookupKey.json
+{
+  "ClassName": "LookupKey",
+  "Superclass": "Magnitude",
+  "InstanceVariables": [
+    "key"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "\u003C",
+      "Source": "\u003CaLookupKey^key\u003CaLookupKeykey!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 41 B2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "aLookupKeykey"
+        }
+      ]
+    },
+    {
+      "Selector": "=",
+      "Source": "=aLookupKeyselfspecies=aLookupKeyspeciesifTrue:[^key=aLookupKeykey]ifFalse:[^false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aLookupKeyspeciesifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash^keyhash!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "keyhash"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^keyhashMappedBy:map!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "key",
+      "Source": "key^key!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "key:",
+      "Source": "key:anObjectkey_anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamkeyprintOn:aStream!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStream"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "key:",
+      "Source": "key:aKey^selfnewkey:aKey!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 8,
+    "SuccessfullyCompiled": 8,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:51.7277868Z"
+  }
+}
+`
+
+FILE path=extracted/Magnitude.json sha256=4f7bd44152788aaaf222794db0c9d1d55457e2bbfdc42daed7f299eae7a699ce lines=164
+---
+`$lang
+// file: extracted/Magnitude.json
+{
+  "ClassName": "Magnitude",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Numeric-Magnitudes",
+  "InstanceMethods": [
+    {
+      "Selector": "\u003C",
+      "Source": "\u003CaMagnitude^selfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003C=",
+      "Source": "\u003C=aMagnitude^(self\u003EaMagnitude)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B3 D1 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "=",
+      "Source": "=aMagnitude^selfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003E",
+      "Source": "\u003EaMagnitude^aMagnitude\u003Cself!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 70 B2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        }
+      ]
+    },
+    {
+      "Selector": "\u003E=",
+      "Source": "\u003E=aMagnitude^(self\u003CaMagnitude)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B2 D1 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "between:and:",
+      "Source": "between:minand:max^self\u003E=minand:[self\u003C=max]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "max"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash^selfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^selfhash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfhash"
+        }
+      ]
+    },
+    {
+      "Selector": "max:",
+      "Source": "max:aMagnitudeself\u003EaMagnitudeifTrue:[^self]ifFalse:[^aMagnitude]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aMagnitudeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "min:",
+      "Source": "min:aMagnitudeself\u003CaMagnitudeifTrue:[^self]ifFalse:[^aMagnitude]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aMagnitudeifTrue"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 10,
+    "SuccessfullyCompiled": 10,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:50.9187301Z"
+  }
+}
+`
+
+FILE path=extracted/Metaclass.json sha256=ed9df42fbba0f0abe90183fdccacf6375cd67e74e173e1c4ab6e0705d6374d07 lines=416
+---
+`$lang
+// file: extracted/Metaclass.json
+{
+  "ClassName": "Metaclass",
+  "Superclass": "ClassDescription",
+  "InstanceVariables": [
+    "thisClass"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "addClassVarName:",
+      "Source": "addClassVarName:aString^thisClassaddClassVarName:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addInstVarName:",
+      "Source": "addInstVarName:aString|fullString|fullString_aString.selfinstVarNamesdo:[:aString2|fullString_aString2,\u0027 \u0027,fullString].selfinstanceVariableNames:fullString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 69 6A 40 7C",
+      "Literals": [
+        {
+          "Value": "selfinstVarNamesdo"
+        }
+      ]
+    },
+    {
+      "Selector": "classPool",
+      "Source": "classPool^thisClassclassPool!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisClassclassPool"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|copyt|t_thisClass.thisClass_nil.copy_supercopy.thisClass_t.^copy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 88 81 60 00 87 69 21 88 60 69 42 88 81 60 03 87 69 40 88 60 69 43 7C",
+      "Literals": [
+        {
+          "Value": "t"
+        },
+        "nil",
+        {
+          "Value": "supercopy"
+        },
+        {
+          "Value": "copy"
+        }
+      ]
+    },
+    {
+      "Selector": "copyForValidation",
+      "Source": "copyForValidation^supercopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "supercopy"
+        }
+      ]
+    },
+    {
+      "Selector": "definition",
+      "Source": "definition|aStreamnames|aStream_WriteStreamon:(Stringnew:300).selfprintOn:aStream.aStreamnextPutAll:\u0027\r\n\tinstanceVariableNames: \u0027\u0027\u0027.names_selfinstVarNames.1to:namessizedo:[:i|aStreamnextPutAll:(namesat:i);space].aStreamnextPut:$\u0027.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn:moveSource:toFile:",
+      "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexsuperfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.(methodDictincludesKey:#initialize)ifTrue:[aFileStreamcr.aFileStreamcr.aFileStreamnextChunkPut:thisClassname,\u0027 initialize\u0027.aFileStreamcr]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "moveSourcetoFile"
+        }
+      ]
+    },
+    {
+      "Selector": "instanceVariableNames:",
+      "Source": "instanceVariableNames:instVarString|newMetainvalidok|newMeta_selfcopyForValidation.invalid_newMetasubclassOf:superclassoldClass:selfinstanceVariableNames:instVarStringvariable:falsewords:truepointers:trueifBad:[^false].invalidifTrue:[ok_newMetavalidateFrom:selfin:SmalltalkinstanceVariableNames:truemethods:true.SmalltalkchangeschangeClass:self.^ok]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 6A 42 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "selfcopyForValidation"
+        },
+        {
+          "Value": "newMeta"
+        },
+        {
+          "Value": "newMetasubclassOf"
+        },
+        {
+          "Value": "invalid"
+        }
+      ]
+    },
+    {
+      "Selector": "instHasMultipleSuperclasses",
+      "Source": "instHasMultipleSuperclasses^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isMeta",
+      "Source": "isMeta^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "isObsolete",
+      "Source": "isObsolete^thisClass==nilor:[thisClass~~(Smalltalkat:thisClassnameifAbsent:[nil])]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "name",
+      "Source": "namethisClass==nilifTrue:[^\u0027a Metaclass\u0027]ifFalse:[^thisClassname,\u0027 class\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "name:inEnvironment:subclassOf:and:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+      "Source": "name:newNameinEnvironment:environsubclassOf:supand:othersinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:\u0027Class names must be capitalized\u0027.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,\u0027 already exists!!  Proceed will store over it\u0027.wasPresent_false.oldClass_selfnewNamed:newNameotherSupers:others]]ifFalse:[oldClass_selfnewNamed:newNameotherSupers:others].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassesdo:[:sup|supremoveSubclass:oldClass;addSubclass:newClass].wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].invalidFieldsifTrue:[newClasscopyMethods.newClassclasscopyMethods].^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environsubclassOf"
+        }
+      ]
+    },
+    {
+      "Selector": "name:inEnvironment:subclassOf:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:",
+      "Source": "name:newNameinEnvironment:environsubclassOf:supinstanceVariableNames:instVarStringvariable:vwords:wpointers:pclassVariableNames:classVarStringpoolDictionaries:poolStringcategory:categoryNamecomment:commentStringchanged:changed|wasPresentoldClassnewClassinvalidFieldsinvalidMethods|newNamefirstisUppercaseifFalse:[selferror:\u0027Class names must be capitalized\u0027.^false].(wasPresent_environincludesKey:newName)ifTrue:[oldClass_environat:newName.(oldClassisKindOf:Behavior)ifFalse:[selferror:newName,\u0027 already exists!!  Proceed will store over it\u0027.wasPresent_false.oldClass_selfnewNamed:newName]]ifFalse:[oldClass_selfnewNamed:newName].newClass_oldClasscopy.invalidFields_changed|(newClasssubclassOf:supoldClass:oldClassinstanceVariableNames:instVarStringvariable:vwords:wpointers:pifBad:[^false]).invalidFieldsifFalse:[newClassobsolete.newClass_oldClass].invalidMethods_invalidFields|(newClassdeclare:classVarString)|(newClasssharing:poolString).commentString==nilifFalse:[newClasscomment:commentString].(environincludesKey:newName)ifFalse:[environdeclare:newNamefrom:Undeclared.environat:newNameput:newClass].SystemOrganizationclassify:newClassnameunder:categoryNameasSymbol.newClassvalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.newClasssuperclassremoveSubclass:oldClass.newClasssuperclassaddSubclass:newClass.wasPresentifTrue:[SmalltalkchangeschangeClass:newClass]ifFalse:[SmalltalkchangesaddClass:newClass].^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environsubclassOf"
+        }
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "newthisClass==nilifTrue:[^thisClass_supernew]ifFalse:[selferror:\u0027A Metaclass should only have one instance!!\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "newNamed:",
+      "Source": "newNamed:aSymbol^(MetaclasssubclassOf:self)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "newNamed:otherSupers:",
+      "Source": "newNamed:aSymbolotherSupers:others^(MetaclassForMultipleInheritancesubclassOf:selfand:others)newsuperclass:ObjectmethodDict:MethodDictionarynewformat:-8192name:aSymbolorganization:ClassOrganizernewinstVarNames:nilclassPool:nilsharedPools:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "others"
+        }
+      ]
+    },
+    {
+      "Selector": "nonTrivial",
+      "Source": "nonTrivial^selfinstVarNamessize\u003E0or:[methodDictsize\u003E0or:[selfcommentsize\u003E0]]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 21 B3 89 00 0C 44 21 B3 89 00 04 45 21 B3 7D E2 7D E2 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "selfinstVarNamessize"
+        },
+        {
+          "Value": "methodDictsize"
+        },
+        {
+          "Value": "selfcommentsize"
+        }
+      ]
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoletethisClass_nil.superobsolete!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 68 41 7C",
+      "Literals": [
+        "nil",
+        {
+          "Value": "superobsolete"
+        }
+      ]
+    },
+    {
+      "Selector": "removeInstVarName:",
+      "Source": "removeInstVarName:aString|newArraynewString|(selfinstVarNamesincludes:aString)ifFalse:[selferror:aString,\u0027 is not one of my instance variables\u0027].newArray_selfinstVarNamescopyWithout:aString.newString_\u0027\u0027.newArraydo:[:aString2|newString_aString2,\u0027 \u0027,newString].selfinstanceVariableNames:newString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": "selfinstVarNamesincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "scopeHas:ifTrue:",
+      "Source": "scopeHas:nameifTrue:assocBlock^thisClassscopeHas:nameifTrue:assocBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "assocBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "soleInstance",
+      "Source": "soleInstance^thisClass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "subclasses",
+      "Source": "subclasses|temp|self==ClassclassifTrue:[temp_thisClasssubclassescopy.tempremove:Objectclass.^tempcollect:[:aSubClass|aSubClassclass]].thisClass==nilifTrue:[^Setnew]ifFalse:[^thisClasssubclassescollect:[:aSubClass|aSubClassclass]]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 41 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ClassclassifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassOf:",
+      "Source": "subclassOf:superMetasuperclass_superMeta.methodDict_MethodDictionarynew.format_superMetaformat.instanceVariables_nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 88 81 60 02 87 69 43 88 81 60 04 87 69 25 88 81 60 06 87 7C",
+      "Literals": [
+        {
+          "Value": "superMeta"
+        },
+        {
+          "Value": "MethodDictionarynew"
+        },
+        {
+          "Value": "methodDict"
+        },
+        {
+          "Value": "superMetaformat"
+        },
+        {
+          "Value": "format"
+        },
+        "nil",
+        {
+          "Value": "instanceVariables"
+        }
+      ]
+    },
+    {
+      "Selector": "superclass:",
+      "Source": "superclass:superMetasuperclass_superMeta!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "superMeta"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "subclassOf:",
+      "Source": "subclassOf:superMeta^selfnewsubclassOf:superMeta!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 26,
+    "SuccessfullyCompiled": 26,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:39.7039637Z"
+  }
+}
+`
+
+FILE path=extracted/MethodDictionary.json sha256=940c6d9034b5971f32e3c52c89c179fef69f2eee0066b064a6c256fa13203cae lines=46
+---
+`$lang
+// file: extracted/MethodDictionary.json
+{
+  "ClassName": "MethodDictionary",
+  "Superclass": "IdentityDictionary",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "methodArray",
+      "Source": "methodArray^valueArray!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "valueArray"
+        }
+      ]
+    },
+    {
+      "Selector": "removeKey:ifAbsent:",
+      "Source": "removeKey:keyifAbsent:errorBlockselfbecome:(selfcopyremoveDangerouslyKey:keyifAbsent:[^errorBlockvalue])!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "errorBlockselfbecome"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 2,
+    "SuccessfullyCompiled": 2,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:41.3202956Z"
+  }
+}
+`
+
+FILE path=extracted/Object.json sha256=74ffc17819196321bfc27e0b7e6a67964b195770eda1a045ff4d6fd6e45a26f3 lines=1204
+---
+`$lang
+// file: extracted/Object.json
+{
+  "ClassName": "Object",
+  "Superclass": "nil",
+  "InstanceVariables": [],
+  "ClassVariables": [
+    "DependentsFields",
+    "ErrorRecursion"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Objects",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "=anObject^self==anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        }
+      ]
+    },
+    {
+      "Selector": "==",
+      "Source": "==anObject\u003Cprimitive: 110\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 110,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "~=",
+      "Source": "~=anObject^self=anObject==false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 B6 22 C6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "=="
+        },
+        false
+      ]
+    },
+    {
+      "Selector": "~~",
+      "Source": "~~anObject^(self==anObject)not!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 C6 D1 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "not"
+        }
+      ]
+    },
+    {
+      "Selector": "addDependent:",
+      "Source": "addDependent:anObject(DependentsFieldsat:selfifAbsent:[selfsetDependents])add:anObject.^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 89 00 02 42 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "selfifAbsent:"
+        },
+        {
+          "Value": "DependentsFieldsat"
+        },
+        {
+          "Value": "selfsetDependents"
+        }
+      ]
+    },
+    {
+      "Selector": "asOop",
+      "Source": "asOop\u003Cprimitive: 75\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 75,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at:index\u003Cprimitive: 60\u003EindexisIntegerifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfat:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 60,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "indexisIntegerifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:indexput:value\u003Cprimitive: 61\u003EindexisIntegerifTrue:[(index\u003E=1and:[index\u003C=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfat:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "basicAt:",
+      "Source": "basicAt:index\u003Cprimitive: 60\u003E(indexisKindOf:Integer)ifTrue:[selferrorSubscriptBounds:index].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncated]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 60,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "Integer"
+        },
+        {
+          "Value": "indexisKindOf"
+        }
+      ]
+    },
+    {
+      "Selector": "basicAt:put:",
+      "Source": "basicAt:indexput:value\u003Cprimitive: 61\u003E(indexisKindOf:Integer)ifTrue:[(index\u003E=1and:[index\u003C=selfsize])ifTrue:[selferrorImproperStore]ifFalse:[selferrorSubscriptBounds:index]].(indexisKindOf:Number)ifTrue:[^selfbasicAt:indextruncatedput:value]ifFalse:[selferrorNonIntegerIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "basicInspect",
+      "Source": "basicInspectInspectorViewopen:(Inspectorinspect:self)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "basicSize",
+      "Source": "basicSize\u003Cprimitive: 62\u003E^0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 62,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "become:",
+      "Source": "become:otherObject\u003Cprimitive: 72\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 72,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "breakDependents",
+      "Source": "breakDependentsDependentsFieldsremoveKey:selfifAbsent:[]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 20 7D",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "broadcast:",
+      "Source": "broadcast:aSymbolselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbol]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "broadcast:with:",
+      "Source": "broadcast:aSymbolwith:anObjectselfdependents~~nilifTrue:[selfdependentsdo:[:aDependent|aDependentperform:aSymbolwith:anObject]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "~~"
+        },
+        {
+          "Value": "anObjectselfdependents"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "changed",
+      "Source": "changedselfchanged:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "changed:",
+      "Source": "changed:aParameterselfdependentsdo:[:aDependent|aDependentupdate:aParameter]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "aParameter"
+        },
+        {
+          "Value": "aDependentupdate"
+        }
+      ]
+    },
+    {
+      "Selector": "changeRequest",
+      "Source": "changeRequestselfdependentsdo:[:dep|depupdateRequestifFalse:[^false]].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "false"
+        },
+        {
+          "Value": "depupdateRequestifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "changeRequestFrom:",
+      "Source": "changeRequestFrom:requestorselfdependentsdo:[:dep|(dep==requestoror:[depupdateRequest])ifFalse:[^false]].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 05 42 43 C6 D1 7D",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "depupdateRequest"
+        },
+        {
+          "Value": "dep"
+        },
+        {
+          "Value": "requestoror"
+        }
+      ]
+    },
+    {
+      "Selector": "class",
+      "Source": "class\u003Cprimitive: 111\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 111,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "confirm:",
+      "Source": "confirm:aString|answer|answer_false.BinaryChoicemessage:aStringdisplayAt:SensorcursorPointcentered:trueifTrue:[answer_true]ifFalse:[answer_false].^answer!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 41 7C",
+      "Literals": [
+        false,
+        {
+          "Value": "BinaryChoicemessage"
+        }
+      ]
+    },
+    {
+      "Selector": "conflictingInheritanceError",
+      "Source": "conflictingInheritanceErrorselferror:\u0027Conflicting methods due to multiple inheritance\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy^selfshallowCopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfshallowCopy"
+        }
+      ]
+    },
+    {
+      "Selector": "deepCopy",
+      "Source": "deepCopy|newObjectclassindex|class_selfclass.(class==Object)ifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index\u003E0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index)deepCopy.index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index\u003E0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index)deepCopy.index_index-1].^newObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 88 81 60 03 87 69 43 44 C6 89 00 03 70 7D 7D E1 69 45 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfclass"
+        },
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "Object"
+        },
+        {
+          "Value": "classisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "dependents",
+      "Source": "dependents^DependentsFieldsat:selfifAbsent:[OrderedCollectionnew]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "doesNotUnderstand:",
+      "Source": "doesNotUnderstand:aMessage|statusgripe|status_selfclasstryCopyingCodeFor:aMessageselector.status==#OKifTrue:[^selfperform:aMessageselectorwithArguments:aMessagearguments].gripe_status==#HierarchyViolationifTrue:[aMessageselectorclassPart,\u0027 is not one of my superclasses: \u0027]ifFalse:[\u0027Message not understood: \u0027].NotifierViewopenContext:thisContextlabel:gripe,aMessageselectorcontents:thisContextshortStack.^selfperform:aMessageselectorwithArguments:aMessagearguments!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfclasstryCopyingCodeFor"
+        },
+        {
+          "Value": "status"
+        }
+      ]
+    },
+    {
+      "Selector": "error:",
+      "Source": "error:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "errorImproperStore",
+      "Source": "errorImproperStoreselferror:\u0027Improper store into indexable object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNonIntegerIndex",
+      "Source": "errorNonIntegerIndexselferror:\u0027only integers should be used as indices\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorSubscriptBounds:",
+      "Source": "errorSubscriptBounds:indexselferror:\u0027subscript is out of bounds: \u0027,indexprintString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 42 E1 7C",
+      "Literals": [
+        "subscript is out of bounds: ",
+        {
+          "Value": ","
+        },
+        {
+          "Value": "indexprintString"
+        }
+      ]
+    },
+    {
+      "Selector": "forkEmergencyEvaluatorAt:",
+      "Source": "forkEmergencyEvaluatorAt:priority|streamchar|[Displaywhite:(0@0extent:1024@36).\u0027EMERGENCY EVALUATOR (priority \u0027,priorityprintString,\u0027) -- type an expression terminated by ESC\u0027displayAt:50@0.Displayreverse:(0@0extent:1024@36).stream_WriteStreamon:Stringnew.[[SensorkeyboardPressed]whileFalse.(char_Sensorkeyboard)=160asCharacter]whileFalse:[char=CharacterbackspaceifTrue:[streamskip:-1.Displayblack:(0@18extent:1024@18)]ifFalse:[streamnextPut:char].streamcontentsdisplayAt:50@18].Displayblack:(0@0extent:1024@18).(Compilerevaluate:streamcontents)printStringdisplayAt:50@0]forkAt:priority!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 45 7D 21 BB 23 24 BB E2 7C",
+      "Literals": [
+        {
+          "Value": "@"
+        },
+        0,
+        {
+          "Value": "extent:"
+        },
+        1024,
+        36,
+        {
+          "Value": "Displaywhite"
+        }
+      ]
+    },
+    {
+      "Selector": "halt",
+      "Source": "haltNotifierViewopenContext:thisContextlabel:\u0027Halt encountered.\u0027contents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 42 E1 7C",
+      "Literals": [
+        "Halt encountered.",
+        {
+          "Value": "contents:"
+        },
+        {
+          "Value": "thisContextshortStack"
+        }
+      ]
+    },
+    {
+      "Selector": "halt:",
+      "Source": "halt:aStringNotifierViewopenContext:thisContextlabel:aStringcontents:thisContextshortStack!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash\u003Cprimitive: 75\u003EselfprimitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 75,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfprimitiveFailed"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:map^mapnewHashFor:selfhash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "inspect",
+      "Source": "inspectselfbasicInspect!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "instVarAt:",
+      "Source": "instVarAt:index\u003Cprimitive: 73\u003E^selfbasicAt:index-selfclassinstSize!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 73,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "instVarAt:put:",
+      "Source": "instVarAt:anIntegerput:anObject\u003Cprimitive: 74\u003E^selfbasicAt:anInteger-selfclassinstSizeput:anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "isInteger",
+      "Source": "isInteger^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isKindOf:",
+      "Source": "isKindOf:aClassselfclass==aClassifTrue:[^true]ifFalse:[^selfclassinheritsFrom:aClass]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "isLiteral",
+      "Source": "isLiteral^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "isMemberOf:",
+      "Source": "isMemberOf:aClass^selfclass==aClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 10 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfclass"
+        }
+      ]
+    },
+    {
+      "Selector": "isNil",
+      "Source": "isNil^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "mustBeBoolean",
+      "Source": "mustBeBooleanselferror:\u0027NonBoolean receiver--proceed for truth.\u0027.^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "nextInstance",
+      "Source": "nextInstance\u003Cprimitive: 78\u003E^nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 78,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "nilFields",
+      "Source": "nilFieldsselfclassisPointersifFalse:[^self].1to:selfbasicSizedo:[:index|selfbasicAt:indexput:nil].1to:selfclassinstSizedo:[:index|selfinstVarAt:indexput:nil].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 70 7D 7D 69 20 42 E1 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "selfbasicSizedo"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:",
+      "Source": "notify:aStringNotifierViewopenContext:thisContextlabel:\u0027Notifier\u0027contents:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thisContextlabel"
+        }
+      ]
+    },
+    {
+      "Selector": "notNil",
+      "Source": "notNil^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "perform:",
+      "Source": "perform:aSymbol\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraynew:0)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 83,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "perform:with:",
+      "Source": "perform:aSymbolwith:anObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:anObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:with:with:",
+      "Source": "perform:aSymbolwith:firstObjectwith:secondObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:with:with:with:",
+      "Source": "perform:aSymbolwith:firstObjectwith:secondObjectwith:thirdObject\u003Cprimitive: 83\u003E^selfperform:aSymbolwithArguments:(Arraywith:firstObjectwith:secondObjectwith:thirdObject)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "perform:withArguments:",
+      "Source": "perform:selectorwithArguments:anArray\u003Cprimitive: 84\u003EselfprimitiveFailed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anArray"
+        }
+      ]
+    },
+    {
+      "Selector": "primitiveError:",
+      "Source": "primitiveError:aString|contextkey|Transcriptcr.Transcriptshow:\u0027**System Error Handling Failed** \u0027.Transcriptshow:aString.Transcriptcr.context_thisContextsendersender.3timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]].[Transcriptshow:\u0027**type \u003Cs\u003E for more stack; anything else restarts scheduler**\u0027.Transcriptcr.key_Sensorkeyboard.key=$s|(key=$S)]whileTrue:[5timesRepeat:[context==nilifFalse:[Transcriptprint:(context_contextsender);cr]]].ScheduledControllerssearchForActiveController!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "Transcriptcr"
+        },
+        {
+          "Value": "Transcriptshow"
+        }
+      ]
+    },
+    {
+      "Selector": "primitiveFailed",
+      "Source": "primitiveFailedselferror:\u0027a primitive has failed\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|title|title_selfclassname.aStreamnextPutAll:((titleat:1)isVowelifTrue:[\u0027an \u0027]ifFalse:[\u0027a \u0027]),title!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfclassname"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "printString",
+      "Source": "printString|aStream|aStream_WriteStreamon:(Stringnew:16).selfprintOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "readFromString:",
+      "Source": "readFromString:aString^selfreadFrom:(ReadStreamon:aString)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "release",
+      "Source": "releaseselfbreakDependents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeDependent:",
+      "Source": "removeDependent:anObject|dependents|dependents_DependentsFieldsat:selfifAbsent:[^anObject].dependentsremove:anObjectifAbsent:[].dependentsisEmptyifTrue:[selfbreakDependents].^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "DependentsFieldsat"
+        }
+      ]
+    },
+    {
+      "Selector": "respondsTo:",
+      "Source": "respondsTo:aSymbol^selfclasscanUnderstand:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "setDependents",
+      "Source": "setDependents|dependents|dependents_OrderedCollectionnew.DependentsFieldsadd:(Associationkey:selfvalue:dependents).^dependents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "DependentsFieldsadd"
+        }
+      ]
+    },
+    {
+      "Selector": "shallowCopy",
+      "Source": "shallowCopy|classnewObjectindex|class_selfclass.class==ObjectifTrue:[^self].classisVariableifTrue:[index_selfbasicSize.newObject_classbasicNew:index.[index\u003E0]whileTrue:[newObjectbasicAt:indexput:(selfbasicAt:index).index_index-1]]ifFalse:[newObject_classbasicNew].index_classinstSize.[index\u003E0]whileTrue:[newObjectinstVarAt:indexput:(selfinstVarAt:index).index_index-1].^newObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 69 42 43 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfclass"
+        },
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "ObjectifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "shouldNotImplement",
+      "Source": "shouldNotImplementselferror:\u0027This message is not appropriate for this object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "size",
+      "Source": "size\u003Cprimitive: 62\u003E^0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 62,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "species",
+      "Source": "species^selfclass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclass"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamaStreamnextPut:$(.selfclassisVariableifTrue:[aStreamnextPutAll:\u0027(\u0027,selfclassname,\u0027 basicNew: \u0027;store:selfbasicSize;nextPutAll:\u0027) \u0027]ifFalse:[aStreamnextPutAll:selfclassname,\u0027 basicNew\u0027].1to:selfclassinstSizedo:[:i|aStreamnextPutAll:\u0027 instVarAt: \u0027;store:i;nextPutAll:\u0027 put: \u0027;store:(selfinstVarAt:i);nextPut:$;].1to:selfbasicSizedo:[:i|aStreamnextPutAll:\u0027 basicAt: \u0027;store:i;nextPutAll:\u0027 put: \u0027;store:(selfbasicAt:i);nextPut:$;].aStreamnextPutAll:\u0027 yourself)\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 69 41 7C",
+      "Literals": [
+        "(",
+        {
+          "Value": "selfclassisVariableifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "storeString",
+      "Source": "storeString|aStream|aStream_WriteStreamon:(Stringnew:16).selfstoreOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassResponsibility",
+      "Source": "subclassResponsibilityselferror:\u0027My subclass should have overridden one of my messages.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "tryPrimitive0",
+      "Source": "tryPrimitive0\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 7,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "primitiveFail"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive1:",
+      "Source": "tryPrimitive1:arg1\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 7,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "primitiveFail"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive2:with:",
+      "Source": "tryPrimitive2:arg1with:arg2\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive3:with:with:",
+      "Source": "tryPrimitive3:arg1with:arg2with:arg3\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2with"
+        }
+      ]
+    },
+    {
+      "Selector": "tryPrimitive4:with:with:with:",
+      "Source": "tryPrimitive4:arg1with:arg2with:arg3with:arg4\u003Cprimitive: 007\u003E^#primitiveFail!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "arg2with"
+        }
+      ]
+    },
+    {
+      "Selector": "update:",
+      "Source": "update:aParameter^self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "updateRequest",
+      "Source": "updateRequest^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        true
+      ]
+    },
+    {
+      "Selector": "yourself",
+      "Source": "yourself!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "howToModifyPrimitives",
+      "Source": "howToModifyPrimitivesselferror:\u0027comment only\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initialize(selfconfirm:\u0027Do you really want to initialize\r\nclass Object?  It will reset all dependents.\u0027)ifTrue:[selfinitializeDependentsFields.selfinitializeErrorRecursion]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 89 00 04 42 68 43 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfconfirm"
+        },
+        {
+          "Value": "selfinitializeDependentsFields"
+        },
+        {
+          "Value": "selfinitializeErrorRecursion"
+        }
+      ]
+    },
+    {
+      "Selector": "initializeDependentsFields",
+      "Source": "initializeDependentsFieldsDependentsFields_IdentityDictionarynew:4!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "IdentityDictionarynew"
+        }
+      ]
+    },
+    {
+      "Selector": "initializeErrorRecursion",
+      "Source": "initializeErrorRecursionErrorRecursion_false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "readFrom:",
+      "Source": "readFrom:aStream|object|object_Compilerevaluate:aStream.(objectisKindOf:self)ifFalse:[selferror:selfname,\u0027 expected\u0027].^object!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "Compilerevaluate"
+        }
+      ]
+    },
+    {
+      "Selector": "whatIsAPrimitive",
+      "Source": "whatIsAPrimitiveselferror:\u0027comment only\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 84,
+    "SuccessfullyCompiled": 84,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:37.2160669Z"
+  }
+}
+`
+
+FILE path=extracted/SequenceableCollection.json sha256=255c4017f28d90f416371436959fa6dce08e840719fd6805e3dc339c73f985aa lines=593
+---
+`$lang
+// file: extracted/SequenceableCollection.json
+{
+  "ClassName": "SequenceableCollection",
+  "Superclass": "Collection",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Abstract",
+  "InstanceMethods": [
+    {
+      "Selector": ",",
+      "Source": ",aSequenceableCollection^selfcopyReplaceFrom:selfsize\u002B1to:selfsizewith:aSequenceableCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "=",
+      "Source": "=otherCollection|sizeindex|(size_selfsize)=otherCollectionsizeifFalse:[^false].selfspecies==otherCollectionspeciesifFalse:[^false].index_0.[(index_index\u002B1)\u003C=size]whileTrue:[(selfat:index)=(otherCollectionat:index)ifFalse:[^false]].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 43 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "otherCollectionsizeifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "asArray",
+      "Source": "asArray|newArray|newArray_Arraynew:selfsize.1to:selfsizedo:[:index|newArrayat:indexput:(selfat:index)].^newArray!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "Arraynew"
+        }
+      ]
+    },
+    {
+      "Selector": "atAll:put:",
+      "Source": "atAll:anIntervalput:anObjectanIntervaldo:[:index|selfat:indexput:anObject]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectanIntervaldo"
+        }
+      ]
+    },
+    {
+      "Selector": "atAllPut:",
+      "Source": "atAllPut:anObject|indexsize|index_0.size_selfsize.[(index_index\u002B1)\u003C=size]whileTrue:[selfat:indexput:anObject]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 05 87 6A 46 88 81 60 07 87 6A 89 00 0B 45 22 B0 88 81 60 05 87 47 B4 7D 89 00 02 48 7D 10 F4 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:indexput:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|aStreamindexlength|aStream_WriteStreamon:(selfspeciesnew:selfsize).index_0.length_selfsize.[(index_index\u002B1)\u003C=length]whileTrue:[aStreamnextPut:(aBlockvalue:(selfat:index))].^aStreamcontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "copyFrom:to:",
+      "Source": "copyFrom:startto:stop|newSize|newSize_stop-start\u002B1.^(selfspeciesnew:newSize)replaceFrom:1to:newSizewith:selfstartingAt:start!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "stop"
+        },
+        {
+          "Value": "newSize"
+        }
+      ]
+    },
+    {
+      "Selector": "copyReplaceAll:with:",
+      "Source": "copyReplaceAll:oldSubstringwith:newSubstring|aStringstartSearchcurrentIndex|aString_self.startSearch_1.[(currentIndex_aStringindexOfSubCollection:oldSubstringstartingAt:startSearch)\u003E0]whileTrue:[aString_aStringcopyReplaceFrom:currentIndexto:currentIndex\u002BoldSubstringsize-1with:newSubstring.startSearch_currentIndex\u002BnewSubstringsize].^aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "newSubstring"
+        },
+        {
+          "Value": "aStringstartSearchcurrentIndex"
+        },
+        {
+          "Value": "aString"
+        }
+      ]
+    },
+    {
+      "Selector": "copyReplaceFrom:to:with:",
+      "Source": "copyReplaceFrom:startto:stopwith:replacementCollection|newSequenceableCollectionnewSizeendReplacement|newSize_selfsize-(stop-start\u002B1)\u002BreplacementCollectionsize.endReplacement_start-1\u002BreplacementCollectionsize.newSequenceableCollection_selfspeciesnew:newSize.newSequenceableCollectionreplaceFrom:1to:start-1with:selfstartingAt:1.newSequenceableCollectionreplaceFrom:startto:endReplacementwith:replacementCollectionstartingAt:1.newSequenceableCollectionreplaceFrom:endReplacement\u002B1to:newSizewith:selfstartingAt:stop\u002B1.^newSequenceableCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "copyWith:",
+      "Source": "copyWith:newElement|newIC|newIC_selfspeciesnew:selfsize\u002B1.newICreplaceFrom:1to:selfsizewith:selfstartingAt:1.newICat:newICsizeput:newElement.^newIC!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "copyWithout:",
+      "Source": "copyWithout:oldElement|aStream|aStream_WriteStreamon:(selfspeciesnew:selfsize).selfdo:[:each|oldElement=eachifFalse:[aStreamnextPut:each]].^aStreamcontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlock|indexlength|index_0.length_selfsize.[(index_index\u002B1)\u003C=length]whileTrue:[aBlockvalue:(selfat:index)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 05 87 6A 46 88 81 60 07 87 6A 89 00 0B 45 22 B0 88 81 60 05 87 47 B4 7D 89 00 02 48 7D 45 F4 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:selfat:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "length"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "errorOutOfBounds",
+      "Source": "errorOutOfBoundsselferror:\u0027indices are out of bounds\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "findFirst:",
+      "Source": "findFirst:aBlock|index|index_0.[(index_index\u002B1)\u003C=selfsize]whileTrue:[(aBlockvalue:(selfat:index))ifTrue:[^index]].^0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 89 00 08 11 22 B0 88 69 46 B4 7D 89 00 04 47 11 E5 7D 89 00 03 11 7D 7D F4 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:ifTrue:"
+        },
+        {
+          "Value": "selfat:"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "findLast:",
+      "Source": "findLast:aBlock|index|index_selfsize\u002B1.[(index_index-1)\u003E=1]whileTrue:[(aBlockvalue:(selfat:index))ifTrue:[^index]].^0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 21 B0 88 69 6A 89 00 08 11 21 B1 88 69 21 B5 7D 89 00 04 47 11 E5 7D 89 00 03 11 7D 7D F4 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "whileTrue:ifTrue:"
+        },
+        {
+          "Value": "selfat:"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "first",
+      "Source": "firstselfemptyCheck.^selfat:1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow|newArray|newArray_selfspeciesnew:selfsize\u002BselfgrowSize.newArrayreplaceFrom:1to:selfsizewith:self.^selfbecome:newArray!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "indexOf:",
+      "Source": "indexOf:anElement^selfindexOf:anElementifAbsent:[0]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "indexOf:ifAbsent:",
+      "Source": "indexOf:anElementifAbsent:exceptionBlock(1to:selfsize)do:[:i|(selfat:i)=anElementifTrue:[^i]].^exceptionBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "exceptionBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "indexOfSubCollection:startingAt:",
+      "Source": "indexOfSubCollection:aSubCollectionstartingAt:anIndex^selfindexOfSubCollection:aSubCollectionstartingAt:anIndexifAbsent:[0]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "indexOfSubCollection:startingAt:ifAbsent:",
+      "Source": "indexOfSubCollection:aSubCollectionstartingAt:anIndexifAbsent:exceptionBlock|firstElementeq|aSubCollectionsize=0ifTrue:[^exceptionBlockvalue].firstElement_aSubCollectionat:1.anIndexto:selfsize-aSubCollectionsize\u002B1do:[:i|eq_true.(selfat:i)=firstElementifTrue:[1to:aSubCollectionsizedo:[:index|(selfat:i\u002Bindex-1)=(aSubCollectionat:index)ifFalse:[eq_false]].eqifTrue:[^i]]].^exceptionBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anIndexifAbsent"
+        }
+      ]
+    },
+    {
+      "Selector": "last",
+      "Source": "lastselfemptyCheck.^selfat:selfsize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "mappedBy:",
+      "Source": "mappedBy:aSequenceableCollection^(MappedCollectioncollection:selfmap:aSequenceableCollection)contents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:oldObjectifAbsent:anExceptionBlockselfshouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anExceptionBlockselfshouldNotImplement"
+        }
+      ]
+    },
+    {
+      "Selector": "replaceFrom:to:with:",
+      "Source": "replaceFrom:startto:stopwith:replacementreplacementsize=(stop-start\u002B1)ifFalse:[selferror:\u0027Size of replacement doesnt match\u0027].^selfreplaceFrom:startto:stopwith:replacementstartingAt:1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "replaceFrom:to:with:startingAt:",
+      "Source": "replaceFrom:startto:stopwith:replacementstartingAt:repStart|indexrepOff|repOff_repStart-start.index_start-1.[(index_index\u002B1)\u003C=stop]whileTrue:[selfat:indexput:(replacementat:repOff\u002Bindex)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "reverse",
+      "Source": "reverse|aStreamindexlength|aStream_WriteStreamon:(selfspeciesnew:selfsize).index_selfsize\u002B1.[(index_index-1)\u003E0]whileTrue:[aStreamnextPut:(selfat:index)].^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "reverseDo:",
+      "Source": "reverseDo:aBlockselfsizeto:1by:-1do:[:index|aBlockvalue:(selfat:index)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 02 42 7D 43 83 61 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "by:do:selfat:"
+        },
+        {
+          "Value": "aBlockvalue"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "select:",
+      "Source": "select:aBlock|aStreamindexlength|aStream_WriteStreamon:(selfspeciesnew:selfsize).index_0.length_selfsize.[(index_index\u002B1)\u003C=length]whileTrue:[(aBlockvalue:(selfat:index))ifTrue:[aStreamnextPut:(selfat:index)]].^aStreamcontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "shallowCopy",
+      "Source": "shallowCopy^selfcopyFrom:1to:selfsize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "size",
+      "Source": "sizeselfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "swap:with:",
+      "Source": "swap:oneIndexwith:anotherIndex|element|element_selfat:oneIndex.selfat:oneIndexput:(selfat:anotherIndex).selfat:anotherIndexput:element!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "anotherIndex"
+        },
+        {
+          "Value": "element"
+        }
+      ]
+    },
+    {
+      "Selector": "with:do:",
+      "Source": "with:aSequenceableCollectiondo:aBlock|otherCollection|selfsize~=aSequenceableCollectionsizeifTrue:[^selferrorNoMatch].otherCollection_ReadStreamon:aSequenceableCollection.selfdo:[:each|aBlockvalue:eachvalue:otherCollectionnext]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 43 E0 44 E0 45 B7 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "~="
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "otherCollection"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "aSequenceableCollectionsizeifTrue"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 33,
+    "SuccessfullyCompiled": 33,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:33:06.9365425Z"
+  }
+}
+`

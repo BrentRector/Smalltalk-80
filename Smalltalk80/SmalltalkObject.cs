@@ -55,8 +55,24 @@ public class SmalltalkObject
         // Start with this class and walk up the superclass chain
         var currentClass = this;
         
+        // Debug: trace the lookup chain
+        if (selector.Value == "new")
+        {
+            Console.WriteLine($"[DEBUG] Looking up #{selector.Value} starting from class at OOP {Oop}");
+            if (Fields?.Length > 3 && Fields[3] is Symbol name)
+                Console.WriteLine($"[DEBUG] Class name: {name.Value}");
+        }
+        
         while (currentClass != null)
         {
+            // Debug output for new method
+            if (selector.Value == "new")
+            {
+                Console.WriteLine($"[DEBUG] Checking class at OOP {currentClass.Oop}");
+                if (currentClass.Fields?.Length > 3 && currentClass.Fields[3] is Symbol className)
+                    Console.WriteLine($"[DEBUG]   Class name: {className.Value}");
+            }
+            
             // Look in the current class's method dictionary
             var method = LookupInMethodDictionary(currentClass, selector);
             if (method != null)
@@ -216,17 +232,33 @@ public class SmalltalkObject
         const int SUPERCLASS_INDEX = 0;
         
         if (classObj.Fields == null || classObj.Fields.Length <= SUPERCLASS_INDEX)
+        {
+            Console.WriteLine($"[DEBUG] GetSuperclassOf: No fields or not enough fields for class at OOP {classObj.Oop}");
             return null;
+        }
             
         var superclass = classObj.Fields[SUPERCLASS_INDEX];
         
         if (superclass is SmalltalkObject superclassObj)
+        {
+            if (Oop == 22) // MethodDictionaryClass OOP
+            {
+                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass object at OOP {superclassObj.Oop}");
+            }
             return superclassObj;
+        }
             
         // Might be stored as OOP
         if (superclass is int oop && oop >= 0)
+        {
+            if (Oop == 22) // MethodDictionaryClass OOP
+            {
+                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass OOP {oop}");
+            }
             return ObjectMemory.FromOop(oop);
+        }
             
+        Console.WriteLine($"[DEBUG] GetSuperclassOf: No superclass found for class at OOP {classObj.Oop}");
         return null;
     }
 

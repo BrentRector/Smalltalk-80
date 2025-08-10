@@ -1,0 +1,178 @@
+CHUNK 21/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "remove:",
+          "source": "remove:anObjectselfshouldNotImplement!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "cHw=",
+          "bytecodeHex": "70 7C",
+          "literals": [],
+          "compilationError": null
+        },
+        {
+          "selector": "remove: ifAbsent:",
+          "source": "remove:anObjectifAbsent:exceptionBlockselfshouldNotImplement!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QHw=",
+          "bytecodeHex": "40 7C",
+          "literals": [
+            {
+              "value": "exceptionBlockselfshouldNotImplement"
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "removeAssociation:",
+          "source": "removeAssociation:anAssociation^selfremoveAssociation:anAssociationifAbsent:[selferrorNotFound]!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "cHw=",
+          "bytecodeHex": "70 7C",
+          "literals": [],
+          "compilationError": null
+        },
+        {
+          "selector": "removeAssociation: ifAbsent:",
+          "source": "removeAssociation:anAssociationifAbsent:anExceptionBlock^superremove:anAssociationifAbsent:anExceptionBlock!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QHw=",
+          "bytecodeHex": "40 7C",
+          "literals": [
+            {
+              "value": "anExceptionBlock"
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "removeKey:",
+          "source": "removeKey:key^selfremoveKey:keyifAbsent:[selferrorKeyNotFound]!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "cHw=",
+          "bytecodeHex": "70 7C",
+          "literals": [],
+          "compilationError": null
+        },
+        {
+          "selector": "removeKey: ifAbsent:",
+          "source": "removeKey:keyifAbsent:aBlock|indexelement|index_selffindKey:keyifAbsent:[^aBlockvalue].element_selfbasicAt:index.selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^element!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QULgQ+B8",
+          "bytecodeHex": "41 42 E0 43 E0 7C",
+          "literals": [
+            {
+              "value": "|"
+            },
+            {
+              "value": "aBlock"
+            },
+            {
+              "value": "indexelement"
+            },
+            {
+              "value": "index"
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "select:",
+          "source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfassociationsDo:[:each|(aBlockvalue:eachvalue)ifTrue:[newCollectionadd:each]].^newCollection!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 2,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QIhpakF8",
+          "bytecodeHex": "40 88 69 6A 41 7C",
+          "literals": [
+            {
+              "value": "selfspeciesnew"
+            },
+            {
+              "value": "selfassociationsDo"
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "storeOn:",
+          "source": "storeOn:aStream|noneYet|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new)\u0027.noneYet_true.selfassociationsDo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 add: \u0027.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+          "category": null,
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QHw=",
+          "bytecodeHex": "40 7C",
+          "literals": [
+            {
+              "value": "aStreamnextPutAll"
+            }
+          ],
+          "compilationError": null
+        },
+        {
+          "selector": "values",
+          "source": "values|aBag|aBag_Bagnew.selfdo:[:value|aBagadd:value].^aBag!",
+          "category": null,
+          "argumentCount": 0,
+          "temporaryCount": 2,
+          "isPrimitive": false,
+          "primitiveNumber": 0,
+          "bytecode": "QIhoaUF8",
+          "bytecodeHex": "40 88 68 69 41 7C",
+          "literals": [
+            {
+              "value": "Bagnew"
+            },
+            {
+              "value": "selfdo"
+            }
+          ],
+          "compilationError": null
+        }
+      ],
+      "classMethods": [],
+      "statistics": {
+        "totalMethods": 37,
+        "successfullyCompiled": 37,
+        "failedCompilation": 0,
+        "compilationRate": 100,
+        "extractionTime": "2025-08-09T17:05:15.5745391Z"
+      }
+    }
+  ],
+  "count": 5,
+  "timestamp": "2025-08-09 17:05:15 UTC"
+}
+`

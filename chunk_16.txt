@@ -1,0 +1,1377 @@
+CHUNK 16/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=Core/Smalltalk80.Core/IBootstrapProvider.cs sha256=d73978a208bde55ac763bfd3e03995c609f9cf44e6cedbf501b8c9eaa6ceeee3 lines=282
+---
+`$lang
+// file: Core/Smalltalk80.Core/IBootstrapProvider.cs
+namespace Smalltalk80.Core;
+
+/// <summary>
+/// Provides bootstrap data for initializing the Smalltalk VM.
+/// Implementations can load data from JSON files, embedded resources, or other sources.
+/// </summary>
+public interface IBootstrapProvider
+{
+    /// <summary>
+    /// Loads the Phase 1 bootstrap data (VM primitives for core class creation).
+    /// </summary>
+    /// <returns>The Phase 1 bootstrap configuration.</returns>
+    Task<Phase1BootstrapData> LoadPhase1Async();
+
+    /// <summary>
+    /// Loads the Phase 2 bootstrap data (messaging-based class and method creation).
+    /// </summary>
+    /// <returns>The Phase 2 bootstrap configuration.</returns>
+    Task<Phase2BootstrapData> LoadPhase2Async();
+
+    /// <summary>
+    /// Loads the Phase 3 bootstrap data (file loading for complete system).
+    /// </summary>
+    /// <returns>The Phase 3 bootstrap configuration.</returns>
+    Task<Phase3BootstrapData> LoadPhase3Async();
+
+    /// <summary>
+    /// Validates that the bootstrap data is consistent and complete.
+    /// </summary>
+    /// <returns>Validation results with any errors or warnings.</returns>
+    Task<BootstrapValidationResult> ValidateAsync();
+}
+
+/// <summary>
+/// Contains Phase 1 bootstrap operations using VM primitives.
+/// </summary>
+public record Phase1BootstrapData
+{
+    /// <summary>
+    /// Gets the list of VM primitive operations to execute.
+    /// </summary>
+    public IReadOnlyList<PrimitiveOperation> Operations { get; init; } = Array.Empty<PrimitiveOperation>();
+
+    /// <summary>
+    /// Gets the validation checkpoints to verify after bootstrap.
+    /// </summary>
+    public IReadOnlyList<ValidationCheckpoint> Checkpoints { get; init; } = Array.Empty<ValidationCheckpoint>();
+}
+
+/// <summary>
+/// Represents a single VM primitive operation in Phase 1 bootstrap.
+/// </summary>
+public record PrimitiveOperation
+{
+    /// <summary>
+    /// Gets the operation type (e.g., "newClass", "setSlot", "installMethod").
+    /// </summary>
+    public string Operation { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the target object reference for operations that modify existing objects.
+    /// </summary>
+    public string? Target { get; init; }
+
+    /// <summary>
+    /// Gets the result variable name for operations that create new objects.
+    /// </summary>
+    public string? Result { get; init; }
+
+    /// <summary>
+    /// Gets operation-specific parameters.
+    /// </summary>
+    public IReadOnlyDictionary<string, object> Parameters { get; init; } = new Dictionary<string, object>();
+
+    /// <summary>
+    /// Gets an optional comment describing this operation.
+    /// </summary>
+    public string? Comment { get; init; }
+}
+
+/// <summary>
+/// Contains Phase 2 bootstrap operations using Smalltalk messaging.
+/// </summary>
+public record Phase2BootstrapData
+{
+    /// <summary>
+    /// Gets the list of class definitions to create via subclass: messages.
+    /// </summary>
+    public IReadOnlyList<ClassDefinition> Classes { get; init; } = Array.Empty<ClassDefinition>();
+
+    /// <summary>
+    /// Gets the list of methods to compile and install.
+    /// </summary>
+    public IReadOnlyList<MethodDefinition> Methods { get; init; } = Array.Empty<MethodDefinition>();
+
+    /// <summary>
+    /// Gets the list of global objects to instantiate.
+    /// </summary>
+    public IReadOnlyList<GlobalDefinition> Globals { get; init; } = Array.Empty<GlobalDefinition>();
+
+    /// <summary>
+    /// Gets the validation checkpoints.
+    /// </summary>
+    public IReadOnlyList<ValidationCheckpoint> Checkpoints { get; init; } = Array.Empty<ValidationCheckpoint>();
+}
+
+/// <summary>
+/// Defines a class to be created in Phase 2.
+/// </summary>
+public record ClassDefinition
+{
+    /// <summary>
+    /// Gets the name of the class.
+    /// </summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the superclass name.
+    /// </summary>
+    public string Superclass { get; init; } = "Object";
+
+    /// <summary>
+    /// Gets the instance variable names.
+    /// </summary>
+    public IReadOnlyList<string> InstanceVariables { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets the class variable names.
+    /// </summary>
+    public IReadOnlyList<string> ClassVariables { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets the pool dictionary names.
+    /// </summary>
+    public IReadOnlyList<string> PoolDictionaries { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets the class category.
+    /// </summary>
+    public string Category { get; init; } = "Unclassified";
+}
+
+/// <summary>
+/// Defines a method to be compiled and installed.
+/// </summary>
+public record MethodDefinition
+{
+    /// <summary>
+    /// Gets the class name where the method will be installed.
+    /// </summary>
+    public string ClassName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets whether this is a class method (true) or instance method (false).
+    /// </summary>
+    public bool IsClassMethod { get; init; }
+
+    /// <summary>
+    /// Gets the method selector (name).
+    /// </summary>
+    public string Selector { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the method source code.
+    /// </summary>
+    public string Source { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the method category for organization.
+    /// </summary>
+    public string Category { get; init; } = "unclassified";
+}
+
+/// <summary>
+/// Defines a global object to be created.
+/// </summary>
+public record GlobalDefinition
+{
+    /// <summary>
+    /// Gets the global variable name.
+    /// </summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the class to instantiate.
+    /// </summary>
+    public string ClassName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets whether this is a singleton (like nil, true, false).
+    /// </summary>
+    public bool IsSingleton { get; init; }
+}
+
+/// <summary>
+/// Contains Phase 3 bootstrap configuration for loading files.
+/// </summary>
+public record Phase3BootstrapData
+{
+    /// <summary>
+    /// Gets the list of source files to load in order.
+    /// </summary>
+    public IReadOnlyList<string> SourceFiles { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets the load order for class categories.
+    /// </summary>
+    public IReadOnlyList<string> LoadOrder { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets configuration options for the file loader.
+    /// </summary>
+    public FileLoaderOptions Options { get; init; } = new();
+}
+
+/// <summary>
+/// Options for loading Smalltalk source files.
+/// </summary>
+public record FileLoaderOptions
+{
+    /// <summary>
+    /// Gets whether to stop on compilation errors.
+    /// </summary>
+    public bool StopOnError { get; init; } = true;
+
+    /// <summary>
+    /// Gets whether to log loaded classes and methods.
+    /// </summary>
+    public bool EnableLogging { get; init; } = true;
+
+    /// <summary>
+    /// Gets whether to validate loaded code.
+    /// </summary>
+    public bool ValidateAfterLoad { get; init; } = true;
+}
+
+/// <summary>
+/// Represents a validation checkpoint to verify bootstrap success.
+/// </summary>
+public record ValidationCheckpoint
+{
+    /// <summary>
+    /// Gets the description of what is being validated.
+    /// </summary>
+    public string Description { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the validation test expression.
+    /// </summary>
+    public string Test { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets whether this checkpoint is critical (failure stops bootstrap).
+    /// </summary>
+    public bool IsCritical { get; init; } = true;
+}
+
+/// <summary>
+/// Results from validating bootstrap data.
+/// </summary>
+public record BootstrapValidationResult
+{
+    /// <summary>
+    /// Gets whether the validation passed.
+    /// </summary>
+    public bool IsValid { get; init; }
+
+    /// <summary>
+    /// Gets the list of validation errors.
+    /// </summary>
+    public IReadOnlyList<string> Errors { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets the list of validation warnings.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets detailed validation information.
+    /// </summary>
+    public IReadOnlyDictionary<string, object> Details { get; init; } = new Dictionary<string, object>();
+}
+`
+
+FILE path=Core/Smalltalk80.Core/IObjectMemory.cs sha256=bd0e1d1c32e2a4893b0f73a301bdd83e3fe07a0b9ff8fe027ea15205a050d0a0 lines=121
+---
+`$lang
+// file: Core/Smalltalk80.Core/IObjectMemory.cs
+namespace Smalltalk80.Core;
+
+/// <summary>
+/// Manages the allocation, storage, and garbage collection of Smalltalk objects in memory.
+/// This interface abstracts the object memory management from the VM implementation.
+/// </summary>
+public interface IObjectMemory
+{
+    /// <summary>
+    /// Allocates a new object with the specified class and field count.
+    /// </summary>
+    /// <param name="classObject">The class of the object to create.</param>
+    /// <param name="fieldCount">The number of instance variable fields.</param>
+    /// <returns>The newly allocated object.</returns>
+    ISmalltalkObject AllocateObject(ISmalltalkClass classObject, int fieldCount);
+
+    /// <summary>
+    /// Allocates a new indexed object (like Array) with the specified size.
+    /// </summary>
+    /// <param name="classObject">The class of the indexed object.</param>
+    /// <param name="size">The number of indexed slots.</param>
+    /// <returns>The newly allocated indexed object.</returns>
+    ISmalltalkObject AllocateIndexedObject(ISmalltalkClass classObject, int size);
+
+    /// <summary>
+    /// Allocates a new byte object (like String or Symbol) with the specified size.
+    /// </summary>
+    /// <param name="classObject">The class of the byte object.</param>
+    /// <param name="size">The number of bytes.</param>
+    /// <returns>The newly allocated byte object.</returns>
+    ISmalltalkObject AllocateByteObject(ISmalltalkClass classObject, int size);
+
+    /// <summary>
+    /// Gets an object by its object identifier (OOP - Object-Oriented Pointer).
+    /// </summary>
+    /// <param name="oop">The object identifier.</param>
+    /// <returns>The object, or null if not found.</returns>
+    ISmalltalkObject? GetObject(int oop);
+
+    /// <summary>
+    /// Registers an object and returns its OOP.
+    /// </summary>
+    /// <param name="obj">The object to register.</param>
+    /// <returns>The object's OOP.</returns>
+    int RegisterObject(ISmalltalkObject obj);
+
+    /// <summary>
+    /// Performs garbage collection to reclaim unused memory.
+    /// </summary>
+    /// <returns>The number of objects collected.</returns>
+    int CollectGarbage();
+
+    /// <summary>
+    /// Gets the current memory statistics.
+    /// </summary>
+    MemoryStatistics GetStatistics();
+
+    /// <summary>
+    /// Creates a memory snapshot for debugging or persistence.
+    /// </summary>
+    /// <returns>A snapshot of the current object memory state.</returns>
+    IMemorySnapshot CreateSnapshot();
+
+    /// <summary>
+    /// Restores object memory from a snapshot.
+    /// </summary>
+    /// <param name="snapshot">The snapshot to restore from.</param>
+    void RestoreSnapshot(IMemorySnapshot snapshot);
+}
+
+/// <summary>
+/// Represents memory usage statistics.
+/// </summary>
+public record MemoryStatistics
+{
+    /// <summary>
+    /// Gets the total number of allocated objects.
+    /// </summary>
+    public int TotalObjects { get; init; }
+
+    /// <summary>
+    /// Gets the total memory used in bytes.
+    /// </summary>
+    public long UsedMemory { get; init; }
+
+    /// <summary>
+    /// Gets the total available memory in bytes.
+    /// </summary>
+    public long AvailableMemory { get; init; }
+
+    /// <summary>
+    /// Gets the number of garbage collections performed.
+    /// </summary>
+    public int GarbageCollectionCount { get; init; }
+
+    /// <summary>
+    /// Gets the breakdown of objects by class.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> ObjectsByClass { get; init; } = new Dictionary<string, int>();
+}
+
+/// <summary>
+/// Represents a snapshot of object memory state.
+/// </summary>
+public interface IMemorySnapshot
+{
+    /// <summary>
+    /// Gets the timestamp when the snapshot was created.
+    /// </summary>
+    DateTime Timestamp { get; }
+
+    /// <summary>
+    /// Gets the serialized object data.
+    /// </summary>
+    byte[] Data { get; }
+
+    /// <summary>
+    /// Gets metadata about the snapshot.
+    /// </summary>
+    IReadOnlyDictionary<string, object> Metadata { get; }
+}
+`
+
+FILE path=Core/Smalltalk80.Core/ISmalltalkObject.cs sha256=896df4f09508d25728d0f6fa5708539d77418dea306b8e366c289ca3dbd1a618 lines=256
+---
+`$lang
+// file: Core/Smalltalk80.Core/ISmalltalkObject.cs
+namespace Smalltalk80.Core;
+
+/// <summary>
+/// Represents the fundamental contract for all Smalltalk objects in the VM.
+/// Every object has a class pointer and can contain fields (instance variables).
+/// </summary>
+public interface ISmalltalkObject
+{
+    /// <summary>
+    /// Gets or sets the class of this object.
+    /// Every Smalltalk object has a class, including classes themselves (whose class is a metaclass).
+    /// </summary>
+    ISmalltalkClass Class { get; set; }
+
+    /// <summary>
+    /// Gets the object identifier (OOP - Object-Oriented Pointer) for this object.
+    /// </summary>
+    int ObjectId { get; }
+
+    /// <summary>
+    /// Gets the number of named instance variable fields in this object.
+    /// </summary>
+    int FieldCount { get; }
+
+    /// <summary>
+    /// Gets or sets a named instance variable field by index.
+    /// </summary>
+    /// <param name="index">The zero-based field index.</param>
+    /// <returns>The field value.</returns>
+    ISmalltalkObject? this[int index] { get; set; }
+
+    /// <summary>
+    /// Gets or sets a named instance variable field by name.
+    /// </summary>
+    /// <param name="fieldName">The name of the instance variable.</param>
+    /// <returns>The field value.</returns>
+    ISmalltalkObject? this[string fieldName] { get; set; }
+
+    /// <summary>
+    /// Determines if this object is an indexed object (like Array).
+    /// </summary>
+    bool IsIndexed { get; }
+
+    /// <summary>
+    /// Gets the size of indexed fields for indexed objects.
+    /// </summary>
+    int IndexedSize { get; }
+
+    /// <summary>
+    /// Gets or sets an indexed field (for Array-like objects).
+    /// </summary>
+    /// <param name="index">The zero-based index.</param>
+    /// <returns>The indexed field value.</returns>
+    ISmalltalkObject? GetIndexed(int index);
+    
+    /// <summary>
+    /// Sets an indexed field value.
+    /// </summary>
+    void SetIndexed(int index, ISmalltalkObject? value);
+
+    /// <summary>
+    /// Determines if this object is a byte object (like String or Symbol).
+    /// </summary>
+    bool IsByteObject { get; }
+
+    /// <summary>
+    /// Gets the byte data for byte objects.
+    /// </summary>
+    byte[]? GetBytes();
+
+    /// <summary>
+    /// Sets the byte data for byte objects.
+    /// </summary>
+    void SetBytes(byte[] bytes);
+
+    /// <summary>
+    /// Creates a shallow copy of this object.
+    /// </summary>
+    ISmalltalkObject ShallowCopy();
+
+    /// <summary>
+    /// Gets a string representation for debugging.
+    /// </summary>
+    string ToDebugString();
+}
+
+/// <summary>
+/// Represents a Smalltalk class object.
+/// Classes are special objects that can create instances and contain method dictionaries.
+/// </summary>
+public interface ISmalltalkClass : ISmalltalkObject
+{
+    /// <summary>
+    /// Gets or sets the superclass of this class.
+    /// ProtoObject is the only class with a null superclass.
+    /// </summary>
+    ISmalltalkClass? Superclass { get; set; }
+
+    /// <summary>
+    /// Gets or sets the method dictionary containing this class's methods.
+    /// </summary>
+    IMethodDictionary MethodDictionary { get; set; }
+
+    /// <summary>
+    /// Gets or sets the class name symbol.
+    /// </summary>
+    ISymbol Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the array of instance variable names.
+    /// </summary>
+    ISymbol[] InstanceVariables { get; set; }
+
+    /// <summary>
+    /// Gets or sets the class variable dictionary (at field index 6).
+    /// </summary>
+    IDictionary<ISymbol, ISmalltalkObject>? ClassVariables { get; set; }
+
+    /// <summary>
+    /// Gets or sets the shared pool dictionaries.
+    /// </summary>
+    IDictionary<ISymbol, ISmalltalkObject>? PoolDictionaries { get; set; }
+
+    /// <summary>
+    /// Gets or sets the format of instances of this class.
+    /// Format encodes: indexed/non-indexed, byte/pointer, field count.
+    /// </summary>
+    int Format { get; set; }
+
+    /// <summary>
+    /// Gets the metaclass of this class (for class-side methods).
+    /// </summary>
+    ISmalltalkClass Metaclass { get; }
+
+    /// <summary>
+    /// Looks up a method by selector in this class or its superclasses.
+    /// </summary>
+    /// <param name="selector">The method selector to find.</param>
+    /// <returns>The compiled method, or null if not found.</returns>
+    ICompiledMethod? LookupMethod(ISymbol selector);
+
+    /// <summary>
+    /// Adds a method to this class's method dictionary.
+    /// </summary>
+    /// <param name="selector">The method selector.</param>
+    /// <param name="method">The compiled method.</param>
+    void AddMethod(ISymbol selector, ICompiledMethod method);
+
+    /// <summary>
+    /// Creates a new instance of this class.
+    /// </summary>
+    /// <returns>A new instance with fields initialized to nil.</returns>
+    ISmalltalkObject NewInstance();
+
+    /// <summary>
+    /// Creates a new indexed instance of this class.
+    /// </summary>
+    /// <param name="size">The number of indexed slots.</param>
+    /// <returns>A new indexed instance.</returns>
+    ISmalltalkObject NewInstance(int size);
+
+    /// <summary>
+    /// Determines if this class is a subclass of another class.
+    /// </summary>
+    /// <param name="other">The potential superclass.</param>
+    /// <returns>True if this class inherits from the other class.</returns>
+    bool IsSubclassOf(ISmalltalkClass other);
+}
+
+/// <summary>
+/// Represents a compiled Smalltalk method.
+/// </summary>
+public interface ICompiledMethod : ISmalltalkObject
+{
+    /// <summary>
+    /// Gets the bytecode instructions for this method.
+    /// </summary>
+    byte[] Bytecodes { get; }
+
+    /// <summary>
+    /// Gets the literal objects referenced by this method.
+    /// </summary>
+    ISmalltalkObject[] Literals { get; }
+
+    /// <summary>
+    /// Gets the number of temporary variables used by this method.
+    /// </summary>
+    int TemporaryCount { get; }
+
+    /// <summary>
+    /// Gets the number of arguments expected by this method.
+    /// </summary>
+    int ArgumentCount { get; }
+
+    /// <summary>
+    /// Gets the primitive index if this is a primitive method, or 0 if not.
+    /// </summary>
+    int PrimitiveIndex { get; }
+
+    /// <summary>
+    /// Gets the method header that encodes temporary count, argument count, etc.
+    /// </summary>
+    int Header { get; }
+
+    /// <summary>
+    /// Gets the source code for this method if available.
+    /// </summary>
+    string? SourceCode { get; }
+
+    /// <summary>
+    /// Gets the selector (method name) for this method.
+    /// </summary>
+    ISymbol? Selector { get; }
+}
+
+/// <summary>
+/// Represents a Smalltalk symbol (interned string).
+/// </summary>
+public interface ISymbol : ISmalltalkObject
+{
+    /// <summary>
+    /// Gets the string value of this symbol.
+    /// </summary>
+    string Value { get; }
+
+    /// <summary>
+    /// Gets the hash code for this symbol.
+    /// </summary>
+    int Hash { get; }
+}
+
+/// <summary>
+/// Represents a method dictionary mapping selectors to compiled methods.
+/// </summary>
+public interface IMethodDictionary : ISmalltalkObject
+{
+    /// <summary>
+    /// Gets a method by selector.
+    /// </summary>
+    ICompiledMethod? GetMethod(ISymbol selector);
+
+    /// <summary>
+    /// Adds or updates a method.
+    /// </summary>
+    void SetMethod(ISymbol selector, ICompiledMethod method);
+
+    /// <summary>
+    /// Removes a method.
+    /// </summary>
+    bool RemoveMethod(ISymbol selector);
+
+    /// <summary>
+    /// Gets all selectors in this dictionary.
+    /// </summary>
+    IEnumerable<ISymbol> Selectors { get; }
+}
+`
+
+FILE path=Core/Smalltalk80.Core/IVirtualMachine.cs sha256=2138cc4d069f6d930b45fe50259162111e5384cee88fa6231167eef25a2a87b2 lines=208
+---
+`$lang
+// file: Core/Smalltalk80.Core/IVirtualMachine.cs
+namespace Smalltalk80.Core;
+
+/// <summary>
+/// Defines the contract for a Smalltalk-80 virtual machine implementation.
+/// The VM manages object memory, class registry, primitive operations, and bytecode execution.
+/// </summary>
+public interface IVirtualMachine
+{
+    /// <summary>
+    /// Gets the object memory manager responsible for object allocation and garbage collection.
+    /// </summary>
+    IObjectMemory ObjectMemory { get; }
+
+    /// <summary>
+    /// Gets the class registry that manages all classes and metaclasses in the system.
+    /// </summary>
+    IClassRegistry ClassRegistry { get; }
+
+    /// <summary>
+    /// Gets the primitive operation dispatcher for handling primitive method calls.
+    /// </summary>
+    IPrimitiveDispatcher PrimitiveDispatcher { get; }
+
+    /// <summary>
+    /// Gets the bytecode interpreter for executing compiled methods.
+    /// </summary>
+    IInterpreter Interpreter { get; }
+
+    /// <summary>
+    /// Bootstraps the VM with the minimal class hierarchy and essential methods.
+    /// </summary>
+    /// <param name="provider">The bootstrap data provider (e.g., JSON file reader).</param>
+    /// <returns>A task that completes when bootstrap is finished.</returns>
+    Task BootstrapAsync(IBootstrapProvider provider);
+
+    /// <summary>
+    /// Executes a compiled method with the given receiver and arguments.
+    /// </summary>
+    /// <param name="method">The compiled method to execute.</param>
+    /// <param name="receiver">The object receiving the message.</param>
+    /// <param name="arguments">The method arguments.</param>
+    /// <returns>The result of method execution.</returns>
+    ISmalltalkObject? Execute(ICompiledMethod method, ISmalltalkObject receiver, params ISmalltalkObject[] arguments);
+
+    /// <summary>
+    /// Sends a message to an object and returns the result.
+    /// </summary>
+    /// <param name="selector">The message selector (method name).</param>
+    /// <param name="receiver">The object receiving the message.</param>
+    /// <param name="arguments">The message arguments.</param>
+    /// <returns>The result of the message send.</returns>
+    ISmalltalkObject? SendMessage(ISymbol selector, ISmalltalkObject receiver, params ISmalltalkObject[] arguments);
+
+    /// <summary>
+    /// Loads and executes a Smalltalk source file.
+    /// </summary>
+    /// <param name="filePath">Path to the Smalltalk source file.</param>
+    /// <returns>A task that completes when the file is loaded.</returns>
+    Task LoadFileAsync(string filePath);
+
+    /// <summary>
+    /// Gets a global variable by name.
+    /// </summary>
+    /// <param name="name">The name of the global variable.</param>
+    /// <returns>The global variable value, or null if not found.</returns>
+    ISmalltalkObject? GetGlobal(string name);
+
+    /// <summary>
+    /// Sets a global variable.
+    /// </summary>
+    /// <param name="name">The name of the global variable.</param>
+    /// <param name="value">The value to set.</param>
+    void SetGlobal(string name, ISmalltalkObject value);
+
+    /// <summary>
+    /// Gets the current VM configuration.
+    /// </summary>
+    IVMConfiguration Configuration { get; }
+
+    /// <summary>
+    /// Event raised when the VM state changes (e.g., during bootstrap phases).
+    /// </summary>
+    event EventHandler<VMStateChangedEventArgs>? StateChanged;
+}
+
+/// <summary>
+/// Represents the VM configuration options.
+/// </summary>
+public interface IVMConfiguration
+{
+    /// <summary>
+    /// Gets or sets whether to enable tracing for debugging.
+    /// </summary>
+    bool EnableTracing { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum stack depth for method calls.
+    /// </summary>
+    int MaxStackDepth { get; set; }
+
+    /// <summary>
+    /// Gets or sets the initial heap size in bytes.
+    /// </summary>
+    int InitialHeapSize { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to enable the method cache for performance.
+    /// </summary>
+    bool EnableMethodCache { get; set; }
+
+    /// <summary>
+    /// Gets or sets the bootstrap mode (Phase1Only, Phase1And2, Full).
+    /// </summary>
+    BootstrapMode BootstrapMode { get; set; }
+}
+
+/// <summary>
+/// Defines the bootstrap modes available for VM initialization.
+/// </summary>
+public enum BootstrapMode
+{
+    /// <summary>
+    /// Only execute Phase 1 (VM primitives) bootstrap.
+    /// </summary>
+    Phase1Only,
+
+    /// <summary>
+    /// Execute Phase 1 and Phase 2 (messaging) bootstrap.
+    /// </summary>
+    Phase1And2,
+
+    /// <summary>
+    /// Execute all three bootstrap phases including file loading.
+    /// </summary>
+    Full
+}
+
+/// <summary>
+/// Event arguments for VM state change notifications.
+/// </summary>
+public class VMStateChangedEventArgs : EventArgs
+{
+    /// <summary>
+    /// Gets the previous VM state.
+    /// </summary>
+    public VMState OldState { get; }
+
+    /// <summary>
+    /// Gets the new VM state.
+    /// </summary>
+    public VMState NewState { get; }
+
+    /// <summary>
+    /// Gets an optional message describing the state change.
+    /// </summary>
+    public string? Message { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the VMStateChangedEventArgs class.
+    /// </summary>
+    public VMStateChangedEventArgs(VMState oldState, VMState newState, string? message = null)
+    {
+        OldState = oldState;
+        NewState = newState;
+        Message = message;
+    }
+}
+
+/// <summary>
+/// Represents the current state of the virtual machine.
+/// </summary>
+public enum VMState
+{
+    /// <summary>
+    /// VM has not been initialized.
+    /// </summary>
+    Uninitialized,
+
+    /// <summary>
+    /// VM is executing Phase 1 bootstrap (VM primitives).
+    /// </summary>
+    BootstrappingPhase1,
+
+    /// <summary>
+    /// VM is executing Phase 2 bootstrap (messaging).
+    /// </summary>
+    BootstrappingPhase2,
+
+    /// <summary>
+    /// VM is executing Phase 3 bootstrap (file loading).
+    /// </summary>
+    BootstrappingPhase3,
+
+    /// <summary>
+    /// VM is ready for normal operation.
+    /// </summary>
+    Ready,
+
+    /// <summary>
+    /// VM is executing code.
+    /// </summary>
+    Executing,
+
+    /// <summary>
+    /// VM has encountered an error.
+    /// </summary>
+    Error
+}
+`
+
+FILE path=Directory.Build.props sha256=a73dbed6e02d90c88fb20dfeda6e51633210f4a127cbffb3a4c3150f866c0f33 lines=57
+---
+`$lang
+// file: Directory.Build.props
+<Project>
+  <!-- Common properties for all projects in the solution -->
+  <PropertyGroup>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8620;CS8625</WarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    
+    <!-- Output paths -->
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</BaseIntermediateOutputPath>
+    
+    <!-- Package metadata -->
+    <Authors>Smalltalk-80 Contributors</Authors>
+    <Company>Smalltalk-80 Project</Company>
+    <Product>Smalltalk-80 Virtual Machine</Product>
+    <Copyright>Copyright © 2024 Smalltalk-80 Project</Copyright>
+    <Version>1.0.0</Version>
+    
+    <!-- Repository information -->
+    <RepositoryUrl>https://github.com/yourusername/Smalltalk-80</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <!-- Debug configuration -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <!-- Release configuration -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Common ItemGroups -->
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading.Tasks" />
+  </ItemGroup>
+
+  <!-- Bootstrap file handling for executable projects -->
+  <PropertyGroup>
+    <BootstrapDataProject>$(MSBuildThisFileDirectory)Bootstrap\Smalltalk80.Bootstrap.Data\Smalltalk80.Bootstrap.Data.csproj</BootstrapDataProject>
+  </PropertyGroup>
+
+</Project>
+`
+
+FILE path=extracted/Array.json sha256=17f4aec1523e8bf199fcf164b376668057cb4d05eef9196abd2dca8d9bca0f04 lines=143
+---
+`$lang
+// file: extracted/Array.json
+{
+  "ClassName": "Array",
+  "Superclass": "ArrayedCollection",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Arrayed",
+  "InstanceMethods": [
+    {
+      "Selector": "asArray",
+      "Source": "asArray^self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hash",
+      "Source": "hashselfsize=0ifTrue:[^17171].^(selfat:1)hash\u002B(selfat:selfsize)hash!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 03 22 7D 7D E1 68 46 D3 D5 46 B0 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        17171,
+        {
+          "Value": "hash"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "selfat"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy:mapselfsize=0ifTrue:[^selfhash].^(selffirsthashMappedBy:map)\u002B(selflasthashMappedBy:map)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 03 43 7D 7D E1 69 44 D2 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "map"
+        },
+        {
+          "Value": "selfhash"
+        },
+        {
+          "Value": "selffirsthashMappedBy"
+        }
+      ]
+    },
+    {
+      "Selector": "isLiteral",
+      "Source": "isLiteralselfdetect:[:element|elementisLiteralnot]ifNone:[^true].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D 89 00 03 22 7D 7D E0 69 23 7C",
+      "Literals": [
+        {
+          "Value": "ifNone:"
+        },
+        {
+          "Value": "elementisLiteralnot"
+        },
+        true,
+        false
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPut:$(.selfdo:[:element|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B0 88 69 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPut"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamselfisLiteralifTrue:[aStreamnextPut:$#;nextPut:$(.selfdo:[:element|elementprintOn:aStream.aStreamspace].aStreamnextPut:$)]ifFalse:[superstoreOn:aStream]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D 88 69 6A 11 22 C4 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "aStreamnextPut"
+        },
+        "(",
+        {
+          "Value": "selfdo"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 6,
+    "SuccessfullyCompiled": 6,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:43.7619433Z"
+  }
+}
+`
+
+FILE path=extracted/ArrayedCollection.json sha256=96665c60e3d7bb936d3480640920fb462772a8a3013671c64c08e0f2f7309640 lines=165
+---
+`$lang
+// file: extracted/ArrayedCollection.json
+{
+  "ClassName": "ArrayedCollection",
+  "Superclass": "SequenceableCollection",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Abstract",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:newObjectselfshouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "defaultElement",
+      "Source": "defaultElement^nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        "nil"
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size\u003Cprimitive: 62\u003E^selfbasicSize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 62,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfbasicSize"
+        }
+      ]
+    },
+    {
+      "Selector": "storeElementsFrom:to:on:",
+      "Source": "storeElementsFrom:firstIndexto:lastIndexon:aStream|noneYetdefaultElementarrayElement|noneYet_true.defaultElement_selfdefaultElement.firstIndexto:lastIndexdo:[:index|arrayElement_selfat:index.arrayElement=defaultElementifFalse:[noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 at: \u0027.aStreamstore:index.aStreamnextPutAll:\u0027 put: \u0027.aStreamstore:arrayElement]].^noneYet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "lastIndexon"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamaStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new: \u0027.aStreamstore:selfsize.aStreamnextPut:$).(selfstoreElementsFrom:1to:selfsizeon:aStream)ifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "new^selfnew:0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "new:withAll:",
+      "Source": "new:sizewithAll:value^(selfnew:size)atAllPut:value!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "with:",
+      "Source": "with:anObject|newCollection|newCollection_selfnew:1.newCollectionat:1put:anObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfnew"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:",
+      "Source": "with:firstObjectwith:secondObject|newCollection|newCollection_selfnew:2.newCollectionat:1put:firstObject.newCollectionat:2put:secondObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "secondObject"
+        },
+        {
+          "Value": "newCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObject|newCollection|newCollection_selfnew:3.newCollectionat:1put:firstObject.newCollectionat:2put:secondObject.newCollectionat:3put:thirdObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObjectwith:fourthObject|newCollection|newCollection_selfnew:4.newCollectionat:1put:firstObject.newCollectionat:2put:secondObject.newCollectionat:3put:thirdObject.newCollectionat:4put:fourthObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 11,
+    "SuccessfullyCompiled": 11,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:32:58.595789Z"
+  }
+}
+`
+
+FILE path=extracted/Association.json sha256=ebe36fd49bfd29459513e3531265f4874390d212290e837e8928d6e724f4cdd7 lines=96
+---
+`$lang
+// file: extracted/Association.json
+{
+  "ClassName": "Association",
+  "Superclass": "LookupKey",
+  "InstanceVariables": [
+    "value"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "key:value:",
+      "Source": "key:aKeyvalue:anObjectkey_aKey.value_anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 69 42 88 60 7C",
+      "Literals": [
+        {
+          "Value": "aKey"
+        },
+        {
+          "Value": "anObjectkey"
+        },
+        {
+          "Value": "anObject"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamsuperprintOn:aStream.aStreamnextPutAll:\u0027-\u003E\u0027.valueprintOn:aStream!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 7C",
+      "Literals": [
+        {
+          "Value": "aStream"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "value",
+      "Source": "value^value!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "value:",
+      "Source": "value:anObjectvalue_anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "key:value:",
+      "Source": "key:newKeyvalue:newValue^(superkey:newKey)value:newValue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "newValue"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 5,
+    "SuccessfullyCompiled": 5,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:52.5034704Z"
+  }
+}
+`

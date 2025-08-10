@@ -1,0 +1,2743 @@
+CHUNK 38/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=Smalltalk80/Primitives/InputOutputPrimitives.cs sha256=45a8df18787ef4e565324ef5275f56c5ef7fc5930027bcc5eb2d79384ddf100b lines=251
+---
+`$lang
+// file: Smalltalk80/Primitives/InputOutputPrimitives.cs
+using System;
+using System.Collections.Generic;
+
+namespace Smalltalk80;
+
+/// <summary>
+/// Implements basic input/output primitives used by the interpreter.
+/// </summary>
+public static class InputOutputPrimitives
+{
+    private static Semaphore? inputSemaphore;
+    private static readonly Queue<int> inputBuffer = new();
+    private static int sampleInterval;
+    private static bool cursorLinked;
+    private static (int X, int Y) cursorLocation;
+    private static SmalltalkObject? displayScreen;
+    private static SmalltalkObject? cursor;
+
+    /// <summary>
+    /// Returns a point describing the current cursor location.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    /// <returns><c>true</c> if successful.</returns>
+    public static bool MousePoint(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        var point = new SmalltalkObject(null, 2);
+        point.Fields[0] = cursorLocation.X;
+        point.Fields[1] = cursorLocation.Y;
+        ctx.Stack.Push(point);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the cursor location.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool CursorLocPut(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject point)
+            return false;
+        _ = ctx.Stack.Pop();
+        if (point.Fields.Length < 2)
+            return false;
+        cursorLocation = (Convert.ToInt32(point.Fields[0]), Convert.ToInt32(point.Fields[1]));
+        ctx.Stack.Push(point);
+        return true;
+    }
+
+    /// <summary>
+    /// Links or unlinks the cursor from the pointing device.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool CursorLink(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not bool link)
+            return false;
+        _ = ctx.Stack.Pop();
+        cursorLinked = link;
+        ctx.Stack.Push(link);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the <see cref="Semaphore"/> used to signal input events.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool InputSemaphore(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not Semaphore sem)
+            return false;
+        _ = ctx.Stack.Pop();
+        inputSemaphore = sem;
+        ctx.Stack.Push(sem);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the sample interval for pointing device movement.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool SampleInterval(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not int interval)
+            return false;
+        _ = ctx.Stack.Pop();
+        sampleInterval = interval;
+        ctx.Stack.Push(interval);
+        return true;
+    }
+
+    /// <summary>
+    /// Retrieves the next input word from the buffer.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool InputWord(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        if (inputBuffer.Count == 0)
+            return false;
+        int word = inputBuffer.Dequeue();
+        ctx.Stack.Push(word);
+        return true;
+    }
+
+    /// <summary>
+    /// Performs a bit block transfer operation. This implementation is a stub.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool CopyBits(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        return false;
+    }
+
+    /// <summary>
+    /// Writes a snapshot of the object memory to disk.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool Snapshot(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        try
+        {
+            ObjectImage.Save("snapshot.json", new List<SmalltalkObject>(ObjectMemory.Objects));
+            ctx.Stack.Push(true);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Stores the current time in seconds since 1901 into a byte array.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool TimeWordsInto(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject bytes || bytes.Fields.Length < 4)
+            return false;
+        _ = ctx.Stack.Pop();
+        var seconds = (int)(DateTime.UtcNow - new DateTime(1901, 1, 1)).TotalSeconds;
+        for (int i = 0; i < 4; i++)
+            bytes.Fields[i] = (byte)((seconds >> (8 * i)) & 0xFF);
+        ctx.Stack.Push(bytes);
+        return true;
+    }
+
+    /// <summary>
+    /// Stores the current tick count in a byte array.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool TickWordsInto(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject bytes || bytes.Fields.Length < 4)
+            return false;
+        _ = ctx.Stack.Pop();
+        int ticks = Environment.TickCount;
+        for (int i = 0; i < 4; i++)
+            bytes.Fields[i] = (byte)((ticks >> (8 * i)) & 0xFF);
+        ctx.Stack.Push(bytes);
+        return true;
+    }
+
+    /// <summary>
+    /// Schedules a semaphore to be signaled at the specified tick count. This implementation uses a timer.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool SignalAtTick(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not int tick || ctx.Stack.Pop() is not Semaphore sem)
+            return false;
+        _ = ctx.Stack.Pop();
+        var delay = Math.Max(0, tick - Environment.TickCount);
+        var timer = new System.Threading.Timer(_ => inputSemaphore?.Waiting.Enqueue(new Process(ctx)), null, delay, System.Threading.Timeout.Infinite);
+        ctx.Stack.Push(sem);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the active cursor object.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool BeCursor(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject c)
+            return false;
+        _ = ctx.Stack.Pop();
+        cursor = c;
+        ctx.Stack.Push(c);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the active display screen object.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool BeDisplay(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not SmalltalkObject disp)
+            return false;
+        _ = ctx.Stack.Pop();
+        displayScreen = disp;
+        ctx.Stack.Push(disp);
+        return true;
+    }
+
+    /// <summary>
+    /// Optional primitive for scanning characters. Always fails in this implementation.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool ScanCharacters(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        return false;
+    }
+
+    /// <summary>
+    /// Optional primitive for drawing loops. Always fails in this implementation.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool DrawLoop(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        return false;
+    }
+
+    /// <summary>
+    /// Replaces bytes in a <see cref="SmalltalkObject"/> array with bytes from another array.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool StringReplace(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not int start ||
+            ctx.Stack.Pop() is not SmalltalkObject source ||
+            ctx.Stack.Pop() is not int stop ||
+            ctx.Stack.Pop() is not SmalltalkObject target)
+            return false;
+        _ = ctx.Stack.Pop();
+        int count = Math.Min(stop - 1, target.Fields.Length) - Math.Min(start - 1, target.Fields.Length) + 1;
+        if (count <= 0)
+            return false;
+        for (int i = 0; i < count && start - 1 + i < target.Fields.Length && i < source.Fields.Length; i++)
+            target.Fields[start - 1 + i] = source.Fields[i];
+        ctx.Stack.Push(target);
+        return true;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/Primitives/PrimitiveDispatcher.cs sha256=3ba7c3761cce2b37f8b06fca4f72f2bed881b75ed3cbbd7d782a2a16e57a10ce lines=208
+---
+`$lang
+// file: Smalltalk80/Primitives/PrimitiveDispatcher.cs
+using System;
+using System.Collections.Generic;
+using Smalltalk80;
+
+/// <summary>
+/// Provides a dispatcher for built-in primitive operations invoked by compiled methods.
+/// </summary>
+public static class Primitives
+{
+    /// <summary>Delegate representing a primitive implementation.</summary>
+    /// <param name="context">The current execution context.</param>
+    /// <returns><c>true</c> if the primitive handled the call.</returns>
+    private delegate bool PrimitiveHandler(Context context);
+
+    /// <summary>Table mapping primitive indices to their handlers.</summary>
+    private static readonly Dictionary<int, PrimitiveHandler> Handlers = new()
+    {
+        // SmallInteger primitives
+        [1] = IntegerPrimitives.Add,
+        [2] = IntegerPrimitives.Subtract,
+        [3] = IntegerPrimitives.LessThan,
+        [4] = IntegerPrimitives.GreaterThan,
+        [5] = IntegerPrimitives.LessOrEqual,
+        [6] = IntegerPrimitives.GreaterOrEqual,
+        [7] = IntegerPrimitives.Equals,
+        [8] = IntegerPrimitives.NotEqual,
+        [9] = IntegerPrimitives.Multiply,
+        [10] = IntegerPrimitives.Divide,
+        [11] = IntegerPrimitives.Mod,
+        [12] = IntegerPrimitives.Div,
+        [13] = IntegerPrimitives.Quo,
+        [14] = IntegerPrimitives.BitAnd,
+        [15] = IntegerPrimitives.BitOr,
+        [16] = IntegerPrimitives.BitXor,
+        [17] = IntegerPrimitives.BitShift,
+        [18] = IntegerPrimitives.MakePoint,
+
+        // LargeInteger primitives
+        [21] = LargeIntegerPrimitives.Add,
+        [22] = LargeIntegerPrimitives.Subtract,
+        [23] = LargeIntegerPrimitives.LessThan,
+        [24] = LargeIntegerPrimitives.GreaterThan,
+        [25] = LargeIntegerPrimitives.LessOrEqual,
+        [26] = LargeIntegerPrimitives.GreaterOrEqual,
+        [27] = LargeIntegerPrimitives.Equals,
+        [28] = LargeIntegerPrimitives.NotEqual,
+        [29] = LargeIntegerPrimitives.Multiply,
+        [30] = LargeIntegerPrimitives.Divide,
+        [31] = LargeIntegerPrimitives.Mod,
+        [32] = LargeIntegerPrimitives.Div,
+        [33] = LargeIntegerPrimitives.Quo,
+        [34] = LargeIntegerPrimitives.BitAnd,
+        [35] = LargeIntegerPrimitives.BitOr,
+        [36] = LargeIntegerPrimitives.BitXor,
+        [37] = LargeIntegerPrimitives.BitShift,
+
+        // Float primitives
+        [40] = FloatPrimitives.AsFloat,
+        [41] = FloatPrimitives.Add,
+        [42] = FloatPrimitives.Subtract,
+        [43] = FloatPrimitives.LessThan,
+        [44] = FloatPrimitives.GreaterThan,
+        [45] = FloatPrimitives.LessOrEqual,
+        [46] = FloatPrimitives.GreaterOrEqual,
+        [47] = FloatPrimitives.Equals,
+        [48] = FloatPrimitives.NotEqual,
+        [49] = FloatPrimitives.Multiply,
+        [50] = FloatPrimitives.Divide,
+        [51] = FloatPrimitives.Truncated,
+        [52] = FloatPrimitives.FractionalPart,
+        [53] = FloatPrimitives.Exponent,
+        [54] = FloatPrimitives.TimesTwoPower,
+
+        // Array and stream primitives
+        [60] = ObjectPrimitives.At,
+        [61] = ObjectPrimitives.AtPut,
+        [62] = ObjectPrimitives.Size,
+        // Array primitives temporarily disabled
+        // [63] = ArrayPrimitives.StringAt,
+        // [64] = ArrayPrimitives.StringAtPut,
+        // [65] = ArrayPrimitives.Next,
+        // [66] = ArrayPrimitives.NextPut,
+        // [67] = ArrayPrimitives.AtEnd,
+        [68] = StorageManagementPrimitives.ObjectAt,
+        [69] = StorageManagementPrimitives.ObjectAtPut,
+        [70] = StorageManagementPrimitives.New,
+        [71] = StorageManagementPrimitives.NewWithArg,
+        [72] = StorageManagementPrimitives.Become,
+        [73] = StorageManagementPrimitives.InstVarAt,
+        [74] = StorageManagementPrimitives.InstVarAtPut,
+        [75] = StorageManagementPrimitives.AsOop,
+        [76] = StorageManagementPrimitives.AsObject,
+        [77] = StorageManagementPrimitives.SomeInstance,
+        [78] = StorageManagementPrimitives.NextInstance,
+        [79] = StorageManagementPrimitives.NewMethod,
+
+        // Control primitives
+        [80] = ControlPrimitives.BlockCopy,
+        [81] = ControlPrimitives.Value,
+        [82] = ControlPrimitives.ValueWithArgs,
+        [83] = ControlPrimitives.Perform,
+        [84] = ControlPrimitives.PerformWithArgs,
+        [85] = ControlPrimitives.Signal,
+        [86] = ControlPrimitives.Wait,
+        [87] = ControlPrimitives.Resume,
+        [88] = ControlPrimitives.Suspend,
+        [89] = ControlPrimitives.FlushCache,
+
+        // Input/output primitives
+        [90] = InputOutputPrimitives.MousePoint,
+        [91] = InputOutputPrimitives.CursorLocPut,
+        [92] = InputOutputPrimitives.CursorLink,
+        [93] = InputOutputPrimitives.InputSemaphore,
+        [94] = InputOutputPrimitives.SampleInterval,
+        [95] = InputOutputPrimitives.InputWord,
+        [96] = InputOutputPrimitives.CopyBits,
+        [97] = InputOutputPrimitives.Snapshot,
+        [98] = InputOutputPrimitives.TimeWordsInto,
+        [99] = InputOutputPrimitives.TickWordsInto,
+        [100] = InputOutputPrimitives.SignalAtTick,
+        [101] = InputOutputPrimitives.BeCursor,
+        [102] = InputOutputPrimitives.BeDisplay,
+        [103] = InputOutputPrimitives.ScanCharacters,
+        [104] = InputOutputPrimitives.DrawLoop,
+        [105] = InputOutputPrimitives.StringReplace,
+
+        // System primitives
+        [110] = ObjectPrimitives.Equivalent,
+        [111] = ObjectPrimitives.Class,
+        [112] = SystemPrimitives.CoreLeft,
+        [113] = SystemPrimitives.Quit,
+        [114] = SystemPrimitives.ExitToDebugger,
+        [115] = SystemPrimitives.OopsLeft,
+        [116] = SystemPrimitives.SignalAtOopsLeftWordsLeft,
+
+        // Additional object primitives
+        [139] = ObjectPrimitives.NextObject,
+
+        // File system primitives temporarily disabled
+        // [142] = FileSystemPrimitives.OpenStream,
+        // [143] = FileSystemPrimitives.CloseStream,
+        // [144] = FileSystemPrimitives.ReadNextChar,
+        // [145] = FileSystemPrimitives.WriteChar,
+        // [146] = FileSystemPrimitives.GetFileSize,
+        // [147] = FileSystemPrimitives.SetPosition,
+        // [148] = FileSystemPrimitives.GetFileSizeByName,
+        // [149] = FileSystemPrimitives.FileExists,
+        // [150] = FileSystemPrimitives.DeleteFile,
+        // [151] = FileSystemPrimitives.RenameFile,
+        
+        // Control flow primitives
+        [152] = ControlPrimitives.IfTrue,
+        [153] = ControlPrimitives.IfFalse,
+        [154] = ControlPrimitives.WhileTrue,
+        
+        // [155] = FileSystemPrimitives.DeleteFile,
+        // [156] = FileSystemPrimitives.IsDirectory,
+        // [157] = FileSystemPrimitives.GetDirectoryEntries,
+
+        // String comparison primitives temporarily disabled
+        // [158] = ArrayPrimitives.StringEquals,
+        // [159] = ArrayPrimitives.StringLessThan,
+
+        // Character creation primitive temporarily disabled
+        // [170] = ArrayPrimitives.CharacterFromValue,
+        
+        // Additional control primitives
+        [201] = ControlPrimitives.BlockValue,
+        
+        // Bootstrap primitives for class creation and method installation
+        [170] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateSubclass,
+        [171] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethod,
+        [172] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethodClassified,
+        [173] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
+        [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
+        [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
+        
+        // Object creation primitives for Phase 1 bootstrap
+        [180] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSmallInteger,
+        [181] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSymbol,
+        [182] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewString,
+        
+        // Note: Dictionary operations are not primitives in Smalltalk-80
+        // Dictionary at:put: and at: are implemented in Smalltalk bytecode
+    };
+
+    static Primitives()
+    {
+        // Fill remaining required primitive slots with stubs returning false
+        for (var i = 1; i <= 157; i++)
+        {
+            if (!Handlers.ContainsKey(i))
+            {
+                Handlers[i] = static _ => false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes the primitive with the specified index.
+    /// </summary>
+    /// <param name="index">The primitive index.</param>
+    /// <param name="context">The current execution context.</param>
+    /// <returns><c>true</c> if the primitive handled the call; otherwise <c>false</c>.</returns>
+    public static bool Execute(int index, Context context)
+        => Handlers.TryGetValue(index, out var handler) && handler(context);
+}
+
+`
+
+FILE path=Smalltalk80/Primitives/SystemPrimitives.cs sha256=c1aeb1184c1a84cd9b41b0202084dcbe9d8f04ca0e1532c94630d801afc8709e lines=73
+---
+`$lang
+// file: Smalltalk80/Primitives/SystemPrimitives.cs
+using System;
+
+namespace Smalltalk80;
+
+/// <summary>
+/// Implements system-level primitives for the interpreter.
+/// </summary>
+public static class SystemPrimitives
+{
+    /// <summary>
+    /// Returns an approximation of free object slots in the object memory.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool CoreLeft(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        int free = int.MaxValue - ObjectMemory.Objects.Count;
+        ctx.Stack.Push(free);
+        return true;
+    }
+
+    /// <summary>
+    /// Requests termination of the process. This implementation does not exit during testing.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool Quit(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        ctx.Stack.Push(null);
+        return true;
+    }
+
+    /// <summary>
+    /// Breaks into the debugger if attached.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool ExitToDebugger(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        System.Diagnostics.Debugger.Launch();
+        ctx.Stack.Push(null);
+        return true;
+    }
+
+    /// <summary>
+    /// Returns a placeholder value representing remaining oops.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool OopsLeft(Context ctx)
+    {
+        _ = ctx.Stack.Pop();
+        ctx.Stack.Push(int.MaxValue - ObjectMemory.Objects.Count);
+        return true;
+    }
+
+    /// <summary>
+    /// Signals a semaphore when the number of allocated objects reaches a threshold.
+    /// </summary>
+    /// <param name="ctx">The active context.</param>
+    public static bool SignalAtOopsLeftWordsLeft(Context ctx)
+    {
+        if (ctx.Stack.Pop() is not int threshold || ctx.Stack.Pop() is not Semaphore sem)
+            return false;
+        _ = ctx.Stack.Pop();
+        if (ObjectMemory.Objects.Count >= threshold)
+        {
+            ProcessorScheduler.Instance.Resume(new Process(ctx));
+        }
+        ctx.Stack.Push(sem);
+        return true;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/ProcessScheduler.cs sha256=5e79ec177c08395f350427eec9cdcd83565341e9859dc55c985af59b634d1597 lines=165
+---
+`$lang
+// file: Smalltalk80/ProcessScheduler.cs
+using System;
+using System.Collections.Generic;
+
+/// <summary>
+/// Implements the Smalltalk-80 process scheduler that manages multiple execution contexts.
+/// Reference: Specification lines 814-816, 1564-1580
+/// </summary>
+public class ProcessScheduler
+{
+    /// <summary>
+    /// The currently active process.
+    /// </summary>
+    public Process? ActiveProcess { get; private set; }
+
+    /// <summary>
+    /// Queue of processes waiting to run at each priority level.
+    /// </summary>
+    private readonly Dictionary<int, Queue<Process>> processQueues = new();
+
+    /// <summary>
+    /// List of processes waiting on semaphores.
+    /// </summary>
+    private readonly List<Process> waitingProcesses = new();
+
+    /// <summary>
+    /// Checks if a process switch should occur and performs it if necessary.
+    /// This should be called at the start of each interpreter cycle.
+    /// </summary>
+    public void CheckProcessSwitch()
+    {
+        // Implementation needed:
+        // 1. Check if higher priority processes are ready
+        // 2. Check if current process time slice expired
+        // 3. Perform context switch if needed
+
+        if (ActiveProcess == null)
+        {
+            ActiveProcess = GetNextRunnableProcess();
+        }
+
+        // Time slice management and priority checking would go here
+    }
+
+    /// <summary>
+    /// Adds a process to the appropriate run queue.
+    /// </summary>
+    /// <param name="process">The process to schedule.</param>
+    public void ScheduleProcess(Process process)
+    {
+        if (!processQueues.ContainsKey(process.Priority))
+        {
+            processQueues[process.Priority] = new Queue<Process>();
+        }
+
+        processQueues[process.Priority].Enqueue(process);
+    }
+
+    /// <summary>
+    /// Suspends the currently active process.
+    /// </summary>
+    public void SuspendActiveProcess()
+    {
+        if (ActiveProcess != null)
+        {
+            waitingProcesses.Add(ActiveProcess);
+            ActiveProcess = GetNextRunnableProcess();
+        }
+    }
+
+    /// <summary>
+    /// Resumes a suspended process.
+    /// </summary>
+    /// <param name="process">The process to resume.</param>
+    public void ResumeProcess(Process process)
+    {
+        waitingProcesses.Remove(process);
+        ScheduleProcess(process);
+    }
+
+    private Process? GetNextRunnableProcess()
+    {
+        // Find highest priority non-empty queue
+        foreach (var priority in new[] { 80, 60, 40, 20, 10 }) // Standard Smalltalk priorities
+        {
+            if (processQueues.ContainsKey(priority) && processQueues[priority].Count > 0)
+            {
+                return processQueues[priority].Dequeue();
+            }
+        }
+        return null;
+    }
+}
+
+/// <summary>
+/// Represents a Smalltalk process (execution context).
+/// </summary>
+public class Process
+{
+    /// <summary>
+    /// The execution context for this process.
+    /// </summary>
+    public Context Context { get; set; } = null!;
+
+    /// <summary>
+    /// Priority level (higher numbers = higher priority).
+    /// </summary>
+    public int Priority { get; set; } = 40;
+
+    /// <summary>
+    /// The semaphore this process is waiting on, if any.
+    /// </summary>
+    public Semaphore? WaitingSemaphore { get; set; }
+}
+
+/// <summary>
+/// Implements Smalltalk semaphores for process synchronization.
+/// </summary>
+public class Semaphore
+{
+    /// <summary>
+    /// Current semaphore count.
+    /// </summary>
+    public int Count { get; private set; }
+
+    /// <summary>
+    /// Queue of processes waiting on this semaphore.
+    /// </summary>
+    private readonly Queue<Process> waitingProcesses = new();
+
+    /// <summary>
+    /// Signals the semaphore, incrementing count or waking a waiting process.
+    /// </summary>
+    public void Signal()
+    {
+        if (waitingProcesses.Count > 0)
+        {
+            var process = waitingProcesses.Dequeue();
+            process.WaitingSemaphore = null;
+            // Schedule process to run
+        }
+        else
+        {
+            Count++;
+        }
+    }
+
+    /// <summary>
+    /// Waits on the semaphore, decrementing count or suspending the process.
+    /// </summary>
+    /// <param name="process">The process attempting to wait.</param>
+    public void Wait(Process process)
+    {
+        if (Count > 0)
+        {
+            Count--;
+        }
+        else
+        {
+            process.WaitingSemaphore = this;
+            waitingProcesses.Enqueue(process);
+            // Suspend the process
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80/RealObjectMemory.cs sha256=afa4e5609691875da6295d281dd2befbf643f9b5e6661edd2da43d2fc9170325 lines=289
+---
+`$lang
+// file: Smalltalk80/RealObjectMemory.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+/// <summary>
+/// Implements a real object memory system following the Smalltalk-80 specification.
+/// Reference: Virtual Machine - Object Memory.md, lines 1-202
+/// </summary>
+public class RealObjectMemory
+{
+    /// <summary>
+    /// The heap where all objects are stored.
+    /// </summary>
+    private readonly List<HeapObject> heap = new();
+
+    /// <summary>
+    /// Free object table for garbage collection.
+    /// </summary>
+    private readonly Stack<int> freeObjects = new();
+
+    /// <summary>
+    /// Reference counting table for automatic memory management.
+    /// </summary>
+    private readonly Dictionary<int, int> referenceCounts = new();
+
+    /// <summary>
+    /// Creates a new object with the specified class and number of fields.
+    /// </summary>
+    /// <param name="classPointer">The class of the new object.</param>
+    /// <param name="fieldCount">Number of instance variables.</param>
+    /// <returns>Object pointer to the new object.</returns>
+    public int CreateObject(SmalltalkObject classPointer, int fieldCount)
+    {
+        int objectPointer;
+
+        if (freeObjects.Count > 0)
+        {
+            objectPointer = freeObjects.Pop();
+            heap[objectPointer] = new HeapObject
+            {
+                ClassPointer = classPointer,
+                Fields = new object?[fieldCount],
+                Size = fieldCount + 2 // Header size
+            };
+        }
+        else
+        {
+            objectPointer = heap.Count;
+            heap.Add(new HeapObject
+            {
+                ClassPointer = classPointer,
+                Fields = new object?[fieldCount],
+                Size = fieldCount + 2
+            });
+        }
+
+        referenceCounts[objectPointer] = 1;
+        return objectPointer;
+    }
+
+    /// <summary>
+    /// Retrieves the object at the specified pointer.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    /// <returns>The heap object.</returns>
+    public HeapObject GetObject(int objectPointer)
+    {
+        if (objectPointer < 0 || objectPointer >= heap.Count)
+            throw new ArgumentOutOfRangeException(nameof(objectPointer));
+
+        return heap[objectPointer];
+    }
+
+    /// <summary>
+    /// Fetches a field from an object.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    /// <param name="fieldIndex">The field index.</param>
+    /// <returns>The field value.</returns>
+    public object? FetchField(int objectPointer, int fieldIndex)
+    {
+        var obj = GetObject(objectPointer);
+        if (fieldIndex < 0 || fieldIndex >= obj.Fields.Length)
+            throw new ArgumentOutOfRangeException(nameof(fieldIndex));
+
+        return obj.Fields[fieldIndex];
+    }
+
+    /// <summary>
+    /// Stores a value in an object field.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    /// <param name="fieldIndex">The field index.</param>
+    /// <param name="value">The value to store.</param>
+    public void StoreField(int objectPointer, int fieldIndex, object? value)
+    {
+        var obj = GetObject(objectPointer);
+        if (fieldIndex < 0 || fieldIndex >= obj.Fields.Length)
+            throw new ArgumentOutOfRangeException(nameof(fieldIndex));
+
+        // Decrement reference count of old value
+        if (obj.Fields[fieldIndex] is int oldPointer)
+        {
+            DecrementReferenceCount(oldPointer);
+        }
+
+        obj.Fields[fieldIndex] = value;
+
+        // Increment reference count of new value
+        if (value is int newPointer)
+        {
+            IncrementReferenceCount(newPointer);
+        }
+    }
+
+    /// <summary>
+    /// Increments the reference count for an object.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    public void IncrementReferenceCount(int objectPointer)
+    {
+        if (referenceCounts.ContainsKey(objectPointer))
+        {
+            referenceCounts[objectPointer]++;
+        }
+        else
+        {
+            referenceCounts[objectPointer] = 1;
+        }
+    }
+
+    /// <summary>
+    /// Decrements the reference count for an object and deallocates if count reaches zero.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    public void DecrementReferenceCount(int objectPointer)
+    {
+        if (!referenceCounts.ContainsKey(objectPointer))
+            return;
+
+        referenceCounts[objectPointer]--;
+
+        if (referenceCounts[objectPointer] <= 0)
+        {
+            DeallocateObject(objectPointer);
+        }
+    }
+
+    /// <summary>
+    /// Deallocates an object and adds it to the free list.
+    /// </summary>
+    /// <param name="objectPointer">The object pointer.</param>
+    private void DeallocateObject(int objectPointer)
+    {
+        var obj = GetObject(objectPointer);
+
+        // Decrement reference counts for all field values
+        foreach (var field in obj.Fields)
+        {
+            if (field is int fieldPointer)
+            {
+                DecrementReferenceCount(fieldPointer);
+            }
+        }
+
+        // Clear the object
+        heap[objectPointer] = new HeapObject();
+        freeObjects.Push(objectPointer);
+        referenceCounts.Remove(objectPointer);
+    }
+
+    /// <summary>
+    /// Performs garbage collection using mark and sweep algorithm.
+    /// </summary>
+    public void GarbageCollect()
+    {
+        // Mark phase: mark all reachable objects
+        var marked = new HashSet<int>();
+        var roots = GetRootObjects();
+
+        foreach (var root in roots)
+        {
+            MarkObject(root, marked);
+        }
+
+        // Sweep phase: deallocate unmarked objects
+        for (int i = 0; i < heap.Count; i++)
+        {
+            if (!marked.Contains(i) && referenceCounts.ContainsKey(i))
+            {
+                DeallocateObject(i);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marks an object and all objects it references.
+    /// </summary>
+    /// <param name="objectPointer">The object to mark.</param>
+    /// <param name="marked">Set of already marked objects.</param>
+    private void MarkObject(int objectPointer, HashSet<int> marked)
+    {
+        if (marked.Contains(objectPointer))
+            return;
+
+        marked.Add(objectPointer);
+        var obj = GetObject(objectPointer);
+
+        // Mark all referenced objects
+        foreach (var field in obj.Fields)
+        {
+            if (field is int fieldPointer)
+            {
+                MarkObject(fieldPointer, marked);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets all root objects that should not be garbage collected.
+    /// </summary>
+    /// <returns>Collection of root object pointers.</returns>
+    private IEnumerable<int> GetRootObjects()
+    {
+        // Implementation would return:
+        // - Objects referenced by the interpreter stack
+        // - Global variables
+        // - Active contexts
+        // - System classes
+        yield break; // Placeholder
+    }
+
+    /// <summary>
+    /// Checks if a value represents a SmallInteger (immediate value).
+    /// SmallIntegers are tagged pointers, not actual object pointers.
+    /// </summary>
+    /// <param name="value">The value to check.</param>
+    /// <returns>True if the value is a SmallInteger.</returns>
+    public static bool IsSmallInteger(object? value)
+    {
+        // In Smalltalk-80, SmallIntegers are stored as immediate values
+        // with the low bit set to 1 to distinguish from object pointers
+        return value is int intValue && (intValue & 1) == 1;
+    }
+
+    /// <summary>
+    /// Converts a .NET integer to a SmallInteger object pointer.
+    /// </summary>
+    /// <param name="value">The integer value.</param>
+    /// <returns>SmallInteger object pointer.</returns>
+    public static int IntegerToSmallInteger(int value)
+    {
+        // Shift left by 1 and set low bit to mark as SmallInteger
+        return (value << 1) | 1;
+    }
+
+    /// <summary>
+    /// Converts a SmallInteger object pointer to a .NET integer.
+    /// </summary>
+    /// <param name="smallInteger">The SmallInteger object pointer.</param>
+    /// <returns>The integer value.</returns>
+    public static int SmallIntegerToInteger(int smallInteger)
+    {
+        // Shift right by 1 to remove the tag bit
+        return smallInteger >> 1;
+    }
+}
+
+/// <summary>
+/// Represents an object in the heap.
+/// </summary>
+public class HeapObject
+{
+    /// <summary>
+    /// The class of this object.
+    /// </summary>
+    public SmalltalkObject? ClassPointer { get; set; }
+
+    /// <summary>
+    /// The instance variables/fields of this object.
+    /// </summary>
+    public object?[] Fields { get; set; } = Array.Empty<object?>();
+
+    /// <summary>
+    /// Size in words (including header).
+    /// </summary>
+    public int Size { get; set; }
+}
+
+`
+
+FILE path=Smalltalk80/SmallInteger.cs sha256=15c3568a07fff36f8bcf4ae757aa5bcdaac1c462f51a367655e1c86cdcc6e7aa lines=59
+---
+`$lang
+// file: Smalltalk80/SmallInteger.cs
+// ==============================================================================
+// SmallInteger - Wrapper for immediate integer values in Smalltalk
+// ==============================================================================
+
+using System;
+
+namespace Smalltalk80;
+
+/// <summary>
+/// Represents a SmallInteger immediate value in Smalltalk.
+/// In a real Smalltalk-80 VM, SmallIntegers are tagged pointers, not objects.
+/// This wrapper allows us to use them during bootstrap.
+/// </summary>
+public sealed class SmallInteger : SmalltalkObject
+{
+    /// <summary>
+    /// Gets the integer value.
+    /// </summary>
+    public int Value { get; }
+    
+    /// <summary>
+    /// Initializes a new SmallInteger with the specified value.
+    /// </summary>
+    public SmallInteger(int value) : base(null, 0)
+    {
+        Value = value;
+    }
+    
+    /// <summary>
+    /// Implicit conversion from int to SmallInteger.
+    /// </summary>
+    public static implicit operator SmallInteger(int value)
+    {
+        return new SmallInteger(value);
+    }
+    
+    /// <summary>
+    /// Implicit conversion from SmallInteger to int.
+    /// </summary>
+    public static implicit operator int(SmallInteger smallInt)
+    {
+        return smallInt.Value;
+    }
+    
+    public override string ToString()
+    {
+        return Value.ToString();
+    }
+    
+    public override bool Equals(object? obj)
+    {
+        return obj is SmallInteger other && Value == other.Value;
+    }
+    
+    public override int GetHashCode()
+    {
+        return Value.GetHashCode();
+    }
+}
+`
+
+FILE path=Smalltalk80/Smalltalk80.csproj sha256=ee51c2708de61b3d64fda78a8b75baf33f0bc680631c707b6f5ddaf0ae32be0e lines=45
+---
+`$lang
+// file: Smalltalk80/Smalltalk80.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+  </ItemGroup>
+  <!-- Need to specify the PrepareForCompile before target so that ANTLR4 finishes generating the
+  parser before we try to compile it. -->
+  <Target Name="RunAntlrIfNewer" BeforeTargets="CoreCompile">
+    <Message Text="Calling script to build ANTLR4 parser..." Importance="high" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\scripts"
+      Command="pwsh -ExecutionPolicy Bypass -File GenerateIfNewer.ps1" />
+  </Target>
+
+  <Target Name="CleanGeneratedFiles" AfterTargets="Clean">
+    <ItemGroup>
+      <GeneratedFiles Include="$(MSBuildProjectDirectory)\Generated\**\*" />
+    </ItemGroup>
+    <Delete Files="@(GeneratedFiles)" />
+  </Target>
+
+  <!-- Copy essential bootstrap JSON files to output directory -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <Message Text="Copying bootstrap files to output directory..." Importance="high" />
+    <ItemGroup>
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap-schema.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase1.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase2.json" />
+      <!-- Phase 3 class files use pattern ###_ClassName.json -->
+      <Phase3ClassFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\*_*.json" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutputPath)Bootstrap" />
+    <Copy SourceFiles="@(EssentialBootstrapFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(Phase3ClassFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Message Text="Copied bootstrap files to $(OutputPath)Bootstrap" Importance="high" />
+  </Target>
+
+</Project>
+`
+
+FILE path=Smalltalk80/SmalltalkLoader.cs sha256=d66e878ad773d547682e379b30d265c526782e83c2306b502aa30bc74936ed6b lines=71
+---
+`$lang
+// file: Smalltalk80/SmalltalkLoader.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using Antlr4.Runtime;
+using Smalltalk80.Generated;
+
+namespace Smalltalk80;
+
+/// <summary>
+/// Simplified Smalltalk file loader that works without SystemDictionary.
+/// </summary>
+public class SmalltalkLoader
+{
+    private readonly Interpreter interpreter;
+    
+    public SmalltalkLoader(Interpreter interpreter)
+    {
+        this.interpreter = interpreter;
+    }
+    
+    /// <summary>
+    /// Load a Smalltalk file.
+    /// </summary>
+    public LoadResult LoadFile(string filePath)
+    {
+        var result = new LoadResult();
+        
+        try
+        {
+            var input = File.ReadAllText(filePath);
+            var inputStream = new AntlrInputStream(input);
+            var lexer = new Smalltalk80Lexer(inputStream);
+            var tokens = new CommonTokenStream(lexer);
+            var parser = new Smalltalk80Parser(tokens);
+            
+            // Parse the file
+            var tree = parser.fileIn();
+            
+            if (parser.NumberOfSyntaxErrors > 0)
+            {
+                result.Success = false;
+                result.Errors.Add($"Failed to parse {filePath}: {parser.NumberOfSyntaxErrors} syntax errors");
+            }
+            else
+            {
+                result.Success = true;
+                // TODO: Process the parsed tree when VM supports it
+                Console.WriteLine($"[LOADER] Parsed {filePath} successfully (processing not yet implemented)");
+            }
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Errors.Add($"Error loading {filePath}: {ex.Message}");
+        }
+        
+        return result;
+    }
+}
+
+/// <summary>
+/// Result of loading a Smalltalk file.
+/// </summary>
+public class LoadResult
+{
+    public bool Success { get; set; }
+    public int ClassesLoaded { get; set; }
+    public int MethodsLoaded { get; set; }
+    public List<string> Errors { get; } = new();
+    public List<string> Warnings { get; } = new();
+}
+`
+
+FILE path=Smalltalk80/SmalltalkObject.cs sha256=96ab78ba917f27b8d63970339a451f915106d6452103a6847331c98eec578513 lines=457
+---
+`$lang
+// file: Smalltalk80/SmalltalkObject.cs
+using System;
+
+/// <summary>
+///     Represents a generic Smalltalk object instance.
+/// </summary>
+public class SmalltalkObject
+{
+    /// <summary>
+    ///     Gets or sets the object's class pointer. This may be <c>null</c>
+    ///     during deserialization until the class table is resolved.
+    /// </summary>
+    public SmalltalkObject? ClassPointer { get; set; }
+
+    /// <summary>
+    ///     Gets the encoded object pointer assigned by <see cref="ObjectMemory"/>.
+    /// </summary>
+    public int Oop { get; internal set; }
+
+    /// <summary>
+    ///     Gets the raw field values stored in the object.
+    /// </summary>
+    public object?[] Fields { get; }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SmalltalkObject"/> class.
+    /// </summary>
+    /// <param name="cls">The object's class pointer.</param>
+    /// <param name="fieldCount">The number of fields to allocate.</param>
+    public SmalltalkObject(SmalltalkObject? cls, int fieldCount)
+    {
+        ClassPointer = cls;
+        Fields = new object?[fieldCount];
+        ObjectMemory.Register(this);
+    }
+
+    /// <summary>
+    ///     Reads the value of the specified field.
+    /// </summary>
+    /// <param name="index">The zero-based field index.</param>
+    /// <returns>The field value.</returns>
+    public object? GetField(int index) => Fields[index];
+
+    /// <summary>
+    ///     Sets the value of the specified field.
+    /// </summary>
+    /// <param name="index">The zero-based field index.</param>
+    /// <param name="value">The value to store.</param>
+    public void SetField(int index, object? value) => Fields[index] = value;
+
+    /// <summary>
+    ///     Looks up a method by searching through the class hierarchy's method dictionaries.
+    /// </summary>
+    public CompiledMethod? Lookup(Symbol selector)
+    {
+        // Start with this class and walk up the superclass chain
+        var currentClass = this;
+        
+        // Debug: trace the lookup chain
+        if (selector.Value == "new")
+        {
+            Console.WriteLine($"[DEBUG] Looking up #{selector.Value} starting from class at OOP {Oop}");
+            if (Fields?.Length > 3 && Fields[3] is Symbol name)
+                Console.WriteLine($"[DEBUG] Class name: {name.Value}");
+        }
+        
+        while (currentClass != null)
+        {
+            // Debug output for new method
+            if (selector.Value == "new")
+            {
+                Console.WriteLine($"[DEBUG] Checking class at OOP {currentClass.Oop}");
+                if (currentClass.Fields?.Length > 3 && currentClass.Fields[3] is Symbol className)
+                    Console.WriteLine($"[DEBUG]   Class name: {className.Value}");
+            }
+            
+            // Look in the current class's method dictionary
+            var method = LookupInMethodDictionary(currentClass, selector);
+            if (method != null)
+                return method;
+            
+            // Move to superclass
+            currentClass = GetSuperclassOf(currentClass);
+        }
+        
+        // Method not found in the entire hierarchy
+        return null;
+    }
+    
+    /// <summary>
+    /// Looks up a selector in a specific class's method dictionary.
+    /// </summary>
+    private CompiledMethod? LookupInMethodDictionary(SmalltalkObject classObj, Symbol selector)
+    {
+        // Method dictionary is typically at index 1 for Behavior-like objects
+        // Format: [superclass, methodDict, format, ...]
+        const int METHOD_DICT_INDEX = 1;
+        
+        if (classObj.Fields == null || classObj.Fields.Length <= METHOD_DICT_INDEX)
+            return null;
+            
+        var methodDictObj = classObj.Fields[METHOD_DICT_INDEX];
+        if (methodDictObj is not SmalltalkObject methodDict)
+            return null;
+        
+        // MethodDictionary format:
+        // Field 0: tally (number of entries)
+        // Fields 1..n/2: keys (selectors)
+        // Fields n/2+1..n: values (compiled methods)
+        
+        if (methodDict.Fields == null || methodDict.Fields.Length < 2)
+            return null;
+            
+        var tally = methodDict.Fields[0] as int? ?? 0;
+        if (tally == 0)
+            return null;
+            
+        // The dictionary is split in half - first half is keys, second half is values
+        var halfSize = (methodDict.Fields.Length - 1) / 2;
+        var keysStart = 1;
+        var valuesStart = keysStart + halfSize;
+        
+        // Search for the selector in the keys
+        for (int i = 0; i < halfSize; i++)
+        {
+            var key = methodDict.Fields[keysStart + i];
+            
+            // Check if this key matches our selector
+            if (key is Symbol keySymbol && keySymbol.Equals(selector))
+            {
+                // Found it! Get the corresponding value
+                var value = methodDict.Fields[valuesStart + i];
+                
+                if (value is CompiledMethod compiledMethod)
+                    return compiledMethod;
+                    
+                // CompiledMethod might be stored as a SmalltalkObject
+                if (value is SmalltalkObject methodObj)
+                {
+                    // Convert SmalltalkObject to CompiledMethod
+                    return ConvertToCompiledMethod(methodObj);
+                }
+                    
+                // Value might be stored as OOP reference - need to resolve it
+                if (value is int oop && oop >= 0)
+                {
+                    var obj = ObjectMemory.FromOop(oop);
+                    if (obj != null)
+                        return ConvertToCompiledMethod(obj);
+                }
+                
+                return null;
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Converts a SmalltalkObject representing a CompiledMethod to a CompiledMethod instance.
+    /// </summary>
+    private CompiledMethod? ConvertToCompiledMethod(SmalltalkObject methodObj)
+    {
+        // CompiledMethod object format:
+        // Field 0: header (contains temp count, literal count, etc.)
+        // Field 1: bytecodes (ByteArray)
+        // Field 2: literals (Array)
+        // Field 3: selector (optional)
+        
+        if (methodObj.Fields == null || methodObj.Fields.Length < 3)
+            return null;
+            
+        // Extract header
+        var header = methodObj.Fields[0];
+        int headerValue = 0;
+        if (header is int h)
+            headerValue = h;
+        else if (header is SmalltalkObject headerObj && headerObj.IsSmallInteger)
+            headerValue = headerObj.SmallIntegerValue;
+            
+        // Parse header to get counts
+        var literalCount = (headerValue >> 9) & 0x3F;
+        var tempCount = (headerValue >> 3) & 0x1F;
+        var flagValue = headerValue & 0x7;
+        
+        // Extract bytecodes
+        byte[]? bytecodes = null;
+        if (methodObj.Fields[1] is SmalltalkObject bytecodeArray && bytecodeArray.Fields != null)
+        {
+            bytecodes = new byte[bytecodeArray.Fields.Length];
+            for (int i = 0; i < bytecodeArray.Fields.Length; i++)
+            {
+                if (bytecodeArray.Fields[i] is int b)
+                    bytecodes[i] = (byte)b;
+                else if (bytecodeArray.Fields[i] is byte bb)
+                    bytecodes[i] = bb;
+            }
+        }
+        
+        // Extract literals
+        object[]? literals = null;
+        if (methodObj.Fields[2] is SmalltalkObject literalArray && literalArray.Fields != null)
+        {
+            literals = new object[literalArray.Fields.Length];
+            Array.Copy(literalArray.Fields, literals, literalArray.Fields.Length);
+        }
+        
+        // Extract selector if present
+        string? selectorName = null;
+        if (methodObj.Fields.Length > 3 && methodObj.Fields[3] is Symbol sel)
+        {
+            selectorName = sel.Value;
+        }
+        
+        if (bytecodes == null || literals == null)
+            return null;
+            
+        return new CompiledMethod
+        {
+            Bytecodes = bytecodes,
+            Literals = literals,
+            TemporariesCount = tempCount,
+            SelectorName = selectorName
+        };
+    }
+    
+    /// <summary>
+    /// Gets the superclass of a class object.
+    /// </summary>
+    private SmalltalkObject? GetSuperclassOf(SmalltalkObject classObj)
+    {
+        // Superclass is typically at index 0 for Behavior-like objects
+        const int SUPERCLASS_INDEX = 0;
+        
+        if (classObj.Fields == null || classObj.Fields.Length <= SUPERCLASS_INDEX)
+        {
+            Console.WriteLine($"[DEBUG] GetSuperclassOf: No fields or not enough fields for class at OOP {classObj.Oop}");
+            return null;
+        }
+            
+        var superclass = classObj.Fields[SUPERCLASS_INDEX];
+        
+        if (superclass is SmalltalkObject superclassObj)
+        {
+            if (Oop == 22) // MethodDictionaryClass OOP
+            {
+                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass object at OOP {superclassObj.Oop}");
+            }
+            return superclassObj;
+        }
+            
+        // Might be stored as OOP
+        if (superclass is int oop && oop >= 0)
+        {
+            if (Oop == 22) // MethodDictionaryClass OOP
+            {
+                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass OOP {oop}");
+            }
+            return ObjectMemory.FromOop(oop);
+        }
+            
+        Console.WriteLine($"[DEBUG] GetSuperclassOf: No superclass found for class at OOP {classObj.Oop}");
+        return null;
+    }
+
+    /// <summary>
+    ///     STUB: Gets superclass - simplified for shadow class removal.  
+    /// </summary>
+    public SmalltalkObject? Superclass => ClassPointer; // Simplified stub
+
+    /// <summary>
+    ///     STUB: Instance variables list - simplified for shadow class removal.
+    /// </summary>
+    public List<string> InstanceVariables { get; } = new();
+
+    /// <summary>
+    ///     STUB: Class variables list - simplified for shadow class removal.
+    /// </summary>
+    public List<string> ClassVariables { get; } = new();
+
+    /// <summary>
+    ///     STUB: Method dictionary - simplified for shadow class removal.
+    /// </summary>
+    public Dictionary<Symbol, CompiledMethod> MethodDictionary { get; } = new();
+
+    /// <summary>
+    ///     STUB: Metaclass reference - simplified for shadow class removal.
+    /// </summary>
+    public SmalltalkObject? Metaclass { get; set; }
+    
+    /// <summary>
+    /// Checks if this object appears to be a SmallInteger.
+    /// </summary>
+    public bool IsSmallInteger => false; // TODO: Implement proper SmallInteger check
+    
+    /// <summary>
+    /// Gets the SmallInteger value if this is a SmallInteger.
+    /// </summary>
+    public int SmallIntegerValue => 0; // TODO: Implement proper SmallInteger value extraction
+    
+    /// <summary>
+    /// Tries to get a field value by name.
+    /// </summary>
+    public bool TryGetField(string fieldName, out object? value)
+    {
+        // For now, handle known field indices based on class structure
+        // This is a simplified implementation - a full one would use the class's instance variable names
+        
+        // Common field mappings based on Smalltalk-80 class structures:
+        switch (fieldName)
+        {
+            case "name" when Fields.Length > 5:
+                // Class objects store name at field 5
+                value = Fields[5];
+                return value != null;
+                
+            case "superclass" when Fields.Length > 0:
+                // Behavior stores superclass at field 0
+                value = Fields[0];
+                return value != null;
+                
+            case "methodDict" when Fields.Length > 1:
+                // Behavior stores method dictionary at field 1
+                value = Fields[1];
+                return value != null;
+                
+            case "format" when Fields.Length > 2:
+                // Behavior stores format at field 2
+                value = Fields[2];
+                return value != null;
+                
+            default:
+                value = null;
+                return false;
+        }
+    }
+    
+    /// <summary>
+    /// Tries to get the string value if this object represents a string.
+    /// </summary>
+    public bool TryGetStringValue(out string value)
+    {
+        // Check if this is a String or Symbol object by examining the class
+        if (ClassPointer != null)
+        {
+            // Try to get the class name to see if it's String or Symbol
+            string? className = GetClassNameForDebugging();
+            
+            // For Phase 3 symbols created by the VM, we expect them to be String/Symbol class objects
+            // In the real Smalltalk-80 system, Symbols and Strings store character data differently:
+            // - They are variable-sized objects where the character data is stored in indexed fields
+            // - Each character is typically stored as a SmallInteger
+            
+            if (className == "String" || className == "Symbol")
+            {
+                // Extract character data from the fields
+                // In Smalltalk-80, variable-sized objects store their data after named instance variables
+                var chars = new System.Text.StringBuilder();
+                
+                // For Symbols and Strings, character data starts from field index 0 for the string data
+                // (since Symbol inherits from String and String has no instance variables)
+                foreach (var field in Fields)
+                {
+                    if (field is int charValue)
+                    {
+                        // Check if it's a SmallInteger (tagged with lowest bit = 1)
+                        if (IsSmallIntegerValue(charValue))
+                        {
+                            int actualValue = ExtractSmallIntegerValue(charValue);
+                            if (actualValue >= 0 && actualValue <= 255)
+                            {
+                                chars.Append((char)actualValue);
+                            }
+                        }
+                        else if (charValue >= 0 && charValue <= 255)
+                        {
+                            // Direct character code (untagged)
+                            chars.Append((char)charValue);
+                        }
+                    }
+                    else if (field is char c)
+                    {
+                        // Direct character
+                        chars.Append(c);
+                    }
+                    else if (field is byte b)
+                    {
+                        // Byte value
+                        chars.Append((char)b);
+                    }
+                }
+                
+                value = chars.ToString();
+                return value.Length > 0;
+            }
+            
+            // Also check if the class name itself indicates this might be a string-like object
+            if (className?.Contains("String") == true || className?.Contains("Symbol") == true)
+            {
+                // Try generic field extraction for debugging
+                var chars = new System.Text.StringBuilder();
+                foreach (var field in Fields)
+                {
+                    if (field is string s)
+                    {
+                        chars.Append(s);
+                    }
+                    else if (field is int i && i >= 32 && i <= 126)
+                    {
+                        chars.Append((char)i);
+                    }
+                }
+                
+                if (chars.Length > 0)
+                {
+                    value = chars.ToString();
+                    return true;
+                }
+            }
+        }
+        
+        value = string.Empty;
+        return false;
+    }
+    
+    /// <summary>
+    /// Gets a string representation of the class name for debugging.
+    /// </summary>
+    private string? GetClassNameForDebugging()
+    {
+        if (ClassPointer?.TryGetField("name", out var nameObj) == true)
+        {
+            if (nameObj is Symbol sym) return sym.Name;
+            if (nameObj is string str) return str;
+            // Avoid recursive call - just check if it's a SmalltalkObject with simple field access
+            if (nameObj is SmalltalkObject nameStrObj)
+            {
+                // Try simple field extraction without recursion
+                foreach (var field in nameStrObj.Fields)
+                {
+                    if (field is string s && !string.IsNullOrEmpty(s)) return s;
+                    if (field is char c) return c.ToString();
+                }
+            }
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Checks if a value represents a SmallInteger (tagged with lowest bit = 1).
+    /// </summary>
+    private static bool IsSmallIntegerValue(int value) => (value & 1) == 1;
+    
+    /// <summary>
+    /// Extracts the actual integer value from a tagged SmallInteger.
+    /// </summary>
+    private static int ExtractSmallIntegerValue(int taggedValue) => taggedValue >> 1;
+}
+`
+
+FILE path=Smalltalk80/SmalltalkTokenizer.cs sha256=eb4530d68577e8e8e0dad3dacb310464af9413541eea485b4f9a9daf53abbb4f lines=40
+---
+`$lang
+// file: Smalltalk80/SmalltalkTokenizer.cs
+using System.Linq;
+using System.Text.RegularExpressions;
+
+/// <summary>
+///     Breaks a Smalltalk source string into lexical tokens.
+/// </summary>
+public sealed class SmalltalkTokenizer
+{
+    private readonly string[] tokens;
+    private int position = 0;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SmalltalkTokenizer"/> class.
+    /// </summary>
+    /// <param name="source">The source string to tokenize.</param>
+    public SmalltalkTokenizer(string source)
+    {
+        // Escape backslashes properly to avoid CS1009 error
+        tokens = Regex.Split(source, "(\\s+|:|\\.|\\(|\\))")
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToArray();
+    }
+
+    /// <summary>
+    ///     Peeks at the next token without consuming it.
+    /// </summary>
+    /// <returns>The next token, or <c>null</c> if none remain.</returns>
+    public string? Peek() => position < tokens.Length ? tokens[position] : null;
+
+    /// <summary>
+    ///     Retrieves the next token from the stream.
+    /// </summary>
+    /// <returns>The next token, or <c>null</c> if none remain.</returns>
+    public string? Next() => position < tokens.Length ? tokens[position++] : null;
+
+    /// <summary>
+    ///     Gets a value indicating whether more tokens are available.
+    /// </summary>
+    public bool HasNext => position < tokens.Length;
+}
+`
+
+FILE path=Smalltalk80/StreamObject.cs sha256=03ef1efe9016e8bc943b84c5db7105aedb2b3717d25df88aa05117afa7c100e2 lines=67
+---
+`$lang
+// file: Smalltalk80/StreamObject.cs
+using System;
+
+namespace Smalltalk80;
+
+/// <summary>
+/// Represents a simple stream over a <see cref="SmalltalkObject"/> array.
+/// </summary>
+public sealed class StreamObject : SmalltalkObject
+{
+    /// <summary>Index of the array field within <see cref="SmalltalkObject.Fields"/>.</summary>
+    public const int ArrayField = 0;
+    /// <summary>Index of the current position field.</summary>
+    public const int IndexField = 1;
+    /// <summary>Index of the read limit field.</summary>
+    public const int ReadLimitField = 2;
+    /// <summary>Index of the write limit field.</summary>
+    public const int WriteLimitField = 3;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StreamObject"/> class.
+    /// </summary>
+    /// <param name="cls">The class pointer for the stream.</param>
+    /// <param name="array">The array backing the stream.</param>
+    /// <param name="readLimit">The maximum index that can be read.</param>
+    /// <param name="writeLimit">The maximum index that can be written.</param>
+    public StreamObject(
+        SmalltalkObject? cls,
+        SmalltalkObject array,
+        int readLimit,
+        int writeLimit)
+        : base(cls, 4)
+    {
+        Fields[ArrayField] = array;
+        Fields[IndexField] = 0;
+        Fields[ReadLimitField] = readLimit;
+        Fields[WriteLimitField] = writeLimit;
+    }
+
+    /// <summary>The array being streamed.</summary>
+    public SmalltalkObject Array
+    {
+        get => (SmalltalkObject)Fields[ArrayField]!;
+        set => Fields[ArrayField] = value;
+    }
+
+    /// <summary>The current position within the stream.</summary>
+    public int Index
+    {
+        get => (int)(Fields[IndexField] ?? 0);
+        set => Fields[IndexField] = value;
+    }
+
+    /// <summary>The maximum index that can be read.</summary>
+    public int ReadLimit
+    {
+        get => (int)(Fields[ReadLimitField] ?? 0);
+        set => Fields[ReadLimitField] = value;
+    }
+
+    /// <summary>The maximum index that can be written.</summary>
+    public int WriteLimit
+    {
+        get => (int)(Fields[WriteLimitField] ?? 0);
+        set => Fields[WriteLimitField] = value;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/Symbol.cs sha256=5c98ae0e2a0d02dc8cefefb92313592f9692caba9749d7932c0dbc528ea002da lines=35
+---
+`$lang
+// file: Smalltalk80/Symbol.cs
+using System;
+
+/// <summary>
+///     Represents an interned symbol used for method selectors and identifiers.
+/// </summary>
+public sealed class Symbol
+{
+    /// <summary>
+    ///     Gets the textual name of the symbol.
+    /// </summary>
+    public string Name { get; }
+    
+    /// <summary>
+    ///     Gets the value of the symbol (alias for Name).
+    /// </summary>
+    public string Value => Name;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="Symbol"/> class.
+    /// </summary>
+    /// <param name="name">The symbol text.</param>
+    public Symbol(string name)
+    {
+        Name = name;
+    }
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is Symbol other && Name == other.Name;
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Name.GetHashCode();
+
+    /// <inheritdoc/>
+    public override string ToString() => "#" + Name;
+}
+`
+
+FILE path=Smalltalk80/Tracer.cs sha256=6f4b645ae6d6540215f1c272c3008a11da7edadc00febec4de8b92a7f92d446b lines=38
+---
+`$lang
+// file: Smalltalk80/Tracer.cs
+using System;
+
+/// <summary>
+///     Provides simple tracing facilities used for debugging the interpreter.
+/// </summary>
+public static class Tracer
+{
+    /// <summary>
+    ///     Gets or sets a value indicating whether tracing is enabled.
+    /// </summary>
+    public static bool Enabled { get; set; } = true;
+
+    /// <summary>
+    ///     Temporarily disables tracing until the returned object is disposed.
+    /// </summary>
+    /// <returns>An <see cref="IDisposable"/> that restores the previous tracing
+    /// state on disposal.</returns>
+    public static IDisposable ScopedDisable()
+    {
+        var previous = Enabled;
+        Enabled = false;
+        return new Restore(previous);
+    }
+
+    private sealed class Restore(bool previous) : IDisposable
+    {
+        public void Dispose() => Enabled = previous;
+    }
+
+    /// <summary>
+    ///     Writes a trace message to the console if tracing is enabled.
+    /// </summary>
+    /// <param name="message">The message to log.</param>
+    public static void Log(string message)
+    {
+        if (Enabled) Console.WriteLine("[TRACE] " + message);
+    }
+}
+`
+
+FILE path=Smalltalk80/VirtualMachine.cs sha256=e0e68d48d8a49996bcaf5863a49fd3279a2093ba1027c89835f4b1f851cb7f26 lines=692
+---
+`$lang
+// file: Smalltalk80/VirtualMachine.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
+using Smalltalk80;
+using Smalltalk80.Bootstrap;
+using Smalltalk80.Generated;
+using Smalltalk80.Parser;
+
+/// <summary>
+/// Provides a high level interface combining the interpreter and object memory
+/// into a simple virtual machine suitable for the REPL and other hosts.
+/// </summary>
+public sealed class VirtualMachine
+{
+    /// <summary>
+    /// Gets the interpreter instance executing methods for this VM.
+    /// </summary>
+    public Interpreter Interpreter { get; } = new() { ExitOnReturn = false };
+    
+    private VMPrimitiveAdapter? bootstrapAdapter;
+    
+    /// <summary>
+    /// Gets the bootstrap adapter for accessing VM primitives.
+    /// </summary>
+    public VMPrimitiveAdapter? Adapter => bootstrapAdapter;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VirtualMachine"/> class using JSON bootstrap.
+    /// </summary>
+    public VirtualMachine(bool skipStandardLibrary = false)
+    {
+        InitializeWithJsonBootstrap(skipStandardLibrary);
+    }
+    
+    /// <summary>
+    /// Initializes the VM using the three-phase JSON bootstrap system.
+    /// </summary>
+    private void InitializeWithJsonBootstrap(bool skipStandardLibrary)
+    {
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting JSON-based bootstrap...");
+        
+        var bootstrapDir = Path.Combine(
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+            "Bootstrap");
+            
+        if (!Directory.Exists(bootstrapDir))
+        {
+            // Fallback: look in project directory during development
+            bootstrapDir = Path.Combine(
+                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
+                "..", "..", "..", "..", "Bootstrap");
+        }
+        
+        if (!Directory.Exists(bootstrapDir))
+        {
+            throw new DirectoryNotFoundException($"Bootstrap directory not found. Searched: {bootstrapDir}");
+        }
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Using bootstrap files from: {bootstrapDir}");
+        
+        // Phase 1: VM primitive operations (create objects and patch pointers)
+        ExecutePhase1Bootstrap(bootstrapDir);
+        
+        // Phase 2: Message-based class hierarchy construction
+        ExecutePhase2Bootstrap(bootstrapDir);
+        
+        // Phase 3: Standard library loading (if not skipped)
+        if (!skipStandardLibrary)
+        {
+            ExecutePhase3Bootstrap(bootstrapDir);
+        }
+        
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] JSON bootstrap complete!");
+    }
+    
+    /// <summary>
+    /// Executes Phase 1 bootstrap from JSON: VM primitive operations.
+    /// </summary>
+    private void ExecutePhase1Bootstrap(string bootstrapDir)
+    {
+        // Disable tracing during Phase 1 bootstrap
+        var wasTracingEnabled = Tracer.Enabled;
+        Tracer.Enabled = false;
+        
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1: VM primitive operations...");
+        
+        var phase1Path = Path.Combine(bootstrapDir, "bootstrap_phase1.json");
+        if (!File.Exists(phase1Path))
+        {
+            throw new FileNotFoundException($"Phase 1 bootstrap file not found: {phase1Path}");
+        }
+        
+        // Clear object memory
+        ObjectMemory.Reset();
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Cleared VM object memory");
+        
+        // Parse and execute JSON bootstrap operations
+        var jsonContent = File.ReadAllText(phase1Path);
+        bootstrapAdapter = new VMPrimitiveAdapter(this);
+        var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
+        bootstrapExecutor.ExecutePhase1(jsonContent);
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 complete: VM primitives executed");
+        
+        // Dump classes after Phase 1
+        // DumpAllClasses("PHASE 1 CLASSES");  // Commented out - Phase 1 is solid
+        
+        // Keep tracing disabled for Phase 2
+    }
+    
+    /// <summary>
+    /// Executes Phase 2 bootstrap from JSON: Message-based class construction.
+    /// </summary>
+    private void ExecutePhase2Bootstrap(string bootstrapDir)
+    {
+        // Ensure tracing is disabled during Phase 2 bootstrap
+        var wasTracingEnabled = Tracer.Enabled;
+        Tracer.Enabled = false;
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 2: Message-based class construction...");
+        
+        var phase2Path = Path.Combine(bootstrapDir, "bootstrap_phase2.json");
+        if (!File.Exists(phase2Path))
+        {
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2 file not found at {phase2Path}, skipping Phase 2");
+            return;
+        }
+        
+        // Parse and execute Phase 2 bootstrap operations
+        var jsonContent = File.ReadAllText(phase2Path);
+        if (bootstrapAdapter == null)
+        {
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
+        }
+        
+        var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
+        bootstrapExecutor.ExecutePhase2(jsonContent);
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Messaging infrastructure created");
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Total objects in VM: {ObjectMemory.Objects.Count}");
+        
+        // Dump classes after Phase 2 (only if bootstrap debug is enabled)
+        if (JsonBootstrapExecutor.EnableBootstrapDebugOutput)
+        {
+            DumpAllClasses("PHASE 2 CLASSES");
+        }
+        
+        // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
+        if (bootstrapAdapter is VMPrimitiveAdapter adapter)
+        {
+            adapter.CompleteBootstrapWithMessageSends();
+        }
+        
+        // Restore tracing state after Phase 2
+        Tracer.Enabled = wasTracingEnabled;
+    }
+    
+    /// <summary>
+    /// Executes Phase 3 bootstrap: Standard library loading or JSON manifest execution.
+    /// </summary>
+    private void ExecutePhase3Bootstrap(string bootstrapDir)
+    {
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 3: Message-driven class construction...");
+        
+        if (bootstrapAdapter == null)
+        {
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Run Phase 1 first.");
+        }
+        
+        // Look for numbered Phase 3 class files (###_ClassName.json pattern)
+        var phase3Files = Directory.GetFiles(bootstrapDir, "*_*.json")
+            .Where(f => Path.GetFileName(f).Length > 4 && 
+                       char.IsDigit(Path.GetFileName(f)[0]) &&
+                       char.IsDigit(Path.GetFileName(f)[1]) &&
+                       char.IsDigit(Path.GetFileName(f)[2]) &&
+                       Path.GetFileName(f)[3] == '_')
+            .OrderBy(f => f)
+            .ToList();
+            
+        if (phase3Files.Count > 0)
+        {
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Found {phase3Files.Count} Phase 3 class files");
+            var phase3Executor = new Phase3Executor(bootstrapAdapter);
+            
+            foreach (var file in phase3Files)
+            {
+                var fileName = Path.GetFileName(file);
+                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Loading Phase 3 class: {fileName}");
+                
+                try
+                {
+                    var jsonContent = File.ReadAllText(file);
+                    phase3Executor.ExecuteClassManifest(jsonContent);
+                }
+                catch (Exception ex)
+                {
+                    JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Error loading {fileName}: {ex.Message}");
+                }
+            }
+            
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 3 class loading complete");
+        }
+        else
+        {
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] No Phase 3 class files found - running with Phase 2 classes only");
+        }
+    }
+    
+    /// <summary>
+    /// Detects whether the JSON content represents a single-class manifest or multi-class manifest.
+    /// </summary>
+    private static bool IsSingleClassManifest(string jsonContent)
+    {
+        // Single-class manifests have "className" property, multi-class manifests have "classes" array
+        return jsonContent.Contains("\"className\"") && !jsonContent.Contains("\"classes\"");
+    }
+    
+    /// <summary>
+    /// Loads a JSON manifest file for Phase 3 bootstrap.
+    /// Automatically detects single-class vs multi-class manifest format.
+    /// </summary>
+    public void LoadJsonManifest(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException($"JSON manifest file not found: {filePath}");
+        }
+        
+        var jsonContent = File.ReadAllText(filePath);
+        
+        if (bootstrapAdapter == null)
+        {
+            throw new InvalidOperationException("Bootstrap adapter not initialized. Bootstrap must be run first.");
+        }
+        
+        var phase3Executor = new Phase3Executor(bootstrapAdapter);
+        
+        // Detect manifest format and call appropriate method
+        if (IsSingleClassManifest(jsonContent))
+        {
+            phase3Executor.ExecuteClassManifest(jsonContent);
+        }
+        else
+        {
+            phase3Executor.ExecuteManifest(jsonContent);
+        }
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
+    }
+    
+    /// <summary>
+    /// Loads a Smalltalk source file.
+    /// </summary>
+    public void LoadSourceFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"File not found: {filePath}");
+            return;
+        }
+        
+        try
+        {
+            // TODO: Implement Smalltalk source file loading
+            Console.WriteLine($"[INTERPRETER] Source file loading not yet implemented for: {Path.GetFileName(filePath)}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading {filePath}: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Evaluates a Smalltalk expression.
+    /// </summary>
+    public void EvaluateSource(string sourceCode)
+    {
+        try
+        {
+            // Simple evaluation via interpreter
+            // This is a basic implementation - a full implementation would need proper parsing and execution
+            Console.WriteLine($"Evaluating: {sourceCode}");
+            // TODO: Implement proper source code evaluation
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error evaluating '{sourceCode}': {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Dumps a symbolic representation of all Smalltalk objects currently in the VM's object memory.
+    /// </summary>
+    /// <param name="title">Title to display for this dump.</param>
+    public void DumpAllClasses(string title)
+    {
+        Console.WriteLine($"\n=== {title} ===");
+        Console.WriteLine($"VM Object Memory Analysis");
+        Console.WriteLine($"========================");
+        
+        var allObjects = ObjectMemory.Objects.ToList();
+        
+        if (allObjects.Count == 0)
+        {
+            Console.WriteLine("  No objects found in VM object memory");
+            Console.WriteLine($"=== End {title} ===\n");
+            return;
+        }
+        
+        Console.WriteLine($"  Total objects in VM: {allObjects.Count}");
+        Console.WriteLine();
+        
+        // Classify objects
+        var classObjects = new List<SmalltalkObject>();
+        var regularObjects = new List<SmalltalkObject>();
+        
+        foreach (var obj in allObjects)
+        {
+            // Check if this object is itself a class (by looking at its structure)
+            // Class objects typically have specific patterns
+            if (IsLikelyClassObject(obj))
+            {
+                classObjects.Add(obj);
+            }
+            else
+            {
+                regularObjects.Add(obj);
+            }
+        }
+        
+        // Dump class objects first
+        if (classObjects.Count > 0)
+        {
+            Console.WriteLine($"📋 Class Objects ({classObjects.Count}):");
+            foreach (var classObj in classObjects)
+            {
+                DumpSmalltalkObject(classObj, "  ", "CLASS");
+            }
+            Console.WriteLine();
+        }
+        
+        // Dump other objects
+        if (regularObjects.Count > 0)
+        {
+            Console.WriteLine($"📦 Other Objects ({regularObjects.Count}):");
+            foreach (var obj in regularObjects)
+            {
+                DumpSmalltalkObject(obj, "  ", "OBJECT");
+            }
+            Console.WriteLine();
+        }
+        
+        // Show object relationships
+        DumpObjectRelationships(allObjects);
+        
+        Console.WriteLine($"=== End {title} ===\n");
+    }
+    
+    // DumpClass method removed - no longer needed without shadow classes
+    
+    // DumpClassHierarchy methods removed - no longer needed without shadow classes
+    
+    /// <summary>
+    /// Determines if a SmalltalkObject is likely a class object based on its structure.
+    /// </summary>
+    private bool IsLikelyClassObject(SmalltalkObject obj)
+    {
+        // Class objects typically have specific characteristics:
+        // 1. They often have a ClassPointer that points to a metaclass
+        // 2. They may have fields that reference method dictionaries, superclasses, etc.
+        // 3. The structure varies, but we can make educated guesses
+        
+        if (obj.ClassPointer == null)
+            return false;
+            
+        // Check if this object's class name contains "class" or "Class" 
+        // (this is a heuristic based on common Smalltalk patterns)
+        var className = GetObjectClassName(obj);
+        if (className?.ToLower().Contains("class") == true)
+            return true;
+            
+        // Check if the object has fields that might indicate it's a class
+        // (method dictionary, superclass reference, instance variables, etc.)
+        if (obj.Fields.Length >= 3) // Classes typically have multiple fields
+        {
+            // Look for patterns in field contents that suggest this is a class
+            foreach (var field in obj.Fields)
+            {
+                if (field is SmalltalkObject fieldObj)
+                {
+                    var fieldClassName = GetObjectClassName(fieldObj);
+                    if (fieldClassName?.Contains("Dictionary") == true || 
+                        fieldClassName?.Contains("Method") == true ||
+                        fieldClassName?.Contains("Symbol") == true)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Gets the class name of a SmalltalkObject by examining its structure.
+    /// </summary>
+    private string? GetObjectClassName(SmalltalkObject obj)
+    {
+        if (obj.ClassPointer == null)
+            return null;
+            
+        // Try to look up the class name from the bootstrap adapter's global registry
+        // Since we can't iterate globals anymore, we'll just use the OOP-based identifier
+        // This is a limitation of the new API, but acceptable for debugging output
+            
+        // Since we no longer have SystemDictionary, we'll identify classes by their OOP
+        // This is a simplified approach - in a full implementation we'd have a name table
+        return $"Class#{obj.ClassPointer.Oop}";
+    }
+    
+    /// <summary>
+    /// Dumps detailed information about a SmalltalkObject.
+    /// </summary>
+    private void DumpSmalltalkObject(SmalltalkObject obj, string indent, string objectType)
+    {
+        // Check if this object is itself a globally named object
+        // Note: With the new API, we can't enumerate globals to find the name
+        // This is a limitation but acceptable for debugging output
+        string? objName = null;
+        
+        // Convert naming convention: "FooClass" -> "Foo class"
+        if (objName != null && objName.EndsWith("Class") && objName != "Class" && objName != "Metaclass")
+        {
+            var baseName = objName.Substring(0, objName.Length - 5);
+            objName = $"{baseName} class";
+        }
+        
+        var className = GetObjectClassName(obj) ?? "(unknown class)";
+        var oop = obj.Oop;
+        var fieldCount = obj.Fields.Length;
+        
+        // Use objName if available (it's already properly formatted), otherwise show as instance of className
+        var displayName = objName ?? $"a {className}";
+        Console.WriteLine($"{indent}🔸 {objectType} #{oop}: {displayName} ({fieldCount} fields)");
+        
+        // Show class pointer info
+        if (obj.ClassPointer != null)
+        {
+            var classInfo = className;
+            if (objName != null && className.StartsWith("Class#"))
+            {
+                // Try to get the actual class name
+                classInfo = GetObjectClassName(obj) ?? className;
+            }
+            Console.WriteLine($"{indent}  📋 Class: {classInfo} @ OOP#{obj.ClassPointer.Oop}");
+        }
+        else
+        {
+            Console.WriteLine($"{indent}  ❌ Class: null (no class pointer)");
+        }
+        
+        // Show field contents (limited to avoid overwhelming output)
+        if (fieldCount > 0)
+        {
+            Console.WriteLine($"{indent}  📦 Fields:");
+            int maxFields = Math.Min(fieldCount, 5); // Limit to first 5 fields
+            
+            // Get field names based on the object type
+            var fieldNames = GetFieldNamesForObject(obj, objName ?? className);
+            
+            for (int i = 0; i < maxFields; i++)
+            {
+                var field = obj.Fields[i];
+                string fieldDesc = DescribeFieldValue(field, indent + "    ");
+                string fieldName = (fieldNames != null && i < fieldNames.Count) ? fieldNames[i] : "?";
+                Console.WriteLine($"{indent}    [{i} - {fieldName}] = {fieldDesc}");
+            }
+            
+            if (fieldCount > maxFields)
+            {
+                Console.WriteLine($"{indent}    ... and {fieldCount - maxFields} more fields");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Gets field names for a given object based on its class.
+    /// </summary>
+    private List<string>? GetFieldNamesForObject(SmalltalkObject obj, string displayName)
+    {
+        // Check if this object IS a class (has a metaclass as its class)
+        bool isClass = false;
+        bool isMetaclass = false;
+        
+        if (obj.ClassPointer != null)
+        {
+            // Get the name of this object's class
+            var classPointerName = GetObjectClassName(obj.ClassPointer);
+            
+            // Check if the class pointer itself is registered as a metaclass
+            // Note: Without the ability to enumerate globals, we can't determine this
+            // This is a limitation of the new API
+            
+            if (!isClass && classPointerName == "Metaclass")
+            {
+                // This object is a metaclass itself
+                isMetaclass = true;
+            }
+        }
+        
+        // If it's a class object, return class field names
+        if (isClass)
+        {
+            return new List<string>
+            {
+                "superclass", "methodDict", "format", "instanceVariables",
+                "organization", "name", "classPool", "sharedPools"
+            };
+        }
+        
+        // If it's a metaclass object, return metaclass field names
+        if (isMetaclass || displayName?.EndsWith(" class") == true)
+        {
+            return new List<string>
+            {
+                "superclass", "methodDict", "format", "instanceVariables",
+                "organization", "thisClass"
+            };
+        }
+        
+        // Otherwise, it's an instance - get field names based on its class
+        var className = GetObjectClassName(obj) ?? displayName;
+        
+        return className switch
+        {
+            // Instance field names
+            "Symbol" => new List<string> { "value" },
+            "String" => new List<string> { "characters" },
+            "Message" => new List<string> { "selector", "arguments" },
+            "CompiledMethod" => new List<string> { "selector", "bytecode", "literals", "header" },
+            "MethodContext" => new List<string> { "sender", "receiver", "method", "arguments", "pc", "stackPointer" },
+            "MethodDictionary" => new List<string> { "keys", "values" },
+            
+            // Arrays are variable-sized
+            "Array" or "ByteArray" => null,
+            
+            _ => null
+        };
+    }
+    
+    /// <summary>
+    /// Creates a descriptive string for a field value.
+    /// </summary>
+    private string DescribeFieldValue(object? field, string indent)
+    {
+        if (field == null)
+            return "nil";
+            
+        if (field is SmalltalkObject fieldObj)
+        {
+            var fieldClassName = GetObjectClassName(fieldObj) ?? "(unknown)";
+            
+            // Special handling for Symbol and String objects to show their value
+            if (fieldClassName == "Symbol" || fieldClassName == "String")
+            {
+                // Try to get the value from the first field
+                if (fieldObj.Fields.Length > 0 && fieldObj.Fields[0] is string value)
+                {
+                    if (fieldClassName == "Symbol")
+                        return $"#{value}";
+                    else
+                        return $"\"{value}\"";
+                }
+            }
+            
+            // Check if this object itself is registered as a class
+            // Note: Without the ability to enumerate globals, we can't find the name
+            // This is a limitation of the new API
+            
+            // For non-global objects, show them more clearly
+            // Use "a/an" article for instances
+            string article = "aeiouAEIOU".Contains(fieldClassName[0]) ? "an" : "a";
+            return $"{article} {fieldClassName} @ #{fieldObj.Oop}";
+        }
+        
+        if (field is string str)
+            return $"String: \"{str}\"";
+            
+        if (field is int intVal)
+            return $"Integer: {intVal}";
+            
+        if (field is bool boolVal)
+            return $"Boolean: {boolVal}";
+            
+        return $"{field.GetType().Name}: {field}";
+    }
+    
+    /// <summary>
+    /// Dumps object relationships to show the object graph structure.
+    /// </summary>
+    private void DumpObjectRelationships(List<SmalltalkObject> allObjects)
+    {
+        Console.WriteLine("🔗 Object Relationships:");
+        
+        if (allObjects.Count == 0)
+        {
+            Console.WriteLine("  No objects to analyze");
+            return;
+        }
+        
+        // Count references between objects
+        var referenceCount = new Dictionary<int, int>(); // OOP -> count of references to it
+        var outgoingRefs = new Dictionary<int, List<int>>(); // OOP -> list of OOPs it references
+        
+        foreach (var obj in allObjects)
+        {
+            referenceCount[obj.Oop] = 0;
+            outgoingRefs[obj.Oop] = new List<int>();
+            
+            // Examine each field for references to other objects
+            foreach (var field in obj.Fields)
+            {
+                if (field is SmalltalkObject referencedObj)
+                {
+                    referenceCount[referencedObj.Oop] = referenceCount.GetValueOrDefault(referencedObj.Oop, 0) + 1;
+                    outgoingRefs[obj.Oop].Add(referencedObj.Oop);
+                }
+            }
+        }
+        
+        // Show objects with high reference counts (likely important objects)
+        var highlyReferenced = referenceCount
+            .Where(kvp => kvp.Value > 0)
+            .OrderByDescending(kvp => kvp.Value)
+            .Take(5)
+            .ToList();
+            
+        if (highlyReferenced.Count > 0)
+        {
+            Console.WriteLine("  📈 Most Referenced Objects:");
+            foreach (var (oop, refCount) in highlyReferenced)
+            {
+                var obj = ObjectMemory.FromOop(oop);
+                var className = obj != null ? GetObjectClassName(obj) ?? "(unknown)" : "(invalid)";
+                Console.WriteLine($"    #{oop} ({className}): {refCount} references");
+            }
+        }
+        
+        // Show objects that reference many others (likely container objects)
+        var highConnectivity = outgoingRefs
+            .Where(kvp => kvp.Value.Count > 0)
+            .OrderByDescending(kvp => kvp.Value.Count)
+            .Take(3)
+            .ToList();
+            
+        if (highConnectivity.Count > 0)
+        {
+            Console.WriteLine("  📤 Objects with Most Outgoing References:");
+            foreach (var (oop, refs) in highConnectivity)
+            {
+                var obj = ObjectMemory.FromOop(oop);
+                var className = obj != null ? GetObjectClassName(obj) ?? "(unknown)" : "(invalid)";
+                Console.WriteLine($"    #{oop} ({className}): references {refs.Count} objects");
+            }
+        }
+        
+        Console.WriteLine($"  📊 Total objects: {allObjects.Count}, Total references: {referenceCount.Values.Sum()}");
+    }
+    
+    // InitializeClasses method removed - no longer needed without shadow classes
+    
+    /// <summary>
+    /// Gets the global variables currently registered in the VM.
+    /// </summary>
+    public Dictionary<string, SmalltalkObject> GetGlobalVariables()
+    {
+        var globals = new Dictionary<string, SmalltalkObject>();
+        
+        // Add known globals from ObjectMemory
+        // TODO: Implement global object access once ObjectMemory is updated
+        
+        // In a full implementation, we would have a proper global dictionary
+        // For now, return just the basic globals
+        return globals;
+    }
+}
+`
+
+FILE path=Smalltalk80/WidgetFactory.cs sha256=aa8c01495bff1c99cfdcaa1469276dbc3647d211bf8ee41ebd5801aff74e2011 lines=17
+---
+`$lang
+// file: Smalltalk80/WidgetFactory.cs
+// Stub implementation to allow cross-platform build without Windows Forms
+using System;
+
+/// <summary>
+///     Provides placeholder GUI functionality for non-Windows environments.
+/// </summary>
+public static class WidgetFactory
+{
+    /// <summary>
+    ///     Creates a form containing a single button. In this build the call is logged only.
+    /// </summary>
+    /// <param name="label">The text that would appear on the button.</param>
+    public static void CreateButtonForm(string label)
+    {
+        Console.WriteLine($"WidgetFactory: GUI not available. Requested button '{label}'.");
+    }
+}
+`
+
+FILE path=TestBootstrap/TestBootstrap.csproj sha256=00bc28c540ad10ab2f879a949a6b98be492845def617aded10dca4a8d52b2c84 lines=11
+---
+`$lang
+// file: TestBootstrap/TestBootstrap.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+
+`
+
+FILE path=TestSmalltalkGrammar/Program.cs sha256=c94b1c1daad04b02567deada29e9a65c042ab891c52b244bfa8d9f9f3e8808c6 lines=100
+---
+`$lang
+// file: TestSmalltalkGrammar/Program.cs
+using System;
+using System.IO;
+using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
+using Smalltalk80.Generated;
+
+namespace Smalltalk80.Tools
+{
+    /// <summary>
+    /// Utility program that validates the Smalltalk-80 grammar by parsing
+    /// a classic <c>file-out</c> source file and reporting any syntax errors.
+    /// </summary>
+    public static class TestSmalltalkGrammar
+    {
+        /// <summary>
+        /// Application entry point.
+        /// </summary>
+        /// <param name="args">An array containing the path to the file-out source.</param>
+        /// <returns>Zero if parsing succeeds; otherwise one.</returns>
+        public static int Main(string[] args)
+        {
+            if (args.Length != 1)
+            {
+                Console.Error.WriteLine("Usage: TestSmalltalkGrammar <path to Smalltalk-80.st>");
+                return 1;
+            }
+
+            // 1) Read the entire file-out source
+            var source = File.ReadAllText(args[0]);
+
+            // 2) Run it through the ANTLR4 pipeline
+            var input = CharStreams.fromString(source);
+            var lexer = new Smalltalk80Lexer(input);
+            var tokens = new CommonTokenStream(lexer);
+
+            // Dump tokens for debugging
+            tokens.Fill(); // Load all tokens
+
+            Console.WriteLine("🔍 Token Stream:");
+            foreach (var token in tokens.GetTokens())
+            {
+                var tokenName = lexer.Vocabulary.GetSymbolicName(token.Type);
+                Console.WriteLine($"  [{token.Line}:{token.Column}] {tokenName} → '{token.Text}'");
+            }
+            Console.WriteLine();
+
+            var parser = new Smalltalk80Parser(tokens);
+            parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL_EXACT_AMBIG_DETECTION;
+            parser.Trace = true;
+
+            // 3) Hook up a listener to catch any lex/parse errors
+            parser.RemoveErrorListeners();
+            var listener = new CountingErrorListener();
+            parser.AddErrorListener(listener);
+
+            // 4) Parse in "fileIn" (batch) mode
+            parser.fileIn();
+
+            // 5) Report results
+            if (listener.ErrorCount == 0 && parser.NumberOfSyntaxErrors == 0)
+            {
+                Console.WriteLine("🎉 Parsed entire file-out with zero syntax errors.");
+                return 0;
+            }
+            else
+            {
+                var total = parser.NumberOfSyntaxErrors + listener.ErrorCount;
+                Console.Error.WriteLine($"❌ Found {total} syntax errors.");
+                return 1;
+            }
+        }
+
+        /// <summary>
+        /// Error listener that counts syntax errors encountered during parsing.
+        /// </summary>
+        private sealed class CountingErrorListener : BaseErrorListener
+        {
+            /// <summary>
+            /// Gets the number of syntax errors recorded.
+            /// </summary>
+            public int ErrorCount { get; private set; }
+
+            /// <inheritdoc />
+            public override void SyntaxError(
+                TextWriter output,
+                IRecognizer recognizer,
+                IToken offendingSymbol,
+                int line,
+                int charPositionInLine,
+                string msg,
+                RecognitionException e)
+            {
+                ErrorCount++;
+                Console.Error.WriteLine($"Syntax Error @ line {line}:{charPositionInLine} – {msg}");
+                Environment.Exit(1); // Immediately stop the program
+            }
+        }
+    }
+}
+
+`
+
+FILE path=TestSmalltalkGrammar/TestSmalltalkGrammar.csproj sha256=5d63b992b3667243f3828bdc90a34b181cd0769613accbc951cf6546e13c8f48 lines=16
+---
+`$lang
+// file: TestSmalltalkGrammar/TestSmalltalkGrammar.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
+  </ItemGroup>
+
+</Project>
+
+`

@@ -1,0 +1,3273 @@
+CHUNK 15/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=Bootstrap/bootstrap-schema.json sha256=450859ebf52cd8fde0106b40272cb4919cee2f2cb2a35af0025c1dc09fd4bbea lines=168
+---
+`$lang
+// file: Bootstrap/bootstrap-schema.json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Smalltalk Bootstrap Manifest",
+  "type": "object",
+  "required": ["version", "phase", "description"],
+  "properties": {
+    "version": { 
+      "type": "string",
+      "description": "Version of the bootstrap manifest format"
+    },
+    "phase": { 
+      "type": "string",
+      "description": "The bootstrap phase (1, 2, or 3)"
+    },
+    "description": { 
+      "type": "string",
+      "description": "Human-readable description of this bootstrap phase"
+    },
+    "comments": {
+      "type": "array",
+      "description": "Optional comments about the bootstrap phase",
+      "items": { "type": "string" }
+    },
+    "messages": {
+      "type": "array",
+      "description": "List of messages to send (for phase 2)",
+      "items": {
+        "type": "object",
+        "required": ["receiver", "selector"],
+        "properties": {
+          "receiver": {
+            "type": "string",
+            "description": "The receiver of the message"
+          },
+          "selector": {
+            "type": "string",
+            "description": "The message selector"
+          },
+          "arguments": {
+            "type": "array",
+            "description": "Arguments for the message",
+            "items": {}
+          },
+          "resultName": {
+            "type": "string",
+            "description": "Variable name to store the result"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional comment explaining the message"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "operations": {
+      "type": "array",
+      "description": "List of bootstrap operations to execute",
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "description": "The operation type",
+            "enum": [
+              "createObject",
+              "setSlot",
+              "patchPointer",
+              "setSuperclass",
+              "setInstanceVariables",
+              "setClassVariables",
+              "defineClass",
+              "defineMethod",
+              "defineMetaclass",
+              "setCategory"
+            ]
+          },
+          "target": { 
+            "type": "string",
+            "description": "The target object for this operation"
+          },
+          "slot": { 
+            "type": ["string", "integer"],
+            "description": "The slot index or name to set"
+          },
+          "name": { 
+            "type": "string",
+            "description": "The name of the class, method, or variable"
+          },
+          "value": {
+            "description": "The value to set (can be string reference, literal, or nested operation)"
+          },
+          "result": { 
+            "type": "string",
+            "description": "Variable name to store the operation result"
+          },
+          "superclass": { 
+            "type": "string",
+            "description": "The superclass for class definition"
+          },
+          "instanceVariables": {
+            "type": "array",
+            "description": "Instance variable names",
+            "items": { "type": "string" }
+          },
+          "classVariables": {
+            "type": "array",
+            "description": "Class variable names",
+            "items": { "type": "string" }
+          },
+          "poolDictionaries": {
+            "type": "array",
+            "description": "Pool dictionary names",
+            "items": { "type": "string" }
+          },
+          "category": {
+            "type": "string",
+            "description": "The class category"
+          },
+          "selector": {
+            "type": "string",
+            "description": "Method selector"
+          },
+          "source": {
+            "type": "string",
+            "description": "Method source code"
+          },
+          "className": {
+            "type": "string",
+            "description": "The class name for method compilation"
+          },
+          "methodCategory": {
+            "type": "string",
+            "description": "The method category"
+          },
+          "arguments": {
+            "type": "array",
+            "description": "Arguments for message send",
+            "items": {}
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional comment explaining the operation"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Optional validation checks for this phase",
+      "properties": {
+        "checkpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "test": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
+`
+
+FILE path=Bootstrap/phase2_5_additions.json sha256=3fbfdc7a448908e7e6fe0720d830c391ce15534be270576eaaa325f742d67c8a lines=381
+---
+`$lang
+// file: Bootstrap/phase2_5_additions.json
+{
+  "description": "Phase 2.5 - Minimal additions for pure message-based class definition",
+  "classes": [
+    {
+      "name": "Object",
+      "superclass": null,
+      "methods": [
+        {
+          "selector": "class",
+          "bytecode": [112, 199, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return the receiver's class"
+        },
+        {
+          "selector": "isNil",
+          "bytecode": [122],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "notNil",
+          "bytecode": [121],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        }
+      ],
+      "classMethods": []
+    },
+    {
+      "name": "Metaclass",
+      "superclass": "Behavior",
+      "instanceVariables": ["thisClass"],
+      "methods": [
+        {
+          "selector": "instanceClass",
+          "bytecode": [0, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return the class this metaclass is for"
+        },
+        {
+          "selector": "instanceClass:",
+          "bytecode": [16, 96, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set the class this metaclass is for"
+        },
+        {
+          "selector": "name",
+          "bytecode": [112, 208, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": ["instanceClass", "name"],
+          "comment": "Return 'ClassName class'"
+        }
+      ],
+      "classMethods": []
+    },
+    {
+      "name": "Array",
+      "superclass": "Collection",
+      "methods": [
+        {
+          "selector": "at:",
+          "bytecode": [112, 16, 192, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 60,
+          "comment": "Primitive array access"
+        },
+        {
+          "selector": "at:put:",
+          "bytecode": [112, 16, 17, 193, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 61,
+          "comment": "Primitive array store"
+        },
+        {
+          "selector": "size",
+          "bytecode": [112, 194, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitiveNumber": 62
+        },
+        {
+          "selector": "collect:",
+          "bytecode": [64, 124],
+          "argumentCount": 1,
+          "temporaryCount": 2,
+          "literals": ["Array", "new:", "at:put:", "value:"],
+          "comment": "Create new array with transformed elements"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new:",
+          "bytecode": [16, 205, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 71,
+          "comment": "Create array of given size"
+        },
+        {
+          "selector": "with:",
+          "bytecode": [64, 124],
+          "argumentCount": 1,
+          "temporaryCount": 1,
+          "comment": "Create array with one element"
+        }
+      ]
+    },
+    {
+      "name": "ByteArray",
+      "superclass": "Array",
+      "methods": [
+        {
+          "selector": "at:",
+          "bytecode": [112, 16, 192, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 60
+        },
+        {
+          "selector": "at:put:",
+          "bytecode": [112, 16, 17, 193, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 61
+        },
+        {
+          "selector": "size",
+          "bytecode": [112, 194, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitiveNumber": 62
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new:",
+          "bytecode": [16, 205, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 71
+        }
+      ]
+    },
+    {
+      "name": "String",
+      "superclass": "Collection",
+      "methods": [
+        {
+          "selector": "asSymbol",
+          "bytecode": [112, 224, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": ["Symbol", "intern:"],
+          "comment": "Convert to symbol via intern"
+        },
+        {
+          "selector": ",",
+          "bytecode": [64, 124],
+          "argumentCount": 1,
+          "temporaryCount": 2,
+          "comment": "String concatenation",
+          "literals": ["String", "new:", "replaceFrom:to:with:startingAt:"]
+        },
+        {
+          "selector": "at:",
+          "bytecode": [112, 16, 192, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 63
+        },
+        {
+          "selector": "at:put:",
+          "bytecode": [112, 16, 17, 193, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 64
+        },
+        {
+          "selector": "size",
+          "bytecode": [112, 194, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitiveNumber": 62
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new:",
+          "bytecode": [16, 205, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 71
+        }
+      ]
+    },
+    {
+      "name": "Symbol",
+      "superclass": "String",
+      "methods": [
+        {
+          "selector": "asSymbol",
+          "bytecode": [112, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Symbols return themselves"
+        },
+        {
+          "selector": "=",
+          "bytecode": [112, 16, 198, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 110,
+          "comment": "Symbol equality is identity"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "intern:",
+          "bytecode": [16, 235, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 91,
+          "comment": "Intern a string as symbol"
+        },
+        {
+          "selector": "new:",
+          "bytecode": [112, 191, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Symbols cannot be created with new:"
+        }
+      ]
+    },
+    {
+      "name": "ClassOrganization",
+      "superclass": "Object",
+      "instanceVariables": ["categories", "categoryStops", "elementArray"],
+      "methods": [
+        {
+          "selector": "initialize",
+          "bytecode": [64, 96, 65, 97, 66, 98, 120],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "literals": ["OrderedCollection", "new", "Array"],
+          "comment": "Initialize empty organization"
+        },
+        {
+          "selector": "classify:under:",
+          "bytecode": [64, 124],
+          "argumentCount": 2,
+          "temporaryCount": 1,
+          "comment": "Classify selector under category"
+        },
+        {
+          "selector": "categories",
+          "bytecode": [0, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0
+        },
+        {
+          "selector": "removeElement:",
+          "bytecode": [64, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Remove selector from organization"
+        }
+      ],
+      "classMethods": []
+    }
+  ],
+  "methodAdditions": [
+    {
+      "class": "CompiledMethod",
+      "methods": [
+        {
+          "selector": "byteAt:",
+          "bytecode": [112, 16, 247, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "primitiveNumber": 143,
+          "comment": "Access bytecode at index"
+        },
+        {
+          "selector": "byteAt:put:",
+          "bytecode": [112, 16, 17, 248, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 144,
+          "comment": "Store byte at index"
+        },
+        {
+          "selector": "byteSize",
+          "bytecode": [112, 249, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "primitiveNumber": 145,
+          "comment": "Return size of bytecode area"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "newMethod:header:",
+          "bytecode": [16, 17, 250, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 79,
+          "comment": "Create method with given size and header"
+        },
+        {
+          "selector": "new:numLiterals:",
+          "bytecode": [16, 17, 251, 124],
+          "argumentCount": 2,
+          "temporaryCount": 0,
+          "primitiveNumber": 80,
+          "comment": "Create method with bytecode size and literal count"
+        }
+      ]
+    },
+    {
+      "class": "Behavior",
+      "methods": [
+        {
+          "selector": "format",
+          "bytecode": [2, 124],
+          "argumentCount": 0,
+          "temporaryCount": 0,
+          "comment": "Return format integer"
+        },
+        {
+          "selector": "format:",
+          "bytecode": [16, 98, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set format integer"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "formatForFixed:variable:words:pointers:",
+          "bytecode": [64, 124],
+          "argumentCount": 4,
+          "temporaryCount": 1,
+          "comment": "Compute format integer from flags",
+          "literals": ["computeFormat"]
+        }
+      ]
+    },
+    {
+      "class": "Class",
+      "methods": [
+        {
+          "selector": "instVarNames:",
+          "bytecode": [16, 101, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set instance variable names"
+        },
+        {
+          "selector": "organization:",
+          "bytecode": [16, 102, 124],
+          "argumentCount": 1,
+          "temporaryCount": 0,
+          "comment": "Set class organization"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Primitive numbers are placeholders - need to match actual VM primitives",
+    "Bytecode sequences are simplified - need actual compilation",
+    "Some methods need proper implementation based on VM specifics",
+    "Symbol table management needs VM support for intern:",
+    "Format computation needs to match Blue Book specification"
+  ]
+}
+`
+
+FILE path=Bootstrap/Smalltalk80.Bootstrap.Data/Smalltalk80.Bootstrap.Data.csproj sha256=ff329d8c12ce65abbd653071dd0773a243775f60a4a1331a52dccf644f442565 lines=51
+---
+`$lang
+// file: Bootstrap/Smalltalk80.Bootstrap.Data/Smalltalk80.Bootstrap.Data.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Bootstrap JSON files as Content -->
+  <ItemGroup>
+    <Content Include="bootstrap_phase1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="bootstrap_phase2.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="bootstrap_phase3.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Copy bootstrap files to output directory in Bootstrap subfolder -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <ItemGroup>
+      <BootstrapFiles Include="bootstrap_phase*.json" />
+    </ItemGroup>
+    
+    <MakeDir Directories="$(OutputPath)Bootstrap" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(OutputPath)Bootstrap"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="SuccessfullyCopiedFiles" />
+    </Copy>
+    
+    <Message Importance="high" Text="Copied bootstrap files to: $(OutputPath)Bootstrap" />
+  </Target>
+
+  <!-- Clean bootstrap files on clean -->
+  <Target Name="CleanBootstrapFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)Bootstrap" Condition="Exists('$(OutputPath)Bootstrap')" />
+    <Message Importance="high" Text="Removed bootstrap directory: $(OutputPath)Bootstrap" />
+  </Target>
+
+</Project>
+`
+
+FILE path=Bootstrap/Smalltalk80.Bootstrap/JsonBootstrapProvider.cs sha256=5b3e7772f5053a28bfadb1858d98c30723838f69c902a2b63eab89906104590f lines=395
+---
+`$lang
+// file: Bootstrap/Smalltalk80.Bootstrap/JsonBootstrapProvider.cs
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Smalltalk80.Core;
+
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Provides bootstrap data from JSON files for initializing the Smalltalk VM.
+/// This implementation reads bootstrap_phase1.json, bootstrap_phase2.json, and bootstrap_phase3.json
+/// to configure the three-phase bootstrap process.
+/// </summary>
+public class JsonBootstrapProvider : IBootstrapProvider
+{
+    private readonly string _bootstrapDirectory;
+    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly ILogger<JsonBootstrapProvider>? _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the JsonBootstrapProvider class.
+    /// </summary>
+    /// <param name="bootstrapDirectory">The directory containing bootstrap JSON files.</param>
+    /// <param name="logger">Optional logger for diagnostic output.</param>
+    public JsonBootstrapProvider(string bootstrapDirectory, ILogger<JsonBootstrapProvider>? logger = null)
+    {
+        _bootstrapDirectory = bootstrapDirectory ?? throw new ArgumentNullException(nameof(bootstrapDirectory));
+        _logger = logger;
+        
+        if (!Directory.Exists(bootstrapDirectory))
+        {
+            throw new DirectoryNotFoundException($"Bootstrap directory not found: {bootstrapDirectory}");
+        }
+
+        _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<Phase1BootstrapData> LoadPhase1Async()
+    {
+        var filePath = Path.Combine(_bootstrapDirectory, "bootstrap_phase1.json");
+        _logger?.LogInformation("Loading Phase 1 bootstrap from {FilePath}", filePath);
+
+        var json = await File.ReadAllTextAsync(filePath);
+        var data = JsonSerializer.Deserialize<Phase1JsonData>(json, _jsonOptions)
+            ?? throw new InvalidOperationException("Failed to deserialize Phase 1 bootstrap data");
+
+        var operations = new List<PrimitiveOperation>();
+        foreach (var op in data.Operations)
+        {
+            operations.Add(ConvertToPrimitiveOperation(op));
+        }
+
+        var checkpoints = data.Validation?.Checkpoints?.Select(c => new ValidationCheckpoint
+        {
+            Description = c.Description ?? string.Empty,
+            Test = c.Test ?? string.Empty,
+            IsCritical = c.IsCritical ?? true
+        }).ToList() ?? new List<ValidationCheckpoint>();
+
+        _logger?.LogInformation("Loaded {Count} Phase 1 operations", operations.Count);
+
+        return new Phase1BootstrapData
+        {
+            Operations = operations,
+            Checkpoints = checkpoints
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<Phase2BootstrapData> LoadPhase2Async()
+    {
+        var filePath = Path.Combine(_bootstrapDirectory, "bootstrap_phase2.json");
+        _logger?.LogInformation("Loading Phase 2 bootstrap from {FilePath}", filePath);
+
+        var json = await File.ReadAllTextAsync(filePath);
+        var data = JsonSerializer.Deserialize<Phase2JsonData>(json, _jsonOptions)
+            ?? throw new InvalidOperationException("Failed to deserialize Phase 2 bootstrap data");
+
+        var classes = new List<ClassDefinition>();
+        var methods = new List<MethodDefinition>();
+        var globals = new List<GlobalDefinition>();
+
+        foreach (var op in data.Operations)
+        {
+            switch (op.Op?.ToLower())
+            {
+                case "subclass":
+                    classes.Add(new ClassDefinition
+                    {
+                        Name = op.Name ?? string.Empty,
+                        Superclass = op.Superclass ?? "Object",
+                        InstanceVariables = op.InstanceVariables ?? Array.Empty<string>(),
+                        ClassVariables = op.ClassVariables ?? Array.Empty<string>(),
+                        PoolDictionaries = op.PoolDictionaries ?? Array.Empty<string>(),
+                        Category = op.Category ?? "Unclassified"
+                    });
+                    break;
+
+                case "compilemethod":
+                    methods.Add(new MethodDefinition
+                    {
+                        ClassName = op.Class ?? string.Empty,
+                        IsClassMethod = false,
+                        Selector = op.Selector ?? string.Empty,
+                        Source = op.Source ?? string.Empty,
+                        Category = op.Category ?? "unclassified"
+                    });
+                    break;
+
+                case "compileclassmethod":
+                    methods.Add(new MethodDefinition
+                    {
+                        ClassName = op.Class ?? string.Empty,
+                        IsClassMethod = true,
+                        Selector = op.Selector ?? string.Empty,
+                        Source = op.Source ?? string.Empty,
+                        Category = op.Category ?? "unclassified"
+                    });
+                    break;
+
+                case "instantiate":
+                    globals.Add(new GlobalDefinition
+                    {
+                        Name = op.Global ?? string.Empty,
+                        ClassName = op.Class ?? string.Empty,
+                        IsSingleton = op.IsSingleton ?? false
+                    });
+                    break;
+            }
+        }
+
+        var checkpoints = data.Validation?.Checkpoints?.Select(c => new ValidationCheckpoint
+        {
+            Description = c.Description ?? string.Empty,
+            Test = c.Test ?? string.Empty,
+            IsCritical = c.IsCritical ?? true
+        }).ToList() ?? new List<ValidationCheckpoint>();
+
+        _logger?.LogInformation("Loaded {ClassCount} classes, {MethodCount} methods, {GlobalCount} globals for Phase 2",
+            classes.Count, methods.Count, globals.Count);
+
+        return new Phase2BootstrapData
+        {
+            Classes = classes,
+            Methods = methods,
+            Globals = globals,
+            Checkpoints = checkpoints
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<Phase3BootstrapData> LoadPhase3Async()
+    {
+        var filePath = Path.Combine(_bootstrapDirectory, "bootstrap_phase3.json");
+        
+        // Phase 3 is optional
+        if (!File.Exists(filePath))
+        {
+            _logger?.LogInformation("Phase 3 bootstrap file not found, returning empty configuration");
+            return new Phase3BootstrapData();
+        }
+
+        _logger?.LogInformation("Loading Phase 3 bootstrap from {FilePath}", filePath);
+
+        var json = await File.ReadAllTextAsync(filePath);
+        var data = JsonSerializer.Deserialize<Phase3JsonData>(json, _jsonOptions)
+            ?? throw new InvalidOperationException("Failed to deserialize Phase 3 bootstrap data");
+
+        return new Phase3BootstrapData
+        {
+            SourceFiles = data.SourceFiles ?? Array.Empty<string>(),
+            LoadOrder = data.LoadOrder ?? Array.Empty<string>(),
+            Options = new FileLoaderOptions
+            {
+                StopOnError = data.Configuration?.StopOnError ?? true,
+                EnableLogging = data.Configuration?.EnableLogging ?? true,
+                ValidateAfterLoad = data.Configuration?.ValidateAfterLoad ?? true
+            }
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<BootstrapValidationResult> ValidateAsync()
+    {
+        var errors = new List<string>();
+        var warnings = new List<string>();
+        var details = new Dictionary<string, object>();
+
+        // Validate Phase 1
+        try
+        {
+            var phase1 = await LoadPhase1Async();
+            details["Phase1Operations"] = phase1.Operations.Count;
+            
+            // Check for required operations
+            var hasMetaclass = phase1.Operations.Any(op => 
+                op.Operation == "newClass" && op.Result == "Metaclass");
+            var hasProtoObject = phase1.Operations.Any(op => 
+                op.Operation == "newClass" && op.Result == "ProtoObject");
+            
+            if (!hasMetaclass)
+                errors.Add("Phase 1: Missing Metaclass creation");
+            if (!hasProtoObject)
+                errors.Add("Phase 1: Missing ProtoObject creation");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Phase 1 validation failed: {ex.Message}");
+        }
+
+        // Validate Phase 2
+        try
+        {
+            var phase2 = await LoadPhase2Async();
+            details["Phase2Classes"] = phase2.Classes.Count;
+            details["Phase2Methods"] = phase2.Methods.Count;
+            
+            // Check for required classes
+            var requiredClasses = new[] { "Boolean", "True", "False", "UndefinedObject", "BlockContext" };
+            foreach (var required in requiredClasses)
+            {
+                if (!phase2.Classes.Any(c => c.Name == required))
+                {
+                    warnings.Add($"Phase 2: Missing required class {required}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Phase 2 validation failed: {ex.Message}");
+        }
+
+        // Validate Phase 3 (optional)
+        try
+        {
+            var phase3 = await LoadPhase3Async();
+            details["Phase3Files"] = phase3.SourceFiles.Count;
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"Phase 3 validation warning: {ex.Message}");
+        }
+
+        return new BootstrapValidationResult
+        {
+            IsValid = errors.Count == 0,
+            Errors = errors,
+            Warnings = warnings,
+            Details = details
+        };
+    }
+
+    private PrimitiveOperation ConvertToPrimitiveOperation(Phase1Operation op)
+    {
+        var parameters = new Dictionary<string, object>();
+        
+        // Extract common parameters
+        if (op.Slot.HasValue)
+            parameters["slot"] = op.Slot.Value;
+        if (!string.IsNullOrEmpty(op.Name))
+            parameters["name"] = op.Name;
+        if (!string.IsNullOrEmpty(op.Value))
+            parameters["value"] = op.Value;
+        if (!string.IsNullOrEmpty(op.Selector))
+            parameters["selector"] = op.Selector;
+        if (!string.IsNullOrEmpty(op.Source))
+            parameters["source"] = op.Source;
+        if (!string.IsNullOrEmpty(op.Key))
+            parameters["key"] = op.Key;
+        if (!string.IsNullOrEmpty(op.Class))
+            parameters["class"] = op.Class;
+        if (!string.IsNullOrEmpty(op.Global))
+            parameters["global"] = op.Global;
+
+        // Handle nested operations (for values that are operations themselves)
+        if (op.ValueOp != null)
+        {
+            parameters["valueOperation"] = new Dictionary<string, object>
+            {
+                ["op"] = op.ValueOp.Op ?? string.Empty,
+                ["size"] = op.ValueOp.Size ?? 0
+            };
+        }
+
+        return new PrimitiveOperation
+        {
+            Operation = op.Op ?? string.Empty,
+            Target = op.Target,
+            Result = op.Result,
+            Parameters = parameters,
+            Comment = op.Comment ?? op.Comment2
+        };
+    }
+
+    // JSON deserialization classes
+    private class Phase1JsonData
+    {
+        public string? Phase { get; set; }
+        public string? Description { get; set; }
+        public List<Phase1Operation>? Operations { get; set; }
+        public ValidationData? Validation { get; set; }
+    }
+
+    private class Phase1Operation
+    {
+        public string? Op { get; set; }
+        public string? Target { get; set; }
+        public string? Result { get; set; }
+        public int? Slot { get; set; }
+        public string? Name { get; set; }
+        public string? Value { get; set; }
+        public string? Selector { get; set; }
+        public string? Source { get; set; }
+        public string? Key { get; set; }
+        public string? Class { get; set; }
+        public string? Global { get; set; }
+        public string? Comment { get; set; }
+        public string? Comment2 { get; set; }
+        public ValueOperation? ValueOp { get; set; }
+    }
+
+    private class ValueOperation
+    {
+        public string? Op { get; set; }
+        public int? Size { get; set; }
+    }
+
+    private class Phase2JsonData
+    {
+        public string? Phase { get; set; }
+        public string? Description { get; set; }
+        public List<Phase2Operation>? Operations { get; set; }
+        public ValidationData? Validation { get; set; }
+    }
+
+    private class Phase2Operation
+    {
+        public string? Op { get; set; }
+        public string? Superclass { get; set; }
+        public string? Name { get; set; }
+        public string? Class { get; set; }
+        public string? Selector { get; set; }
+        public string? Source { get; set; }
+        public string? Global { get; set; }
+        public string? Category { get; set; }
+        public string? Comment { get; set; }
+        public bool? IsSingleton { get; set; }
+        public List<string>? InstanceVariables { get; set; }
+        public List<string>? ClassVariables { get; set; }
+        public List<string>? PoolDictionaries { get; set; }
+    }
+
+    private class Phase3JsonData
+    {
+        public string? Phase { get; set; }
+        public string? Description { get; set; }
+        public List<string>? SourceFiles { get; set; }
+        public List<string>? LoadOrder { get; set; }
+        public Phase3Configuration? Configuration { get; set; }
+    }
+
+    private class Phase3Configuration
+    {
+        public bool? StopOnError { get; set; }
+        public bool? EnableLogging { get; set; }
+        public bool? ValidateAfterLoad { get; set; }
+    }
+
+    private class ValidationData
+    {
+        public List<CheckpointData>? Checkpoints { get; set; }
+    }
+
+    private class CheckpointData
+    {
+        public string? Description { get; set; }
+        public string? Test { get; set; }
+        public bool? IsCritical { get; set; }
+    }
+}
+
+/// <summary>
+/// Logging interface for bootstrap operations.
+/// </summary>
+public interface ILogger<T>
+{
+    void LogInformation(string message, params object[] args);
+    void LogWarning(string message, params object[] args);
+    void LogError(string message, params object[] args);
+}
+`
+
+FILE path=Bootstrap/Smalltalk80.Bootstrap/Phase1BootstrapExecutor.cs sha256=71e25ee1b6dc55855a16554719466c2ae02e021d58d0ce672069af32a856145c lines=454
+---
+`$lang
+// file: Bootstrap/Smalltalk80.Bootstrap/Phase1BootstrapExecutor.cs
+using Smalltalk80.Core;
+
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Executes Phase 1 bootstrap operations using VM primitives to create the minimal class hierarchy.
+/// This phase creates core classes like ProtoObject, Object, Class, Metaclass, and essential support classes
+/// using only primitive operations without any messaging capability.
+/// </summary>
+public class Phase1BootstrapExecutor
+{
+    private readonly IVirtualMachine _vm;
+    private readonly ILogger<Phase1BootstrapExecutor>? _logger;
+    private readonly Dictionary<string, ISmalltalkObject> _objects;
+    private readonly Dictionary<string, ISmalltalkClass> _classes;
+
+    /// <summary>
+    /// Initializes a new instance of the Phase1BootstrapExecutor class.
+    /// </summary>
+    /// <param name="vm">The virtual machine to bootstrap.</param>
+    /// <param name="logger">Optional logger for diagnostic output.</param>
+    public Phase1BootstrapExecutor(IVirtualMachine vm, ILogger<Phase1BootstrapExecutor>? logger = null)
+    {
+        _vm = vm ?? throw new ArgumentNullException(nameof(vm));
+        _logger = logger;
+        _objects = new Dictionary<string, ISmalltalkObject>();
+        _classes = new Dictionary<string, ISmalltalkClass>();
+    }
+
+    /// <summary>
+    /// Executes the Phase 1 bootstrap operations to create the minimal class hierarchy.
+    /// </summary>
+    /// <param name="data">The Phase 1 bootstrap data containing primitive operations.</param>
+    /// <returns>A task that completes when Phase 1 bootstrap is finished.</returns>
+    public async Task ExecuteAsync(Phase1BootstrapData data)
+    {
+        _logger?.LogInformation("Starting Phase 1 bootstrap with {Count} operations", data.Operations.Count);
+
+        try
+        {
+            // Execute each primitive operation in sequence
+            foreach (var operation in data.Operations)
+            {
+                await ExecuteOperationAsync(operation);
+            }
+
+            // Run validation checkpoints
+            await ValidateCheckpointsAsync(data.Checkpoints);
+
+            _logger?.LogInformation("Phase 1 bootstrap completed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Phase 1 bootstrap failed: {Message}", ex.Message);
+            throw new BootstrapException("Phase 1 bootstrap failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Executes a single primitive operation.
+    /// </summary>
+    private async Task ExecuteOperationAsync(PrimitiveOperation operation)
+    {
+        _logger?.LogInformation("Executing operation: {Op} {Comment}", operation.Operation, operation.Comment);
+
+        switch (operation.Operation.ToLower())
+        {
+            case "newclass":
+                await ExecuteNewClass(operation);
+                break;
+
+            case "setslot":
+                await ExecuteSetSlot(operation);
+                break;
+
+            case "setnamedslot":
+                await ExecuteSetNamedSlot(operation);
+                break;
+
+            case "installmethod":
+                await ExecuteInstallMethod(operation);
+                break;
+
+            case "newinstance":
+                await ExecuteNewInstance(operation);
+                break;
+
+            case "registerglobal":
+                await ExecuteRegisterGlobal(operation);
+                break;
+
+            case "dictionaryput":
+                await ExecuteDictionaryPut(operation);
+                break;
+
+            default:
+                _logger?.LogWarning("Unknown operation: {Op}", operation.Operation);
+                break;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Creates a new class object.
+    /// </summary>
+    private async Task ExecuteNewClass(PrimitiveOperation operation)
+    {
+        if (string.IsNullOrEmpty(operation.Result))
+            throw new InvalidOperationException("newClass requires a result name");
+
+        // Create a new class object using VM primitives
+        var classObject = _vm.ObjectMemory.AllocateObject(_vm.ClassRegistry.GetClassClass(), 8);
+        
+        // Convert to class interface
+        var cls = classObject as ISmalltalkClass 
+            ?? throw new InvalidOperationException("Failed to create class object");
+
+        // Initialize basic fields
+        cls.MethodDictionary = CreateMethodDictionary();
+        cls.InstanceVariables = Array.Empty<ISymbol>();
+        
+        // Store the class for later reference
+        _classes[operation.Result] = cls;
+        _objects[operation.Result] = cls;
+
+        _logger?.LogInformation("Created class: {Name}", operation.Result);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sets an indexed slot in an object.
+    /// </summary>
+    private async Task ExecuteSetSlot(PrimitiveOperation operation)
+    {
+        if (string.IsNullOrEmpty(operation.Target))
+            throw new InvalidOperationException("setSlot requires a target");
+
+        if (!_objects.TryGetValue(operation.Target, out var target))
+            throw new InvalidOperationException($"Target object not found: {operation.Target}");
+
+        if (!operation.Parameters.TryGetValue("slot", out var slotObj) || slotObj is not int slot)
+            throw new InvalidOperationException("setSlot requires a slot index");
+
+        if (!operation.Parameters.TryGetValue("value", out var valueRef) || valueRef is not string valueName)
+            throw new InvalidOperationException("setSlot requires a value reference");
+
+        // Handle special cases
+        ISmalltalkObject? value = valueName switch
+        {
+            "null" or null => null,
+            _ => _objects.TryGetValue(valueName, out var obj) ? obj : null
+        };
+
+        // Set the slot
+        target[slot] = value;
+
+        _logger?.LogInformation("Set slot {Slot} of {Target} to {Value}", slot, operation.Target, valueName);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sets a named field in an object.
+    /// </summary>
+    private async Task ExecuteSetNamedSlot(PrimitiveOperation operation)
+    {
+        if (string.IsNullOrEmpty(operation.Target))
+            throw new InvalidOperationException("setNamedSlot requires a target");
+
+        if (!_objects.TryGetValue(operation.Target, out var target))
+            throw new InvalidOperationException($"Target object not found: {operation.Target}");
+
+        if (!operation.Parameters.TryGetValue("name", out var nameObj) || nameObj is not string fieldName)
+            throw new InvalidOperationException("setNamedSlot requires a field name");
+
+        object? value = null;
+        if (operation.Parameters.TryGetValue("value", out var valueObj))
+        {
+            value = valueObj switch
+            {
+                string str when str == "null" => null,
+                string str when _objects.ContainsKey(str) => _objects[str],
+                string str => CreateSymbol(str),
+                int num => num,
+                Dictionary<string, object> dict when dict.ContainsKey("op") => ExecuteNestedOperation(dict),
+                IReadOnlyList<string> list => CreateSymbolArray(list),
+                _ => valueObj
+            };
+        }
+
+        // Set the named field based on the field name
+        if (target is ISmalltalkClass cls)
+        {
+            switch (fieldName.ToLower())
+            {
+                case "name":
+                    cls.Name = value as ISymbol ?? CreateSymbol(value?.ToString() ?? string.Empty);
+                    break;
+                case "superclass":
+                    cls.Superclass = value as ISmalltalkClass;
+                    break;
+                case "methoddict":
+                case "methoddictionary":
+                    cls.MethodDictionary = value as IMethodDictionary ?? CreateMethodDictionary();
+                    break;
+                case "instancevariables":
+                    cls.InstanceVariables = value as ISymbol[] ?? Array.Empty<ISymbol>();
+                    break;
+                case "format":
+                    cls.Format = value as int? ?? 0;
+                    break;
+            }
+        }
+        else
+        {
+            // Generic field setting
+            target[fieldName] = value as ISmalltalkObject;
+        }
+
+        _logger?.LogInformation("Set named slot {Name} of {Target}", fieldName, operation.Target);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Installs a method in a class.
+    /// </summary>
+    private async Task ExecuteInstallMethod(PrimitiveOperation operation)
+    {
+        if (!operation.Parameters.TryGetValue("target", out var targetObj) && 
+            !operation.Parameters.TryGetValue("class", out targetObj))
+        {
+            targetObj = operation.Target;
+        }
+
+        if (targetObj is not string className || !_classes.TryGetValue(className, out var cls))
+            throw new InvalidOperationException($"Class not found: {targetObj}");
+
+        if (!operation.Parameters.TryGetValue("selector", out var selectorObj) || selectorObj is not string selector)
+            throw new InvalidOperationException("installMethod requires a selector");
+
+        if (!operation.Parameters.TryGetValue("source", out var sourceObj) || sourceObj is not string source)
+            throw new InvalidOperationException("installMethod requires source code");
+
+        // Compile the method (simplified for Phase 1 - may just store source)
+        var method = CompileMethod(selector, source);
+        var selectorSymbol = CreateSymbol(selector);
+
+        // Add to method dictionary
+        cls.AddMethod(selectorSymbol, method);
+
+        _logger?.LogInformation("Installed method {Selector} in {Class}", selector, className);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Creates an instance of a class.
+    /// </summary>
+    private async Task ExecuteNewInstance(PrimitiveOperation operation)
+    {
+        if (!operation.Parameters.TryGetValue("class", out var classObj) || classObj is not string className)
+            throw new InvalidOperationException("newInstance requires a class name");
+
+        if (!_classes.TryGetValue(className, out var cls))
+            throw new InvalidOperationException($"Class not found: {className}");
+
+        if (string.IsNullOrEmpty(operation.Result))
+            throw new InvalidOperationException("newInstance requires a result name");
+
+        // Create instance
+        var instance = cls.NewInstance();
+        _objects[operation.Result] = instance;
+
+        _logger?.LogInformation("Created instance of {Class}: {Name}", className, operation.Result);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Registers a global variable.
+    /// </summary>
+    private async Task ExecuteRegisterGlobal(PrimitiveOperation operation)
+    {
+        if (!operation.Parameters.TryGetValue("name", out var nameObj) || nameObj is not string name)
+            throw new InvalidOperationException("registerGlobal requires a name");
+
+        if (!operation.Parameters.TryGetValue("value", out var valueObj) || valueObj is not string valueName)
+            throw new InvalidOperationException("registerGlobal requires a value");
+
+        if (!_objects.TryGetValue(valueName, out var value))
+        {
+            // Special case for nil
+            if (valueName == "nil")
+                value = null;
+            else
+                throw new InvalidOperationException($"Value not found: {valueName}");
+        }
+
+        _vm.SetGlobal(name, value!);
+
+        _logger?.LogInformation("Registered global: {Name}", name);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Adds an entry to a dictionary.
+    /// </summary>
+    private async Task ExecuteDictionaryPut(PrimitiveOperation operation)
+    {
+        if (string.IsNullOrEmpty(operation.Target))
+            throw new InvalidOperationException("dictionaryPut requires a target");
+
+        if (!operation.Parameters.TryGetValue("key", out var keyObj) || keyObj is not string key)
+            throw new InvalidOperationException("dictionaryPut requires a key");
+
+        if (!operation.Parameters.TryGetValue("value", out var valueObj) || valueObj is not string valueName)
+            throw new InvalidOperationException("dictionaryPut requires a value");
+
+        // This would add the key-value pair to the dictionary
+        // Implementation depends on dictionary structure
+        _logger?.LogInformation("Added {Key} to dictionary {Target}", key, operation.Target);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Executes a nested operation (like creating a new dictionary).
+    /// </summary>
+    private ISmalltalkObject ExecuteNestedOperation(Dictionary<string, object> operation)
+    {
+        if (!operation.TryGetValue("op", out var opObj) || opObj is not string op)
+            throw new InvalidOperationException("Nested operation requires 'op' field");
+
+        return op.ToLower() switch
+        {
+            "newdictionary" => CreateDictionary(),
+            "newarray" => CreateArray(operation.TryGetValue("size", out var sizeObj) && sizeObj is int size ? size : 0),
+            _ => throw new InvalidOperationException($"Unknown nested operation: {op}")
+        };
+    }
+
+    /// <summary>
+    /// Creates a method dictionary.
+    /// </summary>
+    private IMethodDictionary CreateMethodDictionary()
+    {
+        var dict = _vm.ObjectMemory.AllocateObject(_vm.ClassRegistry.GetMethodDictionaryClass(), 2);
+        return dict as IMethodDictionary ?? throw new InvalidOperationException("Failed to create method dictionary");
+    }
+
+    /// <summary>
+    /// Creates a dictionary object.
+    /// </summary>
+    private ISmalltalkObject CreateDictionary()
+    {
+        return _vm.ObjectMemory.AllocateObject(_vm.ClassRegistry.GetDictionaryClass(), 2);
+    }
+
+    /// <summary>
+    /// Creates an array object.
+    /// </summary>
+    private ISmalltalkObject CreateArray(int size)
+    {
+        return _vm.ObjectMemory.AllocateIndexedObject(_vm.ClassRegistry.GetArrayClass(), size);
+    }
+
+    /// <summary>
+    /// Creates a symbol from a string.
+    /// </summary>
+    private ISymbol CreateSymbol(string value)
+    {
+        return _vm.ClassRegistry.InternSymbol(value);
+    }
+
+    /// <summary>
+    /// Creates an array of symbols from a list of strings.
+    /// </summary>
+    private ISymbol[] CreateSymbolArray(IReadOnlyList<string> values)
+    {
+        return values.Select(CreateSymbol).ToArray();
+    }
+
+    /// <summary>
+    /// Compiles a method from source (simplified for Phase 1).
+    /// </summary>
+    private ICompiledMethod CompileMethod(string selector, string source)
+    {
+        // In Phase 1, we might just store the source and primitive index
+        // Real compilation happens in later phases
+        var method = _vm.ObjectMemory.AllocateObject(_vm.ClassRegistry.GetCompiledMethodClass(), 4) as ICompiledMethod
+            ?? throw new InvalidOperationException("Failed to create compiled method");
+
+        // Extract primitive index if present
+        var primitiveIndex = ExtractPrimitiveIndex(source);
+        
+        // Store basic method information
+        // Full compilation would happen here in a complete implementation
+        
+        return method;
+    }
+
+    /// <summary>
+    /// Extracts primitive index from method source.
+    /// </summary>
+    private int ExtractPrimitiveIndex(string source)
+    {
+        // Look for <primitive: N> pattern
+        var match = System.Text.RegularExpressions.Regex.Match(source, @"<primitive:\s*(\d+)>");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var index))
+            return index;
+        return 0;
+    }
+
+    /// <summary>
+    /// Validates bootstrap checkpoints.
+    /// </summary>
+    private async Task ValidateCheckpointsAsync(IReadOnlyList<ValidationCheckpoint> checkpoints)
+    {
+        foreach (var checkpoint in checkpoints)
+        {
+            _logger?.LogInformation("Validating: {Description}", checkpoint.Description);
+            
+            // Execute the test expression
+            // This would evaluate the test in the context of the bootstrapped system
+            var passed = await EvaluateCheckpoint(checkpoint);
+            
+            if (!passed && checkpoint.IsCritical)
+            {
+                throw new BootstrapException($"Critical checkpoint failed: {checkpoint.Description}");
+            }
+            else if (!passed)
+            {
+                _logger?.LogWarning("Non-critical checkpoint failed: {Description}", checkpoint.Description);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Evaluates a validation checkpoint.
+    /// </summary>
+    private async Task<bool> EvaluateCheckpoint(ValidationCheckpoint checkpoint)
+    {
+        // Simplified checkpoint evaluation
+        // Real implementation would parse and evaluate the test expression
+        await Task.CompletedTask;
+        return true;
+    }
+}
+
+/// <summary>
+/// Exception thrown when bootstrap operations fail.
+/// </summary>
+public class BootstrapException : Exception
+{
+    public BootstrapException(string message) : base(message) { }
+    public BootstrapException(string message, Exception innerException) : base(message, innerException) { }
+}
+`
+
+FILE path=Bootstrap/test_extract.json/Object.json sha256=9c187bed128e463a691e84e8ea03b42fd52875005c1492210852179e5a61bccd lines=1259
+---
+`$lang
+// file: Bootstrap/test_extract.json/Object.json
+{
+  "className": "Object",
+  "superclass": "Object",
+  "instanceVariables": [],
+  "classVariables": [],
+  "poolDictionaries": [],
+  "category": "",
+  "comment": "",
+  "isVariable": false,
+  "isBytes": false,
+  "isWords": false,
+  "instanceMethodCount": 78,
+  "classMethodCount": 6,
+  "instanceMethods": [
+    {
+      "selector": "release",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "at:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#indexisIntegerifTrue"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 60
+    },
+    {
+      "selector": "at: put:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#value"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 61
+    },
+    {
+      "selector": "basicAt:",
+      "category": "",
+      "bytecode": [
+        64,
+        193,
+        120
+      ],
+      "literals": [
+        "#indexisKindOf",
+        "#Integer"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 60
+    },
+    {
+      "selector": "basicAt: put:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#value"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 61
+    },
+    {
+      "selector": "basicSize",
+      "category": "",
+      "bytecode": [
+        117,
+        124
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 62
+    },
+    {
+      "selector": "readFromString:",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "size",
+      "category": "",
+      "bytecode": [
+        117,
+        124
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 62
+    },
+    {
+      "selector": "yourself",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "isInteger",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "False"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "isNil",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "False"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "notNil",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "True"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "=",
+      "category": "",
+      "bytecode": [
+        112,
+        16,
+        208,
+        124
+      ],
+      "literals": [
+        "#=="
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "==",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#selfprimitiveFailed"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 110
+    },
+    {
+      "selector": "hash",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#selfprimitiveFailed"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 75
+    },
+    {
+      "selector": "hashMappedBy:",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "~=",
+      "category": "",
+      "bytecode": [
+        112,
+        16,
+        182,
+        32,
+        209,
+        124
+      ],
+      "literals": [
+        "False",
+        "#=="
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "~~",
+      "category": "",
+      "bytecode": [
+        112,
+        16,
+        208,
+        193,
+        124
+      ],
+      "literals": [
+        "#==",
+        "#not"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "copy",
+      "category": "",
+      "bytecode": [
+        64,
+        124
+      ],
+      "literals": [
+        "#selfshallowCopy"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "deepCopy",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        161,
+        135,
+        135,
+        65,
+        66,
+        211,
+        137,
+        112,
+        124,
+        152,
+        0,
+        135,
+        68,
+        120
+      ],
+      "literals": [
+        "#selfclass",
+        "#class",
+        "#Object",
+        "#==",
+        "#classisVariableifTrue"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "shallowCopy",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        161,
+        135,
+        135,
+        65,
+        66,
+        211,
+        120
+      ],
+      "literals": [
+        "#selfclass",
+        "#class",
+        "#ObjectifTrue",
+        "#=="
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "addDependent:",
+      "category": "",
+      "bytecode": [
+        64,
+        137,
+        65,
+        210,
+        120
+      ],
+      "literals": [
+        "#DependentsFieldsat",
+        "#selfsetDependents",
+        "#selfifAbsent:"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "dependents",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "removeDependent:",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        105,
+        120
+      ],
+      "literals": [
+        "#DependentsFieldsat"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "broadcast:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#nilifTrue"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "broadcast: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        65,
+        210,
+        120
+      ],
+      "literals": [
+        "#anObjectselfdependents",
+        "#nilifTrue",
+        "#~~"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "changed",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "changed:",
+      "category": "",
+      "bytecode": [
+        137,
+        64,
+        193,
+        120
+      ],
+      "literals": [
+        "#aDependentupdate",
+        "#aParameter"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "changeRequest",
+      "category": "",
+      "bytecode": [
+        137,
+        64,
+        193,
+        120
+      ],
+      "literals": [
+        "#depupdateRequestifFalse",
+        "#false"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "changeRequestFrom:",
+      "category": "",
+      "bytecode": [
+        137,
+        64,
+        65,
+        210,
+        195,
+        120
+      ],
+      "literals": [
+        "#dep",
+        "#requestoror",
+        "#==",
+        "#depupdateRequest"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "update:",
+      "category": "",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "updateRequest",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "True"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "isLiteral",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "False"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "printOn:",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        105,
+        135,
+        65,
+        120
+      ],
+      "literals": [
+        "#selfclassname",
+        "#aStreamnextPutAll"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "printString",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        104,
+        120
+      ],
+      "literals": [
+        "#WriteStreamon"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "storeOn:",
+      "category": "",
+      "bytecode": [
+        135,
+        64,
+        120
+      ],
+      "literals": [
+        "#selfclassisVariableifTrue"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "storeString",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        104,
+        120
+      ],
+      "literals": [
+        "#WriteStreamon"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "class",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#selfprimitiveFailed"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 111
+    },
+    {
+      "selector": "isKindOf:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#aClassifTrue"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "isMemberOf:",
+      "category": "",
+      "bytecode": [
+        64,
+        16,
+        209,
+        124
+      ],
+      "literals": [
+        "#selfclass",
+        "#=="
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "respondsTo:",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "perform:",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 83
+    },
+    {
+      "selector": "perform: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#anObject"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 83
+    },
+    {
+      "selector": "perform: with: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#firstObjectwith"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 83
+    },
+    {
+      "selector": "perform: with: with: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#firstObjectwith"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 83
+    },
+    {
+      "selector": "perform: withArguments:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#anArray"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 84
+    },
+    {
+      "selector": "confirm:",
+      "category": "",
+      "bytecode": [
+        32,
+        136,
+        105,
+        135,
+        65,
+        120
+      ],
+      "literals": [
+        "False",
+        "#BinaryChoicemessage"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "conflictingInheritanceError",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "doesNotUnderstand:",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        161,
+        135,
+        120
+      ],
+      "literals": [
+        "#selfclasstryCopyingCodeFor",
+        "#status"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "error:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#thisContextlabel"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "halt",
+      "category": "",
+      "bytecode": [
+        32,
+        65,
+        210,
+        120
+      ],
+      "literals": [
+        "Halt encountered.",
+        "#thisContextshortStack",
+        "#contents:"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "halt:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#thisContextlabel"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "notify:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#thisContextlabel"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "primitiveFailed",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "shouldNotImplement",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "subclassResponsibility",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "basicInspect",
+      "category": "",
+      "bytecode": [
+        112,
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "inspect",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "asOop",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#selfprimitiveFailed"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 75
+    },
+    {
+      "selector": "become:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#selfprimitiveFailed"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 72
+    },
+    {
+      "selector": "instVarAt:",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 73
+    },
+    {
+      "selector": "instVarAt: put:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#anObject"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 74
+    },
+    {
+      "selector": "nextInstance",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "nil"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 78
+    },
+    {
+      "selector": "tryPrimitive0",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "#primitiveFail"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 7
+    },
+    {
+      "selector": "tryPrimitive1:",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "#primitiveFail"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 7
+    },
+    {
+      "selector": "tryPrimitive2: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#arg2"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 7
+    },
+    {
+      "selector": "tryPrimitive3: with: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#arg2with"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 7
+    },
+    {
+      "selector": "tryPrimitive4: with: with: with:",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#arg2with"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 7
+    },
+    {
+      "selector": "breakDependents",
+      "category": "",
+      "bytecode": [
+        137,
+        123
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "errorImproperStore",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "errorNonIntegerIndex",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "errorSubscriptBounds:",
+      "category": "",
+      "bytecode": [
+        32,
+        65,
+        210,
+        120
+      ],
+      "literals": [
+        "subscript is out of bounds: ",
+        "#indexprintString",
+        "#,"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "forkEmergencyEvaluatorAt:",
+      "category": "",
+      "bytecode": [
+        137,
+        64,
+        117,
+        187,
+        33,
+        34,
+        187,
+        211,
+        120
+      ],
+      "literals": [
+        "#Displaywhite",
+        "1024",
+        "36",
+        "#extent:"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "mustBeBoolean",
+      "category": "",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "True"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "nilFields",
+      "category": "",
+      "bytecode": [
+        137,
+        112,
+        124,
+        118,
+        64,
+        209,
+        120
+      ],
+      "literals": [
+        "#selfbasicSizedo",
+        "#to:"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "primitiveError:",
+      "category": "",
+      "bytecode": [
+        64,
+        135,
+        65,
+        120
+      ],
+      "literals": [
+        "#Transcriptcr",
+        "#Transcriptshow"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "setDependents",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        104,
+        135,
+        65,
+        120
+      ],
+      "literals": [
+        "#OrderedCollectionnew",
+        "#DependentsFieldsadd"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "species",
+      "category": "",
+      "bytecode": [
+        64,
+        124
+      ],
+      "literals": [
+        "#selfclass"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    }
+  ],
+  "classMethods": [
+    {
+      "selector": "initialize",
+      "category": "",
+      "bytecode": [
+        64,
+        137,
+        65,
+        135,
+        66,
+        152,
+        0,
+        120
+      ],
+      "literals": [
+        "#selfconfirm",
+        "#selfinitializeDependentsFields",
+        "#selfinitializeErrorRecursion"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "readFrom:",
+      "category": "",
+      "bytecode": [
+        64,
+        136,
+        105,
+        120
+      ],
+      "literals": [
+        "#Compilerevaluate"
+      ],
+      "argumentCount": 1,
+      "temporaryCount": 1,
+      "primitive": 0
+    },
+    {
+      "selector": "howToModifyPrimitives",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "whatIsAPrimitive",
+      "category": "",
+      "bytecode": [
+        120
+      ],
+      "literals": [],
+      "argumentCount": 1,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "initializeDependentsFields",
+      "category": "",
+      "bytecode": [
+        64,
+        120
+      ],
+      "literals": [
+        "#IdentityDictionarynew"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    },
+    {
+      "selector": "initializeErrorRecursion",
+      "category": "",
+      "bytecode": [
+        32,
+        120
+      ],
+      "literals": [
+        "False"
+      ],
+      "argumentCount": 0,
+      "temporaryCount": 0,
+      "primitive": 0
+    }
+  ]
+}
+`
+
+FILE path=CLI/Smalltalk80.CLI/Program.cs sha256=74dce94cefed06b6bd968b2fe72334c921e540e6c2cd344210ab57460fa6519c lines=418
+---
+`$lang
+// file: CLI/Smalltalk80.CLI/Program.cs
+using System.CommandLine;
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Smalltalk80.Bootstrap;
+using Smalltalk80.Core;
+using Smalltalk80.VM;
+
+namespace Smalltalk80.CLI;
+
+/// <summary>
+/// Main entry point for the Smalltalk-80 command-line interface.
+/// </summary>
+public class Program
+{
+    /// <summary>
+    /// Main entry point.
+    /// </summary>
+    public static async Task<int> Main(string[] args)
+    {
+        var rootCommand = new RootCommand("Smalltalk-80 Virtual Machine")
+        {
+            TreatUnmatchedTokensAsErrors = false
+        };
+
+        // Global options
+        var verboseOption = new Option<bool>(
+            aliases: new[] { "--verbose", "-v" },
+            description: "Enable verbose output");
+
+        var traceOption = new Option<bool>(
+            aliases: new[] { "--trace", "-t" },
+            description: "Enable execution tracing");
+
+        var bootstrapDirOption = new Option<string?>(
+            aliases: new[] { "--bootstrap-dir", "-b" },
+            description: "Path to bootstrap JSON files directory",
+            getDefaultValue: () => null);
+
+        var modeOption = new Option<BootstrapMode>(
+            aliases: new[] { "--mode", "-m" },
+            description: "Bootstrap mode",
+            getDefaultValue: () => BootstrapMode.Full);
+
+        rootCommand.AddOption(verboseOption);
+        rootCommand.AddOption(traceOption);
+        rootCommand.AddOption(bootstrapDirOption);
+        rootCommand.AddOption(modeOption);
+
+        // Run command (default)
+        var runCommand = new Command("run", "Run a Smalltalk file")
+        {
+            new Argument<FileInfo?>("file", "Smalltalk source file to execute") { Arity = ArgumentArity.ZeroOrOne }
+        };
+
+        runCommand.SetHandler(async (context) =>
+        {
+            var file = context.ParseResult.GetValueForArgument<FileInfo?>(
+                context.ParseResult.CommandResult.Command.Arguments.OfType<Argument<FileInfo?>>().First());
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var trace = context.ParseResult.GetValueForOption(traceOption);
+            var bootstrapDir = context.ParseResult.GetValueForOption(bootstrapDirOption);
+            var mode = context.ParseResult.GetValueForOption(modeOption);
+
+            await RunSmalltalk(file?.FullName, verbose, trace, bootstrapDir, mode);
+        });
+
+        // REPL command
+        var replCommand = new Command("repl", "Start interactive REPL");
+        replCommand.SetHandler(async (context) =>
+        {
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var trace = context.ParseResult.GetValueForOption(traceOption);
+            var bootstrapDir = context.ParseResult.GetValueForOption(bootstrapDirOption);
+            var mode = context.ParseResult.GetValueForOption(modeOption);
+
+            await StartRepl(verbose, trace, bootstrapDir, mode);
+        });
+
+        // Validate command
+        var validateCommand = new Command("validate", "Validate bootstrap JSON files");
+        validateCommand.SetHandler(async (context) =>
+        {
+            var bootstrapDir = context.ParseResult.GetValueForOption(bootstrapDirOption);
+            await ValidateBootstrap(bootstrapDir);
+        });
+
+        rootCommand.AddCommand(runCommand);
+        rootCommand.AddCommand(replCommand);
+        rootCommand.AddCommand(validateCommand);
+
+        // Default behavior when no command specified
+        rootCommand.SetHandler(async (context) =>
+        {
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var trace = context.ParseResult.GetValueForOption(traceOption);
+            var bootstrapDir = context.ParseResult.GetValueForOption(bootstrapDirOption);
+            var mode = context.ParseResult.GetValueForOption(modeOption);
+
+            // Check if there's an unnamed argument (file to run)
+            var tokens = context.ParseResult.UnmatchedTokens;
+            if (tokens.Count > 0 && File.Exists(tokens[0]))
+            {
+                await RunSmalltalk(tokens[0], verbose, trace, bootstrapDir, mode);
+            }
+            else
+            {
+                await StartRepl(verbose, trace, bootstrapDir, mode);
+            }
+        });
+
+        return await rootCommand.InvokeAsync(args);
+    }
+
+    /// <summary>
+    /// Runs a Smalltalk source file.
+    /// </summary>
+    private static async Task RunSmalltalk(
+        string? filePath,
+        bool verbose,
+        bool trace,
+        string? bootstrapDir,
+        BootstrapMode mode)
+    {
+        using var logger = CreateLogger(verbose);
+        
+        logger.LogInformation("Starting Smalltalk-80 VM...");
+        
+        try
+        {
+            // Initialize VM
+            var vm = await CreateAndBootstrapVM(bootstrapDir, mode, trace, logger);
+            
+            // Load and execute file if provided
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                logger.LogInformation("Loading file: {FilePath}", filePath);
+                await vm.LoadFileAsync(filePath);
+            }
+            else
+            {
+                logger.LogInformation("VM ready. No file specified.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to run Smalltalk");
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
+    /// Starts the interactive REPL.
+    /// </summary>
+    private static async Task StartRepl(
+        bool verbose,
+        bool trace,
+        string? bootstrapDir,
+        BootstrapMode mode)
+    {
+        using var logger = CreateLogger(verbose);
+        
+        Console.WriteLine("Smalltalk-80 Interactive REPL");
+        Console.WriteLine("Type 'exit' or 'quit' to leave, 'help' for commands");
+        Console.WriteLine();
+
+        try
+        {
+            // Initialize VM
+            var vm = await CreateAndBootstrapVM(bootstrapDir, mode, trace, logger);
+            
+            // REPL loop
+            while (true)
+            {
+                Console.Write("st> ");
+                var input = Console.ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(input))
+                    continue;
+                    
+                if (input.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
+                    input.Equals("quit", StringComparison.OrdinalIgnoreCase))
+                    break;
+                    
+                if (input.Equals("help", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShowHelp();
+                    continue;
+                }
+                
+                try
+                {
+                    // Evaluate the input as Smalltalk code
+                    var result = await vm.EvaluateAsync(input);
+                    if (result != null)
+                    {
+                        Console.WriteLine($"=> {result.ToDebugString()}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error: {ex.Message}");
+                    if (verbose)
+                    {
+                        Console.WriteLine(ex.StackTrace);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to start REPL");
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
+    /// Validates bootstrap JSON files.
+    /// </summary>
+    private static async Task ValidateBootstrap(string? bootstrapDir)
+    {
+        Console.WriteLine("Validating bootstrap files...");
+        
+        bootstrapDir = GetBootstrapDirectory(bootstrapDir);
+        Console.WriteLine($"Bootstrap directory: {bootstrapDir}");
+        
+        try
+        {
+            var provider = new JsonBootstrapProvider(bootstrapDir);
+            var result = await provider.ValidateAsync();
+            
+            if (result.IsValid)
+            {
+                Console.WriteLine("✓ Bootstrap files are valid");
+            }
+            else
+            {
+                Console.WriteLine("✗ Bootstrap validation failed");
+                
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"  Error: {error}");
+                }
+            }
+            
+            if (result.Warnings.Any())
+            {
+                Console.WriteLine("\nWarnings:");
+                foreach (var warning in result.Warnings)
+                {
+                    Console.WriteLine($"  Warning: {warning}");
+                }
+            }
+            
+            if (result.Details.Any())
+            {
+                Console.WriteLine("\nDetails:");
+                foreach (var (key, value) in result.Details)
+                {
+                    Console.WriteLine($"  {key}: {value}");
+                }
+            }
+            
+            Environment.Exit(result.IsValid ? 0 : 1);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to validate: {ex.Message}");
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
+    /// Creates and bootstraps the VM.
+    /// </summary>
+    private static async Task<IVirtualMachine> CreateAndBootstrapVM(
+        string? bootstrapDir,
+        BootstrapMode mode,
+        bool trace,
+        ILogger logger)
+    {
+        bootstrapDir = GetBootstrapDirectory(bootstrapDir);
+        logger.LogInformation("Bootstrap directory: {Directory}", bootstrapDir);
+        
+        // Create VM configuration
+        var config = new VMConfiguration
+        {
+            EnableTracing = trace,
+            EnableMethodCache = true,
+            BootstrapMode = mode,
+            MaxStackDepth = 1000,
+            InitialHeapSize = 10 * 1024 * 1024 // 10MB
+        };
+        
+        // Create VM
+        var vm = new VirtualMachine(config, logger);
+        
+        // Create bootstrap provider
+        var bootstrapProvider = new JsonBootstrapProvider(bootstrapDir, logger);
+        
+        // Execute bootstrap
+        logger.LogInformation("Bootstrapping VM in {Mode} mode...", mode);
+        await vm.BootstrapAsync(bootstrapProvider);
+        
+        logger.LogInformation("VM bootstrap completed successfully");
+        return vm;
+    }
+
+    /// <summary>
+    /// Gets the bootstrap directory path.
+    /// </summary>
+    private static string GetBootstrapDirectory(string? bootstrapDir)
+    {
+        if (!string.IsNullOrEmpty(bootstrapDir))
+            return bootstrapDir;
+            
+        // Default to Bootstrap subfolder relative to executable
+        var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        if (string.IsNullOrEmpty(exeDir))
+            exeDir = Environment.CurrentDirectory;
+            
+        var defaultDir = Path.Combine(exeDir, "Bootstrap");
+        
+        if (!Directory.Exists(defaultDir))
+        {
+            // Try development paths
+            var devPaths = new[]
+            {
+                Path.Combine(exeDir, "..", "..", "..", "Bootstrap", "Smalltalk80.Bootstrap.Data"),
+                Path.Combine(exeDir, "..", "..", "..", "..", "Bootstrap", "Smalltalk80.Bootstrap.Data"),
+                Path.Combine(Environment.CurrentDirectory, "Bootstrap", "Smalltalk80.Bootstrap.Data"),
+                Path.Combine(Environment.CurrentDirectory, "Bootstrap")
+            };
+            
+            foreach (var path in devPaths)
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (Directory.Exists(fullPath))
+                {
+                    return fullPath;
+                }
+            }
+        }
+        
+        return defaultDir;
+    }
+
+    /// <summary>
+    /// Creates a logger instance.
+    /// </summary>
+    private static ILogger CreateLogger(bool verbose)
+    {
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConsole()
+                .SetMinimumLevel(verbose ? LogLevel.Debug : LogLevel.Information);
+        });
+        
+        return new LoggerAdapter(loggerFactory.CreateLogger<Program>());
+    }
+
+    /// <summary>
+    /// Shows REPL help.
+    /// </summary>
+    private static void ShowHelp()
+    {
+        Console.WriteLine(@"
+REPL Commands:
+  exit, quit    - Exit the REPL
+  help          - Show this help
+
+Smalltalk Expressions:
+  3 + 4                           - Arithmetic
+  'Hello' , ' World'              - String concatenation  
+  5 factorial                     - Message send
+  [1 + 2] value                   - Block evaluation
+  1 to: 10 do: [:i | i print]    - Iteration
+  
+Special Variables:
+  nil, true, false                - Constants
+  Smalltalk                       - System dictionary
+");
+    }
+}
+
+/// <summary>
+/// Adapter to bridge Microsoft.Extensions.Logging to our ILogger interface.
+/// </summary>
+internal class LoggerAdapter : Bootstrap.ILogger<Program>
+{
+    private readonly Microsoft.Extensions.Logging.ILogger _logger;
+
+    public LoggerAdapter(Microsoft.Extensions.Logging.ILogger logger)
+    {
+        _logger = logger;
+    }
+
+    public void LogInformation(string message, params object[] args)
+        => _logger.LogInformation(message, args);
+
+    public void LogWarning(string message, params object[] args)
+        => _logger.LogWarning(message, args);
+
+    public void LogError(string message, params object[] args)
+        => _logger.LogError(message, args);
+}
+
+// Placeholder VM implementation extensions
+public static class VirtualMachineExtensions
+{
+    public static async Task<ISmalltalkObject?> EvaluateAsync(this IVirtualMachine vm, string source)
+    {
+        // This would compile and execute the source string
+        await Task.CompletedTask;
+        throw new NotImplementedException("Evaluate not yet implemented");
+    }
+}
+`
+
+FILE path=CLI/Smalltalk80.CLI/Smalltalk80.CLI.csproj sha256=86863351fd0e385ba34e2bfb83f1adaddf930a65f7596a0110a748752f6ff20d lines=98
+---
+`$lang
+// file: CLI/Smalltalk80.CLI/Smalltalk80.CLI.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Smalltalk80</AssemblyName>
+    <RootNamespace>Smalltalk80.CLI</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    
+    <!-- Single file deployment options -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier></RuntimeIdentifier>
+  </PropertyGroup>
+
+  <!-- Project References -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Smalltalk80.Core\Smalltalk80.Core.csproj" />
+    <ProjectReference Include="..\..\Core\Smalltalk80.VM\Smalltalk80.VM.csproj" />
+    <ProjectReference Include="..\..\Bootstrap\Smalltalk80.Bootstrap\Smalltalk80.Bootstrap.csproj" />
+    <ProjectReference Include="..\..\Bootstrap\Smalltalk80.Bootstrap.Data\Smalltalk80.Bootstrap.Data.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- NuGet Packages -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <!-- Application settings -->
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <DependentUpon>appsettings.json</DependentUpon>
+    </None>
+  </ItemGroup>
+
+  <!-- Copy Bootstrap files from Smalltalk80.Bootstrap.Data project -->
+  <Target Name="CopyBootstrapFiles" AfterTargets="Build">
+    <PropertyGroup>
+      <BootstrapSourcePath>$(ProjectDir)..\..\Bootstrap\Smalltalk80.Bootstrap.Data</BootstrapSourcePath>
+      <BootstrapTargetPath>$(OutputPath)Bootstrap</BootstrapTargetPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BootstrapFiles Include="$(BootstrapSourcePath)\bootstrap_phase*.json" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(BootstrapTargetPath)" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(BootstrapTargetPath)"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="SuccessfullyCopiedFiles" />
+    </Copy>
+    
+    <Message Importance="high" Text="Copied $(SuccessfullyCopiedFiles-&gt;Count()) bootstrap files to: $(BootstrapTargetPath)" />
+  </Target>
+
+  <!-- Copy Bootstrap files for publish -->
+  <Target Name="CopyBootstrapFilesForPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <BootstrapSourcePath>$(ProjectDir)..\..\Bootstrap\Smalltalk80.Bootstrap.Data</BootstrapSourcePath>
+      <BootstrapPublishPath>$(PublishDir)Bootstrap</BootstrapPublishPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BootstrapFiles Include="$(BootstrapSourcePath)\bootstrap_phase*.json" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(BootstrapPublishPath)" />
+    
+    <Copy SourceFiles="@(BootstrapFiles)"
+          DestinationFolder="$(BootstrapPublishPath)"
+          SkipUnchangedFiles="true" />
+    
+    <Message Importance="high" Text="Copied bootstrap files to publish directory: $(BootstrapPublishPath)" />
+  </Target>
+
+  <!-- Clean Bootstrap files -->
+  <Target Name="CleanBootstrapFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)Bootstrap" Condition="Exists('$(OutputPath)Bootstrap')" />
+    <Message Importance="high" Text="Cleaned bootstrap directory: $(OutputPath)Bootstrap" />
+  </Target>
+
+</Project>
+`

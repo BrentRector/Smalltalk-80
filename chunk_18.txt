@@ -1,0 +1,2608 @@
+CHUNK 18/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=extracted/Class.json sha256=20eb22497890a7d8d63a934d67a626c74d067f638b2555a7f39be6dfb3db3876 lines=630
+---
+`$lang
+// file: extracted/Class.json
+{
+  "ClassName": "Class",
+  "Superclass": "ClassDescription",
+  "InstanceVariables": [
+    "name",
+    "classPool",
+    "sharedPools"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "addClassVarName:",
+      "Source": "addClassVarName:aStringaStringfirstisLowercaseifTrue:[^selferror:aString,\u0027 class variable name should be capitalized; proceed to include anyway.\u0027].selfwithAllSubclassesdo:[:subclass|subclasspoolHas:aStringasSymbolifTrue:[:ignored|^selferror:aString,\u0027 is already used as a variable name in \u0027,subclassname]].classPool_selfclassPool.classPooladd:(Associationkey:aStringasSymbolvalue:nil)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 43 7D 7D D0 22 E1 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": ","
+        },
+        " class variable name should be capitalized; proceed to include anyway.",
+        {
+          "Value": "selferror"
+        }
+      ]
+    },
+    {
+      "Selector": "addInstVarName:",
+      "Source": "addInstVarName:aStringsuperclassclassname:selfnameinEnvironment:SmalltalksubclassOf:superclassinstanceVariableNames:selfinstanceVariablesString,aStringvariable:selfisVariablewords:selfisWordspointers:selfisPointersclassVariableNames:selfclassVariablesStringpoolDictionaries:selfsharedPoolsStringcategory:selfcategorycomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfnameinEnvironment"
+        }
+      ]
+    },
+    {
+      "Selector": "addSharedPool:",
+      "Source": "addSharedPool:aDictionary(selfsharedPoolsincludes:aDictionary)ifTrue:[^selferror:\u0027The dictionary is already in my pool\u0027].sharedPools==nilifTrue:[sharedPools_Setwith:aDictionary]ifFalse:[sharedPoolsadd:aDictionary]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        },
+        {
+          "Value": "selfsharedPoolsincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "allClassVarNames",
+      "Source": "allClassVarNames|aSet|superclass==nilifTrue:[^selfclassVarNames]ifFalse:[aSet_superclassallClassVarNames.aSetaddAll:selfclassVarNames.^aSet]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "superclass"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "allSharedPools",
+      "Source": "allSharedPools|aSet|superclass==nilifTrue:[^selfsharedPoolscopy]ifFalse:[aSet_superclassallSharedPools.aSetaddAll:selfsharedPools.^aSet]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "superclass"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "classPool",
+      "Source": "classPoolclassPool==nilifTrue:[^Dictionarynew]ifFalse:[^classPool]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "classVarNames",
+      "Source": "classVarNames^selfclassPoolkeys!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassPoolkeys"
+        }
+      ]
+    },
+    {
+      "Selector": "compileAllFrom:",
+      "Source": "compileAllFrom:otherClasssupercompileAllFrom:otherClass.selfclasscompileAllFrom:otherClassclass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 7C",
+      "Literals": [
+        {
+          "Value": "otherClass"
+        },
+        {
+          "Value": "selfclasscompileAllFrom"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|newClass|newClass_selfclasscopynewsuperclass:superclassmethodDict:methodDictcopyformat:formatname:nameorganization:organizationcopyinstVarNames:instanceVariablescopyclassPool:classPoolcopysharedPools:sharedPools.ClassinstSizeto:selfclassinstSizedo:[:offset|newClassinstVarAt:offsetput:(selfinstVarAt:offset)].^newClass!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfclasscopynewsuperclass"
+        }
+      ]
+    },
+    {
+      "Selector": "copyForValidation",
+      "Source": "copyForValidation^selfclasscopynewsuperclass:superclassmethodDict:methodDictcopyformat:formatname:nameorganization:organizationinstVarNames:instanceVariablescopyclassPool:classPoolsharedPools:sharedPools!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "declare:",
+      "Source": "declare:varString|newVarsconflictsassocclass|newVars_(ScannernewscanFieldNames:varString)collect:[:x|xasSymbol].newVarsdo:[:var|varfirstisLowercaseifTrue:[selferror:var,\u0027 class variable name should be capitalized; proceed to include anyway.\u0027]].conflicts_false.classPool==nilifFalse:[(classPoolkeysreject:[:x|newVarsincludes:x])do:[:var|selfremoveClassVarName:var]].(newVarsreject:[:var|selfclassPoolincludesKey:var])do:[:var|(selfscopeHas:varifTrue:[:ignored|ignored])ifTrue:[selferror:var,\u0027 is defined elsewhere\u0027.conflicts_true]].newVarssize\u003E0ifTrue:[classPool_selfclassPool.newVarsdo:[:var|classPooldeclare:varfrom:Undeclared]].^conflicts!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 88 81 60 02 87 7C",
+      "Literals": [
+        {
+          "Value": "varString"
+        },
+        {
+          "Value": "ScannernewscanFieldNames"
+        },
+        {
+          "Value": "newVars"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOut",
+      "Source": "fileOut|fileStream|Transcriptrefresh;cr;cr;show:\u0027Filing out class:\u0027.fileStream_Diskfile:selfname,\u0027.st\u0027.fileStreamtimeStamp.selffileOutOn:fileStreammoveSource:falsetoFile:0.fileStreamshorten;close.selfremoveFromChanges.!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 88 69 6A 11 D0 6A 11 D0 6A 11 22 E1 6A 44 88 68 7C",
+      "Literals": [
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "show:"
+        },
+        "Filing out class:",
+        {
+          "Value": "Transcriptrefresh"
+        },
+        {
+          "Value": "Diskfile"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn:moveSource:toFile:",
+      "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexTranscriptcr;show:name.superfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.selfclassnonTrivialifTrue:[aFileStreamcr;nextPutAll:\u0027\u0022-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- \u0022!!\u0027;cr;cr.selfclassfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "moveSourcetoFile"
+        }
+      ]
+    },
+    {
+      "Selector": "hasMethods",
+      "Source": "hasMethods^superhasMethodsor:[selfclasshasMethods]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hasMultipleSuperclasses",
+      "Source": "hasMultipleSuperclasses^selfclassinstHasMultipleSuperclasses!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassinstHasMultipleSuperclasses"
+        }
+      ]
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initialize^self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "isObsolete",
+      "Source": "isObsolete^selfclassisObsolete!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfclassisObsolete"
+        }
+      ]
+    },
+    {
+      "Selector": "name",
+      "Source": "namename==nilifTrue:[^supername]ifFalse:[^name]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoleteselfisPointersifTrue:[selfallInstancesDo:[:instance|instancenilFields]].(\u0027AnObsolete*\u0027match:name)ifFalse:[name_\u0027AnObsolete\u0027,name].classPool_Dictionarynew.selfclassobsolete.superobsolete!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 40 7D",
+      "Literals": [
+        {
+          "Value": "instancenilFields"
+        }
+      ]
+    },
+    {
+      "Selector": "poolHas:ifTrue:",
+      "Source": "poolHas:varNameifTrue:assocBlock|assocpool|assoc_selfclassPoolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true].selfsharedPoolsdo:[:pool|assoc_poolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "assocBlock"
+        },
+        {
+          "Value": "assocpool"
+        },
+        {
+          "Value": "assoc"
+        }
+      ]
+    },
+    {
+      "Selector": "printOut",
+      "Source": "printOutselffileOut!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeClassVarName:",
+      "Source": "removeClassVarName:aString|anAssocaSymbol|aSymbol_aStringasSymbol.(classPoolincludesKey:aSymbol)ifFalse:[^selferror:aString,\u0027 is not a class variable\u0027].anAssoc_classPoolassociationAt:aSymbol.selfwithAllSubclassesdo:[:subclass|(Arraywith:subclasswith:subclassclass)do:[:classOrMeta|(classOrMetawhichSelectorsReferTo:(classPoolassociationAt:aSymbol))isEmptyifFalse:[^selferror:aString,\u0027 is still used in code of class \u0027,classOrMetaname]]].classPoolremoveKey:aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 00 87 6A 42 D0 7C",
+      "Literals": [
+        {
+          "Value": "aSymbol"
+        },
+        {
+          "Value": "aStringasSymbol"
+        },
+        {
+          "Value": "classPoolincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "removeFromChanges",
+      "Source": "removeFromChangesSmalltalkchangesremoveClassChanges:self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeFromSystem",
+      "Source": "removeFromSystemSmalltalkremoveClassNamed:selfname.!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeInstVarName:",
+      "Source": "removeInstVarName:aString|newInstVarString|(selfinstVarNamesincludes:aString)ifFalse:[selferror:aString,\u0027 is not one of my instance variables\u0027].newInstVarString_\u0027\u0027.(selfinstVarNamescopyWithout:aString)do:[:varName|newInstVarString_newInstVarString,\u0027 \u0027,varName].superclassclassname:selfnameinEnvironment:SmalltalksubclassOf:superclassinstanceVariableNames:newInstVarStringvariable:selfisVariablewords:selfisWordspointers:selfisPointersclassVariableNames:selfclassVariablesStringpoolDictionaries:selfsharedPoolsStringcategory:selfcategorycomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": "selfinstVarNamesincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "removeSharedPool:",
+      "Source": "removeSharedPool:aDictionary|satisfiedSetworkingSetaSubclass|(selfsharedPoolsincludes:aDictionary)ifFalse:[^selferror:\u0027the dictionary is not in my pool\u0027].(selfallSuperclassesselect:[:class|classsharedPoolsincludes:aDictionary])isEmptyifFalse:[sharedPoolsremove:aDictionary.sharedPoolsisEmptyifTrue:[sharedPools_nil].^self].workingSet_selfsubclassesasOrderedCollection.satisfiedSet_Setnew.[workingSetisEmpty]whileFalse:[aSubclass_workingSetremoveFirst.(aSubclasssharedPoolsincludes:aDictionary)ifFalse:[satisfiedSetadd:aSubclass.workingSetaddAll:aSubclasssubclasses]].satisfiedSetadd:self.satisfiedSetdo:[:aSubclass|aDictionaryassociationsDo:[:aGlobal|(aSubclasswhichSelectorsReferTo:aGlobal)isEmptyifFalse:[^selferror:aGlobalkey,\u0027 is still used in code of class \u0027,aSubclassname]]].sharedPoolsremove:aDictionary.sharedPoolsisEmptyifTrue:[sharedPools_nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aDictionary"
+        },
+        {
+          "Value": "selfsharedPoolsincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "rename:",
+      "Source": "rename:aString|newName|newName_aStringasSymbol.(SmalltalkincludesKey:newName)ifTrue:[^selferror:newName,\u0027 already exists\u0027].SmalltalkrenameClass:selfas:newName.name_newName.selfcomment:selfcomment.selfclasscomment:selfclasscomment!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 69 6A 42 D0 7C",
+      "Literals": [
+        {
+          "Value": "newName"
+        },
+        {
+          "Value": "aStringasSymbol"
+        },
+        {
+          "Value": "SmalltalkincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "sharedPools",
+      "Source": "sharedPoolssharedPools==nilifTrue:[^Setnew]ifFalse:[^sharedPools]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "sharing:",
+      "Source": "sharing:poolString|oldPoolspoolNamepool|oldPools_selfsharedPools.sharedPools_Setnew.(ScannernewscanFieldNames:poolString)do:[:poolName|sharedPoolsadd:(Smalltalkat:poolNameasSymbol)].sharedPoolsisEmptyifTrue:[sharedPools_nil].oldPoolsdetect:[:pool|(selfsharedPoolsincludes:pool)not]ifNone:[^false].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 02 87 6A 43 88 62 6A 44 D0 7C",
+      "Literals": [
+        {
+          "Value": "poolString"
+        },
+        {
+          "Value": "selfsharedPools"
+        },
+        {
+          "Value": "oldPools"
+        },
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "ScannernewscanFieldNames"
+        }
+      ]
+    },
+    {
+      "Selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "Source": "subclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "subclass:otherSupers:instanceVariableNames:classVariableNames:category:",
+      "Source": "subclass:totherSupers:othersinstanceVariableNames:fclassVariableNames:dcategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfand:othersinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:\u0027\u0027category:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "othersinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "superclass:methodDict:format:name:organization:instVarNames:classPool:sharedPools:",
+      "Source": "superclass:supmethodDict:mdformat:ftname:nmorganization:orginstVarNames:nilOrArrayclassPool:poolsharedPools:poolSetsuperclass_sup.methodDict_md.format_ft.name_nm.organization_org.instanceVariables_nilOrArray.classPool_pool.sharedPools_poolSet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "mdformat"
+        }
+      ]
+    },
+    {
+      "Selector": "validateFrom:in:instanceVariableNames:methods:",
+      "Source": "validateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethodssupervalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.self~~oldClassifTrue:[environat:nameput:self.selfupdateInheritanceTables:oldClass.oldClassobsolete]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableByteSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "Source": "variableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with named fields\u0027].(selfisVariableand:[selfisWords])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with word fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:falsepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "Source": "variableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisBitsifTrue:[^selferror:\u0027cannot make a pointer subclass of a class with non-pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "variableWordSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
+      "Source": "variableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a word subclass of a class with named fields\u0027].selfisBytesifTrue:[^selferror:\u0027cannot make a word subclass of a class with byte fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a word subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "fclassVariableNames"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "getSuperclasses:",
+      "Source": "getSuperclasses:superNames|supers|supers_(ScannernewscanTokens:superNames)collect:[:each|Smalltalkat:each].supersdo:[:each|(eachisKindOf:Behavior)ifFalse:[selferror:\u0027superclass must be a class-describing object\u0027]].^supers!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 88 69 7C",
+      "Literals": [
+        {
+          "Value": "superNames"
+        },
+        {
+          "Value": "ScannernewscanTokens"
+        }
+      ]
+    },
+    {
+      "Selector": "named:superclasses:instanceVariableNames:classVariableNames:category:",
+      "Source": "named:newClassNamesuperclasses:newSuperNamesinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat|newClasssupersfirstSuperotherSupersfork|supers_selfgetSuperclasses:newSuperNames.superssize=1ifTrue:[^supersfirstsubclass:newClassNameinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamespoolDictionaries:\u0027\u0027category:cat].newClass_supersfirstsubclass:newClassNameotherSupers:(superscopyFrom:2to:superssize)instanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat.^newClass!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "newSuperNamesinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "template:",
+      "Source": "template:category^\u0027NameOfSuperclass subclass: #NameOfClass\r\n\tinstanceVariableNames: \u0027\u0027instVarName1 instVarName2\u0027\u0027\r\n\tclassVariableNames: \u0027\u0027ClassVarName1 ClassVarName2\u0027\u0027\r\n\tpoolDictionaries: \u0027\u0027\u0027\u0027\r\n\tcategory: \u0027\u0027\u0027,category,\u0027\u0027\u0027\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 10 E1 22 E1 7C",
+      "Literals": [
+        "NameOfSuperclass subclass: #NameOfClass\r\n\tinstanceVariableNames: \u0027\u0027instVarName1 instVarName2\u0027\u0027\r\n\tclassVariableNames: \u0027\u0027ClassVarName1 ClassVarName2\u0027\u0027\r\n\tpoolDictionaries: \u0027\u0027\u0027\u0027\r\n\tcategory: \u0027\u0027",
+        {
+          "Value": ","
+        },
+        "\u0027\u0027"
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 39,
+    "SuccessfullyCompiled": 39,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:38.8795082Z"
+  }
+}
+`
+
+FILE path=extracted/ClassDescription.json sha256=03e144b03d62a11276a54c115369eb9c5faddb229adf9767e6804c981c1115ea lines=877
+---
+`$lang
+// file: extracted/ClassDescription.json
+{
+  "ClassName": "ClassDescription",
+  "Superclass": "Behavior",
+  "InstanceVariables": [
+    "instanceVariables",
+    "organization"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Classes",
+  "InstanceMethods": [
+    {
+      "Selector": "addInstVarName:",
+      "Source": "addInstVarName:aStringselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "category",
+      "Source": "category^SystemOrganizationcategoryOfElement:selfname!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "category:",
+      "Source": "category:cat(catisKindOf:String)ifTrue:[SystemOrganizationclassify:selfnameunder:catasSymbol]ifFalse:[selferrorCategoryName]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "String"
+        },
+        {
+          "Value": "catisKindOf"
+        }
+      ]
+    },
+    {
+      "Selector": "classVariablesString",
+      "Source": "classVariablesString|aStream|aStream_WriteStreamon:(Stringnew:100).selfclassPoolkeysasSortedCollectiondo:[:key|aStreamnextPutAll:key;space].^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "comment",
+      "Source": "comment|aString|aString_selforganizationclassComment.aStringsize=0ifTrue:[^\u0027\u0027].^StringreadFromString:aString!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 88 68 69 45 21 B6 89 00 03 23 7D 7D E2 69 46 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        "",
+        {
+          "Value": "selforganizationclassComment"
+        },
+        {
+          "Value": "aStringsize"
+        },
+        {
+          "Value": "StringreadFromString"
+        }
+      ]
+    },
+    {
+      "Selector": "comment:",
+      "Source": "comment:aString|aStream|aStringsize=0ifTrue:[selforganizationclassComment:aString]ifFalse:[aStream_WriteStreamon:(Stringnew:aStringsize).aStreamnextPutAll:selfname,\u0027 comment:\u0027;cr.aStringstoreOn:aStream.selforganizationclassComment:aStreamcontents.SmalltalkchangescommentClass:self]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 21 B6 89 00 02 45 7D D3 E2 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "aString"
+        },
+        {
+          "Value": "aStringsize"
+        },
+        {
+          "Value": "selforganizationclassComment"
+        }
+      ]
+    },
+    {
+      "Selector": "commentTemplate",
+      "Source": "commentTemplate|aString|aString_selforganizationclassComment.aStringsize=0ifTrue:[^selfname,\u0027 comment:\r\n\u0027\u0027This class has not yet been commented.  A proper comment should include the purpose of the class and the type and purpose of each instance variable.\r\n\u0027\u0027\u0027]ifFalse:[^aString]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 88 68 69 46 21 B6 89 00 05 47 24 E3 7D 7D 89 00 03 10 7D 7D F2 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": ","
+        },
+        " comment:\r\n\u0027\u0027This class has not yet been commented.  A proper comment should include the purpose of the class and the type and purpose of each instance variable.\r\n\u0027\u0027",
+        {
+          "Value": "selforganizationclassComment"
+        },
+        {
+          "Value": "aStringsize"
+        },
+        {
+          "Value": "selfname"
+        }
+      ]
+    },
+    {
+      "Selector": "compile:classified:",
+      "Source": "compile:codeclassified:heading^selfcompile:codeclassified:headingnotifying:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "heading"
+        }
+      ]
+    },
+    {
+      "Selector": "compile:classified:notifying:",
+      "Source": "compile:codeclassified:headingnotifying:requestor|selector|selector_selfcompile:codenotifying:requestortrailer:#(000)ifFail:[^nil].(methodDictat:selector)putSource:codeasStringclass:selfcategory:headinginFile:2.selforganizationclassify:selectorunder:heading.^selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "headingnotifying"
+        }
+      ]
+    },
+    {
+      "Selector": "compile:notifying:trailer:ifFail:",
+      "Source": "compile:codenotifying:requestortrailer:bytesifFail:failBlock|methodNodeselector|CursorexecuteshowWhile:[methodNode_selfcompilerClassnewcompile:codein:selfnotifying:requestorifFail:failBlock.selector_methodNodeselector.(methodDictincludesKey:selector)ifTrue:[SmalltalkchangeschangeSelector:selectorclass:self]ifFalse:[SmalltalkchangesaddSelector:selectorclass:self].selfaddSelector:selectorwithMethod:(methodNodegenerate:bytes)].^selector!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "requestortrailer"
+        }
+      ]
+    },
+    {
+      "Selector": "copy:from:",
+      "Source": "copy:selfrom:classselfcopy:selfrom:classclassified:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classselfcopy"
+        }
+      ]
+    },
+    {
+      "Selector": "copy:from:classified:",
+      "Source": "copy:selfrom:classclassified:cat|codecategory|code_classsourceMethodAt:sel.code==nilifFalse:[cat==nilifTrue:[category_classorganizationcategoryOfElement:sel]ifFalse:[category_cat].(methodDictincludesKey:sel)ifTrue:[codeasString=(selfsourceMethodAt:sel)asStringifFalse:[selferror:selfname,\u0027 \u0027,sel,\u0027 will be redefined if you proceed.\u0027]].selfcompile:codeclassified:category]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classclassified"
+        }
+      ]
+    },
+    {
+      "Selector": "copyAll:from:",
+      "Source": "copyAll:selArrayfrom:classselfcopyAll:selArrayfrom:classclassified:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classselfcopyAll"
+        }
+      ]
+    },
+    {
+      "Selector": "copyAll:from:classified:",
+      "Source": "copyAll:selArrayfrom:classclassified:catselArraydo:[:s|selfcopy:sfrom:classclassified:cat]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classclassified"
+        }
+      ]
+    },
+    {
+      "Selector": "copyAllCategoriesFrom:",
+      "Source": "copyAllCategoriesFrom:aClassaClassorganizationcategoriesdo:[:cat|selfcopyCategory:catfrom:aClass]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "catfrom:"
+        },
+        {
+          "Value": "selfcopyCategory"
+        },
+        {
+          "Value": "aClass"
+        }
+      ]
+    },
+    {
+      "Selector": "copyCategory:from:",
+      "Source": "copyCategory:catfrom:classselfcopyCategory:catfrom:classclassified:cat!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classselfcopyCategory"
+        }
+      ]
+    },
+    {
+      "Selector": "copyCategory:from:classified:",
+      "Source": "copyCategory:catfrom:aClassclassified:newCatselfcopyAll:(aClassorganizationlistAtCategoryNamed:cat)from:aClassclassified:newCat!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassclassified"
+        }
+      ]
+    },
+    {
+      "Selector": "definition",
+      "Source": "definition|aStream|aStream_WriteStreamon:(Stringnew:300).selfhasMultipleSuperclassesifTrue:[aStreamnextPutAll:\u0027Class named: \u0027.selfnamestoreOn:aStream.aStreamcr;tab;nextPutAll:\u0027superclasses: \u0027.aStreamstore:selfsuperclassesString.aStreamcr;tab;nextPutAll:\u0027instanceVariableNames: \u0027.aStreamstore:selfinstanceVariablesString.aStreamcr;tab;nextPutAll:\u0027classVariableNames: \u0027.aStreamstore:selfclassVariablesString]ifFalse:[aStreamnextPutAll:(superclass==nilifTrue:[\u0027nil\u0027]ifFalse:[superclassname]).aStreamnextPutAll:selfkindOfSubclass.selfnamestoreOn:aStream.aStreamcr;tab;nextPutAll:\u0027instanceVariableNames: \u0027.aStreamstore:selfinstanceVariablesString.aStreamcr;tab;nextPutAll:\u0027classVariableNames: \u0027.aStreamstore:selfclassVariablesString.aStreamcr;tab;nextPutAll:\u0027poolDictionaries: \u0027.aStreamstore:selfsharedPoolsString].aStreamcr;tab;nextPutAll:\u0027category: \u0027.(SystemOrganizationcategoryOfElement:selfname)asStringstoreOn:aStream.^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "errorCategoryName",
+      "Source": "errorCategoryNameselferror:\u0027Category name must be a String\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "fileOutCategory:",
+      "Source": "fileOutCategory:aString|fileNamefileStream|fileName_DiskcheckName:selfname,\u0027-\u0027,aString,\u0027.st\u0027fixErrors:true.fileStream_Diskfile:fileName.fileStreamtimeStamp.selffileOutCategory:aStringon:fileStreammoveSource:falsetoFile:0.fileStreamshorten;close!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "DiskcheckName"
+        },
+        {
+          "Value": "fileName"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutCategory:on:moveSource:toFile:",
+      "Source": "fileOutCategory:aStringon:aFileStreammoveSource:moveSourcetoFile:fileIndexselfprintCategoryChunk:aStringon:aFileStream.(selforganizationlistAtCategoryNamed:aString)do:[:sel|selfprintMethodChunk:selon:aFileStreammoveSource:moveSourcetoFile:fileIndex].aFileStreamnextChunkPut:\u0027 \u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutChangedMessages:on:",
+      "Source": "fileOutChangedMessages:aSeton:aFileStreamselffileOutChangedMessages:aSeton:aFileStreammoveSource:falsetoFile:0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreamselffileOutChangedMessages"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutChangedMessages:on:moveSource:toFile:",
+      "Source": "fileOutChangedMessages:aSeton:aFileStreammoveSource:moveSourcetoFile:fileIndex|orgsels|(org_selforganization)categoriesdo:[:cat|sels_(orglistAtCategoryNamed:cat)select:[:sel|aSetincludes:sel].selssize\u003E0ifTrue:[Transcriptcr;show:selfname,\u0027\u003E\u0027,cat.selfprintCategoryChunk:caton:aFileStream.selsdo:[:sel|selfprintMethodChunk:selon:aFileStreammoveSource:moveSourcetoFile:fileIndex].aFileStreamnextChunkPut:\u0027 \u0027]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutMessage:",
+      "Source": "fileOutMessage:aStringselffileOutMessage:aStringfileName:(DiskcheckName:selfname,\u0027-\u0027,aString,\u0027.st\u0027fixErrors:true)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStringfileName"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutMessage:fileName:",
+      "Source": "fileOutMessage:aStringfileName:fileName|fileStream|fileStream_Diskfile:fileName.fileStreamtimeStamp.selffileOutMessage:aStringon:fileStreammoveSource:falsetoFile:0.fileStreamclose!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "fileName"
+        },
+        {
+          "Value": "fileStream"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutMessage:on:moveSource:toFile:",
+      "Source": "fileOutMessage:aStringon:aFileStreammoveSource:moveSourcetoFile:fileIndex|cat|cat_selforganizationcategoryOfElement:aString.cat==nilifTrue:[^selferror:\u0027no such message\u0027].selfprintCategoryChunk:caton:aFileStream.selfprintMethodChunk:aStringon:aFileStreammoveSource:moveSourcetoFile:fileIndex.aFileStreamnextChunkPut:\u0027 \u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn:",
+      "Source": "fileOutOn:aFileStreamselffileOutOn:aFileStreammoveSource:falsetoFile:0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOn:moveSource:toFile:",
+      "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexaFileStreamemphasis:5.aFileStreamnextChunkPut:selfdefinition.selforganizationputCommentOnFile:aFileStreamnumbered:fileIndexmoveSource:moveSource.aFileStreamcr.selforganizationcategoriesdo:[:heading|selffileOutCategory:headingon:aFileStreammoveSource:moveSourcetoFile:fileIndex]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "moveSourcetoFile"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutOrganizationOn:",
+      "Source": "fileOutOrganizationOn:aFileStreamaFileStreamemphasis:3.aFileStreamcr;nextPut:$!!.aFileStreamnextChunkPut:selfname,\u0027 reorganize\u0027;cr.aFileStreamnextChunkPut:selforganizationprintString;cr.aFileStreamemphasis:1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 69 42 88 6A 69 12 23 C4 69 44 7C",
+      "Literals": [
+        3,
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "aFileStreamcr"
+        },
+        "!",
+        {
+          "Value": "aFileStreamnextChunkPut"
+        }
+      ]
+    },
+    {
+      "Selector": "instanceVariablesString",
+      "Source": "instanceVariablesString|aStreamnames|aStream_WriteStreamon:(Stringnew:100).names_selfinstVarNames.1to:namessizedo:[:i|aStreamnextPutAll:(namesat:i);space].^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "instVarNames",
+      "Source": "instVarNamesinstanceVariables==nilifTrue:[^#()]ifFalse:[^instanceVariables]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "isMeta",
+      "Source": "isMeta^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        false
+      ]
+    },
+    {
+      "Selector": "kindOfSubclass",
+      "Source": "kindOfSubclassselfisVariableifTrue:[selfisBitsifTrue:[selfisBytesifTrue:[^\u0027 variableByteSubclass: \u0027]ifFalse:[^\u0027 variableWordSubclass: \u0027]]ifFalse:[^\u0027 variableSubclass: \u0027]]ifFalse:[^\u0027 subclass: \u0027]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 42 7D 89 00 03 21 7D 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "ifFalse:"
+        },
+        " variableWordSubclass: ",
+        {
+          "Value": "selfisBytesifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "logOrganizationChange",
+      "Source": "logOrganizationChange|file|SourceFiles==nilifFalse:[file_SourceFilesat:2.filesetToEnd;readWriteShorten.filecr;nextChunkPut:selfname,\u0027 organization changeFromString: \u0027,selforganizationprintStringstoreString.filecr;readOnly]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "SourceFiles"
+        },
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "methodsFor:",
+      "Source": "methodsFor:aString^ClassCategoryReaderclass:selfcategory:aStringasSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "moveChangesTo:",
+      "Source": "moveChangesTo:newFile|changes|selforganizationmoveChangedCommentToFile:newFilenumbered:2.changes_methodDictkeysselect:[:sel|(methodDictat:sel)fileIndex\u003E1].selffileOutChangedMessages:changeson:newFilemoveSource:truetoFile:2!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selforganizationmoveChangedCommentToFile"
+        }
+      ]
+    },
+    {
+      "Selector": "name",
+      "Source": "nameselfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "obsolete",
+      "Source": "obsoleteorganization_nil.superobsolete!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 68 41 7C",
+      "Literals": [
+        "nil",
+        {
+          "Value": "superobsolete"
+        }
+      ]
+    },
+    {
+      "Selector": "organization",
+      "Source": "organizationorganization==nilifTrue:[organization_ClassOrganizernew].^organization!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "printCategoryChunk:on:",
+      "Source": "printCategoryChunk:aStringon:aFileStreamaFileStreamcr;cr;nextPut:$!!.aFileStreamnextChunkPut:selfname,\u0027 methodsFor: \u0027,\u0027\u0027\u0027\u0027,aString,\u0027\u0027\u0027\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 88 69 6A 11 D0 6A 11 23 C4 6A 44 7C",
+      "Literals": [
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "aFileStreamaFileStreamcr"
+        },
+        "!",
+        {
+          "Value": "aFileStreamnextChunkPut"
+        }
+      ]
+    },
+    {
+      "Selector": "printMethodChunk:on:moveSource:toFile:",
+      "Source": "printMethodChunk:aSelectoron:aFileStreammoveSource:moveSourcetoFile:fileIndex|position|aFileStreamcr.CursorwriteshowWhile:[moveSourceifTrue:[position_aFileStreamposition.aFileStreamnextChunkPut:(selfsourceCodeAt:aSelector).(selfcompiledMethodAt:aSelector)setSourcePosition:positioninFile:fileIndex]ifFalse:[aFileStreamcr;nextChunkPut:(selfsourceCodeAt:aSelector)]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aFileStreammoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStreamaStreamnextPutAll:selfname!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfname"
+        }
+      ]
+    },
+    {
+      "Selector": "printOutCategory:",
+      "Source": "printOutCategory:aStringselffileOutCategory:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        }
+      ]
+    },
+    {
+      "Selector": "printOutMessage:",
+      "Source": "printOutMessage:aStringselffileOutMessage:aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aString"
+        }
+      ]
+    },
+    {
+      "Selector": "removeCategory:",
+      "Source": "removeCategory:aString(selforganizationlistAtCategoryNamed:aStringasSymbol)do:[:sel|selfremoveSelector:sel].selforganizationremoveEmptyCategories!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aStringasSymbol"
+        },
+        {
+          "Value": "selforganizationlistAtCategoryNamed"
+        }
+      ]
+    },
+    {
+      "Selector": "removeInstVarName:",
+      "Source": "removeInstVarName:aStringselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "removeSelector:",
+      "Source": "removeSelector:aSymbol(methodDictincludesKey:aSymbol)ifFalse:[^nil].superremoveSelector:aSymbol.selforganizationremoveElement:aSymbol.SmalltalkchangesremoveSelector:aSymbolclass:self.SmalltalklogChange:selfname,\u0027 removeSelector: #\u0027,aSymbol!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aSymbol"
+        },
+        {
+          "Value": "methodDictincludesKey"
+        }
+      ]
+    },
+    {
+      "Selector": "reorganize",
+      "Source": "reorganizeSmalltalkchangesreorganizeClass:self.^selforganization!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selforganization"
+        }
+      ]
+    },
+    {
+      "Selector": "sharedPoolsString",
+      "Source": "sharedPoolsString|aStream|aStream_WriteStreamon:(Stringnew:100).selfsharedPoolsdo:[:x|aStreamnextPutAll:(SmalltalkkeyAtValue:x);space].^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStreamaStreamnextPutAll:selfname!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfname"
+        }
+      ]
+    },
+    {
+      "Selector": "subclassOf:oldClass:instanceVariableNames:variable:words:pointers:ifBad:",
+      "Source": "subclassOf:newSuperoldClass:oldClassinstanceVariableNames:newInstVarStringvariable:vwords:wpointers:pifBad:badBlock|oldnewusedNamesinvalidoldSuperMetanewInstVarArray|old_selfallInstVarNames.usedNames_#(selfsuperthisContexttruefalsenil)asSet.newInstVarArray_ScannernewscanFieldNames:newInstVarString.(invalid_superclass~~newSuper)ifTrue:[oldSuperMeta_superclassclass.superclassremoveSubclass:self.superclass_newSuper.superclassaddSubclass:self.selfclasssuperclass==oldSuperMetaifTrue:[selfclasssuperclass:newSuperclass]].instanceVariables_nil.new_selfallInstVarNames,newInstVarArray.newdo:[:fieldName|(usedNamesincludes:fieldName)ifTrue:[selferror:fieldName,\u0027 is reserved (maybe in a superclass)\u0027.^badBlockvalue].usedNamesadd:fieldName].instanceVariables_newInstVarArraysize=0ifTrue:[nil]ifFalse:[newInstVarArray].invalid_invalid|(new~=old).old_format.selfformat:newsizevariable:vwords:wpointers:p.invalid_invalid|(format~=old).^invalid!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "oldClassinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "superclassesString",
+      "Source": "superclassesString|aStreamnames|aStream_WriteStreamon:(Stringnew:100).selfsuperclassesdo:[:each|aStreamnextPutAll:eachname;space].^aStreamcontents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "aStream"
+        }
+      ]
+    },
+    {
+      "Selector": "updateInstancesFrom:",
+      "Source": "updateInstancesFrom:oldClass|oldInstVarNamesmapvariableoldnewinstSizeoffsetfieldName|oldClasssomeInstance==nilifTrue:[^self].oldInstVarNames_oldClassallInstVarNames.map_selfallInstVarNamescollect:[:instVarName|oldInstVarNamesindexOf:instVarName].variable_selfisVariable.instSize_selfinstSize.oldClassallInstancesdo:[:old|variableifTrue:[new_selfbasicNew:oldbasicSize]ifFalse:[new_selfbasicNew].1to:instSizedo:[:offset|(mapat:offset)\u003E0ifTrue:[newinstVarAt:offsetput:(oldinstVarAt:(mapat:offset))]].variableifTrue:[1to:oldbasicSizedo:[:offset|newbasicAt:offsetput:(oldbasicAt:offset)]].oldbecome:new]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "oldClasssomeInstance"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "validateFrom:in:instanceVariableNames:methods:",
+      "Source": "validateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods|subnewSub|invalidFields\u0026invalidMethodsifFalse:[^self].invalidMethods\u0026selfhasMethodsifTrue:[Transcriptshow:\u0027recompiling \u0027,selfname,\u0027...\u0027.selfcompileAllFrom:oldClass.Transcriptshow:\u0027 done\u0027;cr].self~~oldClassifTrue:[selfupdateInstancesFrom:oldClass].oldClasssubclassesdo:[:sub|newSub_subcopyForValidation.newSubsubclassOf:selfoldClass:subinstanceVariableNames:subinstVarNamesvariable:subisVariablewords:subisBytesnotpointers:subisBitsnotifBad:[selferror:\u0027terrible problem in recompiling subclasses!!\u0027].newSubvalidateFrom:subin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "environinstanceVariableNames"
+        }
+      ]
+    },
+    {
+      "Selector": "whichCategoryIncludesSelector:",
+      "Source": "whichCategoryIncludesSelector:aSelector(selfincludesSelector:aSelector)ifTrue:[^organizationcategoryOfElement:aSelector]ifFalse:[^nil]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "aSelector"
+        },
+        {
+          "Value": "selfincludesSelector"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 55,
+    "SuccessfullyCompiled": 55,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:33:38.9333148Z"
+  }
+}
+`
+
+FILE path=extracted/ClassOrganizer.json sha256=d437df0d1862f1efaebc16f91483fc7dac0a7f2d15e6aa945d9f543efda6bae5 lines=557
+---
+`$lang
+// file: extracted/ClassOrganizer.json
+{
+  "ClassName": "ClassOrganizer",
+  "Superclass": "Object",
+  "InstanceVariables": [
+    "globalComment",
+    "categoryArray",
+    "categoryStops",
+    "elementArray"
+  ],
+  "ClassVariables": [
+    "Default"
+  ],
+  "PoolDictionaries": [],
+  "Category": "Kernel-Support",
+  "InstanceMethods": [
+    {
+      "Selector": "addCategory:",
+      "Source": "addCategory:heading^selfaddCategory:headingbefore:nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addCategory:before:",
+      "Source": "addCategory:headingbefore:nextHeading|nextIndexelements|(categoryArrayindexOf:heading)\u003E0ifTrue:[elements_selflistAtCategoryNamed:heading.elementsdo:[:elt|selfremoveElement:elt].selfremoveCategory:heading.selfaddCategory:headingbefore:nextHeading.selfclassifyAll:elementsunder:heading.^self].nextIndex_categoryArrayindexOf:nextHeadingifAbsent:[categoryArraysize\u002B1].categoryArray_categoryArraycopyReplaceFrom:nextIndexto:nextIndex-1with:(Arraywith:heading).categoryStops_categoryStopscopyReplaceFrom:nextIndexto:nextIndex-1with:(Arraywith:(nextIndex=1ifTrue:[0]ifFalse:[categoryStopsat:nextIndex-1])).!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 D1 43 E0 44 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "heading"
+        },
+        {
+          "Value": "nextHeading"
+        },
+        {
+          "Value": "nextIndexelements"
+        },
+        {
+          "Value": "categoryArrayindexOf"
+        }
+      ]
+    },
+    {
+      "Selector": "categories",
+      "Source": "categories(categoryArraysize=1and:[categoryArrayfirst=Default\u0026(elementArraysize=0)])ifTrue:[^Arraynew].^categoryArray!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 21 B6 89 00 08 47 48 B6 49 24 B6 E3 7D E2 89 00 03 4A 7D 7D E5 68 01 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        1,
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "\u0026"
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "categoryArraysize"
+        },
+        {
+          "Value": "categoryArrayfirst"
+        },
+        {
+          "Value": "Default"
+        },
+        {
+          "Value": "elementArraysize"
+        },
+        {
+          "Value": "Arraynew"
+        }
+      ]
+    },
+    {
+      "Selector": "categories:",
+      "Source": "categories:anArray|newCategoriesnewStopsnewElementscatNamelistrunningTotal|newCategories_Arraynew:anArraysize.newStops_Arraynew:anArraysize.newElements_Arraynew:0.runningTotal_0.1to:anArraysizedo:[:i|catName_(anArrayat:i)asSymbol.list_selflistAtCategoryNamed:catName.newElements_newElements,list.newCategoriesat:iput:catName.newStopsat:iput:(runningTotal_runningTotal\u002Blistsize)].elementArraydo:[:element|(newElementsincludes:element)ifFalse:[^selferror:\u0027New categories must match old ones\u0027]].categoryArray_newCategories.categoryStops_newStops.elementArray_newElements!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "Arraynew"
+        },
+        {
+          "Value": "newCategories"
+        }
+      ]
+    },
+    {
+      "Selector": "categoryOfElement:",
+      "Source": "categoryOfElement:element|index|index_selfnumberOfCategoryOfElement:element.index=0ifTrue:[^nil]ifFalse:[^categoryArrayat:index]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selfnumberOfCategoryOfElement"
+        }
+      ]
+    },
+    {
+      "Selector": "changeFromString:",
+      "Source": "changeFromString:aString|scanneroldElementsnewElementsnewCategoriesnewStopscurrentStopanArray|scanner_ScannernewscanTokens:aString.(scannersize=0and:[elementArraysize=0])ifTrue:[^selfsetDefaultList].oldElements_elementArrayasSet.newCategories_Arraynew:scannersize.newStops_Arraynew:scannersize.currentStop_0.newElements_WriteStreamon:(Arraynew:16).1to:scannersizedo:[:i|anArray_scannerat:i.newCategoriesat:iput:anArrayfirstasSymbol.(anArraycopyFrom:2to:anArraysize)asSortedCollectiondo:[:elem|(oldElementsremove:elemifAbsent:[nil])notNilifTrue:[newElementsnextPut:elem.currentStop_currentStop\u002B1]].newStopsat:iput:currentStop].oldElements_oldElementscollect:[:elem|Arraywith:(selfcategoryOfElement:elem)with:elem].newElements_newElementscontents.categoryArray_newCategories.categoryStops_newStops.elementArray_newElements.oldElementsdo:[:pair|selfclassify:pairlastunder:pairfirst].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "ScannernewscanTokens"
+        },
+        {
+          "Value": "scanner"
+        }
+      ]
+    },
+    {
+      "Selector": "classComment",
+      "Source": "classCommentglobalComment==nilifTrue:[^\u0027\u0027].^globalCommentstring!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "classComment:",
+      "Source": "classComment:aStringaStringsize=0ifTrue:[globalComment_nil]ifFalse:[globalComment_RemoteStringnewString:aStringonFileNumber:2]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 04 23 88 60 7D 89 00 04 44 88 60 7D 22 83 61 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifTrue:ifFalse:aStringonFileNumber:"
+        },
+        2,
+        "nil",
+        {
+          "Value": "RemoteStringnewString"
+        }
+      ]
+    },
+    {
+      "Selector": "classify:under:",
+      "Source": "classify:elementunder:heading|catNamecatIndexelemIndexrealHeading|realHeading_headingasSymbol.(catName_selfcategoryOfElement:element)~~nilifTrue:[realHeading=DefaultifTrue:[^self].realHeading=catNameifTrue:[^self].selfremoveElement:element].(categoryArrayindexOf:realHeading)=0ifTrue:[selfaddCategory:realHeading].catIndex_categoryArrayindexOf:realHeading.elemIndex_catIndex\u003E1ifTrue:[categoryStopsat:catIndex-1]ifFalse:[0].[(elemIndex_elemIndex\u002B1)\u003C=(categoryStopsat:catIndex)and:[element\u003E=(elementArrayat:elemIndex)]]whileTrue.elementArray_(elementArraycopyFrom:1to:elemIndex-1),(Arraywith:element),(elementArraycopyFrom:elemIndexto:elementArraysize).catIndexto:categoryArraysizedo:[:i|categoryStopsat:iput:(categoryStopsat:i)\u002B1].categoryArrayindexOf:DefaultifAbsent:[^self].(selflistAtCategoryNamed:Default)size=0ifTrue:[selfremoveCategory:Default].!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "heading"
+        },
+        {
+          "Value": "catNamecatIndexelemIndexrealHeading"
+        },
+        {
+          "Value": "realHeading"
+        }
+      ]
+    },
+    {
+      "Selector": "classifyAll:under:",
+      "Source": "classifyAll:aCollectionunder:headingaCollectiondo:[:element|selfclassify:elementunder:heading]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "headingaCollectiondo"
+        }
+      ]
+    },
+    {
+      "Selector": "hasNoComment",
+      "Source": "hasNoComment^globalComment==nil!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 21 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "includesElement:",
+      "Source": "includesElement:element^(selfcategoryOfElement:element)~~nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "listAtCategoryNamed:",
+      "Source": "listAtCategoryNamed:categoryName|i|i_categoryArrayindexOf:categoryNameifAbsent:[^Arraynew].^selflistAtCategoryNumber:i!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "categoryArrayindexOf"
+        }
+      ]
+    },
+    {
+      "Selector": "listAtCategoryNumber:",
+      "Source": "listAtCategoryNumber:index|firstIndexlastIndex|firstIndex_index=1ifTrue:[1]ifFalse:[(categoryStopsat:index-1)\u002B1].lastIndex_categoryStopsat:index.^elementArraycopyFrom:firstIndexto:lastIndex!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 21 B6 89 00 02 21 7D 89 00 05 46 D3 21 B1 7D 21 B0 F2 88 81 60 07 87 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        1,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "categoryStopsat"
+        },
+        {
+          "Value": "firstIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "moveChangedCommentToFile:numbered:",
+      "Source": "moveChangedCommentToFile:aFileStreamnumbered:sourceIndex(globalComment~~niland:[globalCommentsourceFileNumber\u003E1])ifTrue:[aFileStreamcr;cr.globalComment_RemoteStringnewString:globalCommentstringonFileNumber:sourceIndextoFile:aFileStream]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "sourceIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "numberOfCategoryOfElement:",
+      "Source": "numberOfCategoryOfElement:element|categoryIndexelementIndex|categoryIndex_1.elementIndex_0.[(elementIndex_elementIndex\u002B1)\u003C=elementArraysize]whileTrue:[[elementIndex\u003E(categoryStopsat:categoryIndex)]whileTrue:[categoryIndex_categoryIndex\u002B1].element=(elementArrayat:elementIndex)ifTrue:[^categoryIndex]].^0!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 06 87 6A 21 88 81 60 09 87 6A 89 00 0B 49 20 B0 88 81 60 09 87 4A B4 7D 89 00 1B 89 00 05 49 D6 4B B3 7D 89 00 09 46 20 B0 88 81 60 06 87 7D E7 6A 10 D9 4C B6 7D 89 00 03 46 7D 7D F4 7C",
+      "Literals": [
+        1,
+        0,
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:ifTrue:"
+        },
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "categoryIndex"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "elementIndex"
+        },
+        {
+          "Value": "elementArraysize"
+        },
+        {
+          "Value": "categoryStopsat"
+        },
+        {
+          "Value": "elementArrayat"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|elementIndexlastStop|elementIndex_1.lastStop_1.1to:categoryArraysizedo:[:i|aStreamnextPut:$(.(categoryArrayat:i)asStringprintOn:aStream.[elementIndex\u003C=(categoryStopsat:i)]whileTrue:[aStreamspace.(elementArrayat:elementIndex)printOn:aStream.elementIndex_elementIndex\u002B1].aStreamnextPut:$).aStreamcr]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 03 87 6A 21 44 E2 88 81 60 05 87 7C",
+      "Literals": [
+        1,
+        1.1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "elementIndex"
+        },
+        {
+          "Value": "categoryArraysizedo"
+        },
+        {
+          "Value": "lastStop"
+        }
+      ]
+    },
+    {
+      "Selector": "putCommentOnFile:numbered:moveSource:",
+      "Source": "putCommentOnFile:aFileStreamnumbered:sourceIndexmoveSource:moveSource|newRemoteStringsaveEmphasis|saveEmphasis_aFileStreamemphasis.aFileStreamemphasis:3.globalComment~~nilifTrue:[aFileStreamcr.newRemoteString_RemoteStringnewString:globalCommentstringonFileNumber:sourceIndextoFile:aFileStream.moveSourceifTrue:[globalComment_newRemoteString]].aFileStreamemphasis:saveEmphasis.!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "sourceIndexmoveSource"
+        }
+      ]
+    },
+    {
+      "Selector": "removeCategory:",
+      "Source": "removeCategory:cat|indexlastStop|index_categoryArrayindexOf:catifAbsent:[^self].lastStop_index=1ifTrue:[0]ifFalse:[categoryStopsat:index-1].(categoryStopsat:index)-lastStop\u003E0ifTrue:[^selferror:\u0027cannot remove non-empty category\u0027].categoryArray_(categoryArraycopyFrom:1to:index-1),(categoryArraycopyFrom:index\u002B1to:categoryArraysize).categoryStops_(categoryStopscopyFrom:1to:index-1),(categoryStopscopyFrom:index\u002B1to:categoryStopssize).categoryArraysize=0ifTrue:[categoryArray_Arraywith:Default.categoryStops_Arraywith:0]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "categoryArrayindexOf"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "removeElement:",
+      "Source": "removeElement:element|categoryIndexelementIndexnextStopnewElements|categoryIndex_1.elementIndex_0.nextStop_0.newElements_WriteStreamon:(Arraynew:elementArraysize).[(elementIndex_elementIndex\u002B1)\u003C=elementArraysize]whileTrue:[[elementIndex\u003E(categoryStopsat:categoryIndex)]whileTrue:[categoryStopsat:categoryIndexput:nextStop.categoryIndex_categoryIndex\u002B1].element=(elementArrayat:elementIndex)ifFalse:[nextStop_nextStop\u002B1.newElementsnextPut:(elementArrayat:elementIndex)]].[categoryIndex\u003C=categoryStopssize]whileTrue:[categoryStopsat:categoryIndexput:nextStop.categoryIndex_categoryIndex\u002B1].elementArray_newElementscontents!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 81 60 02 87 6A 21 88 81 60 03 87 6A 21 88 81 60 04 87 6A 45 88 81 60 06 87 7C",
+      "Literals": [
+        1,
+        0,
+        {
+          "Value": "categoryIndex"
+        },
+        {
+          "Value": "elementIndex"
+        },
+        {
+          "Value": "nextStop"
+        },
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "newElements"
+        }
+      ]
+    },
+    {
+      "Selector": "removeEmptyCategories",
+      "Source": "removeEmptyCategories|categoryIndexcurrentStopkeptCategorieskeptStops|keptCategories_WriteStreamon:(Arraynew:16).keptStops_WriteStreamon:(Arraynew:16).currentStop_categoryIndex_0.[(categoryIndex_categoryIndex\u002B1)\u003C=categoryArraysize]whileTrue:[(categoryStopsat:categoryIndex)\u003EcurrentStopifTrue:[keptCategoriesnextPut:(categoryArrayat:categoryIndex).keptStopsnextPut:(currentStop_categoryStopsat:categoryIndex)]].categoryArray_keptCategoriescontents.categoryStops_keptStopscontents.categoryArraysize=0ifTrue:[categoryArray_Arraywith:Default.categoryStops_Arraywith:0]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        },
+        {
+          "Value": "keptCategories"
+        }
+      ]
+    },
+    {
+      "Selector": "renameCategory:to:",
+      "Source": "renameCategory:oldNameto:newName|isymbol|i_categoryArrayindexOf:oldNameifAbsent:[^false].symbol_newNameasSymbol.categoryArrayindexOf:symbolifAbsent:[categoryArrayat:iput:symbol.^true].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "newName"
+        },
+        {
+          "Value": "isymbol"
+        },
+        {
+          "Value": "i"
+        }
+      ]
+    },
+    {
+      "Selector": "scanFrom:",
+      "Source": "scanFrom:aStreamselfchangeFromString:aStreamnextChunk!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextChunk"
+        }
+      ]
+    },
+    {
+      "Selector": "setDefaultList",
+      "Source": "setDefaultListselfclassComment:\u0027\u0027.categoryArray_categoryStops_elementArray_Arraynew!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 63 88 62 88 61 7C",
+      "Literals": [
+        {
+          "Value": "Arraynew"
+        }
+      ]
+    },
+    {
+      "Selector": "setDefaultList:",
+      "Source": "setDefaultList:aSortedCollectionselfclassComment:\u0027\u0027.categoryArray_Arraywith:Default.categoryStops_Arraywith:aSortedCollectionsize.elementArray_aSortedCollectionasArray!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "defaultProtocol",
+      "Source": "defaultProtocol^Default!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Default"
+        }
+      ]
+    },
+    {
+      "Selector": "initialize",
+      "Source": "initializeDefault_\u0027As yet unclassified\u0027asSymbol!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "asSymbol"
+        }
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "new^supernewsetDefaultList!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "supernewsetDefaultList"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 28,
+    "SuccessfullyCompiled": 28,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-09T21:33:47.8150942Z"
+  }
+}
+`
+
+FILE path=extracted/Collection.json sha256=12c24ddfd940524c7442c5841bf8b0514f2984e79e57673edddd161dcee6b416 lines=519
+---
+`$lang
+// file: extracted/Collection.json
+{
+  "ClassName": "Collection",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Abstract",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:newObjectselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addAll:",
+      "Source": "addAll:aCollectionaCollectiondo:[:each|selfadd:each].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfadd"
+        }
+      ]
+    },
+    {
+      "Selector": "asBag",
+      "Source": "asBag|aBag|aBag_Bagnew.selfdo:[:each|aBagadd:each].^aBag!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "Bagnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "asOrderedCollection",
+      "Source": "asOrderedCollection|anOrderedCollection|anOrderedCollection_OrderedCollectionnew:selfsize.selfdo:[:each|anOrderedCollectionaddLast:each].^anOrderedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSet",
+      "Source": "asSet|aSet|aSet_Setnew:selfsize.selfdo:[:each|aSetadd:each].^aSet!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "Setnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSortedCollection",
+      "Source": "asSortedCollection|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionaddAll:self.^aSortedCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "asSortedCollection:",
+      "Source": "asSortedCollection:aBlock|aSortedCollection|aSortedCollection_SortedCollectionnew:selfsize.aSortedCollectionsortBlock:aBlock.aSortedCollectionaddAll:self.^aSortedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "SortedCollectionnew"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "detect:",
+      "Source": "detect:aBlock^selfdetect:aBlockifNone:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "detect:ifNone:",
+      "Source": "detect:aBlockifNone:exceptionBlockselfdo:[:each|(aBlockvalue:each)ifTrue:[^each]].^exceptionBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "exceptionBlockselfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlockselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "emptyCheck",
+      "Source": "emptyCheckselfisEmptyifTrue:[selferrorEmptyCollection]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorEmptyCollection",
+      "Source": "errorEmptyCollectionselferror:\u0027this collection is empty\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNoMatch",
+      "Source": "errorNoMatchselferror:\u0027collection sizes do not match\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNotFound",
+      "Source": "errorNotFoundselferror:\u0027Object is not in the collection.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNotKeyed",
+      "Source": "errorNotKeyedselferror:selfclassname,\u0027s do not respond to keyed accessing messages.\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "growSize",
+      "Source": "growSizeselfbasicSize\u003E=selfmaxSizeifTrue:[selferror:\u0027unable to grow this collection\u0027].^(selfbasicSizemax:2)min:selfmaxSize-selfbasicSize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfmaxSizeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "includes:",
+      "Source": "includes:anObjectselfdo:[:each|anObject=eachifTrue:[^true]].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 04 42 43 B6 7D D1 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "eachifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "inject:into:",
+      "Source": "inject:thisValueinto:binaryBlock|nextValue|nextValue_thisValue.selfdo:[:each|nextValue_binaryBlockvalue:nextValuevalue:each].^nextValue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "binaryBlock"
+        },
+        {
+          "Value": "nextValue"
+        }
+      ]
+    },
+    {
+      "Selector": "isEmpty",
+      "Source": "isEmpty^selfsize=0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 21 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "selfsize"
+        }
+      ]
+    },
+    {
+      "Selector": "maxPrint",
+      "Source": "maxPrint^5000!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        5000
+      ]
+    },
+    {
+      "Selector": "maxSize",
+      "Source": "maxSize^65486!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        65486
+      ]
+    },
+    {
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf:anObject|tally|tally_0.selfdo:[:each|anObject=eachifTrue:[tally_tally\u002B1]].^tally!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 69 6A 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn:aStream|tooMany|tooMany_aStreamposition\u002BselfmaxPrint.aStreamnextPutAll:selfclassname,\u0027 (\u0027.selfdo:[:element|aStreamposition\u003EtooManyifTrue:[aStreamnextPutAll:\u0027...etc...)\u0027.^self].elementprintOn:aStream.aStreamspace].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B0 88 69 6A 43 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "aStreamposition"
+        },
+        {
+          "Value": "selfmaxPrint"
+        },
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    },
+    {
+      "Selector": "reject:",
+      "Source": "reject:aBlock^selfselect:[:element|(aBlockvalue:element)==false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:",
+      "Source": "remove:oldObject^selfremove:oldObjectifAbsent:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:oldObjectifAbsent:anExceptionBlockselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anExceptionBlockselfsubclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "removeAll:",
+      "Source": "removeAll:aCollectionaCollectiondo:[:each|selfremove:each].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfremove"
+        }
+      ]
+    },
+    {
+      "Selector": "select:",
+      "Source": "select:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|(aBlockvalue:each)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size|tally|tally_0.selfdo:[:each|tally_tally\u002B1].^tally!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 68 69 41 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn:aStream|noneYet|aStreamnextPutAll:\u0027((\u0027.aStreamnextPutAll:selfclassname.aStreamnextPutAll:\u0027 new)\u0027.noneYet_true.selfdo:[:each|noneYetifTrue:[noneYet_false]ifFalse:[aStreamnextPut:$;].aStreamnextPutAll:\u0027 add: \u0027.aStreamstore:each].noneYetifFalse:[aStreamnextPutAll:\u0027; yourself\u0027].aStreamnextPut:$)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aStreamnextPutAll"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "with:",
+      "Source": "with:anObject|newCollection|newCollection_selfnew.newCollectionadd:anObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfnew"
+        },
+        {
+          "Value": "newCollectionadd"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:",
+      "Source": "with:firstObjectwith:secondObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "secondObject"
+        },
+        {
+          "Value": "newCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    },
+    {
+      "Selector": "with:with:with:with:",
+      "Source": "with:firstObjectwith:secondObjectwith:thirdObjectwith:fourthObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.newCollectionadd:fourthObject.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "secondObjectwith"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 35,
+    "SuccessfullyCompiled": 35,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-08-10T03:06:45.3108138Z"
+  }
+}
+`

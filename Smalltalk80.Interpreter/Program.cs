@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80.Bootstrap;
 
 namespace Smalltalk80.Interpreter;
 
@@ -170,35 +171,42 @@ public class Program
                 
                 if (useBytecodeExecution)
                 {
-                    // Use the new bytecode executor for proper method tracing
+                    // Use the Phase3Executor for bytecode-based execution
                     Console.WriteLine("Using bytecode executor for Phase 3...");
-                    var bytecodeExecutor = new Bootstrap.Phase3BytecodeExecutor(vm);
+                    var phase3Executor = new Bootstrap.Phase3Executor(vm.Adapter);
                     
-                    try
+                    // Load the test counter manifest
+                    var testCounterManifest = phase3Manifests.FirstOrDefault(f => f.Contains("phase3_test_counter.json"));
+                    if (testCounterManifest != null)
                     {
-                        bytecodeExecutor.CreateTestCounterClass();
-                        Console.WriteLine($"✓ Successfully created TestCounter class via bytecode execution");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"✗ Failed to create TestCounter: {ex.Message}");
-                        if (enableBootstrapDebug)
+                        try
                         {
-                            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                            var jsonContent = System.IO.File.ReadAllText(testCounterManifest);
+                            phase3Executor.ExecuteManifest(jsonContent);
+                            Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {testCounterManifest}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"✗ Failed to load manifest: {ex.Message}");
+                            if (enableBootstrapDebug)
+                            {
+                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                            }
                         }
                     }
                 }
                 else
                 {
-                    // Use the regular high-level executor
-                    var phase3Executor = new Bootstrap.Phase3HighLevelExecutor(vm.Adapter);
+                    // Use the regular Phase3Executor
+                    var phase3Executor = new Bootstrap.Phase3Executor(vm.Adapter);
                     
                     foreach (var manifestFile in phase3Manifests)
                     {
                         Console.WriteLine($"\nLoading Phase 3 manifest: {manifestFile}");
                         try
                         {
-                            phase3Executor.ExecuteManifest(manifestFile);
+                            var jsonContent = System.IO.File.ReadAllText(manifestFile);
+                            phase3Executor.ExecuteManifest(jsonContent);
                             Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {manifestFile}");
                         }
                         catch (Exception ex)

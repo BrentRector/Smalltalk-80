@@ -175,6 +175,13 @@ public class Phase3Executor
     /// </summary>
     public void ExecuteManifest(string jsonContent)
     {
+        // Check if this is a sequence-based manifest (like phase3_test_counter.json)
+        if (jsonContent.Contains("\"sequence\""))
+        {
+            ExecuteSequenceManifest(jsonContent);
+            return;
+        }
+        
         var options = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -208,6 +215,22 @@ public class Phase3Executor
         }
         
         Phase3Log("[PHASE3] Manifest execution complete");
+    }
+    
+    /// <summary>
+    /// Execute a sequence-based Phase 3 manifest (like phase3_test_counter.json).
+    /// This format uses individual message sends to build classes step by step.
+    /// </summary>
+    private void ExecuteSequenceManifest(string jsonContent)
+    {
+        Console.WriteLine("[PHASE3] Executing sequence-based manifest...");
+        
+        // For now, just log that we're not handling this format yet
+        Console.WriteLine("[PHASE3] ⚠ Sequence-based manifests not yet implemented");
+        Console.WriteLine("[PHASE3] This format requires implementing message sends through the interpreter");
+        
+        // The sequence format requires sending actual Smalltalk messages
+        // like "MethodDictionary new" which requires the lookup to work properly
     }
     
     /// <summary>

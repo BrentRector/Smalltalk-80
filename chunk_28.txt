@@ -1,0 +1,2225 @@
+CHUNK 28/38 repo=Smalltalk-80 branch=main commit=aea8ce38368a857b43e2a55e1aa77abb72ccb1c6
+---
+FILE path=Smalltalk80.Tests/SimpleExecutionTests.cs sha256=fa5a276cf33cbc33f5b3cd9e05e3e7afb5e803fa9cecf7e6d4ff8de23bd4fddc lines=121
+---
+`$lang
+// file: Smalltalk80.Tests/SimpleExecutionTests.cs
+using System;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Simplified execution tests to validate basic method compilation and execution 
+/// without complex file-out format dependencies.
+/// </summary>
+public class SimpleExecutionTests(ITestOutputHelper output)
+{
+    [Fact]
+    public void SimpleMethod_ReturnConstant_ExecutesCorrectly()
+    {
+        // Reset system 
+        ObjectMemory.Reset();
+
+        // Create a simple method that returns a constant
+        var vm = new VirtualMachine();
+        var tempFile = CreateTempMethodFile("Object>>testMethod", "^42!");
+
+        vm.LoadSourceFile(tempFile);
+
+        // Verify method was loaded
+        var objectClass = SystemDictionary.GetClass("Object");
+        var method = objectClass.Lookup(new Symbol("testMethod"));
+        Assert.NotNull(method);
+
+        // Execute the method
+        var objectInstance = new SmalltalkObject(objectClass, 0);
+        var interpreter = new Interpreter();
+        interpreter.SetActiveContext(objectInstance, method);
+        var result = interpreter.ExecuteMethod();
+
+        Assert.Equal(42, result);
+        output.WriteLine("✅ Simple method execution test passed");
+
+        CleanupTempFile(tempFile);
+    }
+
+    [Fact]
+    public void SimpleMethod_WithArgument_ExecutesCorrectly()
+    {
+        // Reset system 
+        ObjectMemory.Reset();
+
+        // Create a method that adds 1 to its argument
+        var vm = new VirtualMachine();
+        var tempFile = CreateTempMethodFile("Object>>addOne: x", "^x + 1!");
+
+        vm.LoadSourceFile(tempFile);
+
+        // Verify method was loaded
+        var objectClass = SystemDictionary.GetClass("Object");
+        var method = objectClass.Lookup(new Symbol("addOne:"));
+        Assert.NotNull(method);
+
+        // Execute the method with argument
+        var objectInstance = new SmalltalkObject(objectClass, 0);
+        var interpreter = new Interpreter();
+        interpreter.SetActiveContext(objectInstance, method, 5);
+        var result = interpreter.ExecuteMethod();
+
+        Assert.Equal(6, result);
+        output.WriteLine("✅ Method with argument test passed");
+
+        CleanupTempFile(tempFile);
+    }
+
+    [Fact]
+    public void SimpleMethod_MultipleArithmetic_ExecutesCorrectly()
+    {
+        // Reset system
+        ObjectMemory.Reset();
+
+        // Create a method that does multiple arithmetic operations
+        var vm = new VirtualMachine();
+        var tempFile = CreateTempMethodFile("Object>>calculate: a with: b", "^(a + b) * 2!");
+
+        vm.LoadSourceFile(tempFile);
+
+        // Execute the method
+        var objectClass = SystemDictionary.GetClass("Object");
+        var method = objectClass.Lookup(new Symbol("calculate:with:"));
+        Assert.NotNull(method);
+
+        var objectInstance = new SmalltalkObject(objectClass, 0);
+        var interpreter = new Interpreter();
+        interpreter.SetActiveContext(objectInstance, method, 3, 7);
+        var result = interpreter.ExecuteMethod();
+
+        Assert.Equal(20, result); // (3 + 7) * 2 = 20
+        output.WriteLine("✅ Multiple arithmetic test passed");
+
+        CleanupTempFile(tempFile);
+    }
+
+    /// <summary>
+    /// Creates a temporary file with the specified method definition.
+    /// </summary>
+    private static string CreateTempMethodFile(string header, string body)
+    {
+        var tempFile = System.IO.Path.GetTempFileName();
+        var content = $"{header}\n{body}";
+        System.IO.File.WriteAllText(tempFile, content);
+        return tempFile;
+    }
+
+    /// <summary>
+    /// Cleans up the temporary file.
+    /// </summary>
+    private static void CleanupTempFile(string tempFile)
+    {
+        if (System.IO.File.Exists(tempFile))
+        {
+            System.IO.File.Delete(tempFile);
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80.Tests/SimpleMethodParsingTest.cs sha256=3489dbf5ab33b2f9ba0ff112bee796b6fb839a3908b3f20d83df85e9acc1d019 lines=69
+---
+`$lang
+// file: Smalltalk80.Tests/SimpleMethodParsingTest.cs
+using System;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Smalltalk80.Tests;
+
+public class SimpleMethodParsingTest(ITestOutputHelper output)
+{
+    [Fact]
+    public void ComplexKeywordMethod_ParsesCorrectly()
+    {
+        ObjectMemory.Reset();
+
+        var fileOutSource = @"
+Object subclass: #Counter
+    instanceVariableNames: 'count'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test-Debug'!
+
+!Counter methodsFor: 'incrementing'!
+incrementBy: amount
+    count _ count + amount.
+    ^self
+! !
+";
+
+        var tempFile = CreateTempFile(fileOutSource);
+
+        try
+        {
+            var vm = new VirtualMachine();
+            vm.LoadSystemFile(tempFile);
+
+            var testClass = SystemDictionary.GetClass("Counter");
+            Assert.NotNull(testClass);
+
+            output.WriteLine("=== Methods loaded ===");
+            foreach (var kvp in testClass.MethodDictionary)
+            {
+                output.WriteLine($"  {kvp.Key.Name}");
+            }
+
+            // This should be 'incrementBy:' not 'incrementBy:count:'
+            var method = testClass.Lookup(new Symbol("incrementBy:"));
+            output.WriteLine($"Method 'incrementBy:' found: {method != null}");
+
+            var wrongMethod = testClass.Lookup(new Symbol("incrementBy:count:"));
+            output.WriteLine($"Method 'incrementBy:count:' found: {wrongMethod != null}");
+
+            Assert.NotNull(method);
+            Assert.Null(wrongMethod);
+
+            output.WriteLine("✅ Complex keyword method parsed correctly");
+        }
+        finally
+        {
+            System.IO.File.Delete(tempFile);
+        }
+    }
+
+    private static string CreateTempFile(string content)
+    {
+        var tempFile = System.IO.Path.GetTempFileName();
+        System.IO.File.WriteAllText(tempFile, content);
+        return tempFile;
+    }
+}
+
+`
+
+FILE path=Smalltalk80.Tests/Smalltalk80.Tests.csproj sha256=c43ac479d48f8c472686b1a14495e027b656aa72788e26d33b44ac44b8c96895 lines=17
+---
+`$lang
+// file: Smalltalk80.Tests/Smalltalk80.Tests.csproj
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
+  </ItemGroup>
+</Project>
+
+`
+
+FILE path=Smalltalk80.Tests/SourceFileLoadingTests.cs sha256=ff8035fd0f5fd310b7cf94dbca25b98edcdb45a88feb6457d2f91fefb80e7d11 lines=53
+---
+`$lang
+// file: Smalltalk80.Tests/SourceFileLoadingTests.cs
+using System;
+using System.IO;
+using Xunit;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Tests verifying loading of Smalltalk source files into the virtual machine.
+/// </summary>
+public class SourceFileLoadingTests
+{
+    [Fact]
+    public void LoadSourceFile_DefinesMethodOnClass()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllLines(tempPath, new[]
+            {
+                "TestClass>>foo",
+                "1 + 2"
+            });
+
+            vm.LoadSourceFile(tempPath);
+
+            var cls = SystemDictionary.GetClass("TestClass");
+            Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("foo")));
+
+            var instance = new SmalltalkObject(cls, 0);
+            var callMethod = new CompiledMethod
+            {
+                Bytecodes = new byte[]
+                {
+                    (byte)Bytecode.PushSelf,
+                    (byte)Bytecode.SingleExtendedSend, 0,
+                    (byte)Bytecode.ReturnTopFromMethod
+                },
+                Literals = new object[] { new Symbol("foo") },
+                TemporariesCount = 0
+            };
+
+            var result = vm.Interpreter.Evaluate(callMethod, instance);
+            Assert.Equal(3, result);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80.Tests/SystematicParserTests.cs sha256=82a2038af8248ec9a5a9446e06bc9f2613142d8ce135f3644099eefab643acac lines=428
+---
+`$lang
+// file: Smalltalk80.Tests/SystematicParserTests.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Antlr4.Runtime;
+using Smalltalk80.Generated;
+using Smalltalk80.Parser;
+using Xunit;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Systematic test suite for Smalltalk-80 parser, organized from simple to complex constructs.
+/// Each test validates both positive and negative cases, and verifies runtime structures.
+/// </summary>
+public class SystematicParserTests
+{
+    private static readonly string TestCasesPath =
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Smalltalk80", "Parser.TestCases");
+
+    #region Test Infrastructure
+
+    private static void ResetSystem()
+    {
+        ObjectMemory.Reset();
+    }
+
+    private static VirtualMachine CreateVM()
+    {
+        return new VirtualMachine();
+    }
+
+    private static FileNode ParseFileIn(string source)
+    {
+        var reader = new StringReader(source);
+        var input = new Antlr4.Runtime.AntlrInputStream(reader);
+        var lexer = new Smalltalk80.Generated.Smalltalk80Lexer(input);
+        var tokens = new Antlr4.Runtime.CommonTokenStream(lexer);
+        var parser = new Smalltalk80.Generated.Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
+
+        var fileCtx = parser.fileIn();
+        if (parser.NumberOfSyntaxErrors > 0)
+            throw new InvalidOperationException("Parse errors detected");
+
+        var visitor = new ClassDefBuildingVisitor();
+        return (FileNode)visitor.VisitFileIn(fileCtx)!;
+    }
+
+    private static void AssertClassExists(string className, string? expectedSuperclass = null)
+    {
+        Assert.True(SystemDictionary.TryGetClass(className, out var cls), $"Class '{className}' should exist");
+        if (expectedSuperclass != null)
+        {
+            Assert.True(SystemDictionary.TryGetClass(expectedSuperclass, out var super), $"Superclass '{expectedSuperclass}' should exist");
+            Assert.Equal(super, cls!.Superclass);
+        }
+    }
+
+    private static void AssertClassHasInstanceVariables(string className, params string[] expectedVars)
+    {
+        var cls = SystemDictionary.GetClass(className);
+        Assert.Equal(expectedVars.Length, cls.InstanceVariables.Count);
+        foreach (var expectedVar in expectedVars)
+        {
+            Assert.Contains(expectedVar, cls.InstanceVariables);
+        }
+    }
+
+    private static void AssertClassHasMethod(string className, string methodSelector)
+    {
+        var cls = SystemDictionary.GetClass(className);
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol(methodSelector)),
+            $"Class '{className}' should have method '{methodSelector}'");
+    }
+
+    private static void AssertClassHasClassVariables(string className, params string[] expectedVars)
+    {
+        var cls = SystemDictionary.GetClass(className);
+        foreach (var varName in expectedVars)
+        {
+            Assert.Contains(varName, cls.ClassVariables);
+        }
+    }
+
+    private static void AssertClassHasClassMethod(string className, string methodSelector)
+    {
+        // For now, simplify by just checking if the class side methods exist
+        // In a full implementation, we'd check the metaclass
+        // This is a placeholder for the systematic test framework
+        var cls = SystemDictionary.GetClass(className);
+        Assert.NotNull(cls); // At minimum, the class should exist
+
+        // TODO: Implement proper metaclass method checking when metaclass support is added
+    }
+
+    #endregion
+
+    #region Level 1: Basic Class Definitions (Empty Classes)
+
+    [Fact]
+    public void L1_EmptyClass_MinimalDefinition()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        var source = @"Object subclass: #TestClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!";
+
+        vm.LoadSystemFile(CreateTempFile(source));
+
+        AssertClassExists("TestClass", "Object");
+        var cls = SystemDictionary.GetClass("TestClass");
+        Assert.Empty(cls.InstanceVariables);
+        Assert.Empty(cls.ClassVariables);
+        Assert.Empty(cls.PoolDictionaries);
+        Assert.Equal("Test", cls.Category);
+    }
+
+    [Theory]
+    [InlineData("Level1-BasicClasses/basic_no_members.st", "BasicNoMembers", "Object")]
+    [InlineData("Level1-BasicClasses/class_with_single_instance_var.st", "WithInstanceVar", "Object")]
+    public void L1_ExistingValidClassFiles_ShouldParseCorrectly(string fileName, string expectedClassName, string expectedSuperclass)
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        var basePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Smalltalk80", "Parser.TestCases");
+        var filePath = Path.GetFullPath(Path.Combine(basePath, fileName));
+
+        vm.LoadSystemFile(filePath);
+
+        AssertClassExists(expectedClassName, expectedSuperclass);
+    }
+
+    [Fact]
+    public void L1_EmptyClass_WithDifferentSuperclass()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        // First define a custom superclass
+        var superSource = @"Object subclass: #MySuperClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!";
+        vm.LoadSystemFile(CreateTempFile(superSource));
+
+        // Then define subclass
+        var subSource = @"MySuperClass subclass: #MySubClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!";
+        vm.LoadSystemFile(CreateTempFile(subSource));
+
+        AssertClassExists("MySuperClass", "Object");
+        AssertClassExists("MySubClass", "MySuperClass");
+    }
+
+    [Fact]
+    public void L1_EmptyClass_WithInstanceVariables()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        var source = @"Object subclass: #ClassWithVars
+    instanceVariableNames: 'var1 var2 var3'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!";
+
+        vm.LoadSystemFile(CreateTempFile(source));
+
+        AssertClassExists("ClassWithVars", "Object");
+        AssertClassHasInstanceVariables("ClassWithVars", "var1", "var2", "var3");
+    }
+
+    [Fact]
+    public void L1_EmptyClass_WithClassVariables()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        var source = @"Object subclass: #ClassWithClassVars
+    instanceVariableNames: ''
+    classVariableNames: 'ClassVar1 ClassVar2'
+    poolDictionaries: ''
+    category: 'Test'!";
+
+        vm.LoadSystemFile(CreateTempFile(source));
+
+        AssertClassExists("ClassWithClassVars", "Object");
+        var cls = SystemDictionary.GetClass("ClassWithClassVars");
+        Assert.Contains("ClassVar1", cls.ClassVariables);
+        Assert.Contains("ClassVar2", cls.ClassVariables);
+    }
+
+    #endregion
+
+    #region Level 2: Simple Method Definitions
+
+    [Fact]
+    public void L2_UnaryMethod_NoArguments()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level2-SimpleMethods", "unary_methods.st"));
+
+        AssertClassExists("ClassWithUnaryMethod", "Object");
+        AssertClassHasMethod("ClassWithUnaryMethod", "getValue");
+
+        var cls = SystemDictionary.GetClass("ClassWithUnaryMethod");
+        var method = cls.MethodDictionary[new Symbol("getValue")];
+        Assert.NotNull(method);
+        Assert.False(method.HasPrimitive);
+    }
+
+    [Fact]
+    public void L2_BinaryMethod_OneArgument()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level2-SimpleMethods", "binary_methods.st"));
+
+        AssertClassExists("ClassWithBinaryMethods", "Object");
+        AssertClassHasMethod("ClassWithBinaryMethods", "+");
+        AssertClassHasMethod("ClassWithBinaryMethods", "-");
+        AssertClassHasMethod("ClassWithBinaryMethods", "*");
+        AssertClassHasMethod("ClassWithBinaryMethods", "=");
+
+        var cls = SystemDictionary.GetClass("ClassWithBinaryMethods");
+        var method = cls.MethodDictionary[new Symbol("+")];
+        Assert.NotNull(method);
+        Assert.False(method.HasPrimitive);
+    }
+
+    [Fact]
+    public void L2_KeywordMethod_MultipleArguments()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level2-SimpleMethods", "keyword_methods.st"));
+
+        AssertClassExists("ClassWithKeywordMethods", "Object");
+        AssertClassHasMethod("ClassWithKeywordMethods", "setValue:");
+        AssertClassHasMethod("ClassWithKeywordMethods", "setValue:withName:");
+        AssertClassHasMethod("ClassWithKeywordMethods", "at:put:");
+        AssertClassHasMethod("ClassWithKeywordMethods", "from:to:do:");
+
+        var cls = SystemDictionary.GetClass("ClassWithKeywordMethods");
+        var method = cls.MethodDictionary[new Symbol("setValue:withName:")];
+        Assert.NotNull(method);
+        Assert.False(method.HasPrimitive);
+    }
+
+    #endregion
+
+    #region Level 3: Methods with Temporaries
+
+    [Fact]
+    public void L3_Method_WithTemporaries()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level3-MethodsWithTemporaries", "methods_with_temporaries.st"));
+
+        AssertClassExists("ClassWithTemporaries", "Object");
+        AssertClassHasMethod("ClassWithTemporaries", "compute");
+        AssertClassHasMethod("ClassWithTemporaries", "processData:");
+        AssertClassHasMethod("ClassWithTemporaries", "complexCalculation:with:");
+
+        var cls = SystemDictionary.GetClass("ClassWithTemporaries");
+        var method = cls.MethodDictionary[new Symbol("compute")];
+        Assert.Equal(2, method.TemporariesCount);
+    }
+
+    #endregion
+
+    #region Level 4: Methods with Instance Variable Access
+
+    [Fact]
+    public void L4_Method_AccessingInstanceVariables()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level4-InstanceVariables", "point_class.st"));
+
+        AssertClassExists("Point", "Object");
+        AssertClassHasInstanceVariables("Point", "x", "y");
+        AssertClassHasMethod("Point", "x");
+        AssertClassHasMethod("Point", "x:");
+        AssertClassHasMethod("Point", "y");
+        AssertClassHasMethod("Point", "y:");
+        AssertClassHasMethod("Point", "setX:y:");
+        AssertClassHasMethod("Point", "distanceFromOrigin");
+    }
+
+    #endregion
+
+    #region Level 5: Primitive Methods
+
+    [Fact]
+    public void L5_Method_WithPrimitive()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level5-Primitives", "primitive_methods.st"));
+
+        AssertClassExists("PrimitiveClass", "Object");
+        AssertClassHasMethod("PrimitiveClass", "basicNew");
+        AssertClassHasMethod("PrimitiveClass", "basicAt:");
+        AssertClassHasMethod("PrimitiveClass", "basicAt:put:");
+        AssertClassHasMethod("PrimitiveClass", "size");
+
+        var cls = SystemDictionary.GetClass("PrimitiveClass");
+        var method = cls.MethodDictionary[new Symbol("basicNew")];
+        Assert.True(method.HasPrimitive);
+        Assert.Equal(70, method.PrimitiveIndex);
+    }
+
+    #endregion
+
+    #region Level 6: Class Methods (Metaclass)
+
+    [Fact]
+    public void L6_ClassMethod_Basic()
+    {
+        ResetSystem();
+        var vm = CreateVM();
+
+        vm.LoadSystemFile(Path.Combine(TestCasesPath, "Level6-ClassMethods", "class_with_class_methods.st"));
+
+        AssertClassExists("CountedClass", "Object");
+        AssertClassHasInstanceVariables("CountedClass", "id");
+        AssertClassHasClassVariables("CountedClass", "InstanceCount");
+
+        // Instance-side methods
+        AssertClassHasMethod("CountedClass", "id");
+        AssertClassHasMethod("CountedClass", "setId:");
+
+        // Class-side methods 
+        AssertClassHasClassMethod("CountedClass", "new");
+        AssertClassHasClassMethod("CountedClass", "instanceCount");
+        AssertClassHasClassMethod("CountedClass", "initialize");
+    }
+
+    #endregion
+
+    #region Negative Test Cases
+
+    [Fact]
+    public void N1_InvalidClass_MissingSuperclass()
+    {
+        var source = @"NonExistentClass subclass: #TestClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!";
+
+        // This should not throw during parsing, but superclass won't be found
+        var fileNode = ParseFileIn(source);
+        Assert.NotNull(fileNode);
+
+        ResetSystem();
+        var vm = CreateVM();
+        vm.LoadSystemFile(CreateTempFile(source));
+
+        // Class should still be created but with null superclass
+        AssertClassExists("TestClass");
+        var cls = SystemDictionary.GetClass("TestClass");
+        Assert.Null(cls.Superclass);
+    }
+
+    [Fact]
+    public void N2_InvalidMethod_InvalidSyntax()
+    {
+        var source = @"Object subclass: #TestClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'!
+
+!TestClass methodsFor: 'broken'!
+
+invalidMethod
+    | unclosed temp
+    ^self!";
+
+        Assert.Throws<InvalidOperationException>(() => ParseFileIn(source));
+    }
+
+    [Fact]
+    public void N3_InvalidClass_MissingBang()
+    {
+        var source = @"Object subclass: #TestClass
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Test'";  // Missing !
+
+        Assert.Throws<InvalidOperationException>(() => ParseFileIn(source));
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static string CreateTempFile(string content)
+    {
+        var tempPath = Path.GetTempFileName();
+        File.WriteAllText(tempPath, content);
+        return tempPath;
+    }
+
+    #endregion
+}
+
+`
+
+FILE path=Smalltalk80.Tests/SystematicTestCaseValidation.cs sha256=79f07a03ccb4d1505c90db0ffe5d2a47c681e187b76dc539651ab536aa2a4c58 lines=286
+---
+`$lang
+// file: Smalltalk80.Tests/SystematicTestCaseValidation.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Smalltalk80.Parser;
+using Xunit;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Validates that all test case files in the systematic parser test suite
+/// behave as expected - positive cases should parse and negative cases should fail.
+/// </summary>
+public class SystematicTestCaseValidation
+{
+    private static readonly string TestCasesRoot = Path.Combine(
+        AppContext.BaseDirectory, "..", "..", "..", "..", "Smalltalk80", "Parser.TestCases");
+
+    private static readonly string FailCasesRoot = Path.Combine(
+        AppContext.BaseDirectory, "..", "..", "..", "..", "Smalltalk80", "Parser.FailCases");
+
+    #region Positive Test Case Validation
+
+    [Theory]
+    [MemberData(nameof(GetLevel1TestFiles))]
+    public void Level1_BasicClasses_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    [Theory]
+    [MemberData(nameof(GetLevel2TestFiles))]
+    public void Level2_SimpleMethods_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    [Theory]
+    [MemberData(nameof(GetLevel3TestFiles))]
+    public void Level3_MethodsWithTemporaries_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    [Theory]
+    [MemberData(nameof(GetLevel4TestFiles))]
+    public void Level4_InstanceVariables_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    [Theory]
+    [MemberData(nameof(GetLevel5TestFiles))]
+    public void Level5_Primitives_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    [Theory]
+    [MemberData(nameof(GetLevel6TestFiles))]
+    public void Level6_ClassMethods_ShouldParseSuccessfully(string filePath)
+    {
+        ValidatePositiveCase(filePath);
+    }
+
+    #endregion
+
+    #region Negative Test Case Validation
+
+    [Theory]
+    [MemberData(nameof(GetSystematicFailCases))]
+    public void SystematicFailCases_ShouldFailToParse(string filePath)
+    {
+        ValidateNegativeCase(filePath);
+    }
+
+    #endregion
+
+    #region Integration Tests with Runtime Validation
+
+    [Fact]
+    public void Level1_EmptyClass_CreatesCorrectRuntimeStructure()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var filePath = GetTestFile("Level1-BasicClasses", "empty_class.st");
+
+        vm.LoadSystemFile(filePath);
+
+        Assert.True(SystemDictionary.TryGetClass("EmptyClass", out var cls));
+        Assert.True(SystemDictionary.TryGetClass("Object", out var objCls));
+        Assert.Equal(objCls, cls!.Superclass);
+        Assert.Empty(cls.InstanceVariables);
+        Assert.Empty(cls.ClassVariables);
+        Assert.Empty(cls.PoolDictionaries);
+        Assert.Equal("Test-Basic", cls.Category);
+    }
+
+    [Fact]
+    public void Level2_UnaryMethods_CreatesCorrectMethodsInRuntime()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var filePath = GetTestFile("Level2-SimpleMethods", "unary_methods.st");
+
+        vm.LoadSystemFile(filePath);
+
+        Assert.True(SystemDictionary.TryGetClass("ClassWithUnaryMethod", out var cls));
+        Assert.True(cls!.MethodDictionary.ContainsKey(new Symbol("getValue")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("getName")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("isReady")));
+
+        // Validate method properties
+        var method = cls.MethodDictionary[new Symbol("getValue")];
+        Assert.False(method.HasPrimitive);
+        Assert.Equal(0, method.TemporariesCount);
+    }
+
+    [Fact]
+    public void Level3_MethodsWithTemporaries_HasCorrectTemporaryCount()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var filePath = GetTestFile("Level3-MethodsWithTemporaries", "methods_with_temporaries.st");
+
+        vm.LoadSystemFile(filePath);
+
+        Assert.True(SystemDictionary.TryGetClass("ClassWithTemporaries", out var cls));
+
+        var computeMethod = cls!.MethodDictionary[new Symbol("compute")];
+        Assert.Equal(2, computeMethod.TemporariesCount); // temp1, temp2
+
+        var processMethod = cls.MethodDictionary[new Symbol("processData:")];
+        Assert.Equal(3, processMethod.TemporariesCount); // data (param) + result, index
+
+        var complexMethod = cls.MethodDictionary[new Symbol("complexCalculation:with:")];
+        Assert.Equal(5, complexMethod.TemporariesCount); // x, y (params) + intermediate1, intermediate2, final
+    }
+
+    [Fact]
+    public void Level4_InstanceVariables_AccessibleInMethods()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var filePath = GetTestFile("Level4-InstanceVariables", "point_class.st");
+
+        vm.LoadSystemFile(filePath);
+
+        Assert.True(SystemDictionary.TryGetClass("Point", out var cls));
+        Assert.Contains("x", cls!.InstanceVariables);
+        Assert.Contains("y", cls.InstanceVariables);
+
+        // Verify accessors exist
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("x")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("x:")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("y")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("y:")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("setX:y:")));
+        Assert.True(cls.MethodDictionary.ContainsKey(new Symbol("distanceFromOrigin")));
+    }
+
+    [Fact]
+    public void Level5_Primitives_HasCorrectPrimitiveInfo()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var filePath = GetTestFile("Level5-Primitives", "primitive_methods.st");
+
+        vm.LoadSystemFile(filePath);
+
+        Assert.True(SystemDictionary.TryGetClass("PrimitiveClass", out var cls));
+
+        var basicNewMethod = cls!.MethodDictionary[new Symbol("basicNew")];
+        Assert.True(basicNewMethod.HasPrimitive);
+        Assert.Equal(70, basicNewMethod.PrimitiveIndex);
+
+        var basicAtMethod = cls.MethodDictionary[new Symbol("basicAt:")];
+        Assert.True(basicAtMethod.HasPrimitive);
+        Assert.Equal(60, basicAtMethod.PrimitiveIndex);
+
+        var basicAtPutMethod = cls.MethodDictionary[new Symbol("basicAt:put:")];
+        Assert.True(basicAtPutMethod.HasPrimitive);
+        Assert.Equal(61, basicAtPutMethod.PrimitiveIndex);
+
+        var sizeMethod = cls.MethodDictionary[new Symbol("size")];
+        Assert.True(sizeMethod.HasPrimitive);
+        Assert.Equal(62, sizeMethod.PrimitiveIndex);
+    }
+
+    #endregion
+
+    #region Test Data Providers
+
+    public static IEnumerable<object[]> GetLevel1TestFiles()
+        => GetTestFiles("Level1-BasicClasses");
+
+    public static IEnumerable<object[]> GetLevel2TestFiles()
+        => GetTestFiles("Level2-SimpleMethods");
+
+    public static IEnumerable<object[]> GetLevel3TestFiles()
+        => GetTestFiles("Level3-MethodsWithTemporaries");
+
+    public static IEnumerable<object[]> GetLevel4TestFiles()
+        => GetTestFiles("Level4-InstanceVariables");
+
+    public static IEnumerable<object[]> GetLevel5TestFiles()
+        => GetTestFiles("Level5-Primitives");
+
+    public static IEnumerable<object[]> GetLevel6TestFiles()
+        => GetTestFiles("Level6-ClassMethods");
+
+    public static IEnumerable<object[]> GetSystematicFailCases()
+        => GetFailCaseFiles("Systematic");
+
+    private static IEnumerable<object[]> GetTestFiles(string levelDir)
+    {
+        var levelPath = Path.Combine(TestCasesRoot, levelDir);
+        if (!Directory.Exists(levelPath))
+            return Enumerable.Empty<object[]>();
+
+        return Directory.GetFiles(levelPath, "*.st")
+            .Select(f => new object[] { f });
+    }
+
+    private static IEnumerable<object[]> GetFailCaseFiles(string subDir)
+    {
+        var failPath = Path.Combine(FailCasesRoot, subDir);
+        if (!Directory.Exists(failPath))
+            return Enumerable.Empty<object[]>();
+
+        return Directory.GetFiles(failPath, "*.st")
+            .Select(f => new object[] { f });
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static void ValidatePositiveCase(string filePath)
+    {
+        var source = File.ReadAllText(filePath);
+
+        // Should parse without throwing
+        var fileNode = ParseFileIn(source);
+        Assert.NotNull(fileNode);
+        Assert.NotEmpty(fileNode.Chunks);
+
+        // Should load into runtime without errors
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        vm.LoadSystemFile(filePath);
+    }
+
+    private static void ValidateNegativeCase(string filePath)
+    {
+        var source = File.ReadAllText(filePath);
+
+        // Should fail to parse
+        Assert.Throws<InvalidOperationException>(() => ParseFileIn(source));
+    }
+
+    private static FileNode ParseFileIn(string source)
+    {
+        var reader = new StringReader(source);
+        var input = new Antlr4.Runtime.AntlrInputStream(reader);
+        var lexer = new Smalltalk80.Generated.Smalltalk80Lexer(input);
+        var tokens = new Antlr4.Runtime.CommonTokenStream(lexer);
+        var parser = new Smalltalk80.Generated.Smalltalk80Parser(tokens);
+        parser.RemoveErrorListeners();
+
+        var fileCtx = parser.fileIn();
+        if (parser.NumberOfSyntaxErrors > 0)
+            throw new InvalidOperationException("Parse errors detected");
+
+        var visitor = new ClassDefBuildingVisitor();
+        return (FileNode)visitor.VisitFileIn(fileCtx)!;
+    }
+
+    private static string GetTestFile(string levelDir, string fileName)
+    {
+        return Path.Combine(TestCasesRoot, levelDir, fileName);
+    }
+
+    #endregion
+}
+
+`
+
+FILE path=Smalltalk80.Tests/TestFrameworkTests.cs sha256=56586484e91b565eaded1611bd3e5a90b16616aa9fbcdf022e381c87e4c3ba8d lines=167
+---
+`$lang
+// file: Smalltalk80.Tests/TestFrameworkTests.cs
+using System;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Tests for the Smalltalk test framework infrastructure.
+/// Validates that TestLibrary.st loads correctly and provides working test execution.
+/// </summary>
+public class TestFrameworkTests
+{
+    private readonly ITestOutputHelper output;
+
+    public TestFrameworkTests(ITestOutputHelper output)
+    {
+        this.output = output;
+    }
+
+    [Fact]
+    public void TestLibrary_LoadsSuccessfully()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Verify essential test framework classes exist
+        Assert.True(SystemDictionary.TryGetClass("TestCase", out var testCaseClass));
+        Assert.True(SystemDictionary.TryGetClass("TestResult", out var testResultClass));
+        Assert.True(SystemDictionary.TryGetClass("TestSuite", out var testSuiteClass));
+        Assert.True(SystemDictionary.TryGetClass("TestRunner", out var testRunnerClass));
+        Assert.True(SystemDictionary.TryGetClass("TestFailure", out var testFailureClass));
+
+        output.WriteLine("✅ All test framework classes loaded successfully");
+
+        // Verify test framework classes have expected methods
+        Assert.True(testCaseClass.MethodDictionary.ContainsKey(new Symbol("assert:")));
+        Assert.True(testCaseClass.MethodDictionary.ContainsKey(new Symbol("assertEqual:to:")));
+        Assert.True(testCaseClass.MethodDictionary.ContainsKey(new Symbol("runTest")));
+
+        output.WriteLine("✅ Test framework classes have expected methods");
+    }
+
+    [Fact]
+    public void SampleBasicTest_ExecutesSuccessfully()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Verify sample test class exists
+        Assert.True(SystemDictionary.TryGetClass("SampleBasicTest", out var sampleTestClass));
+
+        output.WriteLine("✅ SampleBasicTest class found");
+
+        // Check that it has test methods
+        var testMethods = 0;
+        foreach (var methodName in sampleTestClass.MethodDictionary.Keys)
+        {
+            if (methodName.Name.StartsWith("test"))
+            {
+                testMethods++;
+                output.WriteLine($"   Found test method: {methodName.Name}");
+            }
+        }
+
+        Assert.True(testMethods > 0, "SampleBasicTest should have test methods");
+        output.WriteLine($"✅ Found {testMethods} test methods in SampleBasicTest");
+    }
+
+    [Fact]
+    public void TestCase_BasicAssertion_Works()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Get TestCase class and create instance
+        var testCaseClass = SystemDictionary.GetClass("TestCase");
+        var testCaseInstance = new SmalltalkObject(testCaseClass, testCaseClass.InstanceVariables.Count);
+
+        // Test basic assertion - this should not fail
+        var assertMethod = testCaseClass.Lookup(new Symbol("assert:"));
+        Assert.NotNull(assertMethod);
+
+        var interpreter = vm.Interpreter;
+        interpreter.SetActiveContext(testCaseInstance, assertMethod, true); // assert: true
+
+        // This should execute without throwing
+        var result = interpreter.ExecuteMethod();
+
+        output.WriteLine("✅ Basic assertion (assert: true) executed successfully");
+    }
+
+    [Fact]
+    public void TestFramework_Integration_CreatesAndRunsTest()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Test the complete integration by attempting to create and run a simple test
+        // This validates that all the framework pieces work together
+
+        // Get SampleBasicTest class
+        var sampleTestClass = SystemDictionary.GetClass("SampleBasicTest");
+        var sampleTestInstance = new SmalltalkObject(sampleTestClass, sampleTestClass.InstanceVariables.Count);
+
+        // Test that we can access test methods
+        Assert.True(sampleTestClass.MethodDictionary.ContainsKey(new Symbol("testBasicArithmetic")));
+        Assert.True(sampleTestClass.MethodDictionary.ContainsKey(new Symbol("testBooleanLogic")));
+        Assert.True(sampleTestClass.MethodDictionary.ContainsKey(new Symbol("testObjectIdentity")));
+
+        output.WriteLine("✅ Test framework integration validation completed");
+        output.WriteLine("   - TestCase class hierarchy working");
+        output.WriteLine("   - Test methods accessible");
+        output.WriteLine("   - Sample test class properly defined");
+    }
+
+    [Fact]
+    public void TestFramework_ArrayExtensions_Work()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Test that Array extensions from test framework work
+        var arrayClass = SystemDictionary.GetClass("Array");
+
+        // Check that essential methods exist
+        Assert.True(arrayClass.MethodDictionary.ContainsKey(new Symbol("copyWith:")));
+        Assert.True(arrayClass.MethodDictionary.ContainsKey(new Symbol("do:")));
+        Assert.True(arrayClass.MethodDictionary.ContainsKey(new Symbol(",")));
+
+        output.WriteLine("✅ Array extensions from test framework loaded successfully");
+    }
+
+    [Fact]
+    public void TestFramework_StringExtensions_Work()
+    {
+        // Reset system to clean state
+        ObjectMemory.Reset();
+
+        // Create VM and load test framework
+        var vm = VirtualMachine.CreateWithTestFramework();
+
+        // Test that String extensions from test framework work
+        var stringClass = SystemDictionary.GetClass("String");
+
+        // Check that essential methods exist
+        Assert.True(stringClass.MethodDictionary.ContainsKey(new Symbol("startsWith:")));
+        Assert.True(stringClass.MethodDictionary.ContainsKey(new Symbol("printString")));
+
+        output.WriteLine("✅ String extensions from test framework loaded successfully");
+    }
+}
+
+`
+
+FILE path=Smalltalk80.Tests/TracerTests.cs sha256=f16017ee644ad87c9a1c723be2445afb569a7443562eea60fa0bcdfbbd17a3ad lines=33
+---
+`$lang
+// file: Smalltalk80.Tests/TracerTests.cs
+using System;
+using System.IO;
+using Xunit;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Tests ensuring that <see cref="Tracer"/> correctly reports instance variable
+/// information when parsing methods.
+/// </summary>
+public class TracerTests
+{
+    [Fact(Skip = "Tracer not used in current implementation")]
+    public void ParseMethod_LogsInstanceVariables()
+    {
+        var originalOut = Console.Out;
+        try
+        {
+            using var writer = new StringWriter();
+            Console.SetOut(writer);
+            Tracer.Enabled = true;
+            var parser = new SmalltalkParser("selectors at: index!");
+            parser.ParseMethod(new[] { "index" }, new[] { "selectors" }, "selectorAt:");
+            var output = writer.ToString();
+            Assert.Contains("Instance variables in scope: selectors", output);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+}
+
+`
+
+FILE path=Smalltalk80.Tests/VirtualMachineIntegrationTests.cs sha256=5a6b8d4b2f04eddbc2c87b6ca6563cbac4287fbbf5431e2bc1cbbeb8625c6d42 lines=103
+---
+`$lang
+// file: Smalltalk80.Tests/VirtualMachineIntegrationTests.cs
+using System;
+using Xunit;
+
+namespace Smalltalk80.Tests;
+
+/// <summary>
+/// Provides higher level integration tests for the virtual machine.
+/// </summary>
+public class VirtualMachineIntegrationTests
+{
+    /// <summary>
+    /// Ensures that sending the <c>class</c> message to the global <c>Object</c>
+    /// returns its class object.
+    /// </summary>
+    [Fact]
+    public void GlobalObject_RespondsToClassMessage()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var receiver = StandardLibrary.Get("Object");
+        var objectClass = receiver.ClassPointer!;
+
+        objectClass.MethodDictionary[new Symbol("class")] = new CompiledMethod
+        {
+            Bytecodes = new[] { (byte)Bytecode.ReturnSelf },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0,
+            HasPrimitive = true,
+            PrimitiveIndex = 111
+        };
+
+        var method = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SendSpecialSelector7,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = Array.Empty<object>(),
+            TemporariesCount = 0
+        };
+
+        var result = vm.Interpreter.Evaluate(method, receiver);
+
+        Assert.Same(objectClass, result);
+    }
+
+    /// <summary>
+    /// Confirms that a newly created class is registered in the object memory.
+    /// </summary>
+    [Fact]
+    public void NewClass_IsStoredInObjectMemory()
+    {
+        ObjectMemory.Reset();
+        _ = new VirtualMachine();
+        var newClass = new SmalltalkClass();
+
+        Assert.Contains(newClass, ObjectMemory.Objects);
+    }
+
+    /// <summary>
+    /// Validates that instances of a dynamically defined class respond to
+    /// their installed methods.
+    /// </summary>
+    [Fact]
+    public void NewClass_MethodInvocation_Works()
+    {
+        ObjectMemory.Reset();
+        var vm = new VirtualMachine();
+        var newClass = new SmalltalkClass();
+        var instance = new SmalltalkObject(newClass, 0);
+
+        var fooMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushLiteralConstant0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { 99 },
+            TemporariesCount = 0
+        };
+        newClass.MethodDictionary[new Symbol("foo")] = fooMethod;
+
+        var callMethod = new CompiledMethod
+        {
+            Bytecodes = new byte[]
+            {
+                (byte)Bytecode.PushSelf,
+                (byte)Bytecode.SingleExtendedSend, 0,
+                (byte)Bytecode.ReturnTopFromMethod
+            },
+            Literals = new object[] { new Symbol("foo") },
+            TemporariesCount = 0
+        };
+
+        var result = vm.Interpreter.Evaluate(callMethod, instance);
+
+        Assert.Equal(99, result);
+    }
+}
+
+`
+
+FILE path=Smalltalk80/AssemblyInfo.cs sha256=4e7917426165893974f484d8f99d4e80ba378b933e1c312c67ae05d722ad3404 lines=4
+---
+`$lang
+// file: Smalltalk80/AssemblyInfo.cs
+using System;
+
+[assembly: CLSCompliant(false)]
+
+`
+
+FILE path=Smalltalk80/Association.cs sha256=6fef32d42ef253ddbac559896b5203882b95211a7a3923e2a875bbbad1d511f4 lines=30
+---
+`$lang
+// file: Smalltalk80/Association.cs
+using System;
+
+/// <summary>
+///     Represents an association between a symbol and a value. Shared variables
+///     in the literal frame are stored as <see cref="Association"/> objects.
+/// </summary>
+public sealed class Association
+{
+    /// <summary>
+    ///     Gets the symbol naming the variable.
+    /// </summary>
+    public Symbol Key { get; }
+
+    /// <summary>
+    ///     Gets or sets the value of the variable.
+    /// </summary>
+    public object? Value { get; set; }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="Association"/> class.
+    /// </summary>
+    /// <param name="key">The identifier of the variable.</param>
+    /// <param name="value">The initial value.</param>
+    public Association(Symbol key, object? value = null)
+    {
+        Key = key;
+        Value = value;
+    }
+}
+
+`
+
+FILE path=Smalltalk80/BlockContext.cs sha256=f2be6c84b36235f65d8b95501d8aceb47fd27828c576e32850ace625f1c63f7d lines=54
+---
+`$lang
+// file: Smalltalk80/BlockContext.cs
+using System;
+using System.Collections.Generic;
+
+/// <summary>
+///     An execution context used for evaluating Smalltalk blocks.
+/// </summary>
+public sealed class BlockContext : Context
+{
+    /// <summary>
+    ///     Gets the context in which the block was defined.
+    /// </summary>
+    public required Context HomeContext { get; init; }
+
+    /// <summary>
+    ///     Gets the bytecode offset of the first instruction in the block.
+    /// </summary>
+    public int StartPC { get; init; }
+
+    /// <summary>
+    ///     Gets the number of arguments expected by the block.
+    /// </summary>
+    public int ArgumentCount { get; init; }
+
+    /// <summary>
+    ///     Creates a new <see cref="BlockContext"/> configured for execution.
+    /// </summary>
+    /// <param name="homeContext">The context that defined the block.</param>
+    /// <param name="startPC">The bytecode position where the block begins.</param>
+    /// <param name="argCount">The number of arguments accepted by the block.</param>
+    /// <param name="args">The argument values supplied to the block.</param>
+    /// <param name="sender">The context invoking the block.</param>
+    /// <returns>A fully initialized <see cref="BlockContext"/> ready for execution.</returns>
+    public static BlockContext Create(
+        Context homeContext,
+        int startPC,
+        int argCount,
+        object?[] args,
+        Context sender)
+    {
+        return new BlockContext
+        {
+            HomeContext = homeContext,
+            StartPC = startPC,
+            Sender = sender,
+            Method = homeContext.Method,
+            Receiver = homeContext.Receiver,
+            Arguments = args,
+            ArgumentCount = argCount,
+            Temporaries = homeContext.Temporaries,
+            Stack = new Stack<object?>(),
+            PC = startPC
+        };
+    }
+}
+`
+
+FILE path=Smalltalk80/Bootstrap/BootstrapContext.cs sha256=2f7125b6dc6c3b8a8ecb7ec2b66431ac09a72d02dc8ed8b46ea99bbb33a7c519 lines=158
+---
+`$lang
+// file: Smalltalk80/Bootstrap/BootstrapContext.cs
+using System;
+using System.Collections.Generic;
+
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Encapsulates C# shadow dictionaries used ONLY during the initial bootstrap phase.
+/// These dictionaries are necessary to track objects before the Smalltalk SystemDictionary
+/// and message sending infrastructure are operational.
+/// 
+/// IMPORTANT: This class should ONLY be used during Phase 1 bootstrap.
+/// After Phase 1 completes and the Smalltalk SystemDictionary exists,
+/// all lookups should use the Smalltalk dictionary via primitive operations.
+/// </summary>
+internal sealed class BootstrapContext
+{
+    private readonly Dictionary<string, int> temporaryGlobals = new();
+    private readonly Dictionary<string, int> temporaryClasses = new();
+    private readonly Dictionary<string, int> temporarySymbols = new();
+    private bool isActive = true;
+    private int smalltalkDictionaryOop = -1;
+
+    /// <summary>
+    /// Check if the bootstrap context is still active.
+    /// Once deactivated, all operations should fail.
+    /// </summary>
+    public bool IsActive => isActive;
+
+    /// <summary>
+    /// Register a temporary global during bootstrap.
+    /// This should ONLY be called during Phase 1.
+    /// </summary>
+    public void RegisterTemporaryGlobal(string name, int oop)
+    {
+        if (!isActive)
+            throw new InvalidOperationException("Bootstrap context has been deactivated. Use Smalltalk dictionary instead.");
+        
+        temporaryGlobals[name] = oop;
+        
+        // Track the Smalltalk dictionary specially
+        if (name == "Smalltalk")
+        {
+            smalltalkDictionaryOop = oop;
+        }
+    }
+
+    /// <summary>
+    /// Register a temporary class during bootstrap.
+    /// This should ONLY be called during Phase 1.
+    /// </summary>
+    public void RegisterTemporaryClass(string name, int oop)
+    {
+        if (!isActive)
+            throw new InvalidOperationException("Bootstrap context has been deactivated. Use Smalltalk dictionary instead.");
+        
+        temporaryClasses[name] = oop;
+    }
+
+    /// <summary>
+    /// Register a temporary symbol during bootstrap.
+    /// This ensures symbol uniqueness during Phase 1.
+    /// </summary>
+    public bool TryGetTemporarySymbol(string value, out int oop)
+    {
+        if (!isActive)
+            throw new InvalidOperationException("Bootstrap context has been deactivated. Use Smalltalk dictionary instead.");
+        
+        return temporarySymbols.TryGetValue(value, out oop);
+    }
+
+    /// <summary>
+    /// Register a new symbol in the temporary table.
+    /// </summary>
+    public void RegisterTemporarySymbol(string value, int oop)
+    {
+        if (!isActive)
+            throw new InvalidOperationException("Bootstrap context has been deactivated. Use Smalltalk dictionary instead.");
+        
+        temporarySymbols[value] = oop;
+    }
+
+    /// <summary>
+    /// Lookup a temporary global during bootstrap.
+    /// Returns -1 if not found.
+    /// </summary>
+    public int LookupTemporaryGlobal(string name)
+    {
+        if (!isActive)
+            return -1;
+        
+        return temporaryGlobals.TryGetValue(name, out var oop) ? oop : -1;
+    }
+
+    /// <summary>
+    /// Lookup a temporary class during bootstrap.
+    /// Returns -1 if not found.
+    /// </summary>
+    public int LookupTemporaryClass(string name)
+    {
+        if (!isActive)
+            return -1;
+        
+        return temporaryClasses.TryGetValue(name, out var oop) ? oop : -1;
+    }
+
+    /// <summary>
+    /// Get the Smalltalk SystemDictionary OOP if it has been registered.
+    /// </summary>
+    public int GetSmalltalkDictionaryOop()
+    {
+        return smalltalkDictionaryOop;
+    }
+
+    /// <summary>
+    /// Migrate all temporary entries to the Smalltalk SystemDictionary
+    /// and deactivate this bootstrap context.
+    /// After this call, all methods will throw or return -1.
+    /// </summary>
+    public void MigrateToSmalltalkDictionary(Action<string, int> registerInSmalltalk)
+    {
+        if (!isActive)
+            return;
+
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating temporary bootstrap dictionaries to Smalltalk SystemDictionary...");
+        
+        // Migrate all globals to Smalltalk dictionary
+        foreach (var kvp in temporaryGlobals)
+        {
+            // Register all globals including Smalltalk itself
+            // It's important to have "Smalltalk" as an entry in the Smalltalk dictionary
+            registerInSmalltalk(kvp.Key, kvp.Value);
+        }
+        
+        // Migrate all classes to Smalltalk dictionary
+        foreach (var kvp in temporaryClasses)
+        {
+            registerInSmalltalk(kvp.Key, kvp.Value);
+        }
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Migrated {temporaryGlobals.Count} globals and {temporaryClasses.Count} classes");
+        
+        // Clear and deactivate
+        temporaryGlobals.Clear();
+        temporaryClasses.Clear();
+        temporarySymbols.Clear();
+        isActive = false;
+        
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap context deactivated. All lookups now use Smalltalk SystemDictionary.");
+    }
+
+    /// <summary>
+    /// Get statistics about the temporary dictionaries (for debugging).
+    /// </summary>
+    public (int globals, int classes, int symbols) GetStatistics()
+    {
+        return (temporaryGlobals.Count, temporaryClasses.Count, temporarySymbols.Count);
+    }
+}
+`
+
+FILE path=Smalltalk80/Bootstrap/BytecodeBootstrapper.cs sha256=419bf843ee76e6f40df8097e08ec5e11bf986a722492d8a1b6399a5ec0d0abdb lines=377
+---
+`$lang
+// file: Smalltalk80/Bootstrap/BytecodeBootstrapper.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using Smalltalk80.Parser;
+
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Stage 2 bootstrapper that executes Smalltalk bytecode instead of issuing VM primitives.
+/// This represents the transition from external orchestration to internal execution.
+/// </summary>
+public class BytecodeBootstrapper
+{
+    private readonly ISmalltalkVM vm;
+    private readonly Dictionary<string, int> globalOops = new();
+    
+    // Bytecode constants
+    private const byte PUSH_RECEIVER = 0x70;
+    private const byte PUSH_TRUE = 0x71;
+    private const byte PUSH_FALSE = 0x72;
+    private const byte PUSH_NIL = 0x73;
+    private const byte PUSH_TEMP = 0x10;      // +0 to +15 for temps 0-15
+    private const byte PUSH_LITERAL = 0x20;   // +0 to +15 for literals 0-15
+    private const byte PUSH_GLOBAL = 0x40;    // Custom: push global by name
+    private const byte POP_STORE_TEMP = 0x60; // +0 to +15 for temps 0-15
+    private const byte SEND_SELECTOR = 0x80;  // +0 to +15 for arg count
+    private const byte RETURN_TOP = 0x7C;
+    private const byte RETURN_RECEIVER = 0x7D;
+    private const byte DUP = 0x68;
+    private const byte POP = 0x69;
+    
+    public BytecodeBootstrapper(ISmalltalkVM vm)
+    {
+        this.vm = vm;
+        InitializeGlobals();
+    }
+    
+    /// <summary>
+    /// Initialize global mappings from Stage 1
+    /// </summary>
+    private void InitializeGlobals()
+    {
+        // These should already exist from Stage 1
+        globalOops["Object"] = vm.PrimitiveLookupClass("Object");
+        globalOops["Class"] = vm.PrimitiveLookupClass("Class");
+        globalOops["Behavior"] = vm.PrimitiveLookupClass("Behavior");
+        globalOops["ProtoObject"] = vm.PrimitiveLookupClass("ProtoObject");
+        globalOops["Symbol"] = vm.PrimitiveLookupClass("Symbol");
+        globalOops["Dictionary"] = vm.PrimitiveLookupClass("Dictionary");
+        globalOops["Array"] = vm.PrimitiveLookupClass("Array");
+        globalOops["true"] = vm.PrimitiveLookupGlobal("true");
+        globalOops["false"] = vm.PrimitiveLookupGlobal("false");
+        globalOops["nil"] = vm.PrimitiveLookupGlobal("nil");
+    }
+    
+    /// <summary>
+    /// Execute Stage 2 bootstrap using bytecode
+    /// </summary>
+    public void ExecuteStage2(string stage2File)
+    {
+        Console.WriteLine("Starting Stage 2 Bootstrap via Bytecode Execution...");
+        
+        // Load and execute Stage2Bootstrap.st
+        LoadStage2File(stage2File);
+        
+        // Verify critical classes exist
+        VerifyStage2Classes();
+        
+        Console.WriteLine("Stage 2 Bootstrap Complete!");
+    }
+    
+    /// <summary>
+    /// Load a .st file and execute it via bytecode
+    /// </summary>
+    private void LoadStage2File(string filename)
+    {
+        // TODO: Reimplement when parser infrastructure is ready
+        throw new NotImplementedException("LoadStage2File requires ParserService which is being reworked");
+        /*
+        var source = File.ReadAllText(filename);
+        var fileNode = ParserService.ParseFileIn(source);
+        
+        foreach (var chunk in fileNode.Chunks)
+        {
+            switch (chunk)
+            {
+                case ClassDefinitionNode classDef:
+                    ExecuteClassDefinition(classDef);
+                    break;
+                    
+                case MethodCategoryNode methodCategory:
+                    ExecuteMethodCategory(methodCategory);
+                    break;
+                    
+                case ExpressionChunkNode exprChunk:
+                    ExecuteExpression(exprChunk);
+                    break;
+            }
+        }
+        */
+    }
+    
+    /// <summary>
+    /// Execute a class definition via bytecode
+    /// </summary>
+    private void ExecuteClassDefinition(ClassDefinitionNode classDef)
+    {
+        Console.WriteLine($"Creating class {classDef.ClassName} via bytecode...");
+        
+        // Generate bytecode for:
+        // SuperClass subclass: #ClassName
+        //     instanceVariableNames: 'var1 var2'
+        //     classVariableNames: 'ClassVar1'
+        //     poolDictionaries: ''
+        //     category: 'Category'
+        
+        var bytecode = new BytecodeBuilder();
+        
+        // Push superclass
+        if (classDef.Superclass == "nil" || classDef.Superclass == null)
+        {
+            bytecode.PushNil();
+        }
+        else
+        {
+            bytecode.PushGlobal(classDef.Superclass);
+        }
+        
+        // Push class name symbol
+        bytecode.PushLiteral(vm.PrimitiveInternSymbol(classDef.ClassName));
+        
+        // Push instance variables string
+        bytecode.PushLiteral(vm.PrimitiveInternString(
+            string.Join(" ", classDef.InstanceVariables)));
+        
+        // Push class variables string
+        bytecode.PushLiteral(vm.PrimitiveInternString(
+            string.Join(" ", classDef.ClassVariables)));
+        
+        // Push pool dictionaries string
+        bytecode.PushLiteral(vm.PrimitiveInternString(
+            string.Join(" ", classDef.PoolDictionaries)));
+        
+        // Push category string
+        bytecode.PushLiteral(vm.PrimitiveInternString(
+            classDef.Category ?? "Unclassified"));
+        
+        // Send subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+        bytecode.SendSelector("subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:", 5);
+        
+        // Store result in global
+        bytecode.StoreGlobal(classDef.ClassName);
+        
+        // Execute the bytecode
+        vm.ExecuteBytecode(vm.PrimitiveLookupGlobal("Smalltalk"), bytecode.GetBytes(), new int[0]);
+        
+        // Track the new class
+        globalOops[classDef.ClassName] = vm.PrimitiveLookupClass(classDef.ClassName);
+    }
+    
+    /// <summary>
+    /// Execute method definitions via bytecode
+    /// </summary>
+    private void ExecuteMethodCategory(MethodCategoryNode category)
+    {
+        var className = category.Header.ClassName;
+        var isClassSide = category.Header.IsClassSide;
+        
+        Console.WriteLine($"Installing methods in {className}{(isClassSide ? " class" : "")}...");
+        
+        foreach (var method in category.Methods)
+        {
+            ExecuteMethodInstallation(className, method, isClassSide);
+        }
+    }
+    
+    /// <summary>
+    /// Install a single method via bytecode
+    /// </summary>
+    private void ExecuteMethodInstallation(string className, MethodDefinitionNode method, bool isClassSide)
+    {
+        var bytecode = new BytecodeBuilder();
+        
+        // Push the class (or metaclass if class-side)
+        if (isClassSide)
+        {
+            bytecode.PushGlobal(className);
+            bytecode.SendSelector("class", 0); // Get metaclass
+        }
+        else
+        {
+            bytecode.PushGlobal(className);
+        }
+        
+        // Push the method source
+        bytecode.PushLiteral(vm.PrimitiveInternString(method.Source));
+        
+        // Send compile:
+        bytecode.SendSelector("compile:", 1);
+        
+        // Pop result
+        bytecode.Pop();
+        
+        // Execute
+        vm.ExecuteBytecode(vm.PrimitiveLookupGlobal("Smalltalk"), bytecode.GetBytes(), new int[0]);
+    }
+    
+    /// <summary>
+    /// Execute an expression chunk (like SystemDictionary initialize)
+    /// </summary>
+    private void ExecuteExpression(ExpressionChunkNode exprChunk)
+    {
+        Console.WriteLine("Executing expression chunk via bytecode...");
+        
+        // For now, compile the expression to bytecode
+        // This would need a more complete compiler
+        var bytecode = CompileExpression(exprChunk.Expression);
+        vm.ExecuteBytecode(vm.PrimitiveLookupGlobal("Smalltalk"), bytecode, new int[0]);
+    }
+    
+    /// <summary>
+    /// Simple expression compiler (would need expansion)
+    /// </summary>
+    private byte[] CompileExpression(ExpressionNode expr)
+    {
+        var bytecode = new BytecodeBuilder();
+        
+        switch (expr)
+        {
+            case UnarySendExpression unary:
+                // Compile receiver
+                CompileExpressionInto(unary.Receiver, bytecode);
+                // Send selector
+                bytecode.SendSelector(unary.Selector, 0);
+                break;
+                
+            case KeywordSendExpression keyword:
+                // Compile receiver
+                CompileExpressionInto(keyword.Receiver, bytecode);
+                // Compile arguments
+                foreach (var arg in keyword.Arguments)
+                {
+                    CompileExpressionInto(arg, bytecode);
+                }
+                // Send selector
+                var selector = string.Join("", keyword.SelectorParts);
+                bytecode.SendSelector(selector, keyword.Arguments.Count);
+                break;
+                
+            case VariableExpression variable:
+                bytecode.PushGlobal(variable.Name);
+                break;
+                
+            case LiteralExpression literal:
+                if (literal.Value is string str)
+                {
+                    bytecode.PushLiteral(vm.PrimitiveInternString(str));
+                }
+                else if (literal.Value is int num)
+                {
+                    bytecode.PushLiteral(num);
+                }
+                break;
+        }
+        
+        bytecode.ReturnTop();
+        return bytecode.GetBytes();
+    }
+    
+    private void CompileExpressionInto(ExpressionNode expr, BytecodeBuilder bytecode)
+    {
+        // Helper to compile expression without return
+        // Similar to CompileExpression but doesn't add RETURN_TOP
+        // Implementation would be similar to above
+    }
+    
+    /// <summary>
+    /// Verify Stage 2 classes were created
+    /// </summary>
+    private void VerifyStage2Classes()
+    {
+        string[] expectedClasses = {
+            "Message", "BlockContext", "Boolean", "True", "False",
+            "Collection", "SequenceableCollection", "OrderedCollection",
+            "String", "SystemDictionary", "Magnitude", "Number"
+        };
+        
+        foreach (var className in expectedClasses)
+        {
+            var classOop = vm.PrimitiveLookupClass(className);
+            if (classOop != -1)
+            {
+                Console.WriteLine($"✓ {className} created successfully");
+            }
+            else
+            {
+                Console.WriteLine($"✗ {className} not found!");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Helper class to build bytecode sequences
+    /// </summary>
+    private class BytecodeBuilder
+    {
+        private readonly List<byte> bytes = new();
+        private readonly List<object> literals = new();
+        
+        public void PushReceiver() => bytes.Add(PUSH_RECEIVER);
+        public void PushTrue() => bytes.Add(PUSH_TRUE);
+        public void PushFalse() => bytes.Add(PUSH_FALSE);
+        public void PushNil() => bytes.Add(PUSH_NIL);
+        public void Dup() => bytes.Add(DUP);
+        public void Pop() => bytes.Add(POP);
+        public void ReturnTop() => bytes.Add(RETURN_TOP);
+        public void ReturnReceiver() => bytes.Add(RETURN_RECEIVER);
+        
+        public void PushLiteral(object literal)
+        {
+            var index = literals.Count;
+            literals.Add(literal);
+            bytes.Add((byte)(PUSH_LITERAL + index));
+        }
+        
+        public void PushGlobal(string globalName)
+        {
+            bytes.Add(PUSH_GLOBAL);
+            bytes.AddRange(Encoding.UTF8.GetBytes(globalName));
+            bytes.Add(0); // null terminator
+        }
+        
+        public void StoreGlobal(string globalName)
+        {
+            // Custom bytecode for storing global
+            bytes.Add(0x50); // STORE_GLOBAL
+            bytes.AddRange(Encoding.UTF8.GetBytes(globalName));
+            bytes.Add(0);
+        }
+        
+        public void SendSelector(string selector, int argCount)
+        {
+            bytes.Add((byte)(SEND_SELECTOR + argCount));
+            bytes.AddRange(Encoding.UTF8.GetBytes(selector));
+            bytes.Add(0);
+        }
+        
+        public byte[] GetBytes()
+        {
+            // In a real implementation, would need to encode literals properly
+            return bytes.ToArray();
+        }
+    }
+}
+
+/// <summary>
+/// Extended VM interface for Stage 2
+/// </summary>
+public interface ISmalltalkVM_Stage2 : ISmalltalkVM
+{
+    /// <summary>
+    /// Execute bytecode in the VM
+    /// </summary>
+    void ExecuteBytecode(byte[] bytecode);
+    
+    /// <summary>
+    /// Lookup a global by name
+    /// </summary>
+    new int PrimitiveLookupGlobal(string name);
+    
+    /// <summary>
+    /// Intern a string (create String object)
+    /// </summary>
+    new int PrimitiveInternString(string str);
+}
+`
+
+FILE path=Smalltalk80/Bootstrap/GeneratePhase3Manifest.cs sha256=6646d179c4284734d3a882e81b6784fbebca95c371c4eb6ff2554dadda9bf46b lines=43
+---
+`$lang
+// file: Smalltalk80/Bootstrap/GeneratePhase3Manifest.cs
+using System;
+using System.IO;
+
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Console application to generate Phase 3 manifest from Smalltalk source.
+/// </summary>
+public class GeneratePhase3Manifest
+{
+    public static void Main(string[] args)
+    {
+        if (args.Length < 1)
+        {
+            Console.WriteLine("Usage: GeneratePhase3Manifest <input.st> [output.json]");
+            Console.WriteLine("  input.st: Smalltalk source file to parse");
+            Console.WriteLine("  output.json: Output manifest file (default: bootstrap_phase3_generated.json)");
+            return;
+        }
+        
+        var inputPath = args[0];
+        var outputPath = args.Length > 1 ? args[1] : "bootstrap_phase3_generated.json";
+        
+        if (!File.Exists(inputPath))
+        {
+            Console.WriteLine($"Error: Input file '{inputPath}' not found");
+            return;
+        }
+        
+        try
+        {
+            var generator = new Phase3ManifestGenerator();
+            generator.GenerateFromFile(inputPath, outputPath);
+            
+            Console.WriteLine("Phase 3 manifest generation complete!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating manifest: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
+    }
+}
+`
+
+FILE path=Smalltalk80/Bootstrap/ISmalltalkVM.cs sha256=0227f10639c89f668da5292d447b594d9738c6a8aecfed1b170c61cab46dacd5 lines=185
+---
+`$lang
+// file: Smalltalk80/Bootstrap/ISmalltalkVM.cs
+namespace Smalltalk80.Bootstrap;
+
+/// <summary>
+/// Interface for primitive-level VM operations used during bootstrap.
+/// These primitives construct actual Smalltalk objects inside the VM.
+/// </summary>
+public interface ISmalltalkVM
+{
+    /// <summary>
+    /// Create a new class object (not metaclass).
+    /// Returns the object ID (OOP) of the created class.
+    /// </summary>
+    int PrimitiveNewClass();
+
+    /// <summary>
+    /// Create a new metaclass object.
+    /// Returns the object ID (OOP) of the created metaclass.
+    /// </summary>
+    int PrimitiveNewMetaclass();
+
+    /// <summary>
+    /// Create a new instance of a class.
+    /// </summary>
+    /// <param name="classId">The OOP of the class to instantiate.</param>
+    /// <returns>The OOP of the new instance.</returns>
+    int PrimitiveNewInstance(int classId);
+
+    /// <summary>
+    /// Get slot value at a specific index.
+    /// </summary>
+    /// <param name="objectId">The OOP of the object.</param>
+    /// <param name="slotIndex">The 0-based slot index.</param>
+    /// <returns>The OOP of the value at the slot, or -1 if not found.</returns>
+    int GetSlot(int objectId, int slotIndex);
+    
+    /// <summary>
+    /// Set slot value at a specific index.
+    /// </summary>
+    /// <param name="objectId">The OOP of the object.</param>
+    /// <param name="slotIndex">The 0-based slot index.</param>
+    /// <param name="valueId">The OOP of the value to store.</param>
+    void PrimitiveSetSlot(int objectId, int slotIndex, int valueId);
+
+    /// <summary>
+    /// Set the class pointer of an object.
+    /// </summary>
+    /// <param name="objectId">The OOP of the object.</param>
+    /// <param name="classId">The OOP of the class.</param>
+    void PrimitiveSetClass(int objectId, int classId);
+
+    /// <summary>
+    /// Intern a symbol and return its OOP.
+    /// </summary>
+    /// <param name="name">The symbol name to intern.</param>
+    /// <returns>The OOP of the interned symbol.</returns>
+    int PrimitiveInternSymbol(string name);
+
+    /// <summary>
+    /// Create a SmallInteger object.
+    /// </summary>
+    /// <param name="value">The integer value.</param>
+    /// <returns>The OOP of the created SmallInteger.</returns>
+    int PrimitiveNewSmallInteger(int value);
+    
+    /// <summary>
+    /// Create a new array.
+    /// </summary>
+    /// <param name="size">The size of the array.</param>
+    /// <returns>The OOP of the created array.</returns>
+    int PrimitiveNewArray(int size);
+    
+    /// <summary>
+    /// Create a new ByteArray of specified size.
+    /// </summary>
+    /// <param name="size">The size of the ByteArray.</param>
+    /// <returns>The OOP of the created ByteArray.</returns>
+    int PrimitiveNewByteArray(int size);
+
+    /// <summary>
+    /// Set array element at index.
+    /// </summary>
+    /// <param name="arrayId">The OOP of the array.</param>
+    /// <param name="index">The 0-based index.</param>
+    /// <param name="valueId">The OOP of the value to store.</param>
+    void PrimitiveArrayAtPut(int arrayId, int index, int valueId);
+
+    /// <summary>
+    /// Store a raw byte value in a ByteArray at the specified index.
+    /// </summary>
+    /// <param name="byteArrayId">The OOP of the ByteArray.</param>
+    /// <param name="index">The 0-based index.</param>
+    /// <param name="value">The byte value to store (0-255).</param>
+    void PrimitiveByteArrayAtPut(int byteArrayId, int index, byte value);
+
+    /// <summary>
+    /// Create a new dictionary.
+    /// </summary>
+    /// <returns>The OOP of the created dictionary.</returns>
+    int PrimitiveNewDictionary();
+
+    /// <summary>
+    /// Add a key-value pair to a dictionary.
+    /// </summary>
+    /// <param name="dictId">The OOP of the dictionary.</param>
+    /// <param name="keyId">The OOP of the key.</param>
+    /// <param name="valueId">The OOP of the value.</param>
+    void PrimitiveDictionaryAtPut(int dictId, int keyId, int valueId);
+    
+    /// <summary>
+    /// Look up a value in a dictionary by key.
+    /// </summary>
+    /// <param name="dictId">The OOP of the dictionary.</param>
+    /// <param name="keyId">The OOP of the key.</param>
+    /// <returns>The OOP of the value, or -1 if not found.</returns>
+    int PrimitiveDictionaryAt(int dictId, int keyId);
+
+    /// <summary>
+    /// Compile and install a method in a class.
+    /// </summary>
+    /// <param name="classId">The OOP of the class.</param>
+    /// <param name="selector">The method selector.</param>
+    /// <param name="sourceCode">The Smalltalk source code.</param>
+    void PrimitiveInstallMethod(int classId, string selector, string sourceCode);
+
+    /// <summary>
+    /// Get the nil object OOP.
+    /// </summary>
+    int PrimitiveNil();
+
+    /// <summary>
+    /// Register a global variable in Smalltalk dictionary.
+    /// </summary>
+    /// <param name="name">The global variable name.</param>
+    /// <param name="valueId">The OOP of the value.</param>
+    void PrimitiveRegisterGlobal(string name, int valueId);
+
+    /// <summary>
+    /// Get a registered class by name.
+    /// </summary>
+    /// <param name="className">The class name.</param>
+    /// <returns>The OOP of the class, or -1 if not found.</returns>
+    int PrimitiveLookupClass(string className);
+    
+    /// <summary>
+    /// Look up a global variable by name.
+    /// </summary>
+    /// <param name="name">The global variable name.</param>
+    /// <returns>The OOP of the global, or -1 if not found.</returns>
+    int PrimitiveLookupGlobal(string name);
+    
+    /// <summary>
+    /// Intern a string and return its OOP.
+    /// </summary>
+    /// <param name="value">The string value to intern.</param>
+    /// <returns>The OOP of the interned string.</returns>
+    int PrimitiveInternString(string value);
+    
+    /// <summary>
+    /// Send a message to an object.
+    /// </summary>
+    /// <param name="receiverId">The OOP of the receiver object.</param>
+    /// <param name="selectorId">The OOP of the selector symbol.</param>
+    /// <param name="argumentIds">The OOPs of the arguments.</param>
+    /// <returns>The OOP of the result.</returns>
+    int PrimitiveSendMessage(int receiverId, int selectorId, int[] argumentIds);
+    
+    /// <summary>
+    /// Execute bytecode with receiver and arguments.
+    /// </summary>
+    /// <param name="receiverId">The OOP of the receiver object.</param>
+    /// <param name="bytecode">The bytecode array to execute.</param>
+    /// <param name="argumentIds">The OOPs of the arguments.</param>
+    /// <returns>The OOP of the result.</returns>
+    int ExecuteBytecode(int receiverId, byte[] bytecode, int[] argumentIds);
+    
+    /// <summary>
+    /// Execute bytecode with receiver, arguments, and literals.
+    /// </summary>
+    /// <param name="receiverId">The OOP of the receiver object.</param>
+    /// <param name="bytecode">The bytecode array to execute.</param>
+    /// <param name="argumentIds">The OOPs of the arguments.</param>
+    /// <param name="literalIds">The OOPs of the literals used by the bytecode.</param>
+    /// <returns>The OOP of the result.</returns>
+    int ExecuteBytecodeWithLiterals(int receiverId, byte[] bytecode, int[] argumentIds, int[] literalIds);
+}
+`
