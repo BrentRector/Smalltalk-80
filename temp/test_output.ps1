@@ -1,1 +1,0 @@
-dotnet run --project Smalltalk80 -- --eval "Smalltalk" 2>&1 | Select-Object -Last 10

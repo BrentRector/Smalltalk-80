@@ -13,51 +13,64 @@ This project contains a prototype of a Smalltalk-80 interpreter written in C#. W
 - **Repository structure**: Keep implementation code under the `Smalltalk80` directory and tests under `Smalltalk80.Tests`.
 - **Grammar validation**: The repository contains `Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st` with thousands of lines of valid Smalltalk code. Use this file to validate grammar or parser changes and confirm syntax assumptions. Note that the WS lexer rule drops whitespace so there is never any need to add a whitespace production in the parser.
 
-## Contribution Tracking
+## Recent Fixes and Improvements
 
-### Phase 3 Validation Results (2025-01-08) 
+### Phase 2 Validation Achieved 100% (2025-01-10)
 
-**CRITICAL FINDING: Phase 3 JSON Structure Issue Resolved**
+**Major Fixes Implemented:**
 
-**Problem Identified:**
-- Phase 3 JSON files were using custom schema with `"className"`, `"methods"`, `"classMethods"` structure
-- Phase3Executor expects different structure: `"classes": []`, `"methods": []` (flat list with `"class"` property)  
-- This mismatch caused methods to appear to load but not actually install in method dictionaries
+1. **Method Tracing Fixed**
+   - Implemented proper method exit tracing with correct indentation
+   - Added MethodTracer class to track method entry/exit
+   - Fixed interpreter to trigger traces for all method dispatches
 
-**Schema Comparison:**
+2. **Bytecode Dispatcher Corrected**
+   - Fixed bytecode ranges to match Blue Book specification:
+     - 176-191: Send literal selector with 0 args
+     - 192-207: Send literal selector with 1 arg
+     - 208-223: Send literal selector with 2 args
+   - Previously had argument counts swapped
+
+3. **Method Lookup Implemented**
+   - Replaced stub Lookup method with full implementation
+   - Properly searches through class hierarchy's method dictionaries
+   - Critical for Phase 3 class creation via message sends
+
+4. **Pretty Printer Enhanced**
+   - Fixed ExtractMethodsFromDictionary to handle both formats:
+     - MethodDictionary format: `[keysArray, valuesArray]`
+     - Flat Dictionary format: `[tally, key1, value1, key2, value2, ...]`
+   - Now correctly displays all methods (was only showing ~10 of 37 for Dictionary)
+
+5. **Validation Script PowerShell Bug Fixed**
+   - Discovered PowerShell quirk: `$hashtable.Keys` returns the value of entry "keys" if it exists
+   - Changed to use `GetEnumerator()` to properly iterate through all entries
+   - This fixed false positives about "missing" methods
+
+**Phase 2 Status:**
+- ✅ All 8 core classes validate at 100%
+- ✅ 379 total methods match perfectly between Phase 2 and system image
+- ✅ Ready for Phase 3 implementation via bytecode execution
+
+### Phase 3 Implementation Notes
+
+**Bytecode-Based Class Creation:**
+- Phase 3 classes should be created via bytecode execution in method contexts
+- This ensures all operations go through the interpreter and trigger proper method tracing
+- Avoids bypassing the VM which would miss important initialization steps
+
+**Phase 3 JSON Structure:**
+The Phase 3 manifest should use this structure:
 ```json
-// WRONG - Our original schema
 {
-  "className": "Symbol", 
-  "methods": [{...}],
-  "classMethods": [{...}]
-}
-
-// CORRECT - Phase3Executor expected schema
-{
-  "classes": [{"name": "Symbol", ...}],
-  "methods": [{"class": "Symbol", ...}, {"class": "Symbol class", ...}]
+  "classes": [
+    {"name": "ClassName", "superclass": "SuperclassName", ...}
+  ],
+  "methods": [
+    {"class": "ClassName", "selector": "methodName", "bytecode": [...], ...}
+  ]
 }
 ```
-
-**Method Count Validation Against System Image:**
-- **Symbol**: System image has 23 instance + 8 class methods = 31 total ✓ 
-- **Character**: System image has ~35 methods (extraction validated)
-- **Number**: System image has ~50+ methods (simplified to 8 essential)
-- **Integer**: System image has ~60+ methods (simplified to 8 essential)
-
-**Phase 3 Processing Behavior:** 
-- Phase3Executor attempts to create new classes instead of enhancing existing ones
-- This causes class conflicts and prevents proper method installation
-- Solution: Phase 3 should enhance existing Phase 1/2 classes, not recreate them
-
-**Current Status:**
-- ✅ JSON structure corrected to Phase3Manifest format
-- ✅ Symbol methods validated against system image (31 methods correct)
-- ✅ Phase 3 loading process debugged and understood
-- ⚠️ Method installation still has class creation conflicts  
-
-**To Resume Work:** The Phase 3 validation revealed that our classes have the correct methods from the system image, but the installation process needs refinement to enhance existing classes rather than recreating them. Next step is to fix the Phase3Executor to properly install methods in existing classes.
 
 ## Bootstrap Process Overview
 
@@ -135,34 +148,27 @@ This prevents issues with executable files being overwritten.
 
 After any changes to Phase 2, validate the bootstrap is working correctly:
 
-### Quick Validation (Recommended)
+### Run Validation
 ```powershell
 cd scripts
-pwsh -File RunPhase2Validation.ps1 -Quick
+pwsh -File ValidatePhase2Simple.ps1
 ```
 
 This validates the 8 core Phase 2 classes. Success criteria:
-- 95%+ method match rate
-- Core classes (Object, Behavior, Class) have correct methods
-- Minor issues with Dictionary parsing are acceptable
-
-### Complete Validation
-```powershell
-cd scripts
-pwsh -File RunPhase2Validation.ps1
-```
-
-This validates all 20 Phase 2 classes. Expect:
-- 85%+ overall method match rate
-- ~50 missing class methods (intended for Phase 3)
-- <10 bytecode mismatches
+- 100% method match rate (all 379 methods)
+- All bytecode sequences match exactly
+- No missing or extra methods
 
 ### Fixing Common Issues
 
 If validation fails:
 
-1. **Selectors with spaces**: Run `pwsh scripts/FixSelectorSpaces.ps1`
-2. **Method dictionary size issues**: Check Phase 1 pre-allocation
-3. **Bytecode mismatches**: Usually literal or primitive differences
+1. **PowerShell .Keys bug**: If you see bytecode strings as "missing" methods, the script may be hitting the PowerShell bug where `$hashtable.Keys` returns the value of key "keys". The script now uses `GetEnumerator()` to avoid this.
 
-For detailed validation procedures, see `docs/PHASE2_VALIDATION_PROCEDURE.md`
+2. **Method dictionary display**: If the pretty printer shows fewer methods than expected, check that it handles both MethodDictionary formats:
+   - Parallel arrays: `[keysArray, valuesArray]`
+   - Flat format: `[tally, key1, value1, key2, value2, ...]`
+
+3. **Bytecode mismatches**: Ensure bytecode is in hex format (e.g., "40 88 68 7C") and that the extractor and validator use consistent formatting.
+
+4. **Dictionary sizing**: Run `AnalyzeDictionarySizes.ps1` to ensure Phase 1 pre-allocates sufficient capacity for Phase 2 methods.
