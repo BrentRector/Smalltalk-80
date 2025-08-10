@@ -45,4 +45,9 @@ public sealed class CompiledMethod
     ///     Optional comment describing the method's purpose.
     /// </summary>
     public string? Comment { get; init; }
+    
+    /// <summary>
+    ///     Optional selector name for method tracing purposes.
+    /// </summary>
+    public string? SelectorName { get; init; }
 }

@@ -83,7 +83,7 @@
       ]
     },
     {
-      "Selector": "between: and:",
+      "Selector": "between:and:",
       "Source": "between:minand:max^self\u003E=minand:[self\u003C=max]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -159,6 +159,6 @@
     "SuccessfullyCompiled": 10,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:05.5099307Z"
+    "ExtractionTime": "2025-08-10T03:06:50.9187301Z"
   }
 }

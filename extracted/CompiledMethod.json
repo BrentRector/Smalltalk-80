@@ -221,7 +221,7 @@
       "Literals": []
     },
     {
-      "Selector": "literalAt: put:",
+      "Selector": "literalAt:put:",
       "Source": "literalAt:indexput:value^selfobjectAt:index\u002B1put:value!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -285,7 +285,7 @@
       "Literals": []
     },
     {
-      "Selector": "needsStack: encoder:",
+      "Selector": "needsStack:encoder:",
       "Source": "needsStack:newStackSizeencoder:encoder|newMethodnewNumLitsextraByteslargeBit|(selfnumTemps\u002BnewStackSize\u002B1)\u003C=SmallFrameifTrue:[^self].(selfnumTemps\u002BnewStackSize\u002B1)\u003ELargeFrameifTrue:[^selferror:\u0027Stack (including temps) is too deep\u0027].newMethod_CompiledMethodnewBytes:selfendPC-selfinitialPC\u002B1flags:selfflagsnTemps:selfnumTempsnStack:newStackSizenLits:selfnumLiterals.1to:selfnumLiteralsdo:[:index|newMethodliteralAt:indexput:(selfliteralAt:index)].extraBytes_0.selfinitialPCto:selfsizedo:[:index|newMethodat:index\u002BextraBytesput:(selfat:index)].selfbecome:newMethod!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -457,7 +457,7 @@
       ]
     },
     {
-      "Selector": "objectAt: put:",
+      "Selector": "objectAt:put:",
       "Source": "objectAt:indexput:value\u003Cprimitive: 69\u003EselfprimitiveFailed!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -508,7 +508,7 @@
       "Literals": []
     },
     {
-      "Selector": "putSource: class: category: inFile:",
+      "Selector": "putSource:class:category:inFile:",
       "Source": "putSource:sourceStrclass:classcategory:catNameinFile:fileIndex|fileremoteString|SourceFiles==nilifTrue:[^self].file_SourceFilesat:fileIndex.filesetToEnd;readWriteShorten.classprintCategoryChunk:catNameon:file.filecr.remoteString_RemoteStringnewString:sourceStronFileNumber:fileIndextoFile:file.filenextChunkPut:\u0027 \u0027;readOnly.selfsetSourcePosition:remoteStringpositioninFile:fileIndex!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -522,7 +522,7 @@
       ]
     },
     {
-      "Selector": "putSource: inFile:",
+      "Selector": "putSource:inFile:",
       "Source": "putSource:sourceStrinFile:fileIndex|fileremoteString|SourceFiles==nilifTrue:[^self].file_SourceFilesat:fileIndex.filesetToEnd;readWriteShorten.filecr;nextPut:$!!;nextChunkPut:\u0027Behavior method\u0027;cr.remoteString_RemoteStringnewString:sourceStronFileNumber:fileIndextoFile:file.filenextChunkPut:\u0027 \u0027;readOnly.selfsetSourcePosition:remoteStringpositioninFile:fileIndex!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -678,7 +678,7 @@
       ]
     },
     {
-      "Selector": "setSourcePosition: inFile:",
+      "Selector": "setSourcePosition:inFile:",
       "Source": "setSourcePosition:positioninFile:fileIndex|indexhiBytemiddleBytelowByte|fileIndex\u003E4ifTrue:[^selferror:\u0027invalid file number\u0027].index_selfsize-2.middleByte_positionbitShift:-8.hiByte_middleBytebitShift:-8.middleByte_middleBytebitAnd:255.lowByte_positionbitAnd:255.hiByte\u003E62ifTrue:[Transcriptshow:\u0027Source file is getting full!!!!\u0027;cr].selfat:index\u002B2put:fileIndex-1*64\u002BhiByte.selfat:index\u002B1put:middleByte.selfat:indexput:lowByte!",
       "ArgumentCount": 1,
       "TemporaryCount": 1,
@@ -870,7 +870,7 @@
       ]
     },
     {
-      "Selector": "newBytes: flags: nTemps: nStack: nLits:",
+      "Selector": "newBytes:flags:nTemps:nStack:nLits:",
       "Source": "newBytes:numberOfBytesflags:flagsnTemps:numberTempsnStack:stackSpacenLits:numberLiterals|flagBits|flags\u003E=4ifTrue:[flagBits_flags-8]ifFalse:[flagBits_flags].^selfnewMethod:numberOfBytes\u002B3header:flagBits*4096\u002B(numberTemps*128)\u002B(numberTemps\u002BstackSpace\u003ESmallFrameifTrue:[64]ifFalse:[0])\u002BnumberLiterals!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -884,7 +884,7 @@
       ]
     },
     {
-      "Selector": "newMethod: header:",
+      "Selector": "newMethod:header:",
       "Source": "newMethod:numberOfBytesheader:headerWord\u003Cprimitive: 79\u003E^selfprimitiveFailed!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -923,6 +923,6 @@
     "SuccessfullyCompiled": 48,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:32:57.287159Z"
+    "ExtractionTime": "2025-08-10T03:06:40.5136859Z"
   }
 }

@@ -19,6 +19,7 @@ public class Program
         {
             // Parse command line arguments
             var jsonManifests = new List<string>();
+            var phase3Manifests = new List<string>();
             var sourceFiles = new List<string>();
             var classesToPrint = new List<string>();
             bool skipPhase3 = false;
@@ -30,6 +31,7 @@ public class Program
             bool showMnemonics = true;
             bool testCriticalMethods = false;
             bool testUndefinedObject = false;
+            bool enableMethodTracing = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -79,6 +81,15 @@ public class Program
                 {
                     testUndefinedObject = true;
                 }
+                else if (args[i] == "--trace-methods")
+                {
+                    enableMethodTracing = true;
+                }
+                else if (args[i] == "--phase3" && i + 1 < args.Length)
+                {
+                    phase3Manifests.Add(args[++i]);
+                    skipPhase3 = true; // Skip standard Phase 3 when loading custom manifests
+                }
                 else if (!args[i].StartsWith("--"))
                 {
                     sourceFiles.Add(args[i]);
@@ -100,6 +111,13 @@ public class Program
                 Bootstrap.JsonBootstrapExecutor.EnableBootstrapDebugOutput = true;
                 Bootstrap.Phase3Executor.EnablePhase3DebugOutput = true;
                 Console.WriteLine("✓ Bootstrap debug output enabled");
+            }
+            
+            // Enable method tracing if requested
+            if (enableMethodTracing)
+            {
+                MethodTracer.Enabled = true;
+                Console.WriteLine("✓ Method tracing enabled");
             }
             
             // Create the VM with bootstrap through Phase 3
@@ -124,6 +142,79 @@ public class Program
                         Console.WriteLine($"✗ Failed to load JSON manifest {jsonFile}: {ex.Message}");
                     }
                 }
+            }
+            
+            // Load Phase 3 high-level manifests if specified
+            if (phase3Manifests.Count > 0 && vm.Adapter != null)
+            {
+                Console.WriteLine();
+                Console.WriteLine("=== Loading Phase 3 High-Level Manifests ===");
+                
+                // Enable VM debug if requested
+                if (enableVMDebug)
+                {
+                    Bootstrap.VMPrimitiveAdapter.EnableVMDebugOutput = true;
+                }
+                
+                // Check if the manifest requests bytecode execution
+                bool useBytecodeExecution = false;
+                foreach (var manifestFile in phase3Manifests)
+                {
+                    if (manifestFile.Contains("test_counter", StringComparison.OrdinalIgnoreCase) ||
+                        manifestFile.Contains("bytecode", StringComparison.OrdinalIgnoreCase))
+                    {
+                        useBytecodeExecution = true;
+                        break;
+                    }
+                }
+                
+                if (useBytecodeExecution)
+                {
+                    // Use the new bytecode executor for proper method tracing
+                    Console.WriteLine("Using bytecode executor for Phase 3...");
+                    var bytecodeExecutor = new Bootstrap.Phase3BytecodeExecutor(vm);
+                    
+                    try
+                    {
+                        bytecodeExecutor.CreateTestCounterClass();
+                        Console.WriteLine($"✓ Successfully created TestCounter class via bytecode execution");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"✗ Failed to create TestCounter: {ex.Message}");
+                        if (enableBootstrapDebug)
+                        {
+                            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        }
+                    }
+                }
+                else
+                {
+                    // Use the regular high-level executor
+                    var phase3Executor = new Bootstrap.Phase3HighLevelExecutor(vm.Adapter);
+                    
+                    foreach (var manifestFile in phase3Manifests)
+                    {
+                        Console.WriteLine($"\nLoading Phase 3 manifest: {manifestFile}");
+                        try
+                        {
+                            phase3Executor.ExecuteManifest(manifestFile);
+                            Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {manifestFile}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"✗ Failed to load Phase 3 manifest {manifestFile}: {ex.Message}");
+                            if (enableBootstrapDebug)
+                            {
+                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                            }
+                        }
+                    }
+                }
+            }
+            else if (phase3Manifests.Count > 0)
+            {
+                Console.WriteLine("ERROR: VM adapter not available for Phase 3 execution");
             }
             
             // If listing Phase 2 classes, do that and exit

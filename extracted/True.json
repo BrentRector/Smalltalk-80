@@ -53,7 +53,7 @@
       ]
     },
     {
-      "Selector": "ifFalse: ifTrue:",
+      "Selector": "ifFalse:ifTrue:",
       "Source": "ifFalse:falseAlternativeBlockifTrue:trueAlternativeBlock^trueAlternativeBlockvalue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -81,7 +81,7 @@
       ]
     },
     {
-      "Selector": "ifTrue: ifFalse:",
+      "Selector": "ifTrue:ifFalse:",
       "Source": "ifTrue:trueAlternativeBlockifFalse:falseAlternativeBlock^trueAlternativeBlockvalue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -133,6 +133,6 @@
     "SuccessfullyCompiled": 10,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:03.8291371Z"
+    "ExtractionTime": "2025-08-10T03:06:49.3091377Z"
   }
 }

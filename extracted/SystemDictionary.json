@@ -56,7 +56,7 @@
       ]
     },
     {
-      "Selector": "allCallsOn: and:",
+      "Selector": "allCallsOn:and:",
       "Source": "allCallsOn:firstLiteraland:secondLiteral|aCollectionsecondArrayfirstSpecialsecondSpecial|aCollection_SortedCollectionnew.firstSpecial_selfhasSpecialSelector:firstLiteralifTrueSetByte:[:firstByte].secondSpecial_selfhasSpecialSelector:secondLiteralifTrueSetByte:[:secondByte].CursorexecuteshowWhile:[selfallBehaviorsDo:[:class|secondArray_classwhichSelectorsReferTo:secondLiteralspecial:secondSpecialbyte:secondByte.((classwhichSelectorsReferTo:firstLiteralspecial:firstSpecialbyte:firstByte)select:[:aSel|(secondArrayincludes:aSel)])do:[:sel|aCollectionadd:classname,\u0027 \u0027,sel]]].^aCollection!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -164,7 +164,7 @@
       ]
     },
     {
-      "Selector": "at: put:",
+      "Selector": "at:put:",
       "Source": "at:aKeyput:anObject|indexelement|index_selffindKeyOrNil:aKey.element_selfbasicAt:index.element==nilifTrue:[selfvalueAtNewKey:aKeyput:anObjectatIndex:indexdeclareFrom:Undeclared]ifFalse:[elementvalue:anObject].^anObject!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -204,7 +204,7 @@
       ]
     },
     {
-      "Selector": "browseAllCallsOn: and:",
+      "Selector": "browseAllCallsOn:and:",
       "Source": "browseAllCallsOn:literal1and:literal2BrowserViewopenListBrowserOn:(selfallCallsOn:literal1and:literal2)label:literal1printString,literal2printString!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -528,7 +528,7 @@
       ]
     },
     {
-      "Selector": "hasSpecialSelector: ifTrueSetByte:",
+      "Selector": "hasSpecialSelector:ifTrueSetByte:",
       "Source": "hasSpecialSelector:aLiteralifTrueSetByte:aBlock1to:selfspecialSelectorSizedo:[:index|(selfspecialSelectorAt:index)==aLiteralifTrue:[aBlockvalue:index\u002B16rAF.^true]].^false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -637,7 +637,7 @@
       ]
     },
     {
-      "Selector": "newSourceFile: without:",
+      "Selector": "newSourceFile:without:",
       "Source": "newSourceFile:verswithout:setOfClasses|oldFilenewFileclass|oldFile_SourceFilesat:1.newFile_Diskfile:vers,\u0027.sources\u0027.newFiletimeStamp.SmalltalkclassNamesdo:[:className|class_Smalltalkat:className.(setOfClassesincludes:class)ifFalse:[classfileOutOn:newFilemoveSource:truetoFile:1.newFilenextPut:12asCharacter]].newFileshorten;readOnly.SourceFilesat:1put:newFile.SourceFilesat:2put:(Diskfile:vers,\u0027.changes\u0027).(SourceFilesat:2)shorten;readOnly!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -715,7 +715,7 @@
       ]
     },
     {
-      "Selector": "pointersTo: do:",
+      "Selector": "pointersTo:do:",
       "Source": "pointersTo:anObjectdo:aBlock|meclassobjmethodifixedSize|me_thisContext.SmalltalkallBehaviorsDo:[:class|classisBitsifTrue:[class==CompiledMethodifTrue:[classallInstancesDo:[:method|1to:methodnumLiterals\u002B1do:[:i|(methodobjectAt:i)==anObjectifTrue:[aBlockvalue:method]]]]]ifFalse:[fixedSize_classinstSize.classallInstancesDo:[:obj|1to:(fixedSize\u002BobjbasicSize)do:[:i|((objinstVarAt:i)==anObjectand:[obj~~me])ifTrue:[aBlockvalue:obj]]]]].me_nil!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -885,7 +885,7 @@
       ]
     },
     {
-      "Selector": "renameClass: as:",
+      "Selector": "renameClass:as:",
       "Source": "renameClass:aClassas:newName|oldref|SystemOrganizationclassify:newNameunder:aClasscategory.SystemOrganizationremoveElement:aClassname.SystemChangesrenameClass:aClassas:newName.oldref_selfremoveKey:aClassname.oldrefkey:newName.(UndeclaredincludesKey:newName)ifTrue:[selfat:newNameput:aClass]ifFalse:[selfadd:oldref].selfflushClassNameCache!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -966,7 +966,7 @@
       ]
     },
     {
-      "Selector": "saveAs: thenQuit:",
+      "Selector": "saveAs:thenQuit:",
       "Source": "saveAs:imagePrefixthenQuit:quitIfTrueDisk==nilifFalse:[(imagePrefixsameAs:\u0027snapshot\u0027)ifFalse:[selfcopyChangesTo:imagePrefix,\u0027.changes\u0027]].^selfsnapshotAs:imagePrefixthenQuit:quitIfTrue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1015,7 +1015,7 @@
       ]
     },
     {
-      "Selector": "signal: atOopsLeft: wordsLeft:",
+      "Selector": "signal:atOopsLeft:wordsLeft:",
       "Source": "signal:aSemaphoreatOopsLeft:numOopswordsLeft:numWords\u003Cprimitive: 116\u003EselfprimitiveFailed!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1041,7 +1041,7 @@
       ]
     },
     {
-      "Selector": "snapshotAs: thenQuit:",
+      "Selector": "snapshotAs:thenQuit:",
       "Source": "snapshotAs:imageFilePrefixthenQuit:quitIfTrue|heightjustSnapped|Cursorexecuteshow.selflogChange:\u0027\u0027\u0027----SNAPSHOT----\u0027\u0027\u0027.Disk==nilifFalse:[(FileStreamfileNamed:imageFilePrefix,\u0027.im\u0027)beSnapshotFile;readWrite;close].selfreleaseExternalViews.Transcriptcr;show:\u0027Snapshot at: \u0027,TimedateAndTimeNowprintString.height_Displayheight.DisplayScreendisplayHeight:(heightmin:100).DelaypreSnapshot.Cursorwaitshow.justSnapped_selfsnapshotPrimitiveisNil.justSnapped\u0026quitIfTrueifTrue:[selfquitPrimitive]ifFalse:[DelaypostSnapshot.DisplayScreendisplayHeight:height.selfinstall].Cursornormalshow.^justSnapped!",
       "ArgumentCount": 1,
       "TemporaryCount": 1,
@@ -1150,7 +1150,7 @@
       ]
     },
     {
-      "Selector": "valueAtNewKey: put: atIndex: declareFrom:",
+      "Selector": "valueAtNewKey:put:atIndex:declareFrom:",
       "Source": "valueAtNewKey:aKeyput:anObjectatIndex:indexdeclareFrom:aDictionary(aDictionaryincludesKey:aKey)ifTrue:[selfatNewIndex:indexput:((aDictionaryassociationAt:aKey)value:anObject).aDictionaryremoveKey:aKey]ifFalse:[selfatNewIndex:indexput:(Associationkey:aKeyvalue:anObject)].selfflushClassNameCache!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1205,6 +1205,6 @@
     "SuccessfullyCompiled": 71,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:00.6041655Z"
+    "ExtractionTime": "2025-08-10T03:06:46.9042157Z"
   }
 }

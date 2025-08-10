@@ -9,7 +9,7 @@
   "Category": "Collections-Support",
   "InstanceMethods": [
     {
-      "Selector": "key: value:",
+      "Selector": "key:value:",
       "Source": "key:aKeyvalue:anObjectkey_aKey.value_anObject!",
       "ArgumentCount": 1,
       "TemporaryCount": 1,
@@ -72,7 +72,7 @@
   ],
   "ClassMethods": [
     {
-      "Selector": "key: value:",
+      "Selector": "key:value:",
       "Source": "key:newKeyvalue:newValue^(superkey:newKey)value:newValue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -91,6 +91,6 @@
     "SuccessfullyCompiled": 5,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:07.183461Z"
+    "ExtractionTime": "2025-08-10T03:06:52.5034704Z"
   }
 }

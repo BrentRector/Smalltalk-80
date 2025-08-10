@@ -40,8 +40,8 @@ Write-Host "================================"
 Write-Host ""
 Write-Host "Growth Factor: $growthFactor (allows for hash table efficiency)"
 Write-Host ""
-Write-Host "{0,-25} {1,10} {2,10} {3,10} {4,12}" -f "Class", "Allocated", "Actual", "Minimum", "Status"
-Write-Host "{0,-25} {1,10} {2,10} {3,10} {4,12}" -f "-----", "---------", "------", "-------", "------"
+Write-Host ("{0,-25} {1,10} {2,10} {3,10} {4,12}" -f "Class", "Allocated", "Actual", "Minimum", "Status")
+Write-Host ("{0,-25} {1,10} {2,10} {3,10} {4,12}" -f "-----", "---------", "------", "-------", "------")
 
 $totalIssues = 0
 $classesAnalyzed = 0

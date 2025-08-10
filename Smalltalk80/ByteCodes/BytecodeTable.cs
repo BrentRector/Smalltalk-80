@@ -148,34 +148,34 @@ public static class BytecodeTable
             ops[172 + i] = new Jump.PopJumpLongOperation(false, i);
         }
 
-        // 176-191: send arithmetic selector
+        // 176-191: send literal selector with 0 args (Blue Book)
         for (byte i = 0; i < 16; i++)
         {
-            ops[176 + i] = new Send.ArithmeticSelectorSendOperation(i);
+            ops[176 + i] = new Send.LiteralSelectorSendOperation(i, 0);
         }
 
-        // 192-207: send special selector
+        // 192-207: send literal selector with 1 arg (Blue Book)
         for (byte i = 0; i < 16; i++)
         {
-            ops[192 + i] = new Send.SpecialSelectorSendOperation(i);
+            ops[192 + i] = new Send.LiteralSelectorSendOperation(i, 1);
         }
 
-        // 208-223: send literal selector with 0 args
+        // 208-223: send literal selector with 2 args (Blue Book)
         for (byte i = 0; i < 16; i++)
         {
-            ops[208 + i] = new Send.LiteralSelectorSendOperation(i, 0);
+            ops[208 + i] = new Send.LiteralSelectorSendOperation(i, 2);
         }
 
-        // 224-239: send literal selector with 1 arg
+        // 224-239: send arithmetic selector (+, -, <, >, etc.)
         for (byte i = 0; i < 16; i++)
         {
-            ops[224 + i] = new Send.LiteralSelectorSendOperation(i, 1);
+            ops[224 + i] = new Send.ArithmeticSelectorSendOperation(i);
         }
 
-        // 240-255: send literal selector with 2 args
+        // 240-255: send special selector (at:, at:put:, size, etc.)
         for (byte i = 0; i < 16; i++)
         {
-            ops[240 + i] = new Send.LiteralSelectorSendOperation(i, 2);
+            ops[240 + i] = new Send.SpecialSelectorSendOperation(i);
         }
 
         return ops;

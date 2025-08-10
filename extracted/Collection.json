@@ -134,7 +134,7 @@
       "Literals": []
     },
     {
-      "Selector": "detect: ifNone:",
+      "Selector": "detect:ifNone:",
       "Source": "detect:aBlockifNone:exceptionBlockselfdo:[:each|(aBlockvalue:each)ifTrue:[^each]].^exceptionBlockvalue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -245,7 +245,7 @@
       ]
     },
     {
-      "Selector": "inject: into:",
+      "Selector": "inject:into:",
       "Source": "inject:thisValueinto:binaryBlock|nextValue|nextValue_thisValue.selfdo:[:each|nextValue_binaryBlockvalue:nextValuevalue:each].^nextValue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -365,7 +365,7 @@
       "Literals": []
     },
     {
-      "Selector": "remove: ifAbsent:",
+      "Selector": "remove:ifAbsent:",
       "Source": "remove:oldObjectifAbsent:anExceptionBlockselfsubclassResponsibility!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -461,7 +461,7 @@
       ]
     },
     {
-      "Selector": "with: with:",
+      "Selector": "with:with:",
       "Source": "with:firstObjectwith:secondObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.^newCollection!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -481,7 +481,7 @@
       ]
     },
     {
-      "Selector": "with: with: with:",
+      "Selector": "with:with:with:",
       "Source": "with:firstObjectwith:secondObjectwith:thirdObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.^newCollection!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -495,7 +495,7 @@
       ]
     },
     {
-      "Selector": "with: with: with: with:",
+      "Selector": "with:with:with:with:",
       "Source": "with:firstObjectwith:secondObjectwith:thirdObjectwith:fourthObject|newCollection|newCollection_selfnew.newCollectionadd:firstObject.newCollectionadd:secondObject.newCollectionadd:thirdObject.newCollectionadd:fourthObject.^newCollection!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -514,6 +514,6 @@
     "SuccessfullyCompiled": 35,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:47:03.363714Z"
+    "ExtractionTime": "2025-08-10T03:06:45.3108138Z"
   }
 }

@@ -13,6 +13,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     private readonly VirtualMachine vm;
     private readonly BootstrapContext? bootstrapContext;
     private readonly Dictionary<string, int> symbolCache = new(); // Keep a symbol cache even after bootstrap
+    private readonly Dictionary<int, string> reverseSymbolCache = new(); // OOP to string lookup
     private int? nilOop = null;
     private int smalltalkDictOop = -1;
     #pragma warning disable CS0414 // Field is assigned but its value is never used
@@ -224,6 +225,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             if (bootstrapContext.TryGetTemporarySymbol(name, out var existingOop))
             {
                 symbolCache[name] = existingOop;
+                reverseSymbolCache[existingOop] = name;
                 DebugLog($"[VM] Symbol '{name}' already interned as OOP {existingOop} (bootstrap)");
                 return existingOop;
             }
@@ -1131,9 +1133,8 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         DebugLog($"[VM] SendMessage: Executing method with {compiledMethod.Bytecodes.Length} bytecodes");
         try
         {
-            // Enable tracing for debugging
-            Tracer.Enabled = true;
-            var interpreter = new Interpreter { ExitOnReturn = false };
+            // Use the VM's existing interpreter instance so method tracing works
+            var interpreter = vm.Interpreter;
             
             // Create a method context and execute
             var tempCount = Math.Max(compiledMethod.TemporariesCount, args.Length);
@@ -1146,8 +1147,19 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 DebugLog($"[VM] SendMessage: Temp[{i}] = argument OOP {argumentIds[i]}");
             }
             
+            // Store the selector name in the CompiledMethod for tracing
+            // Create a copy with selector information for better tracing
+            var methodWithSelector = new CompiledMethod
+            {
+                Bytecodes = compiledMethod.Bytecodes,
+                Literals = compiledMethod.Literals,
+                TemporariesCount = compiledMethod.TemporariesCount,
+                Header = compiledMethod.Header,
+                SelectorName = selectorName  // Add selector for method tracing
+            };
+            
             DebugLog($"[VM] SendMessage: Executing with {tempCount} temporaries, receiver OOP {receiverId}");
-            var result = interpreter.Evaluate(compiledMethod, receiver, temps);
+            var result = interpreter.Evaluate(methodWithSelector, receiver, temps);
             
             // Debug: log what was returned
             if (result is SmalltalkObject debugObj)
@@ -1369,11 +1381,119 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     }
     
     /// <summary>
-    /// Execute bytecode (not used in Phase 1).
+    /// Execute bytecode by creating a temporary CompiledMethod and executing it.
     /// </summary>
     public int ExecuteBytecode(int receiverId, byte[] bytecode, int[] argumentIds)
     {
-        throw new NotImplementedException("ExecuteBytecode is not used in Phase 1 bootstrap");
+        // Delegate to the version with literals, passing empty literals array
+        return ExecuteBytecodeWithLiterals(receiverId, bytecode, argumentIds, new int[0]);
+    }
+    
+    /// <summary>
+    /// Execute bytecode with literals by creating a temporary CompiledMethod and executing it.
+    /// </summary>
+    public int ExecuteBytecodeWithLiterals(int receiverId, byte[] bytecode, int[] argumentIds, int[] literalIds)
+    {
+        DebugLog($"[VM] ExecuteBytecodeWithLiterals: receiver={receiverId}, bytecode=[{string.Join(",", bytecode)}], args=[{string.Join(",", argumentIds)}], literals=[{string.Join(",", literalIds)}]");
+        
+        // Get the receiver object
+        var receiver = ObjectMemory.FromOop(receiverId);
+        if (receiver == null)
+        {
+            DebugLog($"[VM] ExecuteBytecode: Invalid receiver");
+            return PrimitiveNil();
+        }
+        
+        // Convert argument OOPs to objects
+        var args = new object?[argumentIds.Length];
+        for (int i = 0; i < argumentIds.Length; i++)
+        {
+            if (IsSmallInteger(argumentIds[i]))
+            {
+                // Keep SmallInteger as tagged pointer
+                args[i] = argumentIds[i];
+            }
+            else
+            {
+                args[i] = ObjectMemory.FromOop(argumentIds[i]);
+            }
+        }
+        
+        // Convert literal OOPs to objects
+        var literals = new object[literalIds.Length];
+        for (int i = 0; i < literalIds.Length; i++)
+        {
+            if (IsSmallInteger(literalIds[i]))
+            {
+                // Keep SmallInteger as tagged pointer
+                literals[i] = literalIds[i];
+            }
+            else
+            {
+                var literalObj = ObjectMemory.FromOop(literalIds[i]);
+                literals[i] = literalObj ?? (object)literalIds[i]; // Keep as OOP if object not found
+            }
+        }
+        
+        // Create a temporary CompiledMethod
+        var compiledMethod = new CompiledMethod
+        {
+            Bytecodes = bytecode,
+            Literals = literals, // Include literals array
+            TemporariesCount = args.Length, // Temps for arguments
+            Header = new MethodHeader(0, 0) // No primitive
+        };
+        
+        // Execute the method using the interpreter
+        try
+        {
+            DebugLog($"[VM] ExecuteBytecode: Executing {bytecode.Length} bytecodes");
+            
+            // Create temporaries array with arguments
+            var temps = new object?[Math.Max(compiledMethod.TemporariesCount, args.Length)];
+            Array.Copy(args, temps, args.Length);
+            
+            // Execute using the VM's interpreter
+            var result = vm.Interpreter.Evaluate(compiledMethod, receiver, temps);
+            
+            // Convert result to OOP
+            if (result == null)
+            {
+                DebugLog($"[VM] ExecuteBytecode: Returned nil");
+                return PrimitiveNil();
+            }
+            else if (result is SmalltalkObject resultObj)
+            {
+                DebugLog($"[VM] ExecuteBytecode: Returned object OOP {resultObj.Oop}");
+                return resultObj.Oop;
+            }
+            else if (result is int intResult)
+            {
+                // Check if it's already a SmallInteger (tagged)
+                if (IsSmallInteger(intResult))
+                {
+                    DebugLog($"[VM] ExecuteBytecode: Returned SmallInteger {SmallIntegerValue(intResult)}");
+                    return intResult;
+                }
+                else
+                {
+                    // Create a SmallInteger
+                    var smallInt = PrimitiveNewSmallInteger(intResult);
+                    DebugLog($"[VM] ExecuteBytecode: Returned integer {intResult} as SmallInteger");
+                    return smallInt;
+                }
+            }
+            else
+            {
+                DebugLog($"[VM] ExecuteBytecode: Unknown result type {result.GetType()}");
+                return PrimitiveNil();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"[VM] ExecuteBytecode error: {ex.Message}");
+            return PrimitiveNil();
+        }
     }
     
     /// <summary>

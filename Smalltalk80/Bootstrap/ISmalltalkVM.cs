@@ -172,4 +172,14 @@ public interface ISmalltalkVM
     /// <param name="argumentIds">The OOPs of the arguments.</param>
     /// <returns>The OOP of the result.</returns>
     int ExecuteBytecode(int receiverId, byte[] bytecode, int[] argumentIds);
+    
+    /// <summary>
+    /// Execute bytecode with receiver, arguments, and literals.
+    /// </summary>
+    /// <param name="receiverId">The OOP of the receiver object.</param>
+    /// <param name="bytecode">The bytecode array to execute.</param>
+    /// <param name="argumentIds">The OOPs of the arguments.</param>
+    /// <param name="literalIds">The OOPs of the literals used by the bytecode.</param>
+    /// <returns>The OOP of the result.</returns>
+    int ExecuteBytecodeWithLiterals(int receiverId, byte[] bytecode, int[] argumentIds, int[] literalIds);
 }

@@ -56,44 +56,106 @@ public static class BytecodeDispatcher
             Handlers[i] = (interpreter, opcode) => HandlePushLiteralVariable(interpreter, index);
         }
 
-        // Store into receiver variables (no pop) (96-127)
-        for (int i = 96; i <= 127; i++)
+        // Store and pop receiver variables (96-103)
+        for (int i = 96; i <= 103; i++)
         {
             int index = i - 96; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleStoreIntoReceiverVariable(interpreter, index);
+            Handlers[i] = (interpreter, opcode) => HandleStoreAndPopReceiverVariable(interpreter, index);
         }
 
-        // Store into temporary variables (no pop) (128-159)
-        for (int i = 128; i <= 159; i++)
+        // Store and pop temporary variables (104-111)
+        for (int i = 104; i <= 111; i++)
         {
-            int index = i - 128; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleStoreIntoTemporaryVariable(interpreter, index);
+            int index = i - 104; // Capture for closure
+            Handlers[i] = (interpreter, opcode) => HandleStoreAndPopTemporaryVariable(interpreter, index);
         }
 
-        // Store into literal variables (no pop) (160-175)
-        for (int i = 160; i <= 175; i++)
+        // Push receiver (self) - bytecode 112
+        Handlers[112] = (interpreter, opcode) => HandlePushReceiver(interpreter);
+
+        // Bytecodes 113-119 are undefined in canonical Blue Book
+        // 120-127 are return operations and will be handled below
+
+        // Return operations (120-125)
+        Handlers[120] = (interpreter, opcode) => HandleReturnReceiver(interpreter);
+        // 121-123 are undefined in canonical Blue Book
+        Handlers[124] = (interpreter, opcode) => HandleReturnTop(interpreter);
+        Handlers[125] = (interpreter, opcode) => HandleReturnTopFromBlock(interpreter);
+
+        // Extended operations (128-137)
+        Handlers[128] = (interpreter, opcode) => HandleExtendedPush(interpreter, opcode);
+        Handlers[129] = (interpreter, opcode) => HandleExtendedStore(interpreter, opcode);
+        Handlers[130] = (interpreter, opcode) => HandleExtendedStoreAndPop(interpreter, opcode);
+        Handlers[131] = (interpreter, opcode) => HandleSingleExtendedSend(interpreter, opcode);
+        Handlers[132] = (interpreter, opcode) => HandleDoubleExtendedSend(interpreter, opcode);
+        Handlers[133] = (interpreter, opcode) => HandleSingleExtendedSuperSend(interpreter, opcode);
+        Handlers[134] = (interpreter, opcode) => HandleDoubleExtendedSuperSend(interpreter, opcode);
+        Handlers[135] = (interpreter, opcode) => HandlePopStack(interpreter, opcode);
+        Handlers[136] = (interpreter, opcode) => HandleDuplicateTop(interpreter, opcode);
+        Handlers[137] = (interpreter, opcode) => HandlePushActiveContext(interpreter, opcode);
+
+        // Jump operations (144-175)
+        for (int i = 144; i <= 151; i++)
         {
-            int index = i - 160; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleStoreIntoLiteralVariable(interpreter, index);
+            int offset = i - 143; // Jump offset 1-8
+            Handlers[i] = (interpreter, opcode) => HandleShortUnconditionalJump(interpreter, offset);
+        }
+        
+        for (int i = 152; i <= 159; i++)
+        {
+            int offset = i - 151; // Jump offset 1-8
+            Handlers[i] = (interpreter, opcode) => HandleShortConditionalJump(interpreter, offset, false);
+        }
+        
+        for (int i = 160; i <= 167; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongUnconditionalJump(interpreter, opcode);
+        }
+        
+        for (int i = 168; i <= 171; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpTrue(interpreter, opcode);
+        }
+        
+        for (int i = 172; i <= 175; i++)
+        {
+            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpFalse(interpreter, opcode);
         }
 
-
-        // Return operations (176-180)
-        Handlers[176] = (interpreter, opcode) => HandleReturnReceiver(interpreter);
-        Handlers[177] = (interpreter, opcode) => HandleReturnTrue(interpreter);
-        Handlers[178] = (interpreter, opcode) => HandleReturnFalse(interpreter);
-        Handlers[179] = (interpreter, opcode) => HandleReturnNil(interpreter);
-        Handlers[180] = (interpreter, opcode) => HandleReturnTop(interpreter);
-
-        // Bytecodes 131-191 are not part of the canonical Blue Book specification
-        // They remain mapped to HandleUnknownBytecode to throw errors if encountered
-
-        // Send literal selector bytecodes (192-255)
-        // Blue Book canonical encoding: bits 6-7 = arg count, bits 2-5 = selector index
-        for (int i = 192; i <= 255; i++)
+        // Send operations (176-255) - Blue Book specification
+        // 176-191: Send literal selector with 0 args
+        for (int i = 176; i <= 191; i++)
         {
-            int bytecode = i; // Capture for closure
-            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, bytecode);
+            int index = i - 176; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 0);
+        }
+        
+        // 192-207: Send literal selector with 1 arg
+        for (int i = 192; i <= 207; i++)
+        {
+            int index = i - 192; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 1);
+        }
+        
+        // 208-223: Send literal selector with 2 args
+        for (int i = 208; i <= 223; i++)
+        {
+            int index = i - 208; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
+        }
+        
+        // 224-239: Send arithmetic selector (+, -, <, >, etc.)
+        for (int i = 224; i <= 239; i++)
+        {
+            int selectorIndex = i - 224; // Arithmetic selector 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendArithmeticSelector(interpreter, selectorIndex);
+        }
+        
+        // 240-255: Send special selector (at:, at:put:, size, etc.)
+        for (int i = 240; i <= 255; i++)
+        {
+            int selectorIndex = i - 240; // Special selector 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendCommonSelector(interpreter, selectorIndex);
         }
     }
 
@@ -120,6 +182,110 @@ public static class BytecodeDispatcher
     {
         var context = interpreter.CurrentContext;
         context.Stack.Push(context.Temporaries[index]);
+    }
+
+    private static void HandlePushReceiver(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Push(context.Receiver);
+    }
+
+    private static void HandleStoreAndPopReceiverVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        context.Receiver.Fields[index] = value;
+    }
+
+    private static void HandleStoreAndPopTemporaryVariable(Interpreter interpreter, int index)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        context.Temporaries[index] = value;
+    }
+
+    private static void HandleReturnTopFromBlock(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        var value = context.Stack.Pop();
+        interpreter.HandleReturn(value ?? throw new InvalidOperationException("Cannot return null"));
+    }
+
+    private static void HandleExtendedStore(Interpreter interpreter, byte opcode)
+    {
+        // Extended store implementation would go here
+        throw new NotImplementedException("Extended store not yet implemented");
+    }
+
+    private static void HandleExtendedStoreAndPop(Interpreter interpreter, byte opcode)
+    {
+        // Extended store and pop implementation would go here
+        throw new NotImplementedException("Extended store and pop not yet implemented");
+    }
+
+    private static void HandleSingleExtendedSuperSend(Interpreter interpreter, byte opcode)
+    {
+        // Single extended super send implementation would go here
+        throw new NotImplementedException("Single extended super send not yet implemented");
+    }
+
+    private static void HandleDoubleExtendedSuperSend(Interpreter interpreter, byte opcode)
+    {
+        // Double extended super send implementation would go here
+        throw new NotImplementedException("Double extended super send not yet implemented");
+    }
+
+    private static void HandleLongUnconditionalJump(Interpreter interpreter, byte opcode)
+    {
+        var context = interpreter.CurrentContext;
+        int offset = ((opcode & 0x07) << 8) + context.Method.Bytecodes[context.PC++];
+        context.PC += offset;
+    }
+
+    private static void HandleLongConditionalJumpTrue(Interpreter interpreter, byte opcode)
+    {
+        // Long conditional jump on true implementation would go here
+        throw new NotImplementedException("Long conditional jump on true not yet implemented");
+    }
+
+    private static void HandleLongConditionalJumpFalse(Interpreter interpreter, byte opcode)
+    {
+        // Long conditional jump on false implementation would go here
+        throw new NotImplementedException("Long conditional jump on false not yet implemented");
+    }
+
+    private static void HandleSendArithmeticSelector(Interpreter interpreter, int selectorIndex)
+    {
+        // Send arithmetic selector implementation would go here
+        throw new NotImplementedException("Send arithmetic selector not yet implemented");
+    }
+
+    private static void HandleSendCommonSelector(Interpreter interpreter, int selectorIndex)
+    {
+        // Send common selector implementation would go here
+        throw new NotImplementedException("Send common selector not yet implemented");
+    }
+
+    private static void HandleSendLiteralSelector(Interpreter interpreter, int index, int argCount)
+    {
+        var context = interpreter.CurrentContext;
+        
+        // Get the selector from the literal frame
+        if (index >= context.Method.Literals.Length)
+        {
+            throw new InvalidOperationException($"Selector index {index} out of bounds for literal frame (size: {context.Method.Literals.Length})");
+        }
+        
+        var literal = context.Method.Literals[index];
+        
+        if (literal == null)
+        {
+            throw new InvalidOperationException($"Literal at index {index} is null");
+        }
+        
+        // The literal IS the selector - just use it directly
+        // The interpreter's PerformSend should handle Smalltalk objects
+        interpreter.PerformSendWithObject(literal, argCount, false);
     }
 
     private static void HandleReturnReceiver(Interpreter interpreter)

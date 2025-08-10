@@ -71,7 +71,7 @@
       "Literals": []
     },
     {
-      "Selector": "ifFalse: ifTrue:",
+      "Selector": "ifFalse:ifTrue:",
       "Source": "ifFalse:falseAlternativeBlockifTrue:trueAlternativeBlockselfsubclassResponsibility!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -95,7 +95,7 @@
       "Literals": []
     },
     {
-      "Selector": "ifTrue: ifFalse:",
+      "Selector": "ifTrue:ifFalse:",
       "Source": "ifTrue:trueAlternativeBlockifFalse:falseAlternativeBlockselfsubclassResponsibility!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -187,6 +187,6 @@
     "SuccessfullyCompiled": 15,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:03.0543246Z"
+    "ExtractionTime": "2025-08-10T03:06:48.4989595Z"
   }
 }

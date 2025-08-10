@@ -34,7 +34,7 @@
       "Literals": []
     },
     {
-      "Selector": "associationAt: ifAbsent:",
+      "Selector": "associationAt:ifAbsent:",
       "Source": "associationAt:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^selfbasicAt:index!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -109,7 +109,7 @@
       "Literals": []
     },
     {
-      "Selector": "at: ifAbsent:",
+      "Selector": "at:ifAbsent:",
       "Source": "at:keyifAbsent:aBlock|index|index_selffindKey:keyifAbsent:[^aBlockvalue].^(selfbasicAt:index)value!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -129,7 +129,7 @@
       ]
     },
     {
-      "Selector": "at: put:",
+      "Selector": "at:put:",
       "Source": "at:keyput:anObject|indexelement|index_selffindKeyOrNil:key.element_selfbasicAt:index.element==nilifTrue:[selfatNewIndex:indexput:(Associationkey:keyvalue:anObject)]ifFalse:[elementvalue:anObject].^anObject!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -169,7 +169,7 @@
       ]
     },
     {
-      "Selector": "declare: from:",
+      "Selector": "declare:from:",
       "Source": "declare:keyfrom:aDictionary(selfincludesKey:key)ifTrue:[^self].(aDictionaryincludesKey:key)ifTrue:[selfadd:(aDictionaryassociationAt:key).aDictionaryremoveKey:key]ifFalse:[selfat:keyput:nil]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -220,7 +220,7 @@
       "Literals": []
     },
     {
-      "Selector": "findKey: ifAbsent:",
+      "Selector": "findKey:ifAbsent:",
       "Source": "findKey:keyifAbsent:aBlock|index|index_selffindKeyOrNil:key.(selfbasicAt:index)==nilifTrue:[^aBlockvalue].^index!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -366,7 +366,7 @@
       "Literals": []
     },
     {
-      "Selector": "keyAtValue: ifAbsent:",
+      "Selector": "keyAtValue:ifAbsent:",
       "Source": "keyAtValue:valueifAbsent:exceptionBlockselfassociationsDo:[:association|value==associationvalueifTrue:[^associationkey]].^exceptionBlockvalue!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -476,7 +476,7 @@
       "Literals": []
     },
     {
-      "Selector": "remove: ifAbsent:",
+      "Selector": "remove:ifAbsent:",
       "Source": "remove:anObjectifAbsent:exceptionBlockselfshouldNotImplement!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -500,7 +500,7 @@
       "Literals": []
     },
     {
-      "Selector": "removeAssociation: ifAbsent:",
+      "Selector": "removeAssociation:ifAbsent:",
       "Source": "removeAssociation:anAssociationifAbsent:anExceptionBlock^superremove:anAssociationifAbsent:anExceptionBlock!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -524,7 +524,7 @@
       "Literals": []
     },
     {
-      "Selector": "removeKey: ifAbsent:",
+      "Selector": "removeKey:ifAbsent:",
       "Source": "removeKey:keyifAbsent:aBlock|indexelement|index_selffindKey:keyifAbsent:[^aBlockvalue].element_selfbasicAt:index.selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^element!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -601,6 +601,6 @@
     "SuccessfullyCompiled": 37,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:33:01.4587705Z"
+    "ExtractionTime": "2025-08-10T03:09:35.437113Z"
   }
 }

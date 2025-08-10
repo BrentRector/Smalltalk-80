@@ -16,7 +16,7 @@
   "Category": "Kernel-Classes",
   "InstanceMethods": [
     {
-      "Selector": "accumulateInstVarNames: traversedClasses:",
+      "Selector": "accumulateInstVarNames:traversedClasses:",
       "Source": "accumulateInstVarNames:namestraversedClasses:classSetselfsuperclassesdo:[:each|eachaccumulateInstVarNames:namestraversedClasses:classSet].(classSetincludes:self)ifFalse:[namesaddAll:selfinstVarNames.classSetadd:self]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -30,7 +30,7 @@
       ]
     },
     {
-      "Selector": "addSelector: withMethod:",
+      "Selector": "addSelector:withMethod:",
       "Source": "addSelector:selectorwithMethod:compiledMethod|wasThere|wasThere_methodDictincludesKey:selector.methodDictat:selectorput:compiledMethod.selfflushCache.((SelectorsOfConflictMethodsat:selectorifAbsent:[Arraynew])includes:self)ifTrue:[selfremoveClass:selfselector:selectorin:SelectorsOfConflictMethods].((SelectorsOfCopiedMethodsat:selectorifAbsent:[Arraynew])includes:self)ifTrue:[selfremoveClass:selfselector:selectorin:SelectorsOfCopiedMethods].wasThereifTrue:[selfcheckChangeSelector:selector]ifFalse:[selfsubclassesdo:[:sub|subcheckSuperAddSelector:selector]]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -50,7 +50,7 @@
       ]
     },
     {
-      "Selector": "addSelectorUnchecked: withMethod:",
+      "Selector": "addSelectorUnchecked:withMethod:",
       "Source": "addSelectorUnchecked:selectorwithMethod:compiledMethodmethodDictat:selectorput:compiledMethod.selfflushCache!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -486,7 +486,7 @@
       ]
     },
     {
-      "Selector": "compile: notifying: trailer:",
+      "Selector": "compile:notifying:trailer:",
       "Source": "compile:codenotifying:requestortrailer:bytes^selfcompile:codenotifying:requestortrailer:bytesifFail:[^nil]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -500,7 +500,7 @@
       ]
     },
     {
-      "Selector": "compile: notifying: trailer: ifFail:",
+      "Selector": "compile:notifying:trailer:ifFail:",
       "Source": "compile:codenotifying:requestortrailer:bytesifFail:failBlock|methodNodeselector|methodNode_selfcompilerClassnewcompile:codein:selfnotifying:requestorifFail:failBlock.selector_methodNodeselector.selfaddSelector:selectorwithMethod:(methodNodegenerate:bytes).^selector!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -812,7 +812,7 @@
       "Literals": []
     },
     {
-      "Selector": "format: variable: words: pointers:",
+      "Selector": "format:variable:words:pointers:",
       "Source": "format:nInstVarsvariable:isVarwords:isWordspointers:isPointersformat_nInstVars\u002B(isVarifTrue:[4096]ifFalse:[0])\u002B(isWordsifTrue:[8192]ifFalse:[0])\u002B(isPointersifTrue:[-16384]ifFalse:[0])!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -892,7 +892,7 @@
       ]
     },
     {
-      "Selector": "insertClass: selector: in:",
+      "Selector": "insertClass:selector:in:",
       "Source": "insertClass:aClassselector:selectorin:aDictionary|previous|previous_aDictionaryat:selectorifAbsent:[Arraynew].(previousincludes:aClass)ifFalse:[aDictionaryat:selectorput:(previouscopyWith:aClass)]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1137,7 +1137,7 @@
       ]
     },
     {
-      "Selector": "poolHas: ifTrue:",
+      "Selector": "poolHas:ifTrue:",
       "Source": "poolHas:varNameifTrue:assocBlock^false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1172,7 +1172,7 @@
       ]
     },
     {
-      "Selector": "printMethodChunk: on: moveSource: toFile:",
+      "Selector": "printMethodChunk:on:moveSource:toFile:",
       "Source": "printMethodChunk:selectoron:aFileStreammoveSource:moveSourcetoFile:fileIndex|position|aFileStreamcr;cr.moveSourceifTrue:[position_aFileStreamposition].aFileStreamnextChunkPut:(selfsourceMethodAt:selector)asString.moveSourceifTrue:[(selfcompiledMethodAt:selector)setSourcePosition:positioninFile:fileIndex]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1196,7 +1196,7 @@
       "Literals": []
     },
     {
-      "Selector": "printSubclassesOn: callingSuperclass: level:",
+      "Selector": "printSubclassesOn:callingSuperclass:level:",
       "Source": "printSubclassesOn:aStreamcallingSuperclass:whichSuperlevel:level|subssupers|aStreamcrtab:level.aStreamnextPutAll:selfname.aStreamspace;print:selfinstVarNames.supers_selfsuperclasses.superssize\u003E1ifTrue:[aStreamnextPutAll:\u0027  [also a\u0027.(superscopyWithout:whichSuper)do:[:s|aStreamspace;nextPutAll:sname;space;print:sallInstVarNames].aStreamnextPut:$]].subs_selfsubclasses.self==ClassifTrue:[aStreamcrtab:level\u002B1;nextPutAll:\u0027... all the Metaclasses ...\u0027.subs_subsreject:[:sub|subisMeta]].(subsasSortedCollection:[:x:y|xname\u003Cyname])do:[:sub|subprintSubclassesOn:aStreamcallingSuperclass:selflevel:level\u002B1]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1220,7 +1220,7 @@
       "Literals": []
     },
     {
-      "Selector": "recompile: from:",
+      "Selector": "recompile:from:",
       "Source": "recompile:selectorfrom:oldClass|methodtrailermethodNode|method_oldClasscompiledMethodAt:selector.trailer_(methodsize-2to:methodsize)collect:[:i|methodat:i].methodNode_selfcompilerClassnewcompile:(oldClasssourceCodeAt:selector)in:selfnotifying:nilifFail:[].methodNode==nilifTrue:[^selfrecompile:selector].selector==methodNodeselectorifFalse:[selferror:\u0027selector changed!!\u0027].selfaddSelector:selectorwithMethod:(methodNodegenerate:trailer).!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1243,7 +1243,7 @@
       ]
     },
     {
-      "Selector": "removeClass: selector: in:",
+      "Selector": "removeClass:selector:in:",
       "Source": "removeClass:aClassselector:selectorin:aDictionary|list|list_(aDictionaryat:selector)copyWithout:aClass.listsize=0ifTrue:[aDictionaryremoveKey:selector]ifFalse:[aDictionaryat:selectorput:list]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1356,7 +1356,7 @@
       ]
     },
     {
-      "Selector": "scopeHas: ifTrue:",
+      "Selector": "scopeHas:ifTrue:",
       "Source": "scopeHas:varNameifTrue:assocBlock|assoc|selfwithAllSuperclassesdo:[:sup|(suppoolHas:varNameifTrue:assocBlock)ifTrue:[^true]].assoc_SmalltalkassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true].^false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1379,7 +1379,7 @@
       ]
     },
     {
-      "Selector": "selectorAtMethod: setClass:",
+      "Selector": "selectorAtMethod:setClass:",
       "Source": "selectorAtMethod:methodsetClass:classResultBlock|sel|sel_methodDictkeyAtValue:methodifAbsent:[superclass==nilifTrue:[classResultBlockvalue:self.^selfdefaultSelectorForMethod:method].sel_superclassselectorAtMethod:methodsetClass:classResultBlock.sel==(selfdefaultSelectorForMethod:method)ifTrue:[classResultBlockvalue:self].^sel].classResultBlockvalue:self.^sel!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1427,7 +1427,7 @@
       ]
     },
     {
-      "Selector": "showVariableMenu: collect:",
+      "Selector": "showVariableMenu:collect:",
       "Source": "showVariableMenu:generatorBlockcollect:valueBlock|eachClassaStreamlinescountlastLinevariablesindex|aStream_WriteStreamon:(Stringnew:200).lines_OrderedCollectionnew.count_0.lastLine_0.variables_OrderedCollectionnew.selfwithAllSuperclassesreverseDo:[:eachClass|count=lastLineifFalse:[linesadd:count.lastLine_count].(generatorBlockvalue:eachClass)do:[:var|aStreamnextPutAll:((valueBlockvalue:var)contractTo:20);cr.variablesaddLast:var.count_count\u002B1]].variablesisEmptyifTrue:[^nil].aStreamskip:-1.index_(PopUpMenulabels:aStreamcontentslines:lines)startUp.^index=0ifTrue:[nil]ifFalse:[variablesat:index]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1472,7 +1472,7 @@
       "Literals": []
     },
     {
-      "Selector": "sourceCodeForMethod: at:",
+      "Selector": "sourceCodeForMethod:at:",
       "Source": "sourceCodeForMethod:methodat:messageSelector|newSourceindex|SensorleftShiftDownifTrue:[newSource_(selfdecompilerClassnewdecompile:messageSelectorin:selfmethod:method)decompileString]ifFalse:[newSource_methodgetSource.newSource==nilifTrue:[newSource_(selfdecompilerClassnewdecompile:messageSelectorin:selfmethod:method)decompileString]ifFalse:[((newSourceat:newSourcesize)isSeparator)ifTrue:[index_newSourcesize.[((newSourceat:index)isSeparator)and:[index\u003E1]]whileTrue:[index_index-1].newSource_newSourcecopyFrom:1to:index]]].^newSource!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1699,7 +1699,7 @@
       ]
     },
     {
-      "Selector": "updateInheritanceTable: oldSelf:",
+      "Selector": "updateInheritanceTable:oldSelf:",
       "Source": "updateInheritanceTable:tableoldSelf:oldSelftabledo:[:array|1to:arraysizedo:[:i|(arrayat:i)==oldSelfifTrue:[arrayat:iput:self]]]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1772,7 +1772,7 @@
       ]
     },
     {
-      "Selector": "whichSelectorsReferTo: special: byte:",
+      "Selector": "whichSelectorsReferTo:special:byte:",
       "Source": "whichSelectorsReferTo:literalspecial:specialFlagbyte:specialByte|whomethodmethodArrayindexarraySize|who_OrderedCollectionnew.methodArray_methodDictmethodArray.arraySize_methodArraysize.index_0.[(index_index\u002B1)\u003C=arraySize]whileTrue:[(method_methodArrayat:index)==nilifFalse:[((methodrefersToLiteral:literal)or:[specialFlagand:[methodscanFor:specialByte]])ifTrue:[whoadd:(methodDictbasicAt:index)]]].^who!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -1847,6 +1847,6 @@
     "SuccessfullyCompiled": 116,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:32:58.9570456Z"
+    "ExtractionTime": "2025-08-10T03:06:38.0823724Z"
   }
 }

@@ -277,23 +277,62 @@ public class SmalltalkPrettyPrinterEnhanced
     {
         var methods = new List<(string, SmalltalkObject)>();
         
-        // Try to interpret as alternating key-value pairs
-        for (int i = 1; i < methodDict.Fields.Length - 1; i += 2)
+        // Check if this is a MethodDictionary format (2 slots with arrays) or flat format
+        bool isMethodDictionary = false;
+        
+        if (methodDict.Fields.Length == 2 && 
+            methodDict.Fields[0] is SmalltalkObject keysArray &&
+            methodDict.Fields[1] is SmalltalkObject valuesArray)
         {
-            var keyObj = methodDict.Fields[i];
-            var valueObj = methodDict.Fields[i + 1];
+            // MethodDictionary format: [keysArray, valuesArray]
+            isMethodDictionary = true;
             
-            if (keyObj == null || valueObj == null)
-                continue;
-            
-            if (keyObj is SmalltalkObject keySymbol && valueObj is SmalltalkObject method)
+            // Extract from parallel arrays
+            for (int i = 0; i < keysArray.Fields.Length && i < valuesArray.Fields.Length; i++)
             {
-                if (IsCompiledMethod(method))
+                var keyObj = keysArray.Fields[i];
+                var valueObj = valuesArray.Fields[i];
+                
+                // Skip nil entries
+                if (keyObj == null || valueObj == null)
+                    continue;
+                
+                if (keyObj is SmalltalkObject keySymbol && valueObj is SmalltalkObject method)
                 {
-                    var selector = ExtractSymbolString(keySymbol);
-                    if (!string.IsNullOrEmpty(selector))
+                    if (IsCompiledMethod(method))
                     {
-                        methods.Add((selector, method));
+                        var selector = ExtractSymbolString(keySymbol);
+                        if (!string.IsNullOrEmpty(selector))
+                        {
+                            methods.Add((selector, method));
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!isMethodDictionary)
+        {
+            // Flat format: [tally, key1, value1, key2, value2, ...]
+            // Start at index 1 to skip tally
+            for (int i = 1; i < methodDict.Fields.Length - 1; i += 2)
+            {
+                var keyObj = methodDict.Fields[i];
+                var valueObj = methodDict.Fields[i + 1];
+                
+                // Skip nil entries
+                if (keyObj == null || valueObj == null)
+                    continue;
+                
+                if (keyObj is SmalltalkObject keySymbol && valueObj is SmalltalkObject method)
+                {
+                    if (IsCompiledMethod(method))
+                    {
+                        var selector = ExtractSymbolString(keySymbol);
+                        if (!string.IsNullOrEmpty(selector))
+                        {
+                            methods.Add((selector, method));
+                        }
                     }
                 }
             }
@@ -350,7 +389,9 @@ public class SmalltalkPrettyPrinterEnhanced
                     }
                     else
                     {
-                        Console.WriteLine($"    Bytecode: [{string.Join(", ", bytecode)}]");
+                        // Output in hex format to match extracted JSON files
+                        var hexBytes = bytecode.Select(b => b.ToString("X2"));
+                        Console.WriteLine($"    Bytecode: {string.Join(" ", hexBytes)}");
                     }
                 }
             }

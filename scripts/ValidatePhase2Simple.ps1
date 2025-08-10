@@ -44,7 +44,7 @@ try {
         
         # Step 1: Get Phase 2 bytecode from interpreter
         Write-Host "  Getting Phase 2 state..." -ForegroundColor Gray
-        $phase2Output = & dotnet bin/Debug/net9.0/Smalltalk80.Interpreter.dll --skip-phase3 --print-class $className 2>&1
+        $phase2Output = & dotnet bin/Debug/net9.0/Smalltalk80.Interpreter.dll --skip-phase3 --print-class $className --no-mnemonics 2>&1
         $phase2File = "temp/validation/${className}_phase2.txt"
         $phase2Output | Out-File -FilePath $phase2File -Encoding UTF8
         
@@ -55,20 +55,41 @@ try {
         
         foreach ($line in $phase2Output) {
             # Method name (two spaces indent) - can be alphanumeric or operators
-            # Skip separator lines
+            # Skip separator lines  
             if ($line -match '^\s{2}([^:\s][\S]*)\s*$' -and $line -notmatch '^\s*-+\s*$') {
+                # Extra validation: skip if it looks like bytecode
+                if ($matches[1] -match '^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})+$') {
+                    continue
+                }
                 if ($inMethod -and $currentMethod) {
-                    $result.Phase2Methods[$currentMethod] = $currentBytecode -join ","
+                    if ($currentBytecode -is [string]) {
+                        $result.Phase2Methods[$currentMethod] = $currentBytecode
+                    } else {
+                        $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
+                        $result.Phase2Methods[$currentMethod] = $hexBytes -join " "
+                    }
                 }
                 $currentMethod = $matches[1]
+                # Debug: log if bytecode-like
+                if ($currentMethod -match '^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})+$') {
+                    Write-Host "      DEBUG: Parsed bytecode as method name: [$currentMethod]" -ForegroundColor Magenta
+                }
                 $currentBytecode = @()
                 $inMethod = $true
             }
-            # Bytecode array
+            # Bytecode array (decimal format with brackets)
             elseif ($inMethod -and $line -match '^\s+Bytecode:\s+\[([^\]]+)\]') {
                 $bytecodeStr = $matches[1]
                 if ($bytecodeStr.Trim()) {
                     $currentBytecode = $bytecodeStr -split ',\s*' | ForEach-Object { [int]$_.Trim() }
+                }
+            }
+            # Bytecode hex format (no brackets)
+            elseif ($inMethod -and $line -match '^\s+Bytecode:\s+([0-9A-Fa-f\s]+)\s*$') {
+                $bytecodeStr = $matches[1]
+                if ($bytecodeStr.Trim()) {
+                    # Convert hex to string for comparison
+                    $currentBytecode = $bytecodeStr.Trim()
                 }
             }
             # Bytecode length indicator (alternative format)
@@ -79,7 +100,14 @@ try {
         }
         # Save last method
         if ($inMethod -and $currentMethod) {
-            $result.Phase2Methods[$currentMethod] = $currentBytecode -join ","
+            if ($currentBytecode -is [string]) {
+                # Already a hex string
+                $result.Phase2Methods[$currentMethod] = $currentBytecode
+            } else {
+                # Array of integers - convert to hex string
+                $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
+                $result.Phase2Methods[$currentMethod] = $hexBytes -join " "
+            }
         }
         
         Write-Host "    Found $($result.Phase2Methods.Count) methods in Phase 2" -ForegroundColor Gray
@@ -101,10 +129,19 @@ try {
                     $bytecodeStr = ""
                     if ($method.Bytecode) {
                         if ($method.Bytecode -is [array]) {
-                            $bytecodeStr = ($method.Bytecode | ForEach-Object { [int]$_ }) -join ","
+                            # Convert array to hex string
+                            $hexBytes = $method.Bytecode | ForEach-Object { "{0:X2}" -f [int]$_ }
+                            $bytecodeStr = $hexBytes -join " "
+                        }
+                        elseif ($method.Bytecode -is [string]) {
+                            # Already a hex string - just normalize spaces
+                            $bytecodeStr = ($method.Bytecode -split '\s+' | Where-Object { $_ }) -join " "
                         }
                     }
-                    $result.ExtractedMethods[$method.Selector] = $bytecodeStr
+                    # Validate selector is not bytecode
+                    if ($method.Selector -notmatch '^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})+$') {
+                        $result.ExtractedMethods[$method.Selector] = $bytecodeStr
+                    }
                 }
             }
             
@@ -113,8 +150,12 @@ try {
             Write-Host "    ✗ Extraction failed" -ForegroundColor Red
         }
         
+        # Debug: Check for bad keys (removed - was causing false positives due to PowerShell bug)
+        
         # Step 3: Compare methods
-        foreach ($selector in $result.Phase2Methods.Keys) {
+        # Use GetEnumerator to avoid PowerShell hashtable key/property collision
+        foreach ($entry in $result.Phase2Methods.GetEnumerator()) {
+            $selector = $entry.Key
             if ($result.ExtractedMethods.ContainsKey($selector)) {
                 $phase2Bytes = $result.Phase2Methods[$selector]
                 $extractedBytes = $result.ExtractedMethods[$selector]
@@ -133,7 +174,9 @@ try {
             }
         }
         
-        foreach ($selector in $result.ExtractedMethods.Keys) {
+        # Use GetEnumerator to avoid PowerShell hashtable key/property collision  
+        foreach ($entry in $result.ExtractedMethods.GetEnumerator()) {
+            $selector = $entry.Key
             if (-not $result.Phase2Methods.ContainsKey($selector)) {
                 $result.Missing += $selector
             }

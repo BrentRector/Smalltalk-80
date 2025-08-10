@@ -82,6 +82,10 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecutePhase1Bootstrap(string bootstrapDir)
     {
+        // Disable tracing during Phase 1 bootstrap
+        var wasTracingEnabled = Tracer.Enabled;
+        Tracer.Enabled = false;
+        
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1: VM primitive operations...");
         
         var phase1Path = Path.Combine(bootstrapDir, "bootstrap_phase1.json");
@@ -105,6 +109,8 @@ public sealed class VirtualMachine
         
         // Dump classes after Phase 1
         // DumpAllClasses("PHASE 1 CLASSES");  // Commented out - Phase 1 is solid
+        
+        // Keep tracing disabled for Phase 2
     }
     
     /// <summary>
@@ -112,6 +118,9 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecutePhase2Bootstrap(string bootstrapDir)
     {
+        // Ensure tracing is disabled during Phase 2 bootstrap
+        var wasTracingEnabled = Tracer.Enabled;
+        Tracer.Enabled = false;
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 2: Message-based class construction...");
         
         var phase2Path = Path.Combine(bootstrapDir, "bootstrap_phase2.json");
@@ -146,6 +155,9 @@ public sealed class VirtualMachine
         {
             adapter.CompleteBootstrapWithMessageSends();
         }
+        
+        // Restore tracing state after Phase 2
+        Tracer.Enabled = wasTracingEnabled;
     }
     
     /// <summary>

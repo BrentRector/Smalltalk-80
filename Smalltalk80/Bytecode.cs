@@ -206,337 +206,345 @@ public enum Bytecode : byte
     /// <inheritdoc cref="PushLiteralVariable0" />
     PushLiteralVariable31,
 
-    // 96-127: Store into receiver variables (no pop)
-    /// <summary>Store into receiver variable (no pop).</summary>
-    StoreIntoReceiverVariable0 = 96,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable1,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable2,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable3,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable4,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable5,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable6,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable7,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable8,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable9,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable10,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable11,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable12,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable13,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable14,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable15,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable16,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable17,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable18,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable19,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable20,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable21,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable22,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable23,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable24,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable25,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable26,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable27,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable28,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable29,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable30,
-    /// <inheritdoc cref="StoreIntoReceiverVariable0" />
-    StoreIntoReceiverVariable31,
+    // 96-103: Store and pop receiver variables
+    /// <summary>Store and pop receiver variable.</summary>
+    StoreAndPopReceiverVariable0 = 96,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable1,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable2,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable3,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable4,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable5,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable6,
+    /// <inheritdoc cref="StoreAndPopReceiverVariable0" />
+    StoreAndPopReceiverVariable7,
 
-    // 128-159: Store into temporary variables (no pop)
-    /// <summary>Store into temporary variable (no pop).</summary>
-    StoreIntoTemporaryVariable0 = 128,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable1,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable2,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable3,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable4,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable5,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable6,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable7,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable8,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable9,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable10,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable11,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable12,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable13,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable14,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable15,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable16,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable17,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable18,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable19,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable20,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable21,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable22,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable23,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable24,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable25,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable26,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable27,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable28,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable29,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable30,
-    /// <inheritdoc cref="StoreIntoTemporaryVariable0" />
-    StoreIntoTemporaryVariable31,
+    // 104-111: Store and pop temporary variables
+    /// <summary>Store and pop temporary variable.</summary>
+    StoreAndPopTemporaryVariable0 = 104,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable1,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable2,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable3,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable4,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable5,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable6,
+    /// <inheritdoc cref="StoreAndPopTemporaryVariable0" />
+    StoreAndPopTemporaryVariable7,
 
-    // 160-175: Store into literal variables (no pop)
-    /// <summary>Store into literal variable (Association) (no pop).</summary>
-    StoreIntoLiteralVariable0 = 160,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable1,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable2,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable3,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable4,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable5,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable6,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable7,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable8,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable9,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable10,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable11,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable12,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable13,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable14,
-    /// <inheritdoc cref="StoreIntoLiteralVariable0" />
-    StoreIntoLiteralVariable15,
+    // 112: Push receiver (self)
+    /// <summary>Push receiver (self).</summary>
+    PushReceiver = 112,
 
-    // 176-180: Return operations
+    // 113-119: UNDEFINED in canonical Blue Book
+    Undefined113 = 113,
+    Undefined114,
+    Undefined115,
+    Undefined116,
+    Undefined117,
+    Undefined118,
+    Undefined119,
+
+    // 120: Return receiver
     /// <summary>Return receiver (self).</summary>
-    ReturnReceiver = 176,
-    /// <summary>Return constant true.</summary>
-    ReturnTrue = 177,
-    /// <summary>Return constant false.</summary>
-    ReturnFalse = 178,
-    /// <summary>Return constant nil.</summary>
-    ReturnNil = 179,
-    /// <summary>Return top of stack.</summary>
-    ReturnTop = 180,
+    ReturnReceiver = 120,
 
-    // 181-191: Unused in Blue Book
-    /// <summary>Reserved for future use.</summary>
-    Unused181 = 181,
-    /// <summary>Reserved for future use.</summary>
-    Unused182,
-    /// <summary>Reserved for future use.</summary>
-    Unused183,
-    /// <summary>Reserved for future use.</summary>
-    Unused184,
-    /// <summary>Reserved for future use.</summary>
-    Unused185,
-    /// <summary>Reserved for future use.</summary>
-    Unused186,
-    /// <summary>Reserved for future use.</summary>
-    Unused187,
-    /// <summary>Reserved for future use.</summary>
-    Unused188,
-    /// <summary>Reserved for future use.</summary>
-    Unused189,
-    /// <summary>Reserved for future use.</summary>
-    Unused190,
-    /// <summary>Reserved for future use.</summary>
-    Unused191,
+    // 121-123: UNDEFINED in canonical Blue Book
+    Undefined121 = 121,
+    Undefined122,
+    Undefined123,
 
-    // 192-223: Send message
-    /// <summary>Send message with selector at literal index 0-31.</summary>
-    SendMessage0 = 192,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage1,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage2,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage3,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage4,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage5,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage6,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage7,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage8,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage9,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage10,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage11,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage12,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage13,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage14,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage15,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage16,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage17,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage18,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage19,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage20,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage21,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage22,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage23,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage24,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage25,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage26,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage27,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage28,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage29,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage30,
-    /// <inheritdoc cref="SendMessage0" />
-    SendMessage31,
+    // 124-125: Return top of stack
+    /// <summary>Return top of stack from method.</summary>
+    ReturnTop = 124,
+    /// <summary>Return top of stack from block.</summary>
+    ReturnTopFromBlock = 125,
 
-    // 224-255: Send super message
-    /// <summary>Send super message with selector at literal index 0-31.</summary>
-    SendSuperMessage0 = 224,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage1,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage2,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage3,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage4,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage5,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage6,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage7,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage8,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage9,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage10,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage11,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage12,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage13,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage14,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage15,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage16,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage17,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage18,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage19,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage20,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage21,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage22,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage23,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage24,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage25,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage26,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage27,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage28,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage29,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage30,
-    /// <inheritdoc cref="SendSuperMessage0" />
-    SendSuperMessage31,
+    // 126-127: UNDEFINED in canonical Blue Book
+    Undefined126 = 126,
+    Undefined127,
+
+    // 128-137: Extended operations
+    /// <summary>Extended push.</summary>
+    ExtendedPush = 128,
+    /// <summary>Extended store.</summary>
+    ExtendedStore = 129,
+    /// <summary>Extended store and pop.</summary>
+    ExtendedStoreAndPop = 130,
+    /// <summary>Single extended send.</summary>
+    SingleExtendedSend = 131,
+    /// <summary>Double extended send.</summary>
+    DoubleExtendedSend = 132,
+    /// <summary>Single extended super send.</summary>
+    SingleExtendedSuperSend = 133,
+    /// <summary>Double extended super send.</summary>
+    DoubleExtendedSuperSend = 134,
+    /// <summary>Pop stack.</summary>
+    PopStack = 135,
+    /// <summary>Duplicate top of stack.</summary>
+    DuplicateTop = 136,
+    /// <summary>Push active context.</summary>
+    PushActiveContext = 137,
+
+    // 138-143: UNDEFINED in canonical Blue Book
+    Undefined138 = 138,
+    Undefined139,
+    Undefined140,
+    Undefined141,
+    Undefined142,
+    Undefined143,
+
+    // 144-151: Short unconditional jump
+    /// <summary>Short unconditional jump 1.</summary>
+    ShortUnconditionalJump1 = 144,
+    /// <summary>Short unconditional jump 2.</summary>
+    ShortUnconditionalJump2,
+    /// <summary>Short unconditional jump 3.</summary>
+    ShortUnconditionalJump3,
+    /// <summary>Short unconditional jump 4.</summary>
+    ShortUnconditionalJump4,
+    /// <summary>Short unconditional jump 5.</summary>
+    ShortUnconditionalJump5,
+    /// <summary>Short unconditional jump 6.</summary>
+    ShortUnconditionalJump6,
+    /// <summary>Short unconditional jump 7.</summary>
+    ShortUnconditionalJump7,
+    /// <summary>Short unconditional jump 8.</summary>
+    ShortUnconditionalJump8,
+
+    // 152-159: Short conditional jump (pop and jump on false)
+    /// <summary>Short conditional jump 1 (pop and jump on false).</summary>
+    ShortConditionalJump1 = 152,
+    /// <summary>Short conditional jump 2 (pop and jump on false).</summary>
+    ShortConditionalJump2,
+    /// <summary>Short conditional jump 3 (pop and jump on false).</summary>
+    ShortConditionalJump3,
+    /// <summary>Short conditional jump 4 (pop and jump on false).</summary>
+    ShortConditionalJump4,
+    /// <summary>Short conditional jump 5 (pop and jump on false).</summary>
+    ShortConditionalJump5,
+    /// <summary>Short conditional jump 6 (pop and jump on false).</summary>
+    ShortConditionalJump6,
+    /// <summary>Short conditional jump 7 (pop and jump on false).</summary>
+    ShortConditionalJump7,
+    /// <summary>Short conditional jump 8 (pop and jump on false).</summary>
+    ShortConditionalJump8,
+
+    // 160-167: Long unconditional jump
+    /// <summary>Long unconditional jump.</summary>
+    LongUnconditionalJump0 = 160,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump1,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump2,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump3,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump4,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump5,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump6,
+    /// <inheritdoc cref="LongUnconditionalJump0" />
+    LongUnconditionalJump7,
+
+    // 168-171: Long conditional jump (pop and jump on true)
+    /// <summary>Long conditional jump (pop and jump on true).</summary>
+    LongConditionalJumpTrue0 = 168,
+    /// <inheritdoc cref="LongConditionalJumpTrue0" />
+    LongConditionalJumpTrue1,
+    /// <inheritdoc cref="LongConditionalJumpTrue0" />
+    LongConditionalJumpTrue2,
+    /// <inheritdoc cref="LongConditionalJumpTrue0" />
+    LongConditionalJumpTrue3,
+
+    // 172-175: Long conditional jump (pop and jump on false)
+    /// <summary>Long conditional jump (pop and jump on false).</summary>
+    LongConditionalJumpFalse0 = 172,
+    /// <inheritdoc cref="LongConditionalJumpFalse0" />
+    LongConditionalJumpFalse1,
+    /// <inheritdoc cref="LongConditionalJumpFalse0" />
+    LongConditionalJumpFalse2,
+    /// <inheritdoc cref="LongConditionalJumpFalse0" />
+    LongConditionalJumpFalse3,
+
+    // 176-191: Send arithmetic selector (special selectors 0-15)
+    /// <summary>Send arithmetic selector 0 (+).</summary>
+    SendArithmeticSelector0 = 176,
+    /// <summary>Send arithmetic selector 1 (-).</summary>
+    SendArithmeticSelector1,
+    /// <summary>Send arithmetic selector 2 (&lt;).</summary>
+    SendArithmeticSelector2,
+    /// <summary>Send arithmetic selector 3 (&gt;).</summary>
+    SendArithmeticSelector3,
+    /// <summary>Send arithmetic selector 4 (&lt;=).</summary>
+    SendArithmeticSelector4,
+    /// <summary>Send arithmetic selector 5 (&gt;=).</summary>
+    SendArithmeticSelector5,
+    /// <summary>Send arithmetic selector 6 (=).</summary>
+    SendArithmeticSelector6,
+    /// <summary>Send arithmetic selector 7 (~=).</summary>
+    SendArithmeticSelector7,
+    /// <summary>Send arithmetic selector 8 (*).</summary>
+    SendArithmeticSelector8,
+    /// <summary>Send arithmetic selector 9 (/).</summary>
+    SendArithmeticSelector9,
+    /// <summary>Send arithmetic selector 10 (\\).</summary>
+    SendArithmeticSelector10,
+    /// <summary>Send arithmetic selector 11 (@).</summary>
+    SendArithmeticSelector11,
+    /// <summary>Send arithmetic selector 12 (bitShift:).</summary>
+    SendArithmeticSelector12,
+    /// <summary>Send arithmetic selector 13 (//).</summary>
+    SendArithmeticSelector13,
+    /// <summary>Send arithmetic selector 14 (bitAnd:).</summary>
+    SendArithmeticSelector14,
+    /// <summary>Send arithmetic selector 15 (bitOr:).</summary>
+    SendArithmeticSelector15,
+
+    // 192-207: Send common selector (special selectors 16-31)
+    /// <summary>Send common selector 16 (at:).</summary>
+    SendCommonSelector0 = 192,
+    /// <summary>Send common selector 17 (at:put:).</summary>
+    SendCommonSelector1,
+    /// <summary>Send common selector 18 (size).</summary>
+    SendCommonSelector2,
+    /// <summary>Send common selector 19 (next).</summary>
+    SendCommonSelector3,
+    /// <summary>Send common selector 20 (nextPut:).</summary>
+    SendCommonSelector4,
+    /// <summary>Send common selector 21 (atEnd).</summary>
+    SendCommonSelector5,
+    /// <summary>Send common selector 22 (==).</summary>
+    SendCommonSelector6,
+    /// <summary>Send common selector 23 (class).</summary>
+    SendCommonSelector7,
+    /// <summary>Send common selector 24 (~~).</summary>
+    SendCommonSelector8,
+    /// <summary>Send common selector 25 (value).</summary>
+    SendCommonSelector9,
+    /// <summary>Send common selector 26 (value:).</summary>
+    SendCommonSelector10,
+    /// <summary>Send common selector 27 (do:).</summary>
+    SendCommonSelector11,
+    /// <summary>Send common selector 28 (new).</summary>
+    SendCommonSelector12,
+    /// <summary>Send common selector 29 (new:).</summary>
+    SendCommonSelector13,
+    /// <summary>Send common selector 30 (x).</summary>
+    SendCommonSelector14,
+    /// <summary>Send common selector 31 (y).</summary>
+    SendCommonSelector15,
+
+    // 208-223: Send literal selector with 0 args
+    /// <summary>Send literal selector 0 with 0 args.</summary>
+    SendLiteralSelector0With0Args = 208,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector1With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector2With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector3With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector4With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector5With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector6With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector7With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector8With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector9With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector10With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector11With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector12With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector13With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector14With0Args,
+    /// <inheritdoc cref="SendLiteralSelector0With0Args" />
+    SendLiteralSelector15With0Args,
+
+    // 224-239: Send literal selector with 1 arg
+    /// <summary>Send literal selector 0 with 1 arg.</summary>
+    SendLiteralSelector0With1Arg = 224,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector1With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector2With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector3With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector4With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector5With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector6With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector7With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector8With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector9With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector10With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector11With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector12With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector13With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector14With1Arg,
+    /// <inheritdoc cref="SendLiteralSelector0With1Arg" />
+    SendLiteralSelector15With1Arg,
+
+    // 240-255: Send literal selector with 2 args
+    /// <summary>Send literal selector 0 with 2 args.</summary>
+    SendLiteralSelector0With2Args = 240,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector1With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector2With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector3With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector4With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector5With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector6With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector7With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector8With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector9With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector10With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector11With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector12With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector13With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector14With2Args,
+    /// <inheritdoc cref="SendLiteralSelector0With2Args" />
+    SendLiteralSelector15With2Args,
 }

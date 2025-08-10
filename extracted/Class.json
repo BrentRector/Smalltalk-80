@@ -216,7 +216,7 @@
       ]
     },
     {
-      "Selector": "fileOutOn: moveSource: toFile:",
+      "Selector": "fileOutOn:moveSource:toFile:",
       "Source": "fileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndexTranscriptcr;show:name.superfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex.selfclassnonTrivialifTrue:[aFileStreamcr;nextPutAll:\u0027\u0022-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- \u0022!!\u0027;cr;cr.selfclassfileOutOn:aFileStreammoveSource:moveSourcetoFile:fileIndex].!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -306,7 +306,7 @@
       ]
     },
     {
-      "Selector": "poolHas: ifTrue:",
+      "Selector": "poolHas:ifTrue:",
       "Source": "poolHas:varNameifTrue:assocBlock|assocpool|assoc_selfclassPoolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true].selfsharedPoolsdo:[:pool|assoc_poolassociationAt:varNameifAbsent:[].assoc==nilifFalse:[assocBlockvalue:assoc.^true]].^false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -473,7 +473,7 @@
       ]
     },
     {
-      "Selector": "subclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Selector": "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
       "Source": "subclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -487,7 +487,7 @@
       ]
     },
     {
-      "Selector": "subclass: otherSupers: instanceVariableNames: classVariableNames: category:",
+      "Selector": "subclass:otherSupers:instanceVariableNames:classVariableNames:category:",
       "Source": "subclass:totherSupers:othersinstanceVariableNames:fclassVariableNames:dcategory:catselfisVariableifTrue:[selfisPointersifTrue:[^selfvariableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].selfisBytesifTrue:[^selfvariableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfvariableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:\u0027\u0027category:cat].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfand:othersinstanceVariableNames:fvariable:falsewords:truepointers:trueclassVariableNames:dpoolDictionaries:\u0027\u0027category:catcomment:nilchanged:false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -501,7 +501,7 @@
       ]
     },
     {
-      "Selector": "superclass: methodDict: format: name: organization: instVarNames: classPool: sharedPools:",
+      "Selector": "superclass:methodDict:format:name:organization:instVarNames:classPool:sharedPools:",
       "Source": "superclass:supmethodDict:mdformat:ftname:nmorganization:orginstVarNames:nilOrArrayclassPool:poolsharedPools:poolSetsuperclass_sup.methodDict_md.format_ft.name_nm.organization_org.instanceVariables_nilOrArray.classPool_pool.sharedPools_poolSet!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -515,7 +515,7 @@
       ]
     },
     {
-      "Selector": "validateFrom: in: instanceVariableNames: methods:",
+      "Selector": "validateFrom:in:instanceVariableNames:methods:",
       "Source": "validateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethodssupervalidateFrom:oldClassin:environinstanceVariableNames:invalidFieldsmethods:invalidMethods.self~~oldClassifTrue:[environat:nameput:self.selfupdateInheritanceTables:oldClass.oldClassobsolete]!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -529,7 +529,7 @@
       ]
     },
     {
-      "Selector": "variableByteSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Selector": "variableByteSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
       "Source": "variableByteSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with named fields\u0027].(selfisVariableand:[selfisWords])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with word fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a byte subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:falsepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -543,7 +543,7 @@
       ]
     },
     {
-      "Selector": "variableSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Selector": "variableSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
       "Source": "variableSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfisBitsifTrue:[^selferror:\u0027cannot make a pointer subclass of a class with non-pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:trueclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -557,7 +557,7 @@
       ]
     },
     {
-      "Selector": "variableWordSubclass: instanceVariableNames: classVariableNames: poolDictionaries: category:",
+      "Selector": "variableWordSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:",
       "Source": "variableWordSubclass:tinstanceVariableNames:fclassVariableNames:dpoolDictionaries:scategory:catselfinstSize\u003E0ifTrue:[^selferror:\u0027cannot make a word subclass of a class with named fields\u0027].selfisBytesifTrue:[^selferror:\u0027cannot make a word subclass of a class with byte fields\u0027].(selfisVariableand:[selfisPointers])ifTrue:[^selferror:\u0027cannot make a word subclass of a class with pointer fields\u0027].^selfclassname:tinEnvironment:SmalltalksubclassOf:selfinstanceVariableNames:fvariable:truewords:truepointers:falseclassVariableNames:dpoolDictionaries:scategory:catcomment:nilchanged:false!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -590,7 +590,7 @@
       ]
     },
     {
-      "Selector": "named: superclasses: instanceVariableNames: classVariableNames: category:",
+      "Selector": "named:superclasses:instanceVariableNames:classVariableNames:category:",
       "Source": "named:newClassNamesuperclasses:newSuperNamesinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat|newClasssupersfirstSuperotherSupersfork|supers_selfgetSuperclasses:newSuperNames.superssize=1ifTrue:[^supersfirstsubclass:newClassNameinstanceVariableNames:myInstVarNamesclassVariableNames:classVarNamespoolDictionaries:\u0027\u0027category:cat].newClass_supersfirstsubclass:newClassNameotherSupers:(superscopyFrom:2to:superssize)instanceVariableNames:myInstVarNamesclassVariableNames:classVarNamescategory:cat.^newClass!",
       "ArgumentCount": 1,
       "TemporaryCount": 0,
@@ -625,6 +625,6 @@
     "SuccessfullyCompiled": 39,
     "FailedCompilation": 0,
     "CompilationRate": 100,
-    "ExtractionTime": "2025-08-09T17:32:58.1507052Z"
+    "ExtractionTime": "2025-08-10T03:06:38.8795082Z"
   }
 }
