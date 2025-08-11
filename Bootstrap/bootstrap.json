@@ -1563,34 +1563,6 @@
         {
           "temporaryCount": 0,
           "bytecode": [
-            64,
-            124
-          ],
-          "primitive": 70,
-          "literals": [
-            "selfisVariableifTrue"
-          ],
-          "selector": "basicNew",
-          "argumentCount": 0,
-          "source": "basicNew<primitive: 70>selfisVariableifTrue:[^selfbasicNew:0].selfprimitiveFailed!"
-        },
-        {
-          "temporaryCount": 0,
-          "bytecode": [
-            64,
-            124
-          ],
-          "primitive": 71,
-          "literals": [
-            "selfprimitiveFailed"
-          ],
-          "selector": "basicNew:",
-          "argumentCount": 1,
-          "source": "basicNew:anInteger<primitive: 71>selfprimitiveFailed!"
-        },
-        {
-          "temporaryCount": 0,
-          "bytecode": [
             65,
             208,
             124
@@ -3084,6 +3056,34 @@
           "selector": "init",
           "argumentCount": 0,
           "source": "initSelectorsOfConflictMethods_IdentityDictionarynew.SelectorsOfCopiedMethods_IdentityDictionarynew.SelectorsOfDirectedMethods_IdentityDictionarynew!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "primitive": 70,
+          "literals": [
+            "selfisVariableifTrue"
+          ],
+          "selector": "basicNew",
+          "argumentCount": 0,
+          "source": "basicNew<primitive: 70>selfisVariableifTrue:[^selfbasicNew:0].selfprimitiveFailed!"
+        },
+        {
+          "temporaryCount": 0,
+          "bytecode": [
+            64,
+            124
+          ],
+          "primitive": 71,
+          "literals": [
+            "selfprimitiveFailed"
+          ],
+          "selector": "basicNew:",
+          "argumentCount": 1,
+          "source": "basicNew:anInteger<primitive: 71>selfprimitiveFailed!"
         }
       ]
     },
@@ -12256,7 +12256,7 @@
       "comment": "The singleton instance of True"
     },
     {
-      "id": "false", 
+      "id": "false",
       "class": "False",
       "comment": "The singleton instance of False"
     },

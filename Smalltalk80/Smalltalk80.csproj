@@ -32,14 +32,15 @@
     <ItemGroup>
       <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap-schema.json" />
       <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap.json" />
-      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase1.json" />
-      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase2.json" />
-      <!-- Phase 3 class files use pattern ###_ClassName.json -->
-      <Phase3ClassFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\*_*.json" />
+      <!-- Extended library files use pattern like test_counter.json -->
+      <ExtendedLibraryFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\test_*.json" />
+      <!-- Legacy numbered class files if any remain -->
+      <LegacyClassFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\[0-9][0-9][0-9]_*.json" />
     </ItemGroup>
     <MakeDir Directories="$(OutputPath)Bootstrap" />
     <Copy SourceFiles="@(EssentialBootstrapFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(Phase3ClassFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ExtendedLibraryFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(LegacyClassFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
     <Message Text="Copied bootstrap files to $(OutputPath)Bootstrap" Importance="high" />
   </Target>
 

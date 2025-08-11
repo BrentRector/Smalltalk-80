@@ -377,6 +377,20 @@ public class Phase2Executor
             }
             
             // Create literals - all must be SmalltalkObjects for bytecode execution
+            
+            // Create Symbol SmalltalkObjects for selectors - MUST be defined before createAssociation
+            var symbolClassOop = vm.PrimitiveLookupGlobal("Symbol");
+            var symbolClass = symbolClassOop >= 0 ? ObjectMemory.FromOop(symbolClassOop) : null;
+            Console.WriteLine($"[PHASE2] Symbol class at OOP {symbolClassOop}");
+            
+            // Helper to create a SmalltalkObject Symbol
+            Func<string, SmalltalkObject> createSymbol = (str) =>
+            {
+                var sym = new SmalltalkObject(symbolClass, 1);
+                sym.Fields[0] = str; // Store the string directly
+                return sym;
+            };
+            
             // Create Association SmalltalkObjects for globals
             var associationClassOop = vm.PrimitiveLookupGlobal("Association");
             var associationClass = associationClassOop >= 0 ? ObjectMemory.FromOop(associationClassOop) : null;
@@ -393,28 +407,15 @@ public class Phase2Executor
                 {
                     Console.WriteLine("[PHASE2] WARNING: Association class is null, creating minimal object");
                     var minimalAssoc = new SmalltalkObject(null, 2);
-                    minimalAssoc.Fields[0] = new Symbol(name); // key
+                    minimalAssoc.Fields[0] = createSymbol(name); // key - use SmalltalkObject Symbol
                     minimalAssoc.Fields[1] = value; // value
                     return minimalAssoc;
                 }
                 
                 var assoc = new SmalltalkObject(associationClass, 2);
-                assoc.Fields[0] = new Symbol(name); // key (inherited from LookupKey)
+                assoc.Fields[0] = createSymbol(name); // key - use SmalltalkObject Symbol (inherited from LookupKey)
                 assoc.Fields[1] = value; // value (added by Association)
                 return assoc;
-            };
-            
-            // Create Symbol SmalltalkObjects for selectors
-            var symbolClassOop = vm.PrimitiveLookupGlobal("Symbol");
-            var symbolClass = symbolClassOop >= 0 ? ObjectMemory.FromOop(symbolClassOop) : null;
-            Console.WriteLine($"[PHASE2] Symbol class at OOP {symbolClassOop}");
-            
-            // Helper to create a SmalltalkObject Symbol
-            Func<string, SmalltalkObject> createSymbol = (str) =>
-            {
-                var sym = new SmalltalkObject(symbolClass, 1);
-                sym.Fields[0] = str; // Store the string directly
-                return sym;
             };
             
             // Create SmallInteger objects for integer constants
@@ -427,6 +428,12 @@ public class Phase2Executor
             Console.WriteLine($"[PHASE2] First Association OOP: {firstAssoc.Oop}");
             Console.WriteLine($"[PHASE2] First Association field[0] type: {firstAssoc.Fields[0]?.GetType().Name ?? "null"}");
             Console.WriteLine($"[PHASE2] First Association field[1] type: {firstAssoc.Fields[1]?.GetType().Name ?? "null"}");
+            if (firstAssoc.Fields[1] is SmalltalkObject valueObj)
+            {
+                Console.WriteLine($"[PHASE2] First Association value OOP: {valueObj.Oop} (should be 48 for Metaclass)");
+                Console.WriteLine($"[PHASE2] Metaclass object OOP: {metaclassObj.Oop}");
+                Console.WriteLine($"[PHASE2] Value's class pointer OOP: {valueObj.ClassPointer?.Oop ?? -1}");
+            }
             
             var literalsList = new object[]
             {

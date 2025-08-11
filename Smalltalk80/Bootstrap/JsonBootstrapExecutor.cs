@@ -12,6 +12,7 @@ public class JsonBootstrapExecutor
 {
     private readonly ISmalltalkVM vm;
     private readonly Dictionary<string, int> namedObjects = new();
+    private BootstrapManifestConfig? currentManifest;
     
     /// <summary>
     /// Controls whether bootstrap debug output is displayed.
@@ -86,27 +87,27 @@ public class JsonBootstrapExecutor
             ReadCommentHandling = JsonCommentHandling.Skip
         };
         
-        var phase2 = JsonSerializer.Deserialize<BootstrapManifestConfig>(jsonContent, options);
-        if (phase2 == null)
+        currentManifest = JsonSerializer.Deserialize<BootstrapManifestConfig>(jsonContent, options);
+        if (currentManifest == null)
             throw new InvalidOperationException("Failed to parse bootstrap JSON");
             
-        BootstrapLog($"[BOOTSTRAP] Bootstrap: {phase2.Description}");
+        BootstrapLog($"[BOOTSTRAP] Bootstrap: {currentManifest.Description}");
         
         // IMPORTANT: Create all classes first WITHOUT installing methods
         // This ensures CompiledMethod class exists before any methods are installed
-        if (phase2.Classes != null)
+        if (currentManifest.Classes != null)
         {
-            BootstrapLog($"[BOOTSTRAP] Pass 1: Creating {phase2.Classes.Count} class structures");
-            foreach (var classDef in phase2.Classes)
+            BootstrapLog($"[BOOTSTRAP] Pass 1: Creating {currentManifest.Classes.Count} class structures");
+            foreach (var classDef in currentManifest.Classes)
             {
                 CreateClassStructure(classDef);
             }
             
             // Now create objects (instances of classes) after classes exist
-            if (phase2.Objects != null)
+            if (currentManifest.Objects != null)
             {
-                BootstrapLog($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
-                foreach (var objDef in phase2.Objects)
+                BootstrapLog($"[BOOTSTRAP] Creating {currentManifest.Objects.Count} objects");
+                foreach (var objDef in currentManifest.Objects)
                 {
                     CreateBootstrapObject(objDef);
                 }
@@ -114,17 +115,25 @@ public class JsonBootstrapExecutor
             
             // Now install all methods in a second pass
             BootstrapLog($"[BOOTSTRAP] Pass 2: Installing methods for all classes");
-            foreach (var classDef in phase2.Classes)
+            foreach (var classDef in currentManifest.Classes)
             {
                 InstallClassMethods(classDef);
             }
+            
+            // Fix up any missing class pointers for metaclasses
+            BootstrapLog($"[BOOTSTRAP] Pass 3: Fixing up class pointers for metaclasses");
+            FixupClassPointers();
+            
+            // Set up metaclass superclass relationships
+            BootstrapLog($"[BOOTSTRAP] Pass 4: Setting up metaclass superclass relationships");
+            SetupMetaclassSuperclassRelationships();
         }
         
         // Finally, apply patches to wire everything together
-        if (phase2.Patches != null)
+        if (currentManifest.Patches != null)
         {
-            BootstrapLog($"[BOOTSTRAP] Applying {phase2.Patches.Count} patches");
-            foreach (var patch in phase2.Patches)
+            BootstrapLog($"[BOOTSTRAP] Applying {currentManifest.Patches.Count} patches");
+            foreach (var patch in currentManifest.Patches)
             {
                 ApplyBootstrapPatch(patch);
             }
@@ -330,6 +339,51 @@ public class JsonBootstrapExecutor
         else
         {
             BootstrapLog($"[BOOTSTRAP] Warning: Unknown slot type '{op.Slot}'");
+        }
+    }
+    
+    /// <summary>
+    /// Sets up metaclass superclass relationships after all classes have been created.
+    /// This handles the special case where ObjectClass -> Class, and normal cases where XClass -> YClass.
+    /// </summary>
+    private void SetupMetaclassSuperclassRelationships()
+    {
+        if (currentManifest?.Classes == null) return;
+        
+        foreach (var classDef in currentManifest.Classes)
+        {
+            var metaclassName = $"{classDef.Name}Class";
+            if (!namedObjects.TryGetValue(metaclassName, out var metaclassOop))
+                continue; // Metaclass doesn't exist
+            
+            string? superMetaclassName;
+            
+            // Special case: ObjectClass should have Class as its superclass
+            if (classDef.Name == "Object")
+            {
+                superMetaclassName = "Class";
+                BootstrapLog($"[BOOTSTRAP] Special case: Setting ObjectClass superclass to Class");
+            }
+            else if (string.IsNullOrEmpty(classDef.Superclass) || classDef.Superclass == "nil")
+            {
+                // Root classes without superclass don't set metaclass superclass
+                BootstrapLog($"[BOOTSTRAP] Skipping {metaclassName} - root class with no superclass");
+                continue;
+            }
+            else
+            {
+                superMetaclassName = $"{classDef.Superclass}Class";
+            }
+            
+            if (namedObjects.TryGetValue(superMetaclassName, out var superMetaclassOop))
+            {
+                vm.PrimitiveSetSlot(metaclassOop, 0, superMetaclassOop);
+                BootstrapLog($"[BOOTSTRAP] Successfully set {metaclassName} superclass to {superMetaclassName} (OOP {superMetaclassOop})");
+            }
+            else
+            {
+                BootstrapLog($"[BOOTSTRAP] Warning: Could not find superclass {superMetaclassName} for {metaclassName}");
+            }
         }
     }
     
@@ -1291,13 +1345,21 @@ public class JsonBootstrapExecutor
             vm.PrimitiveSetSlot(classOop, 2, 2); // 2 = words indexable
         }
         
-        // Set class pointers only for new classes (existing ones already have them)
-        if (isNewClass)
+        // Always ensure class pointers are set correctly
+        // Set class pointer for the class
+        if (metaclassOop > 0)
         {
-            // Set class pointer for the class
+            BootstrapLog($"[BOOTSTRAP] Setting class pointer for {classDef.Name} (OOP {classOop}) to metaclass OOP {metaclassOop}");
             vm.PrimitiveSetClass(classOop, metaclassOop);
-            
-            // Set metaclass's class to Metaclass
+        }
+        else
+        {
+            BootstrapLog($"[BOOTSTRAP] Warning: No metaclass found for {classDef.Name}, cannot set class pointer");
+        }
+        
+        // Set metaclass's class to Metaclass
+        if (metaclassOop > 0)
+        {
             // First try namedObjects, then look it up from VM
             int metaclassClassOop = 0;
             if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
@@ -1324,9 +1386,12 @@ public class JsonBootstrapExecutor
         // Set superclass if specified
         if (!string.IsNullOrEmpty(classDef.Superclass))
         {
+            BootstrapLog($"[BOOTSTRAP] Setting superclass of {classDef.Name} to {classDef.Superclass}");
+            
             // For 'nil' superclass (Object), don't set superclass
             if (classDef.Superclass == "nil")
             {
+                BootstrapLog($"[BOOTSTRAP] {classDef.Name} has nil superclass - not setting");
                 // Object has no superclass
                 return;
             }
@@ -1335,40 +1400,32 @@ public class JsonBootstrapExecutor
             int superclassOop = 0;
             if (namedObjects.TryGetValue(classDef.Superclass, out superclassOop))
             {
+                BootstrapLog($"[BOOTSTRAP] Found {classDef.Superclass} in namedObjects with OOP {superclassOop}");
                 // Found in named objects
             }
             else
             {
                 // Try to look up from VM (for classes created earlier)
                 superclassOop = vm.PrimitiveLookupClass(classDef.Superclass);
+                BootstrapLog($"[BOOTSTRAP] VM lookup for {classDef.Superclass} returned OOP {superclassOop}");
             }
             
-            if (superclassOop > 0)
+            if (superclassOop >= 0)  // Object has OOP 0, so use >= not >
             {
                 vm.PrimitiveSetSlot(classOop, 0, superclassOop); // Slot 0 is superclass
+                BootstrapLog($"[BOOTSTRAP] Successfully set superclass of {classDef.Name} (OOP {classOop}) to {classDef.Superclass} (OOP {superclassOop})");
                 
-                // Set metaclass superclass to superclass's metaclass
-                var superMetaclassName = $"{classDef.Superclass}Class";
-                int superMetaclassOop = 0;
-                if (namedObjects.TryGetValue(superMetaclassName, out superMetaclassOop))
-                {
-                    // Found in named objects
-                }
-                else
-                {
-                    // Try to look up from VM
-                    superMetaclassOop = vm.PrimitiveLookupClass(superMetaclassName);
-                }
-                
-                if (superMetaclassOop > 0)
-                {
-                    vm.PrimitiveSetSlot(metaclassOop, 0, superMetaclassOop);
-                }
+                // Metaclass superclass relationships will be set up in Pass 4
+                BootstrapLog($"[BOOTSTRAP] Metaclass superclass for {classDef.Name}Class will be set up in Pass 4");
             }
             else
             {
                 BootstrapLog($"[BOOTSTRAP] Warning: Superclass '{classDef.Superclass}' not found for '{classDef.Name}'");
             }
+        }
+        else
+        {
+            BootstrapLog($"[BOOTSTRAP] {classDef.Name} has no superclass specified");
         }
         
         // Set instance variables
@@ -2161,6 +2218,68 @@ public class JsonBootstrapExecutor
         vm.PrimitiveDictionaryAtPut(dictOop, keyOop, valueOop);
         
         BootstrapLog($"[BOOTSTRAP] Added {op.Key} -> {valueStr} to dictionary '{op.Dictionary}'");
+    }
+    
+    /// <summary>
+    /// Fix up class pointers for all metaclasses to ensure they point to MetaclassClass.
+    /// This is necessary because some metaclasses are created before MetaclassClass exists.
+    /// According to the Blue Book: metaclass objects are instances of Metaclass,
+    /// so their class pointer should point to MetaclassClass (the metaclass of Metaclass).
+    /// </summary>
+    private void FixupClassPointers()
+    {
+        // Get the MetaclassClass OOP (the metaclass of Metaclass)
+        var metaclassClassOop = vm.PrimitiveLookupGlobal("MetaclassClass");
+        if (metaclassClassOop < 0)
+        {
+            BootstrapLog("[BOOTSTRAP] Warning: MetaclassClass not found, cannot fix up class pointers");
+            return;
+        }
+        
+        var metaclassClassObj = ObjectMemory.FromOop(metaclassClassOop);
+        if (metaclassClassObj == null)
+        {
+            BootstrapLog("[BOOTSTRAP] Warning: MetaclassClass object not found in ObjectMemory");
+            return;
+        }
+        
+        int fixedCount = 0;
+        
+        // Go through all named objects that are metaclasses
+        foreach (var kvp in namedObjects)
+        {
+            // Metaclasses are named with "Class" suffix (but "Class" itself is a regular class, not a metaclass)
+            // Only objects ending with "Class" except "Class" itself are metaclasses
+            if (kvp.Key.EndsWith("Class") && kvp.Key != "Class" && kvp.Key != "Metaclass")
+            {
+                var obj = ObjectMemory.FromOop(kvp.Value);
+                if (obj != null && obj.ClassPointer == null)
+                {
+                    obj.ClassPointer = metaclassClassObj;
+                    fixedCount++;
+                    BootstrapLog($"[BOOTSTRAP]   Fixed class pointer for {kvp.Key} (OOP {kvp.Value}) -> MetaclassClass (OOP {metaclassClassOop})");
+                }
+            }
+        }
+        
+        // Also check all objects in ObjectMemory that might be metaclasses
+        // Look for objects with 6 fields (typical metaclass size) that have no class pointer
+        for (int oop = 0; oop < 100; oop += 2) // Check first 100 even OOPs
+        {
+            var obj = ObjectMemory.FromOop(oop);
+            if (obj != null && obj.Fields.Length == 6 && obj.ClassPointer == null)
+            {
+                // This looks like a metaclass - check if it has a method dictionary at slot 1
+                if (obj.Fields[1] is SmalltalkObject methodDict)
+                {
+                    obj.ClassPointer = metaclassClassObj;
+                    fixedCount++;
+                    BootstrapLog($"[BOOTSTRAP]   Fixed class pointer for object at OOP {oop} -> MetaclassClass (OOP {metaclassClassOop})");
+                }
+            }
+        }
+        
+        BootstrapLog($"[BOOTSTRAP] Fixed {fixedCount} metaclass class pointers");
     }
 }
 

@@ -68,6 +68,34 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // [0] superclass, [1] methodDict, [2] format
         // [3] instanceVariables, [4] organization, [5] thisClass
         var metaclassObj = new SmalltalkObject(null, 6);
+        
+        // Initialize method dictionary to an empty MethodDictionary
+        // This is crucial for method lookup to work properly
+        // Create a minimal method dictionary: [tally, keys..., values...]
+        var methodDict = new SmalltalkObject(null, 8); // Small initial size
+        
+        // Initialize tally to 0 as a SmallInteger (encoded as (0 << 1) | 1 = 1)
+        methodDict.Fields[0] = 1;  // SmallInteger 0
+        
+        // Set the method dictionary
+        metaclassObj.Fields[1] = methodDict;
+        
+        // IMPORTANT: Set the metaclass's class to MetaclassClass if it exists
+        // All metaclasses are instances of Metaclass, so their class pointer should be MetaclassClass
+        // (MetaclassClass is the metaclass of Metaclass)
+        var metaclassClassOop = PrimitiveLookupGlobal("MetaclassClass");
+        if (metaclassClassOop > 0)
+        {
+            var metaclassClass = ObjectMemory.FromOop(metaclassClassOop);
+            if (metaclassClass != null)
+            {
+                metaclassObj.ClassPointer = metaclassClass;
+                DebugLog($"[VM] Set metaclass OOP {metaclassObj.Oop} class pointer to MetaclassClass (OOP {metaclassClassOop})");
+            }
+        }
+        
+        DebugLog($"[VM] Created metaclass OOP {metaclassObj.Oop} with method dict OOP {methodDict.Oop}");
+        
         return metaclassObj.Oop;
     }
     
@@ -827,12 +855,15 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     
     /// <summary>
     /// Compile and install a method in a class.
+    /// NOTE: During bootstrap, this just logs the request. Actual method installation
+    /// happens through InstallClassMethods using PrimitiveDictionaryAtPut.
     /// </summary>
     public void PrimitiveInstallMethod(int classId, string selector, string sourceCode)
     {
-        // For bootstrap, we'll skip actual compilation
-        // Methods will be compiled later when the compiler is available
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Method {selector} queued for installation in class {classId}");
+        // For bootstrap, we don't actually install here - just log the request
+        // Actual method installation happens in JsonBootstrapExecutor.InstallClassMethods
+        // via PrimitiveDictionaryAtPut which properly maintains SmallInteger tallies
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Method {selector} requested for class {classId} (will be installed via InstallClassMethods)");
     }
     
     /// <summary>

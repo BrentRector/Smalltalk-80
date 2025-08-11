@@ -20,11 +20,11 @@ public class Program
         {
             // Parse command line arguments
             var jsonManifests = new List<string>();
-            var phase3Manifests = new List<string>();
+            var extendedLibraryManifests = new List<string>();
             var sourceFiles = new List<string>();
             var classesToPrint = new List<string>();
-            bool skipPhase3 = false;
-            bool listPhase2Classes = false;
+            bool skipExtendedLibrary = false;
+            bool listBootstrapClasses = false;
             bool enableVMDebug = false;
             bool enableBootstrapDebug = false;
             bool useEnhancedPrinter = false;
@@ -36,18 +36,23 @@ public class Program
             
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--json" && i + 1 < args.Length)
+                if (args[i] == "--help" || args[i] == "-h")
+                {
+                    PrintHelp();
+                    return 0;
+                }
+                else if (args[i] == "--json" && i + 1 < args.Length)
                 {
                     jsonManifests.Add(args[++i]);
                 }
-                else if (args[i] == "--skip-phase3")
+                else if (args[i] == "--skip-extended" || args[i] == "--skip-phase3")
                 {
-                    skipPhase3 = true;
+                    skipExtendedLibrary = true;
                 }
-                else if (args[i] == "--list-phase2-classes")
+                else if (args[i] == "--list-bootstrap-classes" || args[i] == "--list-phase2-classes")
                 {
-                    listPhase2Classes = true;
-                    skipPhase3 = true; // Always skip Phase 3 when listing Phase 2 classes
+                    listBootstrapClasses = true;
+                    skipExtendedLibrary = true; // Always skip extended library when listing bootstrap classes
                 }
                 else if (args[i] == "--debug-vm")
                 {
@@ -86,10 +91,10 @@ public class Program
                 {
                     enableMethodTracing = true;
                 }
-                else if (args[i] == "--phase3" && i + 1 < args.Length)
+                else if ((args[i] == "--extended-library" || args[i] == "--phase3") && i + 1 < args.Length)
                 {
-                    phase3Manifests.Add(args[++i]);
-                    skipPhase3 = true; // Skip standard Phase 3 when loading custom manifests
+                    extendedLibraryManifests.Add(args[++i]);
+                    skipExtendedLibrary = true; // Skip standard extended library when loading custom manifests
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -121,8 +126,8 @@ public class Program
                 Console.WriteLine("✓ Method tracing enabled");
             }
             
-            // Create the VM with bootstrap through Phase 3
-            var vm = new VirtualMachine(skipStandardLibrary: skipPhase3);
+            // Create the VM with bootstrap through extended library
+            var vm = new VirtualMachine(skipStandardLibrary: skipExtendedLibrary);
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();
@@ -145,11 +150,11 @@ public class Program
                 }
             }
             
-            // Load Phase 3 high-level manifests if specified
-            if (phase3Manifests.Count > 0 && vm.Adapter != null)
+            // Load extended library manifests if specified
+            if (extendedLibraryManifests.Count > 0 && vm.Adapter != null)
             {
                 Console.WriteLine();
-                Console.WriteLine("=== Loading Phase 3 High-Level Manifests ===");
+                Console.WriteLine("=== Loading Extended Library Manifests ===");
                 
                 // Enable VM debug if requested
                 if (enableVMDebug)
@@ -159,7 +164,7 @@ public class Program
                 
                 // Check if the manifest requests bytecode execution
                 bool useBytecodeExecution = false;
-                foreach (var manifestFile in phase3Manifests)
+                foreach (var manifestFile in extendedLibraryManifests)
                 {
                     if (manifestFile.Contains("test_counter", StringComparison.OrdinalIgnoreCase) ||
                         manifestFile.Contains("bytecode", StringComparison.OrdinalIgnoreCase))
@@ -172,18 +177,18 @@ public class Program
                 if (useBytecodeExecution)
                 {
                     // Use the Phase2Executor for bytecode-based execution
-                    Console.WriteLine("Using bytecode executor for Phase 2...");
+                    Console.WriteLine("Using bytecode executor for extended library...");
                     var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
                     
                     // Load the test counter manifest
-                    var testCounterManifest = phase3Manifests.FirstOrDefault(f => f.Contains("phase2_test_counter.json"));
+                    var testCounterManifest = extendedLibraryManifests.FirstOrDefault(f => f.Contains("test_counter.json"));
                     if (testCounterManifest != null)
                     {
                         try
                         {
                             var jsonContent = System.IO.File.ReadAllText(testCounterManifest);
                             phase2Executor.ExecuteManifest(jsonContent);
-                            Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {testCounterManifest}");
+                            Console.WriteLine($"✓ Successfully loaded extended library manifest: {testCounterManifest}");
                         }
                         catch (Exception ex)
                         {
@@ -200,18 +205,18 @@ public class Program
                     // Use the regular Phase2Executor
                     var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
                     
-                    foreach (var manifestFile in phase3Manifests)
+                    foreach (var manifestFile in extendedLibraryManifests)
                     {
-                        Console.WriteLine($"\nLoading Phase 3 manifest: {manifestFile}");
+                        Console.WriteLine($"\nLoading extended library manifest: {manifestFile}");
                         try
                         {
                             var jsonContent = System.IO.File.ReadAllText(manifestFile);
                             phase2Executor.ExecuteManifest(jsonContent);
-                            Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {manifestFile}");
+                            Console.WriteLine($"✓ Successfully loaded extended library manifest: {manifestFile}");
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"✗ Failed to load Phase 3 manifest {manifestFile}: {ex.Message}");
+                            Console.WriteLine($"✗ Failed to load extended library manifest {manifestFile}: {ex.Message}");
                             if (enableBootstrapDebug)
                             {
                                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
@@ -220,15 +225,15 @@ public class Program
                     }
                 }
             }
-            else if (phase3Manifests.Count > 0)
+            else if (extendedLibraryManifests.Count > 0)
             {
-                Console.WriteLine("ERROR: VM adapter not available for Phase 3 execution");
+                Console.WriteLine("ERROR: VM adapter not available for extended library execution");
             }
             
-            // If listing Phase 2 classes, do that and exit
-            if (listPhase2Classes)
+            // If listing bootstrap classes, do that and exit
+            if (listBootstrapClasses)
             {
-                ListPhase2Classes(vm);
+                ListBootstrapClasses(vm);
                 return 0;
             }
             
@@ -544,9 +549,9 @@ public class Program
         return $"<{obj.GetType().Name}@{obj.GetHashCode():X}>";
     }
     
-    private static void ListPhase2Classes(VirtualMachine vm)
+    private static void ListBootstrapClasses(VirtualMachine vm)
     {
-        Console.WriteLine("\n=== Classes Present After Phase 2 ===");
+        Console.WriteLine("\n=== Classes Present After Bootstrap ===");
         
         // Get all objects and find the ones that look like classes
         var allObjects = ObjectMemory.Objects.ToList();
@@ -556,9 +561,9 @@ public class Program
         // and seeing if they resolve to class objects
         var potentialClassNames = new HashSet<string>();
         
-        // First add all known classes from both phases
+        // First add all known classes from bootstrap
         var knownClasses = new[] {
-            // Phase 1 classes - Object is the root!
+            // Bootstrap classes - Object is the root!
             "Object", "Behavior", "Class", "Metaclass",
             "CompiledMethod", "MethodDictionary",
             "Symbol", "String", "Array", "ByteArray",
@@ -601,5 +606,47 @@ public class Program
         Console.WriteLine();
         var classArgs = string.Join(" ", classNames.Select(n => $"-c {n}"));
         Console.WriteLine($"dotnet run --project Smalltalk80.Compiler -- --compile-classes {classArgs} -o bootstrap_phase2_complete.json \"Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st\"");
+    }
+    
+    /// <summary>
+    /// Prints the help message for the interpreter.
+    /// </summary>
+    private static void PrintHelp()
+    {
+        Console.WriteLine("Smalltalk-80 Interpreter");
+        Console.WriteLine("========================");
+        Console.WriteLine();
+        Console.WriteLine("Usage: Smalltalk80.Interpreter [options] [source-files...]");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --help, -h                      Show this help message");
+        Console.WriteLine("  --json <file>                   Load additional JSON manifest");
+        Console.WriteLine("  --skip-extended                 Skip loading extended library (formerly --skip-phase3)");
+        Console.WriteLine("  --extended-library <file>       Load custom extended library manifest (formerly --phase3)");
+        Console.WriteLine("  --list-bootstrap-classes        List all classes in bootstrap");
+        Console.WriteLine("  --debug-vm                      Enable VM debug output");
+        Console.WriteLine("  --debug-bootstrap               Enable bootstrap debug output");
+        Console.WriteLine("  --print-class <name>            Print specific class details");
+        Console.WriteLine("  --enhanced-print                Use enhanced pretty printer");
+        Console.WriteLine("  --no-bytecode                   Hide bytecode in method displays");
+        Console.WriteLine("  --no-mnemonics                  Hide mnemonics in method displays");
+        Console.WriteLine("  --trace-methods                 Enable method entry/exit tracing");
+        Console.WriteLine("  --test-critical-methods         Run critical method tests");
+        Console.WriteLine("  --test-undefined-object         Run UndefinedObject tests");
+        Console.WriteLine();
+        Console.WriteLine("Source Files:");
+        Console.WriteLine("  Any non-option arguments are treated as Smalltalk source files to load");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  Smalltalk80.Interpreter                       # Run with default bootstrap");
+        Console.WriteLine("  Smalltalk80.Interpreter --enhanced-print      # Use enhanced pretty printer");
+        Console.WriteLine("  Smalltalk80.Interpreter --print-class Object  # Print Object class details");
+        Console.WriteLine("  Smalltalk80.Interpreter --trace-methods       # Enable method tracing");
+        Console.WriteLine("  Smalltalk80.Interpreter mycode.st             # Load Smalltalk source file");
+        Console.WriteLine();
+        Console.WriteLine("Bootstrap Process:");
+        Console.WriteLine("  1. Core bootstrap with essential classes and methods");
+        Console.WriteLine("  2. Extended library (optional, can be skipped with --skip-extended)");
+        Console.WriteLine("  3. Custom manifests via --extended-library option");
     }
 }

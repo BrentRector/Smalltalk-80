@@ -600,11 +600,12 @@ public class Interpreter
             }
             else
             {
+                // ALWAYS start lookup at the receiver's class
                 startClass = recvObj.ClassPointer;
             }
 
             var cls = startClass ??
-                      throw new InvalidOperationException("Receiver has no class pointer");
+                      throw new InvalidOperationException("Receiver cannot be null");
 
             // Try method cache first for performance
             var method = MethodCache.Lookup(cls, selector);
@@ -614,7 +615,36 @@ public class Interpreter
                 method = cls.Lookup(selector);
 
                 if (method == null)
+                {
+                    // Method not found - try doesNotUnderstand: as a fallback
+                    // First, check if doesNotUnderstand: exists
+                    var doesNotUnderstand = new Symbol("doesNotUnderstand:");
+                    var dnu_method = cls.Lookup(doesNotUnderstand);
+                    
+                    if (dnu_method != null)
+                    {
+                        // Create a simple Message-like object
+                        // During bootstrap, we may not have the Message class yet
+                        // so we'll create a simple array: [selector, arguments]
+                        var messageData = new object[] { selector, arguments };
+                        
+                        // Execute doesNotUnderstand: with the message data as argument
+                        var newArgs = new object[] { messageData };
+                        var newMessage = new Message
+                        {
+                            Selector = doesNotUnderstand,
+                            Receiver = receiver,
+                            Arguments = newArgs,
+                            SuperSend = false
+                        };
+                        
+                        PerformSend(newMessage);
+                        return;
+                    }
+                    
+                    // Neither the method nor doesNotUnderstand: was found - this is fatal
                     throw new InvalidOperationException($"Method {selector} not found");
+                }
 
                 // Cache the result for future use
                 MethodCache.Store(cls, selector, method);

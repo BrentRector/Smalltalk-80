@@ -53,13 +53,14 @@ public class SmalltalkObject
 
     /// <summary>
     ///     Looks up a method by searching through the class hierarchy's method dictionaries.
-    ///     Implements the Smalltalk-80 lookup including the metaclass-to-instance crossover.
+    ///     Implements the Smalltalk-80 lookup including the Object->Object class sidestep.
     /// </summary>
     public CompiledMethod? Lookup(Symbol selector)
     {
         // Start with this class and walk up the superclass chain
         var currentClass = this;
         int depth = 0;
+        bool hasSidestepped = false;
         
         // Debug output for Phase 3
         if (EnablePhase3LookupDebug)
@@ -97,12 +98,45 @@ public class SmalltalkObject
                 return method;
             }
             
-            // Move to superclass
-            currentClass = GetSuperclassOf(currentClass);
+            // Get the superclass
+            var nextClass = GetSuperclassOf(currentClass);
+            
+            // SPECIAL CASE: If superclass is nil and we haven't sidestepped yet,
+            // sidestep to the class side (Object -> Object class)
+            if (nextClass == null && !hasSidestepped)
+            {
+                if (EnablePhase3LookupDebug)
+                {
+                    Console.WriteLine($"[LOOKUP]   Reached top of hierarchy (superclass=nil), sidestepping to class side");
+                    Console.WriteLine($"[LOOKUP]   Current class OOP {currentClass.Oop}, ClassPointer: {currentClass.ClassPointer?.Oop.ToString() ?? "null"}");
+                }
+                
+                // The current class should be Object (or a root class)
+                // Get its class (metaclass) and continue from there
+                var metaclass = currentClass.ClassPointer;
+                if (metaclass != null)
+                {
+                    if (EnablePhase3LookupDebug)
+                    {
+                        var metaclassName = TryGetClassName(metaclass);
+                        Console.WriteLine($"[LOOKUP]   Sidestepping to {metaclassName ?? $"OOP {metaclass.Oop}"}");
+                    }
+                    nextClass = metaclass;
+                    hasSidestepped = true;
+                }
+                else
+                {
+                    if (EnablePhase3LookupDebug)
+                    {
+                        Console.WriteLine($"[LOOKUP]   ERROR: Cannot sidestep - current class has no ClassPointer!");
+                    }
+                }
+            }
+            
+            currentClass = nextClass;
             depth++;
         }
         
-        // Method not found in the entire hierarchy
         if (EnablePhase3LookupDebug)
         {
             Console.WriteLine($"[LOOKUP]   ✗ #{selector.Value} not found in hierarchy");
@@ -199,7 +233,7 @@ public class SmalltalkObject
         int tally = 0;
         if (methodDict.Fields[0] is int tallyInt)
         {
-            // If it's an int, it might be a SmallInteger (tagged with bit 0 = 1)
+            // If it's an int, it should be a SmallInteger (tagged with bit 0 = 1)
             if ((tallyInt & 1) == 1)
             {
                 // It's a tagged SmallInteger, extract the value
@@ -207,8 +241,13 @@ public class SmalltalkObject
             }
             else
             {
-                // It's a raw int value (shouldn't happen for tally but handle it)
-                tally = tallyInt;
+                // ERROR: Tally should ALWAYS be a SmallInteger!
+                // This indicates a bug in the bootstrap
+                if (EnablePhase3LookupDebug)
+                {
+                    Console.WriteLine($"[LOOKUP]     ERROR: Tally is not a SmallInteger! Value: {tallyInt}");
+                }
+                tally = tallyInt; // Use it anyway for debugging
             }
         }
         else if (methodDict.Fields[0] is SmalltalkObject tallyObj)
