@@ -1,24 +1,25 @@
 {
   "repo": "Smalltalk-80",
-  "commit": "aea8ce38368a857b43e2a55e1aa77abb72ccb1c6",
+  "commit": "d9d5f5a08d2bed62619a1e456edbdfd1437e64de",
   "branch": "main",
-  "generatedAt": "2025-08-10T10:39:11.4864127-07:00",
+  "generatedAt": "2025-08-10T11:53:34.3515013-07:00",
   "stats": {
-    "totalFiles": 191,
+    "totalFiles": 218,
     "byExtension": {
-      ".json": 39,
+      ".json": 60,
       ".cs": 140,
-      ".props": 1,
+      ".props": 4,
+      ".targets": 3,
       ".csproj": 10,
       ".sln": 1
     },
     "largestFiles": [
       {
-        "path": "Bootstrap/bootstrap_phase2_updated.json",
+        "path": "bin/Debug/net9.0/Bootstrap/bootstrap_phase2.json",
         "ext": ".json",
         "size": 354716,
         "lines": 12249,
-        "sha256": "cf46a8d042e9493f82aaad5142846e61980f9376349de67146f3aeea0a3405a2"
+        "sha256": "0f7d254ef9f1a9397afdc714dff1c1350379b8141df6c4ae7d72d5b34d0d579c"
       },
       {
         "path": "Bootstrap/bootstrap_phase2.json",
@@ -26,6 +27,20 @@
         "size": 354716,
         "lines": 12249,
         "sha256": "0f7d254ef9f1a9397afdc714dff1c1350379b8141df6c4ae7d72d5b34d0d579c"
+      },
+      {
+        "path": "bin/Debug/net9.0/Bootstrap/bootstrap_phase2_updated.json",
+        "ext": ".json",
+        "size": 354716,
+        "lines": 12249,
+        "sha256": "cf46a8d042e9493f82aaad5142846e61980f9376349de67146f3aeea0a3405a2"
+      },
+      {
+        "path": "Bootstrap/bootstrap_phase2_updated.json",
+        "ext": ".json",
+        "size": 354716,
+        "lines": 12249,
+        "sha256": "cf46a8d042e9493f82aaad5142846e61980f9376349de67146f3aeea0a3405a2"
       },
       {
         "path": "Smalltalk80/Generated/Smalltalk80Parser.cs",
@@ -79,9 +94,9 @@
       {
         "path": "repo.manifest.json",
         "ext": ".json",
-        "size": 51287,
-        "lines": 1651,
-        "sha256": "458fee39e0af8ae9419e0977b6430cbda80110c11202747e4d1959d854402e58"
+        "size": 57587,
+        "lines": 1841,
+        "sha256": "caf6f0d8501c7168eff2c9c35e5c74f0bc5cf6df230c99d15cc0ec3a141ae6ee"
       },
       {
         "path": "Smalltalk80.Tests/InterpreterBytecodeTests.cs",
@@ -126,32 +141,18 @@
         "sha256": "6754bcffe8d3d887719cd47c28fc9f4e32b5d887bbe15f901621dfd486cf4e72"
       },
       {
+        "path": "Smalltalk80/Bootstrap/Phase3Executor.cs",
+        "ext": ".cs",
+        "size": 32406,
+        "lines": 845,
+        "sha256": "7315aee750eead78f548d8ec9842aee9c1b6c247f24320909a77e4d90b01fa00"
+      },
+      {
         "path": "extracted/ClassDescription.json",
         "ext": ".json",
         "size": 31135,
         "lines": 877,
         "sha256": "03e144b03d62a11276a54c115369eb9c5faddb229adf9767e6804c981c1115ea"
-      },
-      {
-        "path": "Smalltalk80.Interpreter/SmalltalkPrettyPrinterEnhanced.cs",
-        "ext": ".cs",
-        "size": 29687,
-        "lines": 904,
-        "sha256": "8e404cc84118976e4ebb474d785b75e7c175c8eba246687c6ca74fab30830ca7"
-      },
-      {
-        "path": "extracted/CompiledMethod.json",
-        "ext": ".json",
-        "size": 27450,
-        "lines": 928,
-        "sha256": "347275ead6fe0b46d455c0325e0a3d1e385231684477a753a1e5097a4ab5120a"
-      },
-      {
-        "path": "Smalltalk80/VirtualMachine.cs",
-        "ext": ".cs",
-        "size": 27415,
-        "lines": 692,
-        "sha256": "e0e68d48d8a49996bcaf5863a49fd3279a2093ba1027c89835f4b1f851cb7f26"
       }
     ]
   },
@@ -359,6 +360,90 @@
       "sha256": "008722fc7dba331a5a6f0b0523d12b52baae873da4b891ce98b9f69cafdc23b9"
     },
     {
+      "path": "bin/Debug/net9.0/Bootstrap/bootstrap_phase1.json",
+      "ext": ".json",
+      "size": 11280,
+      "lines": 159,
+      "sha256": "4b8a7c3bc2e24da0b9d03a26ad9a4d867f58ccb9e10d4fb911fd286a7925a189"
+    },
+    {
+      "path": "bin/Debug/net9.0/Bootstrap/bootstrap_phase2_updated.json",
+      "ext": ".json",
+      "size": 354716,
+      "lines": 12249,
+      "sha256": "cf46a8d042e9493f82aaad5142846e61980f9376349de67146f3aeea0a3405a2"
+    },
+    {
+      "path": "bin/Debug/net9.0/Bootstrap/bootstrap_phase2.json",
+      "ext": ".json",
+      "size": 354716,
+      "lines": 12249,
+      "sha256": "0f7d254ef9f1a9397afdc714dff1c1350379b8141df6c4ae7d72d5b34d0d579c"
+    },
+    {
+      "path": "bin/Debug/net9.0/Bootstrap/bootstrap-schema.json",
+      "ext": ".json",
+      "size": 4985,
+      "lines": 168,
+      "sha256": "450859ebf52cd8fde0106b40272cb4919cee2f2cb2a35af0025c1dc09fd4bbea"
+    },
+    {
+      "path": "bin/Debug/net9.0/Bootstrap/phase2_5_additions.json",
+      "ext": ".json",
+      "size": 10371,
+      "lines": 381,
+      "sha256": "3fbfdc7a448908e7e6fe0720d830c391ce15534be270576eaaa325f742d67c8a"
+    },
+    {
+      "path": "bin/Debug/net9.0/Bootstrap/phase3_test_counter.json",
+      "ext": ".json",
+      "size": 80,
+      "lines": 4,
+      "sha256": "d13b325e0b134b6ebdd2a5f07d20153c875e572d8f2d22131c27b4c2437980fe"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.Compiler.deps.json",
+      "ext": ".json",
+      "size": 1885,
+      "lines": 66,
+      "sha256": "41524e21af1fcc60a55493c98ea02ee6603a5c7f362d969a0b26b0f0d50b2c87"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.deps.json",
+      "ext": ".json",
+      "size": 1422,
+      "lines": 49,
+      "sha256": "91adb342c44dce5d1ca0ba456f242bec2326cb90ce143f2833794396124a3a19"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.ExtractClass.deps.json",
+      "ext": ".json",
+      "size": 2286,
+      "lines": 80,
+      "sha256": "8cd0294611d6c6121b208da7a8054c45f9583e919747b9ff88c7e456fa7e6050"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.ExtractClass.runtimeconfig.json",
+      "ext": ".json",
+      "size": 268,
+      "lines": 12,
+      "sha256": "a45057885f807f4a337fdea3ccdfa64e1675d22a6d6a6fc7c7394fd44ba9eebe"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.Interpreter.deps.json",
+      "ext": ".json",
+      "size": 1894,
+      "lines": 66,
+      "sha256": "3d51528b20fa5fe3628b80a1a3b226bfec08e21235cab463d8678f3b6eb4e666"
+    },
+    {
+      "path": "bin/Debug/net9.0/Smalltalk80.Interpreter.runtimeconfig.json",
+      "ext": ".json",
+      "size": 268,
+      "lines": 12,
+      "sha256": "a45057885f807f4a337fdea3ccdfa64e1675d22a6d6a6fc7c7394fd44ba9eebe"
+    },
+    {
       "path": "Bootstrap/bootstrap_phase1.json",
       "ext": ".json",
       "size": 11280,
@@ -392,6 +477,13 @@
       "size": 10371,
       "lines": 381,
       "sha256": "3fbfdc7a448908e7e6fe0720d830c391ce15534be270576eaaa325f742d67c8a"
+    },
+    {
+      "path": "Bootstrap/phase3_test_counter.json",
+      "ext": ".json",
+      "size": 80,
+      "lines": 4,
+      "sha256": "d13b325e0b134b6ebdd2a5f07d20153c875e572d8f2d22131c27b4c2437980fe"
     },
     {
       "path": "Bootstrap/Smalltalk80.Bootstrap.Data/Smalltalk80.Bootstrap.Data.csproj",
@@ -657,14 +749,14 @@
       "ext": ".cs",
       "size": 1255,
       "lines": 25,
-      "sha256": "384f0de564b93f38ab59308c00f247c155459cb142030f9959f0c782b3af63e9"
+      "sha256": "03a7552794e4b5111dac4a75b381871ef57150374d9076ae1e05e9e47145b68f"
     },
     {
       "path": "obj/Debug/net9.0/Smalltalk80.Compiler.AssemblyInfo.cs",
       "ext": ".cs",
       "size": 1401,
       "lines": 26,
-      "sha256": "23d0239a3fb7435b51ac1fd9daa5aa9d112181bbefd97847d3b2f25f12109ee2"
+      "sha256": "c4eaa488c8c3002a445a654c556947b53fb3f198a6f8ed3610585af3258e3517"
     },
     {
       "path": "obj/Debug/net9.0/Smalltalk80.Compiler.GlobalUsings.g.cs",
@@ -674,11 +766,18 @@
       "sha256": "f3f134e9e825e3e7268090f58b1af2bda2de513f61a09c56f48b9b8d08612abc"
     },
     {
+      "path": "obj/Debug/net9.0/Smalltalk80.Compiler.sourcelink.json",
+      "ext": ".json",
+      "size": 170,
+      "lines": 1,
+      "sha256": "57c8d25454f713221c400e6500a7d62f4332e13ae2edefbbdee6901afa1322cd"
+    },
+    {
       "path": "obj/Debug/net9.0/Smalltalk80.ExtractClass.AssemblyInfo.cs",
       "ext": ".cs",
       "size": 1442,
       "lines": 27,
-      "sha256": "3a0092286df9aae03bc4e8f2ac95c09525e1d9644d230648bb8c17895ae43a7e"
+      "sha256": "36c79980e75d1bfc22db2107ee93e972fca76963e8e8f77162dda16132e320a9"
     },
     {
       "path": "obj/Debug/net9.0/Smalltalk80.ExtractClass.GlobalUsings.g.cs",
@@ -686,6 +785,13 @@
       "size": 295,
       "lines": 9,
       "sha256": "f3f134e9e825e3e7268090f58b1af2bda2de513f61a09c56f48b9b8d08612abc"
+    },
+    {
+      "path": "obj/Debug/net9.0/Smalltalk80.ExtractClass.sourcelink.json",
+      "ext": ".json",
+      "size": 170,
+      "lines": 1,
+      "sha256": "57c8d25454f713221c400e6500a7d62f4332e13ae2edefbbdee6901afa1322cd"
     },
     {
       "path": "obj/Debug/net9.0/Smalltalk80.GlobalUsings.g.cs",
@@ -699,7 +805,7 @@
       "ext": ".cs",
       "size": 1267,
       "lines": 25,
-      "sha256": "9e600d95cad4f0597620b00e666624af556f6da8396500c255098ca5be930b4f"
+      "sha256": "f6844bd9ff462261065a740340e72cb7b9c67dd50fa25ad4703526dd81e2a67f"
     },
     {
       "path": "obj/Debug/net9.0/Smalltalk80.Interpreter.GlobalUsings.g.cs",
@@ -709,11 +815,95 @@
       "sha256": "f3f134e9e825e3e7268090f58b1af2bda2de513f61a09c56f48b9b8d08612abc"
     },
     {
+      "path": "obj/Debug/net9.0/Smalltalk80.Interpreter.sourcelink.json",
+      "ext": ".json",
+      "size": 170,
+      "lines": 1,
+      "sha256": "57c8d25454f713221c400e6500a7d62f4332e13ae2edefbbdee6901afa1322cd"
+    },
+    {
+      "path": "obj/Debug/net9.0/Smalltalk80.sourcelink.json",
+      "ext": ".json",
+      "size": 170,
+      "lines": 1,
+      "sha256": "57c8d25454f713221c400e6500a7d62f4332e13ae2edefbbdee6901afa1322cd"
+    },
+    {
+      "path": "obj/project.assets.json",
+      "ext": ".json",
+      "size": 6919,
+      "lines": 205,
+      "sha256": "cae68a02218bc6bc04221c5062b3189c255ca342d1c33076117bb42aef00736a"
+    },
+    {
+      "path": "obj/Smalltalk80.csproj.nuget.dgspec.json",
+      "ext": ".json",
+      "size": 2387,
+      "lines": 77,
+      "sha256": "5969a572d932138a87b9f3e03d767cfa3b1d71c2248b4c892cd7dc4c34391a2c"
+    },
+    {
+      "path": "obj/Smalltalk80.csproj.nuget.g.props",
+      "ext": ".props",
+      "size": 1136,
+      "lines": 15,
+      "sha256": "81f7534d9851be8313cff2706b1ef377efb8a1824fe9f3b9bc3a0d53be18177d"
+    },
+    {
+      "path": "obj/Smalltalk80.csproj.nuget.g.targets",
+      "ext": ".targets",
+      "size": 150,
+      "lines": 2,
+      "sha256": "971cc9b535384849b5c661d776cd7a80833a416265e32e8968e06c367368b8b5"
+    },
+    {
+      "path": "obj/Smalltalk80.ExtractClass.csproj.nuget.dgspec.json",
+      "ext": ".json",
+      "size": 7187,
+      "lines": 206,
+      "sha256": "74575230d6bc677d0cb52a4cbafe83b19bd4646d5d51143a0f263a685adb0411"
+    },
+    {
+      "path": "obj/Smalltalk80.ExtractClass.csproj.nuget.g.props",
+      "ext": ".props",
+      "size": 1136,
+      "lines": 15,
+      "sha256": "81f7534d9851be8313cff2706b1ef377efb8a1824fe9f3b9bc3a0d53be18177d"
+    },
+    {
+      "path": "obj/Smalltalk80.ExtractClass.csproj.nuget.g.targets",
+      "ext": ".targets",
+      "size": 150,
+      "lines": 2,
+      "sha256": "971cc9b535384849b5c661d776cd7a80833a416265e32e8968e06c367368b8b5"
+    },
+    {
+      "path": "obj/Smalltalk80.Interpreter.csproj.nuget.dgspec.json",
+      "ext": ".json",
+      "size": 4672,
+      "lines": 140,
+      "sha256": "25b4da2adf7a9dc3b90d141e4a4d342ed229fb367779cc6254eb4d464f74128b"
+    },
+    {
+      "path": "obj/Smalltalk80.Interpreter.csproj.nuget.g.props",
+      "ext": ".props",
+      "size": 1136,
+      "lines": 15,
+      "sha256": "81f7534d9851be8313cff2706b1ef377efb8a1824fe9f3b9bc3a0d53be18177d"
+    },
+    {
+      "path": "obj/Smalltalk80.Interpreter.csproj.nuget.g.targets",
+      "ext": ".targets",
+      "size": 150,
+      "lines": 2,
+      "sha256": "971cc9b535384849b5c661d776cd7a80833a416265e32e8968e06c367368b8b5"
+    },
+    {
       "path": "repo.manifest.json",
       "ext": ".json",
-      "size": 51287,
-      "lines": 1651,
-      "sha256": "458fee39e0af8ae9419e0977b6430cbda80110c11202747e4d1959d854402e58"
+      "size": 57587,
+      "lines": 1841,
+      "sha256": "caf6f0d8501c7168eff2c9c35e5c74f0bc5cf6df230c99d15cc0ec3a141ae6ee"
     },
     {
       "path": "Smalltalk80.Compiler/BytecodeCompiler.cs",
@@ -809,9 +999,9 @@
     {
       "path": "Smalltalk80.Interpreter/SmalltalkPrettyPrinter.cs",
       "ext": ".cs",
-      "size": 14810,
+      "size": 14812,
       "lines": 449,
-      "sha256": "f8cf5b2c7e1f1c7360911fb2c110dc96f7792d403cdab034f720daa328ea6895"
+      "sha256": "e296cb2143b31b77311e4c1f36fdb0af3138772c0be77860a44440b43132b816"
     },
     {
       "path": "Smalltalk80.Interpreter/SmalltalkPrettyPrinterEnhanced.cs",
@@ -1089,9 +1279,9 @@
     {
       "path": "Smalltalk80/Bootstrap/Phase3Executor.cs",
       "ext": ".cs",
-      "size": 26535,
-      "lines": 707,
-      "sha256": "b2e9ca6d6bad14394f41777683a70ebdc528d9b3039bcaf1f802d3f7184f99e6"
+      "size": 32406,
+      "lines": 845,
+      "sha256": "7315aee750eead78f548d8ec9842aee9c1b6c247f24320909a77e4d90b01fa00"
     },
     {
       "path": "Smalltalk80/Bootstrap/Phase3ManifestGenerator.cs",
@@ -1404,9 +1594,9 @@
     {
       "path": "Smalltalk80/MethodTracer.cs",
       "ext": ".cs",
-      "size": 5307,
+      "size": 5229,
       "lines": 156,
-      "sha256": "52c35febb80ac10600ba279eb62b070596a80d124a1744f4c9cbd49f2e3c9e95"
+      "sha256": "c8d1f3b5c32ba5d10bb00b72c0a73279af112304371d12ad5c353fc6005d2f93"
     },
     {
       "path": "Smalltalk80/NonLocalReturnException.cs",
@@ -1579,9 +1769,9 @@
     {
       "path": "Smalltalk80/SmalltalkObject.cs",
       "ext": ".cs",
-      "size": 17699,
-      "lines": 457,
-      "sha256": "96ab78ba917f27b8d63970339a451f915106d6452103a6847331c98eec578513"
+      "size": 16259,
+      "lines": 425,
+      "sha256": "4b79de6f10a31667fc90a28535b9111ddbdc11ac9962e2fe5ae98314e4b537cf"
     },
     {
       "path": "Smalltalk80/SmalltalkTokenizer.cs",

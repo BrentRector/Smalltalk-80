@@ -31,6 +31,7 @@
     <Message Text="Copying bootstrap files to output directory..." Importance="high" />
     <ItemGroup>
       <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap-schema.json" />
+      <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap.json" />
       <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase1.json" />
       <EssentialBootstrapFiles Include="$(MSBuildProjectDirectory)\..\Bootstrap\bootstrap_phase2.json" />
       <!-- Phase 3 class files use pattern ###_ClassName.json -->

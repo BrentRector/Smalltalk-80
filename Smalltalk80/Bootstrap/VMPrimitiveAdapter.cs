@@ -624,6 +624,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // Dictionary structure: [tally, key1, value1, key2, value2, ...]
         // Start at index 1 (skip tally at index 0)
         bool installed = false;
+        bool isNewEntry = false;
         
         for (int i = 1; i < dict.Fields.Length - 1; i += 2)
         {
@@ -637,15 +638,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 dict.SetField(i, key);
                 dict.SetField(i + 1, value);
                 installed = true;
-                
-                // Update tally (slot 0) - increment count of entries
-                var tallyField = dict.Fields[0];
-                if (tallyField is SmalltalkObject tallyObj)
-                {
-                    // Assuming it's a SmallInteger, we need to increment it
-                    // For now, we'll just leave tally management to Smalltalk code
-                    // once proper methods are installed
-                }
+                isNewEntry = true;
                 
                 DebugLog($"[VM] Dictionary at:put: installed new entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
                 break;
@@ -667,9 +660,39 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 // Replace existing value
                 dict.SetField(i + 1, value);
                 installed = true;
+                isNewEntry = false;
                 DebugLog($"[VM] Dictionary at:put: replaced existing entry at slot {i}: key OOP {keyId} -> value OOP {valueId}");
                 break;
             }
+        }
+        
+        // Update tally if we added a new entry
+        if (installed && isNewEntry)
+        {
+            var tallyField = dict.Fields[0];
+            int currentTally = 0;
+            
+            // Extract current tally value
+            if (tallyField is int tallyInt)
+            {
+                currentTally = tallyInt;
+            }
+            else if (tallyField is SmalltalkObject tallyObj)
+            {
+                // If it's a SmallInteger object, extract the value
+                if (tallyObj.Oop % 2 == 1)  // Tagged SmallInteger
+                {
+                    currentTally = tallyObj.Oop >> 1;
+                }
+            }
+            
+            // Increment and store new tally as SmallInteger
+            currentTally++;
+            var newTallyOop = PrimitiveNewSmallInteger(currentTally);
+            // Store the OOP directly, not the object
+            // SmallIntegers are tagged pointers, not objects
+            dict.SetField(0, newTallyOop);
+            DebugLog($"[VM] Dictionary at:put: updated tally to {currentTally} (OOP: {newTallyOop})");
         }
         
         if (!installed)

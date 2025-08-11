@@ -464,18 +464,36 @@ public class SmalltalkPrettyPrinterEnhanced
         tempCount = 0;
         primitive = 0;
         
-        if (headerField is int header)
+        if (headerField is int headerOop)
         {
-            // Smalltalk-80 method header format:
-            // Bits 0-4: argument count
-            // Bits 5-9: temporary count
-            // Bits 10-14: literal count (not used here)
-            // Bit 15: flag for large context
-            // Bits 16-23: primitive number
+            // The header is stored as a SmallInteger OOP (immediate value)
+            // SmallIntegers are encoded as (value << 1) | 1
+            // We need to decode the actual integer value first
+            int header;
+            if ((headerOop & 1) == 1)
+            {
+                // It's a SmallInteger OOP, decode it
+                header = headerOop >> 1;
+            }
+            else
+            {
+                // It's already a raw integer (shouldn't happen in normal operation)
+                header = headerOop;
+            }
             
-            argCount = header & 0x1F;
-            tempCount = (header >> 5) & 0x1F;
-            primitive = (header >> 16) & 0xFF;
+            // Blue Book method header format (16-bit word):
+            // Bits 0-8: Primitive number (0-511)
+            // Bit 9: Large context flag
+            // Bits 10-15: Number of temporaries (includes arguments)
+            
+            primitive = header & 0x1FF;  // Lower 9 bits
+            bool largeContext = (header & 0x200) != 0;  // Bit 9
+            tempCount = (header >> 10) & 0x3F;  // Bits 10-15
+            
+            // Note: argCount is not stored separately in Blue Book format
+            // It's determined from the method's selector or bytecode analysis
+            // For now, we'll leave it as 0 or derive it from context
+            argCount = tempCount;  // This is a simplification
         }
     }
     

@@ -39,11 +39,105 @@ public static class StorageManagementPrimitives
     /// <summary>Creates a new instance of a class with no indexable fields.</summary>
     public static bool New(Context ctx)
     {
+        Console.WriteLine("[PRIM70] Primitive 70 (New) called");
         if (ctx.Stack.Pop() is not SmalltalkObject cls)
+        {
+            Console.WriteLine("[PRIM70] Failed: receiver is not a SmalltalkObject");
             return false;
-        var instance = new SmalltalkObject(cls, 0);
+        }
+        
+        Console.WriteLine($"[PRIM70] Creating instance of class OOP {cls.Oop}");
+        
+        // Determine the number of instance variables for this class
+        // This needs to walk up the class hierarchy and count all instance variables
+        int fieldCount = CountInstanceVariables(cls);
+        
+        Console.WriteLine($"[PRIM70] Calculated field count: {fieldCount}");
+        
+        var instance = new SmalltalkObject(cls, fieldCount);
         ctx.Stack.Push(instance);
+        
+        Console.WriteLine($"[PRIM70] Success: created instance with {fieldCount} fields, OOP {instance.Oop}");
+        Console.WriteLine($"[PRIM70] Returning true from primitive 70");
         return true;
+    }
+    
+    /// <summary>
+    /// Counts the total number of instance variables for a class including inherited ones.
+    /// </summary>
+    private static int CountInstanceVariables(SmalltalkObject cls)
+    {
+        int count = 0;
+        var currentClass = cls;
+        
+        // Walk up the superclass chain counting instance variables
+        while (currentClass != null)
+        {
+            // Get instanceVariables from slot 3 (for ClassDescription and subclasses)
+            // This is at index 3 for ClassDescription: [superclass, methodDict, format, instanceVariables, ...]
+            if (currentClass.Fields.Length > 3 && currentClass.Fields[3] is SmalltalkObject instVars)
+            {
+                // instanceVariables is an Array of Symbol objects
+                count += instVars.Fields.Length;
+            }
+            
+            // Get superclass from slot 0
+            if (currentClass.Fields.Length > 0 && currentClass.Fields[0] is SmalltalkObject superclass)
+            {
+                currentClass = superclass;
+            }
+            else
+            {
+                break; // Reached Object or nil
+            }
+        }
+        
+        // Fallback for core classes that have known field counts
+        if (count == 0)
+        {
+            // Check the class name to determine field count for bootstrap classes
+            // This is a workaround for bootstrap phase where instance variables might not be set yet
+            var className = GetClassName(cls);
+            count = className switch
+            {
+                "Metaclass" or "MetaclassClass" => 6,     // 3 from Behavior + 2 from ClassDescription + 1 from Metaclass
+                "Class" or "ClassClass" => 6,             // 3 from Behavior + 2 from ClassDescription + 1 from Class
+                "ClassDescription" => 5,                  // 3 from Behavior + 2 from ClassDescription
+                "Behavior" => 3,                          // superclass, methodDict, format
+                "Object" => 0,                            // No instance variables
+                "Association" => 2,                       // key, value
+                "LookupKey" => 1,                        // key
+                "CompiledMethod" => 4,                    // selector, bytecode, literals, header
+                "MethodDictionary" or "Dictionary" => 1,  // tally (plus variable part)
+                "Symbol" or "String" => 1,                // value/characters
+                _ => 0
+            };
+        }
+        
+        return count;
+    }
+    
+    /// <summary>
+    /// Attempts to get the class name for debugging/bootstrap purposes.
+    /// </summary>
+    private static string? GetClassName(SmalltalkObject cls)
+    {
+        // Try to get the name from slot 5 (for Class objects)
+        if (cls.Fields.Length > 5 && cls.Fields[5] is Symbol nameSymbol)
+        {
+            return nameSymbol.Value;
+        }
+        
+        // For metaclasses, try to get the thisClass and then its name
+        if (cls.Fields.Length > 5 && cls.Fields[5] is SmalltalkObject thisClass)
+        {
+            if (thisClass.Fields.Length > 5 && thisClass.Fields[5] is Symbol className)
+            {
+                return className.Value + "Class";
+            }
+        }
+        
+        return null;
     }
 
     /// <summary>Creates a new instance of a class with a given field count.</summary>

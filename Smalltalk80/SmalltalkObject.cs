@@ -6,6 +6,10 @@ using System;
 public class SmalltalkObject
 {
     /// <summary>
+    /// Debug flag for Phase 3 lookup tracing.
+    /// </summary>
+    public static bool EnablePhase3LookupDebug { get; set; } = false;
+    /// <summary>
     ///     Gets or sets the object's class pointer. This may be <c>null</c>
     ///     during deserialization until the class table is resolved.
     /// </summary>
@@ -49,40 +53,103 @@ public class SmalltalkObject
 
     /// <summary>
     ///     Looks up a method by searching through the class hierarchy's method dictionaries.
+    ///     Implements the Smalltalk-80 lookup including the metaclass-to-instance crossover.
     /// </summary>
     public CompiledMethod? Lookup(Symbol selector)
     {
         // Start with this class and walk up the superclass chain
         var currentClass = this;
+        int depth = 0;
         
-        // Debug: trace the lookup chain
-        if (selector.Value == "new")
+        // Debug output for Phase 3
+        if (EnablePhase3LookupDebug)
         {
-            Console.WriteLine($"[DEBUG] Looking up #{selector.Value} starting from class at OOP {Oop}");
-            if (Fields?.Length > 3 && Fields[3] is Symbol name)
-                Console.WriteLine($"[DEBUG] Class name: {name.Value}");
+            Console.WriteLine($"[LOOKUP] Looking for #{selector.Value} starting from class OOP {this.Oop}");
+            // Try to identify what class this is
+            var className = TryGetClassName(this);
+            if (!string.IsNullOrEmpty(className))
+            {
+                Console.WriteLine($"[LOOKUP]   Starting class appears to be: {className}");
+            }
         }
         
         while (currentClass != null)
         {
-            // Debug output for new method
-            if (selector.Value == "new")
+            if (EnablePhase3LookupDebug)
             {
-                Console.WriteLine($"[DEBUG] Checking class at OOP {currentClass.Oop}");
-                if (currentClass.Fields?.Length > 3 && currentClass.Fields[3] is Symbol className)
-                    Console.WriteLine($"[DEBUG]   Class name: {className.Value}");
+                var className = TryGetClassName(currentClass);
+                var classDesc = !string.IsNullOrEmpty(className) ? $" ({className})" : "";
+                // Also try to get the superclass for debugging
+                var superclass = GetSuperclassOf(currentClass);
+                var superclassName = superclass != null ? TryGetClassName(superclass) : "nil";
+                var superclassDesc = !string.IsNullOrEmpty(superclassName) ? $", superclass: {superclassName}" : "";
+                Console.WriteLine($"[LOOKUP]   Checking class at OOP {currentClass.Oop}{classDesc} (depth {depth}{superclassDesc})");
             }
             
             // Look in the current class's method dictionary
             var method = LookupInMethodDictionary(currentClass, selector);
             if (method != null)
+            {
+                if (EnablePhase3LookupDebug)
+                {
+                    Console.WriteLine($"[LOOKUP]   ✓ Found #{selector.Value} at depth {depth}");
+                }
                 return method;
+            }
             
             // Move to superclass
             currentClass = GetSuperclassOf(currentClass);
+            depth++;
         }
         
         // Method not found in the entire hierarchy
+        if (EnablePhase3LookupDebug)
+        {
+            Console.WriteLine($"[LOOKUP]   ✗ #{selector.Value} not found in hierarchy");
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Try to get the class name for debugging purposes.
+    /// </summary>
+    private string? TryGetClassName(SmalltalkObject classObj)
+    {
+        // Try to get the name from slot 5 (for Class objects)
+        // But ClassDescription and Behavior don't have name at slot 5
+        // For those, we'll use hardcoded OOP mappings or other heuristics
+        
+        // Known OOP mappings (based on our bootstrap)
+        if (classObj.Oop == 0) return "Object";
+        if (classObj.Oop == 2) return "Behavior";  
+        if (classObj.Oop == 4) return "ClassDescription";
+        if (classObj.Oop == 6) return "Class";
+        if (classObj.Oop == 8) return "Metaclass";
+        
+        // Try slot 5 for Class-like objects
+        if (classObj.Fields != null && classObj.Fields.Length > 5)
+        {
+            var nameField = classObj.Fields[5];
+            if (nameField is Symbol sym) return sym.Name ?? sym.Value;
+            if (nameField is string str) return str;
+            if (nameField is SmalltalkObject nameObj)
+            {
+                if (nameObj.TryGetStringValue(out var name))
+                    return name;
+            }
+        }
+        
+        // For Behavior and ClassDescription, they don't have a name field
+        // Try to identify them by their position in hierarchy
+        if (classObj.Fields != null && classObj.Fields.Length >= 3)
+        {
+            // Behavior has [superclass, methodDict, format]
+            // ClassDescription has [superclass, methodDict, format, instanceVariables, organization]
+            if (classObj.Fields.Length == 3) return "Behavior?";
+            if (classObj.Fields.Length == 5) return "ClassDescription?";
+        }
+        
         return null;
     }
     
@@ -96,11 +163,23 @@ public class SmalltalkObject
         const int METHOD_DICT_INDEX = 1;
         
         if (classObj.Fields == null || classObj.Fields.Length <= METHOD_DICT_INDEX)
+        {
+            if (EnablePhase3LookupDebug)
+            {
+                Console.WriteLine($"[LOOKUP]     No fields or not enough fields in class OOP {classObj.Oop}");
+            }
             return null;
+        }
             
         var methodDictObj = classObj.Fields[METHOD_DICT_INDEX];
         if (methodDictObj is not SmalltalkObject methodDict)
+        {
+            if (EnablePhase3LookupDebug)
+            {
+                Console.WriteLine($"[LOOKUP]     Method dict slot is not a SmalltalkObject, it's: {methodDictObj?.GetType()?.Name ?? "null"}");
+            }
             return null;
+        }
         
         // MethodDictionary format:
         // Field 0: tally (number of entries)
@@ -108,28 +187,174 @@ public class SmalltalkObject
         // Fields n/2+1..n: values (compiled methods)
         
         if (methodDict.Fields == null || methodDict.Fields.Length < 2)
-            return null;
-            
-        var tally = methodDict.Fields[0] as int? ?? 0;
-        if (tally == 0)
-            return null;
-            
-        // The dictionary is split in half - first half is keys, second half is values
-        var halfSize = (methodDict.Fields.Length - 1) / 2;
-        var keysStart = 1;
-        var valuesStart = keysStart + halfSize;
-        
-        // Search for the selector in the keys
-        for (int i = 0; i < halfSize; i++)
         {
-            var key = methodDict.Fields[keysStart + i];
+            if (EnablePhase3LookupDebug)
+            {
+                Console.WriteLine($"[LOOKUP]     Method dict has no fields or too few fields: {methodDict.Fields?.Length ?? 0}");
+            }
+            return null;
+        }
+            
+        // Tally might be stored as a SmalltalkObject (SmallInteger) or as int
+        int tally = 0;
+        if (methodDict.Fields[0] is int tallyInt)
+        {
+            // If it's an int, it might be a SmallInteger (tagged with bit 0 = 1)
+            if ((tallyInt & 1) == 1)
+            {
+                // It's a tagged SmallInteger, extract the value
+                tally = tallyInt >> 1;
+            }
+            else
+            {
+                // It's a raw int value (shouldn't happen for tally but handle it)
+                tally = tallyInt;
+            }
+        }
+        else if (methodDict.Fields[0] is SmalltalkObject tallyObj)
+        {
+            // SmallIntegers are stored with OOP as (value << 1) | 1
+            // So to extract the value, we shift right by 1
+            if (tallyObj.Oop % 2 == 1)  // SmallInteger tagged with lowest bit = 1
+            {
+                tally = tallyObj.Oop >> 1;
+            }
+            else
+            {
+                // Not a SmallInteger - might be stored differently
+                // Try to extract value from fields
+                if (tallyObj.Fields != null && tallyObj.Fields.Length > 0 && tallyObj.Fields[0] is int val)
+                {
+                    tally = val;
+                }
+                else
+                {
+                    // As a last resort, assume the OOP itself might be the value
+                    // (this shouldn't happen for SmallIntegers but helps debugging)
+                    if (EnablePhase3LookupDebug)
+                    {
+                        Console.WriteLine($"[LOOKUP]       Warning: Tally object OOP {tallyObj.Oop} is not a SmallInteger");
+                    }
+                }
+            }
+        }
+        
+        if (EnablePhase3LookupDebug && methodDict.Fields[0] != null)
+        {
+            var tallyDebugStr = methodDict.Fields[0]?.ToString() ?? "null";
+            if (methodDict.Fields[0] is SmalltalkObject to)
+            {
+                tallyDebugStr = $"SmalltalkObject OOP={to.Oop}";
+            }
+            Console.WriteLine($"[LOOKUP]       Tally field type: {methodDict.Fields[0]?.GetType().Name ?? "null"}, value: {tallyDebugStr}, extracted tally: {tally}");
+        }
+        
+        // Handle negative tally (shouldn't happen but helps debugging)
+        if (tally < 0)
+        {
+            if (EnablePhase3LookupDebug)
+            {
+                Console.WriteLine($"[LOOKUP]     WARNING: Method dict has negative tally {tally}, treating as positive");
+            }
+            tally = Math.Abs(tally);
+        }
+        
+        if (tally == 0)
+        {
+            if (EnablePhase3LookupDebug)
+            {
+                Console.WriteLine($"[LOOKUP]     Method dict tally is 0 (empty dictionary)");
+            }
+            return null;
+        }
+        
+        if (EnablePhase3LookupDebug)
+        {
+            Console.WriteLine($"[LOOKUP]     Method dict has {tally} entries, searching for #{selector.Value}");
+        }
+            
+        // Use flat format: [tally, key1, value1, key2, value2, ...] (like the pretty-printer)
+        // Start at index 1 to skip tally, increment by 2
+        int entryIndex = 0;
+        for (int i = 1; i < methodDict.Fields.Length - 1; i += 2)
+        {
+            var key = methodDict.Fields[i];
+            var value = methodDict.Fields[i + 1];
+            
+            if (EnablePhase3LookupDebug && entryIndex < 3) // Only show first few keys to avoid spam
+            {
+                if (key is Symbol keySymbol)
+                {
+                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: #{keySymbol.Value}");
+                }
+                else if (key is SmalltalkObject keyObj)
+                {
+                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: SmalltalkObject OOP={keyObj.Oop}");
+                }
+                else if (key != null)
+                {
+                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: {key.GetType().Name} = {key}");
+                }
+            }
+            
+            // Skip nil entries
+            if (key == null || value == null)
+            {
+                entryIndex++;
+                continue;
+            }
             
             // Check if this key matches our selector
-            if (key is Symbol keySymbol && keySymbol.Equals(selector))
+            bool isMatch = false;
+            
+            // Case 1: C# Symbol object (from Phase 1/2 bootstrap)
+            if (key is Symbol keySymbol2 && keySymbol2.Equals(selector))
+            {
+                isMatch = true;
+            }
+            // Case 2: SmalltalkObject representing a Symbol (from Phase 3 bytecode execution)
+            else if (key is SmalltalkObject keyObj)
+            {
+                // Try to extract the selector name from the SmalltalkObject Symbol
+                if (keyObj.TryGetStringValue(out var keyString))
+                {
+                    if (EnablePhase3LookupDebug && entryIndex < 3)
+                    {
+                        Console.WriteLine($"[LOOKUP]         Extracted string from Symbol OOP {keyObj.Oop}: '{keyString}' (looking for '{selector.Value}')");
+                    }
+                    
+                    if (keyString == selector.Value)
+                    {
+                        isMatch = true;
+                    }
+                }
+                else
+                {
+                    if (EnablePhase3LookupDebug && entryIndex < 3)
+                    {
+                        Console.WriteLine($"[LOOKUP]         Could not extract string from Symbol OOP {keyObj.Oop}, trying field inspection...");
+                        // Let's inspect the fields directly
+                        for (int f = 0; f < Math.Min(keyObj.Fields.Length, 5); f++)
+                        {
+                            var field = keyObj.Fields[f];
+                            Console.WriteLine($"[LOOKUP]           Field {f}: {field?.GetType()?.Name ?? "null"} = {field}");
+                        }
+                    }
+                }
+            }
+            // Case 3: OOP reference that needs to be resolved
+            else if (key is int keyOop && keyOop > 0)
+            {
+                var keyObject = ObjectMemory.FromOop(keyOop);
+                if (keyObject != null && keyObject.TryGetStringValue(out var keyString) && keyString == selector.Value)
+                {
+                    isMatch = true;
+                }
+            }
+            
+            if (isMatch)
             {
                 // Found it! Get the corresponding value
-                var value = methodDict.Fields[valuesStart + i];
-                
                 if (value is CompiledMethod compiledMethod)
                     return compiledMethod;
                     
@@ -150,6 +375,8 @@ public class SmalltalkObject
                 
                 return null;
             }
+            
+            entryIndex++;
         }
         
         return null;
@@ -169,18 +396,56 @@ public class SmalltalkObject
         if (methodObj.Fields == null || methodObj.Fields.Length < 3)
             return null;
             
-        // Extract header
-        var header = methodObj.Fields[0];
+        // Extract header from field[3] (CompiledMethod structure: [selector, bytecode, literals, header])
         int headerValue = 0;
-        if (header is int h)
-            headerValue = h;
-        else if (header is SmalltalkObject headerObj && headerObj.IsSmallInteger)
-            headerValue = headerObj.SmallIntegerValue;
+        int primitiveIndex = 0;
+        int tempCount = 0;
+        
+        // Debug for instVarAt:put:
+        if (methodObj.Fields.Length > 0 && methodObj.Fields[0] is SmalltalkObject selObj)
+        {
+            if (selObj.TryGetStringValue(out var selName) && selName == "instVarAt:put:")
+            {
+                Console.WriteLine($"[DEBUG] ConvertToCompiledMethod for instVarAt:put:");
+                Console.WriteLine($"[DEBUG]   Fields.Length: {methodObj.Fields.Length}");
+                for (int i = 0; i < methodObj.Fields.Length; i++)
+                {
+                    var field = methodObj.Fields[i];
+                    Console.WriteLine($"[DEBUG]   Field[{i}]: {field?.GetType()?.Name ?? "null"} = {field}");
+                }
+            }
+        }
+        
+        if (methodObj.Fields.Length > 3)
+        {
+            var header = methodObj.Fields[3];
+            if (header is int h)
+            {
+                // If it's an int, it might be a SmallInteger OOP (tagged with bit 0 = 1)
+                if ((h & 1) == 1)
+                {
+                    // It's a tagged SmallInteger, extract the value
+                    headerValue = h >> 1;
+                }
+                else
+                {
+                    // It's a raw int value
+                    headerValue = h;
+                }
+            }
+            else if (header is SmalltalkObject headerObj && headerObj.IsSmallInteger)
+            {
+                headerValue = headerObj.SmallIntegerValue;
+            }
             
-        // Parse header to get counts
-        var literalCount = (headerValue >> 9) & 0x3F;
-        var tempCount = (headerValue >> 3) & 0x1F;
-        var flagValue = headerValue & 0x7;
+            // Blue Book header format:
+            // Bits 0-8: Primitive number (0-511)
+            // Bit 9: Large context flag
+            // Bits 10-15: Number of temporaries
+            primitiveIndex = headerValue & 0x1FF;  // Lower 9 bits
+            bool largeContext = (headerValue & 0x200) != 0;  // Bit 9
+            tempCount = (headerValue >> 10) & 0x3F;  // Bits 10-15
+        }
         
         // Extract bytecodes
         byte[]? bytecodes = null;
@@ -204,11 +469,22 @@ public class SmalltalkObject
             Array.Copy(literalArray.Fields, literals, literalArray.Fields.Length);
         }
         
-        // Extract selector if present
+        // Extract selector from field[0]
         string? selectorName = null;
-        if (methodObj.Fields.Length > 3 && methodObj.Fields[3] is Symbol sel)
+        if (methodObj.Fields.Length > 0)
         {
-            selectorName = sel.Value;
+            if (methodObj.Fields[0] is Symbol sel)
+            {
+                selectorName = sel.Value;
+            }
+            else if (methodObj.Fields[0] is SmalltalkObject selectorObj)
+            {
+                // Try to extract string from Symbol SmalltalkObject
+                if (selectorObj.TryGetStringValue(out var name))
+                {
+                    selectorName = name;
+                }
+            }
         }
         
         if (bytecodes == null || literals == null)
@@ -219,7 +495,9 @@ public class SmalltalkObject
             Bytecodes = bytecodes,
             Literals = literals,
             TemporariesCount = tempCount,
-            SelectorName = selectorName
+            SelectorName = selectorName,
+            HasPrimitive = primitiveIndex > 0,
+            PrimitiveIndex = primitiveIndex
         };
     }
     
@@ -232,33 +510,17 @@ public class SmalltalkObject
         const int SUPERCLASS_INDEX = 0;
         
         if (classObj.Fields == null || classObj.Fields.Length <= SUPERCLASS_INDEX)
-        {
-            Console.WriteLine($"[DEBUG] GetSuperclassOf: No fields or not enough fields for class at OOP {classObj.Oop}");
             return null;
-        }
             
         var superclass = classObj.Fields[SUPERCLASS_INDEX];
         
         if (superclass is SmalltalkObject superclassObj)
-        {
-            if (Oop == 22) // MethodDictionaryClass OOP
-            {
-                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass object at OOP {superclassObj.Oop}");
-            }
             return superclassObj;
-        }
             
         // Might be stored as OOP
         if (superclass is int oop && oop >= 0)
-        {
-            if (Oop == 22) // MethodDictionaryClass OOP
-            {
-                Console.WriteLine($"[DEBUG] GetSuperclassOf: Found superclass OOP {oop}");
-            }
             return ObjectMemory.FromOop(oop);
-        }
             
-        Console.WriteLine($"[DEBUG] GetSuperclassOf: No superclass found for class at OOP {classObj.Oop}");
         return null;
     }
 
@@ -339,6 +601,14 @@ public class SmalltalkObject
     /// </summary>
     public bool TryGetStringValue(out string value)
     {
+        // First, try the most direct approach - check if field[0] is a string
+        // This is often the case for symbols in the method dictionaries
+        if (Fields.Length > 0 && Fields[0] is string directString && !string.IsNullOrEmpty(directString))
+        {
+            value = directString;
+            return true;
+        }
+        
         // Check if this is a String or Symbol object by examining the class
         if (ClassPointer != null)
         {
@@ -389,8 +659,11 @@ public class SmalltalkObject
                     }
                 }
                 
-                value = chars.ToString();
-                return value.Length > 0;
+                if (chars.Length > 0)
+                {
+                    value = chars.ToString();
+                    return true;
+                }
             }
             
             // Also check if the class name itself indicates this might be a string-like object
@@ -415,6 +688,50 @@ public class SmalltalkObject
                     value = chars.ToString();
                     return true;
                 }
+            }
+        }
+        
+        // Fallback: try to extract directly from all fields without class info  
+        // This handles cases where the symbol might not have proper class setup
+        if (Fields.Length > 0)
+        {
+            var chars = new System.Text.StringBuilder();
+            foreach (var field in Fields)
+            {
+                if (field is string s)
+                {
+                    chars.Append(s);
+                }
+                else if (field is char c)
+                {
+                    chars.Append(c);
+                }
+                else if (field is int i && i >= 32 && i <= 255)
+                {
+                    // Check for both tagged and untagged character values
+                    if (IsSmallIntegerValue(i))
+                    {
+                        int actualValue = ExtractSmallIntegerValue(i);
+                        if (actualValue >= 32 && actualValue <= 255)
+                        {
+                            chars.Append((char)actualValue);
+                        }
+                    }
+                    else if (i >= 32 && i <= 255)
+                    {
+                        chars.Append((char)i);
+                    }
+                }
+                else if (field is byte b && b >= 32)
+                {
+                    chars.Append((char)b);
+                }
+            }
+            
+            if (chars.Length > 0)
+            {
+                value = chars.ToString();
+                return true;
             }
         }
         

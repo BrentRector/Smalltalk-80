@@ -110,7 +110,7 @@ public class Program
             if (enableBootstrapDebug)
             {
                 Bootstrap.JsonBootstrapExecutor.EnableBootstrapDebugOutput = true;
-                Bootstrap.Phase3Executor.EnablePhase3DebugOutput = true;
+                Bootstrap.Phase2Executor.EnablePhase2DebugOutput = true;
                 Console.WriteLine("✓ Bootstrap debug output enabled");
             }
             
@@ -171,18 +171,18 @@ public class Program
                 
                 if (useBytecodeExecution)
                 {
-                    // Use the Phase3Executor for bytecode-based execution
-                    Console.WriteLine("Using bytecode executor for Phase 3...");
-                    var phase3Executor = new Bootstrap.Phase3Executor(vm.Adapter);
+                    // Use the Phase2Executor for bytecode-based execution
+                    Console.WriteLine("Using bytecode executor for Phase 2...");
+                    var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
                     
                     // Load the test counter manifest
-                    var testCounterManifest = phase3Manifests.FirstOrDefault(f => f.Contains("phase3_test_counter.json"));
+                    var testCounterManifest = phase3Manifests.FirstOrDefault(f => f.Contains("phase2_test_counter.json"));
                     if (testCounterManifest != null)
                     {
                         try
                         {
                             var jsonContent = System.IO.File.ReadAllText(testCounterManifest);
-                            phase3Executor.ExecuteManifest(jsonContent);
+                            phase2Executor.ExecuteManifest(jsonContent);
                             Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {testCounterManifest}");
                         }
                         catch (Exception ex)
@@ -197,8 +197,8 @@ public class Program
                 }
                 else
                 {
-                    // Use the regular Phase3Executor
-                    var phase3Executor = new Bootstrap.Phase3Executor(vm.Adapter);
+                    // Use the regular Phase2Executor
+                    var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
                     
                     foreach (var manifestFile in phase3Manifests)
                     {
@@ -206,7 +206,7 @@ public class Program
                         try
                         {
                             var jsonContent = System.IO.File.ReadAllText(manifestFile);
-                            phase3Executor.ExecuteManifest(jsonContent);
+                            phase2Executor.ExecuteManifest(jsonContent);
                             Console.WriteLine($"✓ Successfully loaded Phase 3 manifest: {manifestFile}");
                         }
                         catch (Exception ex)

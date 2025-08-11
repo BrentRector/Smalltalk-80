@@ -67,9 +67,18 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Execute Phase 2 bootstrap from JSON content.
+    /// Execute unified bootstrap from JSON content (consolidated Phase 1+2).
     /// </summary>
-    public void ExecutePhase2(string jsonContent)
+    public void ExecuteUnifiedBootstrap(string jsonContent)
+    {
+        // This is the main bootstrap method that handles all classes with methods
+        ExecuteBootstrap(jsonContent);
+    }
+    
+    /// <summary>
+    /// Execute bootstrap from JSON content (handles classes with methods).
+    /// </summary>
+    public void ExecuteBootstrap(string jsonContent)
     {
         var options = new JsonSerializerOptions
         {
@@ -77,29 +86,37 @@ public class JsonBootstrapExecutor
             ReadCommentHandling = JsonCommentHandling.Skip
         };
         
-        var phase2 = JsonSerializer.Deserialize<Phase2ManifestConfig>(jsonContent, options);
+        var phase2 = JsonSerializer.Deserialize<BootstrapManifestConfig>(jsonContent, options);
         if (phase2 == null)
-            throw new InvalidOperationException("Failed to parse Phase 2 bootstrap JSON");
+            throw new InvalidOperationException("Failed to parse bootstrap JSON");
             
-        BootstrapLog($"[BOOTSTRAP] Phase 2: {phase2.Description}");
+        BootstrapLog($"[BOOTSTRAP] Bootstrap: {phase2.Description}");
         
-        // First, create all classes
+        // IMPORTANT: Create all classes first WITHOUT installing methods
+        // This ensures CompiledMethod class exists before any methods are installed
         if (phase2.Classes != null)
         {
-            BootstrapLog($"[BOOTSTRAP] Creating {phase2.Classes.Count} classes");
+            BootstrapLog($"[BOOTSTRAP] Pass 1: Creating {phase2.Classes.Count} class structures");
             foreach (var classDef in phase2.Classes)
             {
-                CreatePhase2Class(classDef);
+                CreateClassStructure(classDef);
             }
-        }
-        
-        // Then, create all objects with explicit IDs
-        if (phase2.Objects != null)
-        {
-            BootstrapLog($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
-            foreach (var objDef in phase2.Objects)
+            
+            // Now create objects (instances of classes) after classes exist
+            if (phase2.Objects != null)
             {
-                CreatePhase2Object(objDef);
+                BootstrapLog($"[BOOTSTRAP] Creating {phase2.Objects.Count} objects");
+                foreach (var objDef in phase2.Objects)
+                {
+                    CreateBootstrapObject(objDef);
+                }
+            }
+            
+            // Now install all methods in a second pass
+            BootstrapLog($"[BOOTSTRAP] Pass 2: Installing methods for all classes");
+            foreach (var classDef in phase2.Classes)
+            {
+                InstallClassMethods(classDef);
             }
         }
         
@@ -109,11 +126,11 @@ public class JsonBootstrapExecutor
             BootstrapLog($"[BOOTSTRAP] Applying {phase2.Patches.Count} patches");
             foreach (var patch in phase2.Patches)
             {
-                ApplyPhase2Patch(patch);
+                ApplyBootstrapPatch(patch);
             }
         }
         
-        BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Created messaging infrastructure");
+        BootstrapLog($"[BOOTSTRAP] Bootstrap complete: Created messaging infrastructure");
     }
     
     /// <summary>
@@ -122,8 +139,8 @@ public class JsonBootstrapExecutor
     public void ExecutePhase3(string jsonContent)
     {
         // Phase 3 uses a different executor for message-driven bootstrap
-        var phase3Executor = new Phase3Executor(vm);
-        phase3Executor.ExecuteManifest(jsonContent);
+        var phase2Executor = new Phase2Executor(vm);
+        phase2Executor.ExecuteManifest(jsonContent);
     }
     
     /// <summary>
@@ -725,20 +742,22 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Create an object with explicit ID from Phase 2 manifest.
+    /// Create an object with explicit ID from bootstrap manifest.
     /// </summary>
-    private void CreatePhase2Object(Phase2ObjectDefinition objDef)
+    private void CreateBootstrapObject(BootstrapObjectDefinition objDef)
     {
         if (string.IsNullOrEmpty(objDef.Id))
             throw new InvalidOperationException("Object definition requires an id");
             
-        if (string.IsNullOrEmpty(objDef.ClassName))
+        // Accept either "class" or "className" property
+        var className = objDef.ClassName ?? objDef.ClassNameAlternate;
+        if (string.IsNullOrEmpty(className))
             throw new InvalidOperationException($"Object '{objDef.Id}' requires a class");
             
         int oop = 0;
         
         // Handle different object types
-        switch (objDef.ClassName.ToLower())
+        switch (className.ToLower())
         {
             case "symbol":
                 // Symbol with value field
@@ -753,6 +772,18 @@ public class JsonBootstrapExecutor
                 if (objDef.Fields != null && objDef.Fields.TryGetValue("characters", out var stringValue))
                 {
                     oop = vm.PrimitiveInternString(stringValue?.ToString() ?? "");
+                }
+                break;
+                
+            case "smallinteger":
+                // SmallInteger with value
+                if (objDef.Value != null)
+                {
+                    if (int.TryParse(objDef.Value.ToString(), out var intValue))
+                    {
+                        // SmallIntegers are immediate values (tagged pointers)
+                        oop = (intValue << 1) | 1;
+                    }
                 }
                 break;
                 
@@ -784,11 +815,34 @@ public class JsonBootstrapExecutor
                 
             default:
                 // Generic object creation
-                BootstrapLog($"[BOOTSTRAP] Creating object '{objDef.Id}' of class '{objDef.ClassName}'");
-                if (namedObjects.TryGetValue(objDef.ClassName, out var classOop))
+                BootstrapLog($"[BOOTSTRAP] Creating object '{objDef.Id}' of class '{className}'");
+                if (namedObjects.TryGetValue(className, out var classOop))
                 {
-                    BootstrapLog($"[BOOTSTRAP]   - Found class '{objDef.ClassName}' in namedObjects with OOP {classOop}");
-                    oop = vm.PrimitiveNewInstance(classOop);
+                    BootstrapLog($"[BOOTSTRAP]   - Found class '{className}' in namedObjects with OOP {classOop}");
+                    
+                    // Check if this is a Dictionary-like class that needs a specific size
+                    if (objDef.Size.HasValue && (className == "Dictionary" || className == "SystemDictionary" || className == "MethodDictionary"))
+                    {
+                        BootstrapLog($"[BOOTSTRAP]   - Creating dictionary with size {objDef.Size.Value}");
+                        oop = vm.PrimitiveNewArray(objDef.Size.Value);
+                        vm.PrimitiveSetClass(oop, classOop);
+                        
+                        // Initialize tally to 0 for dictionaries
+                        var zeroOop = vm.PrimitiveNewSmallInteger(0);
+                        vm.PrimitiveArrayAtPut(oop, 0, zeroOop);
+                        
+                        // Initialize remaining slots to nil
+                        var nilOop = vm.PrimitiveNil();
+                        for (int i = 1; i < objDef.Size.Value; i++)
+                        {
+                            vm.PrimitiveArrayAtPut(oop, i, nilOop);
+                        }
+                    }
+                    else
+                    {
+                        oop = vm.PrimitiveNewInstance(classOop);
+                    }
+                    
                     // Set fields if any
                     if (objDef.Fields != null)
                     {
@@ -798,11 +852,34 @@ public class JsonBootstrapExecutor
                 else
                 {
                     // Try looking it up directly
-                    classOop = vm.PrimitiveLookupClass(objDef.ClassName);
+                    classOop = vm.PrimitiveLookupClass(className);
                     if (classOop > 0)
                     {
-                        BootstrapLog($"[BOOTSTRAP]   - Found class '{objDef.ClassName}' via PrimitiveLookupClass with OOP {classOop}");
-                        oop = vm.PrimitiveNewInstance(classOop);
+                        BootstrapLog($"[BOOTSTRAP]   - Found class '{className}' via PrimitiveLookupClass with OOP {classOop}");
+                        
+                        // Check if this is a Dictionary-like class that needs a specific size
+                        if (objDef.Size.HasValue && (className == "Dictionary" || className == "SystemDictionary" || className == "MethodDictionary"))
+                        {
+                            BootstrapLog($"[BOOTSTRAP]   - Creating dictionary with size {objDef.Size.Value}");
+                            oop = vm.PrimitiveNewArray(objDef.Size.Value);
+                            vm.PrimitiveSetClass(oop, classOop);
+                            
+                            // Initialize tally to 0 for dictionaries
+                            var zeroOop = vm.PrimitiveNewSmallInteger(0);
+                            vm.PrimitiveArrayAtPut(oop, 0, zeroOop);
+                            
+                            // Initialize remaining slots to nil
+                            var nilOop = vm.PrimitiveNil();
+                            for (int i = 1; i < objDef.Size.Value; i++)
+                            {
+                                vm.PrimitiveArrayAtPut(oop, i, nilOop);
+                            }
+                        }
+                        else
+                        {
+                            oop = vm.PrimitiveNewInstance(classOop);
+                        }
+                        
                         // Set fields if any
                         if (objDef.Fields != null)
                         {
@@ -811,7 +888,7 @@ public class JsonBootstrapExecutor
                     }
                     else
                     {
-                        BootstrapLog($"[BOOTSTRAP] Warning: Class '{objDef.ClassName}' not found for object '{objDef.Id}'");
+                        BootstrapLog($"[BOOTSTRAP] Warning: Class '{className}' not found for object '{objDef.Id}'");
                     }
                 }
                 break;
@@ -820,11 +897,11 @@ public class JsonBootstrapExecutor
         if (oop > 0)
         {
             namedObjects[objDef.Id] = oop;
-            BootstrapLog($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{objDef.ClassName}' -> OOP {oop}");
+            BootstrapLog($"[BOOTSTRAP] Created object '{objDef.Id}' of class '{className}' -> OOP {oop}");
             
             // Register singleton objects with ObjectMemory
             // Use ObjectMemory.FromOop to safely get the object
-            if (objDef.Id == "nil" && objDef.ClassName == "UndefinedObject")
+            if (objDef.Id == "nil" && className == "UndefinedObject")
             {
                 var nilObj = ObjectMemory.FromOop(oop);
                 if (nilObj != null)
@@ -940,7 +1017,7 @@ public class JsonBootstrapExecutor
     /// <summary>
     /// Create a CompiledMethod from object definition.
     /// </summary>
-    private int CreateCompiledMethodFromDefinition(Phase2ObjectDefinition objDef)
+    private int CreateCompiledMethodFromDefinition(BootstrapObjectDefinition objDef)
     {
         // Get the CompiledMethod class
         var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
@@ -1000,7 +1077,7 @@ public class JsonBootstrapExecutor
     /// <summary>
     /// Create a MethodDictionary from object definition.
     /// </summary>
-    private int CreateMethodDictionary(Phase2ObjectDefinition objDef)
+    private int CreateMethodDictionary(BootstrapObjectDefinition objDef)
     {
         // Get the MethodDictionary class
         var methodDictClassOop = vm.PrimitiveLookupClass("MethodDictionary");
@@ -1155,9 +1232,9 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Create or update a class defined in Phase 2.
+    /// Create the class structure without installing methods.
     /// </summary>
-    private void CreatePhase2Class(Phase2ClassDefinition classDef)
+    private void CreateClassStructure(BootstrapClassDefinition classDef)
     {
         if (string.IsNullOrEmpty(classDef.Name))
             throw new InvalidOperationException("Class definition requires a name");
@@ -1226,26 +1303,34 @@ public class JsonBootstrapExecutor
             if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
             {
                 // Found in named objects
+                vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
             }
             else
             {
                 // Try to get it from the VM's global registry
                 metaclassClassOop = vm.PrimitiveLookupClass("Metaclass");
-            }
-            
-            if (metaclassClassOop > 0)
-            {
-                vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
-            }
-            else
-            {
-                BootstrapLog($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+                if (metaclassClassOop > 0)
+                {
+                    vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
+                }
+                else if (classDef.Name != "Metaclass")
+                {
+                    // Don't warn for Metaclass itself
+                    BootstrapLog($"[BOOTSTRAP] Warning: Metaclass not found, metaclass for '{classDef.Name}' will have no class pointer");
+                }
             }
         }
         
         // Set superclass if specified
         if (!string.IsNullOrEmpty(classDef.Superclass))
         {
+            // For 'nil' superclass (Object), don't set superclass
+            if (classDef.Superclass == "nil")
+            {
+                // Object has no superclass
+                return;
+            }
+            
             // Try namedObjects first, then lookup from VM
             int superclassOop = 0;
             if (namedObjects.TryGetValue(classDef.Superclass, out superclassOop))
@@ -1254,7 +1339,7 @@ public class JsonBootstrapExecutor
             }
             else
             {
-                // Try to look up from VM (for classes created in Phase 1)
+                // Try to look up from VM (for classes created earlier)
                 superclassOop = vm.PrimitiveLookupClass(classDef.Superclass);
             }
             
@@ -1301,8 +1386,28 @@ public class JsonBootstrapExecutor
         // Set class name
         var nameSymbol = vm.PrimitiveInternSymbol(classDef.Name);
         vm.PrimitiveSetSlot(classOop, 5, nameSymbol); // Slot 5 is name
+    }
+    
+    /// <summary>
+    /// Install methods for a class (must be called after all classes are created).
+    /// </summary>
+    private void InstallClassMethods(BootstrapClassDefinition classDef)
+    {
+        if (string.IsNullOrEmpty(classDef.Name))
+            return;
+            
+        // Look up the class that was already created
+        int classOop = vm.PrimitiveLookupClass(classDef.Name);
+        if (classOop < 0)
+        {
+            BootstrapLog($"[BOOTSTRAP] Warning: Class '{classDef.Name}' not found, cannot install methods");
+            return;
+        }
         
-        // Install methods from Phase 2 definition
+        var metaclassName = $"{classDef.Name}Class";
+        int metaclassOop = vm.PrimitiveLookupClass(metaclassName);
+        
+        // Install instance methods
         if (classDef.Methods != null && classDef.Methods.Count > 0)
         {
             BootstrapLog($"[BOOTSTRAP] Installing {classDef.Methods.Count} methods on '{classDef.Name}'");
@@ -1328,6 +1433,7 @@ public class JsonBootstrapExecutor
                     
                     // Initialize tally to 0
                     var zeroOop = vm.PrimitiveNewSmallInteger(0);
+                    BootstrapLog($"[BOOTSTRAP]   - Initializing method dict tally to 0, SmallInteger OOP: {zeroOop}");
                     vm.PrimitiveArrayAtPut(methodDictOop, 0, zeroOop);
                     
                     // Initialize remaining slots to nil
@@ -1391,34 +1497,124 @@ public class JsonBootstrapExecutor
                     vm.PrimitiveSetSlot(methodOop, 1, emptyBytecodeOop);
                 }
                 
-                // Set literals (slot 2)
+                // Set literals (slot 2) - ALWAYS set this slot to maintain CompiledMethod structure
                 if (methodDef.Literals != null && methodDef.Literals.Count > 0)
                 {
                     var literalsOop = vm.PrimitiveNewArray(methodDef.Literals.Count);
                     for (int i = 0; i < methodDef.Literals.Count; i++)
                     {
-                        var literalOop = vm.PrimitiveInternSymbol(methodDef.Literals[i]);
+                        var literal = methodDef.Literals[i];
+                        int literalOop;
+                        
+                        // Check if this is an object reference (e.g., "symbol_1000")
+                        if (literal.StartsWith("symbol_") || literal.StartsWith("int_"))
+                        {
+                            // It's a reference to a pre-created object
+                            if (namedObjects.TryGetValue(literal, out literalOop))
+                            {
+                                // Found the referenced object
+                            }
+                            else
+                            {
+                                // Object not found, create a symbol as fallback
+                                BootstrapLog($"[BOOTSTRAP] Warning: Object reference '{literal}' not found, creating symbol");
+                                literalOop = vm.PrimitiveInternSymbol(literal);
+                            }
+                        }
+                        else
+                        {
+                            // Regular string literal - create as symbol
+                            literalOop = vm.PrimitiveInternSymbol(literal);
+                        }
+                        
                         vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
                     }
                     vm.PrimitiveSetSlot(methodOop, 2, literalsOop);
                 }
                 else
                 {
+                    // Always set literals slot, even for primitive-only methods
+                    // CompiledMethod expects all 4 slots to be present
                     var emptyLiteralsOop = vm.PrimitiveNewArray(0);
                     vm.PrimitiveSetSlot(methodOop, 2, emptyLiteralsOop);
                 }
                 
-                // Set header (slot 3) - encode primitive if present
-                int headerValue = 0;
-                if (methodDef.Primitive.HasValue && methodDef.Primitive.Value > 0)
+                // Set header (slot 3) - use Blue Book encoding
+                // Blue Book header format (16-bit word):
+                // Bits 0-8: Primitive number (0-511)
+                // Bit 9: Large context flag
+                // Bits 10-15: Number of temporaries
+                int primitiveNum = (methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
+                int largeContext = 0; // We don't have large contexts yet
+                int tempCount = methodDef.TemporaryCount; // Use actual temp count from Phase 2
+                
+                // Override incorrect primitive numbers for critical methods
+                if (methodDef.Selector == "basicNew")
                 {
-                    headerValue = methodDef.Primitive.Value;
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitive value from JSON: {methodDef.Primitive ?? -1}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitiveNum before override: {primitiveNum}");
+                    if (primitiveNum != 70)
+                    {
+                        BootstrapLog($"[BOOTSTRAP]   - WARNING: Overriding primitive for basicNew from {primitiveNum} to 70");
+                        primitiveNum = 70;
+                    }
                 }
+                else if (methodDef.Selector == "basicNew:" && primitiveNum != 71)
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - WARNING: Overriding primitive for basicNew: from {primitiveNum} to 71");
+                    primitiveNum = 71;
+                }
+                
+                // Blue Book header encoding
+                int headerValue = primitiveNum | (largeContext << 9) | (tempCount << 10);
+                
+                if (methodDef.Selector == "basicNew")
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header calculation: primitive={primitiveNum}, temps={tempCount}, header={headerValue}");
+                }
+                
                 var headerOop = vm.PrimitiveNewSmallInteger(headerValue);
                 vm.PrimitiveSetSlot(methodOop, 3, headerOop);
                 
+                // Verify the header was set correctly
+                if (methodDef.Selector == "basicNew")
+                {
+                    // The header is stored as a SmallInteger OOP (immediate value)
+                    // We can't use GetSlot for this, we need to check the actual field
+                    var methodObj = ObjectMemory.FromOop(methodOop);
+                    if (methodObj != null && methodObj.Fields.Length > 3)
+                    {
+                        var headerField = methodObj.Fields[3];
+                        BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header field type: {headerField?.GetType().Name ?? "null"}");
+                        if (headerField is int headerInt)
+                        {
+                            // This is the SmallInteger OOP (encoded as (value << 1) | 1)
+                            var decodedValue = headerInt >> 1;
+                            BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header value from field: {decodedValue}, expected: {headerValue}");
+                            var readPrimitive = decodedValue & 0x1FF;
+                            BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitive from field: {readPrimitive}, expected: {primitiveNum}");
+                        }
+                    }
+                }
+                
                 // Add method to dictionary
                 vm.PrimitiveDictionaryAtPut(methodDictOop, selectorOop, methodOop);
+                if (methodDef.Selector == "instVarAt:put:")
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: method created with OOP {methodOop}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: primitive from JSON: {methodDef.Primitive ?? 0}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: primitiveNum: {primitiveNum}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: tempCount: {tempCount}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: header value: {headerValue}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: headerOop: {headerOop}");
+                    
+                    // Check what was actually set
+                    var actualMethod = ObjectMemory.FromOop(methodOop);
+                    if (actualMethod != null && actualMethod.Fields.Length > 3)
+                    {
+                        BootstrapLog($"[BOOTSTRAP]   - DEBUG: instVarAt:put: actual field[3]: {actualMethod.Fields[3]}");
+                    }
+                }
                 BootstrapLog($"[BOOTSTRAP]   - Installed method '{methodDef.Selector}' (bytecode length: {methodDef.Bytecode?.Count ?? 0}, primitive: {methodDef.Primitive ?? 0})");
             }
         }
@@ -1508,31 +1704,105 @@ public class JsonBootstrapExecutor
                     vm.PrimitiveSetSlot(methodOop, 1, emptyBytecodeOop);
                 }
                 
-                // Set literals (slot 2)
+                // Set literals (slot 2) - ALWAYS set this slot to maintain CompiledMethod structure
                 if (methodDef.Literals != null && methodDef.Literals.Count > 0)
                 {
                     var literalsOop = vm.PrimitiveNewArray(methodDef.Literals.Count);
                     for (int i = 0; i < methodDef.Literals.Count; i++)
                     {
-                        var literalOop = vm.PrimitiveInternSymbol(methodDef.Literals[i]);
+                        var literal = methodDef.Literals[i];
+                        int literalOop;
+                        
+                        // Check if this is an object reference (e.g., "symbol_1000")
+                        if (literal.StartsWith("symbol_") || literal.StartsWith("int_"))
+                        {
+                            // It's a reference to a pre-created object
+                            if (namedObjects.TryGetValue(literal, out literalOop))
+                            {
+                                // Found the referenced object
+                            }
+                            else
+                            {
+                                // Object not found, create a symbol as fallback
+                                BootstrapLog($"[BOOTSTRAP] Warning: Object reference '{literal}' not found, creating symbol");
+                                literalOop = vm.PrimitiveInternSymbol(literal);
+                            }
+                        }
+                        else
+                        {
+                            // Regular string literal - create as symbol
+                            literalOop = vm.PrimitiveInternSymbol(literal);
+                        }
+                        
                         vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
                     }
                     vm.PrimitiveSetSlot(methodOop, 2, literalsOop);
                 }
                 else
                 {
+                    // Always set literals slot, even for primitive-only methods
+                    // CompiledMethod expects all 4 slots to be present
                     var emptyLiteralsOop = vm.PrimitiveNewArray(0);
                     vm.PrimitiveSetSlot(methodOop, 2, emptyLiteralsOop);
                 }
                 
-                // Set header (slot 3) - encode primitive if present
-                int headerValue = 0;
-                if (methodDef.Primitive.HasValue && methodDef.Primitive.Value > 0)
+                // Set header (slot 3) - use Blue Book encoding
+                // Blue Book header format (16-bit word):
+                // Bits 0-8: Primitive number (0-511)
+                // Bit 9: Large context flag
+                // Bits 10-15: Number of temporaries
+                int primitiveNum = (methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
+                int largeContext = 0; // We don't have large contexts yet
+                int tempCount = methodDef.TemporaryCount; // Use actual temp count from Phase 2
+                
+                // Override incorrect primitive numbers for critical methods
+                if (methodDef.Selector == "basicNew")
                 {
-                    headerValue = methodDef.Primitive.Value;
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitive value from JSON: {methodDef.Primitive ?? -1}");
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitiveNum before override: {primitiveNum}");
+                    if (primitiveNum != 70)
+                    {
+                        BootstrapLog($"[BOOTSTRAP]   - WARNING: Overriding primitive for basicNew from {primitiveNum} to 70");
+                        primitiveNum = 70;
+                    }
                 }
+                else if (methodDef.Selector == "basicNew:" && primitiveNum != 71)
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - WARNING: Overriding primitive for basicNew: from {primitiveNum} to 71");
+                    primitiveNum = 71;
+                }
+                
+                // Blue Book header encoding
+                int headerValue = primitiveNum | (largeContext << 9) | (tempCount << 10);
+                
+                if (methodDef.Selector == "basicNew")
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header calculation: primitive={primitiveNum}, temps={tempCount}, header={headerValue}");
+                }
+                
                 var headerOop = vm.PrimitiveNewSmallInteger(headerValue);
                 vm.PrimitiveSetSlot(methodOop, 3, headerOop);
+                
+                // Verify the header was set correctly
+                if (methodDef.Selector == "basicNew")
+                {
+                    // The header is stored as a SmallInteger OOP (immediate value)
+                    // We can't use GetSlot for this, we need to check the actual field
+                    var methodObj = ObjectMemory.FromOop(methodOop);
+                    if (methodObj != null && methodObj.Fields.Length > 3)
+                    {
+                        var headerField = methodObj.Fields[3];
+                        BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header field type: {headerField?.GetType().Name ?? "null"}");
+                        if (headerField is int headerInt)
+                        {
+                            // This is the SmallInteger OOP (encoded as (value << 1) | 1)
+                            var decodedValue = headerInt >> 1;
+                            BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew header value from field: {decodedValue}, expected: {headerValue}");
+                            var readPrimitive = decodedValue & 0x1FF;
+                            BootstrapLog($"[BOOTSTRAP]   - DEBUG: basicNew primitive from field: {readPrimitive}, expected: {primitiveNum}");
+                        }
+                    }
+                }
                 
                 // Add method to dictionary
                 vm.PrimitiveDictionaryAtPut(metaclassMethodDictOop, selectorOop, methodOop);
@@ -1542,16 +1812,88 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Apply a patch operation in Phase 2.
+    /// Register all classes in the Smalltalk global dictionary.
     /// </summary>
-    private void ApplyPhase2Patch(Phase2Patch patch)
+    private void RegisterAllClassesInSmalltalk()
     {
+        var smalltalkOop = vm.PrimitiveLookupGlobal("Smalltalk");
+        if (smalltalkOop < 0)
+        {
+            BootstrapLog("[BOOTSTRAP] Warning: Smalltalk global not found, cannot register classes");
+            return;
+        }
+        
+        BootstrapLog("[BOOTSTRAP] Registering all classes in Smalltalk dictionary...");
+        int count = 0;
+        
+        // Register all classes from namedObjects
+        foreach (var kvp in namedObjects)
+        {
+            // Skip non-class objects (like "Smalltalk", "true", "false", "nil")
+            if (kvp.Key == "Smalltalk" || kvp.Key == "true" || kvp.Key == "false" || kvp.Key == "nil")
+                continue;
+                
+            // Skip metaclasses (they end with "Class")
+            if (kvp.Key.EndsWith("Class") && kvp.Key != "Class" && kvp.Key != "Metaclass")
+                continue;
+                
+            // Register the class in Smalltalk dictionary
+            var keySymbol = vm.PrimitiveInternSymbol(kvp.Key);
+            vm.PrimitiveDictionaryAtPut(smalltalkOop, keySymbol, kvp.Value);
+            count++;
+        }
+        
+        BootstrapLog($"[BOOTSTRAP]   - Registered {count} classes in Smalltalk dictionary");
+    }
+    
+    /// <summary>
+    /// Apply a patch operation.
+    /// </summary>
+    private void ApplyBootstrapPatch(BootstrapPatch patch)
+    {
+        // Log comment if present
+        if (!string.IsNullOrEmpty(patch.Comment))
+        {
+            BootstrapLog($"[BOOTSTRAP] Patch: {patch.Comment}");
+        }
+        
+        // Handle different operations
+        if (!string.IsNullOrEmpty(patch.Operation))
+        {
+            switch (patch.Operation.ToLower())
+            {
+                case "registerglobal":
+                    if (string.IsNullOrEmpty(patch.Target) || string.IsNullOrEmpty(patch.Name))
+                        throw new InvalidOperationException("registerGlobal requires target and name");
+                    
+                    if (namedObjects.TryGetValue(patch.Target, out var globalOop))
+                    {
+                        vm.PrimitiveRegisterGlobal(patch.Name, globalOop);
+                        BootstrapLog($"[BOOTSTRAP]   - Registered '{patch.Name}' as global -> OOP {globalOop}");
+                    }
+                    else
+                    {
+                        BootstrapLog($"[BOOTSTRAP] Warning: Object '{patch.Target}' not found for global registration");
+                    }
+                    return;
+                    
+                case "registerallclassesinsmalltalk":
+                    RegisterAllClassesInSmalltalk();
+                    return;
+                    
+                default:
+                    BootstrapLog($"[BOOTSTRAP] Warning: Unknown patch operation '{patch.Operation}'");
+                    return;
+            }
+        }
+        
+        // Original slot-based patching
         if (string.IsNullOrEmpty(patch.Target) || string.IsNullOrEmpty(patch.Slot))
             throw new InvalidOperationException("Patch requires target and slot");
             
         if (!namedObjects.TryGetValue(patch.Target, out var targetOop))
         {
-            // Try to look up from VM (for classes created in Phase 1)
+            // Try to look up from VM
             targetOop = vm.PrimitiveLookupClass(patch.Target);
             if (targetOop < 0)
             {
@@ -1840,51 +2182,55 @@ public class BootstrapConfig
 public class Phase2BootstrapConfig
 {
     public string? Phase { get; set; }
-    public List<Phase2ClassDefinition>? Classes { get; set; }
-    public List<Phase2Patch>? Patches { get; set; }
+    public List<BootstrapClassDefinition>? Classes { get; set; }
+    public List<BootstrapPatch>? Patches { get; set; }
 }
 
 /// <summary>
 /// Phase 2 manifest configuration with explicit objects.
 /// </summary>
-public class Phase2ManifestConfig
+public class BootstrapManifestConfig
 {
     public string? Phase { get; set; }
     public string? Description { get; set; }
-    public List<Phase2ClassDefinition>? Classes { get; set; }
-    public List<Phase2ObjectDefinition>? Objects { get; set; }
-    public List<Phase2Patch>? Patches { get; set; }
+    public List<BootstrapClassDefinition>? Classes { get; set; }
+    public List<BootstrapObjectDefinition>? Objects { get; set; }
+    public List<BootstrapPatch>? Patches { get; set; }
 }
 
 /// <summary>
 /// Object definition for Phase 2 manifest.
 /// </summary>
-public class Phase2ObjectDefinition
+public class BootstrapObjectDefinition
 {
     public string? Id { get; set; }
     [JsonPropertyName("class")]
     public string? ClassName { get; set; }
+    [JsonPropertyName("className")]
+    public string? ClassNameAlternate { get; set; } // Allow both "class" and "className" 
     public Dictionary<string, object>? Fields { get; set; }
     public List<object>? Elements { get; set; } // For arrays
+    public object? Value { get; set; } // For SmallInteger and other immediate values
+    public int? Size { get; set; } // For variable-sized objects like dictionaries
 }
 
 /// <summary>
 /// Class definition for Phase 2.
 /// </summary>
-public class Phase2ClassDefinition
+public class BootstrapClassDefinition
 {
     public string? Name { get; set; }
     public string? Superclass { get; set; }
     public List<string>? InstanceVariables { get; set; }
-    public List<Phase2MethodDefinition>? Methods { get; set; }
-    public List<Phase2MethodDefinition>? ClassMethods { get; set; }
+    public List<BootstrapMethodDefinition>? Methods { get; set; }
+    public List<BootstrapMethodDefinition>? ClassMethods { get; set; }
     public bool VariableSize { get; set; }
 }
 
 /// <summary>
 /// Method definition for Phase 2.
 /// </summary>
-public class Phase2MethodDefinition
+public class BootstrapMethodDefinition
 {
     public string? Selector { get; set; }
     public string? Source { get; set; }
@@ -1899,11 +2245,14 @@ public class Phase2MethodDefinition
 /// <summary>
 /// Patch operation for Phase 2.
 /// </summary>
-public class Phase2Patch
+public class BootstrapPatch
 {
     public string? Target { get; set; }
     public string? Slot { get; set; }
     public object? Value { get; set; }
+    public string? Operation { get; set; }
+    public string? Name { get; set; }
+    public string? Comment { get; set; }
 }
 
 /// <summary>

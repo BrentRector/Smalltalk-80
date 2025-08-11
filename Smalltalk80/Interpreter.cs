@@ -433,6 +433,7 @@ public class Interpreter
                 arguments,
                 currentContext);
 
+            Console.WriteLine($"[DEBUG] Activating block context");
             currentContext = newContext;
             return;
         }
@@ -621,6 +622,7 @@ public class Interpreter
 
             if (method.HasPrimitive)
             {
+                Console.WriteLine($"[DEBUG] Method {method.SelectorName ?? "unknown"} has primitive {method.PrimitiveIndex}");
                 currentContext.Stack.Push(receiver);
                 foreach (var arg in arguments)
                 {
@@ -629,6 +631,7 @@ public class Interpreter
 
                 if (Primitives.Execute(method.PrimitiveIndex, currentContext))
                 {
+                    Console.WriteLine($"[DEBUG] Primitive {method.PrimitiveIndex} succeeded, returning without executing bytecode");
                     return;
                 }
 
@@ -642,6 +645,16 @@ public class Interpreter
             for (int i = 0; i < arguments.Length && i < temps.Length; i++)
                 temps[i] = arguments[i];
 
+            // Debug instVarAt:put: specifically
+            if (method.SelectorName == "instVarAt:put:")
+            {
+                Console.WriteLine($"[DEBUG] instVarAt:put: method details:");
+                Console.WriteLine($"[DEBUG]   HasPrimitive: {method.HasPrimitive}");
+                Console.WriteLine($"[DEBUG]   PrimitiveIndex: {method.PrimitiveIndex}");
+                Console.WriteLine($"[DEBUG]   Bytecode length: {method.Bytecodes?.Length ?? 0}");
+                Console.WriteLine($"[DEBUG]   Literals count: {method.Literals?.Length ?? 0}");
+            }
+            
             // Log method entry with actual selector name 
             var className = GetClassName(startClass) ?? "Unknown";
             MethodTracer.LogMethodEntry(className, selector.Name, recvObj);
@@ -656,6 +669,7 @@ public class Interpreter
                 Stack = new Stack<object?>(),
                 PC = 0
             };
+            Console.WriteLine($"[DEBUG] Activating method: {method.SelectorName ?? "unknown"}");
             currentContext = newContext;
             return;
         }
@@ -688,6 +702,7 @@ public class Interpreter
             // Execute primitive method directly
             if (method.HasPrimitive)
             {
+                Console.WriteLine($"[DEBUG] Method {method.SelectorName ?? "unknown"} has primitive {method.PrimitiveIndex}");
                 currentContext.Stack.Push(receiver);
                 foreach (var arg in arguments)
                 {
@@ -696,6 +711,7 @@ public class Interpreter
 
                 if (Primitives.Execute(method.PrimitiveIndex, currentContext))
                 {
+                    Console.WriteLine($"[DEBUG] Primitive {method.PrimitiveIndex} succeeded, returning without executing bytecode");
                     return;
                 }
 

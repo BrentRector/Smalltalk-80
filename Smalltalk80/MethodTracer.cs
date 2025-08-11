@@ -25,7 +25,7 @@ public static class MethodTracer
     {
         if (!Enabled) return;
         
-        Console.WriteLine($"[METHOD] {GetIndent()}>> Entering {className}#{selector} (receiver: {DescribeObject(receiver)})");
+        Console.WriteLine($"[METHOD] {GetIndent()}>> Entering {className}>>{selector}");
         callDepth++;
     }
     
@@ -37,7 +37,7 @@ public static class MethodTracer
         if (!Enabled) return;
         
         callDepth = Math.Max(0, callDepth - 1);
-        Console.WriteLine($"[METHOD] {GetIndent()}<< Exiting {className}#{selector} (returns: {DescribeObject(returnValue)})");
+        Console.WriteLine($"[METHOD] {GetIndent()}<< Exiting {className}>>{selector}");
     }
     
     /// <summary>

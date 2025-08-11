@@ -244,14 +244,14 @@ public class SmalltalkPrettyPrinter
             
             // If this object's class's class is Metaclass, then this object is a class
             // (because its class is a metaclass)
-            if (obj.ClassPointer.ClassPointer != null)
+            if (obj.ClassPointer?.ClassPointer != null)
             {
                 if (obj.ClassPointer.ClassPointer.Oop == metaclassOop)
                     return true;
             }
             
             // If this object is a direct instance of Class, it's a class
-            if (obj.ClassPointer.Oop == classOop)
+            if (obj.ClassPointer?.Oop == classOop)
                 return true;
                 
             // Check if the class pointer points to a metaclass

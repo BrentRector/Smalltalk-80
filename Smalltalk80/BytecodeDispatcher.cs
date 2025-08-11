@@ -72,57 +72,55 @@ public static class BytecodeDispatcher
 
         // Push receiver (self) - bytecode 112
         Handlers[112] = (interpreter, opcode) => HandlePushReceiver(interpreter);
+        // 113-119 are part of pushReceiver range but unused in canonical Blue Book
 
-        // Bytecodes 113-119 are undefined in canonical Blue Book
-        // 120-127 are return operations and will be handled below
+        // pushConstant range (120-127) - Push constants like nil, true, false, -1 to 2
+        // These must be in the literal frame in canonical Blue Book
+        // 120-127 are reserved but not specifically defined in canonical spec
+        
+        // 128-135 are pushActiveContext and related (except 135 which is pop stack)
+        Handlers[135] = (interpreter, opcode) => HandlePopStack(interpreter);
+        
+        // 136-143 are return operations
+        Handlers[136] = (interpreter, opcode) => HandleReturnReceiver(interpreter);
+        Handlers[137] = (interpreter, opcode) => HandleReturnTop(interpreter);
+        Handlers[138] = (interpreter, opcode) => HandleReturnTopFromBlock(interpreter);
+        // 139-143 are additional return operations
 
-        // Return operations (120-125)
-        Handlers[120] = (interpreter, opcode) => HandleReturnReceiver(interpreter);
-        // 121-123 are undefined in canonical Blue Book
-        Handlers[124] = (interpreter, opcode) => HandleReturnTop(interpreter);
-        Handlers[125] = (interpreter, opcode) => HandleReturnTopFromBlock(interpreter);
+        // pushActiveContext range (128-134)
+        // These are context-related push operations
+        // Not fully defined in canonical spec
 
-        // Extended operations (128-137)
-        Handlers[128] = (interpreter, opcode) => HandleExtendedPush(interpreter, opcode);
-        Handlers[129] = (interpreter, opcode) => HandleExtendedStore(interpreter, opcode);
-        Handlers[130] = (interpreter, opcode) => HandleExtendedStoreAndPop(interpreter, opcode);
-        Handlers[131] = (interpreter, opcode) => HandleSingleExtendedSend(interpreter, opcode);
-        Handlers[132] = (interpreter, opcode) => HandleDoubleExtendedSend(interpreter, opcode);
-        Handlers[133] = (interpreter, opcode) => HandleSingleExtendedSuperSend(interpreter, opcode);
-        Handlers[134] = (interpreter, opcode) => HandleDoubleExtendedSuperSend(interpreter, opcode);
-        Handlers[135] = (interpreter, opcode) => HandlePopStack(interpreter, opcode);
-        Handlers[136] = (interpreter, opcode) => HandleDuplicateTop(interpreter, opcode);
-        Handlers[137] = (interpreter, opcode) => HandlePushActiveContext(interpreter, opcode);
-
-        // Jump operations (144-175)
+        // Send operations (144-175)
+        // 144-151: sendSelector with 0 args (literal index 0-7)
         for (int i = 144; i <= 151; i++)
         {
-            int offset = i - 143; // Jump offset 1-8
-            Handlers[i] = (interpreter, opcode) => HandleShortUnconditionalJump(interpreter, offset);
+            int index = i - 144; // Literal index 0-7
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 0);
         }
         
+        // 152-159: sendSelector with 1 arg (literal index 0-7)
         for (int i = 152; i <= 159; i++)
         {
-            int offset = i - 151; // Jump offset 1-8
-            Handlers[i] = (interpreter, opcode) => HandleShortConditionalJump(interpreter, offset, false);
+            int index = i - 152; // Literal index 0-7
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 1);
         }
         
+        // 160-167: sendSelector with 2 args (literal index 0-7)
         for (int i = 160; i <= 167; i++)
         {
-            Handlers[i] = (interpreter, opcode) => HandleLongUnconditionalJump(interpreter, opcode);
+            int index = i - 160; // Literal index 0-7
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
         }
         
-        for (int i = 168; i <= 171; i++)
+        // 168-175: sendSelector with 3 args (literal index 0-7)
+        for (int i = 168; i <= 175; i++)
         {
-            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpTrue(interpreter, opcode);
-        }
-        
-        for (int i = 172; i <= 175; i++)
-        {
-            Handlers[i] = (interpreter, opcode) => HandleLongConditionalJumpFalse(interpreter, opcode);
+            int index = i - 168; // Literal index 0-7
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 3);
         }
 
-        // Send operations (176-255) - Blue Book specification
+        // Send operations (176-223) - Blue Book specification
         // 176-191: Send literal selector with 0 args
         for (int i = 176; i <= 191; i++)
         {
@@ -144,19 +142,8 @@ public static class BytecodeDispatcher
             Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
         }
         
-        // 224-239: Send arithmetic selector (+, -, <, >, etc.)
-        for (int i = 224; i <= 239; i++)
-        {
-            int selectorIndex = i - 224; // Arithmetic selector 0-15
-            Handlers[i] = (interpreter, opcode) => HandleSendArithmeticSelector(interpreter, selectorIndex);
-        }
-        
-        // 240-255: Send special selector (at:, at:put:, size, etc.)
-        for (int i = 240; i <= 255; i++)
-        {
-            int selectorIndex = i - 240; // Special selector 0-15
-            Handlers[i] = (interpreter, opcode) => HandleSendCommonSelector(interpreter, selectorIndex);
-        }
+        // 224-255: Unused in canonical Blue Book
+        // Later implementations use these for extended operations
     }
 
     /// <summary>
@@ -166,6 +153,12 @@ public static class BytecodeDispatcher
     /// <param name="opcode">The bytecode to dispatch.</param>
     public static void Dispatch(Interpreter interpreter, byte opcode)
     {
+        // Debug logging for Phase 3 unknown methods
+        if (interpreter.CurrentContext.Method.SelectorName == null || interpreter.CurrentContext.Method.SelectorName == "unknown")
+        {
+            Console.WriteLine($"[DEBUG] PC={interpreter.CurrentContext.PC-1}, opcode={opcode}");
+        }
+        
         Handlers[opcode](interpreter, opcode);
     }
 
@@ -211,64 +204,13 @@ public static class BytecodeDispatcher
         interpreter.HandleReturn(value ?? throw new InvalidOperationException("Cannot return null"));
     }
 
-    private static void HandleExtendedStore(Interpreter interpreter, byte opcode)
-    {
-        // Extended store implementation would go here
-        throw new NotImplementedException("Extended store not yet implemented");
-    }
 
-    private static void HandleExtendedStoreAndPop(Interpreter interpreter, byte opcode)
-    {
-        // Extended store and pop implementation would go here
-        throw new NotImplementedException("Extended store and pop not yet implemented");
-    }
-
-    private static void HandleSingleExtendedSuperSend(Interpreter interpreter, byte opcode)
-    {
-        // Single extended super send implementation would go here
-        throw new NotImplementedException("Single extended super send not yet implemented");
-    }
-
-    private static void HandleDoubleExtendedSuperSend(Interpreter interpreter, byte opcode)
-    {
-        // Double extended super send implementation would go here
-        throw new NotImplementedException("Double extended super send not yet implemented");
-    }
-
-    private static void HandleLongUnconditionalJump(Interpreter interpreter, byte opcode)
-    {
-        var context = interpreter.CurrentContext;
-        int offset = ((opcode & 0x07) << 8) + context.Method.Bytecodes[context.PC++];
-        context.PC += offset;
-    }
-
-    private static void HandleLongConditionalJumpTrue(Interpreter interpreter, byte opcode)
-    {
-        // Long conditional jump on true implementation would go here
-        throw new NotImplementedException("Long conditional jump on true not yet implemented");
-    }
-
-    private static void HandleLongConditionalJumpFalse(Interpreter interpreter, byte opcode)
-    {
-        // Long conditional jump on false implementation would go here
-        throw new NotImplementedException("Long conditional jump on false not yet implemented");
-    }
-
-    private static void HandleSendArithmeticSelector(Interpreter interpreter, int selectorIndex)
-    {
-        // Send arithmetic selector implementation would go here
-        throw new NotImplementedException("Send arithmetic selector not yet implemented");
-    }
-
-    private static void HandleSendCommonSelector(Interpreter interpreter, int selectorIndex)
-    {
-        // Send common selector implementation would go here
-        throw new NotImplementedException("Send common selector not yet implemented");
-    }
 
     private static void HandleSendLiteralSelector(Interpreter interpreter, int index, int argCount)
     {
         var context = interpreter.CurrentContext;
+        
+        Console.WriteLine($"[DEBUG] HandleSendLiteralSelector: index={index}, argCount={argCount}, stack count={context.Stack.Count}");
         
         // Get the selector from the literal frame
         if (index >= context.Method.Literals.Length)
@@ -283,9 +225,32 @@ public static class BytecodeDispatcher
             throw new InvalidOperationException($"Literal at index {index} is null");
         }
         
-        // The literal IS the selector - just use it directly
-        // The interpreter's PerformSend should handle Smalltalk objects
-        interpreter.PerformSendWithObject(literal, argCount, false);
+        Console.WriteLine($"[DEBUG]   Literal type: {literal.GetType().Name}");
+        
+        // Handle both C# Symbols (from Phase 1/2) and SmalltalkObject Symbols (from Phase 3)
+        if (literal is Symbol symbol)
+        {
+            // C# Symbol - use directly
+            Console.WriteLine($"[DEBUG]   C# Symbol: {symbol}");
+            interpreter.PerformSend(symbol, argCount, false);
+        }
+        else if (literal is SmalltalkObject symbolObj)
+        {
+            // SmalltalkObject Symbol - extract the string and create a C# Symbol
+            if (symbolObj.Fields.Length > 0 && symbolObj.Fields[0] is string str)
+            {
+                Console.WriteLine($"[DEBUG]   SmalltalkObject Symbol: {str}");
+                interpreter.PerformSend(new Symbol(str), argCount, false);
+            }
+            else
+            {
+                throw new InvalidOperationException($"Literal at index {index} is a SmalltalkObject but doesn't contain a string");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException($"Literal at index {index} is not a Symbol, got {literal.GetType().Name}");
+        }
     }
 
     private static void HandleReturnReceiver(Interpreter interpreter)
@@ -301,132 +266,90 @@ public static class BytecodeDispatcher
         interpreter.HandleReturn(topValue ?? throw new InvalidOperationException("Cannot return null value"));
     }
 
+    private static void HandlePopStack(Interpreter interpreter)
+    {
+        var context = interpreter.CurrentContext;
+        context.Stack.Pop();
+    }
+
     private static void HandleUnknownBytecode(Interpreter interpreter, byte opcode)
     {
-        throw new NotImplementedException($"Unknown bytecode: {opcode}");
+        var context = interpreter.CurrentContext;
+        Console.WriteLine($"[BYTECODE ERROR] Unknown bytecode: {opcode} (0x{opcode:X2})");
+        Console.WriteLine($"[BYTECODE ERROR] Method has {context.Method.Bytecodes.Length} bytes total");
+        Console.WriteLine($"[BYTECODE ERROR] Current PC: {context.PC}");
+        Console.WriteLine($"[BYTECODE ERROR] Full bytecode sequence:");
+        for (int i = 0; i < Math.Min(context.Method.Bytecodes.Length, 20); i++)
+        {
+            var b = context.Method.Bytecodes[i];
+            Console.WriteLine($"[BYTECODE ERROR]   [{i}]: {b} (0x{b:X2})");
+        }
+        throw new NotImplementedException($"Unknown bytecode: {opcode} (0x{opcode:X2})");
     }
 
     // Additional handler methods would be implemented here following the same pattern
     // This provides a foundation that's much faster than the current if/else chain
 
-    private static void HandleExtendedPush(Interpreter interpreter, byte opcode)
-    {
-        // Implementation for extended push operations
-        var context = interpreter.CurrentContext;
-        byte descriptor = context.Method.Bytecodes[context.PC++];
-        // Handle extended push based on descriptor
-    }
 
-    private static void HandleSingleExtendedSend(Interpreter interpreter, byte opcode)
-    {
-        // Implementation for single extended send
-        var context = interpreter.CurrentContext;
-        byte descriptor = context.Method.Bytecodes[context.PC++];
-        int argCount = descriptor >> 5;
-        int selectorIndex = descriptor & 0x1F;
-        var selector = (Symbol)context.Method.Literals[selectorIndex];
-        // Perform send
-    }
 
-    private static void HandleShortUnconditionalJump(Interpreter interpreter, int offset)
-    {
-        interpreter.CurrentContext.PC += offset;
-    }
-
-    private static void HandleShortConditionalJump(Interpreter interpreter, int offset, bool jumpOnTrue)
-    {
-        var context = interpreter.CurrentContext;
-        var condObj = context.Stack.Pop();
-        if (condObj is bool b && b == jumpOnTrue)
-        {
-            context.PC += offset;
-        }
-    }
-
-    private static void HandleSendArithmetic(Interpreter interpreter, int index)
-    {
-        // Implementation for arithmetic message sends
-        // Uses the special selector table from the interpreter
-    }
-
-    private static void HandleSendLiteral(Interpreter interpreter, int index)
-    {
-        var context = interpreter.CurrentContext;
-        var selector = (Symbol)context.Method.Literals[index];
-        // Determine argument count and perform send
-    }
 
     // Additional placeholder handlers - full implementation would include all bytecodes
-    private static void HandleDoubleExtendedSend(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Extended send bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleSingleExtendedSuper(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleDoubleExtendedSuper(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Extended super bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandlePopStack(Interpreter interpreter, byte opcode)
-    {
-        interpreter.CurrentContext.Stack.Pop();
-    }
-    private static void HandleDuplicateTop(Interpreter interpreter, byte opcode)
-    {
-        var context = interpreter.CurrentContext;
-        var value = context.Stack.Peek();
-        context.Stack.Push(value);
-    }
-    private static void HandlePushActiveContext(Interpreter interpreter, byte opcode)
-    {
-        interpreter.CurrentContext.Stack.Push(interpreter.CurrentContext);
-    }
-    private static void HandleJumpShort(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleJumpLong(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Jump bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleJumpIfFalseShort(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleJumpIfFalseLong(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleJumpIfTrueShort(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
-    }
-    private static void HandleJumpIfTrueLong(Interpreter interpreter, byte opcode)
-    {
-        // Non-canonical extension - should not be used in Blue Book VM
-        throw new InvalidOperationException($"Conditional jump bytecode {opcode} is not part of the Blue Book specification");
-    }
     private static void HandlePushLiteralConstant(Interpreter interpreter, int index)
     {
         var context = interpreter.CurrentContext;
-        context.Stack.Push(context.Method.Literals[index]);
+        var literal = context.Method.Literals[index];
+        
+        // SmallIntegers are stored as tagged integers: (value << 1) | 1
+        // We need to push them as-is for Smalltalk compatibility
+        context.Stack.Push(literal);
     }
 
     private static void HandlePushLiteralVariable(Interpreter interpreter, int index)
     {
         var context = interpreter.CurrentContext;
-        var assoc = (Association)context.Method.Literals[index]!;
-        context.Stack.Push(assoc.Value);
+        var literal = context.Method.Literals[index];
+        
+        Console.WriteLine($"[DEBUG] HandlePushLiteralVariable: index={index}, literal type={literal?.GetType()?.Name ?? "null"}");
+        Console.WriteLine($"[DEBUG]   Current method: {context.Method.SelectorName ?? "unknown"}");
+        if (literal is SmalltalkObject so)
+        {
+            Console.WriteLine($"[DEBUG]   Literal is SmalltalkObject OOP={so.Oop}, fields={so.Fields.Length}");
+        }
+        
+        if (literal is Association assoc)
+        {
+            // C# Association object (from Phase 1/2)
+            Console.WriteLine($"[DEBUG]   C# Association key={assoc.Key}, value type={assoc.Value?.GetType()?.Name ?? "null"}");
+            context.Stack.Push(assoc.Value);
+        }
+        else if (literal is SmalltalkObject smalltalkAssoc)
+        {
+            // SmalltalkObject representing an Association (from Phase 3)
+            // Association format: [key, value]
+            Console.WriteLine($"[DEBUG]   SmalltalkObject with {smalltalkAssoc.Fields.Length} fields");
+            if (smalltalkAssoc.Fields.Length >= 2)
+            {
+                var value = smalltalkAssoc.Fields[1]; // value field
+                Console.WriteLine($"[DEBUG]   Pushing value: {value?.GetType()?.Name ?? "null"}");
+                context.Stack.Push(value);
+                Console.WriteLine($"[DEBUG]   Stack now has {context.Stack.Count} items");
+            }
+            else
+            {
+                Console.WriteLine($"[DEBUG] ERROR: Association has {smalltalkAssoc.Fields.Length} fields, expected 2");
+                Console.WriteLine($"[DEBUG]   Association OOP: {smalltalkAssoc.Oop}");
+                Console.WriteLine($"[DEBUG]   Association class: {smalltalkAssoc.ClassPointer?.Oop ?? -1}");
+                for (int i = 0; i < smalltalkAssoc.Fields.Length; i++)
+                {
+                    Console.WriteLine($"[DEBUG]   Field[{i}]: {smalltalkAssoc.Fields[i]?.GetType()?.Name ?? "null"}");
+                }
+                throw new InvalidOperationException($"SmalltalkObject Association at literal {index} has insufficient fields ({smalltalkAssoc.Fields.Length})");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException($"Literal variable at index {index} is not an Association, got {literal?.GetType()?.Name ?? "null"}");
+        }
     }
 
     private static void HandleStoreIntoReceiverVariable(Interpreter interpreter, int index)
@@ -451,84 +374,6 @@ public static class BytecodeDispatcher
         assoc.Value = value;
     }
 
-    private static void HandleReturnTrue(Interpreter interpreter)
-    {
-        // Return the Smalltalk true singleton object
-        if (ObjectMemory.TrueObject != null)
-        {
-            interpreter.HandleReturn(ObjectMemory.TrueObject);
-        }
-        else
-        {
-            // Debug: log the issue
-            Console.WriteLine("[BYTECODE] WARNING: True singleton not found in ObjectMemory.TrueObject");
-            throw new InvalidOperationException("True singleton not found - ensure Phase 2 bootstrap creates it");
-        }
-    }
 
-    private static void HandleReturnFalse(Interpreter interpreter)
-    {
-        // Return the Smalltalk false singleton object
-        if (ObjectMemory.FalseObject != null)
-        {
-            interpreter.HandleReturn(ObjectMemory.FalseObject);
-        }
-        else
-        {
-            throw new InvalidOperationException("False singleton not found - ensure Phase 2 bootstrap creates it");
-        }
-    }
 
-    private static void HandleReturnNil(Interpreter interpreter)
-    {
-        // Return the Smalltalk nil singleton object
-        if (ObjectMemory.NilObject != null)
-        {
-            interpreter.HandleReturn(ObjectMemory.NilObject);
-        }
-        else
-        {
-            throw new InvalidOperationException("Nil singleton not found - ensure Phase 2 bootstrap creates it");
-        }
-    }
-
-    private static void HandleSendLiteralSelector(Interpreter interpreter, int bytecode)
-    {
-        var context = interpreter.CurrentContext;
-        // Blue Book canonical encoding:
-        // Bits 6-7: Argument count (00=0, 01=1, 10=2, 11=N args)
-        // Bits 2-5: Literal frame index (0-15)
-        // Bits 0-1: Unused/reserved
-        
-        var argCount = (bytecode >> 6) & 0x3; // Extract bits 6-7
-        var selectorIndex = (bytecode >> 2) & 0xF; // Extract bits 2-5
-        
-        if (selectorIndex >= context.Method.Literals.Length)
-        {
-            throw new InvalidOperationException($"Selector index {selectorIndex} out of bounds for literal frame (size: {context.Method.Literals.Length})");
-        }
-        
-        if (!(context.Method.Literals[selectorIndex] is Symbol selector))
-        {
-            throw new InvalidOperationException($"Literal at index {selectorIndex} is not a Symbol: {context.Method.Literals[selectorIndex]?.GetType()}");
-        }
-        
-        // Handle special case for 11xx_xxxx (bits 6-7 = 11) - variable argument count
-        if (argCount == 3) // 11 binary
-        {
-            // For now, treat as 0 arguments - proper implementation would need more context
-            // TODO: Implement variable argument count handling
-            argCount = 0;
-        }
-        
-        interpreter.PerformSend(selector, argCount, false);
-    }
-
-    // Blue Book does not have separate super send bytecodes in the 192-255 range
-    // Super sends are handled through extended bytecodes or compiler-generated patterns
-    // This method is no longer used but kept for reference
-    private static void HandleSendSuperMessage_Obsolete(Interpreter interpreter, int index)
-    {
-        throw new InvalidOperationException("Super send bytecodes are not part of the canonical Blue Book 192-255 range");
-    }
 }
