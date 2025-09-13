@@ -200,3 +200,17 @@ public sealed record DynamicArrayExpression(IReadOnlyList<ExpressionNode> Elemen
 /// <param name="Elements">The expressions contained within the dictionary literal.</param>
 public sealed record DynamicDictionaryExpression(IReadOnlyList<ExpressionNode> Elements) : ExpressionNode;
 
+/// <summary>
+/// Node representing a complete method including its signature and body.
+/// Used for direct method compilation.
+/// </summary>
+/// <param name="Selector">The method selector.</param>
+/// <param name="Arguments">Method parameter names.</param>
+/// <param name="Body">The method body sequence.</param>
+/// <param name="Primitive">Optional primitive number.</param>
+public sealed record MethodNode(
+    string Selector,
+    IReadOnlyList<string> Arguments,
+    SequenceNode Body,
+    int? Primitive = null) : AstNode;
+

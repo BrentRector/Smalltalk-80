@@ -166,13 +166,17 @@ public static class Primitives
         // Additional control primitives
         [201] = ControlPrimitives.BlockValue,
         
-        // Bootstrap primitives for class creation and method installation
-        [170] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateSubclass,
-        [171] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethod,
-        [172] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CompileMethodClassified,
-        [173] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
-        [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
-        [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
+        // Compiler primitives for dynamic method compilation
+        [170] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.CompileMethod,
+        [171] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.CompileAndInstallMethod,
+        [172] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.EvaluateExpression,
+        [173] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.ParseMethodToAst,
+        
+        // Legacy bootstrap primitives (moved to 174-179)
+        [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateSubclass,
+        [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
+        [176] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
+        [177] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
         
         // Object creation primitives for Phase 1 bootstrap
         [180] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSmallInteger,

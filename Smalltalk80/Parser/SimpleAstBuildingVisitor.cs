@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
@@ -10,6 +11,85 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 {
+    /// <summary>
+    /// Visit a method entry context and create a MethodNode.
+    /// </summary>
+    public override object? VisitMethodEntry(Smalltalk80Parser.MethodEntryContext context)
+    {
+        // Extract method header (selector and arguments)
+        var methodHeader = context.methodHeader();
+        string selector;
+        var arguments = new List<string>();
+        
+        // Handle different method header types
+        if (methodHeader.unarySelector() != null)
+        {
+            // Unary selector (no arguments)
+            selector = methodHeader.unarySelector().GetText();
+        }
+        else if (methodHeader.binarySelector() != null)
+        {
+            // Binary selector with one argument
+            selector = methodHeader.binarySelector().GetText();
+            arguments.Add(methodHeader.formalArg()[0].GetText());
+        }
+        else
+        {
+            // Keyword selector with multiple arguments
+            var selectorParts = new List<string>();
+            var formalArgs = methodHeader.formalArg();
+            var identifierColons = methodHeader.identifierColon();
+            
+            for (int i = 0; i < identifierColons.Length; i++)
+            {
+                selectorParts.Add(identifierColons[i].GetText());
+                arguments.Add(formalArgs[i].GetText());
+            }
+            selector = string.Join("", selectorParts);
+        }
+        
+        // Extract temporaries
+        var temporaries = new List<string>();
+        if (context.temporaries() != null)
+        {
+            foreach (var temp in context.temporaries().temporaryName())
+            {
+                temporaries.Add(temp.GetText());
+            }
+        }
+        
+        // Extract primitive number if present
+        int? primitiveNumber = null;
+        if (context.primitiveDecl() != null)
+        {
+            var primitiveText = context.primitiveDecl().GetText();
+            // Extract number from <primitive: 123>
+            var match = System.Text.RegularExpressions.Regex.Match(primitiveText, @"\d+");
+            if (match.Success && int.TryParse(match.Value, out var primitive))
+            {
+                primitiveNumber = primitive;
+            }
+        }
+        
+        // Parse method body
+        var bodyContext = context.methodBodyNoBang();
+        var statements = new List<StatementNode>();
+        
+        if (bodyContext.statements() != null)
+        {
+            var stmtList = (List<StatementNode>)Visit(bodyContext.statements())!;
+            statements.AddRange(stmtList);
+        }
+        else if (bodyContext.returnStatement() != null)
+        {
+            statements.Add((StatementNode)Visit(bodyContext.returnStatement())!);
+        }
+        
+        var body = new SequenceNode(temporaries, statements);
+        
+        return new MethodNode(selector, arguments, body, primitiveNumber);
+    }
+    
     /// <summary>
     /// Visit a return statement context and create an AnswerStatement.
     /// </summary>
