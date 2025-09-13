@@ -222,6 +222,9 @@ public class CompilationContext
     public string ClassName { get; }
     public bool IsClassMethod { get; }
     public Interpreter Interpreter { get; }
+    public SmalltalkObject? ClassObject { get; private set; }
+    
+    // These should be loaded from the actual class object, not maintained separately
     public Dictionary<string, int> InstanceVariables { get; } = new();
     public Dictionary<string, int> ClassVariables { get; } = new();
     public Dictionary<string, object> PoolVariables { get; } = new();
@@ -232,25 +235,47 @@ public class CompilationContext
         IsClassMethod = isClassMethod;
         Interpreter = interpreter;
         
-        // Load instance variables for the class
+        // Try to find the class object in the VM
+        LoadClassObject();
+        
+        // Load instance variables from the actual class object
         LoadInstanceVariables();
         
-        // Load class variables
+        // Load class variables from the actual class object
         LoadClassVariables();
+    }
+    
+    private void LoadClassObject()
+    {
+        // Look up the class in the Smalltalk global dictionary
+        // This should access the actual VM class object
+        // For now, this is a stub - in a full implementation,
+        // we'd look up the class from the global Smalltalk dictionary
+        
+        // Note: This needs to be properly implemented to avoid shadow copies
+        // The class object should be retrieved from the VM's SystemDictionary
     }
     
     private void LoadInstanceVariables()
     {
-        // For now, we'll need to pass the class object directly
-        // or find another way to look it up
-        // This is a simplified implementation
+        // TODO: Load instance variable names from the actual class object
+        // The instance variable names are typically stored in slot 2 of the class
+        // This should access ClassObject.Fields[2] which contains the variable names
+        
+        // This is currently a stub - proper implementation would:
+        // 1. Get the instance variable names from ClassObject.Fields[2]
+        // 2. Parse them and create the index mapping
     }
     
     private void LoadClassVariables()
     {
-        // For now, we'll need to pass the class object directly
-        // or find another way to look it up
-        // This is a simplified implementation
+        // TODO: Load class variable names from the actual class object
+        // Class variables are typically stored in the class's shared pool
+        // This should access the actual VM structures, not maintain separate copies
+        
+        // This is currently a stub - proper implementation would:
+        // 1. Get the class variable dictionary from the class
+        // 2. Extract the variable names and create the index mapping
     }
 }
 
