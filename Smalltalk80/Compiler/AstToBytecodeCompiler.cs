@@ -14,8 +14,8 @@ public class AstToBytecodeCompiler
     private readonly List<byte> bytecodes = new();
     private readonly List<object> literals = new();
     private readonly Dictionary<object, int> literalIndex = new();
-    private readonly Dictionary<string, int> temporaries = new();
-    private readonly Dictionary<string, int> arguments = new();
+    private Dictionary<string, int> temporaries = new();
+    private Dictionary<string, int> arguments = new();
     private int argumentCount = 0;
     private int temporaryCount = 0;
     private int primitiveNumber = 0;
@@ -489,15 +489,109 @@ public class AstToBytecodeCompiler
     /// </summary>
     private void CompileBlock(BlockExpression block)
     {
-        // Blocks are complex - for now, create a simple block
-        // The Blue Book block compilation requires:
-        // 1. Push block context
-        // 2. Jump around block body
-        // 3. Block body bytecodes
-        // 4. Block return
+        // Blocks in Smalltalk-80 are compiled as follows:
+        // 1. Push block context creation bytecode
+        // 2. Jump around the block body (so it's not executed immediately)
+        // 3. Block body with block return at end
         
-        // For Phase 2, we'll implement a simplified version
-        throw new NotImplementedException("Block compilation not yet implemented");
+        // Count block arguments
+        var blockArgCount = block.Parameters.Count;
+        
+        // Push block context bytecode (143 = push block context)
+        // Format: 143, argCount, bodySize (next 2 bytes)
+        EmitByte(143);
+        EmitByte((byte)blockArgCount);
+        
+        // We need to compile the block body first to know its size
+        // Save the current state
+        var savedArguments = new Dictionary<string, int>(arguments);
+        var savedTemporaries = new Dictionary<string, int>(temporaries);
+        var savedArgumentCount = argumentCount;
+        var savedTemporaryCount = temporaryCount;
+        
+        // Create a temporary compiler for the block body
+        var blockCompiler = new AstToBytecodeCompiler(context);
+        
+        // Set up block arguments (they become temporaries in the block)
+        for (int i = 0; i < block.Parameters.Count; i++)
+        {
+            blockCompiler.arguments[block.Parameters[i]] = i;
+        }
+        blockCompiler.argumentCount = block.Parameters.Count;
+        
+        // Add block temporaries if any
+        if (block.Body.Temporaries.Count > 0)
+        {
+            foreach (var temp in block.Body.Temporaries)
+            {
+                blockCompiler.temporaries[temp] = blockCompiler.argumentCount + blockCompiler.temporaryCount;
+                blockCompiler.temporaryCount++;
+            }
+        }
+        
+        // Copy literals context
+        foreach (var kvp in literalIndex)
+        {
+            blockCompiler.literalIndex[kvp.Key] = kvp.Value;
+        }
+        blockCompiler.literals.AddRange(literals);
+        
+        // Compile block body
+        foreach (var statement in block.Body.Statements)
+        {
+            blockCompiler.CompileStatement(statement);
+        }
+        
+        // If block doesn't end with explicit return, add block return
+        if (blockCompiler.bytecodes.Count == 0 || !IsReturnBytecode(blockCompiler.bytecodes[^1]))
+        {
+            // Block return (125 = return stack top from block)
+            blockCompiler.EmitByte(125);
+        }
+        
+        // Get the block body bytecodes
+        var blockBodyBytecodes = blockCompiler.bytecodes.ToArray();
+        
+        // Sync literals back (in case block added new ones)
+        literals.Clear();
+        literals.AddRange(blockCompiler.literals);
+        literalIndex.Clear();
+        foreach (var kvp in blockCompiler.literalIndex)
+        {
+            literalIndex[kvp.Key] = kvp.Value;
+        }
+        
+        // Add block body size (2 bytes, little-endian)
+        var blockSize = blockBodyBytecodes.Length;
+        EmitByte((byte)(blockSize & 0xFF));
+        EmitByte((byte)((blockSize >> 8) & 0xFF));
+        
+        // Jump around block body (unconditional jump)
+        // Format: 164-167 (short jump 1-4 bytes) or 168-171 (long jump)
+        if (blockSize <= 4)
+        {
+            // Short jump
+            EmitByte((byte)(163 + blockSize));
+        }
+        else if (blockSize <= 255)
+        {
+            // Long jump with 1 byte offset
+            EmitByte(168);
+            EmitByte((byte)blockSize);
+        }
+        else
+        {
+            // Long jump with 2 byte offset
+            EmitByte(169);
+            EmitByte((byte)(blockSize & 0xFF));
+            EmitByte((byte)((blockSize >> 8) & 0xFF));
+        }
+        
+        // Now emit the block body
+        foreach (var bytecode in blockBodyBytecodes)
+        {
+            EmitByte(bytecode);
+        }
     }
     
     /// <summary>

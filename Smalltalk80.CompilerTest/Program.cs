@@ -69,6 +69,21 @@ class Program
             Console.WriteLine($"    Bytecodes: {method5.Bytecodes.Length} bytes");
             Console.WriteLine($"    Bytecode sequence: {BitConverter.ToString(method5.Bytecodes)}");
             
+            // Test 6: Compile method with block
+            Console.WriteLine("\nTest 6: Compile method with block");
+            var source6 = "select: aBlock\n\t| result |\n\tresult _ OrderedCollection new.\n\tself do: [:each | (aBlock value: each) ifTrue: [result add: each]].\n\t^result";
+            var method6 = compiler.CompileMethod(source6, "Collection", false);
+            
+            Console.WriteLine($"  Success! Method with block compiled:");
+            Console.WriteLine($"    Selector: {method6.SelectorName}");
+            Console.WriteLine($"    Bytecodes: {method6.Bytecodes.Length} bytes");
+            Console.WriteLine($"    Literals: {method6.Literals.Length}");
+            
+            // Test 7: Test compiler primitives registration
+            Console.WriteLine("\nTest 7: Register interpreter for primitives");
+            Smalltalk80.Primitives.Compiler.CompilerPrimitives.RegisterInterpreter(interpreter);
+            Console.WriteLine("  Success! Interpreter registered for compiler primitives");
+            
             Console.WriteLine("\n✓ All compiler tests passed!");
             
         }

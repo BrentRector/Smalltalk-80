@@ -43,6 +43,7 @@ public class SmalltalkCompiler
     
     /// <summary>
     /// Parse a method source string into an AST.
+    /// Supports both standalone methods and file-out format (with bang terminators).
     /// </summary>
     private MethodNode ParseMethod(string source)
     {
@@ -56,17 +57,40 @@ public class SmalltalkCompiler
         var errorListener = new ThrowingErrorListener();
         parser.AddErrorListener(errorListener);
         
-        // Parse as a standalone method
-        var tree = parser.methodEntry();
+        // Determine format: file-out (with !) or standalone
+        bool isFileOutFormat = source.Contains('!');
         
-        if (parser.NumberOfSyntaxErrors > 0)
+        Antlr4.Runtime.Tree.IParseTree tree;
+        object? result;
+        
+        if (isFileOutFormat)
         {
-            throw new CompilationException($"Syntax error in method: {parser.NumberOfSyntaxErrors} errors found");
+            // Parse as file-out format
+            tree = parser.fileIn();
+            
+            if (parser.NumberOfSyntaxErrors > 0)
+            {
+                throw new CompilationException($"Syntax error in method: {parser.NumberOfSyntaxErrors} errors found");
+            }
+            
+            // Build AST - for file-out, we need to extract the method from chunks
+            var visitor = new FileInMethodExtractor();
+            result = visitor.Visit(tree);
         }
-        
-        // Build AST
-        var visitor = new SimpleAstBuildingVisitor();
-        var result = visitor.Visit(tree);
+        else
+        {
+            // Parse as standalone method
+            tree = parser.methodEntry();
+            
+            if (parser.NumberOfSyntaxErrors > 0)
+            {
+                throw new CompilationException($"Syntax error in method: {parser.NumberOfSyntaxErrors} errors found");
+            }
+            
+            // Build AST
+            var visitor = new SimpleAstBuildingVisitor();
+            result = visitor.Visit(tree);
+        }
         
         if (result is not MethodNode methodNode)
         {
