@@ -309,46 +309,32 @@ public static class BytecodeDispatcher
         var context = interpreter.CurrentContext;
         var literal = context.Method.Literals[index];
         
-        Console.WriteLine($"[DEBUG] HandlePushLiteralVariable: index={index}, literal type={literal?.GetType()?.Name ?? "null"}");
-        Console.WriteLine($"[DEBUG]   Current method: {context.Method.SelectorName ?? "unknown"}");
-        if (literal is SmalltalkObject so)
-        {
-            Console.WriteLine($"[DEBUG]   Literal is SmalltalkObject OOP={so.Oop}, fields={so.Fields.Length}");
-        }
+        // According to Smalltalk-80 specification, PushLiteralVariable (bytecodes 64-95)
+        // MUST have an Association in the literal frame, never anything else.
+        // An Association has 2 fields: key (Symbol) and value (the actual object).
+        // The bytecode pushes the value field of the Association.
         
         if (literal is Association assoc)
         {
             // C# Association object (from Phase 1/2)
-            Console.WriteLine($"[DEBUG]   C# Association key={assoc.Key}, value type={assoc.Value?.GetType()?.Name ?? "null"}");
             context.Stack.Push(assoc.Value);
         }
-        else if (literal is SmalltalkObject smalltalkAssoc)
+        else if (literal is SmalltalkObject smalltalkAssoc && smalltalkAssoc.Fields.Length == 2)
         {
-            // SmalltalkObject representing an Association (from Phase 3)
-            // Association format: [key, value]
-            Console.WriteLine($"[DEBUG]   SmalltalkObject with {smalltalkAssoc.Fields.Length} fields");
-            if (smalltalkAssoc.Fields.Length >= 2)
-            {
-                var value = smalltalkAssoc.Fields[1]; // value field
-                Console.WriteLine($"[DEBUG]   Pushing value: {value?.GetType()?.Name ?? "null"}");
-                context.Stack.Push(value);
-                Console.WriteLine($"[DEBUG]   Stack now has {context.Stack.Count} items");
-            }
-            else
-            {
-                Console.WriteLine($"[DEBUG] ERROR: Association has {smalltalkAssoc.Fields.Length} fields, expected 2");
-                Console.WriteLine($"[DEBUG]   Association OOP: {smalltalkAssoc.Oop}");
-                Console.WriteLine($"[DEBUG]   Association class: {smalltalkAssoc.ClassPointer?.Oop ?? -1}");
-                for (int i = 0; i < smalltalkAssoc.Fields.Length; i++)
-                {
-                    Console.WriteLine($"[DEBUG]   Field[{i}]: {smalltalkAssoc.Fields[i]?.GetType()?.Name ?? "null"}");
-                }
-                throw new InvalidOperationException($"SmalltalkObject Association at literal {index} has insufficient fields ({smalltalkAssoc.Fields.Length})");
-            }
+            // SmalltalkObject Association - must have exactly 2 fields
+            // Field 0: key (Symbol)
+            // Field 1: value (the object)
+            var value = smalltalkAssoc.Fields[1];
+            context.Stack.Push(value);
         }
         else
         {
-            throw new InvalidOperationException($"Literal variable at index {index} is not an Association, got {literal?.GetType()?.Name ?? "null"}");
+            // This is an error - PushLiteralVariable requires an Association
+            throw new InvalidOperationException(
+                $"PushLiteralVariable at index {index} requires an Association, " +
+                $"but found {literal?.GetType()?.Name ?? "null"}" +
+                (literal is SmalltalkObject so ? $" with {so.Fields.Length} fields" : "") +
+                $". This indicates incorrect literal creation in the bootstrap.");
         }
     }
 

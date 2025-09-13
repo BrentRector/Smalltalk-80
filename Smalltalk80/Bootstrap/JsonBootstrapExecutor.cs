@@ -127,6 +127,10 @@ public class JsonBootstrapExecutor
             // Set up metaclass superclass relationships
             BootstrapLog($"[BOOTSTRAP] Pass 4: Setting up metaclass superclass relationships");
             SetupMetaclassSuperclassRelationships();
+            
+            // Fix existing Association objects that may have been created with wrong size
+            BootstrapLog($"[BOOTSTRAP] Pass 5: Fixing existing Association objects");
+            FixExistingAssociations();
         }
         
         // Finally, apply patches to wire everything together
@@ -1563,6 +1567,13 @@ public class JsonBootstrapExecutor
                         var literal = methodDef.Literals[i];
                         int literalOop;
                         
+                        // Fix malformed "Associationkey" literal
+                        if (literal == "Associationkey")
+                        {
+                            BootstrapLog($"[BOOTSTRAP] Warning: Fixing malformed literal 'Associationkey' -> 'Association'");
+                            literal = "Association";
+                        }
+                        
                         // Check if this is an object reference (e.g., "symbol_1000")
                         if (literal.StartsWith("symbol_") || literal.StartsWith("int_"))
                         {
@@ -1580,8 +1591,66 @@ public class JsonBootstrapExecutor
                         }
                         else
                         {
-                            // Regular string literal - create as symbol
-                            literalOop = vm.PrimitiveInternSymbol(literal);
+                            // Check if this is a pseudo-variable (nil, true, false)
+                            // These are NOT global variables and should NOT be wrapped in Associations
+                            // They should be stored as literal constants (bytecodes 32-63)
+                            if (literal == "nil" || literal == "true" || literal == "false")
+                            {
+                                // Pseudo-variables should be stored as direct object references
+                                // They are constants, not variables that can be changed
+                                var pseudoVarOop = vm.PrimitiveLookupGlobal(literal);
+                                if (pseudoVarOop >= 0)
+                                {
+                                    literalOop = pseudoVarOop;
+                                    BootstrapLog($"[BOOTSTRAP]   Using pseudo-variable '{literal}' directly as OOP {pseudoVarOop}");
+                                }
+                                else
+                                {
+                                    // Fallback to symbol if not found (shouldn't happen)
+                                    BootstrapLog($"[BOOTSTRAP] Warning: Pseudo-variable '{literal}' not found, using symbol");
+                                    literalOop = vm.PrimitiveInternSymbol(literal);
+                                }
+                            }
+                            else
+                            {
+                                // Check if this literal is a global variable reference (a known class name)
+                                var globalOop = vm.PrimitiveLookupGlobal(literal);
+                                if (globalOop >= 0)  // Object class has OOP 0, so use >= not >
+                                {
+                                    // This is a true global variable - create an Association object
+                                    // Association has 2 fields: key (Symbol) and value (the global object)
+                                    BootstrapLog($"[BOOTSTRAP]   Creating Association for global variable '{literal}'");
+                                    
+                                    // Get the Association class
+                                    var associationClassOop = vm.PrimitiveLookupGlobal("Association");
+                                    if (associationClassOop >= 0)
+                                    {
+                                        // Create an Association instance (will have 2 fields: key and value)
+                                        var associationOop = vm.PrimitiveNewInstance(associationClassOop);
+                                        
+                                        // Set field 0: key (the symbol name)
+                                        var keySymbolOop = vm.PrimitiveInternSymbol(literal);
+                                        vm.PrimitiveSetSlot(associationOop, 0, keySymbolOop);
+                                        
+                                        // Set field 1: value (the global object)
+                                        vm.PrimitiveSetSlot(associationOop, 1, globalOop);
+                                        
+                                        literalOop = associationOop;
+                                        BootstrapLog($"[BOOTSTRAP]     Created Association OOP {associationOop}: key='{literal}', value=OOP {globalOop}");
+                                    }
+                                    else
+                                    {
+                                        // Association class not found, fall back to symbol
+                                        BootstrapLog($"[BOOTSTRAP] Warning: Association class not found, using symbol for '{literal}'");
+                                        literalOop = vm.PrimitiveInternSymbol(literal);
+                                    }
+                                }
+                                else
+                                {
+                                    // Regular string literal - create as symbol
+                                    literalOop = vm.PrimitiveInternSymbol(literal);
+                                }
+                            }
                         }
                         
                         vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
@@ -1770,6 +1839,13 @@ public class JsonBootstrapExecutor
                         var literal = methodDef.Literals[i];
                         int literalOop;
                         
+                        // Fix malformed "Associationkey" literal
+                        if (literal == "Associationkey")
+                        {
+                            BootstrapLog($"[BOOTSTRAP] Warning: Fixing malformed literal 'Associationkey' -> 'Association'");
+                            literal = "Association";
+                        }
+                        
                         // Check if this is an object reference (e.g., "symbol_1000")
                         if (literal.StartsWith("symbol_") || literal.StartsWith("int_"))
                         {
@@ -1787,8 +1863,66 @@ public class JsonBootstrapExecutor
                         }
                         else
                         {
-                            // Regular string literal - create as symbol
-                            literalOop = vm.PrimitiveInternSymbol(literal);
+                            // Check if this is a pseudo-variable (nil, true, false)
+                            // These are NOT global variables and should NOT be wrapped in Associations
+                            // They should be stored as literal constants (bytecodes 32-63)
+                            if (literal == "nil" || literal == "true" || literal == "false")
+                            {
+                                // Pseudo-variables should be stored as direct object references
+                                // They are constants, not variables that can be changed
+                                var pseudoVarOop = vm.PrimitiveLookupGlobal(literal);
+                                if (pseudoVarOop >= 0)
+                                {
+                                    literalOop = pseudoVarOop;
+                                    BootstrapLog($"[BOOTSTRAP]   Using pseudo-variable '{literal}' directly as OOP {pseudoVarOop}");
+                                }
+                                else
+                                {
+                                    // Fallback to symbol if not found (shouldn't happen)
+                                    BootstrapLog($"[BOOTSTRAP] Warning: Pseudo-variable '{literal}' not found, using symbol");
+                                    literalOop = vm.PrimitiveInternSymbol(literal);
+                                }
+                            }
+                            else
+                            {
+                                // Check if this literal is a global variable reference (a known class name)
+                                var globalOop = vm.PrimitiveLookupGlobal(literal);
+                                if (globalOop >= 0)  // Object class has OOP 0, so use >= not >
+                                {
+                                    // This is a true global variable - create an Association object
+                                    // Association has 2 fields: key (Symbol) and value (the global object)
+                                    BootstrapLog($"[BOOTSTRAP]   Creating Association for global variable '{literal}'");
+                                    
+                                    // Get the Association class
+                                    var associationClassOop = vm.PrimitiveLookupGlobal("Association");
+                                    if (associationClassOop >= 0)
+                                    {
+                                        // Create an Association instance (will have 2 fields: key and value)
+                                        var associationOop = vm.PrimitiveNewInstance(associationClassOop);
+                                        
+                                        // Set field 0: key (the symbol name)
+                                        var keySymbolOop = vm.PrimitiveInternSymbol(literal);
+                                        vm.PrimitiveSetSlot(associationOop, 0, keySymbolOop);
+                                        
+                                        // Set field 1: value (the global object)
+                                        vm.PrimitiveSetSlot(associationOop, 1, globalOop);
+                                        
+                                        literalOop = associationOop;
+                                        BootstrapLog($"[BOOTSTRAP]     Created Association OOP {associationOop}: key='{literal}', value=OOP {globalOop}");
+                                    }
+                                    else
+                                    {
+                                        // Association class not found, fall back to symbol
+                                        BootstrapLog($"[BOOTSTRAP] Warning: Association class not found, using symbol for '{literal}'");
+                                        literalOop = vm.PrimitiveInternSymbol(literal);
+                                    }
+                                }
+                                else
+                                {
+                                    // Regular string literal - create as symbol
+                                    literalOop = vm.PrimitiveInternSymbol(literal);
+                                }
+                            }
                         }
                         
                         vm.PrimitiveArrayAtPut(literalsOop, i, literalOop);
@@ -2280,6 +2414,96 @@ public class JsonBootstrapExecutor
         }
         
         BootstrapLog($"[BOOTSTRAP] Fixed {fixedCount} metaclass class pointers");
+    }
+    
+    /// <summary>
+    /// Fix existing Association objects that may have been created with wrong size.
+    /// Association should have 2 fields: key (from LookupKey) and value.
+    /// </summary>
+    private void FixExistingAssociations()
+    {
+        // Get the Association class
+        var associationClassOop = vm.PrimitiveLookupGlobal("Association");
+        if (associationClassOop < 0)
+        {
+            BootstrapLog("[BOOTSTRAP] Warning: Association class not found, cannot fix existing objects");
+            return;
+        }
+        
+        var associationClass = ObjectMemory.FromOop(associationClassOop);
+        if (associationClass == null)
+        {
+            BootstrapLog("[BOOTSTRAP] Warning: Association class object not found in ObjectMemory");
+            return;
+        }
+        
+        int fixedCount = 0;
+        int checkedCount = 0;
+        var replacements = new Dictionary<int, SmalltalkObject>();
+        
+        // Scan through all objects in ObjectMemory to find broken Associations
+        for (int oop = 0; oop < 10000; oop += 2) // Check first 10000 even OOPs
+        {
+            var obj = ObjectMemory.FromOop(oop);
+            if (obj != null && obj.ClassPointer == associationClass)
+            {
+                checkedCount++;
+                
+                // Check if this Association has wrong number of fields
+                if (obj.Fields.Length == 1)
+                {
+                    BootstrapLog($"[BOOTSTRAP] Found Association at OOP {oop} with only 1 field, needs fixing");
+                    
+                    // Create a new Association with correct size
+                    var newAssoc = new SmalltalkObject(associationClass, 2);
+                    newAssoc.Fields[0] = obj.Fields[0]; // Copy the key
+                    newAssoc.Fields[1] = ObjectMemory.NilObject; // Set value to nil
+                    
+                    // Store the replacement (we'll update references later)
+                    replacements[oop] = newAssoc;
+                    fixedCount++;
+                    BootstrapLog($"[BOOTSTRAP]   Created replacement Association with 2 fields");
+                }
+                else if (obj.Fields.Length != 2)
+                {
+                    BootstrapLog($"[BOOTSTRAP] Warning: Association at OOP {oop} has {obj.Fields.Length} fields (expected 2)");
+                }
+            }
+        }
+        
+        // Now update all references to the broken Associations
+        if (replacements.Count > 0)
+        {
+            BootstrapLog($"[BOOTSTRAP] Updating references to {replacements.Count} fixed Associations...");
+            
+            // Update references in all objects
+            for (int oop = 0; oop < 10000; oop += 2)
+            {
+                var obj = ObjectMemory.FromOop(oop);
+                if (obj != null)
+                {
+                    for (int i = 0; i < obj.Fields.Length; i++)
+                    {
+                        if (obj.Fields[i] is SmalltalkObject fieldObj)
+                        {
+                            if (replacements.TryGetValue(fieldObj.Oop, out var replacement))
+                            {
+                                obj.Fields[i] = replacement;
+                                BootstrapLog($"[BOOTSTRAP]   Updated reference in OOP {oop} field {i}");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Update the ObjectMemory mapping
+            foreach (var kvp in replacements)
+            {
+                ObjectMemory.ReplaceObject(kvp.Key, kvp.Value);
+            }
+        }
+        
+        BootstrapLog($"[BOOTSTRAP] Checked {checkedCount} Association objects, fixed {fixedCount}");
     }
 }
 
