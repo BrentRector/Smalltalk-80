@@ -248,34 +248,167 @@ public class CompilationContext
     private void LoadClassObject()
     {
         // Look up the class in the Smalltalk global dictionary
-        // This should access the actual VM class object
-        // For now, this is a stub - in a full implementation,
-        // we'd look up the class from the global Smalltalk dictionary
+        // We need to find the Smalltalk global dictionary first
+        var smalltalkDict = LookupGlobalDictionary();
+        if (smalltalkDict == null)
+        {
+            // During bootstrap or testing, the global dictionary might not be available
+            return;
+        }
         
-        // Note: This needs to be properly implemented to avoid shadow copies
-        // The class object should be retrieved from the VM's SystemDictionary
+        // Look up the class by name
+        var classSymbol = new Symbol(ClassName);
+        ClassObject = LookupInDictionary(smalltalkDict, classSymbol);
     }
     
     private void LoadInstanceVariables()
     {
-        // TODO: Load instance variable names from the actual class object
-        // The instance variable names are typically stored in slot 2 of the class
-        // This should access ClassObject.Fields[2] which contains the variable names
+        if (ClassObject == null)
+            return;
+            
+        // Instance variables are stored in slot 3 of ClassDescription
+        // The class hierarchy is: Object -> Behavior -> ClassDescription -> Class
+        // ClassDescription adds slot 3 for instance variables
         
-        // This is currently a stub - proper implementation would:
-        // 1. Get the instance variable names from ClassObject.Fields[2]
-        // 2. Parse them and create the index mapping
+        if (ClassObject.Fields.Length > 3)
+        {
+            var instVarsField = ClassObject.Fields[3];
+            
+            // Instance variables can be stored as:
+            // 1. An Array of Symbols
+            // 2. A String with space-separated names
+            // 3. A SmalltalkObject containing symbols
+            
+            if (instVarsField is SmalltalkObject instVarsArray)
+            {
+                // Array of symbols
+                for (int i = 0; i < instVarsArray.Fields.Length; i++)
+                {
+                    if (instVarsArray.Fields[i] is Symbol symbol)
+                    {
+                        InstanceVariables[symbol.Value] = i;
+                    }
+                    else if (instVarsArray.Fields[i] is SmalltalkObject symObj && symObj.Fields.Length > 0)
+                    {
+                        // Symbol objects have the string in field 0
+                        if (symObj.Fields[0] is string varName)
+                        {
+                            InstanceVariables[varName] = i;
+                        }
+                    }
+                }
+            }
+            else if (instVarsField is string instVarsString)
+            {
+                // Space-separated string
+                var varNames = instVarsString.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < varNames.Length; i++)
+                {
+                    InstanceVariables[varNames[i]] = i;
+                }
+            }
+        }
     }
     
     private void LoadClassVariables()
     {
-        // TODO: Load class variable names from the actual class object
-        // Class variables are typically stored in the class's shared pool
-        // This should access the actual VM structures, not maintain separate copies
+        if (ClassObject == null)
+            return;
+            
+        // Class variables are typically stored in slot 6 (classVariables)
+        // This is a Dictionary or similar structure
+        // For now, we'll look for them but this needs the full class structure
         
-        // This is currently a stub - proper implementation would:
-        // 1. Get the class variable dictionary from the class
-        // 2. Extract the variable names and create the index mapping
+        if (ClassObject.Fields.Length > 6)
+        {
+            var classVarsField = ClassObject.Fields[6];
+            
+            if (classVarsField is SmalltalkObject classVarsDict)
+            {
+                // This would be a Dictionary object
+                // We'd need to iterate through it to get the variable names
+                // For now, leaving empty as class variables are less commonly used
+                // and require dictionary iteration support
+            }
+        }
+    }
+    
+    private SmalltalkObject? LookupGlobalDictionary()
+    {
+        // The global dictionary is named "Smalltalk" and should be registered
+        // We need to find it in the object memory
+        
+        // Look through all objects for the SystemDictionary
+        foreach (var obj in ObjectMemory.Objects)
+        {
+            if (obj == null) continue;
+            
+            // Check if this is the Smalltalk dictionary
+            // It would be a SystemDictionary instance with many entries
+            if (obj.ClassPointer != null)
+            {
+                var className = GetClassNameFromObject(obj.ClassPointer);
+                if (className == "SystemDictionary")
+                {
+                    // This should be the Smalltalk global dictionary
+                    return obj;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    private string? GetClassNameFromObject(SmalltalkObject classObj)
+    {
+        // Class name is typically in slot 5
+        if (classObj.Fields.Length > 5)
+        {
+            if (classObj.Fields[5] is Symbol symbol)
+                return symbol.Value;
+            if (classObj.Fields[5] is SmalltalkObject symObj && symObj.Fields.Length > 0)
+            {
+                if (symObj.Fields[0] is string name)
+                    return name;
+            }
+        }
+        return null;
+    }
+    
+    private SmalltalkObject? LookupInDictionary(SmalltalkObject dict, Symbol key)
+    {
+        // Dictionary structure in Smalltalk-80:
+        // Field 0: tally (number of entries)
+        // Then pairs of key-value entries
+        
+        if (dict.Fields.Length < 1)
+            return null;
+            
+        var tally = dict.Fields[0] as int? ?? 0;
+        if (tally == 0)
+            return null;
+            
+        // Search for the key in the dictionary
+        for (int i = 1; i < dict.Fields.Length - 1; i += 2)
+        {
+            var dictKey = dict.Fields[i];
+            
+            if (dictKey is Symbol sym && sym.Value == key.Value)
+            {
+                // Found it!
+                return dict.Fields[i + 1] as SmalltalkObject;
+            }
+            else if (dictKey is SmalltalkObject keyObj && keyObj.Fields.Length > 0)
+            {
+                // Check if it's a symbol object
+                if (keyObj.Fields[0] is string keyName && keyName == key.Value)
+                {
+                    return dict.Fields[i + 1] as SmalltalkObject;
+                }
+            }
+        }
+        
+        return null;
     }
 }
 
