@@ -100,6 +100,97 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     }
     
     /// <summary>
+    /// Calculate the total instance size for a class including inherited instance variables.
+    /// </summary>
+    private int CalculateTotalInstanceSize(int classId)
+    {
+        var classObj = ObjectMemory.FromOop(classId);
+        if (classObj == null)
+            return 0;
+            
+        int totalSize = 0;
+        var className = GetClassNameDebug(classId);
+        
+        // Walk up the class hierarchy to count all instance variables
+        var currentClass = classObj;
+        while (currentClass != null)
+        {
+            var currentClassName = GetClassNameDebug(currentClass.Oop);
+            
+            // Look at slot 3 (instanceVariables) to count fields for this class
+            var instVarsField = currentClass.GetField(3);
+            if (instVarsField is SmalltalkObject instVarsArray)
+            {
+                var varCount = instVarsArray.Fields.Length;
+                totalSize += varCount;
+                
+                // Debug output for Association class hierarchy
+                if (className.Contains("Association") || currentClassName.Contains("Association") ||
+                    className.Contains("LookupKey") || currentClassName.Contains("LookupKey"))
+                {
+                    DebugLog($"[VM] CalculateTotalInstanceSize: {currentClassName} has {varCount} instance variables, totalSize now = {totalSize}");
+                }
+            }
+            
+            // Move to superclass (slot 0)
+            var superclassField = currentClass.GetField(0);
+            if (superclassField is SmalltalkObject superclass)
+            {
+                currentClass = superclass;
+                // Stop at Object or if we hit nil
+                var superclassName = GetClassNameDebug(superclass.Oop);
+                if (superclassName == "Object" || superclass.Oop == PrimitiveNil())
+                {
+                    // Object class has no instance variables in Smalltalk-80
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        
+        // Debug output for Association
+        if (className.Contains("Association"))
+        {
+            DebugLog($"[VM] CalculateTotalInstanceSize: Final size for {className} = {totalSize}");
+        }
+        
+        return totalSize;
+    }
+    
+    /// <summary>
+    /// Gets the name of a class for debugging purposes.
+    /// </summary>
+    private string GetClassNameDebug(int classOop)
+    {
+        if (classOop < 0) return "<invalid>";
+        
+        // Check known class OOPs during bootstrap
+        if (classOop == 186) return "Association";
+        if (classOop == 182) return "LookupKey";
+        if (classOop == 170) return "Magnitude";
+        if (classOop == 2) return "Object";
+        
+        // Try to get name from slot 5
+        var classObj = ObjectMemory.FromOop(classOop);
+        if (classObj != null && classObj.Fields.Length > 5)
+        {
+            var nameField = classObj.GetField(5);
+            if (nameField is SmalltalkObject nameSymbol && nameSymbol.Fields.Length > 0)
+            {
+                if (nameSymbol.Fields[0] is string name)
+                {
+                    return name;
+                }
+            }
+        }
+        
+        return $"<class OOP {classOop}>";
+    }
+
+    /// <summary>
     /// Create a new instance of a class.
     /// </summary>
     public int PrimitiveNewInstance(int classId)
@@ -108,18 +199,10 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (classObj == null)
             throw new InvalidOperationException($"Class with OOP {classId} not found");
             
-        // Determine instance size from the class's instance variables
-        // Look at slot 3 (instanceVariables) to count fields
-        int instanceSize = 0;
-        var instVarsField = classObj.GetField(3);
-        if (instVarsField is SmalltalkObject instVarsArray)
-        {
-            instanceSize = instVarsArray.Fields.Length;
-        }
+        // Calculate instance size including inherited variables
+        int instanceSize = CalculateTotalInstanceSize(classId);
         
-        // For CompiledMethod, we know it has 4 fields: selector, bytecode, literals, header
-        // This is a simplified approach - a full implementation would calculate from class hierarchy
-        // Try to get the class name by checking known classes
+        // Special handling for certain classes that need specific sizes
         string className = GetClassName(classId);
         if (!string.IsNullOrEmpty(className) && !className.StartsWith("<"))
         {
@@ -149,6 +232,17 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 // Total: ~110 entries, need at least 110 pairs + room for growth
                 instanceSize = 257; // tally + 128 pairs (plenty for bootstrap + growth)
                 DebugLog($"[VM] Creating {className} with size {instanceSize} for initial capacity");
+            }
+            else if (className == "Association")
+            {
+                // Association should have 2 fields: key (from LookupKey) and value
+                DebugLog($"[VM] WARNING: Creating Association with calculated size {instanceSize} (should be 2)");
+                if (instanceSize != 2)
+                {
+                    DebugLog($"[VM] ERROR: Association size mismatch! Calculated {instanceSize} but expected 2");
+                    DebugLog($"[VM] Forcing Association instance size to 2");
+                    instanceSize = 2;  // Force correct size for Association
+                }
             }
         }
         
@@ -502,6 +596,15 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (!IsSmallInteger(oop))
             throw new InvalidOperationException($"OOP {oop} is not a SmallInteger");
         return oop >> 1;
+    }
+    
+    /// <summary>
+    /// Creates a SmallInteger from an integer value.
+    /// </summary>
+    public static int MakeSmallInteger(int value)
+    {
+        // SmallIntegers are tagged with lowest bit = 1
+        return (value << 1) | 1;
     }
     
     /// <summary>

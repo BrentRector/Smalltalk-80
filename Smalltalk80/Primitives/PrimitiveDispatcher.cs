@@ -75,12 +75,11 @@ public static class Primitives
         [60] = ObjectPrimitives.At,
         [61] = ObjectPrimitives.AtPut,
         [62] = ObjectPrimitives.Size,
-        // Array primitives temporarily disabled
-        // [63] = ArrayPrimitives.StringAt,
-        // [64] = ArrayPrimitives.StringAtPut,
-        // [65] = ArrayPrimitives.Next,
-        // [66] = ArrayPrimitives.NextPut,
-        // [67] = ArrayPrimitives.AtEnd,
+        [63] = Smalltalk80.Primitives.Collections.ArrayPrimitives.StringAt,
+        [64] = Smalltalk80.Primitives.Collections.ArrayPrimitives.StringAtPut,
+        [65] = Smalltalk80.Primitives.Collections.ArrayPrimitives.Next,
+        [66] = Smalltalk80.Primitives.Collections.ArrayPrimitives.NextPut,
+        [67] = Smalltalk80.Primitives.Collections.ArrayPrimitives.AtEnd,
         [68] = StorageManagementPrimitives.ObjectAt,
         [69] = StorageManagementPrimitives.ObjectAtPut,
         [70] = StorageManagementPrimitives.New,
@@ -157,12 +156,12 @@ public static class Primitives
         // [156] = FileSystemPrimitives.IsDirectory,
         // [157] = FileSystemPrimitives.GetDirectoryEntries,
 
-        // String comparison primitives temporarily disabled
-        // [158] = ArrayPrimitives.StringEquals,
-        // [159] = ArrayPrimitives.StringLessThan,
+        // String comparison primitives
+        [158] = Smalltalk80.Primitives.Collections.ArrayPrimitives.StringEquals,
+        [159] = Smalltalk80.Primitives.Collections.ArrayPrimitives.StringLessThan,
 
-        // Character creation primitive temporarily disabled
-        // [170] = ArrayPrimitives.CharacterFromValue,
+        // Note: Primitive 170 is currently used for bootstrap CreateSubclass
+        // CharacterFromValue would normally be primitive 170 but is moved elsewhere
         
         // Additional control primitives
         [201] = ControlPrimitives.BlockValue,
@@ -179,6 +178,7 @@ public static class Primitives
         [180] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSmallInteger,
         [181] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSymbol,
         [182] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewString,
+        [183] = Smalltalk80.Primitives.Collections.ArrayPrimitives.CharacterFromValue,
         
         // Note: Dictionary operations are not primitives in Smalltalk-80
         // Dictionary at:put: and at: are implemented in Smalltalk bytecode

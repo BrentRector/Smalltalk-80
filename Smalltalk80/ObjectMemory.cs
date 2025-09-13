@@ -102,4 +102,18 @@ public static class ObjectMemory
             }
         }
     }
+    
+    /// <summary>
+    /// Replace an object at a specific OOP with a new object.
+    /// Used to fix objects that were created incorrectly.
+    /// </summary>
+    public static void ReplaceObject(int oop, SmalltalkObject newObject)
+    {
+        if (oop >= 0 && oop < objects.Count)
+        {
+            var oldObject = objects[oop];
+            objects[oop] = newObject;
+            newObject.Oop = oop; // Ensure the new object has the correct OOP
+        }
+    }
 }
