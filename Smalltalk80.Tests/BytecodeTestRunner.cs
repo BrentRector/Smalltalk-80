@@ -18,9 +18,9 @@ namespace Smalltalk80.Tests
         private static int PassedTests = 0;
         
         /// <summary>
-        /// Main entry point for test execution
+        /// Main entry point for test execution (disabled - use ComprehensiveBytecodeTests instead)
         /// </summary>
-        public static void Main(string[] args)
+        public static void MainOld(string[] args)
         {
             // Disable tracing for performance
             Tracer.Enabled = false;
