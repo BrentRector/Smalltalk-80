@@ -1,0 +1,405 @@
+{
+  "ClassName": "Set",
+  "Superclass": "Collection",
+  "InstanceVariables": [
+    "tally"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Unordered",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:newObject|index|newObject==nilifTrue:[^newObject].index_selffindElementOrNil:newObject.(selfbasicAt:index)==nilifTrue:[selfatNewIndex:indexput:newObject].^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 41 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at:indexselferrorNotKeyed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:indexput:anObjectselferrorNotKeyed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectselferrorNotKeyed"
+        }
+      ]
+    },
+    {
+      "Selector": "atNewIndex:put:",
+      "Source": "atNewIndex:indexput:anObjectselfbasicAt:indexput:anObject.tally_tally\u002B1.selffullCheck!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectselfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newSetsizeindexelement|tally=0ifTrue:[^Setnew:2].newSet_Setnew:(size_selfbasicSize).index_0.[(index_index\u002B1)\u003C=size]whileTrue:[(element_selfbasicAt:index)==nilifFalse:[newSetadd:(aBlockvalue:element)]].^newSet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 21 B6 89 00 03 43 7D 7D E2 6A 43 88 81 60 04 87 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "Setnew"
+        },
+        {
+          "Value": "newSet"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlocktally=0ifTrue:[^self].1to:selfbasicSizedo:[:index|(selfbasicAt:index)==nilifFalse:[aBlockvalue:(selfbasicAt:index)]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 03 70 7D 7D E1 69 22 44 E3 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "selfbasicSizedo"
+        }
+      ]
+    },
+    {
+      "Selector": "find:ifAbsent:",
+      "Source": "find:anObjectifAbsent:aBlock|index|index_selffindElementOrNil:anObject.(selfbasicAt:index)==nilifTrue:[^aBlockvalue]ifFalse:[^index]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "findElementOrNil:",
+      "Source": "findElementOrNil:anObject|indexlengthprobepass|length_selfbasicSize.pass_1.index_anObjecthash\\\\length\u002B1.[(probe_selfbasicAt:index)==nilor:[probe=anObject]]whileFalse:[(index_index\u002B1)\u003ElengthifTrue:[index_1.pass_pass\u002B1.pass\u003E2ifTrue:[^selfgrowfindElementOrNil:anObject]]].^index!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 88 81 60 06 87 6A 20 88 81 60 07 87 6A 48 46 BA 20 B0 88 81 60 03 87 6A 89 00 08 49 88 81 60 0A 87 D3 7D 4B C6 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "length"
+        },
+        {
+          "Value": "pass"
+        },
+        {
+          "Value": "anObjecthash"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "probe"
+        },
+        {
+          "Value": "nilor"
+        }
+      ]
+    },
+    {
+      "Selector": "fixCollisionsFrom:",
+      "Source": "fixCollisionsFrom:index|myLengtholdIndexnextIndexnextObject|oldIndex_index.myLength_selfbasicSize.[oldIndex_oldIndex\\\\myLength\u002B1.nextObject_selfbasicAt:oldIndex.nextObject==nil]whileFalse:[nextIndex_selffindElementOrNil:nextObject.nextIndex=oldIndexifFalse:[selfbasicAt:nextIndexput:nextObject.selfbasicAt:oldIndexput:nil]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 81 60 03 87 6A 45 88 81 60 06 87 6A 89 00 12 43 46 BA 22 B0 88 81 60 03 87 6A 47 88 81 60 08 87 7D D3 6A 48 29 C6 7C",
+      "Literals": [
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "oldIndex"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "myLength"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "nextObject"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "fullCheck",
+      "Source": "fullCheckselfbasicSize-selfsize\u003C=(selfbasicSize//4)ifTrue:[selfgrow]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 22 BD B4 89 00 02 45 7D E3 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "//"
+        },
+        4,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "selfgrow"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow|newSelf|newSelf_selfspeciesnew:selfbasicSize\u002BselfgrowSize.selfdo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "includes:",
+      "Source": "includes:anObject^(selfbasicAt:(selffindElementOrNil:anObject))~~nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "noCheckAdd:",
+      "Source": "noCheckAdd:anObjectselfbasicAt:(selffindElementOrNil:anObject)put:anObject.tally_tally\u002B1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "selffindElementOrNil"
+        }
+      ]
+    },
+    {
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf:anObject(selfincludes:anObject)ifTrue:[^1]ifFalse:[^0]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "selfincludes"
+        }
+      ]
+    },
+    {
+      "Selector": "rehash",
+      "Source": "rehash|newSelf|newSelf_selfspeciesnew:selfbasicSize.selfdo:[:each|newSelfnoCheckAdd:each].selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:oldObjectifAbsent:aBlock|index|index_selffind:oldObjectifAbsent:[^aBlockvalue].selfbasicAt:indexput:nil.tally_tally-1.selffixCollisionsFrom:index.^oldObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "aBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "setTally",
+      "Source": "setTallytally_0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size^tally!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "swap:with:",
+      "Source": "swap:oneElementwith:otherElement|save|save_selfbasicAt:oneElement.selfbasicAt:oneElementput:(selfbasicAt:otherElement).selfbasicAt:otherElementput:save!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "otherElement"
+        },
+        {
+          "Value": "save"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "new^selfnew:2!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "new:",
+      "Source": "new:anInteger^(supernew:(anIntegermax:1))setTally!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 21,
+    "SuccessfullyCompiled": 21,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:19.1423341Z"
+  }
+}

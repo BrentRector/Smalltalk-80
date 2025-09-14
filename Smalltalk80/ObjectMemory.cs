@@ -1,16 +1,37 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 /// <summary>
-/// Provides a very small object table used to assign and resolve object pointers.
+/// Manages the Smalltalk object memory with manual garbage collection support.
+/// Uses Option D: Explicit memory management with manual GC while maintaining
+/// full support for become: and instance enumeration.
 /// </summary>
 public static class ObjectMemory
 {
-    private static readonly List<SmalltalkObject> objects = new();
-
+    // Object table - uses array for O(1) access by OOP
+    private static SmalltalkObject?[] objects = new SmalltalkObject?[65536]; // Initial capacity
+    private static int nextFreeIndex = 0;
+    private static readonly Queue<int> freeList = new();
+    
+    // GC roots - objects that should never be collected
+    private static readonly HashSet<SmalltalkObject> permanentRoots = new();
+    private static readonly HashSet<SmalltalkObject> transientRoots = new();
+    
+    // GC configuration
+    private const int HIGH_WATER_MARK = 50000;  // Trigger GC when this many objects allocated
+    private const int LOW_FREE_COUNT = 1000;    // Trigger GC when free list below this
+    private const int GROWTH_FACTOR = 2;        // How much to grow object table when full
+    
+    // GC statistics
+    private static int totalAllocations = 0;
+    private static int totalCollections = 0;
+    private static int totalObjectsFreed = 0;
+    private static DateTime lastGCTime = DateTime.MinValue;
+    
     /// <summary>Gets a read-only view of all registered objects.</summary>
-    public static IReadOnlyList<SmalltalkObject> Objects => objects;
+    public static IReadOnlyList<SmalltalkObject?> Objects => objects;
     
     /// <summary>The singleton nil object (instance of UndefinedObject).</summary>
     public static SmalltalkObject? NilObject { get; set; }
@@ -20,24 +41,277 @@ public static class ObjectMemory
     
     /// <summary>The singleton false object (instance of False).</summary>
     public static SmalltalkObject? FalseObject { get; set; }
+    
+    /// <summary>Gets the current number of allocated objects.</summary>
+    public static int AllocatedObjectCount => nextFreeIndex - freeList.Count;
+    
+    /// <summary>Gets the total number of GC collections performed.</summary>
+    public static int GCCollectionCount => totalCollections;
+    
+    /// <summary>Gets the total number of objects freed by GC.</summary>
+    public static int TotalObjectsFreed => totalObjectsFreed;
 
     /// <summary>
-    /// Registers a new object with the object table assigning it an <c>oop</c> value.
+    /// Registers a new object with the object table assigning it an OOP value.
+    /// May trigger garbage collection if memory pressure is high.
     /// </summary>
     /// <param name="obj">The object to register.</param>
     internal static void Register(SmalltalkObject obj)
     {
-        int index = objects.Count;
-        objects.Add(obj);
+        int index;
+        
+        // Try to reuse a freed slot first
+        if (freeList.Count > 0)
+        {
+            index = freeList.Dequeue();
+            objects[index] = obj;
+        }
+        else
+        {
+            // Need a new slot
+            if (nextFreeIndex >= objects.Length)
+            {
+                // Grow the object table
+                GrowObjectTable();
+            }
+            
+            index = nextFreeIndex++;
+            objects[index] = obj;
+        }
+        
         obj.Oop = index << 1;
+        totalAllocations++;
+        
+        // Check if we should trigger GC
+        if (ShouldTriggerGC())
+        {
+            ManualGC();
+        }
+    }
+    
+    /// <summary>
+    /// Grows the object table when it's full.
+    /// </summary>
+    private static void GrowObjectTable()
+    {
+        int newSize = objects.Length * GROWTH_FACTOR;
+        var newArray = new SmalltalkObject?[newSize];
+        Array.Copy(objects, newArray, objects.Length);
+        objects = newArray;
+        
+        Console.WriteLine($"[ObjectMemory] Grew object table from {objects.Length / GROWTH_FACTOR} to {newSize}");
+    }
+    
+    /// <summary>
+    /// Determines if garbage collection should be triggered.
+    /// </summary>
+    private static bool ShouldTriggerGC()
+    {
+        // Don't GC too frequently
+        if ((DateTime.Now - lastGCTime).TotalSeconds < 1.0)
+            return false;
+            
+        return AllocatedObjectCount > HIGH_WATER_MARK || 
+               freeList.Count < LOW_FREE_COUNT;
+    }
+
+    /// <summary>
+    /// Adds a permanent root object that will never be garbage collected.
+    /// Use for system objects like classes, Smalltalk dictionary, etc.
+    /// </summary>
+    public static void AddPermanentRoot(SmalltalkObject obj)
+    {
+        permanentRoots.Add(obj);
+    }
+    
+    /// <summary>
+    /// Removes a permanent root, allowing it to be collected if unreachable.
+    /// </summary>
+    public static void RemovePermanentRoot(SmalltalkObject obj)
+    {
+        permanentRoots.Remove(obj);
+    }
+    
+    /// <summary>
+    /// Adds a transient root object (e.g., current execution context).
+    /// These are cleared after execution completes.
+    /// </summary>
+    public static void AddTransientRoot(SmalltalkObject obj)
+    {
+        transientRoots.Add(obj);
+    }
+    
+    /// <summary>
+    /// Clears all transient roots. Call after method execution completes.
+    /// </summary>
+    public static void ClearTransientRoots()
+    {
+        transientRoots.Clear();
+    }
+    
+    /// <summary>
+    /// Performs manual garbage collection using mark-and-sweep algorithm.
+    /// Returns the number of objects freed.
+    /// </summary>
+    public static int ManualGC()
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var reachable = new HashSet<int>();
+        
+        // Phase 1: Mark all reachable objects from roots
+        foreach (var root in permanentRoots)
+        {
+            if (root != null)
+                MarkReachable(root, reachable);
+        }
+        
+        foreach (var root in transientRoots)
+        {
+            if (root != null)
+                MarkReachable(root, reachable);
+        }
+        
+        // Always mark the special objects as roots
+        if (NilObject != null) MarkReachable(NilObject, reachable);
+        if (TrueObject != null) MarkReachable(TrueObject, reachable);
+        if (FalseObject != null) MarkReachable(FalseObject, reachable);
+        
+        // Mark the Smalltalk system dictionary if it exists
+        var smalltalkDict = FindSystemDictionary();
+        if (smalltalkDict != null)
+            MarkReachable(smalltalkDict, reachable);
+        
+        // Phase 2: Sweep unreachable objects
+        int freedCount = 0;
+        for (int i = 0; i < nextFreeIndex; i++)
+        {
+            if (objects[i] != null && !reachable.Contains(i))
+            {
+                objects[i] = null;
+                freeList.Enqueue(i);
+                freedCount++;
+            }
+        }
+        
+        // Update statistics
+        totalCollections++;
+        totalObjectsFreed += freedCount;
+        lastGCTime = DateTime.Now;
+        
+        stopwatch.Stop();
+        
+        // Log GC results if significant
+        if (freedCount > 0 || stopwatch.ElapsedMilliseconds > 100)
+        {
+            Console.WriteLine($"[GC] Collection #{totalCollections}: Freed {freedCount} objects in {stopwatch.ElapsedMilliseconds}ms. " +
+                            $"Live objects: {AllocatedObjectCount}, Total freed: {totalObjectsFreed}");
+        }
+        
+        return freedCount;
+    }
+    
+    /// <summary>
+    /// Marks an object and all objects reachable from it.
+    /// </summary>
+    private static void MarkReachable(SmalltalkObject obj, HashSet<int> reachable)
+    {
+        if (obj == null) return;
+        
+        int index = obj.Oop >> 1;
+        if (reachable.Contains(index))
+            return; // Already marked
+            
+        reachable.Add(index);
+        
+        // Mark the class pointer
+        if (obj.ClassPointer != null)
+            MarkReachable(obj.ClassPointer, reachable);
+        
+        // Mark all fields
+        foreach (var field in obj.Fields)
+        {
+            if (field is SmalltalkObject fieldObj)
+                MarkReachable(fieldObj, reachable);
+        }
+    }
+    
+    /// <summary>
+    /// Attempts to find the Smalltalk system dictionary.
+    /// </summary>
+    private static SmalltalkObject? FindSystemDictionary()
+    {
+        // Look for an object that might be the Smalltalk dictionary
+        // This is typically a SystemDictionary instance
+        for (int i = 0; i < nextFreeIndex; i++)
+        {
+            var obj = objects[i];
+            if (obj?.ClassPointer != null)
+            {
+                // Check if this might be SystemDictionary
+                var className = TryGetClassName(obj.ClassPointer);
+                if (className == "SystemDictionary")
+                    return obj;
+            }
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Try to get a class name for debugging/logging.
+    /// </summary>
+    private static string? TryGetClassName(SmalltalkObject cls)
+    {
+        // This is a simplified version - you might have a better way
+        // to get class names in your implementation
+        if (cls.Fields.Length > 6 && cls.Fields[6] is string name)
+            return name;
+        return null;
+    }
+    
+    /// <summary>
+    /// Forces a full garbage collection regardless of thresholds.
+    /// Use sparingly as this can be expensive.
+    /// </summary>
+    public static void ForceGC()
+    {
+        Console.WriteLine("[GC] Forced collection requested");
+        ManualGC();
+    }
+    
+    /// <summary>
+    /// Gets memory statistics for monitoring.
+    /// </summary>
+    public static (int allocated, int free, int total, int collections) GetMemoryStats()
+    {
+        return (
+            allocated: AllocatedObjectCount,
+            free: freeList.Count,
+            total: nextFreeIndex,
+            collections: totalCollections
+        );
     }
 
     /// <summary>Clears the object table. Primarily used for tests.</summary>
-    public static void Reset() => objects.Clear();
+    public static void Reset()
+    {
+        Array.Clear(objects, 0, nextFreeIndex);
+        nextFreeIndex = 0;
+        freeList.Clear();
+        permanentRoots.Clear();
+        transientRoots.Clear();
+        totalAllocations = 0;
+        totalCollections = 0;
+        totalObjectsFreed = 0;
+        lastGCTime = DateTime.MinValue;
+    }
 
     /// <summary>Determines whether an object exists for the specified pointer.</summary>
     /// <param name="oop">The encoded object pointer.</param>
-    public static bool HasObject(int oop) => (oop >> 1) >= 0 && (oop >> 1) < objects.Count;
+    public static bool HasObject(int oop)
+    {
+        int index = oop >> 1;
+        return index >= 0 && index < objects.Length && objects[index] != null;
+    }
 
     /// <summary>Resolves an encoded pointer to the corresponding object.</summary>
     /// <param name="oop">The encoded object pointer.</param>
@@ -45,7 +319,7 @@ public static class ObjectMemory
     public static SmalltalkObject? FromOop(int oop)
     {
         int index = oop >> 1;
-        return index >= 0 && index < objects.Count ? objects[index] : null;
+        return (index >= 0 && index < objects.Length) ? objects[index] : null;
     }
 
     /// <summary>Obtains the encoded pointer for the specified object.</summary>
@@ -55,11 +329,20 @@ public static class ObjectMemory
 
     /// <summary>
     /// Finds an arbitrary instance of the given class if one exists.
+    /// Note: This skips over freed slots for efficiency.
     /// </summary>
     /// <param name="cls">The class to search for.</param>
     /// <returns>The first instance found or <c>null</c>.</returns>
     public static SmalltalkObject? SomeInstance(SmalltalkObject cls)
-        => objects.FirstOrDefault(o => ReferenceEquals(o.ClassPointer, cls));
+    {
+        for (int i = 0; i < nextFreeIndex; i++)
+        {
+            var obj = objects[i];
+            if (obj != null && ReferenceEquals(obj.ClassPointer, cls))
+                return obj;
+        }
+        return null;
+    }
 
     /// <summary>
     /// Returns the instance following the specified object in enumeration order.
@@ -70,18 +353,20 @@ public static class ObjectMemory
     {
         int start = obj.Oop >> 1;
         var cls = obj.ClassPointer;
-        for (int i = start + 1; i < objects.Count; i++)
+        
+        for (int i = start + 1; i < nextFreeIndex; i++)
         {
             var candidate = objects[i];
-            if (ReferenceEquals(candidate.ClassPointer, cls))
+            if (candidate != null && ReferenceEquals(candidate.ClassPointer, cls))
                 return candidate;
         }
-
+        
         return null;
     }
 
     /// <summary>
     /// Swaps the identity of two objects and updates all references.
+    /// This operation is expensive as it must scan all live objects.
     /// </summary>
     /// <param name="a">The first object.</param>
     /// <param name="b">The second object.</param>
@@ -90,15 +375,26 @@ public static class ObjectMemory
         int indexA = a.Oop >> 1;
         int indexB = b.Oop >> 1;
 
+        // Swap in object table
         (objects[indexA], objects[indexB]) = (objects[indexB], objects[indexA]);
         (a.Oop, b.Oop) = (b.Oop, a.Oop);
 
-        foreach (var obj in objects)
+        // Update all references in all live objects
+        for (int i = 0; i < nextFreeIndex; i++)
         {
-            for (int i = 0; i < obj.Fields.Length; i++)
+            var obj = objects[i];
+            if (obj != null)
             {
-                if (ReferenceEquals(obj.Fields[i], a)) obj.Fields[i] = b;
-                else if (ReferenceEquals(obj.Fields[i], b)) obj.Fields[i] = a;
+                // Update class pointer if needed
+                if (ReferenceEquals(obj.ClassPointer, a)) obj.ClassPointer = b;
+                else if (ReferenceEquals(obj.ClassPointer, b)) obj.ClassPointer = a;
+                
+                // Update fields
+                for (int j = 0; j < obj.Fields.Length; j++)
+                {
+                    if (ReferenceEquals(obj.Fields[j], a)) obj.Fields[j] = b;
+                    else if (ReferenceEquals(obj.Fields[j], b)) obj.Fields[j] = a;
+                }
             }
         }
     }
@@ -109,11 +405,40 @@ public static class ObjectMemory
     /// </summary>
     public static void ReplaceObject(int oop, SmalltalkObject newObject)
     {
-        if (oop >= 0 && oop < objects.Count)
+        int index = oop >> 1;
+        if (index >= 0 && index < objects.Length)
         {
-            var oldObject = objects[oop];
-            objects[oop] = newObject;
+            var oldObject = objects[index];
+            objects[index] = newObject;
             newObject.Oop = oop; // Ensure the new object has the correct OOP
         }
+    }
+    
+    /// <summary>
+    /// Enumerates all live objects. Used for debugging and statistics.
+    /// </summary>
+    public static IEnumerable<SmalltalkObject> EnumerateLiveObjects()
+    {
+        for (int i = 0; i < nextFreeIndex; i++)
+        {
+            var obj = objects[i];
+            if (obj != null)
+                yield return obj;
+        }
+    }
+    
+    /// <summary>
+    /// Gets the number of objects of a specific class.
+    /// </summary>
+    public static int CountInstancesOf(SmalltalkObject cls)
+    {
+        int count = 0;
+        for (int i = 0; i < nextFreeIndex; i++)
+        {
+            var obj = objects[i];
+            if (obj != null && ReferenceEquals(obj.ClassPointer, cls))
+                count++;
+        }
+        return count;
     }
 }

@@ -966,6 +966,7 @@ public class JsonBootstrapExecutor
                 {
                     Console.WriteLine($"[DEBUG] Setting ObjectMemory.NilObject to object with OOP {oop}");
                     ObjectMemory.NilObject = nilObj;
+                    ObjectMemory.AddPermanentRoot(nilObj); // nil is always reachable
                     vm.PrimitiveRegisterGlobal("nil", oop);
                     BootstrapLog($"[BOOTSTRAP] Registered nil singleton with OOP {oop}");
                 }
@@ -976,6 +977,7 @@ public class JsonBootstrapExecutor
                 if (trueObj != null)
                 {
                     ObjectMemory.TrueObject = trueObj;
+                    ObjectMemory.AddPermanentRoot(trueObj); // true is always reachable
                     vm.PrimitiveRegisterGlobal("true", oop);
                     BootstrapLog($"[BOOTSTRAP] Registered true singleton");
                 }
@@ -986,6 +988,7 @@ public class JsonBootstrapExecutor
                 if (falseObj != null)
                 {
                     ObjectMemory.FalseObject = falseObj;
+                    ObjectMemory.AddPermanentRoot(falseObj); // false is always reachable
                     vm.PrimitiveRegisterGlobal("false", oop);
                     BootstrapLog($"[BOOTSTRAP] Registered false singleton");
                 }
@@ -1311,10 +1314,18 @@ public class JsonBootstrapExecutor
             namedObjects[classDef.Name] = classOop;
             vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
             
+            // Register class as permanent root - classes should never be GC'd
+            var classObj = ObjectMemory.FromOop(classOop);
+            if (classObj != null) ObjectMemory.AddPermanentRoot(classObj);
+            
             // Create the metaclass
             metaclassOop = vm.PrimitiveNewMetaclass();
             namedObjects[metaclassName] = metaclassOop;
             vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
+            
+            // Register metaclass as permanent root
+            var metaclassObj = ObjectMemory.FromOop(metaclassOop);
+            if (metaclassObj != null) ObjectMemory.AddPermanentRoot(metaclassObj);
             
         }
         else

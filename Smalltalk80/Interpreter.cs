@@ -100,16 +100,40 @@ public class Interpreter
     public void Execute()
     {
         IsRunning = true;
+        
+        // Track current context as transient root for GC
+        if (currentContext?.Receiver != null)
+        {
+            ObjectMemory.AddTransientRoot(currentContext.Receiver);
+        }
+        
         try
         {
+            int bytecodesSinceGC = 0;
+            const int GC_CHECK_INTERVAL = 10000; // Check every 10k bytecodes
+            
             while (IsRunning)
             {
                 // Check for process switches at the start of each cycle
                 // as specified in the Smalltalk-80 interpreter specification
                 Scheduler?.CheckProcessSwitch();
 
+                if (currentContext?.Method == null)
+                    throw new InvalidOperationException("Context or method is null");
                 var opcode = (Bytecode)currentContext.Method.Bytecodes[currentContext.PC++];
                 Dispatch(opcode);
+                
+                // Periodically check if GC should run
+                if (++bytecodesSinceGC >= GC_CHECK_INTERVAL)
+                {
+                    bytecodesSinceGC = 0;
+                    // The ManualGC will only run if thresholds are exceeded
+                    // This is a cheap check that doesn't impact performance
+                    if (ObjectMemory.AllocatedObjectCount > 40000)
+                    {
+                        ObjectMemory.ManualGC();
+                    }
+                }
             }
         }
         catch (NonLocalReturnException ex)
@@ -117,6 +141,11 @@ public class Interpreter
             // Handle non-local returns by setting the result and stopping execution
             LastResult = ex.ReturnValue;
             IsRunning = false;
+        }
+        finally
+        {
+            // Clear transient roots when execution completes
+            ObjectMemory.ClearTransientRoots();
         }
     }
 
@@ -247,28 +276,8 @@ public class Interpreter
             Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
         }
         
-        // Special handling for bytecode 10: Method Lookup
-        if ((byte)bytecode == 10)
-        {
-            // OP_LOOKUP_METHOD: Pop selector and receiver, lookup method, push result
-            var selector = currentContext.Stack.Pop() as Symbol;
-            var receiver = currentContext.Stack.Pop() as SmalltalkObject;
-            
-            if (selector != null && receiver != null && receiver.ClassPointer != null)
-            {
-                var method = receiver.ClassPointer.Lookup(selector);
-                currentContext.Stack.Push(method);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Method lookup requires Symbol selector and SmalltalkObject receiver with valid class");
-            }
-        }
-        else
-        {
-            // Use the Blue Book compatible dispatcher for all other bytecodes
-            BytecodeDispatcher.Dispatch(this, (byte)bytecode);
-        }
+        // Use the Blue Book compatible dispatcher for all bytecodes
+        BytecodeDispatcher.Dispatch(this, (byte)bytecode);
     }
 
     /// <summary>
@@ -302,6 +311,10 @@ public class Interpreter
                 };
             }
             LastResult = returnValue;
+            
+            // Clear transient roots when returning from top-level
+            ObjectMemory.ClearTransientRoots();
+            
             if (ExitOnReturn)
             {
                 Console.WriteLine($"Returned: {returnValue}");
@@ -313,6 +326,13 @@ public class Interpreter
         {
             currentContext = currentContext.Sender;
             currentContext.Stack.Push(returnValue);
+            
+            // Update transient root to new current context
+            if (currentContext?.Receiver != null)
+            {
+                ObjectMemory.ClearTransientRoots();
+                ObjectMemory.AddTransientRoot(currentContext.Receiver);
+            }
         }
     }
 

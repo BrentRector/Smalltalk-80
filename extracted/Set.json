@@ -1,0 +1,582 @@
+{
+  "ClassName": "Set",
+  "Superclass": "Collection",
+  "InstanceVariables": [
+    "tally"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Unordered",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add: newObject \r\n\t| index |\r\n\tnewObject == nil ifTrue: [^newObject].\r\n\tindex _ self findElementOrNil: newObject.\r\n\t(self basicAt: index) == nil ifTrue: [self atNewIndex: index put: newObject].\r\n\t^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 25 C6 89 00 03 10 7D 7D E1 6A 70 10 E2 88 69 6A 70 11 E3 25 C6 89 00 05 70 11 10 F4 7D E1 6A 10 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "findElementOrNil:"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "atNewIndex:put:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at: index\r\n\tself errorNotKeyed!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "errorNotKeyed"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at: index put: anObject\r\n\tself errorNotKeyed!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "errorNotKeyed"
+        }
+      ]
+    },
+    {
+      "Selector": "atNewIndex:put:",
+      "Source": "atNewIndex: index put: anObject \r\n\tself basicAt: index put: anObject.\r\n\ttally _ tally \u002B 1.\r\n\tself fullCheck!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 11 F0 6A 00 22 B0 88 60 6A 70 D3 7C",
+      "Literals": [
+        {
+          "Value": "basicAt:put:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "fullCheck"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect: aBlock \r\n\t\u0022Evaluate aBlock with each of the receiver\u0027s elements as the argument.  Collect the \r\n\tresulting values into another Set.  Answer the new Set.  We override the general\r\n\tmethod, so that we make a big enough set and avoid growing. \u0022\r\n\r\n\t| newSet size index element |\r\n\ttally = 0 ifTrue: [^Set new: 2].\r\n\tnewSet _ Set new: (size _ self basicSize).\r\n\tindex _ 0.\r\n\t[(index _ index \u002B 1) \u003C= size] whileTrue:\r\n\t\t[(element _ self basicAt: index) == nil ifFalse:\r\n\t\t\t[newSet add: (aBlock value: element)]].\r\n\t^newSet!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 5,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 21 B6 89 00 05 4F 24 CD 7D 7D E2 6D 4F 70 D5 88 6A CD 88 69 6D 21 88 6B 6D 89 00 08 13 27 B0 88 6B 12 B4 7D 89 00 12 70 13 EA 88 6C 30 C6 89 00 06 11 10 14 CA ED 7D EC 7D E9 6D 11 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "new:"
+        },
+        2,
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "add:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "Set"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do: aBlock \r\n\ttally = 0 ifTrue: [^self].\r\n\t1 to: self basicSize do: \r\n\t\t[:index | \r\n\t\t(self basicAt: index) == nil ifFalse: [aBlock value: (self basicAt: index)]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 21 B6 89 00 03 70 7D 7D E2 69 23 70 D5 89 00 10 70 4A E6 2B C6 89 00 06 10 70 4A E6 CA 7D E8 7D F4 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        1,
+        {
+          "Value": "to:do:"
+        },
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "index"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "find:ifAbsent:",
+      "Source": "find: anObject ifAbsent: aBlock \r\n\t| index |\r\n\tindex _ self findElementOrNil: anObject.\r\n\t(self basicAt: index) == nil\r\n\t\tifTrue: [^aBlock value]\r\n\t\tifFalse: [^index]!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 88 6A 6B 70 12 E1 25 C6 89 00 04 11 C9 7D 7D 89 00 03 12 7D 7D F3 7C",
+      "Literals": [
+        {
+          "Value": "findElementOrNil:"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "value"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "findElementOrNil:",
+      "Source": "findElementOrNil: anObject \r\n\t| index length probe pass |\r\n\tlength _ self basicSize.\r\n\tpass _ 1.\r\n\tindex _ anObject hash \\\\ length \u002B 1.\r\n\t[(probe _ self basicAt: index) == nil or: [probe = anObject]]\r\n\t\twhileFalse: [(index _ index \u002B 1) \u003E length\r\n\t\t\t\tifTrue: \r\n\t\t\t\t\t[index _ 1.\r\n\t\t\t\t\tpass _ pass \u002B 1.\r\n\t\t\t\t\tpass \u003E 2 ifTrue: [^self grow findElementOrNil: anObject]]].\r\n\t^index!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 5,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 88 6A 6D 21 88 6C 6D 10 D2 12 BA 21 B0 88 69 6D 89 00 10 70 11 E5 88 6B 2F C6 89 00 04 13 10 B6 7D E7 7D 89 00 24 11 21 B0 88 69 12 B3 89 00 18 21 88 69 6D 14 21 B0 88 6C 6D 14 2C B3 89 00 06 70 DD 10 EE 7D 7D EB 7D EB 7D E9 6D 11 7C",
+      "Literals": [
+        {
+          "Value": "basicSize"
+        },
+        1,
+        {
+          "Value": "hash"
+        },
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        2,
+        {
+          "Value": "grow"
+        },
+        {
+          "Value": "findElementOrNil:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "fixCollisionsFrom:",
+      "Source": "fixCollisionsFrom: index \r\n\t| myLength oldIndex nextIndex nextObject |\r\n\toldIndex _ index.\r\n\tmyLength _ self basicSize.\r\n\t[oldIndex _ oldIndex \\\\ myLength \u002B 1.\r\n\tnextObject _ self basicAt: oldIndex.\r\n\tnextObject == nil]\r\n\t\twhileFalse: \r\n\t\t\t[nextIndex _ self findElementOrNil: nextObject.\r\n\t\t\tnextIndex = oldIndex\r\n\t\t\t\tifFalse: \r\n\t\t\t\t\t[self basicAt: nextIndex put: nextObject.\r\n\t\t\t\t\tself basicAt: oldIndex put: nil]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 5,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 6A 6D 70 D0 88 69 6D 89 00 12 12 11 BA 23 B0 88 6A 6D 70 12 E4 88 6C 6D 14 2B C6 7D 89 00 18 70 14 E7 88 6B 6D 13 12 B6 89 00 0A 70 13 14 FA 6D 70 12 2B FA 7D E9 7D E6 7C",
+      "Literals": [
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "\\\\"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "findElementOrNil:"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "basicAt:put:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "fullCheck",
+      "Source": "fullCheck\r\n\tself basicSize - self size \u003C= (self basicSize // 4) ifTrue: [self grow]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 C2 70 B1 70 D0 25 BD B4 89 00 03 70 D7 7D E6 7C",
+      "Literals": [
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "//"
+        },
+        4,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "grow"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow\r\n\t\u0022The receiver becomes twice as big--this is not a copy of the receiver, so all shared references survive.\u0022\r\n\r\n\t| newSelf |\r\n\tnewSelf _ self species new: self basicSize \u002B self growSize.\r\n\tself do: [:each | newSelf noCheckAdd: each].\r\n\tself become: newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 70 D2 D4 70 B0 CD 88 68 69 70 89 00 04 10 48 E6 7D CB 69 70 10 E7 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "growSize"
+        },
+        {
+          "Value": "do:"
+        },
+        {
+          "Value": "noCheckAdd:"
+        },
+        {
+          "Value": "become:"
+        },
+        {
+          "Value": "each"
+        }
+      ]
+    },
+    {
+      "Selector": "includes:",
+      "Source": "includes: anObject \r\n\t^(self basicAt: (self findElementOrNil: anObject)) ~~ nil!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 70 10 E1 E0 23 E2 7C",
+      "Literals": [
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "findElementOrNil:"
+        },
+        {
+          "Value": "~~"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "noCheckAdd:",
+      "Source": "noCheckAdd: anObject \r\n\tself basicAt: (self findElementOrNil: anObject)\r\n\t\tput: anObject.\r\n\ttally _ tally \u002B 1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 70 10 E1 10 F0 69 00 23 B0 88 60 7C",
+      "Literals": [
+        {
+          "Value": "basicAt:put:"
+        },
+        {
+          "Value": "findElementOrNil:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1
+      ]
+    },
+    {
+      "Selector": "occurrencesOf:",
+      "Source": "occurrencesOf: anObject \r\n\t(self includes: anObject)\r\n\t\tifTrue: [^1]\r\n\t\tifFalse: [^0]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 89 00 03 22 7D 7D 89 00 03 23 7D 7D F1 7C",
+      "Literals": [
+        {
+          "Value": "includes:"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        1,
+        0
+      ]
+    },
+    {
+      "Selector": "rehash",
+      "Source": "rehash\r\n\t| newSelf |\r\n\tnewSelf _ self species new: self basicSize.\r\n\tself do: [:each | newSelf noCheckAdd: each].\r\n\tself become: newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 70 D2 CD 88 68 69 70 89 00 04 10 46 E4 7D CB 69 70 10 E5 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "basicSize"
+        },
+        {
+          "Value": "do:"
+        },
+        {
+          "Value": "noCheckAdd:"
+        },
+        {
+          "Value": "become:"
+        },
+        {
+          "Value": "each"
+        }
+      ]
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove: oldObject ifAbsent: aBlock \r\n\t| index |\r\n\tindex _ self find: oldObject ifAbsent: [^aBlock value].\r\n\tself basicAt: index put: nil.\r\n\ttally _ tally - 1.\r\n\tself fixCollisionsFrom: index.\r\n\t^oldObject!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 89 00 04 11 C9 7D 7D F0 88 6A 6B 70 12 26 F2 6B 00 24 B1 88 60 6B 70 12 E5 6B 10 7C",
+      "Literals": [
+        {
+          "Value": "find:ifAbsent:"
+        },
+        {
+          "Value": "value"
+        },
+        {
+          "Value": "basicAt:put:"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "fixCollisionsFrom:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "setTally",
+      "Source": "setTally\r\n\ttally _ 0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 60 7C",
+      "Literals": [
+        0
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size\r\n\t^tally!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "swap:with:",
+      "Source": "swap: oneElement with: otherElement \r\n\t| save |\r\n\tsave _ self basicAt: oneElement.\r\n\tself basicAt: oneElement put: (self basicAt: otherElement).\r\n\tself basicAt: otherElement put: save!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 88 6A 6B 70 10 70 11 E0 F1 6B 70 11 12 F1 7C",
+      "Literals": [
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "basicAt:put:"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "new\r\n\t^self new: 2!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 CD 7C",
+      "Literals": [
+        {
+          "Value": "new:"
+        },
+        2
+      ]
+    },
+    {
+      "Selector": "new:",
+      "Source": "new: anInteger \r\n\t^(super new: (anInteger max: 1)) setTally!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 22 E1 CD D3 7C",
+      "Literals": [
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "max:"
+        },
+        1,
+        {
+          "Value": "setTally"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 21,
+    "SuccessfullyCompiled": 21,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:53.3423474Z"
+  }
+}

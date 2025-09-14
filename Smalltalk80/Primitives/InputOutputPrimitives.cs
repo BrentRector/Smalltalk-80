@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Smalltalk80;
 
@@ -122,7 +123,7 @@ public static class InputOutputPrimitives
         _ = ctx.Stack.Pop();
         try
         {
-            ObjectImage.Save("snapshot.json", new List<SmalltalkObject>(ObjectMemory.Objects));
+            ObjectImage.Save("snapshot.json", new List<SmalltalkObject>(ObjectMemory.Objects.Where(o => o != null)!));
             ctx.Stack.Push(true);
             return true;
         }

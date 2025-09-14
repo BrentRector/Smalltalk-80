@@ -1,13 +1,38 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Smalltalk80.Compiler;
 
 namespace Smalltalk80.ExtractClass
 {
+    /// <summary>
+    /// Represents basic class information from the system image.
+    /// </summary>
+    public class ClassInfo
+    {
+        public string Name { get; set; } = "";
+        public string Superclass { get; set; } = "Object";
+        public List<string> InstanceVariables { get; set; } = new();
+        public List<string> ClassVariables { get; set; } = new();
+        public List<string> PoolDictionaries { get; set; } = new();
+        public string? Category { get; set; }
+    }
+    
+    /// <summary>
+    /// Represents basic method information from the system image.
+    /// </summary>
+    public class MethodInfo
+    {
+        public string Selector { get; set; } = "";
+        public string Source { get; set; } = "";
+        public bool IsClassMethod { get; set; }
+        public string? Category { get; set; }
+    }
+    
     /// <summary>
     /// Represents an extracted Smalltalk class with full bytecode compilation.
     /// </summary>
@@ -72,11 +97,37 @@ namespace Smalltalk80.ExtractClass
     /// </summary>
     public class ClassExtractor
     {
-        private readonly BytecodeCompiler bytecodeCompiler;
+        private readonly string compilerPath;
         
         public ClassExtractor()
         {
-            bytecodeCompiler = new BytecodeCompiler();
+            // Find the compiler executable
+            compilerPath = FindCompilerExecutable();
+        }
+        
+        private string FindCompilerExecutable()
+        {
+            // Look for the compiler in common locations
+            var possiblePaths = new[]
+            {
+                "Smalltalk80.Compiler.exe",
+                "./Smalltalk80.Compiler.exe",
+                "../Smalltalk80.Compiler/bin/Debug/net9.0/Smalltalk80.Compiler.exe",
+                "../Smalltalk80.Compiler/bin/Release/net9.0/Smalltalk80.Compiler.exe",
+                "./bin/Debug/net9.0/Smalltalk80.Compiler.exe",
+                "./bin/Release/net9.0/Smalltalk80.Compiler.exe"
+            };
+            
+            foreach (var path in possiblePaths)
+            {
+                if (File.Exists(path))
+                {
+                    return Path.GetFullPath(path);
+                }
+            }
+            
+            // Default to hoping it's in the PATH
+            return "Smalltalk80.Compiler";
         }
         
         /// <summary>
@@ -124,34 +175,94 @@ namespace Smalltalk80.ExtractClass
                     Statistics = new ExtractionStatistics()
                 };
                 
-                // Step 3: Compile each method
-                Console.WriteLine($"  Compiling {methods.Count} methods...");
-                var instanceVars = classInfo.InstanceVariables;
+                // Step 3: Generate Smalltalk source file
+                Console.WriteLine($"  Generating source for {methods.Count} methods...");
+                var sourceBuilder = GenerateClassSource(classInfo, methods);
+                
+                // Step 4: Write to temporary file and compile
+                var tempSourceFile = Path.GetTempFileName() + ".st";
+                var tempJsonFile = Path.ChangeExtension(tempSourceFile, ".json");
+                
                 int successCount = 0;
                 int failureCount = 0;
                 
-                foreach (var method in methods)
+                try
                 {
-                    try
+                    File.WriteAllText(tempSourceFile, sourceBuilder.ToString());
+                    Console.WriteLine($"  Compiling with Smalltalk80.Compiler...");
+                    
+                    // Run the compiler
+                    var startInfo = new ProcessStartInfo
                     {
-                        // Compile the method
-                        var compiledData = bytecodeCompiler.CompileMethod(method.Source, instanceVars);
+                        FileName = compilerPath,
+                        Arguments = $"\"{tempSourceFile}\" \"{tempJsonFile}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+                    
+                    using (var process = System.Diagnostics.Process.Start(startInfo))
+                    {
+                        if (process == null)
+                        {
+                            throw new Exception("Failed to start compiler process");
+                        }
                         
+                        var output = process.StandardOutput.ReadToEnd();
+                        var error = process.StandardError.ReadToEnd();
+                        process.WaitForExit();
+                        
+                        if (process.ExitCode != 0)
+                        {
+                            throw new Exception($"Compiler failed: {error}");
+                        }
+                    }
+                    
+                    // Read the compiled JSON
+                    if (!File.Exists(tempJsonFile))
+                    {
+                        throw new Exception("Compiler did not produce output file");
+                    }
+                    
+                    var compiledJson = File.ReadAllText(tempJsonFile);
+                    var compiledManifest = JsonSerializer.Deserialize<CompilerOutput>(compiledJson);
+                    
+                    if (compiledManifest == null || compiledManifest.Methods == null)
+                    {
+                        throw new Exception("Invalid compiler output");
+                    }
+                    
+                    // Convert compiler output to extracted methods
+                    
+                    foreach (var compiledMethod in compiledManifest.Methods)
+                    {
                         var extractedMethod = new ExtractedMethod
                         {
-                            Selector = method.Selector,
-                            Source = method.Source,
-                            Category = method.Category,
-                            ArgumentCount = compiledData.ArgumentCount,
-                            TemporaryCount = compiledData.TemporaryCount,
-                            Bytecode = BitConverter.ToString(compiledData.Bytecode).Replace("-", " "),
-                            Literals = compiledData.Literals,
-                            IsPrimitive = compiledData.IsPrimitive,
-                            PrimitiveNumber = compiledData.PrimitiveNumber
+                            Selector = compiledMethod.Selector,
+                            Source = "", // We'll need to match this from original methods
+                            Category = "",
+                            ArgumentCount = compiledMethod.NumArgs,
+                            TemporaryCount = compiledMethod.NumTemps,
+                            Bytecode = BitConverter.ToString(compiledMethod.Bytecode ?? Array.Empty<byte>()).Replace("-", " "),
+                            Literals = compiledMethod.Literals?.ToArray() ?? Array.Empty<object>(),
+                            IsPrimitive = compiledMethod.PrimitiveIndex > 0,
+                            PrimitiveNumber = compiledMethod.PrimitiveIndex
                         };
                         
+                        // Find the original method to get source and category
+                        var originalMethod = methods.FirstOrDefault(m => 
+                            m.Selector == compiledMethod.Selector && 
+                            m.IsClassMethod == compiledMethod.IsClassMethod);
+                        
+                        if (originalMethod != null)
+                        {
+                            extractedMethod.Source = originalMethod.Source;
+                            extractedMethod.Category = originalMethod.Category;
+                        }
+                        
                         // Add to appropriate collection
-                        if (method.IsClassMethod)
+                        if (compiledMethod.IsClassMethod)
                         {
                             extracted.ClassMethods.Add(extractedMethod);
                         }
@@ -161,34 +272,16 @@ namespace Smalltalk80.ExtractClass
                         }
                         
                         successCount++;
-                        Console.Write(".");
                     }
-                    catch (Exception ex)
-                    {
-                        // Add method with error information
-                        var failedMethod = new ExtractedMethod
-                        {
-                            Selector = method.Selector,
-                            Source = method.Source,
-                            Category = method.Category,
-                            CompilationError = ex.Message
-                        };
-                        
-                        if (method.IsClassMethod)
-                        {
-                            extracted.ClassMethods.Add(failedMethod);
-                        }
-                        else
-                        {
-                            extracted.InstanceMethods.Add(failedMethod);
-                        }
-                        
-                        failureCount++;
-                        Console.Write("x");
-                    }
+                    
+                    Console.WriteLine($"  Compiled {successCount} methods successfully");
                 }
-                
-                Console.WriteLine(); // New line after progress dots
+                finally
+                {
+                    // Clean up temp files
+                    if (File.Exists(tempSourceFile)) File.Delete(tempSourceFile);
+                    if (File.Exists(tempJsonFile)) File.Delete(tempJsonFile);
+                }
                 
                 // Update statistics
                 extracted.Statistics.TotalMethods = methods.Count;
@@ -306,6 +399,110 @@ namespace Smalltalk80.ExtractClass
                 Console.WriteLine($"Failed to extract: {string.Join(", ", failedClasses)}");
             }
         }
+        
+        /// <summary>
+        /// Generate Smalltalk source code for a class.
+        /// </summary>
+        private StringBuilder GenerateClassSource(ClassInfo classInfo, List<MethodInfo> methods)
+        {
+            var sb = new StringBuilder();
+            
+            // Generate class definition
+            sb.AppendLine($"{classInfo.Superclass} subclass: #{classInfo.Name}");
+            sb.AppendLine($"\tinstanceVariableNames: '{string.Join(" ", classInfo.InstanceVariables)}'");
+            sb.AppendLine($"\tclassVariableNames: '{string.Join(" ", classInfo.ClassVariables)}'");
+            sb.AppendLine($"\tpoolDictionaries: '{string.Join(" ", classInfo.PoolDictionaries)}'");
+            sb.AppendLine($"\tcategory: '{classInfo.Category ?? "System"}'");
+            sb.AppendLine("!");
+            sb.AppendLine();
+            
+            // Group methods by category and type
+            var instanceMethods = methods.Where(m => !m.IsClassMethod)
+                .GroupBy(m => m.Category ?? "accessing")
+                .OrderBy(g => g.Key);
+            
+            var classMethods = methods.Where(m => m.IsClassMethod)
+                .GroupBy(m => m.Category ?? "instance creation")
+                .OrderBy(g => g.Key);
+            
+            // Generate instance methods
+            foreach (var categoryGroup in instanceMethods)
+            {
+                sb.AppendLine($"!{classInfo.Name} methodsFor: '{categoryGroup.Key}'!");
+                sb.AppendLine();
+                
+                foreach (var method in categoryGroup.OrderBy(m => m.Selector))
+                {
+                    sb.AppendLine(method.Source);
+                    sb.AppendLine("!");
+                    sb.AppendLine();
+                }
+                
+                sb.AppendLine("!");
+                sb.AppendLine();
+            }
+            
+            // Generate class methods
+            foreach (var categoryGroup in classMethods)
+            {
+                sb.AppendLine($"!{classInfo.Name} class methodsFor: '{categoryGroup.Key}'!");
+                sb.AppendLine();
+                
+                foreach (var method in categoryGroup.OrderBy(m => m.Selector))
+                {
+                    sb.AppendLine(method.Source);
+                    sb.AppendLine("!");
+                    sb.AppendLine();
+                }
+                
+                sb.AppendLine("!");
+                sb.AppendLine();
+            }
+            
+            return sb;
+        }
+    }
+    
+    /// <summary>
+    /// Represents the output from the Smalltalk80.Compiler.
+    /// </summary>
+    internal class CompilerOutput
+    {
+        [JsonPropertyName("classes")]
+        public List<object>? Classes { get; set; }
+        
+        [JsonPropertyName("methods")]
+        public List<CompiledMethod>? Methods { get; set; }
+    }
+    
+    /// <summary>
+    /// Represents a compiled method from the compiler output.
+    /// </summary>
+    internal class CompiledMethod
+    {
+        [JsonPropertyName("class")]
+        public string Class { get; set; } = "";
+        
+        [JsonPropertyName("selector")]
+        public string Selector { get; set; } = "";
+        
+        [JsonPropertyName("bytecode")]
+        public byte[]? Bytecode { get; set; }
+        
+        [JsonPropertyName("literals")]
+        public List<object>? Literals { get; set; }
+        
+        [JsonPropertyName("primitiveIndex")]
+        public int PrimitiveIndex { get; set; }
+        
+        [JsonPropertyName("numArgs")]
+        public int NumArgs { get; set; }
+        
+        [JsonPropertyName("numTemps")]
+        public int NumTemps { get; set; }
+        
+        [JsonPropertyName("isClassMethod")]
+        public bool IsClassMethod { get; set; }
     }
     
     /// <summary>
@@ -323,6 +520,14 @@ namespace Smalltalk80.ExtractClass
         {
             writer.WriteStringValue($"#{value.Value}");
         }
+    }
+    
+    /// <summary>
+    /// Represents nil object for JSON conversion.
+    /// </summary>
+    public class NilObject
+    {
+        public override string ToString() => "nil";
     }
     
     /// <summary>

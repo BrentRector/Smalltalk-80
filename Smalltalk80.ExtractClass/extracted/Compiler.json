@@ -1,0 +1,232 @@
+{
+  "ClassName": "Compiler",
+  "Superclass": "Object",
+  "InstanceVariables": [
+    "sourceStream",
+    "requestor",
+    "class",
+    "context"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "System-Compiler",
+  "InstanceMethods": [
+    {
+      "Selector": "compile:in:notifying:ifFail:",
+      "Source": "compile:textOrStreamin:aClassnotifying:aRequestorifFail:failBlockselffrom:textOrStreamclass:aClasscontext:nilnotifying:aRequestor.^selftranslate:sourceStreamnoPattern:falseifFail:failBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassnotifying"
+        }
+      ]
+    },
+    {
+      "Selector": "editor",
+      "Source": "editor^requestor!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "evaluate:in:to:notifying:ifFail:",
+      "Source": "evaluate:textOrStreamin:aContextto:receivernotifying:aRequestorifFail:failBlock|methodNodemethodvalue|Cursorexecuteshow.class_(aContext==nilifTrue:[receiver]ifFalse:[aContextreceiver])class.selffrom:textOrStreamclass:classcontext:aContextnotifying:aRequestor.methodNode_selftranslate:sourceStreamnoPattern:trueifFail:[^failBlockvalue].method_methodNodegenerate:#(000).context==nilifTrue:[classaddSelector:#DoItwithMethod:method.value_receiverDoIt.classremoveSelectorSimply:#DoIt.Cursornormalshow.^value]ifFalse:[classaddSelector:#DoItIn:withMethod:method.value_receiverDoItIn:context.classremoveSelectorSimply:#DoItIn:.Cursornormalshow.^value]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aContextto"
+        }
+      ]
+    },
+    {
+      "Selector": "format:in:notifying:",
+      "Source": "format:textOrStreamin:aClassnotifying:aRequestor|aNode|selffrom:textOrStreamclass:aClasscontext:nilnotifying:aRequestor.aNode_selfformat:sourceStreamnoPattern:falseifFail:[^nil].^aNodedecompileString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassnotifying"
+        }
+      ]
+    },
+    {
+      "Selector": "format:noPattern:ifFail:",
+      "Source": "format:aStreamnoPattern:noPatternifFail:failBlock|tree|tree_classparserClassnewparse:aStreamclass:classnoPattern:noPatterncontext:contextnotifying:selfifFail:[^failBlockvalue].^tree!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "noPatternifFail"
+        }
+      ]
+    },
+    {
+      "Selector": "from:class:context:notifying:",
+      "Source": "from:textOrStreamclass:aClasscontext:aContextnotifying:req(textOrStreamisKindOf:PositionableStream)ifTrue:[sourceStream_textOrStream]ifFalse:[sourceStream_ReadStreamon:textOrStreamasString].class_aClass.context_aContext.requestor_req!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClasscontext"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:at:",
+      "Source": "notify:aStringat:positionCursornormalshow.requestor==nilifTrue:[^SyntaxErrorerrorInClass:classwithCode:(sourceStreamcontentscopyReplaceFrom:positionto:position-1with:aString)errorString:aString]ifFalse:[^requestorinsertAndSelect:aStringat:(positionmax:1)]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 69 01 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "positionCursornormalshow"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "parse:in:notifying:",
+      "Source": "parse:textOrStreamin:aClassnotifying:reqselffrom:textOrStreamclass:aClasscontext:nilnotifying:req.^selftranslate:sourceStreamnoPattern:falseifFail:[]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aClassnotifying"
+        }
+      ]
+    },
+    {
+      "Selector": "translate:noPattern:ifFail:",
+      "Source": "translate:aStreamnoPattern:noPatternifFail:failBlock|tree|tree_classparserClassnewparse:aStreamclass:classnoPattern:noPatterncontext:contextnotifying:selfifFail:[^failBlockvalue].^tree!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "noPatternifFail"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "evaluate:",
+      "Source": "evaluate:textOrString^selfevaluate:textOrStringfor:nillogged:false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "evaluate:for:logged:",
+      "Source": "evaluate:textOrStringfor:anObjectlogged:logFlag^selfevaluate:textOrStringfor:anObjectnotifying:nillogged:logFlag!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectlogged"
+        }
+      ]
+    },
+    {
+      "Selector": "evaluate:for:notifying:logged:",
+      "Source": "evaluate:textOrStringfor:anObjectnotifying:aControllerlogged:logFlag|val|val_selfnewevaluate:textOrStringin:nilto:anObjectnotifying:aControllerifFail:[^nil].logFlagifTrue:[SmalltalklogChange:textOrString].^val!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectnotifying"
+        }
+      ]
+    },
+    {
+      "Selector": "evaluate:logged:",
+      "Source": "evaluate:textOrStringlogged:logFlag^selfevaluate:textOrStringfor:nillogged:logFlag!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "logFlag"
+        }
+      ]
+    },
+    {
+      "Selector": "evaluate:notifying:logged:",
+      "Source": "evaluate:textOrStringnotifying:aControllerlogged:logFlag^selfevaluate:textOrStringfor:nilnotifying:aControllerlogged:logFlag!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aControllerlogged"
+        }
+      ]
+    },
+    {
+      "Selector": "preferredParserClass",
+      "Source": "preferredParserClass^Parser!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Parser"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 15,
+    "SuccessfullyCompiled": 15,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T00:38:21.531528Z"
+  }
+}

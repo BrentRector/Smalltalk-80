@@ -1,0 +1,500 @@
+{
+  "ClassName": "Interval",
+  "Superclass": "SequenceableCollection",
+  "InstanceVariables": [
+    "start",
+    "stop",
+    "step"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Sequenceable",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "= anInterval \r\n\t\u0022Answer true if my species and anInterval species are equal, and\r\n\tif our starts, steps and sizes are equal.\u0022\r\n\r\n\tself species == anInterval species\r\n\t\tifTrue: [^start = anInterval first\r\n\t\t\t\t\tand: [step = anInterval increment and: [self size = anInterval size]]]\r\n\t\tifFalse: [^false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 D0 10 C6 89 00 19 00 D4 10 B6 89 00 0F 02 D6 10 B6 89 00 06 70 C2 C2 10 B6 7D E5 7D E5 7D 7D 89 00 03 28 7D 7D F2 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "first"
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "increment"
+        },
+        {
+          "Value": "size"
+        },
+        false
+      ]
+    },
+    {
+      "Selector": "add:",
+      "Source": "add: newObject \r\n\t\u0022Adding to an Interval is not allowed.\u0022\r\n\tself shouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "shouldNotImplement"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at: anInteger \r\n\t\u0022Answer the anInteger\u0027th element.\u0022\r\n\r\n\t(anInteger \u003E= 1 and: [anInteger \u003C= self size])\r\n\t\tifTrue: [^start \u002B (step * (anInteger - 1))]\r\n\t\tifFalse: [self errorSubscriptBounds: anInteger]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 21 B5 89 00 05 10 C2 70 B4 7D E2 89 00 09 00 02 10 21 B1 B8 B0 7D 7D 89 00 04 70 10 E9 7D F5 7C",
+      "Literals": [
+        {
+          "Value": "\u003E="
+        },
+        1,
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "*"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "errorSubscriptBounds:"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at: anInteger put: anObject \r\n\t\u0022Storing into an Interval is not allowed.\u0022\r\n\r\n\tself error: \u0027you can not store into an interval\u0027!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "error:"
+        },
+        "you can not store into an interval"
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect: aBlock \r\n\t| nextValue i result |\r\n\tresult _ self species new: self size.\r\n\tnextValue _ start.\r\n\ti _ 1.\r\n\tstep \u003C 0\r\n\t\tifTrue: [[stop \u003C= nextValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[result at: i put: (aBlock value: nextValue).\r\n\t\t\t\t\tnextValue _ nextValue \u002B step.\r\n\t\t\t\t\ti _ i \u002B 1]]\r\n\t\tifFalse: [[stop \u003E= nextValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[result at: i put: (aBlock value: nextValue).\r\n\t\t\t\t\tnextValue _ nextValue \u002B step.\r\n\t\t\t\t\ti _ i \u002B 1]].\r\n\t^result!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 4,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 70 C2 CD 88 6B 6C 00 88 69 6C 23 88 6A 6C 02 25 B2 89 00 1F 89 00 04 01 11 B4 7D 89 00 13 13 12 10 11 CA C1 6C 11 02 B0 88 69 6C 12 23 B0 88 6A 7D E8 7D 89 00 1F 89 00 04 01 11 B5 7D 89 00 13 13 12 10 11 CA C1 6C 11 02 B0 88 69 6C 12 23 B0 88 6A 7D E8 7D F6 6C 13 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "size"
+        },
+        1,
+        {
+          "Value": "\u003C"
+        },
+        0,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "at:put:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "\u003E="
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy\r\n\t\u0022Return a copy of me.\r\n\tI override this message because my species is Array and copy, as inherited \r\n\tfrom SequenceableCollection, uses copyFrom:to:, which creates a new object \r\n\tof my species\u0022\r\n\r\n\t^self shallowCopy!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "shallowCopy"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do: aBlock \r\n\t| aValue |\r\n\taValue _ start.\r\n\tstep \u003C 0\r\n\t\tifTrue: [[stop \u003C= aValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[aBlock value: aValue.\r\n\t\t\t\t\taValue _ aValue \u002B step]]\r\n\t\tifFalse: [[stop \u003E= aValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[aBlock value: aValue.\r\n\t\t\t\t\taValue _ aValue \u002B step]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 88 69 6A 02 21 B2 89 00 16 89 00 04 01 11 B4 7D 89 00 0A 10 11 CA 6A 11 02 B0 88 69 7D E4 7D 89 00 16 89 00 04 01 11 B5 7D 89 00 0A 10 11 CA 6A 11 02 B0 88 69 7D E4 7D F2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        0,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "\u003E="
+        }
+      ]
+    },
+    {
+      "Selector": "first",
+      "Source": "first\r\n\t^start!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "hash",
+      "Source": "hash\r\n\t^(((start hash bitShift: 2)\r\n\t\tbitOr: stop hash)\r\n\t\tbitShift: 1)\r\n\t\tbitOr: self size!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 D0 22 BC 01 D0 BF 24 BC 70 C2 BF 7C",
+      "Literals": [
+        {
+          "Value": "hash"
+        },
+        {
+          "Value": "bitShift:"
+        },
+        2,
+        {
+          "Value": "bitOr:"
+        },
+        1,
+        {
+          "Value": "size"
+        }
+      ]
+    },
+    {
+      "Selector": "hashMappedBy:",
+      "Source": "hashMappedBy: map\r\n\t\u0022My hash is independent of my oop\u0022\r\n\t^ self hash!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "hash"
+        }
+      ]
+    },
+    {
+      "Selector": "increment",
+      "Source": "increment\r\n\t\u0022Answer the receiver\u0027s interval increment.\u0022\r\n\t^step!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "last",
+      "Source": "last\r\n\t^stop - (stop - start \\\\ step)!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 01 00 B1 02 BA B1 7C",
+      "Literals": [
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\\\\"
+        }
+      ]
+    },
+    {
+      "Selector": "printOn:",
+      "Source": "printOn: aStream \r\n\taStream nextPut: $(.\r\n\tstart printOn: aStream.\r\n\taStream nextPutAll: \u0027 to: \u0027.\r\n\tstop printOn: aStream.\r\n\tstep ~= 1\r\n\t\tifTrue: \r\n\t\t\t[aStream nextPutAll: \u0027 by: \u0027.\r\n\t\t\tstep printOn: aStream].\r\n\taStream nextPut: $)!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 28 C4 69 00 10 E1 69 10 23 E2 69 01 10 E1 69 02 25 B7 89 00 08 10 27 E2 69 02 10 E1 7D E6 69 10 29 C4 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "printOn:"
+        },
+        {
+          "Value": "nextPutAll:"
+        },
+        " to: ",
+        {
+          "Value": "~="
+        },
+        1,
+        {
+          "Value": "ifTrue:"
+        },
+        " by: ",
+        "(",
+        ")"
+      ]
+    },
+    {
+      "Selector": "remove:",
+      "Source": "remove: newObject \r\n\t\u0022Removing from an Interval is not allowed.\u0022\r\n\r\n\tself error: \u0027elements cannot be removed from an Interval\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "error:"
+        },
+        "elements cannot be removed from an Interval"
+      ]
+    },
+    {
+      "Selector": "reverseDo:",
+      "Source": "reverseDo: aBlock \r\n\t\u0022Evaluate aBlock for each element of my interval, in reverse order.\u0022\r\n\r\n\t| aValue |\r\n\taValue _ stop.\r\n\tstep \u003C 0\r\n\t\tifTrue: [[start \u003E= aValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[aBlock value: aValue.\r\n\t\t\t\t\taValue _ aValue - step]]\r\n\t\tifFalse: [[start \u003C= aValue]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[aBlock value: aValue.\r\n\t\t\t\t\taValue _ aValue - step]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 88 69 6A 02 21 B2 89 00 16 89 00 04 00 11 B5 7D 89 00 0A 10 11 CA 6A 11 02 B1 88 69 7D E4 7D 89 00 16 89 00 04 00 11 B4 7D 89 00 0A 10 11 CA 6A 11 02 B1 88 69 7D E4 7D F2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        0,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u003C="
+        }
+      ]
+    },
+    {
+      "Selector": "setFrom:to:by:",
+      "Source": "setFrom: startInteger to: stopInteger by: stepInteger \r\n\tstart _ startInteger.\r\n\tstop _ stopInteger.\r\n\tstep _ stepInteger!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 60 6B 11 88 61 6B 12 88 62 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "size",
+      "Source": "size\r\n\tstep \u003C 0\r\n\t\tifTrue: [start \u003C stop\r\n\t\t\t\tifTrue: [^0]\r\n\t\t\t\tifFalse: [^stop - start // step \u002B 1]]\r\n\t\tifFalse: [stop \u003C start\r\n\t\t\t\tifTrue: [^0]\r\n\t\t\t\tifFalse: [^stop - start // step \u002B 1]]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 21 B2 89 00 17 00 01 B2 89 00 03 21 7D 7D 89 00 09 01 00 B1 02 BD 26 B0 7D 7D F2 7D 89 00 17 01 00 B2 89 00 03 21 7D 7D 89 00 09 01 00 B1 02 BD 26 B0 7D 7D F2 7D F2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        0,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "//"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1
+      ]
+    },
+    {
+      "Selector": "species",
+      "Source": "species\r\n\t^Array!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Array"
+        }
+      ]
+    },
+    {
+      "Selector": "storeOn:",
+      "Source": "storeOn: aStream \r\n\t\u0022This is possible because we know numbers store and print the same\u0022\r\n\r\n\tself printOn: aStream!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 7C",
+      "Literals": [
+        {
+          "Value": "printOn:"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "from:to:",
+      "Source": "from: startInteger to: stopInteger \r\n\t\u0022Answer a new instance of me, starting at startInteger, ending and\r\n\tstopInteger, and with an interval increment of 1.\u0022\r\n\r\n\t^self new\r\n\t\tsetFrom: startInteger\r\n\t\tto: stopInteger\r\n\t\tby: 1!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 CC 10 11 22 83 61 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "setFrom:to:by:"
+        },
+        1
+      ]
+    },
+    {
+      "Selector": "from:to:by:",
+      "Source": "from: startInteger to: stopInteger by: stepInteger \r\n\t\u0022Answer a new instance of me, starting at startInteger, ending and\r\n\tstopInteger, and with an interval increment of stepInteger.\u0022\r\n\r\n\t^self new\r\n\t\tsetFrom: startInteger\r\n\t\tto: stopInteger\r\n\t\tby: stepInteger!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 CC 10 11 12 83 61 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "setFrom:to:by:"
+        }
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "new\r\n\t\u0022Create and answer with a new instance of the receiver (a class) with no indexable \r\n\tfields.  Fail if the class is indexable.  Override SequenceableCollection new.  \r\n\tEssential.  See Object documentation whatIsAPrimitive.\u0022\r\n\r\n\t\u003Cprimitive: 70\u003E\r\n\tself isVariable ifTrue: [^self new: 0].\r\n\tself primitiveFailed!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 70,
+      "Bytecode": "70 D0 89 00 05 70 23 CD 7D 7D E1 68 70 D4 7C",
+      "Literals": [
+        {
+          "Value": "isVariable"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "new:"
+        },
+        0,
+        {
+          "Value": "primitiveFailed"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 22,
+    "SuccessfullyCompiled": 22,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:50.8290503Z"
+  }
+}

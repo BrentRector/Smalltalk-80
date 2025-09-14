@@ -131,30 +131,35 @@ public static class Primitives
         [114] = SystemPrimitives.ExitToDebugger,
         [115] = SystemPrimitives.OopsLeft,
         [116] = SystemPrimitives.SignalAtOopsLeftWordsLeft,
+        
+        // Garbage collection primitives
+        [130] = SystemPrimitives.GarbageCollect,
+        [131] = SystemPrimitives.GCStats,
+        [132] = SystemPrimitives.ForceGC,
 
         // Additional object primitives
         [139] = ObjectPrimitives.NextObject,
 
-        // File system primitives temporarily disabled
-        // [142] = FileSystemPrimitives.OpenStream,
-        // [143] = FileSystemPrimitives.CloseStream,
-        // [144] = FileSystemPrimitives.ReadNextChar,
-        // [145] = FileSystemPrimitives.WriteChar,
-        // [146] = FileSystemPrimitives.GetFileSize,
-        // [147] = FileSystemPrimitives.SetPosition,
-        // [148] = FileSystemPrimitives.GetFileSizeByName,
-        // [149] = FileSystemPrimitives.FileExists,
-        // [150] = FileSystemPrimitives.DeleteFile,
-        // [151] = FileSystemPrimitives.RenameFile,
+        // File system primitives - ENABLED for self-hosting support
+        [142] = Smalltalk80.Primitives.IO.FileSystemPrimitives.OpenStream,
+        [143] = Smalltalk80.Primitives.IO.FileSystemPrimitives.CloseStream,
+        [144] = Smalltalk80.Primitives.IO.FileSystemPrimitives.ReadNextChar,
+        [145] = Smalltalk80.Primitives.IO.FileSystemPrimitives.WriteChar,
+        [146] = Smalltalk80.Primitives.IO.FileSystemPrimitives.GetFileSize,
+        [147] = Smalltalk80.Primitives.IO.FileSystemPrimitives.SetPosition,
+        [148] = Smalltalk80.Primitives.IO.FileSystemPrimitives.GetFileSizeByName,
+        [149] = Smalltalk80.Primitives.IO.FileSystemPrimitives.FileExists,
+        [150] = Smalltalk80.Primitives.IO.FileSystemPrimitives.DeleteFile,
+        [151] = Smalltalk80.Primitives.IO.FileSystemPrimitives.RenameFile,
         
         // Control flow primitives
         [152] = ControlPrimitives.IfTrue,
         [153] = ControlPrimitives.IfFalse,
         [154] = ControlPrimitives.WhileTrue,
         
-        // [155] = FileSystemPrimitives.DeleteFile,
-        // [156] = FileSystemPrimitives.IsDirectory,
-        // [157] = FileSystemPrimitives.GetDirectoryEntries,
+        [155] = Smalltalk80.Primitives.IO.FileSystemPrimitives.DeleteDirectory,
+        [156] = Smalltalk80.Primitives.IO.FileSystemPrimitives.IsDirectory,
+        [157] = Smalltalk80.Primitives.IO.FileSystemPrimitives.GetDirectoryEntries,
 
         // String comparison primitives
         [158] = Smalltalk80.Primitives.Collections.ArrayPrimitives.StringEquals,

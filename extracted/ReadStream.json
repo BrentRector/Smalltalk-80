@@ -1,0 +1,121 @@
+{
+  "ClassName": "ReadStream",
+  "Superclass": "PositionableStream",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "next",
+      "Source": "next\r\n\t\u0022Answer with the next object in the Stream represented by the receiver. \r\n\tFail if the collection of this stream is not an Array or a String. Fail if \r\n\tthe stream is positioned at its end, or if the position is out of bounds in \r\n\tthe collection. Optional. See Object documentation whatIsAPrimitive.\u0022\r\n\r\n\t\u003Cprimitive: 65\u003E\r\n\tposition \u003E= readLimit\r\n\t\tifTrue: [^nil]\r\n\t\tifFalse: [^collection at: (position _ position \u002B 1)]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 65,
+      "Bytecode": "45 46 B5 89 00 03 27 7D 7D 89 00 0C 48 45 24 B0 88 81 60 05 87 C0 7D 7D F1 7C",
+      "Literals": [
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "readLimit"
+        },
+        "nil",
+        {
+          "Value": "collection"
+        }
+      ]
+    },
+    {
+      "Selector": "nextPut:",
+      "Source": "nextPut: anObject \r\n\tself shouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "shouldNotImplement"
+        }
+      ]
+    },
+    {
+      "Selector": "on:from:to:",
+      "Source": "on: aCollection from: firstIndex to: lastIndex \r\n\t| len |\r\n\tcollection _ aCollection.\r\n\treadLimit _  lastIndex \u003E (len _ collection size)\r\n\t\t\t\t\t\tifTrue: [len]\r\n\t\t\t\t\t\tifFalse: [lastIndex].\r\n\tposition _ firstIndex \u003C= 1\r\n\t\t\t\tifTrue: [0]\r\n\t\t\t\tifFalse: [firstIndex - 1]!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 81 60 07 87 6C 12 47 C2 88 6B B3 89 00 02 13 7D 89 00 02 12 7D F2 88 81 60 08 87 6C 11 24 B4 89 00 02 25 7D 89 00 04 11 24 B1 7D F2 88 81 60 09 87 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        1,
+        0,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "collection"
+        },
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "on:from:to:",
+      "Source": "on: aCollection from: firstIndex to: lastIndex \r\n\t\u0022Answer with a new instance streaming over a copy of aCollection from\r\n\tfirstIndex to lastIndex.\u0022\r\n\r\n\t^self basicNew\r\n\t\ton: aCollection\r\n\t\tfrom: firstIndex\r\n\t\tto: lastIndex!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 10 11 12 83 61 7C",
+      "Literals": [
+        {
+          "Value": "basicNew"
+        },
+        {
+          "Value": "on:from:to:"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 4,
+    "SuccessfullyCompiled": 4,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:55.8027039Z"
+  }
+}

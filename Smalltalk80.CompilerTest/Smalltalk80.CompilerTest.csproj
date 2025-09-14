@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
-    <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj" />
+    <ProjectReference Include="..\StandaloneCompiler\StandaloneCompiler.csproj" />
     <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj" />
   </ItemGroup>
 

@@ -1,0 +1,521 @@
+{
+  "ClassName": "WriteStream",
+  "Superclass": "PositionableStream",
+  "InstanceVariables": [
+    "writeLimit"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "contents",
+      "Source": "contents\r\n\treadLimit _ readLimit max: position.\r\n\t^collection copyFrom: 1 to: position!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 44 E0 88 81 60 03 87 68 45 22 44 F1 7C",
+      "Literals": [
+        {
+          "Value": "max:"
+        },
+        {
+          "Value": "copyFrom:to:"
+        },
+        1,
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "collection"
+        }
+      ]
+    },
+    {
+      "Selector": "cr",
+      "Source": "cr\r\n\t\u0022Append a return character to the receiver.\u0022\r\n\r\n\tself nextPut: Character cr!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 42 D1 C4 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "Character"
+        }
+      ]
+    },
+    {
+      "Selector": "crtab",
+      "Source": "crtab\r\n\t\u0022Append a return character, followed by a single tab character, to the receiver.\u0022\r\n\r\n\tself nextPut: Character cr.\r\n\tself nextPut: Character tab!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 43 D1 C4 68 70 43 D2 C4 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "tab"
+        },
+        {
+          "Value": "Character"
+        }
+      ]
+    },
+    {
+      "Selector": "crtab:",
+      "Source": "crtab: anInteger \r\n\t\u0022Append a return character, followed by anInteger tab characters, to the receiver.\u0022\r\n\r\n\tself nextPut: Character cr.\r\n\tanInteger timesRepeat: [self nextPut: Character tab]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 44 D1 C4 69 10 89 00 05 70 44 D3 C4 7D E2 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "cr"
+        },
+        {
+          "Value": "timesRepeat:"
+        },
+        {
+          "Value": "tab"
+        },
+        {
+          "Value": "Character"
+        }
+      ]
+    },
+    {
+      "Selector": "emphasis",
+      "Source": "emphasis\r\n\t^ 1\r\n\t\u0022Allows compatibility with streams which carry emphasis\u0022!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        1
+      ]
+    },
+    {
+      "Selector": "emphasis:",
+      "Source": "emphasis: ignored\r\n\t\u0022Allows compatibility with streams which carry emphasis\u0022!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "next",
+      "Source": "next\r\n\tself shouldNotImplement!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "shouldNotImplement"
+        }
+      ]
+    },
+    {
+      "Selector": "nextChunkPut:",
+      "Source": "nextChunkPut: aString \r\n\t\u0022Put aString onto self, doubling embedded terminators.\u0022\r\n\r\n\t| index stringSize char terminator |\r\n\tterminator _ $!!.\r\n\tindex _ 0.\r\n\tstringSize _ aString size.\r\n\t[(index _ index \u002B 1) \u003C= stringSize]\r\n\t\twhileTrue: \r\n\t\t\t[char _ aString at: index.\r\n\t\t\tself nextPut: char.\r\n\t\t\tchar == terminator ifTrue: [\u0022double imbedded terminator\u0022\r\n\t\t\t\tself nextPut: char]].\r\n\tself nextPut: terminator!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 5,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "2A 88 6C 6D 20 88 69 6D 10 C2 88 6A 6D 89 00 08 11 23 B0 88 69 12 B4 7D 89 00 16 10 11 C0 88 6B 6D 70 13 C4 6D 13 14 C6 89 00 04 70 13 C4 7D E9 7D E5 6D 70 14 C4 7C",
+      "Literals": [
+        0,
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        "!"
+      ]
+    },
+    {
+      "Selector": "nextPut:",
+      "Source": "nextPut: anObject \r\n\t\u0022Insert the argument at the next position in the Stream represented by the \r\n\treceiver. Fail if the collection of this stream is not an Array or a String. \r\n\tFail if the stream is positioned at its end, or if the position is out of \r\n\tbounds in the collection. Fail if the argument is not of the right type for \r\n\tthe collection. Optional. See Object documentation whatIsAPrimitive.\u0022\r\n\r\n\t\u003Cprimitive: 66\u003E\r\n\tposition = writeLimit\r\n\t\tifTrue: [^self pastEndPut: anObject]\r\n\t\tifFalse: \r\n\t\t\t[^collection at: (position _ position \u002B 1) put: anObject]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 66,
+      "Bytecode": "46 00 B6 89 00 05 70 10 E2 7D 7D 89 00 0D 47 46 25 B0 88 81 60 06 87 10 C1 7D 7D F1 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "pastEndPut:"
+        },
+        {
+          "Value": "at:put:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "collection"
+        }
+      ]
+    },
+    {
+      "Selector": "on:",
+      "Source": "on: aCollection \r\n\tsuper on: aCollection.\r\n\treadLimit _ 0.\r\n\twriteLimit _ aCollection size!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 69 21 88 81 60 03 87 69 10 C2 88 60 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        0,
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "readLimit"
+        }
+      ]
+    },
+    {
+      "Selector": "on:from:to:",
+      "Source": "on: aCollection from: firstIndex to: lastIndex \r\n\t| len |\r\n\tcollection _ aCollection.\r\n\treadLimit _ \r\n\t\twriteLimit _ lastIndex \u003E (len _ collection size)\r\n\t\t\t\t\t\tifTrue: [len]\r\n\t\t\t\t\t\tifFalse: [lastIndex].\r\n\tposition _ firstIndex \u003C= 1\r\n\t\t\t\tifTrue: [0]\r\n\t\t\t\tifFalse: [firstIndex - 1]!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 81 60 07 87 6C 12 47 C2 88 6B B3 89 00 02 13 7D 89 00 02 12 7D F2 88 60 88 81 60 08 87 6C 11 24 B4 89 00 02 25 7D 89 00 04 11 24 B1 7D F2 88 81 60 09 87 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        1,
+        0,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "collection"
+        },
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    },
+    {
+      "Selector": "pastEndPut:",
+      "Source": "pastEndPut: anObject \r\n\tcollection grow.\r\n\twriteLimit _ collection size.\r\n\tcollection at: (position _ position \u002B 1) put: anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 D0 69 45 C2 88 60 69 45 46 24 B0 88 81 60 06 87 10 C1 7C",
+      "Literals": [
+        {
+          "Value": "grow"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "at:put:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "collection"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    },
+    {
+      "Selector": "position:",
+      "Source": "position: anInteger \r\n\treadLimit _ readLimit max: position.\r\n\tsuper position: anInteger!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 43 E0 88 81 60 02 87 69 70 10 E1 7C",
+      "Literals": [
+        {
+          "Value": "max:"
+        },
+        {
+          "Value": "position:"
+        },
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    },
+    {
+      "Selector": "print:",
+      "Source": "print: anObject \r\n\t\u0022Have anObject print on the receiver.\u0022\r\n\r\n\tanObject printOn: self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 70 E0 7C",
+      "Literals": [
+        {
+          "Value": "printOn:"
+        }
+      ]
+    },
+    {
+      "Selector": "reset",
+      "Source": "reset\r\n\treadLimit _ readLimit max: position.\r\n\tposition _ 0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 43 E0 88 81 60 02 87 68 21 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "max:"
+        },
+        0,
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size\r\n\t^readLimit _ readLimit max: position!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "max:"
+        },
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    },
+    {
+      "Selector": "space",
+      "Source": "space\r\n\t\u0022Append a space character to the receiver.\u0022\r\n\r\n\tself nextPut: Character space!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 42 D1 C4 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "space"
+        },
+        {
+          "Value": "Character"
+        }
+      ]
+    },
+    {
+      "Selector": "store:",
+      "Source": "store: anObject \r\n\t\u0022Have anObject print on me for rereading.\u0022\r\n\r\n\tanObject storeOn: self!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 70 E0 7C",
+      "Literals": [
+        {
+          "Value": "storeOn:"
+        }
+      ]
+    },
+    {
+      "Selector": "tab",
+      "Source": "tab\r\n\t\u0022Append a tab character to the receiver.\u0022\r\n\r\n\tself nextPut: Character tab!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 42 D1 C4 7C",
+      "Literals": [
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "tab"
+        },
+        {
+          "Value": "Character"
+        }
+      ]
+    },
+    {
+      "Selector": "with:",
+      "Source": "with: aCollection \r\n\tsuper on: aCollection.\r\n\tposition _ readLimit _ writeLimit _ aCollection size!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 69 10 C2 88 60 88 81 60 02 87 88 81 60 03 87 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "readLimit"
+        },
+        {
+          "Value": "position"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "on:from:to:",
+      "Source": "on: aCollection from: firstIndex to: lastIndex \r\n\t\u0022Answer with a new instance streaming over a copy of aCollection from\r\n\tfirstIndex to lastIndex.\u0022\r\n\r\n\t^self basicNew\r\n\t\ton: aCollection\r\n\t\tfrom: firstIndex\r\n\t\tto: lastIndex!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 10 11 12 83 61 7C",
+      "Literals": [
+        {
+          "Value": "basicNew"
+        },
+        {
+          "Value": "on:from:to:"
+        }
+      ]
+    },
+    {
+      "Selector": "with:",
+      "Source": "with: aCollection \r\n\t\u0022Answer a new instance of me streaming on aCollection.  Assume that the\r\n\tcollection is already full so the position and the limits are set to the end.\u0022\r\n\r\n\t^self basicNew with: aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 10 E1 7C",
+      "Literals": [
+        {
+          "Value": "basicNew"
+        },
+        {
+          "Value": "with:"
+        }
+      ]
+    },
+    {
+      "Selector": "with:from:to:",
+      "Source": "with: aCollection from: firstIndex to: lastIndex \r\n\t\u0022Answer a new instance of me streaming on the subcollection of aCollection, starting\r\n\tat index firstIndex and ending at lastIndex.  Assume that the\r\n\tresulting collection is already full so the position and the limits are set to the end.\u0022\r\n\r\n\t^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 10 11 12 F2 E1 7C",
+      "Literals": [
+        {
+          "Value": "basicNew"
+        },
+        {
+          "Value": "with:"
+        },
+        {
+          "Value": "copyFrom:to:"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 23,
+    "SuccessfullyCompiled": 23,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:56.6379044Z"
+  }
+}

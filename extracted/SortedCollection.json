@@ -1,0 +1,449 @@
+{
+  "ClassName": "SortedCollection",
+  "Superclass": "OrderedCollection",
+  "InstanceVariables": [
+    "sortBlock"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Sequenceable",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "= aSortedCollection \r\n\t\u0022Answer true if my and aSortedCollection\u0027s species are the same,\r\n\tand if our blocks are the same, and if our elements are the same.\u0022\r\n\r\n\tself species = aSortedCollection species ifFalse: [^false].\r\n\tsortBlock = aSortedCollection sortBlock\r\n\t\tifTrue: [^super = aSortedCollection]\r\n\t\tifFalse: [^false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 D0 10 B6 89 00 03 25 7D 7D E2 69 00 D3 10 B6 89 00 05 70 10 B6 7D 7D 89 00 03 25 7D 7D F4 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "sortBlock"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        false
+      ]
+    },
+    {
+      "Selector": "add:",
+      "Source": "add: newObject \r\n\t| nextIndex |\r\n\tself isEmpty ifTrue: [^super addLast: newObject].\r\n\tnextIndex _ self indexForInserting: newObject.\r\n\tself insert: newObject before: nextIndex.\r\n\t^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 89 00 05 70 10 E2 7D 7D E1 6A 70 10 E3 88 69 6A 70 10 11 F4 6A 10 7C",
+      "Literals": [
+        {
+          "Value": "isEmpty"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "addLast:"
+        },
+        {
+          "Value": "indexForInserting:"
+        },
+        {
+          "Value": "insert:before:"
+        }
+      ]
+    },
+    {
+      "Selector": "addAll:",
+      "Source": "addAll: aCollection \r\n\taCollection size \u003E (self size // 3)\r\n\t\tifTrue: \r\n\t\t\t[\u0022Faster to add the new elements and resort\u0022\r\n\t\t\taCollection do: [:each | super addLast: each].\r\n\t\t\tself reSort]\r\n\t\tifFalse: [\u0022Faster to add the elements individually in their proper places\u0022\r\n\t\t\taCollection do: [:each | self add: each]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 C2 70 C2 23 BD B3 89 00 0D 10 89 00 04 70 49 E6 7D CB 69 70 D7 7D 89 00 0A 10 89 00 04 70 49 E8 7D CB 7D F4 7C",
+      "Literals": [
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "//"
+        },
+        3,
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "do:"
+        },
+        {
+          "Value": "addLast:"
+        },
+        {
+          "Value": "reSort"
+        },
+        {
+          "Value": "add:"
+        },
+        {
+          "Value": "each"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at: anInteger put: anObject \r\n\t\u0022Storing into a SortedCollection with at:put: is not allowed.\u0022\r\n\r\n\tself error: \u0027to add to a sorted collection, you must use add:\u0027!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "error:"
+        },
+        "to add to a sorted collection, you must use add:"
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect: aBlock \r\n\t\u0022Evaluate aBlock with each of my elements as the argument.  Collect the \r\n\tresulting values into an OrderedCollection  Answer with the new collection. \r\n\tOverride superclass in order to produce OrderedCollection instead of \r\n\tSortedCollection. \u0022\r\n\r\n\t| newCollection |\r\n\tnewCollection _ OrderedCollection new.\r\n\tself do: [:each | newCollection add: (aBlock value: each)].\r\n\t^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 CC 88 69 6A 70 89 00 06 11 10 45 CA E2 7D CB 6A 11 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "do:"
+        },
+        {
+          "Value": "add:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "OrderedCollection"
+        },
+        {
+          "Value": "each"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy\r\n\t| newCollection |\r\n\tnewCollection _ self species sortBlock: sortBlock.\r\n\tnewCollection addAll: self.\r\n\t^newCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 00 E1 88 68 69 10 70 E2 69 10 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "sortBlock:"
+        },
+        {
+          "Value": "addAll:"
+        }
+      ]
+    },
+    {
+      "Selector": "copyEmpty",
+      "Source": "copyEmpty\r\n\t\u0022Answer a copy of the receiver without any of the receiver\u0027s elements.\u0022\r\n\r\n\t^SortedCollection sortBlock: sortBlock!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 00 E0 7C",
+      "Literals": [
+        {
+          "Value": "sortBlock:"
+        },
+        {
+          "Value": "SortedCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow\r\n\t\u0022We must duplicate this message from OrderedCollection so the addLast: won\u0027t cause an error.\u0022\r\n\r\n\t| newSelf |\r\n\tnewSelf _ self species new: self size \u002B self growSize.\r\n\tnewSelf sortBlock: sortBlock.\r\n\tnewSelf addAll: self.\r\n\tself become: newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 70 C2 D4 70 B0 CD 88 68 69 10 00 E5 69 10 70 E6 69 70 10 E7 7C",
+      "Literals": [
+        {
+          "Value": "species"
+        },
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "growSize"
+        },
+        {
+          "Value": "sortBlock:"
+        },
+        {
+          "Value": "addAll:"
+        },
+        {
+          "Value": "become:"
+        }
+      ]
+    },
+    {
+      "Selector": "indexForInserting:",
+      "Source": "indexForInserting: newObject \r\n\t| index low high |\r\n\tlow _ firstIndex.\r\n\thigh _ lastIndex.\r\n\t[index _ high \u002B low // 2.\r\n\tlow \u003E high]\r\n\t\twhileFalse: \r\n\t\t\t[(sortBlock value: (self basicAt: index) value: newObject)\r\n\t\t\t\tifTrue: [low _ index \u002B 1]\r\n\t\t\t\tifFalse: [high _ index - 1]].\r\n\t^low!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 4,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "4A 88 6A 6C 4B 88 6B 6C 89 00 0C 13 12 B0 22 BD 88 69 6C 12 13 B3 7D 89 00 1A 00 70 11 E6 10 F5 89 00 06 11 28 B0 88 6A 7D 89 00 06 11 28 B1 88 6B 7D F7 7D E4 6C 12 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "//"
+        },
+        2,
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "value:value:"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        1,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "firstIndex"
+        },
+        {
+          "Value": "lastIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "reSort",
+      "Source": "reSort\r\n\tself sort: firstIndex to: lastIndex!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 41 42 F0 7C",
+      "Literals": [
+        {
+          "Value": "sort:to:"
+        },
+        {
+          "Value": "firstIndex"
+        },
+        {
+          "Value": "lastIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "sort:to:",
+      "Source": "sort: i to: j \r\n\t\u0022Sort elements i through j of self to be nondescending according to sortBlock.\u0022\r\n\r\n\t| di dij dj tt ij k l n |\r\n\t\u0022The prefix d means the data at that index.\u0022\r\n\t(n _ j \u002B 1  - i) \u003C= 1 ifTrue: [^self].\t\u0022Nothing to sort.\u0022 \r\n\t \u0022Sort di,dj.\u0022\r\n\tdi _ self basicAt: i.\r\n\tdj _ self basicAt: j.\r\n\t(sortBlock value: di value: dj) \u0022i.e., should di precede dj?\u0022\r\n\t\tifFalse: \r\n\t\t\t[self swap: i with: j.\r\n\t\t\t tt _ di.\r\n\t\t\t di _ dj.\r\n\t\t\t dj _ tt].\r\n\tn \u003E 2\r\n\t\tifTrue:  \u0022More than two elements.\u0022\r\n\t\t\t[ij _ (i \u002B j) // 2.  \u0022ij is the midpoint of i and j.\u0022\r\n\t\t\t dij _ self basicAt: ij.  \u0022Sort di,dij,dj.  Make dij be their median.\u0022\r\n\t\t\t (sortBlock value: di value: dij) \u0022i.e. should di precede dij?\u0022\r\n\t\t\t   ifTrue: \r\n\t\t\t\t[(sortBlock value: dij value: dj) \u0022i.e., should dij precede dj?\u0022\r\n\t\t\t\t  ifFalse: \r\n\t\t\t\t\t[self swap: j with: ij.\r\n\t\t\t\t\t dij _ dj]]\r\n\t\t\t   ifFalse:  \u0022i.e. di should come after dij\u0022\r\n\t\t\t\t[self swap: i with: ij.\r\n\t\t\t\t dij _ di].\r\n\t\t\tn \u003E 3\r\n\t\t\t  ifTrue:  \u0022More than three elements.\u0022\r\n\t\t\t\t[\u0022Find k\u003Ei and l\u003Cj such that dk,dij,dl are in reverse order.\r\n\t\t\t\tSwap k and l.  Repeat this procedure until k and l pass each other.\u0022\r\n\t\t\t\t k _ i.\r\n\t\t\t\t l _ j.\r\n\t\t\t\t [[l _ l - 1.  k \u003C= l and: [sortBlock value: dij value: (self basicAt: l)]]\r\n\t\t\t\t   whileTrue.  \u0022i.e. while dl succeeds dij\u0022\r\n\t\t\t\t  [k _ k \u002B 1.  k \u003C= l and: [sortBlock value: (self basicAt: k) value: dij]]\r\n\t\t\t\t   whileTrue.  \u0022i.e. while dij succeeds dk\u0022\r\n\t\t\t\t  k \u003C= l]\r\n\t\t\t\t   whileTrue:\r\n\t\t\t\t\t[self swap: k with: l]. \r\n\t\u0022Now l\u003Ck (either 1 or 2 less), and di through dl are all less than or equal to dk\r\n\tthrough dj.  Sort those two segments.\u0022\r\n\t\t\t\tself sort: i to: l.\r\n\t\t\t\tself sort: k to: j]]!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 9,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "11 21 B0 10 B1 88 81 68 09 87 21 B4 89 00 03 70 7D 7D E4 81 68 0A 87 70 10 E5 88 6A 81 68 0A 87 70 11 E5 88 6C 81 68 0A 87 00 12 14 F6 89 00 1A 70 10 11 F8 81 68 0A 87 12 88 6D 81 68 0A 87 14 88 6A 81 68 0A 87 15 88 6C 7D E7 81 68 0A 87 19 2A B3 89 00 C4 10 11 B0 2A BD 88 6E 81 68 0A 87 70 16 E5 88 6B 81 68 0A 87 00 12 13 F6 89 00 15 00 13 14 F6 89 00 0C 70 11 16 F8 81 68 0A 87 14 88 6B 7D E7 7D 89 00 0C 70 10 16 F8 81 68 0A 87 12 88 6B 7D FC 81 68 0A 87 19 2D B3 89 00 78 10 88 6F 81 68 0A 87 11 88 81 68 08 87 81 68 0A 87 89 00 47 89 00 1B 18 21 B1 88 81 68 08 87 81 68 0A 87 17 18 B4 89 00 07 00 13 70 18 E5 F6 7D EE 7D DF 81 68 0A 87 89 00 18 17 21 B0 88 6F 81 68 0A 87 17 18 B4 89 00 07 00 70 17 E5 13 F6 7D EE 7D DF 81 68 0A 87 17 18 B4 7D 89 00 05 70 17 18 F8 7D 83 30 81 68 0A 87 70 10 18 83 51 81 68 0A 87 70 17 11 83 51 7D E4 7D E4 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "value:value:"
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "swap:with:"
+        },
+        {
+          "Value": "\u003E"
+        },
+        2,
+        {
+          "Value": "//"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        3,
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "whileTrue"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "sort:to:"
+        }
+      ]
+    },
+    {
+      "Selector": "sortBlock",
+      "Source": "sortBlock\r\n\t\u0022Answer the blockContext which is the criterion for sorting elements of\r\n\tthe receiver.\u0022\r\n\t^sortBlock!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "sortBlock:",
+      "Source": "sortBlock: aBlock \r\n\t\u0022Make the argument, aBlock, be the criterion for ordering elements of the\r\n\treceiver.\u0022\r\n\r\n\tsortBlock _ aBlock fixTemps.\r\n\t\u0022The sortBlock must copy its home context, so as to avoid circularities!!\u0022\r\n\t\u0022Therefore sortBlocks with side effects may not work right\u0022\r\n\tself size \u003E 0 ifTrue: [self reSort]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 D0 88 60 69 70 C2 23 B3 89 00 03 70 D5 7D E4 7C",
+      "Literals": [
+        {
+          "Value": "fixTemps"
+        },
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "reSort"
+        }
+      ]
+    },
+    {
+      "Selector": "swap:with:",
+      "Source": "swap: i with: j \r\n\t| t |\r\n\tt _ self basicAt: i.\r\n\tself basicAt: i put: (self basicAt: j).\r\n\tself basicAt: j put: t!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 88 6A 6B 70 10 70 11 E0 F1 6B 70 11 12 F1 7C",
+      "Literals": [
+        {
+          "Value": "basicAt:"
+        },
+        {
+          "Value": "basicAt:put:"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new:",
+      "Source": "new: anInteger \r\n\t\u0022The default sorting function is a \u003C= comparison on elements.\u0022\r\n\r\n\t^(super new: anInteger) sortBlock: [:x :y | x \u003C= y]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 CD 89 00 04 43 44 B4 7D E1 7C",
+      "Literals": [
+        {
+          "Value": "new:"
+        },
+        {
+          "Value": "sortBlock:"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "x"
+        },
+        {
+          "Value": "y"
+        }
+      ]
+    },
+    {
+      "Selector": "sortBlock:",
+      "Source": "sortBlock: aBlock \r\n\t\u0022Answer a new instance of me such that its elements are sorted according\r\n\tto the criterion specified in aBlock.\u0022\r\n\r\n\t^(super new: 10) sortBlock: aBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 CD 10 E2 7C",
+      "Literals": [
+        {
+          "Value": "new:"
+        },
+        10,
+        {
+          "Value": "sortBlock:"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 16,
+    "SuccessfullyCompiled": 16,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:52.4963436Z"
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "ClassName": "ReadWriteStream",
+  "Superclass": "WriteStream",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "close",
+      "Source": "close^self!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "contents",
+      "Source": "contentsreadLimit_readLimitmax:position.^collectioncopyFrom:1to:readLimit!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "readLimitmax"
+        }
+      ]
+    },
+    {
+      "Selector": "fileIn",
+      "Source": "fileIn|val|CursorreadshowWhile:[[selfatEnd]whileFalse:[selfskipSeparators.val_(selfpeekFor:$!!)ifTrue:[(Compilerevaluate:selfnextChunklogged:false)scanFrom:self]ifFalse:[Compilerevaluate:selfnextChunklogged:true]].selfclose].^val!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "CursorreadshowWhile"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutChanges",
+      "Source": "fileOutChangesCursorwriteshowWhile:[selftimeStamp.SmalltalkchangesfileOutOn:self.selfclose]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "SmalltalkchangesfileOutOn"
+        }
+      ]
+    },
+    {
+      "Selector": "fileOutChangesFor:",
+      "Source": "fileOutChangesFor:classCursorwriteshowWhile:[selftimeStamp.SmalltalkchangesfileOutChangesFor:classon:self.selfclose]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 04 41 69 42 7D 70 E0 69 43 7C",
+      "Literals": [
+        {
+          "Value": "classon:"
+        },
+        {
+          "Value": "selftimeStamp"
+        },
+        {
+          "Value": "SmalltalkchangesfileOutChangesFor"
+        },
+        {
+          "Value": "selfclose"
+        }
+      ]
+    },
+    {
+      "Selector": "next",
+      "Source": "next\u003Cprimitive: 65\u003Eposition\u003E=readLimitifTrue:[^nil]ifFalse:[^collectionat:(position_position\u002B1)]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 65,
+      "Bytecode": "41 42 B5 7C",
+      "Literals": [
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "readLimitifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "timeStamp",
+      "Source": "timeStamp|aStream|aStream_WriteStreamon:(Stringnew:16).SmalltalktimeStamp:aStream.selfnextChunkPut:aStreamcontentsprintString.selfcr;cr!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "WriteStreamon"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 7,
+    "SuccessfullyCompiled": 7,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T00:39:04.0005565Z"
+  }
+}

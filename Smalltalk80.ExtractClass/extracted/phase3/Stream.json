@@ -1,0 +1,157 @@
+{
+  "ClassName": "Stream",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "atEnd",
+      "Source": "atEndselfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "contents",
+      "Source": "contentsselfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlock[selfatEnd]whileFalse:[aBlockvalue:selfnext]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 42 7D 89 00 02 43 7D D1 E0 7C",
+      "Literals": [
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "selfnext"
+        },
+        {
+          "Value": "selfatEnd"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "next",
+      "Source": "nextselfsubclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "next:",
+      "Source": "next:anInteger|aCollection|aCollection_OrderedCollectionnew.anIntegertimesRepeat:[aCollectionaddLast:selfnext].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "anIntegertimesRepeat"
+        }
+      ]
+    },
+    {
+      "Selector": "next:put:",
+      "Source": "next:anIntegerput:anObjectanIntegertimesRepeat:[selfnextPut:anObject].^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectanIntegertimesRepeat"
+        }
+      ]
+    },
+    {
+      "Selector": "nextMatchFor:",
+      "Source": "nextMatchFor:anObject^anObject=selfnext!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 41 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "selfnext"
+        }
+      ]
+    },
+    {
+      "Selector": "nextPut:",
+      "Source": "nextPut:anObjectselfsubclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "nextPutAll:",
+      "Source": "nextPutAll:aCollectionaCollectiondo:[:v|selfnextPut:v].^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "v"
+        },
+        {
+          "Value": "selfnextPut"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "newselferror:\u0027Streams are created with on: and with:\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 10,
+    "SuccessfullyCompiled": 10,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:19.9598385Z"
+  }
+}

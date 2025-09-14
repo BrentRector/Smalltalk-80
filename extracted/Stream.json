@@ -1,0 +1,193 @@
+{
+  "ClassName": "Stream",
+  "Superclass": "Object",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "atEnd",
+      "Source": "atEnd\r\n\t\u0022Answer whether the position is greater than or equal to the limit.\u0022\r\n\tself subclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "subclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "contents",
+      "Source": "contents\r\n\t\u0022Answer the contents of the receiver.\u0022\r\n\tself subclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "subclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do: aBlock \r\n\t\u0022Evaluate aBlock for each of the elements of the receiver.\u0022\r\n\r\n\t[self atEnd]\r\n\t\twhileFalse: [aBlock value: self next]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 03 70 C5 7D 89 00 05 10 70 C3 CA 7D E1 7C",
+      "Literals": [
+        {
+          "Value": "atEnd"
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "value:"
+        },
+        {
+          "Value": "next"
+        }
+      ]
+    },
+    {
+      "Selector": "next",
+      "Source": "next\r\n\t\u0022Answer the next object in the receiver.\u0022\r\n\tself subclassResponsibility!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "subclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "next:",
+      "Source": "next: anInteger \r\n\t\u0022Answer an OrderedCollection of the next anInteger number of random numbers.\u0022\r\n\t| aCollection |\r\n\taCollection _ OrderedCollection new.\r\n\tanInteger timesRepeat: [aCollection addLast: self next].\r\n\t^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 CC 88 69 6A 10 89 00 05 11 70 C3 E2 7D E1 6A 11 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "timesRepeat:"
+        },
+        {
+          "Value": "addLast:"
+        },
+        {
+          "Value": "next"
+        },
+        {
+          "Value": "OrderedCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "next:put:",
+      "Source": "next: anInteger put: anObject \r\n\t\u0022Put anObject into the next anInteger elements of the receiver.\u0022\r\n\r\n\tanInteger timesRepeat: [self nextPut: anObject].\r\n\t^anObject!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 89 00 04 70 11 C4 7D E0 6A 11 7C",
+      "Literals": [
+        {
+          "Value": "timesRepeat:"
+        },
+        {
+          "Value": "nextPut:"
+        }
+      ]
+    },
+    {
+      "Selector": "nextMatchFor:",
+      "Source": "nextMatchFor: anObject \r\n\t\u0022Gobble the next element and answer whether it is equal to anObject.\u0022\r\n\r\n\t^anObject = self next!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 C3 70 B6 7C",
+      "Literals": [
+        {
+          "Value": "="
+        },
+        {
+          "Value": "next"
+        }
+      ]
+    },
+    {
+      "Selector": "nextPut:",
+      "Source": "nextPut: anObject \r\n\t\u0022Insert the argument, anObject, at the next position in the receiver.\r\n\tAnswer anObject.\u0022\r\n\tself subclassResponsibility!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "subclassResponsibility"
+        }
+      ]
+    },
+    {
+      "Selector": "nextPutAll:",
+      "Source": "nextPutAll: aCollection \r\n\t\u0022Append the elements of aCollection onto the receiver.  Answer aCollection.\u0022\r\n\r\n\taCollection do: [:v | self nextPut: v].\r\n\t^aCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 89 00 04 70 42 C4 7D CB 69 10 7C",
+      "Literals": [
+        {
+          "Value": "do:"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "v"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "new\r\n\tself error: \u0027Streams are created with on: and with:\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 21 E0 7C",
+      "Literals": [
+        {
+          "Value": "error:"
+        },
+        "Streams are created with on: and with:"
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 10,
+    "SuccessfullyCompiled": 10,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:54.1202831Z"
+  }
+}

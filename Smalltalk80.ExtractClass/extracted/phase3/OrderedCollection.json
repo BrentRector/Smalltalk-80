@@ -1,0 +1,819 @@
+{
+  "ClassName": "OrderedCollection",
+  "Superclass": "SequenceableCollection",
+  "InstanceVariables": [
+    "firstIndex",
+    "lastIndex"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Sequenceable",
+  "InstanceMethods": [
+    {
+      "Selector": "add:",
+      "Source": "add:newObject^selfaddLast:newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "add:after:",
+      "Source": "add:newObjectafter:oldObject|index|index_selffind:oldObject.selfinsert:newObjectbefore:index\u002B1.^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "oldObject"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "add:before:",
+      "Source": "add:newObjectbefore:oldObject|index|index_selffind:oldObject.selfinsert:newObjectbefore:index.^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "oldObject"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "addAll:",
+      "Source": "addAll:anOrderedCollection^selfaddAllLast:anOrderedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "addAllFirst:",
+      "Source": "addAllFirst:anOrderedCollectionanOrderedCollectionreverseDo:[:each|selfaddFirst:each].^anOrderedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfaddFirst"
+        }
+      ]
+    },
+    {
+      "Selector": "addAllLast:",
+      "Source": "addAllLast:anOrderedCollectionanOrderedCollectiondo:[:each|selfaddLast:each].^anOrderedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 02 41 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "selfaddLast"
+        }
+      ]
+    },
+    {
+      "Selector": "addFirst:",
+      "Source": "addFirst:newObjectfirstIndex=1ifTrue:[selfmakeRoomAtFirst].firstIndex_firstIndex-1.selfbasicAt:firstIndexput:newObject.^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 89 00 02 43 7D E1 69 00 20 B1 88 60 69 44 7C",
+      "Literals": [
+        1,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "selfmakeRoomAtFirst"
+        },
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "addLast:",
+      "Source": "addLast:newObjectlastIndex=selfbasicSizeifTrue:[selfmakeRoomAtLast].lastIndex_lastIndex\u002B1.selfbasicAt:lastIndexput:newObject.^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfbasicSizeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "after:",
+      "Source": "after:oldObject|index|index_selffind:oldObject.index=lastIndexifTrue:[^selferrorLastObject]ifFalse:[^selfbasicAt:index\u002B1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selffind"
+        }
+      ]
+    },
+    {
+      "Selector": "at:",
+      "Source": "at:anInteger(anInteger\u003C1or:[anInteger\u002BfirstIndex-1\u003ElastIndex])ifTrue:[selferrorNoSuchElement]ifFalse:[^superat:anInteger\u002BfirstIndex-1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 21 B2 89 00 08 10 00 B0 21 B1 01 B3 7D E2 89 00 02 48 7D 89 00 03 49 7D 7D D7 00 B0 21 B1 F6 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        1,
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "anInteger"
+        },
+        {
+          "Value": "selferrorNoSuchElement"
+        },
+        {
+          "Value": "superat"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:anIntegerput:anObject|index|index_anIntegertruncated.(index\u003C1or:[index\u002BfirstIndex-1\u003ElastIndex])ifTrue:[selferrorNoSuchElement]ifFalse:[^superat:index\u002BfirstIndex-1put:anObject]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "anObject"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "before:",
+      "Source": "before:oldObject|index|index_selffind:oldObject.index=firstIndexifTrue:[^selferrorFirstObject]ifFalse:[^selfbasicAt:index-1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 7C",
+      "Literals": [
+        {
+          "Value": "selffind"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_selfspeciesnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "copyEmpty",
+      "Source": "copyEmpty^selfspeciesnew!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "copyFrom:to:",
+      "Source": "copyFrom:startIndexto:endIndex|targetCollectionindex|endIndex\u003CstartIndexifTrue:[^selfspeciesnew:0].targetCollection_selfspeciesnew:endIndex\u002B1-startIndex.startIndexto:endIndexdo:[:index|targetCollectionadd:(selfat:index)].^targetCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "42 43 E0 42 E0 44 B2 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "endIndex"
+        },
+        {
+          "Value": "targetCollectionindex"
+        },
+        {
+          "Value": "startIndexifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "copyReplaceFrom:to:with:",
+      "Source": "copyReplaceFrom:startto:stopwith:replacementCollection|newOrderedCollectiondeltanewIndexindexmySizestartIndexstopIndex|delta_0.startIndex_start.stopIndex_stop.start\u003C1ifTrue:[startIndex_stopIndex_0]ifFalse:[startIndex\u003EselfsizeifTrue:[startIndex_stopIndex_selfsize\u002B1]ifFalse:[(stopIndex\u003C(startIndex-1)or:[stopIndex\u003Eselfsize])ifTrue:[selferrorOutOfBounds].delta_stopIndex-startIndex\u002B1]].newOrderedCollection_selfspeciesnew:selfsize\u002BreplacementCollectionsize-delta.1to:startIndex-1do:[:index|newOrderedCollectionadd:(selfat:index)].1to:replacementCollectionsizedo:[:index|newOrderedCollectionadd:(replacementCollectionat:index)].stopIndex\u002B1to:selfsizedo:[:index|newOrderedCollectionadd:(selfat:index)].^newOrderedCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "stopwith"
+        }
+      ]
+    },
+    {
+      "Selector": "copyWith:",
+      "Source": "copyWith:newElement|newCollection|newCollection_selfcopy.newCollectionadd:newElement.^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfcopy"
+        },
+        {
+          "Value": "newCollectionadd"
+        }
+      ]
+    },
+    {
+      "Selector": "copyWithout:",
+      "Source": "copyWithout:oldElement|newCollectioneach|newCollection_selfspeciesnew:selfsize.selfdo:[:each|oldElement=eachifFalse:[newCollectionadd:each]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 81 60 01 87 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "newCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "do:",
+      "Source": "do:aBlock|index|index_firstIndex.[index\u003C=lastIndex]whileTrue:[aBlockvalue:(selfbasicAt:index).index_index\u002B1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 88 69 6A 89 00 04 11 01 B4 7D 89 00 02 42 7D 11 F1 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:selfbasicAt:"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "errorFirstObject",
+      "Source": "errorFirstObjectselferror:\u0027specified object is first object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorLastObject",
+      "Source": "errorLastObjectselferror:\u0027specified object is last object\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNoSuchElement",
+      "Source": "errorNoSuchElementselferror:\u0027attempt to index non-existent element in an ordered collection\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "errorNotFound",
+      "Source": "errorNotFoundselferror:\u0027element not found\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "find:",
+      "Source": "find:oldObject|index|index_firstIndex.[index\u003C=lastIndexand:[oldObject~=(selfbasicAt:index)]]whileTrue:[index_index\u002B1].index\u003C=lastIndexifTrue:[^index]ifFalse:[selferrorNotFound]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 88 69 6A 89 00 04 11 44 B4 7D D1 D3 45 B7 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "oldObject"
+        },
+        {
+          "Value": "~="
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "lastIndexand"
+        },
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "first",
+      "Source": "firstselfemptyCheck.^selfbasicAt:firstIndex!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow|newSelf|newSelf_selfspeciesnew:selfsize\u002BselfgrowSize.selfdo:[:each|newSelfaddLast:each].selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "insert:before:",
+      "Source": "insert:anObjectbefore:spot|indexdeltaspotIndex|spotIndex_spot.delta_spotIndex-firstIndex.firstIndex=1ifTrue:[selfmakeRoomAtFirst.spotIndex_firstIndex\u002Bdelta].index_firstIndex_firstIndex-1.[index\u003C(spotIndex-1)]whileTrue:[selfbasicAt:indexput:(selfbasicAt:index\u002B1).index_index\u002B1].selfbasicAt:indexput:anObject.^anObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "spot"
+        },
+        {
+          "Value": "indexdeltaspotIndex"
+        },
+        {
+          "Value": "spotIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "last",
+      "Source": "lastselfemptyCheck.^selfbasicAt:lastIndex!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "makeRoomAtFirst",
+      "Source": "makeRoomAtFirst|deltaindex|delta_selfbasicSize-selfsize.delta=0ifTrue:[selfgrow.delta_selfbasicSize-selfsize].lastIndex=selfbasicSizeifTrue:[^self].index_selfbasicSize.[index\u003Edelta]whileTrue:[selfbasicAt:indexput:(selfbasicAt:index-delta\u002BfirstIndex-1).selfbasicAt:index-delta\u002BfirstIndex-1put:nil.index_index-1].firstIndex_delta\u002B1.lastIndex_selfbasicSize!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 45 B1 88 81 60 06 87 69 46 22 B6 89 00 0B 47 69 44 45 B1 88 81 60 06 87 7D E3 69 01 48 B6 7C",
+      "Literals": [
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "delta"
+        },
+        {
+          "Value": "selfgrow"
+        },
+        {
+          "Value": "selfbasicSizeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "makeRoomAtLast",
+      "Source": "makeRoomAtLast|indexnewLast|newLast_selfsize.selfbasicSize-selfsize=0ifTrue:[selfgrow].firstIndex=1ifTrue:[^self].index_1.[index\u003C=newLast]whileTrue:[selfbasicAt:indexput:(selfbasicAt:index\u002BfirstIndex-1).selfbasicAt:index\u002BfirstIndex-1put:nil.index_index\u002B1].firstIndex_1.lastIndex_newLast!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "49 88 81 60 0A 87 69 4B 49 B1 22 B6 89 00 02 4C 7D E3 69 00 24 B6 89 00 03 70 7D 7D E3 69 24 88 81 60 07 87 69 89 00 04 47 4A B4 7D 89 00 02 4D 7D 4D D7 00 B0 24 B1 F6 7C",
+      "Literals": [
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        1,
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:indexput:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "newLast"
+        },
+        {
+          "Value": "selfbasicSize"
+        },
+        {
+          "Value": "selfgrow"
+        },
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "remove:ifAbsent:",
+      "Source": "remove:oldObjectifAbsent:absentBlock|index|index_firstIndex.[index\u003C=lastIndex]whileTrue:[oldObject=(selfbasicAt:index)ifTrue:[selfremoveIndex:index.^oldObject]ifFalse:[index_index\u002B1]].^absentBlockvalue!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "absentBlock"
+        },
+        {
+          "Value": "index"
+        }
+      ]
+    },
+    {
+      "Selector": "removeAllSuchThat:",
+      "Source": "removeAllSuchThat:aBlock|indexelementnewCollection|newCollection_selfspeciesnew.index_firstIndex.[index\u003C=lastIndex]whileTrue:[element_selfbasicAt:index.(aBlockvalue:element)ifTrue:[newCollectionadd:element.selfremoveIndex:index]ifFalse:[index_index\u002B1]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 88 81 60 05 87 6A 00 88 81 60 02 87 6A 89 00 04 42 01 B4 7D 89 00 07 46 88 81 60 03 87 7D D2 E1 6A 47 D3 7C",
+      "Literals": [
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "element"
+        },
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "newCollection"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "removeFirst",
+      "Source": "removeFirst|firstObject|selfemptyCheck.firstObject_selfbasicAt:firstIndex.selfbasicAt:firstIndexput:nil.firstIndex_firstIndex\u002B1.^firstObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfemptyCheck"
+        },
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "removeIndex:",
+      "Source": "removeIndex:removedIndex|index|index_removedIndex.[index\u003ClastIndex]whileTrue:[selfbasicAt:indexput:(selfbasicAt:index\u002B1).index_index\u002B1].selfbasicAt:lastIndexput:nil.lastIndex_lastIndex-1!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 69 6A 89 00 04 11 01 B2 7D 89 00 02 45 7D 45 D2 24 B0 F1 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "whileTrue:indexput:"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "removeLast",
+      "Source": "removeLast|lastObject|selfemptyCheck.lastObject_selfbasicAt:lastIndex.selfbasicAt:lastIndexput:nil.lastIndex_lastIndex-1.^lastObject!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 69 41 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfemptyCheck"
+        },
+        {
+          "Value": "selfbasicAt"
+        }
+      ]
+    },
+    {
+      "Selector": "reverse",
+      "Source": "reverse|newCollection|newCollection_selfspeciesnew.selfreverseDo:[:each|newCollectionadd:each].^newCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 69 41 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        },
+        {
+          "Value": "selfreverseDo"
+        }
+      ]
+    },
+    {
+      "Selector": "reverseDo:",
+      "Source": "reverseDo:aBlock|index|index_lastIndex.[index\u003E=firstIndex]whileTrue:[aBlockvalue:(selfbasicAt:index).index_index-1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 88 69 6A 89 00 04 11 00 B5 7D 89 00 02 42 7D 11 F1 7C",
+      "Literals": [
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "whileTrue:selfbasicAt:"
+        },
+        {
+          "Value": "aBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "select:",
+      "Source": "select:aBlock|newCollection|newCollection_selfcopyEmpty.selfdo:[:each|(aBlockvalue:each)ifTrue:[newCollectionadd:each]].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "selfcopyEmpty"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "setIndices",
+      "Source": "setIndicesfirstIndex_selfbasicSize//2max:1.lastIndex_firstIndex-1max:0!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 21 BD 23 E2 68 00 23 B1 25 E2 88 61 7C",
+      "Literals": [
+        {
+          "Value": "//"
+        },
+        2,
+        {
+          "Value": "max:"
+        },
+        1,
+        {
+          "Value": "-"
+        },
+        0,
+        {
+          "Value": "selfbasicSize"
+        }
+      ]
+    },
+    {
+      "Selector": "size",
+      "Source": "size^lastIndex-firstIndex\u002B1!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 00 B1 22 B0 7C",
+      "Literals": [
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new",
+      "Source": "new^selfnew:10!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "new:",
+      "Source": "new:anInteger^(supernew:anInteger)setIndices!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 42,
+    "SuccessfullyCompiled": 42,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:18.3413916Z"
+  }
+}

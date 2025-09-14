@@ -1,0 +1,77 @@
+{
+  "ClassName": "ReadStream",
+  "Superclass": "PositionableStream",
+  "InstanceVariables": [],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Streams",
+  "InstanceMethods": [
+    {
+      "Selector": "next",
+      "Source": "next\u003Cprimitive: 65\u003Eposition\u003E=readLimitifTrue:[^nil]ifFalse:[^collectionat:(position_position\u002B1)]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": true,
+      "PrimitiveNumber": 65,
+      "Bytecode": "41 42 B5 7C",
+      "Literals": [
+        {
+          "Value": "\u003E="
+        },
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "readLimitifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "nextPut:",
+      "Source": "nextPut:anObjectselfshouldNotImplement!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "on:from:to:",
+      "Source": "on:aCollectionfrom:firstIndexto:lastIndex|len|collection_aCollection.readLimit_lastIndex\u003E(len_collectionsize)ifTrue:[len]ifFalse:[lastIndex].position_firstIndex\u003C=1ifTrue:[0]ifFalse:[firstIndex-1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstIndexto"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "on:from:to:",
+      "Source": "on:aCollectionfrom:firstIndexto:lastIndex^selfbasicNewon:aCollectionfrom:firstIndexto:lastIndex!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "firstIndexto"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 4,
+    "SuccessfullyCompiled": 4,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:21.5824462Z"
+  }
+}

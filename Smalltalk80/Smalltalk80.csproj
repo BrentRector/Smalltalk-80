@@ -43,5 +43,16 @@
     <Copy SourceFiles="@(LegacyClassFiles)" DestinationFolder="$(OutputPath)Bootstrap" SkipUnchangedFiles="true" />
     <Message Text="Copied bootstrap files to $(OutputPath)Bootstrap" Importance="high" />
   </Target>
+  
+  <!-- Run tests only when explicitly requested via -p:RunTests=true -->
+  <Target Name="RunTests" AfterTargets="CopyBootstrapFiles" Condition="'$(DesignTimeBuild)' != 'true' AND '$(RunTests)' == 'true'">
+    <Message Text="Running Smalltalk-80 bytecode tests..." Importance="high" />
+    <Exec Command="dotnet run --project $(MSBuildProjectDirectory)\..\Smalltalk80.Tests\Smalltalk80.Tests.csproj --no-build" 
+          ContinueOnError="true"
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="TestExitCode" />
+    </Exec>
+    <Message Text="Tests completed with exit code: $(TestExitCode)" Importance="high" />
+  </Target>
 
 </Project>

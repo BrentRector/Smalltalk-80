@@ -179,6 +179,7 @@ messageBase:
 	literal
 	| parenthesizedExpr
 	| block
+	| dynamicArray
 	| variable
 	| negativeNumber;
 
@@ -211,6 +212,8 @@ argumentName: IDENTIFIER;
 blockTemps: PIPE temporaryName+ PIPE;
 
 parenthesizedExpr: LEFT_PAREN expression RIGHT_PAREN;
+
+dynamicArray: LEFT_BRACE (expression (PERIOD expression)*)? RIGHT_BRACE;
 
 ////
 // / Selectors and Tokens //
@@ -318,6 +321,8 @@ LEFT_BRACKET: '[';
 RIGHT_BRACKET: ']';
 LEFT_PAREN: '(';
 RIGHT_PAREN: ')';
+LEFT_BRACE: '{';
+RIGHT_BRACE: '}';
 SEMICOLON: ';';
 PERIOD: '.';
 

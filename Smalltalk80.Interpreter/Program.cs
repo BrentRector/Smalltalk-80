@@ -326,7 +326,7 @@ public class Program
         foreach (var obj in allObjects)
         {
             // Try to determine if this is a class object
-            if (IsLikelyClass(obj))
+            if (obj != null && IsLikelyClass(obj))
             {
                 var className = GetClassName(vm, obj);
                 if (!string.IsNullOrEmpty(className))

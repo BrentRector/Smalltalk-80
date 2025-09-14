@@ -287,6 +287,8 @@ public sealed class VirtualMachine
         
         foreach (var obj in allObjects)
         {
+            if (obj == null) continue;
+            
             // Check if this object is itself a class (by looking at its structure)
             // Class objects typically have specific patterns
             if (IsLikelyClassObject(obj))
@@ -570,7 +572,7 @@ public sealed class VirtualMachine
     /// <summary>
     /// Dumps object relationships to show the object graph structure.
     /// </summary>
-    private void DumpObjectRelationships(List<SmalltalkObject> allObjects)
+    private void DumpObjectRelationships(List<SmalltalkObject?> allObjects)
     {
         Console.WriteLine("🔗 Object Relationships:");
         
@@ -586,6 +588,8 @@ public sealed class VirtualMachine
         
         foreach (var obj in allObjects)
         {
+            if (obj == null) continue;
+            
             referenceCount[obj.Oop] = 0;
             outgoingRefs[obj.Oop] = new List<int>();
             

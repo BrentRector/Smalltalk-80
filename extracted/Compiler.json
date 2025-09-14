@@ -1,0 +1,392 @@
+{
+  "ClassName": "Compiler",
+  "Superclass": "Object",
+  "InstanceVariables": [
+    "sourceStream",
+    "requestor",
+    "class",
+    "context"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "System-Compiler",
+  "InstanceMethods": [
+    {
+      "Selector": "compile:in:notifying:ifFail:",
+      "Source": "compile: textOrStream in: aClass notifying: aRequestor ifFail: failBlock \r\n\t\u0022Answer with a parse tree whose root is a MethodNode.\r\n\tThis can then be told to generate code as is done in the calls from Behavior\u0022\r\n\tself from: textOrStream\r\n\t\tclass: aClass\r\n\t\tcontext: nil\r\n\t\tnotifying: aRequestor.\r\n\t^self\r\n\t\ttranslate: sourceStream\r\n\t\tnoPattern: false\r\n\t\tifFail: failBlock!",
+      "ArgumentCount": 4,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 11 22 12 83 80 6C 70 00 23 13 83 61 7C",
+      "Literals": [
+        {
+          "Value": "from:class:context:notifying:"
+        },
+        {
+          "Value": "translate:noPattern:ifFail:"
+        },
+        "nil",
+        false
+      ]
+    },
+    {
+      "Selector": "editor",
+      "Source": "editor\r\n\t^ requestor!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "evaluate:in:to:notifying:ifFail:",
+      "Source": "evaluate: textOrStream in: aContext to: receiver notifying: aRequestor ifFail: failBlock\r\n\t\u0022Compiles the sourceStream into a parse tree, then generates code into a method.\r\n\tThis method is then installed in the receiver\u0027s class so that it can be invoked.\r\n\tIn other words, if receiver is not nil, then the text can refer to instance variables\r\n\tof that receiver (the Inspector uses this).  If aContext is not nil, the text can refer to\r\n\ttemporaries in that context (the Debugger uses this).  If aRequestor is not nil, then\r\n\tit will receive a notify:at: message before the attempt to evaluate is aborted.\r\n\r\n\tFinally, the compiled method is invoked from here as DoIt or\r\n\t(in the case of evaluation in aContext) DoItIn:.\r\n\r\n\tThe method is subsequently removed from the class, but this will not get done\r\n\tif the invocation causes an error which is terminated.  Such garbage can be\r\n\tremoved by executing:\r\n\t\tSmalltalk allBehaviorsDo: \r\n\t\t\t[:cl | cl removeSelector: #DoIt; removeSelector: #DoItIn:].\u0022\r\n\r\n\t| methodNode method value |\r\n\tCursor execute show.\r\n\tclass _ (aContext == nil ifTrue: [receiver] ifFalse: [aContext receiver]) class.\r\n\tself from: textOrStream class: class context: aContext notifying: aRequestor.\r\n\tmethodNode _ self translate: sourceStream noPattern: true ifFail:\r\n\t\t[^failBlock value].\r\n\tmethod _ methodNode generate: #(0 0 0).\r\n\tcontext == nil\r\n\t\t\tifTrue: [class addSelector: #DoIt withMethod: method.\r\n\t\t\t\t\tvalue _ receiver DoIt.\r\n\t\t\t\t\tclass removeSelectorSimply: #DoIt.\r\n\t\t\t\t\tCursor normal show.\r\n\t\t\t\t\t^value]\r\n\t\t\tifFalse: [class addSelector: #DoItIn: withMethod: method.\r\n\t\t\t\t\tvalue _ receiver DoItIn: context.\r\n\t\t\t\t\tclass removeSelectorSimply: #DoItIn:.\r\n\t\t\t\t\tCursor normal show.\r\n\t\t\t\t\t^value]!",
+      "ArgumentCount": 5,
+      "TemporaryCount": 4,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "53 D0 D1 81 68 08 87 11 34 C6 89 00 02 12 7D 89 00 03 11 D4 7D F3 C7 88 62 81 68 08 87 70 10 02 11 13 83 86 81 68 08 87 70 00 35 89 00 04 14 C9 7D 7D 83 67 88 6D 81 68 08 87 15 36 E9 88 6E 81 68 08 87 03 34 C6 89 00 21 02 2C 16 FB 81 68 08 87 12 DC 88 6F 81 68 08 87 02 2C ED 81 68 08 87 53 DE D1 81 68 08 87 17 7D 7D 89 00 24 02 30 83 11 EF 81 68 08 87 12 03 83 32 88 6F 81 68 08 87 02 32 ED 81 68 08 87 53 DE D1 81 68 08 87 17 7D 7D F3 7C",
+      "Literals": [
+        {
+          "Value": "execute"
+        },
+        {
+          "Value": "show"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "receiver"
+        },
+        {
+          "Value": "class"
+        },
+        {
+          "Value": "from:class:context:notifying:"
+        },
+        {
+          "Value": "translate:noPattern:ifFail:"
+        },
+        {
+          "Value": "value"
+        },
+        {
+          "Value": "generate:"
+        },
+        0,
+        {
+          "Value": "addSelector:withMethod:"
+        },
+        {
+          "Value": "DoIt"
+        },
+        {
+          "Value": "removeSelectorSimply:"
+        },
+        {
+          "Value": "normal"
+        },
+        {
+          "Value": "addSelector:"
+        },
+        {
+          "Value": "DoItIn:withMethod:"
+        },
+        {
+          "Value": "method"
+        },
+        {
+          "Value": "DoItIn:"
+        },
+        {
+          "Value": "Cursor"
+        },
+        "nil",
+        true,
+        "#(000)"
+      ]
+    },
+    {
+      "Selector": "format:in:notifying:",
+      "Source": "format: textOrStream in: aClass notifying: aRequestor\r\n\t\u0022Compile a parse tree from the incoming text, and then print the parse tree to yield the answer, a string containing the original code in standard format.\u0022\r\n\r\n\t| aNode |\r\n\tself from: textOrStream\r\n\t\tclass: aClass\r\n\t\tcontext: nil\r\n\t\tnotifying: aRequestor.\r\n\taNode _ self format: sourceStream noPattern: false ifFail: [^nil].\r\n\t^aNode decompileString!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 11 23 12 83 80 6C 70 00 24 89 00 03 23 7D 7D 83 61 88 6B 6C 13 D2 7C",
+      "Literals": [
+        {
+          "Value": "from:class:context:notifying:"
+        },
+        {
+          "Value": "format:noPattern:ifFail:"
+        },
+        {
+          "Value": "decompileString"
+        },
+        "nil",
+        false
+      ]
+    },
+    {
+      "Selector": "format:noPattern:ifFail:",
+      "Source": "format: aStream noPattern: noPattern ifFail: failBlock \r\n\t| tree |\r\n\ttree _ \r\n\t\tclass parserClass new\r\n\t\t\tparse: aStream\r\n\t\t\tclass: class\r\n\t\t\tnoPattern: noPattern\r\n\t\t\tcontext: context\r\n\t\t\tnotifying: self\r\n\t\t\tifFail: [^failBlock value].\r\n\t^tree!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 D0 CC 10 02 11 03 70 89 00 04 12 C9 7D 7D 83 C2 88 6B 6C 13 7C",
+      "Literals": [
+        {
+          "Value": "parserClass"
+        },
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "parse:class:noPattern:context:notifying:ifFail:"
+        },
+        {
+          "Value": "value"
+        }
+      ]
+    },
+    {
+      "Selector": "from:class:context:notifying:",
+      "Source": "from: textOrStream class: aClass context: aContext notifying: req \r\n\t(textOrStream isKindOf: PositionableStream)\r\n\t\tifTrue: [sourceStream _ textOrStream]\r\n\t\tifFalse: [sourceStream _ ReadStream on: textOrStream asString].\r\n\tclass _ aClass.\r\n\tcontext _ aContext.\r\n\trequestor _ req!",
+      "ArgumentCount": 4,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 44 E0 89 00 04 10 88 60 7D 89 00 07 45 10 D3 E2 88 60 7D F1 6C 11 88 62 6C 12 88 63 6C 13 88 61 7C",
+      "Literals": [
+        {
+          "Value": "isKindOf:"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "asString"
+        },
+        {
+          "Value": "PositionableStream"
+        },
+        {
+          "Value": "ReadStream"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:at:",
+      "Source": "notify: aString at: position\r\n\tCursor normal show.\r\n\trequestor == nil\r\n\t\tifTrue: [^SyntaxError \r\n\t\t\t\t\terrorInClass: class\r\n\t\t\t\t\twithCode: \r\n\t\t\t\t\t\t(sourceStream contents\r\n\t\t\t\t\t\t\tcopyReplaceFrom: position\r\n\t\t\t\t\t\t\tto: position - 1\r\n\t\t\t\t\t\t\twith: aString)\r\n\t\t\t\t\terrorString: aString]\r\n\t\tifFalse: [^ requestor insertAndSelect: aString at: (position max: 1)]!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "4B D0 D1 6A 01 2C C6 89 00 10 4D 02 00 D5 11 11 28 B1 10 83 66 10 83 64 7D 7D 89 00 08 01 10 11 28 EA F9 7D 7D F3 7C",
+      "Literals": [
+        {
+          "Value": "normal"
+        },
+        {
+          "Value": "show"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "errorInClass:withCode:errorString:"
+        },
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": "copyReplaceFrom:to:with:"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "insertAndSelect:at:"
+        },
+        {
+          "Value": "max:"
+        },
+        {
+          "Value": "Cursor"
+        },
+        "nil",
+        {
+          "Value": "SyntaxError"
+        }
+      ]
+    },
+    {
+      "Selector": "parse:in:notifying:",
+      "Source": "parse: textOrStream in: aClass notifying: req\r\n\t\u0022Compile the incoming text and answer with the resulting parse tree.\u0022\r\n\tself from: textOrStream class: aClass context: nil notifying: req.\r\n\t^self translate: sourceStream noPattern: false ifFail: []!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 11 22 12 83 80 6B 70 00 23 89 00 02 22 7D 83 61 7C",
+      "Literals": [
+        {
+          "Value": "from:class:context:notifying:"
+        },
+        {
+          "Value": "translate:noPattern:ifFail:"
+        },
+        "nil",
+        false
+      ]
+    },
+    {
+      "Selector": "translate:noPattern:ifFail:",
+      "Source": "translate: aStream noPattern: noPattern ifFail: failBlock \r\n\t| tree |\r\n\ttree _ \r\n\t\tclass parserClass new\r\n\t\t\tparse: aStream\r\n\t\t\tclass: class\r\n\t\t\tnoPattern: noPattern\r\n\t\t\tcontext: context\r\n\t\t\tnotifying: self\r\n\t\t\tifFail: [^failBlock value].\r\n\t^tree!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 D0 CC 10 02 11 03 70 89 00 04 12 C9 7D 7D 83 C2 88 6B 6C 13 7C",
+      "Literals": [
+        {
+          "Value": "parserClass"
+        },
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "parse:class:noPattern:context:notifying:ifFail:"
+        },
+        {
+          "Value": "value"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "evaluate:",
+      "Source": "evaluate: textOrString \r\n\t^self evaluate: textOrString for: nil logged: false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 21 22 83 60 7C",
+      "Literals": [
+        {
+          "Value": "evaluate:for:logged:"
+        },
+        "nil",
+        false
+      ]
+    },
+    {
+      "Selector": "evaluate:for:logged:",
+      "Source": "evaluate: textOrString for: anObject logged: logFlag \r\n\t^ self evaluate: textOrString for: anObject notifying: nil logged: logFlag!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 11 21 12 83 80 7C",
+      "Literals": [
+        {
+          "Value": "evaluate:for:notifying:logged:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "evaluate:for:notifying:logged:",
+      "Source": "evaluate: textOrString for: anObject notifying: aController logged: logFlag \t\u0022Compile and execute the supplied text (see message to instance for details).\r\n\tIf both were successful then, if logFlag is true, log (write) the text onto\r\n\tthe changes file so that it can be replayed if necessary.\u0022\r\n\t| val |\r\n\tval _ self new\r\n\t\t\t\tevaluate: textOrString\r\n\t\t\t\tin: nil\r\n\t\t\t\tto: anObject\r\n\t\t\t\tnotifying: aController\r\n\t\t\t\tifFail: [^nil].\r\n\tlogFlag ifTrue: [Smalltalk logChange: textOrString].\r\n\t^val!",
+      "ArgumentCount": 4,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 CC 10 24 11 12 89 00 03 24 7D 7D 83 A1 88 6C 6D 13 89 00 04 45 10 E3 7D E2 6D 14 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "evaluate:in:to:notifying:ifFail:"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "logChange:"
+        },
+        "nil",
+        {
+          "Value": "Smalltalk"
+        }
+      ]
+    },
+    {
+      "Selector": "evaluate:logged:",
+      "Source": "evaluate: textOrString logged: logFlag\r\n\t^self evaluate: textOrString for: nil logged: logFlag!",
+      "ArgumentCount": 2,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 21 11 83 60 7C",
+      "Literals": [
+        {
+          "Value": "evaluate:for:logged:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "evaluate:notifying:logged:",
+      "Source": "evaluate: textOrString notifying: aController logged: logFlag \r\n\t^self evaluate: textOrString for: nil notifying: aController logged: logFlag!",
+      "ArgumentCount": 3,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 21 11 12 83 80 7C",
+      "Literals": [
+        {
+          "Value": "evaluate:for:notifying:logged:"
+        },
+        "nil"
+      ]
+    },
+    {
+      "Selector": "preferredParserClass",
+      "Source": "preferredParserClass\r\n\t\u0022Return a parser class which is appropriate for parsing methods compilable\r\n\t by this compiler class.  Should be overwritten by subclasses.\u0022\r\n\r\n\t^Parser!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "Parser"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 15,
+    "SuccessfullyCompiled": 15,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:33:50.4580959Z"
+  }
+}

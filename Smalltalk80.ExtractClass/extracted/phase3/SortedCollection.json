@@ -1,0 +1,332 @@
+{
+  "ClassName": "SortedCollection",
+  "Superclass": "OrderedCollection",
+  "InstanceVariables": [
+    "sortBlock"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "Collections-Sequenceable",
+  "InstanceMethods": [
+    {
+      "Selector": "=",
+      "Source": "=aSortedCollectionselfspecies=aSortedCollectionspeciesifFalse:[^false].sortBlock=aSortedCollectionsortBlockifTrue:[^super=aSortedCollection]ifFalse:[^false]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aSortedCollectionspeciesifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "add:",
+      "Source": "add:newObject|nextIndex|selfisEmptyifTrue:[^superaddLast:newObject].nextIndex_selfindexForInserting:newObject.selfinsert:newObjectbefore:nextIndex.^newObject!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "selfisEmptyifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "addAll:",
+      "Source": "addAll:aCollectionaCollectionsize\u003E(selfsize//3)ifTrue:[aCollectiondo:[:each|superaddLast:each].selfreSort]ifFalse:[aCollectiondo:[:each|selfadd:each]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 21 BD 89 00 02 46 7D D3 47 E4 E2 7C",
+      "Literals": [
+        {
+          "Value": "//"
+        },
+        3,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "each"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "aCollectiondo"
+        },
+        {
+          "Value": "superaddLast"
+        }
+      ]
+    },
+    {
+      "Selector": "at:put:",
+      "Source": "at:anIntegerput:anObjectselferror:\u0027to add to a sorted collection, you must use add:\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "anObjectselferror"
+        }
+      ]
+    },
+    {
+      "Selector": "collect:",
+      "Source": "collect:aBlock|newCollection|newCollection_OrderedCollectionnew.selfdo:[:each|newCollectionadd:(aBlockvalue:each)].^newCollection!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 69 6A 41 7C",
+      "Literals": [
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "selfdo"
+        }
+      ]
+    },
+    {
+      "Selector": "copy",
+      "Source": "copy|newCollection|newCollection_selfspeciessortBlock:sortBlock.newCollectionaddAll:self.^newCollection!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciessortBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "copyEmpty",
+      "Source": "copyEmpty^SortedCollectionsortBlock:sortBlock!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "grow",
+      "Source": "grow|newSelf|newSelf_selfspeciesnew:selfsize\u002BselfgrowSize.newSelfsortBlock:sortBlock.newSelfaddAll:self.selfbecome:newSelf!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 88 68 7C",
+      "Literals": [
+        {
+          "Value": "selfspeciesnew"
+        }
+      ]
+    },
+    {
+      "Selector": "indexForInserting:",
+      "Source": "indexForInserting:newObject|indexlowhigh|low_firstIndex.high_lastIndex.[index_high\u002Blow//2.low\u003Ehigh]whileFalse:[(sortBlockvalue:(selfbasicAt:index)value:newObject)ifTrue:[low_index\u002B1]ifFalse:[high_index-1]].^low!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 88 81 60 07 87 6A 48 88 81 60 09 87 6A 89 00 0F 49 47 B0 22 BD 88 81 60 0A 87 6A 47 49 B3 7D 89 00 04 4B 4A E5 7D 10 F4 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "//"
+        },
+        2,
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "whileFalse:value:"
+        },
+        {
+          "Value": "selfbasicAt:"
+        },
+        {
+          "Value": "firstIndex"
+        },
+        {
+          "Value": "low"
+        },
+        {
+          "Value": "lastIndex"
+        },
+        {
+          "Value": "high"
+        },
+        {
+          "Value": "index"
+        },
+        {
+          "Value": "sortBlockvalue"
+        }
+      ]
+    },
+    {
+      "Selector": "reSort",
+      "Source": "reSortselfsort:firstIndexto:lastIndex!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "lastIndex"
+        }
+      ]
+    },
+    {
+      "Selector": "sort:to:",
+      "Source": "sort:ito:j|didijdjttijkln|(n_j\u002B1-i)\u003C=1ifTrue:[^self].di_selfbasicAt:i.dj_selfbasicAt:j.(sortBlockvalue:divalue:dj)ifFalse:[selfswap:iwith:j.tt_di.di_dj.dj_tt].n\u003E2ifTrue:[ij_(i\u002Bj)//2.dij_selfbasicAt:ij.(sortBlockvalue:divalue:dij)ifTrue:[(sortBlockvalue:dijvalue:dj)ifFalse:[selfswap:jwith:ij.dij_dj]]ifFalse:[selfswap:iwith:ij.dij_di].n\u003E3ifTrue:[k_i.l_j.[[l_l-1.k\u003C=land:[sortBlockvalue:dijvalue:(selfbasicAt:l)]]whileTrue.[k_k\u002B1.k\u003C=land:[sortBlockvalue:(selfbasicAt:k)value:dij]]whileTrue.k\u003C=l]whileTrue:[selfswap:kwith:l].selfsort:ito:l.selfsort:kto:j]]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 47 E0 46 22 B0 48 B1 88 81 60 09 87 E0 22 B4 89 00 03 70 7D 7D E5 69 4A 88 81 60 0B 87 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u003C="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "j"
+        },
+        {
+          "Value": "didijdjttijkln"
+        },
+        {
+          "Value": "i"
+        },
+        {
+          "Value": "n"
+        },
+        {
+          "Value": "selfbasicAt"
+        },
+        {
+          "Value": "di"
+        }
+      ]
+    },
+    {
+      "Selector": "sortBlock",
+      "Source": "sortBlock^sortBlock!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "00 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "sortBlock:",
+      "Source": "sortBlock:aBlocksortBlock_aBlockfixTemps.selfsize\u003E0ifTrue:[selfreSort]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 69 44 21 B3 89 00 02 45 7D E2 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "aBlockfixTemps"
+        },
+        {
+          "Value": "selfsize"
+        },
+        {
+          "Value": "selfreSort"
+        }
+      ]
+    },
+    {
+      "Selector": "swap:with:",
+      "Source": "swap:iwith:j|t|t_selfbasicAt:i.selfbasicAt:iput:(selfbasicAt:j).selfbasicAt:jput:t!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 42 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "j"
+        },
+        {
+          "Value": "t"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "new:",
+      "Source": "new:anInteger^(supernew:anInteger)sortBlock:[:x:y|x\u003C=y]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "sortBlock:",
+      "Source": "sortBlock:aBlock^(supernew:10)sortBlock:aBlock!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 16,
+    "SuccessfullyCompiled": 16,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:39.8643837Z"
+  }
+}

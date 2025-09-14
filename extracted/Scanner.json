@@ -1,0 +1,1027 @@
+{
+  "ClassName": "Scanner",
+  "Superclass": "Object",
+  "InstanceVariables": [
+    "source",
+    "mark",
+    "hereChar",
+    "aheadChar",
+    "token",
+    "tokenType",
+    "currentComment",
+    "buffer",
+    "typeTable"
+  ],
+  "ClassVariables": [
+    "EndChar",
+    "TypeTable"
+  ],
+  "PoolDictionaries": [],
+  "Category": "System-Compiler",
+  "InstanceMethods": [
+    {
+      "Selector": "initScanner",
+      "Source": "initScanner\r\n\tbuffer _ WriteStream on: (String new: 40).\r\n\ttypeTable _ TypeTable!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 44 22 CD E0 88 67 68 45 88 81 60 08 87 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "new:"
+        },
+        40,
+        {
+          "Value": "WriteStream"
+        },
+        {
+          "Value": "String"
+        },
+        {
+          "Value": "TypeTable"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:",
+      "Source": "notify: string \r\n\tself error: string!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 7C",
+      "Literals": [
+        {
+          "Value": "error:"
+        }
+      ]
+    },
+    {
+      "Selector": "offEnd:",
+      "Source": "offEnd: aString \r\n\t\u0022Parser overrides this\u0022\r\n\r\n\t^self notify: aString!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 7C",
+      "Literals": [
+        {
+          "Value": "notify:"
+        }
+      ]
+    },
+    {
+      "Selector": "on:",
+      "Source": "on: inputStream \r\n\t\u0022Bind the input stream, fill the character buffers\u0022\r\n\tsource _ inputStream.\r\n\tself step.\r\n\tself step!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 88 60 69 70 D0 69 70 D0 7C",
+      "Literals": [
+        {
+          "Value": "step"
+        }
+      ]
+    },
+    {
+      "Selector": "scan:",
+      "Source": "scan: inputStream \r\n\t\u0022Bind the input stream, fill the character buffers and first token buffer\u0022\r\n\tself on: inputStream.\r\n\tself scanToken!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 10 E0 69 70 D1 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "scanToken"
+        }
+      ]
+    },
+    {
+      "Selector": "scanFieldNames:",
+      "Source": "scanFieldNames: stringOrArray\r\n\t\u0022Answer with an Array of strings which are the identifiers in the input string.\r\n\tIf passed an Array, just answer with that Array (it has already been scanned).\u0022\r\n\t| strm |\r\n\t(stringOrArray isMemberOf: Array)\r\n\t\tifTrue: [^stringOrArray].\r\n\tself scan: (ReadStream on: stringOrArray asString).\r\n\tstrm _ WriteStream on: (Array new: 10).\r\n\t[tokenType = #doIt]\r\n\t\twhileFalse: \r\n\t\t\t[tokenType = #word ifTrue: [strm nextPut: token].\r\n\t\t\tself scanToken].\r\n\t^strm contents\r\n\r\n\t\u0022Scanner new scanFieldNames: \u0027abc  def ghi\u0027 (\u0027abc\u0027 \u0027def\u0027 \u0027ghi\u0027 )\u0022!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 4E E0 89 00 03 10 7D 7D E1 6A 70 4F 10 D4 E3 E2 6A 50 4E 26 CD E3 88 69 6A 89 00 04 05 28 B6 7D 89 00 0F 05 2A B6 89 00 04 11 04 C4 7D E1 6A 70 DC 7D E9 6A 11 DD 7C",
+      "Literals": [
+        {
+          "Value": "isMemberOf:"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "scan:"
+        },
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "asString"
+        },
+        {
+          "Value": "new:"
+        },
+        10,
+        {
+          "Value": "="
+        },
+        {
+          "Value": "doIt"
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "word"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "scanToken"
+        },
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": "Array"
+        },
+        {
+          "Value": "ReadStream"
+        },
+        {
+          "Value": "WriteStream"
+        }
+      ]
+    },
+    {
+      "Selector": "scanLitVec",
+      "Source": "scanLitVec\r\n\t| s |\r\n\ts _ WriteStream on: (Array new: 16).\r\n\t[tokenType = #rightParenthesis or: [tokenType = #doIt]]\r\n\t\twhileFalse: \r\n\t\t\t[tokenType = #leftParenthesis\r\n\t\t\t\tifTrue: \r\n\t\t\t\t\t[self scanToken; scanLitVec]\r\n\t\t\t\tifFalse: \r\n\t\t\t\t\t[tokenType = #word | (tokenType = #keyword)\r\n\t\t\t\t\t\tifTrue: \r\n\t\t\t\t\t\t\t[self scanLitWord]\r\n\t\t\t\t\t\tifFalse:\r\n\t\t\t\t\t\t\t[(token == #- \r\n\t\t\t\t\t\t\t\t\tand: [(typeTable at: hereChar asciiValue) = #xDigit])\r\n\t\t\t\t\t\t\t\tifTrue: \r\n\t\t\t\t\t\t\t\t\t[self scanToken.\r\n\t\t\t\t\t\t\t\t\ttoken _ token negated]]].\r\n\t\t\ts nextPut: token.\r\n\t\t\tself scanToken].\r\n\ttoken _ s contents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "5A 5B 22 CD E0 88 68 69 89 00 0C 05 24 B6 89 00 04 05 26 B6 7D E5 7D 89 00 4B 05 28 B6 89 00 08 70 88 6A DA 69 12 DB 7D 89 00 31 05 2C B6 05 2E B6 ED 89 00 03 70 DF 7D 89 00 1F 04 31 C6 89 00 08 08 02 83 14 C0 35 B6 7D 83 32 89 00 09 70 DA 69 04 83 17 88 64 7D 83 36 7D F9 7D F9 69 10 04 C4 69 70 DA 7D E7 69 10 83 19 88 64 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "new:"
+        },
+        16,
+        {
+          "Value": "="
+        },
+        {
+          "Value": "rightParenthesis"
+        },
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "doIt"
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "leftParenthesis"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "scanToken"
+        },
+        {
+          "Value": "scanLitVec"
+        },
+        {
+          "Value": "word"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "keyword"
+        },
+        {
+          "Value": "scanLitWord"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "xDigit"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "negated"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": "WriteStream"
+        },
+        {
+          "Value": "Array"
+        }
+      ]
+    },
+    {
+      "Selector": "scanLitWord",
+      "Source": "scanLitWord\r\n\t\u0022accumulate keywords and asSymbol the result\u0022\r\n\r\n\t| t |\r\n\t[(typeTable at: hereChar asciiValue) = #xLetter]\r\n\t\twhileTrue: \r\n\t\t\t[t _ token.\r\n\t\t\tself xLetter.\r\n\t\t\ttoken _ t , token].\r\n\ttoken _ token asSymbol!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 07 08 02 D1 C0 23 B6 7D 89 00 0D 04 88 68 69 70 D3 69 10 04 E5 88 64 7D E4 69 04 D6 88 64 7C",
+      "Literals": [
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "xLetter"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": ","
+        },
+        {
+          "Value": "asSymbol"
+        }
+      ]
+    },
+    {
+      "Selector": "scanToken",
+      "Source": "scanToken\r\n\t[(tokenType _ typeTable at: hereChar asciiValue) == #xDelimiter]\r\n\t\twhileTrue: [self step].  \u0022Skip delimiters fast, there almost always is one.\u0022\r\n\tmark _ source position - 1.\r\n\t(tokenType at: 1) = $x \u0022x as first letter\u0022\r\n\t\tifTrue: [self perform: tokenType \u0022means perform to compute token \u0026 type\u0022]\r\n\t\tifFalse: [token _ self step asSymbol \u0022else just unique the first char\u0022].\r\n\t^token!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "89 00 09 08 02 D1 C0 88 65 23 C6 7D 89 00 03 70 D5 7D E4 68 00 D6 28 B1 88 61 68 05 28 C0 2D B6 89 00 04 70 05 EB 7D 89 00 06 70 D5 DC 88 64 7D FA 68 04 7C",
+      "Literals": [
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "xDelimiter"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "position"
+        },
+        {
+          "Value": "-"
+        },
+        1,
+        {
+          "Value": "="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "perform:"
+        },
+        {
+          "Value": "asSymbol"
+        },
+        "x"
+      ]
+    },
+    {
+      "Selector": "scanTokens:",
+      "Source": "scanTokens: textOrString \r\n\t\u0022Answer with an Array which has been tokenized as though the input text\r\n\thad appeared between #( and ) in a Smalltalk literal expression.\u0022\r\n\r\n\tself scan: (ReadStream on: textOrString asString).\r\n\tself scanLitVec.\r\n\t^token\r\n\r\n\t\u0022Scanner new scanTokens: \r\n\t\t\t\u0027identifier keyword: 8r31 \u0027\u0027string\u0027\u0027 embedded.period key:word: .   \u0027     \u0022!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 44 10 D2 E1 E0 69 70 D3 69 04 7C",
+      "Literals": [
+        {
+          "Value": "scan:"
+        },
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "asString"
+        },
+        {
+          "Value": "scanLitVec"
+        },
+        {
+          "Value": "ReadStream"
+        }
+      ]
+    },
+    {
+      "Selector": "step",
+      "Source": "step\r\n\t| c |\r\n\tc _ hereChar.\r\n\thereChar _ aheadChar.\r\n\t(aheadChar _ source next) == nil\r\n\t\tifTrue: [aheadChar _ EndChar \u0022doit\u0022].\r\n\t^c!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 88 68 69 03 88 62 69 00 C3 88 63 23 C6 89 00 04 44 88 63 7D E2 69 10 7C",
+      "Literals": [
+        {
+          "Value": "next"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        "nil",
+        {
+          "Value": "EndChar"
+        }
+      ]
+    },
+    {
+      "Selector": "xBinary",
+      "Source": "xBinary\r\n\ttokenType _ #binary.\r\n\ttoken _ Symbol internCharacter: self step.\r\n\t((typeTable at: hereChar asciiValue) = #xBinary and: [hereChar ~= $-])\r\n\t\tifTrue: [token _ (token , (String with: self step)) asSymbol]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 65 68 4D 70 D2 E1 88 64 68 08 02 D4 C0 26 B6 89 00 04 02 2E B7 7D E7 89 00 0A 04 4F 70 D2 EB EA DC 88 64 7D E9 7C",
+      "Literals": [
+        {
+          "Value": "binary"
+        },
+        {
+          "Value": "internCharacter:"
+        },
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "xBinary"
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "~="
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": ","
+        },
+        {
+          "Value": "with:"
+        },
+        {
+          "Value": "asSymbol"
+        },
+        {
+          "Value": "Symbol"
+        },
+        "-",
+        {
+          "Value": "String"
+        }
+      ]
+    },
+    {
+      "Selector": "xDelimiter",
+      "Source": "xDelimiter\r\n\t\u0022ignore blanks etc.\u0022\r\n\r\n\tself scanToken!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 7C",
+      "Literals": [
+        {
+          "Value": "scanToken"
+        }
+      ]
+    },
+    {
+      "Selector": "xDigit",
+      "Source": "xDigit\r\n\t\u0022form a number\u0022\r\n\r\n\ttokenType _ #number.\r\n\t(aheadChar = EndChar and: [source atEnd\r\n\t\t\tand:  [source skip: -1. source next ~= EndChar]])\r\n\t\tifTrue: [source skip: -1 \u0022Read off the end last time\u0022]\r\n\t\tifFalse: [source skip: -2].\r\n\ttoken _ Number readFrom: source.\r\n\tself step; step!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 88 65 68 03 4C B6 89 00 0F 00 C5 89 00 08 00 E4 68 00 C3 4C B7 7D E2 7D E2 89 00 03 00 E4 7D 89 00 03 00 E4 7D F8 68 4D 00 EA 88 64 68 70 88 69 DB 68 11 DB 7C",
+      "Literals": [
+        {
+          "Value": "number"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "atEnd"
+        },
+        {
+          "Value": "skip:"
+        },
+        1,
+        {
+          "Value": "next"
+        },
+        {
+          "Value": "~="
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        2,
+        {
+          "Value": "readFrom:"
+        },
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "EndChar"
+        },
+        {
+          "Value": "Number"
+        }
+      ]
+    },
+    {
+      "Selector": "xDollar",
+      "Source": "xDollar\r\n\t\u0022form a Character literal\u0022\r\n\r\n\tself step. \u0022pass over $\u0022\r\n\ttoken _ self step.\r\n\ttokenType _ #number \u0022really should be Char, but rest of compiler doesn\u0027t know\u0022!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 68 70 D0 88 64 68 21 D2 88 65 7C",
+      "Literals": [
+        {
+          "Value": "step"
+        },
+        {
+          "Value": ""
+        },
+        {
+          "Value": "number"
+        }
+      ]
+    },
+    {
+      "Selector": "xDoubleQuote",
+      "Source": "xDoubleQuote\r\n\t\u0022collect comment\u0022\r\n\r\n\t| aStream |\r\n\taStream _ WriteStream on: (String new: 32).\r\n\tself step.\r\n\t[aStream nextPut: self step. hereChar == $\u0022]\r\n\t\twhileFalse: \r\n\t\t\t[(hereChar = EndChar and: [source atEnd])\r\n\t\t\t\tifTrue: [^self offEnd: \u0027Unmatched comment quote\u0027]].\r\n\tself step.\r\n\tcurrentComment == nil\r\n\t\tifTrue: [currentComment _ OrderedCollection with: aStream contents]\r\n\t\tifFalse: [currentComment add: aStream contents].\r\n\tself scanToken!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "52 53 22 CD E0 88 68 69 70 D3 69 89 00 09 10 70 D3 C4 69 02 34 C6 7D 89 00 14 02 55 B6 89 00 03 00 C5 7D E8 89 00 05 70 2C EB 7D 7D EA 7D E6 69 70 D3 69 06 36 C6 89 00 07 57 10 DF EE 88 66 7D 89 00 06 06 10 DF 83 30 7D FD 69 70 83 11 7C",
+      "Literals": [
+        {
+          "Value": "on:"
+        },
+        {
+          "Value": "new:"
+        },
+        32,
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "atEnd"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "offEnd:"
+        },
+        "Unmatched comment quote",
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "with:"
+        },
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": "add:"
+        },
+        {
+          "Value": "scanToken"
+        },
+        {
+          "Value": "WriteStream"
+        },
+        {
+          "Value": "String"
+        },
+        "\u0022",
+        {
+          "Value": "EndChar"
+        },
+        "nil",
+        {
+          "Value": "OrderedCollection"
+        }
+      ]
+    },
+    {
+      "Selector": "xLetter",
+      "Source": "xLetter\r\n\t\u0022form a word or keyword\u0022\r\n\t| type prefix |\r\n\tbuffer reset.\r\n\t[type _ typeTable at: hereChar asciiValue.\r\n\ttype == #xLetter or: [type == #xDigit]]\r\n\t\twhileTrue:\r\n\t\t\t[\u0022open code step for speed\u0022\r\n\t\t\tbuffer nextPut: hereChar.\r\n\t\t\thereChar _ aheadChar.\r\n\t\t\tsource atEnd\r\n\t\t\t\tifTrue: [aheadChar _ EndChar \u0022doit\u0022]\r\n\t\t\t\tifFalse: [aheadChar _ source next]].\r\n\t(type == #period and:\r\n\t\t\t[tokenType _ typeTable at: aheadChar asciiValue.\r\n\t\t\t(tokenType == #xLetter) | (tokenType == #xBinary)])\r\n\t\tifTrue:  \u0022Allow embedded period in selectors\u0022\r\n\t\t\t[buffer nextPut: self step.\r\n\t\t\tprefix _ buffer contents.\r\n\t\t\tself perform: tokenType.\r\n\t\t\ttoken _ prefix , token.\r\n\t\t\ttokenType == #binary ifTrue: [token _ token asSymbol].\r\n\t\t\t^self].\r\n\ttype == #colon\r\n\t\tifTrue: \r\n\t\t\t[buffer nextPut: self step.\r\n\t\t\ttokenType _ #keyword]\r\n\t\tifFalse: \r\n\t\t\t[tokenType _ #word].\r\n\ttoken _ buffer contents!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "07 D0 6A 89 00 13 08 02 D2 C0 88 68 6A 10 24 C6 89 00 04 10 26 C6 7D E5 7D 89 00 1B 07 02 C4 6A 03 88 62 6A 00 C5 89 00 04 5A 88 63 7D 89 00 05 00 C3 88 63 7D FA 7D E7 6A 10 2C C6 89 00 0F 08 03 D2 C0 88 65 6A 05 24 C6 05 2F C6 EE 7D ED 89 00 2A 07 70 83 11 C4 6A 07 83 12 88 69 6A 70 05 83 33 6A 11 04 83 34 88 64 6A 05 35 C6 89 00 06 04 83 16 88 64 7D 83 30 6A 70 7D 7D 83 30 6A 10 37 C6 89 00 0A 07 70 83 11 C4 6A 38 88 65 7D 89 00 04 39 88 65 7D FA 6A 07 83 12 88 64 7C",
+      "Literals": [
+        {
+          "Value": "reset"
+        },
+        {
+          "Value": "at:"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "xLetter"
+        },
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "xDigit"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "atEnd"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "next"
+        },
+        {
+          "Value": "period"
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "xBinary"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": "perform:"
+        },
+        {
+          "Value": ","
+        },
+        {
+          "Value": "binary"
+        },
+        {
+          "Value": "asSymbol"
+        },
+        {
+          "Value": "colon"
+        },
+        {
+          "Value": "keyword"
+        },
+        {
+          "Value": "word"
+        },
+        {
+          "Value": "EndChar"
+        }
+      ]
+    },
+    {
+      "Selector": "xLitQuote",
+      "Source": "xLitQuote\r\n\t\u0022UniqueStrings and Vectors\u0022\r\n\t\u0022 #(1 (4 5) 2 3) #ifTrue:ifFalse:\u0022\r\n\r\n\t| start |\r\n\tself step. \u0022litQuote\u0022\r\n\tself scanToken.\r\n\ttokenType = #leftParenthesis\r\n\t\tifTrue: \r\n\t\t\t[start _ mark.\r\n\t\t\tself scanToken; scanLitVec.\r\n\t\t\ttokenType == #doIt\r\n\t\t\t\tifTrue: [mark _ start.\r\n\t\t\t\t\t\tself offEnd: \u0027Unmatched parenthesis\u0027]]\r\n\t\tifFalse: \r\n\t\t\t[(#(word keyword colon) includes: tokenType) \r\n\t\t\t\tifTrue: [self scanLitWord]].\r\n\ttokenType _ #literal!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 69 70 D1 69 05 23 B6 89 00 1C 01 88 68 69 70 88 6A D1 69 12 D5 69 05 27 C6 89 00 08 10 88 61 69 70 2A E9 7D E8 7D 89 00 0B 2F 05 EB 89 00 03 70 DC 7D E8 7D F4 69 2D DE 88 65 7C",
+      "Literals": [
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "scanToken"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "leftParenthesis"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "scanLitVec"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "doIt"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "offEnd:"
+        },
+        "Unmatched parenthesis",
+        {
+          "Value": "includes:"
+        },
+        {
+          "Value": "scanLitWord"
+        },
+        {
+          "Value": ""
+        },
+        {
+          "Value": "literal"
+        },
+        "#(wordkeywordcolon)"
+      ]
+    },
+    {
+      "Selector": "xSingleQuote",
+      "Source": "xSingleQuote\r\n\t\u0022string\u0022\r\n\tself step.\r\n\tbuffer reset.\r\n\t[hereChar == $\u0027 \r\n\t\tand: [aheadChar == $\u0027 \r\n\t\t\t\tifTrue: [self step. false]\r\n\t\t\t\tifFalse: [true]]]\r\n\t\twhileFalse: \r\n\t\t\t[buffer nextPut: self step.\r\n\t\t\t(hereChar == EndChar and: [source atEnd])\r\n\t\t\t\tifTrue: [^self offEnd: \u0027Unmatched string quote\u0027]].\r\n\tself step.\r\n\ttoken _ buffer contents.\r\n\ttokenType _ #string!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 D0 68 07 D1 68 89 00 1A 02 2E C6 89 00 12 03 2E C6 89 00 05 70 D0 68 2F 7D 89 00 02 30 7D F4 7D E3 7D 89 00 19 07 70 D0 C4 68 02 51 C6 89 00 03 00 C5 7D E3 89 00 05 70 2A E9 7D 7D E8 7D E5 68 70 D0 68 07 DB 88 64 68 2C DD 88 65 7C",
+      "Literals": [
+        {
+          "Value": "step"
+        },
+        {
+          "Value": "reset"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "whileFalse:"
+        },
+        {
+          "Value": "nextPut:"
+        },
+        {
+          "Value": "atEnd"
+        },
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "offEnd:"
+        },
+        "Unmatched string quote",
+        {
+          "Value": "contents"
+        },
+        {
+          "Value": ""
+        },
+        {
+          "Value": "string"
+        },
+        "\u0027",
+        false,
+        true,
+        {
+          "Value": "EndChar"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [
+    {
+      "Selector": "initialize",
+      "Source": "initialize\r\n\t\u0022Scanner initialize.\u0022\r\n\r\n\t| newTable |\r\n\tnewTable _ Array new: 256 withAll: #xBinary. \u0022default\u0022\r\n\tnewTable atAll: #(9 10 12 13 32 ) put: #xDelimiter. \u0022tab lf ff cr space\u0022\r\n\tnewTable atAll: ($0 asciiValue to: $9 asciiValue) put: #xDigit.\r\n\tnewTable atAll: ($A asciiValue to: $Z asciiValue) put: #xLetter.\r\n\tnewTable atAll: ($a asciiValue to: $z asciiValue) put: #xLetter.\r\n\tnewTable at: 30 put: #doIt.\r\n\tnewTable at: $\u0022 asciiValue put: #xDoubleQuote.\r\n\tnewTable at: $# asciiValue put: #xLitQuote.\r\n\tnewTable at: $$ asciiValue put: #xDollar.\r\n\tnewTable at: $\u0027 asciiValue put: #xSingleQuote.\r\n\tnewTable at: $( asciiValue put: #leftParenthesis.\r\n\tnewTable at: $) asciiValue put: #rightParenthesis.\r\n\tnewTable at: $. asciiValue put: #period.\r\n\tnewTable at: $: asciiValue put: #colon.\r\n\tnewTable at: $; asciiValue put: #semicolon.\r\n\tnewTable at: $[ asciiValue put: #leftBracket.\r\n\tnewTable at: $] asciiValue put: #rightBracket.\r\n\tnewTable at: $^ asciiValue put: #upArrow.\r\n\tnewTable at: $_ asciiValue put: #leftArrow.\r\n\tnewTable at: $| asciiValue put: #verticalBar.\r\n\tEndChar _ 30 asCharacter.\r\n\tTypeTable _ newTable \u0022bon voyage!!\u0022!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "83 80 21 22 F0 88 68 69 10 83 61 29 F3 69 10 83 62 DA 83 63 DA EB 2C F3 69 10 83 64 DA 83 65 DA EB 2D F3 69 10 83 66 DA 83 67 DA EB 2D F3 69 10 2F 30 C1 69 10 83 68 DA 31 C1 69 10 83 69 DA 32 C1 69 10 83 6A DA 33 C1 69 10 83 6B DA 34 C1 69 10 83 6C DA 35 C1 69 10 83 6D DA 36 C1 69 10 83 6E DA 37 C1 69 10 83 6F DA 38 C1 69 10 83 70 DA 39 C1 69 10 83 71 DA 3A C1 69 10 83 72 DA 3B C1 69 10 83 73 DA 3C C1 69 10 83 74 DA 3D C1 69 10 83 75 DA 3E C1 69 2F 83 1F 88 81 60 36 87 69 10 88 81 60 37 87 7C",
+      "Literals": [
+        {
+          "Value": "new:withAll:"
+        },
+        256,
+        {
+          "Value": "xBinary"
+        },
+        {
+          "Value": "atAll:put:"
+        },
+        9,
+        10,
+        12,
+        13,
+        32,
+        {
+          "Value": "xDelimiter"
+        },
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "xDigit"
+        },
+        {
+          "Value": "xLetter"
+        },
+        {
+          "Value": "at:put:"
+        },
+        30,
+        {
+          "Value": "doIt"
+        },
+        {
+          "Value": "xDoubleQuote"
+        },
+        {
+          "Value": "xLitQuote"
+        },
+        {
+          "Value": "xDollar"
+        },
+        {
+          "Value": "xSingleQuote"
+        },
+        {
+          "Value": "leftParenthesis"
+        },
+        {
+          "Value": "rightParenthesis"
+        },
+        {
+          "Value": "period"
+        },
+        {
+          "Value": "colon"
+        },
+        {
+          "Value": "semicolon"
+        },
+        {
+          "Value": "leftBracket"
+        },
+        {
+          "Value": "rightBracket"
+        },
+        {
+          "Value": "upArrow"
+        },
+        {
+          "Value": "leftArrow"
+        },
+        {
+          "Value": "verticalBar"
+        },
+        {
+          "Value": "asCharacter"
+        },
+        {
+          "Value": "Array"
+        },
+        "#(910121332)",
+        "0",
+        "9",
+        "A",
+        "Z",
+        "a",
+        "z",
+        "\u0022",
+        "#",
+        "$",
+        "\u0027",
+        "(",
+        ")",
+        ".",
+        ":",
+        ";",
+        "[",
+        "]",
+        "^",
+        "_",
+        "|",
+        {
+          "Value": "EndChar"
+        },
+        {
+          "Value": "TypeTable"
+        }
+      ]
+    },
+    {
+      "Selector": "isLiteralSymbol:",
+      "Source": "isLiteralSymbol: aSymbol \r\n\t\u0022Test whether a symbol can be stored as # followed by its characters.  \r\n\tSymbols created internally with asSymbol may not have this property, \r\n\te.g. \u00273\u0027 asSymbol.\u0022\r\n\r\n\t| i ascii type |\r\n\ti _ aSymbol size.\r\n\ti = 0 ifTrue: [^false].\r\n\tascii _ (aSymbol at: 1) asciiValue.\r\n\t\u0022TypeTable should have been origined at 0 rather than 1 ...\u0022\r\n\tascii = 0 ifTrue: [^false].\r\n\ttype _ TypeTable at: ascii.\r\n\t(type == #colon or: [type == #verticalBar])\r\n\t\tifTrue: [^i = 1].\r\n\ttype == #xBinary\r\n\t\tifTrue: \r\n\t\t\t[[i \u003E 1]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[ascii _ (aSymbol at: i) asciiValue.\r\n\t\t\t\t\tascii = 0 ifTrue: [^false].\r\n\t\t\t\t\t(TypeTable at: ascii) == #xBinary ifFalse: [^false].\r\n\t\t\t\t\ti _ i - 1].\r\n\t\t\t^true].\r\n\ttype == #xLetter\r\n\t\tifTrue: \r\n\t\t\t[[i \u003E 1]\r\n\t\t\t\twhileTrue: \r\n\t\t\t\t\t[ascii _ (aSymbol at: i) asciiValue.\r\n\t\t\t\t\tascii = 0 ifTrue: [^false].\r\n\t\t\t\t\ttype _ TypeTable at: ascii.\r\n\t\t\t\t\t(type == #xLetter or: [type == #xDigit or: [type == #colon]])\r\n\t\t\t\t\t\tifFalse: [^false].\r\n\t\t\t\t\ti _ i - 1].\r\n\t\t\t^true].\r\n\t^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 4,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 C2 88 69 6C 11 22 B6 89 00 03 32 7D 7D E3 6C 10 25 C0 D6 88 6A 6C 12 22 B6 89 00 03 32 7D 7D E3 6C 53 12 C0 88 6B 6C 13 28 C6 89 00 04 13 2A C6 7D E9 89 00 05 11 25 B6 7D 7D E3 6C 13 2B C6 89 00 34 89 00 04 11 25 B3 7D 89 00 25 10 11 C0 D6 88 6A 6C 12 22 B6 89 00 03 32 7D 7D E3 6C 53 12 C0 2B C6 89 00 03 32 7D 7D EE 6C 11 25 B1 88 69 7D ED 6C 34 7D 7D E3 6C 13 30 C6 89 00 48 89 00 04 11 25 B3 7D 89 00 39 10 11 C0 D6 88 6A 6C 12 22 B6 89 00 03 32 7D 7D E3 6C 53 12 C0 88 6B 6C 13 30 C6 89 00 0C 13 31 C6 89 00 04 13 28 C6 7D E9 7D E9 89 00 03 32 7D 7D EE 6C 11 25 B1 88 69 7D ED 6C 34 7D 7D E3 6C 32 7C",
+      "Literals": [
+        {
+          "Value": "size"
+        },
+        {
+          "Value": "="
+        },
+        0,
+        {
+          "Value": "ifTrue:"
+        },
+        {
+          "Value": "at:"
+        },
+        1,
+        {
+          "Value": "asciiValue"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "colon"
+        },
+        {
+          "Value": "or:"
+        },
+        {
+          "Value": "verticalBar"
+        },
+        {
+          "Value": "xBinary"
+        },
+        {
+          "Value": "\u003E"
+        },
+        {
+          "Value": "whileTrue:"
+        },
+        {
+          "Value": "ifFalse:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "xLetter"
+        },
+        {
+          "Value": "xDigit"
+        },
+        false,
+        {
+          "Value": "TypeTable"
+        },
+        true
+      ]
+    },
+    {
+      "Selector": "new",
+      "Source": "new\r\n\t^super new initScanner!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 CC D1 7C",
+      "Literals": [
+        {
+          "Value": "new"
+        },
+        {
+          "Value": "initScanner"
+        }
+      ]
+    }
+  ],
+  "Statistics": {
+    "TotalMethods": 22,
+    "SuccessfullyCompiled": 22,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-14T01:34:59.953635Z"
+  }
+}

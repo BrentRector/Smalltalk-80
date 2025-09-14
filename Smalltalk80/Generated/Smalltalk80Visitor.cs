@@ -315,6 +315,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitParenthesizedExpr([NotNull] Smalltalk80Parser.ParenthesizedExprContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.dynamicArray"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitDynamicArray([NotNull] Smalltalk80Parser.DynamicArrayContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unarySelector"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

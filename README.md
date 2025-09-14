@@ -1,65 +1,148 @@
 # Smalltalk-80
 
-This rep## VS Code Setup
+A complete implementation of the Smalltalk-80 system in C#, including an interpreter, standalone bytecode compiler, and comprehensive test suite.
 
-The repository contains a `.vscode` folder with build and debug tasks. After
-installing the [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
-extension, open this folder in VS Code and press <kbd>F5</kbd> to build and
-debug. 
+## Prerequisites
 
-### Integrated Build and Test Workflow
+- **.NET 9.0 SDK** or later
+- PowerShell (for Windows scripts) or Bash (for Unix scripts)
+- VS Code with C# Dev Kit extension (optional, for IDE support)
 
-The VS Code build system is configured to automatically run all test cases after successful compilation:
+## Quick Start
 
-- **Default Build** (Ctrl+Shift+B): Builds the solution and runs comprehensive test suite
-- **Build Task**: Compiles `Smalltalk80.sln` with automatic ANTLR generation
-- **Test Integration**: Automatically executes all 9 test categories after successful build
-- **Results Display**: Shows test results with pass/fail status in the terminal
-
-### Available VS Code Tasks
-
-1. **`build`** (default) - Complete build and test workflow
-2. **`build-and-test`** - Build only without tests  
-3. **`run-tests`** - Run comprehensive test suite independently
-4. **`generate-antlr`** - Generate ANTLR parser files only
-5. **`run`** - Run the interpreter
-6. **`repl`** - Start REPL mode
-
-### Task Execution Flow
-```
-Ctrl+Shift+B (Build)
-  ↓
-ANTLR Generation → .NET Build → Comprehensive Tests
-  ↓
-Test Results: Pass/Fail Summary with Detailed Logging
-```
-
-### Manual Task Execution
-Access tasks via Command Palette (`Ctrl+Shift+P` → "Tasks: Run Task") or use keyboard shortcuts:
-- `Ctrl+Shift+B` - Default build with tests
-- `Ctrl+Shift+P` → "Tasks: Run Task" → Select specific task contains a basic prototype of a Smalltalk-80 interpreter written in C#. The solution includes a console application demonstrating a minimal bytecode parser and execution engine.
-
-## Building
-
-Use the .NET SDK (`dotnet`) to build the solution:
-
-The projects target **.NET&nbsp;9.0**, so be sure to install a matching SDK before building.
+### Building the System
 
 ```bash
-dotnet build Smalltalk80.sln
+# Clean build
+dotnet clean
+dotnet build
+
+# Build without running tests
+dotnet build --no-restore
 ```
 
-Running the console app executes a small bytecode sequence and prints the result.
-
-## REPL
-
-Launch the interactive Smalltalk-80 REPL with:
+### Running Tests
 
 ```bash
-dotnet run --project Smalltalk80/Smalltalk80.csproj -- --repl
+# Run the bytecode test suite (tests all 256 bytecodes)
+dotnet run --project Smalltalk80.Tests
+
+# Or use the test scripts
+./run-tests.ps1    # Windows PowerShell
+./run-tests.sh      # Linux/Mac
+
+# Run with test flag during build
+dotnet build -p:RunTests=true
 ```
 
-You can also start it directly from VS Code using the **Smalltalk REPL** launch configuration or the **repl** task.
+## Project Structure
+
+### Core Projects
+
+- **Smalltalk80/** - Core interpreter and VM implementation
+- **Smalltalk80.Interpreter/** - Interactive interpreter executable
+- **StandaloneCompiler/** - Smalltalk source to bytecode compiler
+- **Smalltalk80.ExtractClass/** - Class extraction utility
+- **Smalltalk80.Tests/** - Comprehensive bytecode test suite
+- **Smalltalk80.CompilerTest/** - Compiler validation tests
+
+### Key Files
+
+- **complete_system_final.json** - Compiled Smalltalk-80 system image (223 classes, 4,493 methods)
+- **Bootstrap/** - Bootstrap manifests for system initialization
+- **StandardLibrary.st** - Core Smalltalk-80 standard library
+
+## Building the System
+
+### Complete Build Process
+
+```bash
+# 1. Clean previous build artifacts
+dotnet clean
+
+# 2. Build all projects
+dotnet build
+
+# 3. Verify no warnings or errors
+# Build should complete with 0 warnings, 0 errors
+```
+
+The build process automatically:
+- Generates ANTLR4 parser from Smalltalk grammar
+- Compiles all C# projects
+- Copies bootstrap files to output directory
+- Optionally runs Phase 3 comprehensive tests
+
+## Standalone Compiler
+
+The standalone compiler converts Smalltalk source code to bytecode JSON manifests.
+
+### Usage
+
+```bash
+# Compile a Smalltalk source file
+dotnet run --project StandaloneCompiler -- input.st [output.json]
+
+# Or use the built executable
+./bin/Debug/net9.0/Smalltalk80.Compiler.exe input.st [output.json]
+
+# If output file is omitted, defaults to input.json
+dotnet run --project StandaloneCompiler -- MyClass.st  # Creates MyClass.json
+```
+
+### Command-Line Arguments
+
+1. **input.st** (required) - Smalltalk source file to compile
+2. **output.json** (optional) - Output JSON file path (defaults to input filename with .json extension)
+
+### Example: Compiling the System Image
+
+```bash
+# Compile the entire Smalltalk-80 system
+dotnet run --project StandaloneCompiler -- "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st" system.json
+
+# Result: Creates system.json with all 223 classes and 4,493 methods
+```
+
+### Output Format
+
+The compiler generates a JSON manifest with:
+- **classes** - Array of class definitions with instance variables, class variables, etc.
+- **methods** - Array of compiled methods with bytecode, literals, and metadata
+
+See [SMALLTALK_COMPILER.md](SMALLTALK_COMPILER.md) for detailed JSON schema.
+
+## Interpreter
+
+### REPL Mode
+
+Launch the interactive Smalltalk-80 REPL:
+
+```bash
+dotnet run --project Smalltalk80.Interpreter -- --repl
+```
+
+### Command-Line Arguments
+
+```bash
+# Load and execute a Smalltalk source file
+dotnet run --project Smalltalk80.Interpreter -- --filein "source.st"
+
+# Load a single method
+dotnet run --project Smalltalk80.Interpreter -- --load "method.st"
+
+# Load bootstrap manifest
+dotnet run --project Smalltalk80.Interpreter -- --bootstrap manifest.json
+
+# Enable method tracing
+dotnet run --project Smalltalk80.Interpreter -- --trace-methods
+
+# Enable bytecode tracing
+dotnet run --project Smalltalk80.Interpreter -- --bytecode-trace
+
+# Print a specific class
+dotnet run --project Smalltalk80.Interpreter -- --print-class Dictionary
+```
 
 ## VS Code Setup
 

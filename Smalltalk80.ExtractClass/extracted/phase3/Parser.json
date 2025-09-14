@@ -1,0 +1,709 @@
+{
+  "ClassName": "Parser",
+  "Superclass": "Scanner",
+  "InstanceVariables": [
+    "here",
+    "hereType",
+    "hereMark",
+    "prevToken",
+    "prevMark",
+    "encoder",
+    "requestor",
+    "parseNode",
+    "failBlock",
+    "lastTempMark",
+    "correctionDelta"
+  ],
+  "ClassVariables": [],
+  "PoolDictionaries": [],
+  "Category": "System-Compiler",
+  "InstanceMethods": [
+    {
+      "Selector": "abort",
+      "Source": "abort|exitBlock|encoder==nilifFalse:[encoderrelease.encoder_nil].exitBlock_failBlock.failBlock_nil.^exitBlockvalue!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "05 41 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "addComment",
+      "Source": "addCommentparseNode~~nilifTrue:[parseNodecomment:currentComment.currentComment_nil]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "advance",
+      "Source": "advance|this|prevMark_hereMark.prevToken_(hereType==#number)|(hereType==#string)ifTrue:[mark-prevMark]ifFalse:[heresize].this_here.here_token.hereType_tokenType.hereMark_mark.selfscanToken.^this!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "02 88 64 69 01 21 C6 01 23 C6 E2 89 00 04 46 04 B1 7D 89 00 02 47 7D F4 88 63 69 00 88 68 69 48 88 60 69 49 88 61 69 46 88 62 69 4A 69 10 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "number"
+        },
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "string"
+        },
+        {
+          "Value": "ifTrue:ifFalse:"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "mark"
+        },
+        {
+          "Value": "heresize"
+        },
+        {
+          "Value": "token"
+        },
+        {
+          "Value": "tokenType"
+        },
+        {
+          "Value": "selfscanToken"
+        }
+      ]
+    },
+    {
+      "Selector": "argumentName",
+      "Source": "argumentNamehereType==#wordifFalse:[^selfexpected:\u0027Argument name\u0027].^selfadvance!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "wordifFalse:"
+        }
+      ]
+    },
+    {
+      "Selector": "assignment",
+      "Source": "assignment|varNamevar|varName_selfadvance.(encodercantStoreInto:varName)ifTrue:[^selfnotify:\u0027Cannot store into\u0027].var_encoderencodeVariable:varName.selfadvance.selfexpressionifFalse:[^selfexpected:\u0027Expression\u0027].varisArgifTrue:[^selfnotify:\u0027Cannot store into argument\u0027].parseNode_AssignmentNodenewvariable:varvalue:parseNodefrom:encoder!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 81 60 00 87 69 42 D0 7C",
+      "Literals": [
+        {
+          "Value": "varName"
+        },
+        {
+          "Value": "selfadvance"
+        },
+        {
+          "Value": "encodercantStoreInto"
+        }
+      ]
+    },
+    {
+      "Selector": "bareEndOfLastToken",
+      "Source": "bareEndOfLastToken^prevMark\u002BprevToken-1\u002BcorrectionDelta!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "04 03 B0 22 B1 0A B0 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "-"
+        },
+        1
+      ]
+    },
+    {
+      "Selector": "bindTemp:",
+      "Source": "bindTemp:name^name!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "10 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "blockExpression",
+      "Source": "blockExpression|argNodes|argNodes_OrderedCollectionnew.[selfmatch:#colon]whileTrue:[argNodesaddLast:(encoderautoBind:selfargumentName)].(argNodessize\u003E0\u0026(hereType~~#rightBracket)and:[(selfmatch:#verticalBar)not])ifTrue:[^selfexpected:\u0027Vertical bar\u0027].selfstatements:argNodesinnerBlock:true.(selfmatch:#rightBracket)ifFalse:[^selfexpected:\u0027Period or right bracket\u0027]!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 88 68 69 89 00 02 42 7D D0 7C",
+      "Literals": [
+        {
+          "Value": "colon"
+        },
+        {
+          "Value": "OrderedCollectionnew"
+        },
+        {
+          "Value": "selfmatch"
+        }
+      ]
+    },
+    {
+      "Selector": "cascade",
+      "Source": "cascade|rcvrmsgs|parseNodecanCascadeifFalse:[^selfexpected:\u0027Cascading not\u0027].rcvr_parseNodecascadeReceiver.msgs_OrderedCollectionwith:parseNode.[selfmatch:#semicolon]whileTrue:[parseNode_rcvr.(selfmessagePart:3repeat:false)ifFalse:[^selfexpected:\u0027Cascade\u0027].parseNodecanCascadeifFalse:[^selfexpected:\u0027\u003C- No special messages\u0027].parseNodecascadeReceiver.msgsaddLast:parseNode].parseNode_CascadeNodenewreceiver:rcvrmessages:msgs!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "parseNodecanCascadeifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "editor",
+      "Source": "editor^requestoreditor!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "requestoreditor"
+        }
+      ]
+    },
+    {
+      "Selector": "endOfLastToken",
+      "Source": "endOfLastTokenhereType==#doItifTrue:[^prevMark\u002BprevToken\u002B1\u002BcorrectionDelta].tokenType==#doItifTrue:[^prevMark\u002BprevToken\u002BcorrectionDelta].^prevMark\u002BprevToken-1\u002BcorrectionDelta!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "doItifTrue:"
+        }
+      ]
+    },
+    {
+      "Selector": "expected:",
+      "Source": "expected:aStringtokenType==#doItifTrue:[hereMark_hereMark\u002B1].hereType==#doItifTrue:[hereMark_hereMark\u002B1].^selfnotify:aString,\u0027 expected\u0027at:hereMark!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "doItifTrue:"
+        }
+      ]
+    },
+    {
+      "Selector": "expression",
+      "Source": "expression(hereType==#wordand:[tokenType==#leftArrow])ifTrue:[selfassignment.^true].selfprimaryExpressionifFalse:[^false].(selfmessagePart:3repeat:true)ifTrue:[hereType==#semicolonifTrue:[selfcascade]].^true!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "01 21 C6 D2 D4 23 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "wordand:"
+        },
+        {
+          "Value": "tokenType"
+        },
+        {
+          "Value": ""
+        },
+        {
+          "Value": "leftArrow"
+        }
+      ]
+    },
+    {
+      "Selector": "init:notifying:failBlock:",
+      "Source": "init:sourceStreamnotifying:reqfailBlock:aBlockrequestor_req.failBlock_aBlock.correctionDelta_0.superscan:sourceStream.prevMark_hereMark_mark.selfadvance!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "reqfailBlock"
+        }
+      ]
+    },
+    {
+      "Selector": "initPattern:notifying:return:",
+      "Source": "initPattern:aStringnotifying:reqreturn:aBlock|result|selfinit:(ReadStreamon:aStringasString)notifying:reqfailBlock:[^nil].encoder_self.result_aBlockvalue:(selfpattern:falseinContext:nil).encoder_failBlock_nil.^result!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "reqreturn"
+        }
+      ]
+    },
+    {
+      "Selector": "makeNewSymbol:startingAt:",
+      "Source": "makeNewSymbol:aStringstartingAt:start|editorindexmenusymoldTextnewTextoldStreamoldKey|SymbolhasInterned:aStringifTrue:[:symbol|^symbol].(editor_selfeditor)isNilifTrue:[^aStringasSymbol].editorselectFrom:startto:selfendOfLastToken.Cursornormalshow.index_(menu_ActionMenulabels:\u0027proceed as is\\correct it\\abort\u0027withCRsselectors:#(proceedcorrectabort))startUp:#anyButtonwithHeading:\u0027 \u0027,(aStringcontractTo:20),\u0027 is a new message \u0027.index=0ifTrue:[^selfnotify:\u0027\u0027].(menuselectorAt:index)==#proceedifTrue:[^aStringasSymbol].(menuselectorAt:index)==#correctifTrue:[sym_SymbolcorrectMessage:aString.sym==falseifTrue:[selfnotify:\u0027Couldn\u0027\u0027t correct\u0027.selfabort].sym==nilifTrue:[selfabort].oldText_editorselection.symisKeywordifTrue:[newText_oldText.oldStream_ReadStreamon:aString.symkeywordsdo:[:newKey|oldKey_(oldStreamupTo:$:),\u0027:\u0027.oldKey=newKeyifFalse:[newText_newTextcopyReplaceAll:oldKeyasTextwith:newKeyasText]]]ifFalse:[newText_oldTextcopyReplaceAll:aStringasTextwith:symasText].selfreplaceEditSelectionWith:newText.^sym].selfabort!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "start"
+        },
+        {
+          "Value": "editorindexmenusymoldTextnewTextoldStreamoldKey"
+        },
+        {
+          "Value": "SymbolhasInterned"
+        }
+      ]
+    },
+    {
+      "Selector": "match:",
+      "Source": "match:typehereType==typeifTrue:[selfadvance.^true].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "typeifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "matchToken:",
+      "Source": "matchToken:thinghere=thingifTrue:[selfadvance.^true].^false!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "thingifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "messagePart:repeat:",
+      "Source": "messagePart:levelrepeat:repeat|startreceiverselectorargsprecedence|[receiver_parseNode.(hereType==#keywordand:[level\u003E=3])ifTrue:[start_selfstartOfNextToken.selector_WriteStreamon:(Stringnew:32).args_OrderedCollectionnew.[hereType==#keyword]whileTrue:[selectornextPutAll:selfadvance.selfprimaryExpressionifFalse:[^selfexpected:\u0027Argument\u0027].selfmessagePart:2repeat:true.argsaddLast:parseNode].selector_selfmakeNewSymbol:selectorcontentsstartingAt:start.precedence_3]ifFalse:[((hereType==#binaryor:[hereType==#verticalBar])and:[level\u003E=2])ifTrue:[start_selfstartOfNextToken.selector_selfadvanceasSymbol.selfprimaryExpressionifFalse:[^selfexpected:\u0027Argument\u0027].selfmessagePart:1repeat:true.args_Arraywith:parseNode.precedence_2]ifFalse:[hereType==#wordifTrue:[start_selfstartOfNextToken.selector_selfmakeNewSymbol:selfadvancestartingAt:start.args_#().precedence_1]ifFalse:[^argsnotNil]]].parseNode_MessageNodenewreceiver:receiverselector:selectorarguments:argsprecedence:precedencefrom:encodersourceRange:(startto:selfendOfLastToken).repeat]whileTrue:[].^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "46 47 E0 89 00 0E 07 88 81 60 08 87 69 01 22 C6 D3 25 B5 7D E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "keywordand:"
+        },
+        {
+          "Value": "level"
+        },
+        {
+          "Value": "\u003E="
+        },
+        3,
+        {
+          "Value": "repeat"
+        },
+        {
+          "Value": "startreceiverselectorargsprecedence"
+        },
+        {
+          "Value": "receiver"
+        }
+      ]
+    },
+    {
+      "Selector": "method:context:",
+      "Source": "method:doitcontext:ctxt|sapblkprimtempsmessageCommentmethodNode|sap_selfpattern:doitinContext:ctxt.(sapat:2)do:[:argNode|argNodeisArg:true].temps_selftemporaries.messageComment_currentComment.currentComment_nil.prim_doitifTrue:[0]ifFalse:[selfprimitive].selfstatements:#()innerBlock:doit.blk_parseNode.doitifTrue:[blkreturnLast]ifFalse:[blkreturnSelfIfNoOther].hereType==#doItifFalse:[^selfexpected:\u0027Nothing more\u0027].methodNode_MethodNodenewcomment:messageComment.^methodNodeselector:(sapat:1)arguments:(sapat:2)precedence:(sapat:3)temporaries:tempsblock:blkencoder:encoderprimitive:prim!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "ctxt"
+        },
+        {
+          "Value": "sapblkprimtempsmessageCommentmethodNode"
+        },
+        {
+          "Value": "sap"
+        }
+      ]
+    },
+    {
+      "Selector": "notify:",
+      "Source": "notify:aString^selfnotify:aStringat:prevMark!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "notify:at:",
+      "Source": "notify:stringat:locationrequestor==nilifFalse:[requestornotify:string,\u0027 -\u003E\u0027at:location\u002BcorrectionDelta].selfabort!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "locationrequestor"
+        },
+        {
+          "Value": "nilifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "offEnd:",
+      "Source": "offEnd:aString^selfnotify:aStringat:mark!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "parse:class:noPattern:context:notifying:ifFail:",
+      "Source": "parse:sourceStreamclass:classnoPattern:noPatterncontext:ctxtnotifying:reqifFail:aBlock|meth|selfinit:sourceStreamnotifying:reqfailBlock:[^aBlockvalue].encoder_Encodernewinit:classcontext:ctxtnotifying:self.failBlock_aBlock.meth_selfmethod:noPatterncontext:ctxt.encoder_failBlock_requestor_parseNode_nil.^meth!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "classnoPattern"
+        }
+      ]
+    },
+    {
+      "Selector": "parseArgsAndTemps:notifying:",
+      "Source": "parseArgsAndTemps:aStringnotifying:reqaString==nilifTrue:[^#()].^selfinitPattern:aStringnotifying:reqreturn:[:pattern|(patternat:2),selftemporaries]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 C6 7C",
+      "Literals": [
+        {
+          "Value": "=="
+        },
+        {
+          "Value": "reqaString"
+        },
+        {
+          "Value": "nilifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "parseMethodComment:setPattern:",
+      "Source": "parseMethodComment:aStringsetPattern:aBlockselfinitPattern:aStringnotifying:nilreturn:aBlock.currentComment==nilifTrue:[^OrderedCollectionnew]ifFalse:[^currentComment]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "40 7C",
+      "Literals": [
+        {
+          "Value": "aBlockselfinitPattern"
+        }
+      ]
+    },
+    {
+      "Selector": "parseSelector:",
+      "Source": "parseSelector:aString^selfinitPattern:aStringnotifying:nilreturn:[:pattern|patternat:1]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "70 7C",
+      "Literals": []
+    },
+    {
+      "Selector": "pasteTemp:",
+      "Source": "pasteTemp:name|editor|editor_selfeditor.(lastTempMark\u003E0and:[(editortextat:lastTempMark)=$|])ifTrue:[editorselectAt:lastTempMark.selfreplaceEditSelectionWith:name,\u0027 \u0027.lastTempMark_lastTempMark\u002Bnamesize\u002B1]ifFalse:[editorselectAt:lastTempMark\u002B1.selfreplaceEditSelectionWith:(Stringwith:Charactercr),\u0027\t| \u0027,name,\u0027 | \u0027.lastTempMark_lastTempMark\u002Bnamesize\u002B6]!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 2,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "45 88 69 6A 09 21 B3 89 00 03 46 D3 7D E2 27 B6 7C",
+      "Literals": [
+        {
+          "Value": "\u003E"
+        },
+        0,
+        {
+          "Value": "and:"
+        },
+        {
+          "Value": "lastTempMark"
+        },
+        {
+          "Value": "="
+        },
+        {
+          "Value": "selfeditor"
+        },
+        {
+          "Value": "editortextat"
+        },
+        "|"
+      ]
+    },
+    {
+      "Selector": "pattern:inContext:",
+      "Source": "pattern:fromDoitinContext:ctxt|argsselector|fromDoitifTrue:[ctxt==nilifTrue:[^Arraywith:#DoItwith:#()with:1]ifFalse:[^Arraywith:#DoItIn:with:(Arraywith:(encoderencodeVariable:\u0027homeContext\u0027))with:3]].hereType==#wordifTrue:[^Arraywith:selfadvanceasSymbolwith:#()with:1].(hereType==#binaryor:[hereType==#verticalBar])ifTrue:[selector_selfadvanceasSymbol.args_Arraywith:(encoderbindTemp:selfargumentName).^Arraywith:selectorwith:argswith:2].hereType==#keywordifTrue:[selector_WriteStreamon:(Stringnew:32).args_OrderedCollectionnew.[hereType==#keyword]whileTrue:[selectornextPutAll:selfadvance.argsaddLast:(encoderbindTemp:selfargumentName)].^Arraywith:selectorcontentsasSymbolwith:argswith:3].^selfexpected:\u0027Message pattern\u0027!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "ctxt"
+        },
+        {
+          "Value": "argsselector"
+        },
+        {
+          "Value": "fromDoitifTrue"
+        }
+      ]
+    },
+    {
+      "Selector": "primaryExpression",
+      "Source": "primaryExpressionhereType==#wordifTrue:[parseNode_encoderencodeVariable:selfadvance.^true].hereType==#leftBracketifTrue:[selfadvance.selfblockExpression.^true].hereType==#leftParenthesisifTrue:[selfadvance.selfexpressionifFalse:[^selfexpected:\u0027expression\u0027].(selfmatch:#rightParenthesis)ifFalse:[^selfexpected:\u0027right parenthesis\u0027].^true].(hereType==#stringor:[hereType==#numberor:[hereType==#literal]])ifTrue:[parseNode_encoderencodeLiteral:selfadvance.^true].(here==#-and:[tokenType==#number])ifTrue:[selfadvance.parseNode_encoderencodeLiteral:selfadvancenegated.^true].^false!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "wordifTrue:"
+        }
+      ]
+    },
+    {
+      "Selector": "primitive",
+      "Source": "primitive|n|(selfmatchToken:#\u003C)ifFalse:[^0].(selfmatchToken:\u0027primitive:\u0027)ifFalse:[^selfexpected:\u0027primitive:\u0027].n_here.((selfmatch:#number)and:[nisKindOf:Integer])ifFalse:[^selfexpected:\u0027Integer\u0027].(selfmatchToken:#\u003E)ifFalse:[^selfexpected:\u0027\u003E\u0027].^n!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 B2 7C",
+      "Literals": [
+        {
+          "Value": "\u003C"
+        },
+        {
+          "Value": "selfmatchToken"
+        },
+        {
+          "Value": "ifFalse"
+        }
+      ]
+    },
+    {
+      "Selector": "replaceEditSelectionWith:",
+      "Source": "replaceEditSelectionWith:aString|editor|editor_selfeditor.correctionDelta_correctionDelta\u002BaStringsize-editorselectionsize.editordeselect;replaceSelectionWith:aStringasText!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 3,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "43 88 69 6A 0A 44 B0 45 B1 88 81 60 0A 87 6A 46 88 6B 6A 13 47 E2 7C",
+      "Literals": [
+        {
+          "Value": "\u002B"
+        },
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "replaceSelectionWith:"
+        },
+        {
+          "Value": "selfeditor"
+        },
+        {
+          "Value": "aStringsize"
+        },
+        {
+          "Value": "editorselectionsize"
+        },
+        {
+          "Value": "editordeselect"
+        },
+        {
+          "Value": "aStringasText"
+        }
+      ]
+    },
+    {
+      "Selector": "selectVariable:",
+      "Source": "selectVariable:nameselfeditorselectFrom:selfbareEndOfLastToken-namesize\u002B1to:selfbareEndOfLastToken!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "44 45 B1 22 B0 44 E3 7C",
+      "Literals": [
+        {
+          "Value": "-"
+        },
+        {
+          "Value": "\u002B"
+        },
+        1,
+        {
+          "Value": "to:"
+        },
+        {
+          "Value": "selfbareEndOfLastToken"
+        },
+        {
+          "Value": "namesize"
+        }
+      ]
+    },
+    {
+      "Selector": "startOfNextToken",
+      "Source": "startOfNextTokenhereType==#doItifTrue:[^sourceposition\u002B1\u002BcorrectionDelta].^hereMark\u002BcorrectionDelta!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "20 7C",
+      "Literals": [
+        {
+          "Value": "doItifTrue:"
+        }
+      ]
+    },
+    {
+      "Selector": "statements:innerBlock:",
+      "Source": "statements:argNodesinnerBlock:inner|stmtsreturnsstartmoreblockComment|stmts_OrderedCollectionnew.blockComment_currentComment.currentComment_nil.returns_false.more_hereType~~#rightBracket.[more]whileTrue:[start_selfstartOfNextToken.(returns_selfmatch:#upArrow)ifTrue:[selfexpressionifFalse:[^selfexpected:\u0027Expression to return\u0027].selfaddComment.stmtsaddLast:(ReturnNodenewexpr:parseNodeencoder:encodersourceRange:(startto:selfendOfLastToken))]ifFalse:[selfexpressionifTrue:[selfaddComment.stmtsaddLast:parseNode]ifFalse:[selfaddComment.stmtssize=0ifTrue:[stmtsaddLast:(encoderencodeVariable:(innerifTrue:[\u0027nil\u0027]ifFalse:[\u0027self\u0027]))]]].returnsifTrue:[(hereType==#rightBracketor:[hereType==#doIt])ifFalse:[^selfexpected:\u0027End of block\u0027]].more_returnsnotand:[selfmatch:#period]].parseNode_BlockNodenewarguments:argNodesstatements:stmtsreturns:returnsfrom:encodersourceEnd:selfendOfLastToken\u002B1.parseNodecomment:blockComment.^true!",
+      "ArgumentCount": 1,
+      "TemporaryCount": 0,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 42 E0 43 E0 7C",
+      "Literals": [
+        {
+          "Value": "|"
+        },
+        {
+          "Value": "inner"
+        },
+        {
+          "Value": "stmtsreturnsstartmoreblockComment"
+        },
+        {
+          "Value": "stmts"
+        }
+      ]
+    },
+    {
+      "Selector": "temporaries",
+      "Source": "temporaries|vars|(selfmatch:#verticalBar)ifFalse:[lastTempMark_selfbareEndOfLastToken.^#()].(selfmatch:#verticalBar)ifTrue:[lastTempMark_selfendOfLastToken.^#()].vars_OrderedCollectionnew.[hereType==#word]whileTrue:[varsaddLast:(encoderbindTemp:selfadvance)].(selfmatch:#verticalBar)ifTrue:[lastTempMark_selfendOfLastToken.^vars].^selfexpected:\u0027Vertical bar\u0027!",
+      "ArgumentCount": 0,
+      "TemporaryCount": 1,
+      "IsPrimitive": false,
+      "PrimitiveNumber": 0,
+      "Bytecode": "41 D0 7C",
+      "Literals": [
+        {
+          "Value": "verticalBar"
+        },
+        {
+          "Value": "selfmatch"
+        }
+      ]
+    }
+  ],
+  "ClassMethods": [],
+  "Statistics": {
+    "TotalMethods": 36,
+    "SuccessfullyCompiled": 36,
+    "FailedCompilation": 0,
+    "CompilationRate": 100,
+    "ExtractionTime": "2025-09-13T02:46:16.6354383Z"
+  }
+}
