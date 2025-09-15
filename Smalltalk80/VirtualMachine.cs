@@ -35,69 +35,26 @@ public sealed class VirtualMachine
     public BootstrapOrchestrator? BootstrapOrchestrator => bootstrapOrchestrator;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="VirtualMachine"/> class using JSON bootstrap.
+    /// Initializes a new instance of the <see cref="VirtualMachine"/> class using the BootstrapOrchestrator.
+    /// This provides enhanced bootstrap management with phase tracking, validation, and rollback capabilities.
     /// </summary>
-    public VirtualMachine(bool skipStandardLibrary = false)
+    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
+    public VirtualMachine(bool skipExtendedSystem = false)
     {
-        InitializeWithJsonBootstrap(skipStandardLibrary);
+        InitializeWithBootstrapOrchestrator(skipExtendedSystem, null);
     }
     
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using the BootstrapOrchestrator.
     /// This provides enhanced bootstrap management with phase tracking, validation, and rollback capabilities.
     /// </summary>
-    /// <param name="useOrchestrator">Whether to use the BootstrapOrchestrator for initialization.</param>
     /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
     /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
-    public VirtualMachine(bool useOrchestrator, bool skipExtendedSystem = false, string? bootstrapDirectory = null)
+    public VirtualMachine(bool skipExtendedSystem, string? bootstrapDirectory)
     {
-        if (useOrchestrator)
-        {
-            InitializeWithBootstrapOrchestrator(skipExtendedSystem, bootstrapDirectory);
-        }
-        else
-        {
-            InitializeWithJsonBootstrap(!skipExtendedSystem);
-        }
+        InitializeWithBootstrapOrchestrator(skipExtendedSystem, bootstrapDirectory);
     }
     
-    /// <summary>
-    /// Initializes the VM using the JSON bootstrap system.
-    /// </summary>
-    private void InitializeWithJsonBootstrap(bool skipStandardLibrary)
-    {
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting JSON-based bootstrap...");
-        
-        var bootstrapDir = Path.Combine(
-            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
-            "Bootstrap");
-            
-        if (!Directory.Exists(bootstrapDir))
-        {
-            // Fallback: look in project directory during development
-            bootstrapDir = Path.Combine(
-                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".",
-                "..", "..", "..", "..", "Bootstrap");
-        }
-        
-        if (!Directory.Exists(bootstrapDir))
-        {
-            throw new DirectoryNotFoundException($"Bootstrap directory not found. Searched: {bootstrapDir}");
-        }
-        
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Using bootstrap files from: {bootstrapDir}");
-        
-        // Bootstrap: Core classes with methods
-        ExecuteBootstrap(bootstrapDir);
-        
-        // Low-level class loading (if not skipped)
-        if (!skipStandardLibrary)
-        {
-            ExecuteLowLevelClasses(bootstrapDir);
-        }
-        
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] JSON bootstrap complete!");
-    }
     
     /// <summary>
     /// Initializes the VM using the BootstrapOrchestrator for enhanced bootstrap management.
@@ -142,145 +99,10 @@ public sealed class VirtualMachine
         }
         catch (Exception ex)
         {
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] BootstrapOrchestrator failed: {ex.Message}");
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Falling back to traditional JSON bootstrap...");
-            
-            // Fallback to traditional bootstrap
-            InitializeWithJsonBootstrap(!skipExtendedSystem);
+            throw new InvalidOperationException($"BootstrapOrchestrator initialization failed: {ex.Message}", ex);
         }
     }
     
-    /// <summary>
-    /// Executes core bootstrap from JSON: All essential classes and methods.
-    /// </summary>
-    private void ExecuteBootstrap(string bootstrapDir)
-    {
-        // Tracing removed
-        
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading core classes and methods...");
-        
-        var bootstrapPath = Path.Combine(bootstrapDir, "bootstrap.json");
-        // Try new name first, fall back to old name for compatibility
-        if (!File.Exists(bootstrapPath))
-        {
-            bootstrapPath = Path.Combine(bootstrapDir, "bootstrap_phase1.json");
-            if (!File.Exists(bootstrapPath))
-            {
-                throw new FileNotFoundException($"Bootstrap file not found: {bootstrapPath}");
-            }
-        }
-        
-        // Clear object memory
-        ObjectMemory.Reset();
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Cleared VM object memory");
-        
-        // Parse and execute JSON bootstrap operations
-        var jsonContent = File.ReadAllText(bootstrapPath);
-        bootstrapAdapter = new VMPrimitiveAdapter(this);
-        var bootstrapExecutor = new JsonBootstrapExecutor(bootstrapAdapter);
-        bootstrapExecutor.ExecuteUnifiedBootstrap(jsonContent);
-        
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap complete: Core classes and methods loaded");
-        
-        // Dump classes after bootstrap (debug output removed)
-        // DumpAllClasses("BOOTSTRAP CLASSES");
-        
-        // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
-        if (bootstrapAdapter is VMPrimitiveAdapter adapter)
-        {
-            adapter.CompleteBootstrapWithMessageSends();
-        }
-        
-        // Restore tracing state after bootstrap
-        // Tracing removed
-    }
-    
-    /// <summary>
-    /// Executes low-level class loading from complete system image.
-    /// </summary>
-    private void ExecuteLowLevelClasses(string bootstrapDir)
-    {
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading classes via low-level message sends...");
-        
-        if (bootstrapAdapter == null)
-        {
-            throw new InvalidOperationException("Bootstrap adapter not initialized. Run bootstrap first.");
-        }
-        
-        // Look for complete_system_final.json in various locations
-        var systemImagePaths = new[]
-        {
-            Path.Combine(Directory.GetCurrentDirectory(), "complete_system_final.json"),
-            Path.Combine(bootstrapDir, "..", "complete_system_final.json"),
-            Path.Combine(bootstrapDir, "..", "..", "complete_system_final.json"),
-            "complete_system_final.json"
-        };
-        
-        string? systemImagePath = null;
-        foreach (var path in systemImagePaths)
-        {
-            if (File.Exists(path))
-            {
-                systemImagePath = path;
-                break;
-            }
-        }
-        
-        if (systemImagePath == null)
-        {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: complete_system_final.json not found, skipping low-level class loading");
-            return;
-        }
-        
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Found system image: {systemImagePath}");
-        
-        // Define essential extended classes to load
-        var essentialClasses = new List<string>
-        {
-            // Core system classes
-            "BlockContext", "MethodContext", "ContextPart",
-            "SmallInteger", "LargePositiveInteger", "LargeNegativeInteger", "Integer", "Number",
-            "Float", "Fraction",
-            
-            // Collections
-            "Set", "IdentitySet", "Bag", "OrderedCollection", "SortedCollection",
-            "LinkedList", "Interval",
-            
-            // Streams
-            "Stream", "PositionableStream", "ReadStream", "WriteStream", "ReadWriteStream",
-            
-            // Characters and Strings
-            "Character", "Text", "Paragraph", "TextStyle",
-            
-            // Processes and Scheduling
-            "Process", "ProcessorScheduler", "Semaphore", "Delay",
-            
-            // Exceptions
-            "Exception", "Error", "Halt", "MessageNotUnderstood",
-            
-            // Compiler and Parser
-            "Parser", "Scanner", "Compiler", "CompilationContext",
-            
-            // File System
-            "File", "FileDirectory", "FileStream",
-            
-            // Graphics (basic)
-            "Point", "Rectangle", "Form", "BitBlt"
-        };
-        
-        try
-        {
-            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteLowLevelClasses(systemImagePath, essentialClasses);
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Successfully loaded {essentialClasses.Count} essential classes");
-        }
-        catch (Exception ex)
-        {
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Error in low-level class loading: {ex.Message}");
-        }
-    }
     
     /// <summary>
     /// Detects whether the JSON content represents a single-class manifest or multi-class manifest.

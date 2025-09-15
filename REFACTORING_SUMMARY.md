@@ -187,11 +187,12 @@ catch (BootstrapException ex) {
 All refactoring maintains **100% backward compatibility**:
 
 ```csharp
-// Existing code continues to work unchanged
-var vm = new VirtualMachine(skipStandardLibrary: false);
+// All VirtualMachine instances now use BootstrapOrchestrator by default
+var vm = new VirtualMachine(skipExtendedSystem: false);
 
-// New enhanced features available optionally
-var enhancedVm = new VirtualMachine(useOrchestrator: true, skipExtendedSystem: false);
+// Enhanced features are now standard (bootstrap info, validation, rollback)
+var stats = vm.GetBootstrapStatistics();
+var info = vm.GetBootstrapInfo();
 ```
 
 ## 🚀 **System Validation Results**

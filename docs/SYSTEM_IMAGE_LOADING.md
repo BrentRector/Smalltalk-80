@@ -100,8 +100,8 @@ Based on our analysis:
 ## How to Load System Image
 
 ```csharp
-// 1. Create VM with bootstrap
-var vm = new VirtualMachine(skipStandardLibrary: true, useGeneratedBootstrap: true);
+// 1. Create VM with BootstrapOrchestrator
+var vm = new VirtualMachine(skipExtendedSystem: true);
 
 // 2. Load second stage bootstrap for class creation
 SystemImageLoader.LoadSystemImage("SecondStageBootstrap.st");

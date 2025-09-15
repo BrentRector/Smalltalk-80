@@ -23,7 +23,6 @@ public class Program
             var jsonManifests = new List<string>();
             var sourceFiles = new List<string>();
             var classesToPrint = new List<string>();
-            bool skipLowLevelClasses = false;
             bool listBootstrapClasses = false;
             var verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Overview;
             bool showBytecode = true;
@@ -40,14 +39,9 @@ public class Program
                 {
                     jsonManifests.Add(args[++i]);
                 }
-                else if (args[i] == "--skip-low-level")
-                {
-                    skipLowLevelClasses = true;
-                }
                 else if (args[i] == "--list-bootstrap-classes")
                 {
                     listBootstrapClasses = true;
-                    skipLowLevelClasses = true; // Always skip low-level classes when listing bootstrap classes
                 }
                 else if (args[i] == "--print-classes")
                 {
@@ -89,14 +83,6 @@ public class Program
                 {
                     showMnemonics = false;
                 }
-                else if (args[i] == "--low-level-classes" && i + 1 < args.Length)
-                {
-                    // Low-level class creation approach using system image JSON
-                    var systemImagePath = args[++i];
-                    Console.WriteLine($"Using low-level class creation from system image: {systemImagePath}");
-                    // TODO: Add classNames list
-                    skipLowLevelClasses = true;
-                }
                 else if (!args[i].StartsWith("--"))
                 {
                     sourceFiles.Add(args[i]);
@@ -105,8 +91,8 @@ public class Program
             
             Console.WriteLine("Initializing Virtual Machine...");
             
-            // Create the VM with bootstrap through low-level classes
-            var vm = new VirtualMachine(skipStandardLibrary: skipLowLevelClasses);
+            // Create the VM with BootstrapOrchestrator
+            var vm = new VirtualMachine(skipExtendedSystem: false);
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();
@@ -498,8 +484,6 @@ public class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --help, -h                      Show this help message");
         Console.WriteLine("  --json <file>                   Load additional JSON manifest");
-        Console.WriteLine("  --skip-low-level                Skip loading low-level classes");
-        Console.WriteLine("  --low-level-classes <image>     Create classes via low-level message sends from system image");
         Console.WriteLine("  --list-bootstrap-classes        List all classes in bootstrap");
         Console.WriteLine("  --print-classes                 Show class overview (verbosity level 1)");
         Console.WriteLine("  --inspect-class <name>          Inspect specific class with full details");
@@ -522,7 +506,7 @@ public class Program
         Console.WriteLine();
         Console.WriteLine("Bootstrap Process:");
         Console.WriteLine("  1. Core bootstrap with essential classes and methods");
-        Console.WriteLine("  2. Extended library (optional, can be skipped with --skip-extended)");
-        Console.WriteLine("  3. Custom manifests via --extended-library option");
+        Console.WriteLine("  2. Extended system with full Smalltalk-80 functionality");
+        Console.WriteLine("  3. Custom manifests via --json option");
     }
 }

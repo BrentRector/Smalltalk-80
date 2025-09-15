@@ -97,7 +97,7 @@ public record BootstrapPhaseStats
 
 ```csharp
 // Create VM with BootstrapOrchestrator
-var vm = new VirtualMachine(useOrchestrator: true, skipExtendedSystem: false);
+var vm = new VirtualMachine(skipExtendedSystem: false);
 
 // Access bootstrap information
 var bootstrapInfo = vm.GetBootstrapInfo();
@@ -370,7 +370,7 @@ orchestrator.RollbackToPhase(BootstrapPhase.Phase1_CoreClasses);
 **BootstrapOrchestrator:**
 ```csharp
 // Runtime access to bootstrap information
-var vm = new VirtualMachine(useOrchestrator: true);
+var vm = new VirtualMachine();
 var bootstrapInfo = vm.GetBootstrapInfo();
 var stats = vm.GetBootstrapStatistics();
 bool rollbackSuccess = vm.TryRollbackBootstrap(targetPhase);
@@ -464,15 +464,9 @@ Bootstrap Phase Execution
 
 ## Integration with VirtualMachine
 
-### Traditional Bootstrap (Backward Compatible)
+### Standard Bootstrap (BootstrapOrchestrator)
 ```csharp
-var vm = new VirtualMachine(skipStandardLibrary: false);
-// Uses original bootstrap system
-```
-
-### Enhanced Bootstrap with Orchestrator
-```csharp
-var vm = new VirtualMachine(useOrchestrator: true, skipExtendedSystem: false);
+var vm = new VirtualMachine(skipExtendedSystem: false);
 // Uses BootstrapOrchestrator with full monitoring
 ```
 

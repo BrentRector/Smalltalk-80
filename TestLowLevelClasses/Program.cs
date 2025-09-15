@@ -15,7 +15,7 @@ class Program
         try
         {
             // Create VM with skip standard library to test manual loading
-            var vm = new VirtualMachine(skipStandardLibrary: true);
+            var vm = new VirtualMachine(skipExtendedSystem: true);
             Console.WriteLine("✓ VM created successfully");
             
             if (vm.Adapter == null)
