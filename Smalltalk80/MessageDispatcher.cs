@@ -282,16 +282,13 @@ public class MessageDispatcher
             // Debug logging removed but structure preserved for future debugging
         }
         
-        var newContext = new MethodContext
-        {
-            Sender = currentContext,
-            Method = method,
-            Receiver = receiver,
-            Arguments = arguments,
-            Temporaries = temps,
-            Stack = new Stack<object?>(),
-            PC = 0
-        };
+        // Use context pooling for better performance
+        var newContext = ContextPool.GetMethodContext(
+            currentContext,
+            method,
+            receiver,
+            arguments,
+            temps);
 
         // Update the interpreter's current context
         interpreter.SetCurrentContext(newContext);
@@ -309,7 +306,8 @@ public class MessageDispatcher
                 throw new InvalidOperationException("Incorrect number of block arguments");
             }
 
-            var newContext = BlockContext.Create(
+            // Use context pooling for better performance
+            var newContext = ContextPool.GetBlockContext(
                 block.HomeContext,
                 block.StartPC,
                 block.ArgumentCount,
@@ -333,19 +331,13 @@ public class MessageDispatcher
         if (selector.Name == "blockCopy:" && arguments.Length == 1 && arguments[0] is int argCount)
         {
             int startPc = currentContext.PC + 3;
-            var block = new BlockContext
-            {
-                HomeContext = ctx,
-                StartPC = startPc,
-                Sender = null,
-                Method = ctx.Method,
-                Receiver = ctx.Receiver,
-                Arguments = Array.Empty<object?>(),
-                ArgumentCount = argCount,
-                Temporaries = ctx.Temporaries,
-                Stack = new Stack<object?>(),
-                PC = startPc
-            };
+            // Use context pooling for better performance
+            var block = ContextPool.GetBlockContext(
+                ctx,
+                startPc,
+                argCount,
+                Array.Empty<object?>(),
+                null);
 
             currentContext.Stack.Push(block);
             return;

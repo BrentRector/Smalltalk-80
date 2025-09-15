@@ -208,16 +208,14 @@ public class Interpreter
         var previousExit = ExitOnReturn;
         ExitOnReturn = false;
         LastResult = null;
-        currentContext = new MethodContext
-        {
-            Sender = null!,
-            Method = method,
-            Receiver = receiver!,
-            Arguments = Array.Empty<object?>(),
-            Temporaries = temporaries ?? new object?[method.TemporariesCount],
-            Stack = new Stack<object?>(),
-            PC = 0
-        };
+        // Use context pooling for better performance
+        var temps = temporaries ?? new object?[method.TemporariesCount];
+        currentContext = ContextPool.GetMethodContext(
+            null, // No sender for top-level evaluation
+            method,
+            receiver,
+            Array.Empty<object?>(),
+            temps);
         Execute();
         ExitOnReturn = previousExit;
         
@@ -259,16 +257,13 @@ public class Interpreter
             temps[i] = arguments[i];
         }
 
-        currentContext = new MethodContext
-        {
-            Sender = null,
-            Method = method,
-            Receiver = receiver,
-            Arguments = arguments,
-            Temporaries = temps,
-            Stack = new Stack<object?>(),
-            PC = 0
-        };
+        // Use context pooling for better performance
+        currentContext = ContextPool.GetMethodContext(
+            null, // No sender for test setup
+            method,
+            receiver,
+            arguments,
+            temps);
     }
 
     /// <summary>
@@ -313,6 +308,9 @@ public class Interpreter
             methodTracer.TraceMethodExit(className, selector, returnValue);
         }
         
+        // Store the context to return to pool before switching away from it
+        var contextToReturn = currentContext;
+        
         if (currentContext.Sender == null)
         {
             if (returnValue is MethodContext mc)
@@ -330,6 +328,12 @@ public class Interpreter
             }
             LastResult = returnValue;
             
+            // Return the context to the pool for reuse
+            if (contextToReturn is MethodContext methodCtxToReturn)
+                ContextPool.ReturnMethodContext(methodCtxToReturn);
+            else if (contextToReturn is BlockContext blockCtxToReturn)
+                ContextPool.ReturnBlockContext(blockCtxToReturn);
+            
             // Clear transient roots when returning from top-level
             ObjectMemory.ClearTransientRoots();
             
@@ -344,6 +348,12 @@ public class Interpreter
         {
             currentContext = currentContext.Sender;
             currentContext.Stack.Push(returnValue);
+            
+            // Return the context to the pool for reuse
+            if (contextToReturn is MethodContext methodCtxToReturn)
+                ContextPool.ReturnMethodContext(methodCtxToReturn);
+            else if (contextToReturn is BlockContext blockCtxToReturn)
+                ContextPool.ReturnBlockContext(blockCtxToReturn);
             
             // Update transient root to new current context
             if (currentContext?.Receiver != null)
