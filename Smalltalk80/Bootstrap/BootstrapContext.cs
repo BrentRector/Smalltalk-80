@@ -110,6 +110,14 @@ internal sealed class BootstrapContext
     {
         return smalltalkDictionaryOop;
     }
+    
+    /// <summary>
+    /// Get all globals for debugging purposes.
+    /// </summary>
+    public Dictionary<string, int> GetAllGlobals()
+    {
+        return new Dictionary<string, int>(temporaryGlobals);
+    }
 
     /// <summary>
     /// Migrate all temporary entries to the Smalltalk SystemDictionary

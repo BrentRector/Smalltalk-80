@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80;
 using Smalltalk80.Bootstrap;
 
 namespace Smalltalk80.Interpreter;
@@ -32,7 +33,11 @@ public class Program
             bool showMnemonics = true;
             bool testCriticalMethods = false;
             bool testUndefinedObject = false;
+            bool testClassCreation = false;
+            bool testClassCreationFixed = false;
+            bool testSimpleMessage = false;
             bool enableMethodTracing = false;
+            bool testOOPBug = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -86,6 +91,26 @@ public class Program
                 else if (args[i] == "--test-undefined-object")
                 {
                     testUndefinedObject = true;
+                }
+                else if (args[i] == "--test-class-creation")
+                {
+                    testClassCreation = true;
+                    skipExtendedLibrary = true; // Don't load Phase 3
+                }
+                else if (args[i] == "--test-class-creation-fixed")
+                {
+                    testClassCreationFixed = true;
+                    skipExtendedLibrary = true; // Don't load Phase 3
+                }
+                else if (args[i] == "--test-oop-bug")
+                {
+                    testOOPBug = true;
+                    skipExtendedLibrary = true;
+                }
+                else if (args[i] == "--test-simple-message")
+                {
+                    testSimpleMessage = true;
+                    skipExtendedLibrary = true;
                 }
                 else if (args[i] == "--trace-methods")
                 {
@@ -249,6 +274,36 @@ public class Program
             if (testUndefinedObject)
             {
                 TestUndefinedObject.RunTests(vm);
+                return 0;
+            }
+            
+            // If testing class creation, do that
+            if (testClassCreation)
+            {
+                Console.WriteLine("DEBUG: About to run TestClassCreation");
+                TestClassCreation.RunTest(vm);
+                return 0;
+            }
+            
+            // If testing fixed class creation, do that
+            if (testClassCreationFixed)
+            {
+                Console.WriteLine("DEBUG: About to run TestClassCreationFixed");
+                TestClassCreationFixed.RunTest(vm);
+                return 0;
+            }
+            
+            // If testing simple message, do that
+            if (testSimpleMessage)
+            {
+                TestSimpleMessage.RunTest(vm);
+                return 0;
+            }
+            
+            // If testing OOP bug, do that
+            if (testOOPBug)
+            {
+                TestOOPBug(vm);
                 return 0;
             }
             
@@ -648,5 +703,84 @@ public class Program
         Console.WriteLine("  1. Core bootstrap with essential classes and methods");
         Console.WriteLine("  2. Extended library (optional, can be skipped with --skip-extended)");
         Console.WriteLine("  3. Custom manifests via --extended-library option");
+    }
+    
+    /// <summary>
+    /// Test for Object/ObjectClass OOP collision bug.
+    /// </summary>
+    private static void TestOOPBug(VirtualMachine vm)
+    {
+        Console.WriteLine("=== Testing Object/ObjectClass OOP Assignment ===\n");
+        
+        var adapter = vm.Adapter;
+        if (adapter == null)
+        {
+            Console.WriteLine("ERROR: VM adapter not available");
+            return;
+        }
+        
+        // Check what OOPs Object and ObjectClass have
+        int objectOop = adapter.PrimitiveLookupGlobal("Object");
+        int objectClassOop = adapter.PrimitiveLookupGlobal("ObjectClass");
+        
+        Console.WriteLine($"After bootstrap:");
+        Console.WriteLine($"  Object OOP: {objectOop}");
+        Console.WriteLine($"  ObjectClass OOP: {objectClassOop}");
+        
+        if (objectOop == objectClassOop)
+        {
+            Console.WriteLine("\n*** BUG CONFIRMED: Object and ObjectClass have the same OOP! ***");
+            
+            // Try to understand why
+            var objectObj = ObjectMemory.FromOop(objectOop);
+            if (objectObj != null)
+            {
+                Console.WriteLine($"  Object at OOP {objectOop} has {objectObj.Fields.Length} fields");
+                Console.WriteLine($"  Object's slot 0 (superclass): {objectObj.Fields[0]}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("\n✓ Object and ObjectClass have different OOPs (no bug)");
+            
+            // Check Association's superclass chain
+            int associationOop = adapter.PrimitiveLookupGlobal("Association");
+            if (associationOop > 0)
+            {
+                Console.WriteLine($"\nChecking Association's superclass chain:");
+                var current = ObjectMemory.FromOop(associationOop);
+                int depth = 0;
+                var visitedOops = new HashSet<int>();
+                
+                while (current != null && depth < 10)
+                {
+                    if (!visitedOops.Add(current.Oop))
+                    {
+                        Console.WriteLine($"  *** Cycle detected at OOP {current.Oop}! ***");
+                        break;
+                    }
+                    
+                    Console.WriteLine($"  Depth {depth}: OOP {current.Oop} ({current.Fields.Length} fields)");
+                    
+                    // Get superclass from slot 0
+                    if (current.Fields.Length > 0 && current.Fields[0] is SmalltalkObject super)
+                    {
+                        Console.WriteLine($"    -> superclass OOP {super.Oop}");
+                        current = super;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"    -> superclass is null or not an object");
+                        break;
+                    }
+                    depth++;
+                }
+                
+                if (depth >= 10)
+                {
+                    Console.WriteLine("  *** Maximum depth reached - possible infinite loop! ***");
+                }
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Smalltalk80;
 
@@ -69,26 +70,59 @@ public static class StorageManagementPrimitives
     {
         int count = 0;
         var currentClass = cls;
+        var visitedClasses = new HashSet<int>(); // Track visited OOPs to detect cycles
+        
+        Console.WriteLine($"[PRIM70] CountInstanceVariables starting with class OOP {cls.Oop}");
         
         // Walk up the superclass chain counting instance variables
         while (currentClass != null)
         {
+            // Check for cycles
+            if (!visitedClasses.Add(currentClass.Oop))
+            {
+                Console.WriteLine($"[PRIM70] WARNING: Cycle detected at class OOP {currentClass.Oop}");
+                break;
+            }
+            
+            Console.WriteLine($"[PRIM70] Checking class OOP {currentClass.Oop}");
+            
             // Get instanceVariables from slot 3 (for ClassDescription and subclasses)
             // This is at index 3 for ClassDescription: [superclass, methodDict, format, instanceVariables, ...]
             if (currentClass.Fields.Length > 3 && currentClass.Fields[3] is SmalltalkObject instVars)
             {
                 // instanceVariables is an Array of Symbol objects
-                count += instVars.Fields.Length;
+                int varCount = instVars.Fields.Length;
+                count += varCount;
+                Console.WriteLine($"[PRIM70]   Found {varCount} instance variables");
             }
             
             // Get superclass from slot 0
-            if (currentClass.Fields.Length > 0 && currentClass.Fields[0] is SmalltalkObject superclass)
+            if (currentClass.Fields.Length > 0)
             {
-                currentClass = superclass;
+                var superclassField = currentClass.Fields[0];
+                
+                // Check if it's nil (the Smalltalk nil object)
+                if (superclassField == null || superclassField == ObjectMemory.NilObject)
+                {
+                    Console.WriteLine($"[PRIM70]   Superclass is nil, stopping");
+                    break;
+                }
+                
+                if (superclassField is SmalltalkObject superclass)
+                {
+                    Console.WriteLine($"[PRIM70]   Moving to superclass OOP {superclass.Oop}");
+                    currentClass = superclass;
+                }
+                else
+                {
+                    Console.WriteLine($"[PRIM70]   Superclass field is not a SmalltalkObject, stopping");
+                    break;
+                }
             }
             else
             {
-                break; // Reached Object or nil
+                Console.WriteLine($"[PRIM70]   No fields in class, stopping");
+                break;
             }
         }
         

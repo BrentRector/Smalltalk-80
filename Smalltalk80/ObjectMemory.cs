@@ -77,6 +77,7 @@ public static class ObjectMemory
             
             index = nextFreeIndex++;
             objects[index] = obj;
+            
         }
         
         obj.Oop = index << 1;
@@ -107,6 +108,11 @@ public static class ObjectMemory
     /// </summary>
     private static bool ShouldTriggerGC()
     {
+        // Don't GC during very early bootstrap (first 100 objects)
+        // These are critical system objects that shouldn't be collected
+        if (totalAllocations < 100)
+            return false;
+            
         // Don't GC too frequently
         if ((DateTime.Now - lastGCTime).TotalSeconds < 1.0)
             return false;

@@ -1315,6 +1315,7 @@ public class JsonBootstrapExecutor
             vm.PrimitiveRegisterGlobal(classDef.Name, classOop);
             
             // Register class as permanent root - classes should never be GC'd
+            // IMPORTANT: Must do this BEFORE creating metaclass to prevent GC from freeing the class!
             var classObj = ObjectMemory.FromOop(classOop);
             if (classObj != null) ObjectMemory.AddPermanentRoot(classObj);
             

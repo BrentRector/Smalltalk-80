@@ -149,40 +149,40 @@ public static class BytecodeDispatcher
             Handlers[i] = (interpreter, opcode) => HandleLongJumpForward(interpreter, highBits);
         }
 
-        // Send operations (176-223) - Blue Book specification
-        // 176-191: Send arithmetic selectors (special selectors 0-15)
+        // Send operations (176-255) - Blue Book specification
+        // 176-191: Send literal selector with 0 args
         for (int i = 176; i <= 191; i++)
         {
-            int index = i - 176; // Special selector index 0-15
-            Handlers[i] = (interpreter, opcode) => HandleSendArithmeticSelector(interpreter, index);
-        }
-        
-        // 192-207: Send special selectors with proper arg counts (special selectors 16-31)
-        for (int i = 192; i <= 207; i++)
-        {
-            int index = i - 192 + 16; // Special selector index 16-31
-            Handlers[i] = (interpreter, opcode) => HandleSendSpecialSelector(interpreter, index);
-        }
-        
-        // 208-223: Send literal selector with 0 args
-        for (int i = 208; i <= 223; i++)
-        {
-            int index = i - 208; // Literal index 0-15
+            int index = i - 176; // Literal index 0-15
             Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 0);
         }
         
-        // 224-239: Send literal selector with 1 arg - Blue Book specification
-        for (int i = 224; i <= 239; i++)
+        // 192-207: Send literal selector with 1 arg
+        for (int i = 192; i <= 207; i++)
         {
-            int index = i - 224; // Literal index 0-15
+            int index = i - 192; // Literal index 0-15
             Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 1);
         }
         
-        // 240-255: Send literal selector with 2 args - Blue Book specification
+        // 208-223: Send literal selector with 2 args
+        for (int i = 208; i <= 223; i++)
+        {
+            int index = i - 208; // Literal index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
+        }
+        
+        // 224-239: Send arithmetic selector (special selectors 0-15)
+        for (int i = 224; i <= 239; i++)
+        {
+            int index = i - 224; // Special selector index 0-15
+            Handlers[i] = (interpreter, opcode) => HandleSendArithmeticSelector(interpreter, index);
+        }
+        
+        // 240-255: Send special selector (special selectors 16-31)
         for (int i = 240; i <= 255; i++)
         {
-            int index = i - 240; // Literal index 0-15
-            Handlers[i] = (interpreter, opcode) => HandleSendLiteralSelector(interpreter, index, 2);
+            int index = i - 240 + 16; // Special selector index 16-31
+            Handlers[i] = (interpreter, opcode) => HandleSendSpecialSelector(interpreter, index);
         }
     }
 
