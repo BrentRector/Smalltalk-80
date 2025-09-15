@@ -7,19 +7,19 @@ using System.Collections.Generic;
 public sealed class BlockContext : Context
 {
     /// <summary>
-    ///     Gets the context in which the block was defined.
+    ///     Gets or sets the context in which the block was defined.
     /// </summary>
-    public required Context HomeContext { get; init; }
+    public Context HomeContext { get; set; } = null!;
 
     /// <summary>
-    ///     Gets the bytecode offset of the first instruction in the block.
+    ///     Gets or sets the bytecode offset of the first instruction in the block.
     /// </summary>
-    public int StartPC { get; init; }
+    public int StartPC { get; set; }
 
     /// <summary>
-    ///     Gets the number of arguments expected by the block.
+    ///     Gets or sets the number of arguments expected by the block.
     /// </summary>
-    public int ArgumentCount { get; init; }
+    public int ArgumentCount { get; set; }
 
     /// <summary>
     ///     Creates a new <see cref="BlockContext"/> configured for execution.

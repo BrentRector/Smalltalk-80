@@ -19,6 +19,10 @@ public static class ObjectMemory
     private static readonly HashSet<SmalltalkObject> permanentRoots = new();
     private static readonly HashSet<SmalltalkObject> transientRoots = new();
     
+    // Object type indexing for faster instance enumeration
+    private static readonly Dictionary<SmalltalkObject, HashSet<int>> typeIndex = new();
+    private static readonly object typeIndexLock = new();
+    
     // GC configuration
     private const int HIGH_WATER_MARK = 50000;  // Trigger GC when this many objects allocated
     private const int LOW_FREE_COUNT = 1000;    // Trigger GC when free list below this
@@ -82,6 +86,9 @@ public static class ObjectMemory
         
         obj.Oop = index << 1;
         totalAllocations++;
+        
+        // Update type index for faster instance enumeration
+        UpdateTypeIndex(obj, index, isRegistration: true);
         
         // Check if we should trigger GC
         if (ShouldTriggerGC())
@@ -193,6 +200,8 @@ public static class ObjectMemory
         {
             if (objects[i] != null && !reachable.Contains(i))
             {
+                var objToFree = objects[i]!;
+                UpdateTypeIndex(objToFree, i, isRegistration: false);
                 objects[i] = null;
                 freeList.Enqueue(i);
                 freedCount++;
@@ -305,6 +314,10 @@ public static class ObjectMemory
         freeList.Clear();
         permanentRoots.Clear();
         transientRoots.Clear();
+        lock (typeIndexLock)
+        {
+            typeIndex.Clear();
+        }
         totalAllocations = 0;
         totalCollections = 0;
         totalObjectsFreed = 0;
@@ -435,16 +448,132 @@ public static class ObjectMemory
     
     /// <summary>
     /// Gets the number of objects of a specific class.
+    /// Uses the type index for improved performance.
     /// </summary>
     public static int CountInstancesOf(SmalltalkObject cls)
     {
-        int count = 0;
-        for (int i = 0; i < nextFreeIndex; i++)
+        lock (typeIndexLock)
         {
-            var obj = objects[i];
-            if (obj != null && ReferenceEquals(obj.ClassPointer, cls))
-                count++;
+            return typeIndex.TryGetValue(cls, out var instances) ? instances.Count : 0;
         }
-        return count;
+    }
+    
+    /// <summary>
+    /// Updates the type index when objects are registered or freed.
+    /// </summary>
+    /// <param name="obj">The object being registered or freed.</param>
+    /// <param name="index">The object table index.</param>
+    /// <param name="isRegistration">True if registering, false if freeing.</param>
+    private static void UpdateTypeIndex(SmalltalkObject obj, int index, bool isRegistration)
+    {
+        var classPointer = obj.ClassPointer;
+        if (classPointer == null) return;
+        
+        lock (typeIndexLock)
+        {
+            if (isRegistration)
+            {
+                // Add object to type index
+                if (!typeIndex.TryGetValue(classPointer, out var instances))
+                {
+                    instances = new HashSet<int>();
+                    typeIndex[classPointer] = instances;
+                }
+                instances.Add(index);
+            }
+            else
+            {
+                // Remove object from type index
+                if (typeIndex.TryGetValue(classPointer, out var instances))
+                {
+                    instances.Remove(index);
+                    // Clean up empty sets to prevent memory leaks
+                    if (instances.Count == 0)
+                    {
+                        typeIndex.Remove(classPointer);
+                    }
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Finds an arbitrary instance of the given class if one exists.
+    /// Uses the type index for O(1) performance instead of O(n) linear search.
+    /// </summary>
+    /// <param name="cls">The class to search for.</param>
+    /// <returns>The first instance found or <c>null</c>.</returns>
+    public static SmalltalkObject? SomeInstanceOptimized(SmalltalkObject cls)
+    {
+        lock (typeIndexLock)
+        {
+            if (typeIndex.TryGetValue(cls, out var instances) && instances.Count > 0)
+            {
+                // Get any instance from the set
+                int index = instances.First();
+                return objects[index];
+            }
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Enumerates all instances of a specific class.
+    /// Uses the type index for O(k) performance where k is the number of instances,
+    /// instead of O(n) where n is the total number of objects.
+    /// </summary>
+    /// <param name="cls">The class to enumerate instances of.</param>
+    /// <returns>All live instances of the specified class.</returns>
+    public static IEnumerable<SmalltalkObject> EnumerateInstancesOf(SmalltalkObject cls)
+    {
+        HashSet<int> instanceIndices;
+        lock (typeIndexLock)
+        {
+            if (!typeIndex.TryGetValue(cls, out var foundInstances) || foundInstances == null)
+            {
+                yield break; // No instances of this class
+            }
+            // Create a copy to avoid holding the lock during enumeration
+            instanceIndices = new HashSet<int>(foundInstances);
+        }
+        
+        foreach (int index in instanceIndices)
+        {
+            var obj = objects[index];
+            if (obj != null) // Double-check in case GC ran between lock release and now
+            {
+                yield return obj;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Gets statistics about the type index for monitoring and debugging.
+    /// </summary>
+    /// <returns>Number of classes indexed and total instances tracked.</returns>
+    public static (int classesIndexed, int totalInstances) GetTypeIndexStats()
+    {
+        lock (typeIndexLock)
+        {
+            int totalInstances = 0;
+            foreach (var instances in typeIndex.Values)
+            {
+                totalInstances += instances.Count;
+            }
+            return (typeIndex.Count, totalInstances);
+        }
+    }
+    
+    /// <summary>
+    /// Gets all classes that have at least one live instance.
+    /// Useful for debugging and introspection.
+    /// </summary>
+    /// <returns>All classes with live instances.</returns>
+    public static IEnumerable<SmalltalkObject> GetClassesWithInstances()
+    {
+        lock (typeIndexLock)
+        {
+            return typeIndex.Keys.ToList(); // Return a copy to avoid holding the lock
+        }
     }
 }

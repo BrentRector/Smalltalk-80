@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80.Exceptions;
 
 /// <summary>
 /// Handles message dispatch and method lookup for the Smalltalk-80 interpreter.
@@ -16,7 +17,8 @@ public class MessageDispatcher
     /// <param name="methodCache">The method cache to use for performance optimization.</param>
     public MessageDispatcher(MethodCache methodCache)
     {
-        this.methodCache = methodCache ?? throw new ArgumentNullException(nameof(methodCache));
+        ErrorHelper.ThrowIfNull(methodCache, nameof(methodCache));
+        this.methodCache = methodCache;
     }
 
     /// <summary>
@@ -140,7 +142,7 @@ public class MessageDispatcher
             return;
         }
 
-        throw new InvalidOperationException($"Cannot send {selector} to {receiver}");
+        throw ErrorHelper.InvalidReceiver(selector, receiver, interpreter.CurrentContext);
     }
 
     /// <summary>
@@ -234,7 +236,7 @@ public class MessageDispatcher
         }
         
         // Neither the method nor doesNotUnderstand: was found - this is fatal
-        throw new InvalidOperationException($"Method {selector} not found");
+        throw ErrorHelper.MethodNotFound(selector, receiver, interpreter.CurrentContext);
     }
 
     /// <summary>
@@ -272,7 +274,8 @@ public class MessageDispatcher
     {
         var currentContext = interpreter.CurrentContext;
         
-        var temps = new object?[method.TemporariesCount];
+        // Use pooled temporaries array for better performance
+        var temps = ContextPool.GetTemporaries(method.TemporariesCount);
         for (int i = 0; i < arguments.Length && i < temps.Length; i++)
             temps[i] = arguments[i];
 

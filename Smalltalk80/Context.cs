@@ -10,32 +10,32 @@ public class Context
     ///     Gets or sets the sending context. This will be <c>null</c> for the
     ///     top-level context.
     /// </summary>
-    public Context? Sender { get; init; }
+    public Context? Sender { get; set; }
 
     /// <summary>
-    ///     Gets the compiled method being executed.
+    ///     Gets or sets the compiled method being executed.
     /// </summary>
-    public required CompiledMethod Method { get; init; }
+    public CompiledMethod Method { get; set; } = null!;
 
     /// <summary>
-    ///     Gets the receiver object for the method.
+    ///     Gets or sets the receiver object for the method.
     /// </summary>
     public SmalltalkObject Receiver { get; set; } = null!;
 
     /// <summary>
-    ///     Gets the array of argument values passed to the method.
+    ///     Gets or sets the array of argument values passed to the method.
     /// </summary>
-    public required object?[] Arguments { get; init; } = Array.Empty<object?>();
+    public object?[] Arguments { get; set; } = Array.Empty<object?>();
 
     /// <summary>
-    ///     Gets the storage for temporary variables defined by the method.
+    ///     Gets or sets the storage for temporary variables defined by the method.
     /// </summary>
-    public required object?[] Temporaries { get; init; }
+    public object?[] Temporaries { get; set; } = Array.Empty<object?>();
 
     /// <summary>
-    ///     Gets the evaluation stack used while executing the method.
+    ///     Gets or sets the evaluation stack used while executing the method.
     /// </summary>
-    public required Stack<object?> Stack { get; init; }
+    public Stack<object?> Stack { get; set; } = new();
 
     /// <summary>
     ///     Gets or sets the program counter within the method.

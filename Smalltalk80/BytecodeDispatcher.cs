@@ -1,4 +1,5 @@
 using System;
+using Smalltalk80.Exceptions;
 
 /// <summary>
 /// Optimized bytecode dispatcher using a lookup table for better performance.
@@ -240,7 +241,7 @@ public static class BytecodeDispatcher
     {
         var context = interpreter.CurrentContext;
         var value = context.Stack.Pop();
-        interpreter.HandleReturn(value ?? throw new InvalidOperationException("Cannot return null"));
+        interpreter.HandleReturn(value ?? throw ErrorHelper.CannotReturnNull("block return", context));
     }
 
 
@@ -253,7 +254,7 @@ public static class BytecodeDispatcher
         // Get the selector from the literal frame
         if (index >= context.Method.Literals.Length)
         {
-            throw new InvalidOperationException($"Selector index {index} out of bounds for literal frame (size: {context.Method.Literals.Length})");
+            throw ErrorHelper.LiteralOutOfBounds(index, context.Method.Literals.Length, context);
         }
         
         var literal = context.Method.Literals[index];
@@ -479,7 +480,7 @@ public static class BytecodeDispatcher
             var b = context.Method.Bytecodes[i];
             Console.WriteLine($"[BYTECODE ERROR]   [{i}]: {b} (0x{b:X2})");
         }
-        throw new NotImplementedException($"Unknown bytecode: {opcode} (0x{opcode:X2})");
+        throw ErrorHelper.UnknownBytecode(opcode, interpreter.CurrentContext);
     }
 
     // Additional handler methods would be implemented here following the same pattern
@@ -562,7 +563,7 @@ public static class BytecodeDispatcher
         // Extended return - used for returning from blocks to methods
         var context = interpreter.CurrentContext;
         var value = context.Stack.Pop();
-        interpreter.HandleReturn(value ?? throw new InvalidOperationException("Cannot return null"));
+        interpreter.HandleReturn(value ?? throw ErrorHelper.CannotReturnNull("extended return", context));
     }
 
     private static void HandleExtendedPush(Interpreter interpreter)
