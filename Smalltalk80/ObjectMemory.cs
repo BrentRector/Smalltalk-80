@@ -23,10 +23,20 @@ public static class ObjectMemory
     private static readonly Dictionary<SmalltalkObject, HashSet<int>> typeIndex = new();
     private static readonly object typeIndexLock = new();
     
-    // GC configuration
-    private const int HIGH_WATER_MARK = 50000;  // Trigger GC when this many objects allocated
-    private const int LOW_FREE_COUNT = 1000;    // Trigger GC when free list below this
+    // GC configuration - adaptive thresholds
     private const int GROWTH_FACTOR = 2;        // How much to grow object table when full
+    
+    // Adaptive GC thresholds
+    private static int adaptiveHighWaterMark = 50000;    // Dynamic threshold for triggering GC
+    private static int adaptiveLowFreeCount = 1000;     // Dynamic threshold for free list size
+    private static double gcEfficiencyTarget = 0.15;    // Target: GC should free at least 15% of objects
+    private static double gcTimeTarget = 50.0;          // Target: GC should complete within 50ms
+    
+    // GC adaptation state
+    private static readonly Queue<double> recentGcEfficiencies = new();
+    private static readonly Queue<double> recentGcTimes = new();
+    private static int gcAdaptationCycle = 0;
+    private const int ADAPTATION_WINDOW = 5;             // Number of GCs to consider for adaptation
     
     // GC statistics
     private static int totalAllocations = 0;
@@ -111,7 +121,7 @@ public static class ObjectMemory
     }
     
     /// <summary>
-    /// Determines if garbage collection should be triggered.
+    /// Determines if garbage collection should be triggered using adaptive thresholds.
     /// </summary>
     private static bool ShouldTriggerGC()
     {
@@ -124,8 +134,8 @@ public static class ObjectMemory
         if ((DateTime.Now - lastGCTime).TotalSeconds < 1.0)
             return false;
             
-        return AllocatedObjectCount > HIGH_WATER_MARK || 
-               freeList.Count < LOW_FREE_COUNT;
+        return AllocatedObjectCount > adaptiveHighWaterMark || 
+               freeList.Count < adaptiveLowFreeCount;
     }
 
     /// <summary>
@@ -215,11 +225,17 @@ public static class ObjectMemory
         
         stopwatch.Stop();
         
+        // Calculate GC efficiency and adapt thresholds
+        double efficiency = AllocatedObjectCount > 0 ? (double)freedCount / (AllocatedObjectCount + freedCount) : 0.0;
+        double gcTime = stopwatch.ElapsedMilliseconds;
+        
+        AdaptGCThresholds(efficiency, gcTime, freedCount);
+        
         // Log GC results if significant
         if (freedCount > 0 || stopwatch.ElapsedMilliseconds > 100)
         {
             Console.WriteLine($"[GC] Collection #{totalCollections}: Freed {freedCount} objects in {stopwatch.ElapsedMilliseconds}ms. " +
-                            $"Live objects: {AllocatedObjectCount}, Total freed: {totalObjectsFreed}");
+                            $"Live objects: {AllocatedObjectCount}, Total freed: {totalObjectsFreed}, Efficiency: {efficiency:P1}");
         }
         
         return freedCount;
@@ -322,6 +338,13 @@ public static class ObjectMemory
         totalCollections = 0;
         totalObjectsFreed = 0;
         lastGCTime = DateTime.MinValue;
+        
+        // Reset adaptive GC state
+        adaptiveHighWaterMark = 50000;
+        adaptiveLowFreeCount = 1000;
+        recentGcEfficiencies.Clear();
+        recentGcTimes.Clear();
+        gcAdaptationCycle = 0;
     }
 
     /// <summary>Determines whether an object exists for the specified pointer.</summary>
@@ -576,4 +599,158 @@ public static class ObjectMemory
             return typeIndex.Keys.ToList(); // Return a copy to avoid holding the lock
         }
     }
+    
+    /// <summary>
+    /// Adapts GC thresholds based on recent performance metrics.
+    /// </summary>
+    /// <param name="efficiency">The efficiency of the current GC (0.0 to 1.0).</param>
+    /// <param name="gcTime">The time taken for the current GC in milliseconds.</param>
+    /// <param name="freedCount">The number of objects freed in the current GC.</param>
+    private static void AdaptGCThresholds(double efficiency, double gcTime, int freedCount)
+    {
+        // Track recent performance
+        recentGcEfficiencies.Enqueue(efficiency);
+        recentGcTimes.Enqueue(gcTime);
+        
+        // Keep only the most recent measurements
+        while (recentGcEfficiencies.Count > ADAPTATION_WINDOW)
+        {
+            recentGcEfficiencies.Dequeue();
+        }
+        while (recentGcTimes.Count > ADAPTATION_WINDOW)
+        {
+            recentGcTimes.Dequeue();
+        }
+        
+        // Only adapt after we have enough data
+        if (recentGcEfficiencies.Count < ADAPTATION_WINDOW)
+            return;
+            
+        gcAdaptationCycle++;
+        
+        // Calculate average performance over the window
+        double avgEfficiency = recentGcEfficiencies.Average();
+        double avgGcTime = recentGcTimes.Average();
+        
+        // Adaptation logic
+        int oldHighWaterMark = adaptiveHighWaterMark;
+        int oldLowFreeCount = adaptiveLowFreeCount;
+        
+        // If GC is too inefficient (freeing too few objects), increase high water mark
+        // to delay GC and allow more garbage to accumulate
+        if (avgEfficiency < gcEfficiencyTarget)
+        {
+            adaptiveHighWaterMark = Math.Min(adaptiveHighWaterMark * 5 / 4, 200000); // Increase by 25%, cap at 200k
+            adaptiveLowFreeCount = Math.Min(adaptiveLowFreeCount * 5 / 4, 5000);     // Increase by 25%, cap at 5k
+        }
+        // If GC is too efficient (freeing many objects), we might be doing GC too late
+        // Decrease thresholds to run GC more frequently with smaller collections
+        else if (avgEfficiency > gcEfficiencyTarget * 2.0)
+        {
+            adaptiveHighWaterMark = Math.Max(adaptiveHighWaterMark * 4 / 5, 10000);  // Decrease by 20%, floor at 10k
+            adaptiveLowFreeCount = Math.Max(adaptiveLowFreeCount * 4 / 5, 500);      // Decrease by 20%, floor at 500
+        }
+        
+        // If GC is taking too long, increase thresholds to reduce frequency
+        if (avgGcTime > gcTimeTarget)
+        {
+            adaptiveHighWaterMark = Math.Min(adaptiveHighWaterMark * 6 / 5, 200000); // Increase by 20%
+            adaptiveLowFreeCount = Math.Min(adaptiveLowFreeCount * 6 / 5, 5000);     // Increase by 20%
+        }
+        // If GC is very fast, we can afford to run it more frequently
+        else if (avgGcTime < gcTimeTarget / 2.0)
+        {
+            adaptiveHighWaterMark = Math.Max(adaptiveHighWaterMark * 9 / 10, 10000); // Decrease by 10%
+            adaptiveLowFreeCount = Math.Max(adaptiveLowFreeCount * 9 / 10, 500);     // Decrease by 10%
+        }
+        
+        // Log adaptation if thresholds changed significantly
+        if (Math.Abs(adaptiveHighWaterMark - oldHighWaterMark) > oldHighWaterMark * 0.1 ||
+            Math.Abs(adaptiveLowFreeCount - oldLowFreeCount) > oldLowFreeCount * 0.1)
+        {
+            Console.WriteLine($"[GC Adapt] Cycle {gcAdaptationCycle}: " +
+                            $"High water mark: {oldHighWaterMark} -> {adaptiveHighWaterMark}, " +
+                            $"Low free count: {oldLowFreeCount} -> {adaptiveLowFreeCount}, " +
+                            $"Avg efficiency: {avgEfficiency:P1}, Avg time: {avgGcTime:F1}ms");
+        }
+    }
+    
+    /// <summary>
+    /// Gets the current adaptive GC thresholds and performance metrics.
+    /// </summary>
+    /// <returns>Current GC configuration and recent performance data.</returns>
+    public static AdaptiveGCStats GetAdaptiveGCStats()
+    {
+        return new AdaptiveGCStats
+        {
+            HighWaterMark = adaptiveHighWaterMark,
+            LowFreeCount = adaptiveLowFreeCount,
+            EfficiencyTarget = gcEfficiencyTarget,
+            TimeTarget = gcTimeTarget,
+            AdaptationCycle = gcAdaptationCycle,
+            RecentEfficiencies = recentGcEfficiencies.ToArray(),
+            RecentTimes = recentGcTimes.ToArray(),
+            AverageEfficiency = recentGcEfficiencies.Count > 0 ? recentGcEfficiencies.Average() : 0.0,
+            AverageTime = recentGcTimes.Count > 0 ? recentGcTimes.Average() : 0.0
+        };
+    }
+    
+    /// <summary>
+    /// Allows manual tuning of adaptive GC targets for different workloads.
+    /// </summary>
+    /// <param name="efficiencyTarget">Target GC efficiency (0.0 to 1.0).</param>
+    /// <param name="timeTarget">Target GC time in milliseconds.</param>
+    public static void SetAdaptiveGCTargets(double efficiencyTarget, double timeTarget)
+    {
+        if (efficiencyTarget < 0.05 || efficiencyTarget > 0.5)
+            throw new ArgumentOutOfRangeException(nameof(efficiencyTarget), "Efficiency target must be between 5% and 50%");
+        if (timeTarget < 10.0 || timeTarget > 1000.0)
+            throw new ArgumentOutOfRangeException(nameof(timeTarget), "Time target must be between 10ms and 1000ms");
+            
+        gcEfficiencyTarget = efficiencyTarget;
+        gcTimeTarget = timeTarget;
+        
+        Console.WriteLine($"[GC Adapt] Updated targets: Efficiency={efficiencyTarget:P1}, Time={timeTarget:F1}ms");
+    }
+}
+
+/// <summary>
+/// Statistics and configuration for adaptive garbage collection.
+/// </summary>
+public record AdaptiveGCStats
+{
+    /// <summary>Current high water mark threshold.</summary>
+    public int HighWaterMark { get; init; }
+    
+    /// <summary>Current low free count threshold.</summary>
+    public int LowFreeCount { get; init; }
+    
+    /// <summary>Target GC efficiency.</summary>
+    public double EfficiencyTarget { get; init; }
+    
+    /// <summary>Target GC time in milliseconds.</summary>
+    public double TimeTarget { get; init; }
+    
+    /// <summary>Number of adaptation cycles completed.</summary>
+    public int AdaptationCycle { get; init; }
+    
+    /// <summary>Recent GC efficiency measurements.</summary>
+    public double[] RecentEfficiencies { get; init; } = Array.Empty<double>();
+    
+    /// <summary>Recent GC time measurements in milliseconds.</summary>
+    public double[] RecentTimes { get; init; } = Array.Empty<double>();
+    
+    /// <summary>Average efficiency over recent collections.</summary>
+    public double AverageEfficiency { get; init; }
+    
+    /// <summary>Average time over recent collections in milliseconds.</summary>
+    public double AverageTime { get; init; }
+    
+    /// <summary>
+    /// Gets a summary string of the adaptive GC performance.
+    /// </summary>
+    public string Summary => 
+        $"Thresholds: {HighWaterMark}/{LowFreeCount}, " +
+        $"Performance: {AverageEfficiency:P1} efficiency, {AverageTime:F1}ms, " +
+        $"Cycles: {AdaptationCycle}";
 }
