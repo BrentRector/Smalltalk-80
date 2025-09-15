@@ -1,16 +1,16 @@
-# Script to update Phase 2 JSON with complete method information from extracted classes
+# Script to update bootstrap JSON with complete method information from extracted classes
 
 param(
     [string]$ExtractedDir = "..\extracted",
-    [string]$Phase2File = "..\Bootstrap\bootstrap_phase2.json",
-    [string]$OutputFile = "..\Bootstrap\bootstrap_phase2_updated.json"
+    [string]$BootstrapFile = "..\Bootstrap\bootstrap.json",
+    [string]$OutputFile = "..\Bootstrap\bootstrap_updated.json"
 )
 
-# Load the current Phase 2 data
-$phase2Data = Get-Content $Phase2File | ConvertFrom-Json
+# Load the current bootstrap data
+$bootstrapData = Get-Content $BootstrapFile | ConvertFrom-Json
 
-# Classes to update - includes all Phase 1 and Phase 2 classes
-$phase2Classes = @(
+# Classes to update - includes all bootstrap classes
+$bootstrapClasses = @(
     # Core hierarchy
     "Object",
     "Behavior",
@@ -39,37 +39,37 @@ $phase2Classes = @(
 )
 
 # Update each class with extracted method data
-foreach ($className in $phase2Classes) {
+foreach ($className in $bootstrapClasses) {
     $extractedFile = Join-Path $ExtractedDir "$className.json"
     
     if (Test-Path $extractedFile) {
         Write-Host "Updating $className from extracted data..."
         $extractedData = Get-Content $extractedFile | ConvertFrom-Json
         
-        # Find the class in Phase 2 data
-        $phase2Class = $phase2Data.classes | Where-Object { $_.name -eq $className }
+        # Find the class in bootstrap data
+        $bootstrapClass = $bootstrapData.classes | Where-Object { $_.name -eq $className }
         
-        if (-not $phase2Class) {
+        if (-not $bootstrapClass) {
             # Add new class if it doesn't exist
-            Write-Host "  Adding new class $className to Phase 2..."
-            $phase2Class = @{
+            Write-Host "  Adding new class $className to bootstrap..."
+            $bootstrapClass = @{
                 name = $className
                 superclass = $extractedData.Superclass
                 instanceVariables = $extractedData.InstanceVariables
                 methods = @()
                 classMethods = @()
             }
-            $phase2Data.classes += $phase2Class
-            $phase2Class = $phase2Data.classes | Where-Object { $_.name -eq $className }
+            $bootstrapData.classes += $bootstrapClass
+            $bootstrapClass = $bootstrapData.classes | Where-Object { $_.name -eq $className }
         }
         
-        if ($phase2Class) {
+        if ($bootstrapClass) {
             # Clear existing methods and class methods arrays
-            $phase2Class.methods = @()
-            if ($null -eq $phase2Class.classMethods) {
-                $phase2Class | Add-Member -NotePropertyName classMethods -NotePropertyValue @()
+            $bootstrapClass.methods = @()
+            if ($null -eq $bootstrapClass.classMethods) {
+                $bootstrapClass | Add-Member -NotePropertyName classMethods -NotePropertyValue @()
             } else {
-                $phase2Class.classMethods = @()
+                $bootstrapClass.classMethods = @()
             }
             
             # Add instance methods with complete information
@@ -86,7 +86,7 @@ foreach ($className in $phase2Classes) {
                     }
                 }
                 
-                $phase2Method = @{
+                $bootstrapMethod = @{
                     selector = $method.Selector
                     source = $method.Source
                     bytecode = $bytecodeArray
@@ -107,15 +107,15 @@ foreach ($className in $phase2Classes) {
                         }
                     }
                     if ($stringLiterals.Count -gt 0) {
-                        $phase2Method.literals = $stringLiterals
+                        $bootstrapMethod.literals = $stringLiterals
                     }
                 }
                 
                 if ($method.IsPrimitive -and $method.PrimitiveNumber -gt 0) {
-                    $phase2Method.primitive = $method.PrimitiveNumber
+                    $bootstrapMethod.primitive = $method.PrimitiveNumber
                 }
                 
-                $phase2Class.methods += $phase2Method
+                $bootstrapClass.methods += $bootstrapMethod
             }
             
             # Add class methods with complete information
@@ -132,7 +132,7 @@ foreach ($className in $phase2Classes) {
                     }
                 }
                 
-                $phase2Method = @{
+                $bootstrapMethod = @{
                     selector = $method.Selector
                     source = $method.Source
                     bytecode = $bytecodeArray
@@ -153,20 +153,20 @@ foreach ($className in $phase2Classes) {
                         }
                     }
                     if ($stringLiterals.Count -gt 0) {
-                        $phase2Method.literals = $stringLiterals
+                        $bootstrapMethod.literals = $stringLiterals
                     }
                 }
                 
                 if ($method.IsPrimitive -and $method.PrimitiveNumber -gt 0) {
-                    $phase2Method.primitive = $method.PrimitiveNumber
+                    $bootstrapMethod.primitive = $method.PrimitiveNumber
                 }
                 
-                $phase2Class.classMethods += $phase2Method
+                $bootstrapClass.classMethods += $bootstrapMethod
             }
             
-            Write-Host "  Updated with $($phase2Class.methods.Count) instance methods and $($phase2Class.classMethods.Count) class methods"
+            Write-Host "  Updated with $($bootstrapClass.methods.Count) instance methods and $($bootstrapClass.classMethods.Count) class methods"
         } else {
-            Write-Host "  Warning: Class $className not found in Phase 2 JSON"
+            Write-Host "  Warning: Class $className not found in bootstrap JSON"
         }
     } else {
         Write-Host "Warning: Extracted file not found for $className"
@@ -174,21 +174,21 @@ foreach ($className in $phase2Classes) {
 }
 
 # Update the description
-$phase2Data.description = "Phase 2 with complete compiled methods from system image"
-$phase2Data.comments = @(
-    "This Phase 2 contains all methods from the system image for Phase 2 classes",
+$bootstrapData.description = "Bootstrap with complete compiled methods from system image"
+$bootstrapData.comments = @(
+    "This bootstrap contains all methods from the system image for bootstrap classes",
     "Methods include full bytecode, literals, and metadata",
     "Generated from extracted system image classes"
 )
 
-# Save the updated Phase 2 data
-$phase2Data | ConvertTo-Json -Depth 10 | Set-Content $OutputFile
-Write-Host "`nPhase 2 JSON updated and saved to: $OutputFile"
+# Save the updated bootstrap data
+$bootstrapData | ConvertTo-Json -Depth 10 | Set-Content $OutputFile
+Write-Host "`nBootstrap JSON updated and saved to: $OutputFile"
 
 # Summary
 $totalMethods = 0
 $totalClassMethods = 0
-foreach ($class in $phase2Data.classes) {
+foreach ($class in $bootstrapData.classes) {
     $totalMethods += $class.methods.Count
     if ($class.classMethods) {
         $totalClassMethods += $class.classMethods.Count
@@ -196,6 +196,6 @@ foreach ($class in $phase2Data.classes) {
 }
 
 Write-Host "`nSummary:"
-Write-Host "  Total classes: $($phase2Data.classes.Count)"
+Write-Host "  Total classes: $($bootstrapData.classes.Count)"
 Write-Host "  Total instance methods: $totalMethods"
 Write-Host "  Total class methods: $totalClassMethods"

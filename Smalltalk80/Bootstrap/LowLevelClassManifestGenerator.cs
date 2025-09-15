@@ -9,10 +9,10 @@ using System.Text.RegularExpressions;
 namespace Smalltalk80.Bootstrap;
 
 /// <summary>
-/// Generates a Phase 3 JSON manifest from parsed Smalltalk source.
+/// Generates a low-level class JSON manifest from parsed Smalltalk source.
 /// The manifest contains message sends to create classes and install methods.
 /// </summary>
-public class Phase3ManifestGenerator
+public class LowLevelClassManifestGenerator
 {
     /// <summary>
     /// Represents a class definition in the manifest.

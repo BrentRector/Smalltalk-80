@@ -20,9 +20,6 @@ namespace Smalltalk80.Tests
         public static void Main(string[] args)
         {
             // Disable tracing for performance
-            Tracer.Enabled = false;
-            MethodTracer.Enabled = false;
-            MethodTracer.BytecodeTracingEnabled = false;
             
             Console.WriteLine("=== Comprehensive Bytecode Test Suite ===\n");
             Console.WriteLine("Testing ALL 256 bytecodes with real tests\n");

@@ -1,0 +1,1762 @@
+Smalltalk-80 Interpreter
+========================
+
+Initializing Virtual Machine...
+[DEBUG] Created metaclass OOP 2 with method dict OOP 4
+[DEBUG] Created metaclass OOP 8 with method dict OOP 10
+[DEBUG] Created metaclass OOP 24 with method dict OOP 26
+[DEBUG] Created metaclass OOP 38 with method dict OOP 40
+[DEBUG] Created metaclass OOP 50 with method dict OOP 52
+[DEBUG] Created metaclass OOP 62 with method dict OOP 64
+[DEBUG] Created metaclass OOP 80 with method dict OOP 82
+[DEBUG] Created metaclass OOP 88 with method dict OOP 90
+[DEBUG] Created metaclass OOP 100 with method dict OOP 102
+[DEBUG] Created metaclass OOP 108 with method dict OOP 110
+[DEBUG] Created metaclass OOP 116 with method dict OOP 118
+[DEBUG] Created metaclass OOP 124 with method dict OOP 126
+[DEBUG] Created metaclass OOP 136 with method dict OOP 138
+[DEBUG] Created metaclass OOP 148 with method dict OOP 150
+[DEBUG] Created metaclass OOP 156 with method dict OOP 158
+[DEBUG] Created metaclass OOP 164 with method dict OOP 166
+[DEBUG] Created metaclass OOP 172 with method dict OOP 174
+[DEBUG] Created metaclass OOP 180 with method dict OOP 182
+[DEBUG] Created metaclass OOP 188 with method dict OOP 190
+[GC] Collection #1: Freed 1 objects in 0ms. Live objects: 99, Total freed: 1
+[DEBUG] Created metaclass OOP 196 with method dict OOP 198
+[DEBUG] Created metaclass OOP 202 with method dict OOP 204
+[DEBUG] Created metaclass OOP 210 with method dict OOP 212
+[DEBUG] Created metaclass OOP 218 with method dict OOP 220
+[DEBUG] Created metaclass OOP 226 with method dict OOP 228
+[DEBUG] Setting ObjectMemory.NilObject to object with OOP 252
+√ Virtual Machine created
+
+
+=== Smalltalk System State ===
+
+[DEBUG] PrimitiveLookupGlobal('Smalltalk'): Smalltalk dict lookup returned 244
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+[DEBUG] PrimitiveLookupGlobal('Class'): Smalltalk dict lookup returned 36
+[DEBUG] PrimitiveLookupGlobal('Metaclass'): Smalltalk dict lookup returned 48
+Showing 1 filtered classes (of 48 total)
+
+================================================================================
+Class: Behavior
+================================================================================
+  Superclass: Object
+  Instance Variables: superclass, methodDict, format
+
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+[DEBUG] PrimitiveLookupGlobal('CompiledMethod'): Smalltalk dict lookup returned 60
+  Methods (115):
+  ----------------------------------------------------------------------------
+  accumulateInstVarNames:traversedClasses:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##superclasses, ##do:, ##accumulateInstVarNames:traversedClasses:, ##includes:, ##ifFalse:, ##addAll:, ##instVarNames, ##add:, ##each]
+    Bytecode: 70 D0 89 00 05 48 10 11 F2 7D CB 6A 11 70 E3 89 00 09 10 70 D6 E5 6A 11 70 E7 7D E4 7C
+
+  addSelector:withMethod:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##includesKey:, ##at:put:, ##flushCache, ##at:ifAbsent:, ##new, ##includes:, ##ifTrue:, ##removeClass:selector:in:, ##ifTrue:ifFalse:, ##checkChangeSelector:, ##subclasses, ##do:, ##checkSuperAddSelector:, ##SelectorsOfConflictMethods, ##Array, ##SelectorsOfCopiedMethods, ##sub]
+    Bytecode: 01 10 E0 88 6A 6B 01 10 11 C1 6B 70 D2 6B 4D 10 89 00 03 4E CC 7D F3 70 E5 89 00 07 70 70 10 4D 83 67 7D E6 6B 4F 10 89 00 03 4E CC 7D F3 70 E5 89 00 07 70 70 10 4F 83 67 7D E6 6B 12 89 00 04 70 10 E9 7D 89 00 0B 70 DA 89 00 04 50 10 EC 7D CB 7D F8 7C
+
+  addSelectorUnchecked:withMethod:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##at:put:, ##flushCache]
+    Bytecode: 01 10 11 C1 6A 70 D1 7C
+
+  addSubclass:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##superclasses, ##includes:, ##ifTrue:ifFalse:, ##==, ##with:, ##add:, ##error:, ##name, ##,, # is not my subclass, <obj@252>, ##Set]
+    Bytecode: 10 D0 70 E1 89 00 15 03 2A C6 89 00 06 4B 10 E4 88 63 7D 89 00 04 03 10 E5 7D F2 7D 89 00 07 70 10 D7 29 E8 E6 7D F2 7C
+
+  allAccessesTo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##execute, ##showWhile:, ##withAllSuperclasses, ##reverse, ##,, ##allSubclasses, ##do:, ##whichSelectorsAccess:, ##~~, ##DoIt, ##ifTrue:, ##add:, ##name, # , ##OrderedCollection, ##Cursor, ##class, ##sel]
+    Bytecode: 4F CC 88 69 6A 50 D1 89 00 24 70 D3 D4 D6 70 E5 89 00 19 51 10 E8 89 00 11 52 2A E9 89 00 09 11 51 DD 2E E5 52 E5 EC 7D EB 7D CB 7D CB 7D E2 6A 11 7C
+
+  allCallsOn:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##new, ##hasSpecialSelector:ifTrueSetByte:, ##withAllSuperclasses, ##reverse, ##,, ##allSubclasses, ##do:, ##whichSelectorsReferTo:special:byte:, ##~~, ##DoIt, ##ifTrue:, ##add:, ##name, # , ##class, ##SortedCollection, ##Smalltalk, <obj@252>, ##byte, ##sel]
+    Bytecode: 4F CC 88 69 6B 50 10 89 00 02 31 7D F1 88 6A 6B 70 D2 D3 D5 70 E4 89 00 3A 4E 10 12 52 83 67 89 00 11 53 29 E8 89 00 09 11 4E DC 2D E4 53 E4 EB 7D EA 7D CB 6B 4E C7 10 12 52 83 67 89 00 12 53 29 E8 89 00 0A 11 4E C7 DC 2D E4 53 E4 EB 7D EA 7D CB 7D CB 6B 11 7C
+
+  allClassVarNames
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  allDynamicSuperclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##==, ##ifTrue:ifFalse:, ##new, ##allDynamicSuperclasses, ##addFirst:, <obj@252>, ##OrderedCollection]
+    Bytecode: 00 25 C6 89 00 04 46 CC 7D 7D 89 00 0C 00 D3 88 68 69 10 00 E4 69 10 7D 7D F1 7C
+
+  allInstances
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##allInstancesDo:, ##==, ##ifFalse:, ##add:, ##OrderedCollection, ##x]
+    Bytecode: 45 CC 88 68 69 70 89 00 0C 46 10 C6 89 00 04 10 46 E4 7D E3 7D E1 69 10 7C
+
+  allInstancesDo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##someInstance, ##==, ##ifFalse:, ##nextInstance, ##value:, ##whileFalse:, ##class, ##ifTrue:, <obj@252>]
+    Bytecode: 70 D0 88 69 6B 11 28 C6 89 00 19 89 00 0D 11 D3 88 6A 6B 10 11 CA 6B 12 28 C6 7D 89 00 04 12 88 69 7D E5 7D E2 6B 28 C7 70 C6 89 00 04 10 28 CA 7D E7 7C
+
+  allInstVarNames
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##accumulateInstVarNames:traversedClasses:, ##OrderedCollection, ##Set]
+    Bytecode: 42 CC 88 68 69 70 10 43 CC F1 69 10 7C
+
+  allSelectors
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##withAllSuperclasses, ##do:, ##addAll:, ##selectors, ##Set, ##each]
+    Bytecode: 45 CC 88 68 69 70 D1 89 00 05 10 46 D4 E3 7D CB 69 10 7C
+
+  allSharedPools
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  allSubclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##addAll:, ##subclasses, ##do:, ##allSubclasses, ##OrderedCollection, ##eachSubclass]
+    Bytecode: 45 CC 88 68 69 10 70 D2 E1 69 70 D2 89 00 05 10 46 D4 E1 7D CB 69 10 7C
+
+  allSubclassesDo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##subclasses, ##do:, ##value:, ##allSubclassesDo:, ##cl]
+    Bytecode: 70 D0 89 00 08 10 44 CA 69 44 10 E3 7D CB 7C
+
+  allSubInstancesDo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##allSubclassesDo:, ##allInstancesDo:, ##sub]
+    Bytecode: 70 89 00 04 42 10 E1 7D E0 7C
+
+  allSuperclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##allSuperclassesInto:, ##OrderedCollection]
+    Bytecode: 42 CC 88 68 69 70 10 E1 69 10 7C
+
+  allSuperclassesInto:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##superclasses, ##do:, ##allSuperclassesInto:, ##reverseDo:, ##includes:, ##ifFalse:, ##addFirst:, ##each]
+    Bytecode: 70 D0 88 69 6A 11 89 00 04 47 10 E2 7D CB 6A 11 89 00 0C 10 47 E4 89 00 04 10 47 E6 7D E5 7D E3 7C
+
+  allVarNamesSelect:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##classPool, ##keys, ##select:, ##sharedPools, ##do:, ##addAll:, ##==, ##ifTrue:ifFalse:, ##allVarNamesSelect:, ##pool, <obj@252>, ##Smalltalk]
+    Bytecode: 70 D0 D1 10 E2 88 69 6A 70 D3 89 00 07 11 49 D1 10 E2 E5 7D CB 6A 00 2A C6 89 00 07 11 4B D1 10 E2 E5 7D 89 00 06 11 00 10 E8 E5 7D F7 6A 11 7C
+
+  basicNew
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 70
+    Literals: [##isVariable, ##ifTrue:, ##basicNew:, #0, ##primitiveFailed]
+    Bytecode: 70 D0 89 00 05 70 23 E2 7D 7D E1 68 70 D4 7C
+
+  basicNew:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 71
+    Literals: [##primitiveFailed]
+    Bytecode: 70 D0 7C
+
+  browseAllAccessesTo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##openListBrowserOn:label:initialSelection:, ##allAccessesTo:, ##BrowserView]
+    Bytecode: 42 70 10 E1 10 10 83 60 7C
+
+  browseAllCallsOn:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##isMemberOf:, ##ifTrue:ifFalse:, ##key, #Users of , ##,, #Senders of , ##openListBrowserOn:label:initialSelection:, ##allCallsOn:, # from , ##name, ##asSymbol, ##keywords, ##first, ##Association, ##BrowserView]
+    Bytecode: 10 4D E0 89 00 0B 10 D2 88 6A 6B 23 12 E4 88 69 7D 89 00 0A 10 88 6A 6B 25 12 E4 88 69 7D F1 6B 4E 70 10 E7 11 D9 28 E4 70 E4 12 DA DB DC 83 66 7C
+
+  canUnderstand:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##includesSelector:, ##ifTrue:, ##==, ##canUnderstand:, <obj@248>, <obj@252>, <obj@250>]
+    Bytecode: 70 10 E0 89 00 03 24 7D 7D E1 69 00 25 C6 89 00 03 26 7D 7D E1 69 00 10 E3 7C
+
+  checkChangeSelector:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 5, Temps: 5, Primitive: 0
+    Literals: [##at:ifAbsent:, ##new, ##do:, ##inheritsFrom:, ##ifTrue:, ##checkMethodFor:, ##ifFalse:, ##cr, ##show:, #conflicting methods for , ##,, # in , ##name, ##compoundSelectorsMatching:, ##removeSelectorUnchecked:, ##removeClass:selector:in:, ##SelectorsOfCopiedMethods, ##Array, ##Transcript, ##SelectorsOfDirectedMethods, ##sel]
+    Bytecode: 50 10 89 00 03 51 CC 7D F0 89 00 20 13 70 E3 89 00 18 13 10 E5 89 00 10 52 88 6C D7 6D 14 29 DC 10 EA 2B EA 13 EA E8 7D E6 7D E4 7D CB 6D 53 10 89 00 03 51 CC 7D F0 89 00 1B 13 70 E3 89 00 13 13 10 ED 89 00 04 13 54 EE 7D CB 6D 70 13 10 53 83 6F 7D E4 7D CB 7C
+
+  checkMethodFor:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 7, Temps: 7, Primitive: 0
+    Literals: [##includesKey:, ##at:ifAbsent:, ##new, ##includes:, ##&, ##not, ##ifTrue:, ##superMethodDescriptionAt:, ##isMethodNotImplemented, ##removeSelectorUnchecked:, ##isConflictingMethods, ##compileConflictCodeFor:, ##removeClass:selector:in:, ##=, ##dynamicMethodDescriptionAt:, ##ifFalse:, ##unmovedVarsFrom:, ##whichClass, ##method, ##fieldsTouched, ##do:, ##at:, ##ifTrue:ifFalse:, ##addSelectorUnchecked:withMethod:, ##selector, ##compileUnchecked:, ##sourceCode, ##insertClass:selector:in:, ##SelectorsOfCopiedMethods, ##Array, ##SelectorsOfConflictMethods, <obj@248>, <obj@250>, ##field]
+    Bytecode: 01 10 E0 88 6C 6F 5C 10 89 00 03 5D CC 7D F1 70 E3 88 6D 6F 5E 10 89 00 03 5D CC 7D F1 70 E3 88 6E 6F 14 D5 D5 15 E4 16 E4 89 00 03 3F 7D 7D E6 6F 70 10 E7 88 69 6F 11 D8 89 00 07 70 10 E9 6F 3F 7D 7D E6 6F 11 DA 89 00 08 70 10 EB 6F 83 60 7D 7D E6 6F 16 89 00 0B 70 10 E9 6F 70 70 10 5E 83 6C 7D E6 6F 11 70 10 EE B6 89 00 42 70 11 83 11 83 30 88 6A 6F 3F 88 6B 6F 11 83 12 83 13 89 00 09 13 12 83 81 C0 E4 88 6B 7D CB 6F 13 89 00 0A 70 11 83 18 11 83 12 83 57 7D 89 00 07 70 11 83 1A 83 39 7D 83 56 6F 70 70 10 5C 83 7B 7D EF 6F 3F 7C
+
+  checkSuperAddSelector:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##includesSelector:, ##hasMultipleSuperclasses, ##ifFalse:, ##ifTrue:, ##subclasses, ##do:, ##checkSuperAddSelector:, ##checkMethodFor:, ##cr, ##show:, #conflicting methods for , ##,, # in , ##name, ##sub, ##Transcript]
+    Bytecode: 70 10 E0 88 69 6A 70 D1 89 00 15 11 89 00 03 70 7D 7D E3 6A 70 D4 89 00 04 4E 10 E6 7D CB 7D 7D E2 6A 70 10 E7 89 00 10 4F 88 6B D8 6A 13 2A DD 10 EB 2C EB 70 EB E9 7D E2 6A 11 89 00 03 70 7D 7D E3 6A 70 D4 89 00 04 4E 10 E6 7D CB 7C
+
+  classVarNames
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  compile:notifying:trailer:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  compile:notifying:trailer:ifFail:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##compilerClass, ##new, ##compile:in:notifying:ifFail:, ##selector, ##addSelector:withMethod:, ##generate:]
+    Bytecode: 70 D0 CC 10 70 11 13 83 82 88 6C 6E 14 D3 88 6D 6E 70 15 14 12 E5 F4 6E 15 7C
+
+  compileAll
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  compileAllFrom:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##selectors, ##do:, ##recompile:from:, ##sel]
+    Bytecode: 70 D0 89 00 05 70 43 10 F2 7D CB 7C
+
+  compileAllSubclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##allSubclasses, ##do:, ##compileAll, ##aSubclass]
+    Bytecode: 70 D0 89 00 03 43 D2 7D CB 7C
+
+  compileBroadcastCodeFor:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 8, Temps: 8, Primitive: 0
+    Literals: [##withAllSuperclasses, ##select:, ##includesSelector:, ##new:, ##numArgs, #1, ##to:do:, ##size, ##at:put:, #arg, ##,, ##printString, ##on:, #500, ##nextPutAll:, #all., ##=, #0, ##ifTrue:ifFalse:, ##keywords, ##at:, ##space, ##do:, ##cr, ##tab, #self , ##name, ##nextPut:, ##compileUnchecked:, ##contents, ##each, ##Array, ##i, ##WriteStream, ##String, #.]
+    Bytecode: 70 D0 89 00 04 5E 10 E2 7D E1 88 69 6D 5F 10 D4 CD 88 6C 6D 25 14 C2 89 00 0A 14 83 80 29 DB 83 80 EA C1 7D F6 6D 83 81 83 82 2D CD EC 88 6A 6D 12 2F EE 6D 14 C2 31 B6 89 00 04 12 10 EE 7D 89 00 26 10 83 13 88 6B 6D 25 14 C2 89 00 18 12 88 6E 13 83 80 C0 EE 6D 16 83 15 6D 16 14 83 80 C0 EE 6D 16 83 15 7D F6 7D 83 52 6D 11 89 00 58 12 88 6F 83 17 6D 17 83 18 6D 17 39 EE 6D 17 5E 83 1A EE 6D 17 83 63 C4 6D 14 C2 31 B6 89 00 04 12 10 EE 7D 89 00 29 10 83 13 88 6B 6D 25 14 C2 89 00 1B 12 88 81 68 08 87 13 83 80 C0 EE 6D 18 83 15 6D 18 14 83 80 C0 EE 6D 18 83 15 7D F6 7D 83 52 6D 12 83 63 C4 7D CB 6D 70 12 83 1D 83 3C 7C
+
+  compileConflictCodeFor:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##at:ifAbsent:, ##new, ##includes:, ##name, ##ifTrue:, ##compile:classified:notifying:, ##conflictCodeFor:, #conflicting inherited methods, ##insertClass:selector:in:, ##SelectorsOfConflictMethods, ##Array, <obj@252>]
+    Bytecode: 49 10 89 00 03 4A CC 7D F0 88 69 6A 11 70 D3 E2 89 00 03 70 7D 7D E4 6A 70 70 10 E6 27 2B 83 65 6A 70 70 10 49 83 68 7C
+
+  compiledMethodAt:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  compilerClass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  compileUnchecked:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##compilerClass, ##new, ##compile:in:notifying:ifFail:, ##selector, ##addSelectorUnchecked:withMethod:, ##generate:, #0, <obj@252>, ##(000)]
+    Bytecode: 70 D0 CC 10 70 27 89 00 03 27 7D 7D 83 82 88 6A 6B 12 D3 88 69 6B 70 11 12 28 E5 F4 6B 11 7C
+
+  compoundSelectorsMatching:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  conflictCodeFor:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##dynamicMethodDescriptionAt:, ##sourceCode, ##parserClass, ##new, ##parseSelector:, ##copyFrom:to:, #1, ##endOfLastToken, ##min:, ##size, ##,, ##with:, ##cr, #	^self conflictingInheritanceError, ##String, ##Character]
+    Bytecode: 70 10 E0 D1 88 69 6B 70 D2 CC 88 6A 11 E4 6B 11 26 12 D7 11 C2 E8 F5 4E 4F DC EB EA 2D EA 7C
+
+  copy
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##shallowCopy, ##methodDictionary:, ##copy, <obj@252>]
+    Bytecode: 03 88 69 6A 23 88 63 6A 70 D0 88 68 6A 11 88 63 6A 10 01 D2 E1 7C
+
+  copyMethods
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##allSelectors, ##do:, ##&, ##checkMethodFor:, ##ifFalse:, ##cr, ##show:, ##name, ##,, # has conflicting inherited methods
+  -- consult browser for their names, <obj@248>, ##selector, ##Transcript]
+    Bytecode: 2A 88 68 69 70 D0 89 00 08 10 70 4B E3 E2 88 68 7D CB 69 10 89 00 0C 4C 88 6A D5 69 12 70 D7 29 E8 E6 7D E4 7C
+
+  crossReference
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  decompile:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  decompilerClass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  defaultSelectorForMethod:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##on:, ##new:, #16, ##nextPutAll:, #unboundMethod, #1, ##to:do:, ##numArgs, #with:, ##contents, ##asSymbol, ##WriteStream, ##String]
+    Bytecode: 4B 4C 22 CD E0 88 69 6A 11 24 E3 6A 25 10 D7 89 00 04 11 28 E3 7D F6 6A 11 D9 DA 7C
+
+  dynamicMethodDescriptionAt:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##includesKey:, ##ifTrue:, ##whichClass:selector:, ##==, ##makeMethodNotImplemented, ##dynamicMethodDescriptionAt:, ##MethodDescription, <obj@252>]
+    Bytecode: 01 10 E0 89 00 06 46 70 10 F2 7D 7D E1 69 00 27 C6 89 00 04 46 D4 7D 7D E1 69 00 10 E5 7C
+
+  dynamicSuperclass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  evaluatorClass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  flushCache
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 89
+    Literals: [##primitiveFailed]
+    Bytecode: 70 D0 7C
+
+  format
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  format:variable:words:pointers:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##+, ##ifTrue:ifFalse:, #4096, #0, #8192, #16384]
+    Bytecode: 10 11 89 00 02 22 7D 89 00 02 23 7D F1 B0 12 89 00 02 24 7D 89 00 02 23 7D F1 B0 13 89 00 01 7D 89 00 02 23 7D F1 B0 88 62 7C
+
+  hasMethods
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  hasMultipleSuperclasses
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  includesSelector:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  inheritsFrom:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##superclasses, ##do:, ##==, ##or:, ##inheritsFrom:, ##ifTrue:, ##each, <obj@248>, <obj@250>]
+    Bytecode: 70 D0 89 00 13 46 10 C6 89 00 04 46 10 E4 7D E3 89 00 03 27 7D 7D E5 7D CB 69 28 7C
+
+  insertClass:selector:in:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##at:ifAbsent:, ##new, ##includes:, ##ifFalse:, ##at:put:, ##copyWith:, ##Array]
+    Bytecode: 12 11 89 00 03 46 CC 7D F0 88 6B 6C 13 10 E2 89 00 07 12 11 13 10 E5 C1 7D E3 7C
+
+  instanceCount
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [#0, ##allInstancesDo:, ##+, #1]
+    Bytecode: 20 88 68 69 70 89 00 06 10 23 B0 88 68 7D E1 69 10 7C
+
+  instSize
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  instVarNames
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##instSize, ##==, ##ifTrue:ifFalse:, #0, ##=, ##ifTrue:, ##+, #1, ##to:, ##collect:, #inst, ##,, ##printString, <obj@252>, ##(), ##i]
+    Bytecode: 70 D0 88 68 6A 00 2D C6 89 00 02 23 7D 89 00 03 00 D0 7D F2 88 69 6A 10 11 B6 89 00 03 2E 7D 7D E5 6A 11 27 B0 10 E8 89 00 05 2A DC 4F EB 7D E9 7C
+
+  isBits
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  isBytes
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  isFixed
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  isPointers
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  isVariable
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  isWords
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  kindOfSubclass
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##isVariable, ##ifTrue:ifFalse:, ##isBits, ##isBytes, # variableByteSubclass: , # variableWordSubclass: , # variableSubclass: , # subclass: ]
+    Bytecode: 70 D0 89 00 1D 70 D2 89 00 10 70 D3 89 00 03 24 7D 7D 89 00 03 25 7D 7D F1 7D 89 00 03 26 7D 7D F1 7D 89 00 03 27 7D 7D F1 7C
+
+  methodDescriptionAt:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 4, Temps: 4, Primitive: 0
+    Literals: [##includesKey:, ##at:ifAbsent:, ##new, ##includes:, ##&, ##not, ##ifTrue:, ##whichClass:selector:, ##superMethodDescriptionAt:, ##SelectorsOfCopiedMethods, ##Array, ##SelectorsOfConflictMethods, ##MethodDescription]
+    Bytecode: 01 10 E0 88 69 6C 49 10 89 00 03 4A CC 7D F1 70 E3 88 6A 6C 4B 10 89 00 03 4A CC 7D F1 70 E3 88 6B 6C 11 D5 D5 12 E4 13 E4 89 00 06 4C 70 10 F7 7D 7D E6 6C 70 10 E8 7C
+
+  methodDictionary:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 10 88 61 7C
+
+  new
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 70
+    Literals: [##isVariable, ##ifTrue:, ##new:, #0, ##primitiveFailed]
+    Bytecode: 70 D0 89 00 05 70 23 CD 7D 7D E1 68 70 D4 7C
+
+  new:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 71
+    Literals: [##primitiveFailed]
+    Bytecode: 70 D0 7C
+
+  obsolete
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##new, ##superclasses, ##do:, ##removeSubclass:, ##removeFromInheritanceTables, ##MethodDictionary, ##each]
+    Bytecode: 45 CC 88 61 68 70 D1 89 00 04 46 70 E3 7D CB 68 70 D4 7C
+
+  parserClass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  poolHas:ifTrue:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  printHierarchy
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 5, Temps: 5, Primitive: 0
+    Literals: [#0, ##on:, ##new:, #16, ##allDynamicSuperclasses, ##reverseDo:, ##crtab:, ##+, #1, ##nextPutAll:, ##name, ##space, ##print:, ##instVarNames, ##superclasses, ##size, ##>, ##ifTrue:, #  [also a , ##copyFrom:to:, #2, ##do:, ##allInstVarNames, ##nextPut:, ##cr, ##printSubclassesOn:callingSuperclass:level:, ##dynamicSuperclass, ##contents, ##WriteStream, ##String, ##aClass, ##s, #]]
+    Bytecode: 20 88 69 6B 5C 5D 23 CD E1 88 68 6B 70 D4 89 00 4D 10 11 E6 6B 11 28 B0 88 69 6B 10 5E DA E9 6B 10 DB 6B 10 5E DD EC 6B 5E DE 88 6A 6B 12 C2 28 B3 89 00 27 10 32 E9 6B 12 34 12 C2 83 53 89 00 13 10 88 6C DB 6B 14 5F DA E9 6B 14 DB 6B 14 5F 83 16 EC 7D CB 6B 10 83 60 C4 7D 83 31 7D E5 6B 10 83 18 6B 70 10 70 83 1A 11 83 79 6B 10 83 1B 7C
+
+  printMethodChunk:on:moveSource:toFile:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##cr, ##ifTrue:, ##position, ##nextChunkPut:, ##sourceMethodAt:, ##asString, ##compiledMethodAt:, ##setSourcePosition:inFile:]
+    Bytecode: 11 88 6D D0 6E 15 D0 6E 12 89 00 05 11 D2 88 6C 7D E1 6E 11 70 10 E4 D5 E3 6E 12 89 00 07 70 10 E6 14 13 F7 7D E1 7C
+
+  printOn:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##nextPutAll:, #a descendent of , ##printOn:]
+    Bytecode: 10 21 E0 69 00 10 E2 7C
+
+  printSubclassesOn:callingSuperclass:level:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 6, Temps: 6, Primitive: 0
+    Literals: [##crtab:, ##nextPutAll:, ##name, ##space, ##print:, ##instVarNames, ##superclasses, ##size, ##>, #1, ##ifTrue:, #  [also a, ##copyWithout:, ##do:, ##allInstVarNames, ##nextPut:, ##subclasses, ##==, ##+, #... all the Metaclasses ..., ##reject:, ##isMeta, ##asSortedCollection:, ##<, ##printSubclassesOn:callingSuperclass:level:, ##s, #], ##Class, ##sub, ##x, ##y]
+    Bytecode: 10 12 E0 6D 10 70 D2 E1 6D 10 88 6E D3 6D 16 70 D5 E4 6D 70 D6 88 6C 6D 14 C2 29 B3 89 00 22 10 2B E1 6D 14 11 EC 89 00 12 10 88 6F D3 6D 17 59 D2 E1 6D 17 D3 6D 17 59 DE E4 7D CB 6D 10 3A C4 7D EA 6D 70 83 10 88 6B 6D 70 5B C6 89 00 1C 10 88 81 68 08 87 12 29 B0 E0 6D 18 33 E1 6D 13 89 00 04 5C 83 15 7D 83 34 88 6B 7D EA 6D 13 89 00 06 5D D2 D2 5E B2 7D 83 36 89 00 09 5C 10 70 12 29 B0 83 78 7D CB 7C
+
+  recompile:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  recompile:from:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 4, Temps: 4, Primitive: 0
+    Literals: [##compiledMethodAt:, ##size, ##-, #2, ##to:, ##collect:, ##at:, ##compilerClass, ##new, ##compile:in:notifying:ifFail:, ##sourceCodeAt:, ##==, ##ifTrue:, ##recompile:, ##selector, ##ifFalse:, ##error:, #selector changed!!, ##addSelector:withMethod:, ##generate:, ##i, <obj@252>]
+    Bytecode: 11 10 E0 88 6A 6D 12 C2 23 B1 12 C2 E4 89 00 04 12 54 C0 7D E5 88 6B 6D 70 D7 CC 11 10 EA 70 35 89 00 02 35 7D 83 89 88 6C 6D 14 35 C6 89 00 05 70 10 ED 7D 7D EC 6D 10 DE 14 C6 89 00 05 70 31 83 30 7D EF 6D 70 10 14 13 83 33 83 52 7C
+
+  removeClass:selector:in:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##at:, ##copyWithout:, ##size, ##=, #0, ##ifTrue:ifFalse:, ##removeKey:, ##at:put:]
+    Bytecode: 12 11 C0 10 E1 88 6B 6C 13 C2 24 B6 89 00 04 12 11 E6 7D 89 00 05 12 11 13 C1 7D F5 7C
+
+  removeFromInheritanceTable:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##keys, ##do:, ##at:, ##copyWithout:, ##size, ##=, #0, ##ifTrue:ifFalse:, ##removeKey:, ##at:put:, ##key]
+    Bytecode: 10 D0 88 69 6B 11 89 00 1D 10 4A C0 70 E3 88 6A 6B 12 C2 26 B6 89 00 04 10 4A E8 7D 89 00 05 10 4A 12 C1 7D F7 7D CB 7C
+
+  removeFromInheritanceTables
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##removeFromInheritanceTable:, ##SelectorsOfConflictMethods, ##SelectorsOfCopiedMethods, ##SelectorsOfDirectedMethods]
+    Bytecode: 70 41 E0 68 70 42 E0 68 70 43 E0 7C
+
+  removeSelector:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##removeKey:, ##flushCache, ##checkChangeSelector:]
+    Bytecode: 01 10 E0 69 70 D1 69 70 10 E2 7C
+
+  removeSelectorSimply:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##removeKey:ifAbsent:, ##flushCache]
+    Bytecode: 01 10 89 00 03 70 7D 7D F0 69 70 D1 7C
+
+  removeSelectorUnchecked:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##removeKey:, ##flushCache]
+    Bytecode: 01 10 E0 69 70 D1 7C
+
+  removeSubclass:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##==, ##ifFalse:, ##remove:ifAbsent:, ##isEmpty, ##ifTrue:, <obj@252>]
+    Bytecode: 03 25 C6 89 00 14 03 10 89 00 02 25 7D F2 69 03 D3 89 00 04 25 88 63 7D E4 7D E1 7C
+
+  scopeHas:ifTrue:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##withAllSuperclasses, ##do:, ##poolHas:ifTrue:, ##ifTrue:, ##associationAt:ifAbsent:, ##==, ##ifFalse:, ##value:, ##sup, <obj@248>, ##Smalltalk, <obj@252>, <obj@250>]
+    Bytecode: 70 D0 89 00 0C 48 10 11 F2 89 00 03 29 7D 7D E3 7D CB 6B 4A 10 89 00 02 2B 7D F4 88 6A 6B 12 2B C6 89 00 07 11 12 CA 6B 29 7D 7D E6 6B 2C 7C
+
+  selectorAtMethod:setClass:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##keyAtValue:ifAbsent:, ##==, ##ifTrue:, ##value:, ##defaultSelectorForMethod:, ##selectorAtMethod:setClass:, <obj@252>]
+    Bytecode: 01 10 89 00 29 00 26 C6 89 00 09 11 70 CA 6B 70 10 E4 7D 7D E2 6B 00 10 11 F5 88 6A 6B 12 70 10 E4 C6 89 00 04 11 70 CA 7D E2 6B 12 7D 7D F0 88 6A 6B 11 70 CA 6B 12 7C
+
+  selectors
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  sharedPools
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  showVariableMenu:collect:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 9, Temps: 9, Primitive: 0
+    Literals: [##on:, ##new:, #200, ##new, #0, ##withAllSuperclasses, ##reverseDo:, ##=, ##ifFalse:, ##add:, ##value:, ##do:, ##nextPutAll:, ##contractTo:, #20, ##cr, ##addLast:, ##+, #1, ##isEmpty, ##ifTrue:, ##skip:, ##labels:lines:, ##contents, ##startUp, ##ifTrue:ifFalse:, ##at:, ##WriteStream, ##String, ##OrderedCollection, ##var, <obj@252>, ##PopUpMenu]
+    Bytecode: 5B 5C 22 CD E0 88 6B 81 68 09 87 5D CC 88 6C 81 68 09 87 24 88 6D 81 68 09 87 24 88 6E 81 68 09 87 5D CC 88 6F 81 68 09 87 70 D5 89 00 42 15 16 B6 89 00 0B 14 15 E9 81 68 09 87 15 88 6E 7D E8 81 68 09 87 10 12 CA 89 00 24 13 88 81 68 0A 87 11 5E CA 2E ED EC 81 68 09 87 1A DF 81 68 09 87 17 5E 83 30 81 68 09 87 15 32 B0 88 6D 7D CB 7D E6 81 68 09 87 17 83 13 89 00 03 3F 7D 7D 83 34 81 68 09 87 13 83 35 81 68 09 87 83 80 13 83 17 14 83 56 83 18 88 81 68 08 87 81 68 09 87 18 24 B6 89 00 02 3F 7D 89 00 04 17 18 C0 7D 83 59 7C
+
+  someInstance
+    Args: 0, Temps: 0, Primitive: 77
+    Bytecode: 70 7C
+
+  sourceCodeAt:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  sourceCodeForMethod:at:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##leftShiftDown, ##ifTrue:ifFalse:, ##decompilerClass, ##new, ##decompile:in:method:, ##decompileString, ##getSource, ##==, ##at:, ##size, ##isSeparator, ##ifTrue:, ##and:, ##>, #1, ##whileTrue:, ##-, ##copyFrom:to:, ##Sensor, <obj@252>]
+    Bytecode: 52 D0 89 00 0C 70 D2 CC 11 70 10 83 64 D5 88 6A 7D 89 00 4E 10 D6 88 6A 6C 12 33 C6 89 00 0C 70 D2 CC 11 70 10 83 64 D5 88 6A 7D 89 00 32 12 12 C2 C0 DA 89 00 28 12 C2 88 6B 6C 89 00 0D 12 13 C0 DA 89 00 04 13 2E B3 7D EC 7D 89 00 06 13 2E B1 88 6B 7D EF 6C 12 2E 13 83 51 88 6A 7D EB 7D F1 7D F1 6C 12 7C
+
+  sourceCodeTemplate
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  sourceMethodAt:
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  sourceTextAt:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##at:, ##leftShiftDown, ##ifTrue:ifFalse:, ##decompilerClass, ##new, ##decompile:in:method:, ##getSource, ##==, ##ifTrue:, ##asText, ##Sensor, <obj@252>]
+    Bytecode: 01 10 C0 88 6A 6B 4A D1 89 00 0B 70 D3 CC 10 70 12 83 65 88 69 7D 89 00 18 12 D6 88 69 6B 11 2B C6 89 00 0B 70 D3 CC 10 70 12 83 65 88 69 7D E8 7D F2 6B 11 D9 7C
+
+  subclassDefinerClass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  subclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##==, ##ifTrue:ifFalse:, ##new, ##copy, <obj@252>, ##Set]
+    Bytecode: 03 24 C6 89 00 04 45 CC 7D 7D 89 00 04 03 D3 7D 7D F1 7C
+
+  subclassInstVarNames
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##new, ##allSubclasses, ##do:, ##addAll:, ##instVarNames, ##Set, ##aSubclass]
+    Bytecode: 45 CC 88 68 69 70 D1 89 00 05 10 46 D4 E3 7D CB 69 10 7C
+
+  superclass
+    Args: 0, Temps: 0, Primitive: 0
+    Bytecode: 70 7C
+
+  superclass:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##isKindOf:, ##ifTrue:ifFalse:, ##error:, #superclass must be a class-describing object, ##Behavior]
+    Bytecode: 10 44 E0 89 00 04 10 88 60 7D 89 00 04 70 23 E2 7D F1 7C
+
+  superclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##==, ##ifTrue:, ##hasMultipleSuperclasses, ##with:, ##,, ##class, ##otherSuperclasses, <obj@252>, ##(), ##Array]
+    Bytecode: 00 27 C6 89 00 03 28 7D 7D E1 68 70 D2 89 00 09 49 00 E3 C7 D6 70 E4 7D 7D E1 68 49 00 E3 7C
+
+  superMethodDescriptionAt:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##makeMethodNotImplemented, ##superclasses, ##do:, ##methodDescriptionAt:, ##isMethodNotImplemented, ##ifFalse:, ##ifTrue:ifFalse:, ##=, ##makeConflictingMethods, ##MethodDescription, ##each]
+    Bytecode: 49 D0 88 6A 6B 70 D1 89 00 27 4A 10 E3 88 69 6B 11 D4 89 00 1A 12 D4 89 00 04 11 88 6A 7D 89 00 0C 12 11 B6 89 00 04 49 D8 7D 7D E5 7D F6 7D E5 7D CB 6B 12 7C
+
+  tryCopyingCodeFor:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 5, Temps: 5, Primitive: 0
+    Literals: [##isCompound, ##ifFalse:, ##NotFound, ##classPart, ##selectorPart, ##==, ##all, ##ifTrue:, ##compileBroadcastCodeFor:, ##insertClass:selector:in:, ##OK, ##super, ##ifTrue:ifFalse:, ##superMethodDescriptionAt:, ##at:, ##isMeta, ##class, ##inheritsFrom:, ##HierarchyViolation, ##methodDescriptionAt:, ##isBad, ##compileUnchecked:, ##,, #., ##sourceCode, ##, ##SelectorsOfDirectedMethods, ##Smalltalk]
+    Bytecode: 10 D0 89 00 03 22 7D 7D E1 6D 10 D3 88 69 6D 10 D4 88 6B 6D 11 26 C6 89 00 0E 70 13 E8 6D 70 70 13 5A 83 69 6D 2A 7D 7D E7 6D 11 2B C6 89 00 06 70 13 ED 88 6C 7D 89 00 25 5B 11 C0 88 6A 6D 70 DF 89 00 05 12 C7 88 6A 7D E7 6D 70 12 83 31 89 00 03 32 7D 7D E1 6D 12 13 83 33 88 6C 7D FC 6D 14 83 14 89 00 03 22 7D 7D E7 6D 70 11 83 18 37 83 36 14 83 36 83 35 6D 70 70 13 5A 83 69 6D 39 DA 7C
+
+  unmovedVarsFrom:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 3, Temps: 3, Primitive: 0
+    Literals: [##allInstVarNames, #1, ##to:, ##instSize, ##collect:, ##at:, ##=, ##i]
+    Bytecode: 70 D0 88 69 6B 10 D0 88 6A 6B 21 10 D3 E2 89 00 08 12 47 C0 11 47 C0 B6 7D E4 7C
+
+  updateInheritanceTable:oldSelf:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 0, Temps: 0, Primitive: 0
+    Literals: [##do:, #1, ##to:do:, ##size, ##at:, ##==, ##ifTrue:, ##at:put:, ##array, ##i]
+    Bytecode: 10 89 00 17 21 48 C2 89 00 0F 48 49 C0 11 C6 89 00 05 48 49 70 C1 7D E6 7D F2 7D CB 7C
+
+  updateInheritanceTables:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##updateInheritanceTable:oldSelf:, ##SelectorsOfConflictMethods, ##SelectorsOfCopiedMethods, ##SelectorsOfDirectedMethods]
+    Bytecode: 70 41 10 F0 69 70 42 10 F0 69 70 43 10 F0 7C
+
+  whichClassIncludesSelector:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 1, Temps: 1, Primitive: 0
+    Literals: [##includesKey:, ##ifTrue:, ##==, ##whichClassIncludesSelector:, <obj@252>]
+    Bytecode: 01 10 E0 89 00 03 70 7D 7D E1 69 00 24 C6 89 00 03 24 7D 7D E1 69 00 10 E3 7C
+
+  whichSelectorsAccess:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##allInstVarNames, ##indexOf:ifAbsent:, ##new, ##keys, ##select:, ##at:, ##readsField:, ##or:, ##writesField:, ##Set, ##sel]
+    Bytecode: 70 D0 10 89 00 04 49 CC 7D 7D F1 88 69 6A 01 D3 89 00 10 01 4A C0 11 E6 89 00 06 01 4A C0 11 E8 7D E7 7D E4 7C
+
+  whichSelectorsReferTo:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##hasSpecialSelector:ifTrueSetByte:, ##whichSelectorsReferTo:special:byte:, ##Smalltalk, <obj@252>, ##byte]
+    Bytecode: 42 10 89 00 02 23 7D F0 88 69 6A 70 10 11 44 83 61 7C
+
+  whichSelectorsReferTo:special:byte:
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 6, Temps: 6, Primitive: 0
+    Literals: [##new, ##methodArray, ##size, #0, ##+, #1, ##<=, ##whileTrue:, ##at:, ##==, ##ifFalse:, ##refersToLiteral:, ##or:, ##and:, ##scanFor:, ##ifTrue:, ##add:, ##basicAt:, ##OrderedCollection, <obj@252>]
+    Bytecode: 52 CC 88 6B 81 68 08 87 01 D1 88 6D 81 68 08 87 15 C2 88 6F 81 68 08 87 23 88 6E 81 68 08 87 89 00 08 16 25 B0 88 6E 17 B4 7D 89 00 2A 15 16 C0 88 6C 33 C6 89 00 1E 14 10 EB 89 00 0A 11 89 00 04 14 12 EE 7D ED 7D EC 89 00 08 13 01 16 83 31 83 30 7D EF 7D EA 7D E7 81 68 08 87 13 7C
+
+  withAllSubclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##allSubclasses, ##addFirst:]
+    Bytecode: 70 D0 88 68 69 10 70 E1 69 10 7C
+
+  withAllSuperclasses
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+[DEBUG] PrimitiveLookupGlobal('Symbol'): Smalltalk dict lookup returned 186
+    Args: 2, Temps: 2, Primitive: 0
+    Literals: [##allSuperclasses, ##addFirst:]
+    Bytecode: 70 D0 88 68 69 10 70 E1 69 10 7C
+
+

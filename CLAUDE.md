@@ -47,20 +47,20 @@ This project contains a prototype of a Smalltalk-80 interpreter written in C#. W
    - Changed to use `GetEnumerator()` to properly iterate through all entries
    - This fixed false positives about "missing" methods
 
-**Phase 2 Status:**
+**Bootstrap Status:**
 - ✅ All 8 core classes validate at 100%
-- ✅ 379 total methods match perfectly between Phase 2 and system image
-- ✅ Ready for Phase 3 implementation via bytecode execution
+- ✅ 379 total methods match perfectly between bootstrap and system image
+- ✅ Ready for extended class implementation via bytecode execution
 
-### Phase 3 Implementation Notes
+### Extended Class Implementation Notes
 
 **Bytecode-Based Class Creation:**
-- Phase 3 classes should be created via bytecode execution in method contexts
+- Extended classes should be created via bytecode execution in method contexts
 - This ensures all operations go through the interpreter and trigger proper method tracing
 - Avoids bypassing the VM which would miss important initialization steps
 
-**Phase 3 JSON Structure:**
-The Phase 3 manifest should use this structure:
+**Extended JSON Structure:**
+The extended manifest should use this structure:
 ```json
 {
   "classes": [
@@ -74,24 +74,22 @@ The Phase 3 manifest should use this structure:
 
 ## Bootstrap Process Overview
 
-The Smalltalk-80 system bootstraps in three phases:
+The Smalltalk-80 system bootstraps in a unified process:
 
-### Phase 1: Minimal Core Classes
+### Bootstrap: Core System Classes
 - Creates the essential classes needed to bootstrap: Object, Behavior, Class, Metaclass, CompiledMethod, MethodDictionary, Symbol, String, Array, ByteArray, Collection, Dictionary, SystemDictionary
 - Establishes the class hierarchy and metaclass relationships
-- Creates empty method dictionaries with pre-allocated sizes (critical since dictionaries cannot resize until after Phase 2)
+- Creates method dictionaries with pre-allocated sizes for all bootstrap methods
+- Installs compiled methods with bytecode into all bootstrap classes
+- Creates additional classes (UndefinedObject, Boolean, True, False, Magnitude, LookupKey, Association)
+- Methods are separated into instance methods (installed on the class) and class methods (installed on the metaclass)
 - Registers all classes in the global Smalltalk SystemDictionary
 
-### Phase 2: Method Installation
-- Installs compiled methods with bytecode into the Phase 1 classes
-- Creates additional classes not in Phase 1 (UndefinedObject, Boolean, True, False, Magnitude, LookupKey, Association)
-- Methods are separated into instance methods (installed on the class) and class methods (installed on the metaclass)
-- Method dictionaries must be sized correctly in Phase 1 to accommodate all Phase 2 methods
-
-### Phase 3: Full System Classes
+### Extended Classes: Additional System Classes
 - Adds remaining Smalltalk-80 classes with their complete method implementations
 - Enhances existing classes with additional methods
 - Uses flat structure with separate classes and methods arrays
+- Loaded via self-hosting message sends
 
 ## Extracting Classes from System Image
 
@@ -108,14 +106,14 @@ This generates `extracted/ClassName.json` with:
 - Literals array
 - Separation of instance and class methods
 
-### 2. Update Phase 2 Bootstrap
+### 2. Update Bootstrap
 ```powershell
 cd scripts
-pwsh -File UpdatePhase2Methods.ps1
+pwsh -File UpdateBootstrapMethods.ps1
 ```
 This script:
 - Reads all extracted class JSON files
-- Updates `bootstrap_phase2.json` with the latest bytecode
+- Updates `bootstrap.json` with the latest bytecode
 - Ensures bytecode is always an array (even single-byte)
 - Handles literal conversion to proper format
 
@@ -124,8 +122,8 @@ This script:
 cd scripts
 pwsh -File AnalyzeDictionarySizes.ps1
 ```
-This checks that Phase 1 pre-allocated dictionary sizes match Phase 2 requirements.
-Critical issues (TOO SMALL) must be fixed by updating Phase 1 capacities.
+This checks that bootstrap pre-allocated dictionary sizes match requirements.
+Critical issues (TOO SMALL) must be fixed by updating bootstrap capacities.
 
 ### 4. Clean Rebuild
 After significant changes:
@@ -136,25 +134,25 @@ This prevents issues with executable files being overwritten.
 
 ## Important Bootstrap Constraints
 
-1. **Dictionary Sizing**: Method dictionaries cannot resize until after Phase 2 completes. Phase 1 must pre-allocate sufficient capacity (typically actual * 1.5 for hash table efficiency).
+1. **Dictionary Sizing**: Method dictionaries cannot resize until after bootstrap completes. Bootstrap must pre-allocate sufficient capacity (typically actual * 1.5 for hash table efficiency).
 
-2. **Class Creation**: Phase 1 contains only minimal core classes. Phase 2 creates additional classes as needed using `CreatePhase2Class` which checks if a class exists before creating it.
+2. **Class Creation**: Bootstrap contains all core classes with their complete method implementations in a single unified step.
 
 3. **Method Installation**: Instance methods go on the class's method dictionary, class methods go on the metaclass's method dictionary.
 
 4. **Bytecode Format**: All bytecode must be arrays of integers, even single-byte bytecode.
 
-## Validating Phase 2 Bootstrap
+## Validating Bootstrap
 
-After any changes to Phase 2, validate the bootstrap is working correctly:
+After any changes to bootstrap, validate the bootstrap is working correctly:
 
 ### Run Validation
 ```powershell
 cd scripts
-pwsh -File ValidatePhase2Simple.ps1
+pwsh -File ValidateBootstrapSimple.ps1
 ```
 
-This validates the 8 core Phase 2 classes. Success criteria:
+This validates the 8 core bootstrap classes. Success criteria:
 - 100% method match rate (all 379 methods)
 - All bytecode sequences match exactly
 - No missing or extra methods

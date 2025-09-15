@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <AssemblyName>Smalltalk80.Compiler</AssemblyName>
+    <AssemblyName>StandaloneCompiler</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />

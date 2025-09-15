@@ -29,10 +29,10 @@ public class GeneratePhase3Manifest
         
         try
         {
-            var generator = new Phase3ManifestGenerator();
+            var generator = new LowLevelClassManifestGenerator();
             generator.GenerateFromFile(inputPath, outputPath);
             
-            Console.WriteLine("Phase 3 manifest generation complete!");
+            Console.WriteLine("Low-level class manifest generation complete!");
         }
         catch (Exception ex)
         {

@@ -21,23 +21,13 @@ public class Program
         {
             // Parse command line arguments
             var jsonManifests = new List<string>();
-            var extendedLibraryManifests = new List<string>();
             var sourceFiles = new List<string>();
             var classesToPrint = new List<string>();
-            bool skipExtendedLibrary = false;
+            bool skipLowLevelClasses = false;
             bool listBootstrapClasses = false;
-            bool enableVMDebug = false;
-            bool enableBootstrapDebug = false;
-            bool useEnhancedPrinter = false;
+            var verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Overview;
             bool showBytecode = true;
             bool showMnemonics = true;
-            bool testCriticalMethods = false;
-            bool testUndefinedObject = false;
-            bool testClassCreation = false;
-            bool testClassCreationFixed = false;
-            bool testSimpleMessage = false;
-            bool enableMethodTracing = false;
-            bool testOOPBug = false;
             
             for (int i = 0; i < args.Length; i++)
             {
@@ -50,31 +40,46 @@ public class Program
                 {
                     jsonManifests.Add(args[++i]);
                 }
-                else if (args[i] == "--skip-extended" || args[i] == "--skip-phase3")
+                else if (args[i] == "--skip-low-level")
                 {
-                    skipExtendedLibrary = true;
+                    skipLowLevelClasses = true;
                 }
-                else if (args[i] == "--list-bootstrap-classes" || args[i] == "--list-phase2-classes")
+                else if (args[i] == "--list-bootstrap-classes")
                 {
                     listBootstrapClasses = true;
-                    skipExtendedLibrary = true; // Always skip extended library when listing bootstrap classes
+                    skipLowLevelClasses = true; // Always skip low-level classes when listing bootstrap classes
                 }
-                else if (args[i] == "--debug-vm")
+                else if (args[i] == "--print-classes")
                 {
-                    enableVMDebug = true;
+                    // Print class list (verbosity level 1)
+                    verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Overview;
                 }
-                else if (args[i] == "--debug-bootstrap")
-                {
-                    enableBootstrapDebug = true;
-                }
-                else if (args[i] == "--print-class" && i + 1 < args.Length)
+                else if (args[i] == "--inspect-class" && i + 1 < args.Length)
                 {
                     classesToPrint.Add(args[++i]);
-                    useEnhancedPrinter = true;
+                    verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Complete;
                 }
-                else if (args[i] == "--enhanced-print")
+                else if (args[i] == "--verbose-level" && i + 1 < args.Length)
                 {
-                    useEnhancedPrinter = true;
+                    if (int.TryParse(args[++i], out int level) && level >= 1 && level <= 3)
+                    {
+                        verbosityLevel = (SmalltalkPrettyPrinterUnified.VerbosityLevel)level;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Invalid verbosity level: {args[i]}. Must be 1, 2, or 3.");
+                        return 1;
+                    }
+                }
+                else if (args[i] == "--show-bytecode")
+                {
+                    showBytecode = true;
+                    verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Complete;
+                }
+                else if (args[i] == "--show-mnemonics")
+                {
+                    showMnemonics = true;
+                    verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Complete;
                 }
                 else if (args[i] == "--no-bytecode")
                 {
@@ -84,42 +89,13 @@ public class Program
                 {
                     showMnemonics = false;
                 }
-                else if (args[i] == "--test-critical-methods")
+                else if (args[i] == "--low-level-classes" && i + 1 < args.Length)
                 {
-                    testCriticalMethods = true;
-                }
-                else if (args[i] == "--test-undefined-object")
-                {
-                    testUndefinedObject = true;
-                }
-                else if (args[i] == "--test-class-creation")
-                {
-                    testClassCreation = true;
-                    skipExtendedLibrary = true; // Don't load Phase 3
-                }
-                else if (args[i] == "--test-class-creation-fixed")
-                {
-                    testClassCreationFixed = true;
-                    skipExtendedLibrary = true; // Don't load Phase 3
-                }
-                else if (args[i] == "--test-oop-bug")
-                {
-                    testOOPBug = true;
-                    skipExtendedLibrary = true;
-                }
-                else if (args[i] == "--test-simple-message")
-                {
-                    testSimpleMessage = true;
-                    skipExtendedLibrary = true;
-                }
-                else if (args[i] == "--trace-methods")
-                {
-                    enableMethodTracing = true;
-                }
-                else if ((args[i] == "--extended-library" || args[i] == "--phase3") && i + 1 < args.Length)
-                {
-                    extendedLibraryManifests.Add(args[++i]);
-                    skipExtendedLibrary = true; // Skip standard extended library when loading custom manifests
+                    // Low-level class creation approach using system image JSON
+                    var systemImagePath = args[++i];
+                    Console.WriteLine($"Using low-level class creation from system image: {systemImagePath}");
+                    // TODO: Add classNames list
+                    skipLowLevelClasses = true;
                 }
                 else if (!args[i].StartsWith("--"))
                 {
@@ -129,30 +105,8 @@ public class Program
             
             Console.WriteLine("Initializing Virtual Machine...");
             
-            // Set VM debug output flag
-            if (enableVMDebug)
-            {
-                Bootstrap.VMPrimitiveAdapter.EnableVMDebugOutput = true;
-                Console.WriteLine("✓ VM debug output enabled");
-            }
-            
-            // Set bootstrap debug output flags
-            if (enableBootstrapDebug)
-            {
-                Bootstrap.JsonBootstrapExecutor.EnableBootstrapDebugOutput = true;
-                Bootstrap.Phase2Executor.EnablePhase2DebugOutput = true;
-                Console.WriteLine("✓ Bootstrap debug output enabled");
-            }
-            
-            // Enable method tracing if requested
-            if (enableMethodTracing)
-            {
-                MethodTracer.Enabled = true;
-                Console.WriteLine("✓ Method tracing enabled");
-            }
-            
-            // Create the VM with bootstrap through extended library
-            var vm = new VirtualMachine(skipStandardLibrary: skipExtendedLibrary);
+            // Create the VM with bootstrap through low-level classes
+            var vm = new VirtualMachine(skipStandardLibrary: skipLowLevelClasses);
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();
@@ -175,86 +129,6 @@ public class Program
                 }
             }
             
-            // Load extended library manifests if specified
-            if (extendedLibraryManifests.Count > 0 && vm.Adapter != null)
-            {
-                Console.WriteLine();
-                Console.WriteLine("=== Loading Extended Library Manifests ===");
-                
-                // Enable VM debug if requested
-                if (enableVMDebug)
-                {
-                    Bootstrap.VMPrimitiveAdapter.EnableVMDebugOutput = true;
-                }
-                
-                // Check if the manifest requests bytecode execution
-                bool useBytecodeExecution = false;
-                foreach (var manifestFile in extendedLibraryManifests)
-                {
-                    if (manifestFile.Contains("test_counter", StringComparison.OrdinalIgnoreCase) ||
-                        manifestFile.Contains("bytecode", StringComparison.OrdinalIgnoreCase))
-                    {
-                        useBytecodeExecution = true;
-                        break;
-                    }
-                }
-                
-                if (useBytecodeExecution)
-                {
-                    // Use the Phase2Executor for bytecode-based execution
-                    Console.WriteLine("Using bytecode executor for extended library...");
-                    var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
-                    
-                    // Load the test counter manifest
-                    var testCounterManifest = extendedLibraryManifests.FirstOrDefault(f => f.Contains("test_counter.json"));
-                    if (testCounterManifest != null)
-                    {
-                        try
-                        {
-                            var jsonContent = System.IO.File.ReadAllText(testCounterManifest);
-                            phase2Executor.ExecuteManifest(jsonContent);
-                            Console.WriteLine($"✓ Successfully loaded extended library manifest: {testCounterManifest}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"✗ Failed to load manifest: {ex.Message}");
-                            if (enableBootstrapDebug)
-                            {
-                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // Use the regular Phase2Executor
-                    var phase2Executor = new Bootstrap.Phase2Executor(vm.Adapter);
-                    
-                    foreach (var manifestFile in extendedLibraryManifests)
-                    {
-                        Console.WriteLine($"\nLoading extended library manifest: {manifestFile}");
-                        try
-                        {
-                            var jsonContent = System.IO.File.ReadAllText(manifestFile);
-                            phase2Executor.ExecuteManifest(jsonContent);
-                            Console.WriteLine($"✓ Successfully loaded extended library manifest: {manifestFile}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"✗ Failed to load extended library manifest {manifestFile}: {ex.Message}");
-                            if (enableBootstrapDebug)
-                            {
-                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                            }
-                        }
-                    }
-                }
-            }
-            else if (extendedLibraryManifests.Count > 0)
-            {
-                Console.WriteLine("ERROR: VM adapter not available for extended library execution");
-            }
-            
             // If listing bootstrap classes, do that and exit
             if (listBootstrapClasses)
             {
@@ -262,50 +136,6 @@ public class Program
                 return 0;
             }
             
-            // If testing critical methods, do that
-            if (testCriticalMethods)
-            {
-                // Suppress the Phase 2 dump for testing
-                TestCriticalMethods.RunTests(vm);
-                return 0;
-            }
-            
-            // If testing UndefinedObject, do that
-            if (testUndefinedObject)
-            {
-                TestUndefinedObject.RunTests(vm);
-                return 0;
-            }
-            
-            // If testing class creation, do that
-            if (testClassCreation)
-            {
-                Console.WriteLine("DEBUG: About to run TestClassCreation");
-                TestClassCreation.RunTest(vm);
-                return 0;
-            }
-            
-            // If testing fixed class creation, do that
-            if (testClassCreationFixed)
-            {
-                Console.WriteLine("DEBUG: About to run TestClassCreationFixed");
-                TestClassCreationFixed.RunTest(vm);
-                return 0;
-            }
-            
-            // If testing simple message, do that
-            if (testSimpleMessage)
-            {
-                TestSimpleMessage.RunTest(vm);
-                return 0;
-            }
-            
-            // If testing OOP bug, do that
-            if (testOOPBug)
-            {
-                TestOOPBug(vm);
-                return 0;
-            }
             
             // Load Smalltalk source files if specified
             if (sourceFiles.Count > 0)
@@ -326,24 +156,16 @@ public class Program
                 }
             }
             
-            // Print final VM state using proper Smalltalk object examination
+            // Print final VM state using unified pretty printer
             Console.WriteLine();
             if (vm.Adapter != null)
             {
-                if (useEnhancedPrinter)
+                var printer = new SmalltalkPrettyPrinterUnified(vm.Adapter, verbosityLevel, showBytecode, showMnemonics);
+                if (classesToPrint.Count > 0)
                 {
-                    var enhancedPrinter = new SmalltalkPrettyPrinterEnhanced(vm.Adapter, showBytecode, showMnemonics);
-                    if (classesToPrint.Count > 0)
-                    {
-                        enhancedPrinter.SetClassFilter(classesToPrint.ToArray());
-                    }
-                    enhancedPrinter.PrintSystemState();
+                    printer.SetClassFilter(classesToPrint.ToArray());
                 }
-                else
-                {
-                    var prettyPrinter = new SmalltalkPrettyPrinter(vm.Adapter);
-                    prettyPrinter.PrintSystemState();
-                }
+                printer.PrintSystemState();
             }
             else
             {
@@ -676,111 +498,31 @@ public class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --help, -h                      Show this help message");
         Console.WriteLine("  --json <file>                   Load additional JSON manifest");
-        Console.WriteLine("  --skip-extended                 Skip loading extended library (formerly --skip-phase3)");
-        Console.WriteLine("  --extended-library <file>       Load custom extended library manifest (formerly --phase3)");
+        Console.WriteLine("  --skip-low-level                Skip loading low-level classes");
+        Console.WriteLine("  --low-level-classes <image>     Create classes via low-level message sends from system image");
         Console.WriteLine("  --list-bootstrap-classes        List all classes in bootstrap");
-        Console.WriteLine("  --debug-vm                      Enable VM debug output");
-        Console.WriteLine("  --debug-bootstrap               Enable bootstrap debug output");
-        Console.WriteLine("  --print-class <name>            Print specific class details");
-        Console.WriteLine("  --enhanced-print                Use enhanced pretty printer");
+        Console.WriteLine("  --print-classes                 Show class overview (verbosity level 1)");
+        Console.WriteLine("  --inspect-class <name>          Inspect specific class with full details");
+        Console.WriteLine("  --verbose-level <1-3>           Set output detail level:");
+        Console.WriteLine("                                    1=Overview, 2=Detailed, 3=Complete");
+        Console.WriteLine("  --show-bytecode                 Show bytecode disassembly (sets level 3)");
+        Console.WriteLine("  --show-mnemonics                Show instruction mnemonics (sets level 3)");
         Console.WriteLine("  --no-bytecode                   Hide bytecode in method displays");
         Console.WriteLine("  --no-mnemonics                  Hide mnemonics in method displays");
-        Console.WriteLine("  --trace-methods                 Enable method entry/exit tracing");
-        Console.WriteLine("  --test-critical-methods         Run critical method tests");
-        Console.WriteLine("  --test-undefined-object         Run UndefinedObject tests");
         Console.WriteLine();
         Console.WriteLine("Source Files:");
         Console.WriteLine("  Any non-option arguments are treated as Smalltalk source files to load");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  Smalltalk80.Interpreter                       # Run with default bootstrap");
-        Console.WriteLine("  Smalltalk80.Interpreter --enhanced-print      # Use enhanced pretty printer");
-        Console.WriteLine("  Smalltalk80.Interpreter --print-class Object  # Print Object class details");
-        Console.WriteLine("  Smalltalk80.Interpreter --trace-methods       # Enable method tracing");
-        Console.WriteLine("  Smalltalk80.Interpreter mycode.st             # Load Smalltalk source file");
+        Console.WriteLine("  Smalltalk80.Interpreter                          # Run with basic output");
+        Console.WriteLine("  Smalltalk80.Interpreter --verbose-level 2        # Show detailed class info");
+        Console.WriteLine("  Smalltalk80.Interpreter --inspect-class Object   # Full analysis of Object class");
+        Console.WriteLine("  Smalltalk80.Interpreter --show-bytecode          # Show bytecode disassembly");
+        Console.WriteLine("  Smalltalk80.Interpreter mycode.st                # Load Smalltalk source file");
         Console.WriteLine();
         Console.WriteLine("Bootstrap Process:");
         Console.WriteLine("  1. Core bootstrap with essential classes and methods");
         Console.WriteLine("  2. Extended library (optional, can be skipped with --skip-extended)");
         Console.WriteLine("  3. Custom manifests via --extended-library option");
-    }
-    
-    /// <summary>
-    /// Test for Object/ObjectClass OOP collision bug.
-    /// </summary>
-    private static void TestOOPBug(VirtualMachine vm)
-    {
-        Console.WriteLine("=== Testing Object/ObjectClass OOP Assignment ===\n");
-        
-        var adapter = vm.Adapter;
-        if (adapter == null)
-        {
-            Console.WriteLine("ERROR: VM adapter not available");
-            return;
-        }
-        
-        // Check what OOPs Object and ObjectClass have
-        int objectOop = adapter.PrimitiveLookupGlobal("Object");
-        int objectClassOop = adapter.PrimitiveLookupGlobal("ObjectClass");
-        
-        Console.WriteLine($"After bootstrap:");
-        Console.WriteLine($"  Object OOP: {objectOop}");
-        Console.WriteLine($"  ObjectClass OOP: {objectClassOop}");
-        
-        if (objectOop == objectClassOop)
-        {
-            Console.WriteLine("\n*** BUG CONFIRMED: Object and ObjectClass have the same OOP! ***");
-            
-            // Try to understand why
-            var objectObj = ObjectMemory.FromOop(objectOop);
-            if (objectObj != null)
-            {
-                Console.WriteLine($"  Object at OOP {objectOop} has {objectObj.Fields.Length} fields");
-                Console.WriteLine($"  Object's slot 0 (superclass): {objectObj.Fields[0]}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("\n✓ Object and ObjectClass have different OOPs (no bug)");
-            
-            // Check Association's superclass chain
-            int associationOop = adapter.PrimitiveLookupGlobal("Association");
-            if (associationOop > 0)
-            {
-                Console.WriteLine($"\nChecking Association's superclass chain:");
-                var current = ObjectMemory.FromOop(associationOop);
-                int depth = 0;
-                var visitedOops = new HashSet<int>();
-                
-                while (current != null && depth < 10)
-                {
-                    if (!visitedOops.Add(current.Oop))
-                    {
-                        Console.WriteLine($"  *** Cycle detected at OOP {current.Oop}! ***");
-                        break;
-                    }
-                    
-                    Console.WriteLine($"  Depth {depth}: OOP {current.Oop} ({current.Fields.Length} fields)");
-                    
-                    // Get superclass from slot 0
-                    if (current.Fields.Length > 0 && current.Fields[0] is SmalltalkObject super)
-                    {
-                        Console.WriteLine($"    -> superclass OOP {super.Oop}");
-                        current = super;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"    -> superclass is null or not an object");
-                        break;
-                    }
-                    depth++;
-                }
-                
-                if (depth >= 10)
-                {
-                    Console.WriteLine("  *** Maximum depth reached - possible infinite loop! ***");
-                }
-            }
-        }
     }
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env pwsh
-# ValidatePhase2Simple.ps1 - Simpler Phase 2 validation comparing bytecode
+# ValidateBootstrapSimple.ps1 - Simple bootstrap validation comparing bytecode
 
 param(
     [string[]]$Classes = @("Object", "Behavior", "Class", "Symbol", "String", "Array", "Dictionary", "CompiledMethod")
 )
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "Phase 2 Bytecode Validation (Simple)" -ForegroundColor Cyan
+Write-Host "Bootstrap Bytecode Validation (Simple)" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -34,7 +34,7 @@ try {
         
         $result = @{
             Class = $className
-            Phase2Methods = @{}
+            BootstrapMethods = @{}
             ExtractedMethods = @{}
             Matches = @()
             Mismatches = @()
@@ -42,18 +42,18 @@ try {
             Extra = @()
         }
         
-        # Step 1: Get Phase 2 bytecode from interpreter
-        Write-Host "  Getting Phase 2 state..." -ForegroundColor Gray
-        $phase2Output = & dotnet bin/Debug/net9.0/Smalltalk80.Interpreter.dll --skip-phase3 --print-class $className --no-mnemonics 2>&1
-        $phase2File = "temp/validation/${className}_phase2.txt"
-        $phase2Output | Out-File -FilePath $phase2File -Encoding UTF8
+        # Step 1: Get bootstrap bytecode from interpreter
+        Write-Host "  Getting bootstrap state..." -ForegroundColor Gray
+        $bootstrapOutput = & dotnet bin/Debug/net9.0/Smalltalk80.Interpreter.dll --skip-phase3 --print-class $className --no-mnemonics 2>&1
+        $bootstrapFile = "temp/validation/${className}_bootstrap.txt"
+        $bootstrapOutput | Out-File -FilePath $bootstrapFile -Encoding UTF8
         
-        # Parse Phase 2 methods and bytecode
+        # Parse bootstrap methods and bytecode
         $inMethod = $false
         $currentMethod = ""
         $currentBytecode = @()
         
-        foreach ($line in $phase2Output) {
+        foreach ($line in $bootstrapOutput) {
             # Method name (two spaces indent) - can be alphanumeric or operators
             # Skip separator lines  
             if ($line -match '^\s{2}([^:\s][\S]*)\s*$' -and $line -notmatch '^\s*-+\s*$') {
@@ -63,10 +63,10 @@ try {
                 }
                 if ($inMethod -and $currentMethod) {
                     if ($currentBytecode -is [string]) {
-                        $result.Phase2Methods[$currentMethod] = $currentBytecode
+                        $result.BootstrapMethods[$currentMethod] = $currentBytecode
                     } else {
                         $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
-                        $result.Phase2Methods[$currentMethod] = $hexBytes -join " "
+                        $result.BootstrapMethods[$currentMethod] = $hexBytes -join " "
                     }
                 }
                 $currentMethod = $matches[1]
@@ -102,15 +102,15 @@ try {
         if ($inMethod -and $currentMethod) {
             if ($currentBytecode -is [string]) {
                 # Already a hex string
-                $result.Phase2Methods[$currentMethod] = $currentBytecode
+                $result.BootstrapMethods[$currentMethod] = $currentBytecode
             } else {
                 # Array of integers - convert to hex string
                 $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
-                $result.Phase2Methods[$currentMethod] = $hexBytes -join " "
+                $result.BootstrapMethods[$currentMethod] = $hexBytes -join " "
             }
         }
         
-        Write-Host "    Found $($result.Phase2Methods.Count) methods in Phase 2" -ForegroundColor Gray
+        Write-Host "    Found $($result.BootstrapMethods.Count) methods in bootstrap" -ForegroundColor Gray
         
         # Step 2: Extract class from system image
         Write-Host "  Extracting from system image..." -ForegroundColor Gray
@@ -154,18 +154,18 @@ try {
         
         # Step 3: Compare methods
         # Use GetEnumerator to avoid PowerShell hashtable key/property collision
-        foreach ($entry in $result.Phase2Methods.GetEnumerator()) {
+        foreach ($entry in $result.BootstrapMethods.GetEnumerator()) {
             $selector = $entry.Key
             if ($result.ExtractedMethods.ContainsKey($selector)) {
-                $phase2Bytes = $result.Phase2Methods[$selector]
+                $bootstrapBytes = $result.BootstrapMethods[$selector]
                 $extractedBytes = $result.ExtractedMethods[$selector]
                 
-                if ($phase2Bytes -eq $extractedBytes) {
+                if ($bootstrapBytes -eq $extractedBytes) {
                     $result.Matches += $selector
                 } else {
                     $result.Mismatches += @{
                         Method = $selector
-                        Phase2 = $phase2Bytes
+                        Bootstrap = $bootstrapBytes
                         Extracted = $extractedBytes
                     }
                 }
@@ -177,13 +177,13 @@ try {
         # Use GetEnumerator to avoid PowerShell hashtable key/property collision  
         foreach ($entry in $result.ExtractedMethods.GetEnumerator()) {
             $selector = $entry.Key
-            if (-not $result.Phase2Methods.ContainsKey($selector)) {
+            if (-not $result.BootstrapMethods.ContainsKey($selector)) {
                 $result.Missing += $selector
             }
         }
         
         # Display result
-        if ($result.Matches.Count -eq $result.Phase2Methods.Count -and 
+        if ($result.Matches.Count -eq $result.BootstrapMethods.Count -and 
             $result.Matches.Count -eq $result.ExtractedMethods.Count) {
             Write-Host "  ✓ VALID: All $($result.Matches.Count) methods match" -ForegroundColor Green
         } else {
@@ -195,17 +195,17 @@ try {
                 Write-Host "    ✗ Bytecode mismatches: $($result.Mismatches.Count)" -ForegroundColor Red
                 foreach ($mismatch in $result.Mismatches | Select-Object -First 3) {
                     Write-Host "      - $($mismatch.Method)" -ForegroundColor Red
-                    $p2 = if ($mismatch.Phase2.Length -gt 30) { $mismatch.Phase2.Substring(0,30) + "..." } else { $mismatch.Phase2 }
+                    $bs = if ($mismatch.Bootstrap.Length -gt 30) { $mismatch.Bootstrap.Substring(0,30) + "..." } else { $mismatch.Bootstrap }
                     $ex = if ($mismatch.Extracted.Length -gt 30) { $mismatch.Extracted.Substring(0,30) + "..." } else { $mismatch.Extracted }
-                    Write-Host "        Phase2:    [$p2]" -ForegroundColor Gray
-                    Write-Host "        Extracted: [$ex]" -ForegroundColor Gray
+                    Write-Host "        Bootstrap:  [$bs]" -ForegroundColor Gray
+                    Write-Host "        Extracted:  [$ex]" -ForegroundColor Gray
                 }
             }
             if ($result.Missing.Count -gt 0) {
-                Write-Host "    - Missing from Phase 2: $($result.Missing -join ', ')" -ForegroundColor Yellow
+                Write-Host "    - Missing from bootstrap: $($result.Missing -join ', ')" -ForegroundColor Yellow
             }
             if ($result.Extra.Count -gt 0) {
-                Write-Host "    - Extra in Phase 2: $($result.Extra -join ', ')" -ForegroundColor Yellow
+                Write-Host "    - Extra in bootstrap: $($result.Extra -join ', ')" -ForegroundColor Yellow
             }
         }
         
@@ -220,14 +220,14 @@ try {
     
     $totalClasses = $validationResults.Count
     $validClasses = ($validationResults | Where-Object { 
-        $_.Matches.Count -eq $_.Phase2Methods.Count -and 
+        $_.Matches.Count -eq $_.BootstrapMethods.Count -and 
         $_.Matches.Count -eq $_.ExtractedMethods.Count 
     }).Count
     
     Write-Host "Classes analyzed: $totalClasses" -ForegroundColor Yellow
     Write-Host "Fully valid: $validClasses" -ForegroundColor $(if ($validClasses -eq $totalClasses) { "Green" } else { "Yellow" })
     
-    $totalMethods = ($validationResults | ForEach-Object { $_.Phase2Methods.Count } | Measure-Object -Sum).Sum
+    $totalMethods = ($validationResults | ForEach-Object { $_.BootstrapMethods.Count } | Measure-Object -Sum).Sum
     $matchingMethods = ($validationResults | ForEach-Object { $_.Matches.Count } | Measure-Object -Sum).Sum
     
     Write-Host "Total methods: $totalMethods" -ForegroundColor Yellow

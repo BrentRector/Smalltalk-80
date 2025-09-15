@@ -23,9 +23,6 @@ namespace Smalltalk80.Tests
         public static void MainOld(string[] args)
         {
             // Disable tracing for performance
-            Tracer.Enabled = false;
-            MethodTracer.Enabled = false;
-            MethodTracer.BytecodeTracingEnabled = false;
             
             Console.WriteLine("=== Smalltalk-80 Bytecode Test Runner ===\n");
             

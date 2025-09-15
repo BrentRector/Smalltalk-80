@@ -6,10 +6,6 @@ using System;
 public class SmalltalkObject
 {
     /// <summary>
-    /// Debug flag for Phase 3 lookup tracing.
-    /// </summary>
-    public static bool EnablePhase3LookupDebug { get; set; } = false;
-    /// <summary>
     ///     Gets or sets the object's class pointer. This may be <c>null</c>
     ///     during deserialization until the class table is resolved.
     /// </summary>
@@ -59,42 +55,16 @@ public class SmalltalkObject
     {
         // Start with this class and walk up the superclass chain
         var currentClass = this;
-        int depth = 0;
         bool hasSidestepped = false;
         
-        // Debug output for Phase 3
-        if (EnablePhase3LookupDebug)
-        {
-            Console.WriteLine($"[LOOKUP] Looking for #{selector.Value} starting from class OOP {this.Oop}");
-            // Try to identify what class this is
-            var className = TryGetClassName(this);
-            if (!string.IsNullOrEmpty(className))
-            {
-                Console.WriteLine($"[LOOKUP]   Starting class appears to be: {className}");
-            }
-        }
         
         while (currentClass != null)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                var className = TryGetClassName(currentClass);
-                var classDesc = !string.IsNullOrEmpty(className) ? $" ({className})" : "";
-                // Also try to get the superclass for debugging
-                var superclass = GetSuperclassOf(currentClass);
-                var superclassName = superclass != null ? TryGetClassName(superclass) : "nil";
-                var superclassDesc = !string.IsNullOrEmpty(superclassName) ? $", superclass: {superclassName}" : "";
-                Console.WriteLine($"[LOOKUP]   Checking class at OOP {currentClass.Oop}{classDesc} (depth {depth}{superclassDesc})");
-            }
             
             // Look in the current class's method dictionary
             var method = LookupInMethodDictionary(currentClass, selector);
             if (method != null)
             {
-                if (EnablePhase3LookupDebug)
-                {
-                    Console.WriteLine($"[LOOKUP]   ✓ Found #{selector.Value} at depth {depth}");
-                }
                 return method;
             }
             
@@ -105,41 +75,17 @@ public class SmalltalkObject
             // sidestep to the class side (Object -> Object class)
             if (nextClass == null && !hasSidestepped)
             {
-                if (EnablePhase3LookupDebug)
-                {
-                    Console.WriteLine($"[LOOKUP]   Reached top of hierarchy (superclass=nil), sidestepping to class side");
-                    Console.WriteLine($"[LOOKUP]   Current class OOP {currentClass.Oop}, ClassPointer: {currentClass.ClassPointer?.Oop.ToString() ?? "null"}");
-                }
-                
                 // The current class should be Object (or a root class)
                 // Get its class (metaclass) and continue from there
                 var metaclass = currentClass.ClassPointer;
                 if (metaclass != null)
                 {
-                    if (EnablePhase3LookupDebug)
-                    {
-                        var metaclassName = TryGetClassName(metaclass);
-                        Console.WriteLine($"[LOOKUP]   Sidestepping to {metaclassName ?? $"OOP {metaclass.Oop}"}");
-                    }
                     nextClass = metaclass;
                     hasSidestepped = true;
-                }
-                else
-                {
-                    if (EnablePhase3LookupDebug)
-                    {
-                        Console.WriteLine($"[LOOKUP]   ERROR: Cannot sidestep - current class has no ClassPointer!");
-                    }
                 }
             }
             
             currentClass = nextClass;
-            depth++;
-        }
-        
-        if (EnablePhase3LookupDebug)
-        {
-            Console.WriteLine($"[LOOKUP]   ✗ #{selector.Value} not found in hierarchy");
         }
         
         return null;
@@ -198,20 +144,12 @@ public class SmalltalkObject
         
         if (classObj.Fields == null || classObj.Fields.Length <= METHOD_DICT_INDEX)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                Console.WriteLine($"[LOOKUP]     No fields or not enough fields in class OOP {classObj.Oop}");
-            }
             return null;
         }
             
         var methodDictObj = classObj.Fields[METHOD_DICT_INDEX];
         if (methodDictObj is not SmalltalkObject methodDict)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                Console.WriteLine($"[LOOKUP]     Method dict slot is not a SmalltalkObject, it's: {methodDictObj?.GetType()?.Name ?? "null"}");
-            }
             return null;
         }
         
@@ -222,10 +160,6 @@ public class SmalltalkObject
         
         if (methodDict.Fields == null || methodDict.Fields.Length < 2)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                Console.WriteLine($"[LOOKUP]     Method dict has no fields or too few fields: {methodDict.Fields?.Length ?? 0}");
-            }
             return null;
         }
             
@@ -243,10 +177,6 @@ public class SmalltalkObject
             {
                 // ERROR: Tally should ALWAYS be a SmallInteger!
                 // This indicates a bug in the bootstrap
-                if (EnablePhase3LookupDebug)
-                {
-                    Console.WriteLine($"[LOOKUP]     ERROR: Tally is not a SmallInteger! Value: {tallyInt}");
-                }
                 tally = tallyInt; // Use it anyway for debugging
             }
         }
@@ -270,76 +200,34 @@ public class SmalltalkObject
                 {
                     // As a last resort, assume the OOP itself might be the value
                     // (this shouldn't happen for SmallIntegers but helps debugging)
-                    if (EnablePhase3LookupDebug)
-                    {
-                        Console.WriteLine($"[LOOKUP]       Warning: Tally object OOP {tallyObj.Oop} is not a SmallInteger");
-                    }
                 }
             }
         }
         
-        if (EnablePhase3LookupDebug && methodDict.Fields[0] != null)
-        {
-            var tallyDebugStr = methodDict.Fields[0]?.ToString() ?? "null";
-            if (methodDict.Fields[0] is SmalltalkObject to)
-            {
-                tallyDebugStr = $"SmalltalkObject OOP={to.Oop}";
-            }
-            Console.WriteLine($"[LOOKUP]       Tally field type: {methodDict.Fields[0]?.GetType().Name ?? "null"}, value: {tallyDebugStr}, extracted tally: {tally}");
-        }
         
         // Handle negative tally (shouldn't happen but helps debugging)
         if (tally < 0)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                Console.WriteLine($"[LOOKUP]     WARNING: Method dict has negative tally {tally}, treating as positive");
-            }
             tally = Math.Abs(tally);
         }
         
         if (tally == 0)
         {
-            if (EnablePhase3LookupDebug)
-            {
-                Console.WriteLine($"[LOOKUP]     Method dict tally is 0 (empty dictionary)");
-            }
             return null;
         }
         
-        if (EnablePhase3LookupDebug)
-        {
-            Console.WriteLine($"[LOOKUP]     Method dict has {tally} entries, searching for #{selector.Value}");
-        }
             
         // Use flat format: [tally, key1, value1, key2, value2, ...] (like the pretty-printer)
         // Start at index 1 to skip tally, increment by 2
-        int entryIndex = 0;
         for (int i = 1; i < methodDict.Fields.Length - 1; i += 2)
         {
             var key = methodDict.Fields[i];
             var value = methodDict.Fields[i + 1];
             
-            if (EnablePhase3LookupDebug && entryIndex < 3) // Only show first few keys to avoid spam
-            {
-                if (key is Symbol keySymbol)
-                {
-                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: #{keySymbol.Value}");
-                }
-                else if (key is SmalltalkObject keyObj)
-                {
-                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: SmalltalkObject OOP={keyObj.Oop}");
-                }
-                else if (key != null)
-                {
-                    Console.WriteLine($"[LOOKUP]       Entry {entryIndex}: {key.GetType().Name} = {key}");
-                }
-            }
             
             // Skip nil entries
             if (key == null || value == null)
             {
-                entryIndex++;
                 continue;
             }
             
@@ -357,27 +245,9 @@ public class SmalltalkObject
                 // Try to extract the selector name from the SmalltalkObject Symbol
                 if (keyObj.TryGetStringValue(out var keyString))
                 {
-                    if (EnablePhase3LookupDebug && entryIndex < 3)
-                    {
-                        Console.WriteLine($"[LOOKUP]         Extracted string from Symbol OOP {keyObj.Oop}: '{keyString}' (looking for '{selector.Value}')");
-                    }
-                    
                     if (keyString == selector.Value)
                     {
                         isMatch = true;
-                    }
-                }
-                else
-                {
-                    if (EnablePhase3LookupDebug && entryIndex < 3)
-                    {
-                        Console.WriteLine($"[LOOKUP]         Could not extract string from Symbol OOP {keyObj.Oop}, trying field inspection...");
-                        // Let's inspect the fields directly
-                        for (int f = 0; f < Math.Min(keyObj.Fields.Length, 5); f++)
-                        {
-                            var field = keyObj.Fields[f];
-                            Console.WriteLine($"[LOOKUP]           Field {f}: {field?.GetType()?.Name ?? "null"} = {field}");
-                        }
                     }
                 }
             }
@@ -414,8 +284,6 @@ public class SmalltalkObject
                 
                 return null;
             }
-            
-            entryIndex++;
         }
         
         return null;
@@ -440,20 +308,6 @@ public class SmalltalkObject
         int primitiveIndex = 0;
         int tempCount = 0;
         
-        // Debug for instVarAt:put:
-        if (methodObj.Fields.Length > 0 && methodObj.Fields[0] is SmalltalkObject selObj)
-        {
-            if (selObj.TryGetStringValue(out var selName) && selName == "instVarAt:put:")
-            {
-                Console.WriteLine($"[DEBUG] ConvertToCompiledMethod for instVarAt:put:");
-                Console.WriteLine($"[DEBUG]   Fields.Length: {methodObj.Fields.Length}");
-                for (int i = 0; i < methodObj.Fields.Length; i++)
-                {
-                    var field = methodObj.Fields[i];
-                    Console.WriteLine($"[DEBUG]   Field[{i}]: {field?.GetType()?.Name ?? "null"} = {field}");
-                }
-            }
-        }
         
         if (methodObj.Fields.Length > 3)
         {

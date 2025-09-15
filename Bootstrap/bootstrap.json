@@ -14022,9 +14022,15 @@
           "temporaryCount": 0,
           "bytecode": [
             112,
+            208,
             124
           ],
-          "selector": "newNamed:"
+          "selector": "newNamed:",
+          "primitiveIndex": 174,
+          "primitive": 174,
+          "literals": [
+            "#primitiveFailed"
+          ]
         },
         {
           "temporaryCount": 0,

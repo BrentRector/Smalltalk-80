@@ -196,7 +196,6 @@ public static class BytecodeDispatcher
         // Debug logging for Phase 3 unknown methods (disabled for tests)
         // if (interpreter.CurrentContext.Method.SelectorName == null || interpreter.CurrentContext.Method.SelectorName == "unknown")
         // {
-        //     Console.WriteLine($"[DEBUG] PC={interpreter.CurrentContext.PC-1}, opcode={opcode}");
         // }
         
         Handlers[opcode](interpreter, opcode);
@@ -250,7 +249,6 @@ public static class BytecodeDispatcher
     {
         var context = interpreter.CurrentContext;
         
-        Console.WriteLine($"[DEBUG] HandleSendLiteralSelector: index={index}, argCount={argCount}, stack count={context.Stack.Count}");
         
         // Get the selector from the literal frame
         if (index >= context.Method.Literals.Length)
@@ -265,13 +263,11 @@ public static class BytecodeDispatcher
             throw new InvalidOperationException($"Literal at index {index} is null");
         }
         
-        Console.WriteLine($"[DEBUG]   Literal type: {literal.GetType().Name}");
         
         // Handle both C# Symbols (from Phase 1/2) and SmalltalkObject Symbols (from Phase 3)
         if (literal is Symbol symbol)
         {
             // C# Symbol - use directly
-            Console.WriteLine($"[DEBUG]   C# Symbol: {symbol}");
             interpreter.PerformSend(symbol, argCount, false);
         }
         else if (literal is SmalltalkObject symbolObj)
@@ -279,7 +275,6 @@ public static class BytecodeDispatcher
             // SmalltalkObject Symbol - extract the string and create a C# Symbol
             if (symbolObj.Fields.Length > 0 && symbolObj.Fields[0] is string str)
             {
-                Console.WriteLine($"[DEBUG]   SmalltalkObject Symbol: {str}");
                 interpreter.PerformSend(new Symbol(str), argCount, false);
             }
             else

@@ -21,11 +21,6 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     #pragma warning restore CS0414
     private int methodDictionaryClassOop = -1;  // Cache the MethodDictionary class OOP
     
-    /// <summary>
-    /// Controls whether detailed VM debug output is printed to console.
-    /// Set to false to reduce output noise during normal operation.
-    /// </summary>
-    public static bool EnableVMDebugOutput { get; set; } = false;
     
     public VMPrimitiveAdapter(VirtualMachine vm)
     {
@@ -35,15 +30,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         this.bootstrapContext = new BootstrapContext();
     }
     
+    
     /// <summary>
-    /// Helper method to conditionally output VM debug messages.
+    /// Helper method that does nothing (replaces debug logging).
     /// </summary>
     private static void DebugLog(string message)
     {
-        if (EnableVMDebugOutput)
-        {
-            Console.WriteLine(message);
-        }
+        // Debug logging removed
     }
     
     /// <summary>
@@ -56,6 +49,11 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // [3] instanceVariables, [4] organization, [5] name
         // [6] classPool, [7] sharedPools
         var classObj = new SmalltalkObject(null, 8);
+        
+        // CRITICAL: Add class as permanent root IMMEDIATELY to prevent GC
+        // Classes should never be garbage collected
+        ObjectMemory.AddPermanentRoot(classObj);
+        
         return classObj.Oop;
     }
     
@@ -69,10 +67,17 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // [3] instanceVariables, [4] organization, [5] thisClass
         var metaclassObj = new SmalltalkObject(null, 6);
         
+        // CRITICAL: Add metaclass as permanent root IMMEDIATELY to prevent GC
+        // Metaclasses should never be garbage collected
+        ObjectMemory.AddPermanentRoot(metaclassObj);
+        
         // Initialize method dictionary to an empty MethodDictionary
         // This is crucial for method lookup to work properly
         // Create a minimal method dictionary: [tally, keys..., values...]
         var methodDict = new SmalltalkObject(null, 8); // Small initial size
+        
+        // Also add method dictionary as permanent root (methods shouldn't be GC'd)
+        ObjectMemory.AddPermanentRoot(methodDict);
         
         // Initialize tally to 0 as a SmallInteger (encoded as (0 << 1) | 1 = 1)
         methodDict.Fields[0] = 1;  // SmallInteger 0
@@ -94,7 +99,6 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             }
         }
         
-        DebugLog($"[VM] Created metaclass OOP {metaclassObj.Oop} with method dict OOP {methodDict.Oop}");
         
         return metaclassObj.Oop;
     }
@@ -1078,11 +1082,9 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (smalltalkDictOop > 0)
         {
             var result = LookupInSmalltalkDictionary(name);
-            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in Smalltalk dict -> OOP {result}");
             return result;
         }
         
-        DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Not found (no bootstrap context and smalltalkDictOop={smalltalkDictOop})");
         return -1;
     }
     
@@ -1471,6 +1473,40 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             var headerDesc = DescribeObject(headerFieldObj);
             DebugLog($"[VM] ExtractCompiledMethod: Header field is {headerDesc}");
         }
+        else if (headerField is int taggedInt)
+        {
+            // Check if it's a tagged SmallInteger
+            if (IsSmallInteger(taggedInt))
+            {
+                // Extract the actual integer value by removing the tag
+                int headerInt = SmallIntegerValue(taggedInt);
+                DebugLog($"[VM] ExtractCompiledMethod: Header field is {taggedInt} (tagged SmallInteger, actual value: {headerInt})");
+                
+                // Decode Blue Book header format
+                primitiveNumber = headerInt & 0x1FF;  // Lower 9 bits
+                bool largeContext = (headerInt & 0x200) != 0;  // Bit 9
+                tempCount = (headerInt >> 10) & 0x3F;  // Bits 10-15
+                
+                // For methods without explicit temp count, use arg count
+                if (tempCount == 0 && primitiveNumber == 0)
+                {
+                    // This might be an old-style header with just arg count
+                    if (headerInt <= 10)
+                    {
+                        argCount = headerInt;
+                        tempCount = headerInt;
+                    }
+                }
+                else
+                {
+                    argCount = tempCount; // Will be refined when we have proper arg tracking
+                }
+            }
+            else
+            {
+                DebugLog($"[VM] ExtractCompiledMethod: Header field is {headerField} (raw integer, not tagged)");
+            }
+        }
         else
         {
             DebugLog($"[VM] ExtractCompiledMethod: Header field is {headerField} (raw)");
@@ -1522,11 +1558,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // Single concise summary line
         DebugLog($"[VM] ExtractCompiledMethod: CompiledMethod with bytecodes=[{string.Join(", ", bytecodes)}], {literals.Length} literals, primitive={primitiveNumber}, args={argCount}");
         
-        // Create a proper method header
-        // The header encoding: bits 0-2: flag/argCount, bits 3-7: tempCount, bit 8: large context, bits 9-14: literal count
-        // If there's a primitive, set flag to 7 to indicate extension is used
-        int flagValue = primitiveNumber > 0 ? 7 : Math.Min(argCount, 7);
-        int headerRaw = (flagValue & 0x7) | ((tempCount & 0x1F) << 3) | ((literals.Length & 0x3F) << 9);
+        // Create a proper method header using Blue Book format:
+        // Bits 0-8: Primitive number (0-511)
+        // Bit 9: Large context flag
+        // Bits 10-15: Number of temporaries
+        bool needsLargeContext = false; // We don't have large contexts yet
+        int headerRaw = (primitiveNumber & 0x1FF) | ((needsLargeContext ? 1 : 0) << 9) | ((tempCount & 0x3F) << 10);
         
         return new CompiledMethod
         {

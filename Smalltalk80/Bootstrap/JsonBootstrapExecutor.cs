@@ -15,19 +15,11 @@ public class JsonBootstrapExecutor
     private BootstrapManifestConfig? currentManifest;
     
     /// <summary>
-    /// Controls whether bootstrap debug output is displayed.
-    /// </summary>
-    public static bool EnableBootstrapDebugOutput { get; set; } = false;
-    
-    /// <summary>
-    /// Logs a bootstrap message only if debug output is enabled.
+    /// No-op logging method (debug logging removed).
     /// </summary>
     public static void BootstrapLog(string message)
     {
-        if (EnableBootstrapDebugOutput)
-        {
-            Console.WriteLine(message);
-        }
+        // Debug logging removed
     }
     
     public JsonBootstrapExecutor(ISmalltalkVM vm)
@@ -36,9 +28,9 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Execute Phase 1 bootstrap from JSON content.
+    /// Execute bootstrap classes from JSON content (without methods).
     /// </summary>
-    public void ExecutePhase1(string jsonContent)
+    public void ExecuteBootstrapClasses(string jsonContent)
     {
         var options = new JsonSerializerOptions
         {
@@ -60,15 +52,15 @@ public class JsonBootstrapExecutor
             ExecuteOperation(operation);
         }
         
-        BootstrapLog($"[BOOTSTRAP] Phase 1 created {namedObjects.Count} named objects");
+        BootstrapLog($"[BOOTSTRAP] Bootstrap created {namedObjects.Count} named objects");
         
-        // Don't migrate yet - wait until after Phase 2/3 when at:put: method is available
+        // Don't migrate yet - wait until after methods when at:put: method is available
         // This avoids the dictionary expansion problem
-        BootstrapLog("[BOOTSTRAP] Phase 1 complete - will migrate to Smalltalk dictionary after methods are installed");
+        BootstrapLog("[BOOTSTRAP] Bootstrap class creation complete - will migrate to Smalltalk dictionary after methods are installed");
     }
     
     /// <summary>
-    /// Execute unified bootstrap from JSON content (consolidated Phase 1+2).
+    /// Execute unified bootstrap from JSON content (consolidated bootstrap).
     /// </summary>
     public void ExecuteUnifiedBootstrap(string jsonContent)
     {
@@ -147,13 +139,27 @@ public class JsonBootstrapExecutor
     }
     
     /// <summary>
-    /// Execute Phase 3 bootstrap from JSON content.
+    /// Execute extended library bootstrap from JSON content.
     /// </summary>
-    public void ExecutePhase3(string jsonContent)
+    public void ExecuteExtendedLibrary(string jsonContent)
     {
-        // Phase 3 uses a different executor for message-driven bootstrap
+        // Extended library uses a different executor for message-driven bootstrap
         var phase2Executor = new Phase2Executor(vm);
         phase2Executor.ExecuteManifest(jsonContent);
+    }
+    
+    /// <summary>
+    /// Execute low-level class creation from complete system image.
+    /// </summary>
+    public void ExecuteLowLevelClasses(string systemImagePath, List<string> classNames)
+    {
+        BootstrapLog("[BOOTSTRAP] Executing low-level class creation from system image");
+        
+        var loader = new LowLevelClassLoader(vm);
+        loader.LoadSystemImage(systemImagePath);
+        loader.CreateClasses(classNames);
+        
+        BootstrapLog($"[BOOTSTRAP] Low-level class creation completed: {classNames.Count} classes created via message sends");
     }
     
     /// <summary>
@@ -225,9 +231,6 @@ public class JsonBootstrapExecutor
                 ExecuteSendMessage(operation);
                 break;
                 
-            case "assert":
-                ExecuteAssert(operation);
-                break;
                 
             case "createinstance":
                 ExecuteCreateInstance(operation);
@@ -964,7 +967,6 @@ public class JsonBootstrapExecutor
                 var nilObj = ObjectMemory.FromOop(oop);
                 if (nilObj != null)
                 {
-                    Console.WriteLine($"[DEBUG] Setting ObjectMemory.NilObject to object with OOP {oop}");
                     ObjectMemory.NilObject = nilObj;
                     ObjectMemory.AddPermanentRoot(nilObj); // nil is always reachable
                     vm.PrimitiveRegisterGlobal("nil", oop);
@@ -1321,12 +1323,22 @@ public class JsonBootstrapExecutor
             
             // Create the metaclass
             metaclassOop = vm.PrimitiveNewMetaclass();
+            
+            // IMMEDIATELY register metaclass as permanent root before ANY other operations
+            // This prevents GC from collecting it during debug output or other allocations
+            var metaclassObj = ObjectMemory.FromOop(metaclassOop);
+            if (metaclassObj != null) 
+            {
+                ObjectMemory.AddPermanentRoot(metaclassObj);
+                BootstrapLog($"[DEBUG] Created metaclass '{metaclassName}' with OOP {metaclassOop}");
+            }
+            else
+            {
+                BootstrapLog($"[ERROR] PrimitiveNewMetaclass returned OOP {metaclassOop} but object doesn't exist!");
+            }
+            
             namedObjects[metaclassName] = metaclassOop;
             vm.PrimitiveRegisterGlobal(metaclassName, metaclassOop);
-            
-            // Register metaclass as permanent root
-            var metaclassObj = ObjectMemory.FromOop(metaclassOop);
-            if (metaclassObj != null) ObjectMemory.AddPermanentRoot(metaclassObj);
             
         }
         else
@@ -1381,6 +1393,20 @@ public class JsonBootstrapExecutor
             if (namedObjects.TryGetValue("Metaclass", out metaclassClassOop))
             {
                 // Found in named objects
+                BootstrapLog($"[DEBUG] Setting class pointer for metaclass OOP {metaclassOop} to Metaclass OOP {metaclassClassOop}");
+                
+                // Verify the metaclass object exists
+                var metaclassObj = ObjectMemory.FromOop(metaclassOop);
+                if (metaclassObj == null)
+                {
+                    BootstrapLog($"[ERROR] Metaclass object with OOP {metaclassOop} doesn't exist!");
+                    BootstrapLog($"[ERROR] This metaclass was just created for '{classDef.Name}'");
+                    
+                    // Check if GC ran
+                    var stats = ObjectMemory.GetMemoryStats();
+                    BootstrapLog($"[ERROR] Memory stats: allocated={stats.allocated}, free={stats.free}, total={stats.total}, collections={stats.collections}");
+                }
+                
                 vm.PrimitiveSetClass(metaclassOop, metaclassClassOop);
             }
             else
@@ -1682,7 +1708,8 @@ public class JsonBootstrapExecutor
                 // Bits 0-8: Primitive number (0-511)
                 // Bit 9: Large context flag
                 // Bits 10-15: Number of temporaries
-                int primitiveNum = (methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
+                // Use PrimitiveIndex if available, otherwise fall back to Primitive
+                int primitiveNum = (methodDef.PrimitiveIndex ?? methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
                 int largeContext = 0; // We don't have large contexts yet
                 int tempCount = methodDef.TemporaryCount; // Use actual temp count from Phase 2
                 
@@ -1705,6 +1732,16 @@ public class JsonBootstrapExecutor
                 
                 // Blue Book header encoding
                 int headerValue = primitiveNum | (largeContext << 9) | (tempCount << 10);
+                
+                if (methodDef.Selector == "new")
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: 'new' method header calculation:");
+                    BootstrapLog($"[BOOTSTRAP]     - methodDef.Primitive = {methodDef.Primitive}");
+                    BootstrapLog($"[BOOTSTRAP]     - methodDef.PrimitiveIndex = {methodDef.PrimitiveIndex}");
+                    BootstrapLog($"[BOOTSTRAP]     - primitiveNum (after calculation) = {primitiveNum}");
+                    BootstrapLog($"[BOOTSTRAP]     - tempCount = {tempCount}");
+                    BootstrapLog($"[BOOTSTRAP]     - headerValue = {headerValue}");
+                }
                 
                 if (methodDef.Selector == "basicNew")
                 {
@@ -1954,7 +1991,8 @@ public class JsonBootstrapExecutor
                 // Bits 0-8: Primitive number (0-511)
                 // Bit 9: Large context flag
                 // Bits 10-15: Number of temporaries
-                int primitiveNum = (methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
+                // Use PrimitiveIndex if available, otherwise fall back to Primitive
+                int primitiveNum = (methodDef.PrimitiveIndex ?? methodDef.Primitive ?? 0) & 0x1FF; // 9 bits for primitive
                 int largeContext = 0; // We don't have large contexts yet
                 int tempCount = methodDef.TemporaryCount; // Use actual temp count from Phase 2
                 
@@ -1977,6 +2015,16 @@ public class JsonBootstrapExecutor
                 
                 // Blue Book header encoding
                 int headerValue = primitiveNum | (largeContext << 9) | (tempCount << 10);
+                
+                if (methodDef.Selector == "new")
+                {
+                    BootstrapLog($"[BOOTSTRAP]   - DEBUG: 'new' method header calculation:");
+                    BootstrapLog($"[BOOTSTRAP]     - methodDef.Primitive = {methodDef.Primitive}");
+                    BootstrapLog($"[BOOTSTRAP]     - methodDef.PrimitiveIndex = {methodDef.PrimitiveIndex}");
+                    BootstrapLog($"[BOOTSTRAP]     - primitiveNum (after calculation) = {primitiveNum}");
+                    BootstrapLog($"[BOOTSTRAP]     - tempCount = {tempCount}");
+                    BootstrapLog($"[BOOTSTRAP]     - headerValue = {headerValue}");
+                }
                 
                 if (methodDef.Selector == "basicNew")
                 {
@@ -2215,32 +2263,6 @@ public class JsonBootstrapExecutor
         }
     }
     
-    /// <summary>
-    /// Execute assert operation for testing.
-    /// </summary>
-    private void ExecuteAssert(BootstrapOperation op)
-    {
-        if (string.IsNullOrEmpty(op.Target))
-            throw new InvalidOperationException("assert requires target");
-            
-        if (!namedObjects.TryGetValue(op.Target, out var targetOop))
-            throw new InvalidOperationException($"Assert failed: target '{op.Target}' not found");
-            
-        var obj = ObjectMemory.FromOop(targetOop);
-        if (obj == null)
-            throw new InvalidOperationException($"Assert failed: object at OOP {targetOop} is null");
-            
-        // If type is specified, verify it
-        if (!string.IsNullOrEmpty(op.Type))
-        {
-            // TODO: Verify the object's class matches the expected type
-            BootstrapLog($"[BOOTSTRAP] Assert: '{op.Target}' exists (type check for '{op.Type}' not implemented)");
-        }
-        else
-        {
-            BootstrapLog($"[BOOTSTRAP] Assert: '{op.Target}' exists at OOP {targetOop}");
-        }
-    }
     
     /// <summary>
     /// Execute createInstance operation - create an instance of a class.
@@ -2592,6 +2614,7 @@ public class BootstrapMethodDefinition
     public List<int>? Bytecode { get; set; }
     public List<string>? Literals { get; set; }
     public int? Primitive { get; set; }
+    public int? PrimitiveIndex { get; set; }  // Also capture primitiveIndex field from JSON
     public int ArgumentCount { get; set; }
     public int TemporaryCount { get; set; }
     public string? Comment { get; set; }
@@ -2627,7 +2650,6 @@ public class BootstrapOperation
     public string? Comment { get; set; }
     public string? Receiver { get; set; }  // For sendMessage
     public List<object>? Args { get; set; }  // For sendMessage
-    public string? Type { get; set; }  // For assert
     public string? ClassName { get; set; }  // For createInstance (use ClassName instead of Class to avoid keyword)
     public string? Dictionary { get; set; }  // For dictionaryAtPut
     public string? Key { get; set; }  // For dictionaryAtPut

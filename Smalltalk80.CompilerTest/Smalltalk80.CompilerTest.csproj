@@ -4,12 +4,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <AssemblyName>Smalltalk80.CompilerTest</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
     <ProjectReference Include="..\StandaloneCompiler\StandaloneCompiler.csproj" />
-    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj" />
   </ItemGroup>
 
 </Project>

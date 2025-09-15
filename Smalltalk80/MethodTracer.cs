@@ -1,156 +1,213 @@
 using System;
+using System.Collections.Generic;
 
 /// <summary>
-/// Provides method execution tracing for the Smalltalk interpreter.
+/// Handles method execution tracing for the Smalltalk-80 interpreter.
+/// Extracted from Interpreter.cs to improve separation of concerns and maintainability.
 /// </summary>
-public static class MethodTracer
+public class MethodTracer
 {
-    /// <summary>
-    /// Gets or sets whether method entry/exit tracing is enabled.
-    /// </summary>
-    public static bool Enabled { get; set; } = false;
+    private readonly bool isTracingEnabled;
+    private readonly Stack<string> callStack = new();
+    private int indentLevel = 0;
     
     /// <summary>
-    /// Gets or sets whether individual bytecode tracing is enabled.
+    /// Initializes a new instance of the MethodTracer class.
     /// </summary>
-    public static bool BytecodeTracingEnabled { get; set; } = false;
-    
-    private static int callDepth = 0;
-    private static string GetIndent() => new string(' ', callDepth * 2);
-    
-    /// <summary>
-    /// Logs method entry.
-    /// </summary>
-    public static void LogMethodEntry(string className, string selector, object? receiver)
+    /// <param name="enableTracing">Whether method tracing is enabled.</param>
+    public MethodTracer(bool enableTracing = false)
     {
-        if (!Enabled) return;
-        
-        Console.WriteLine($"[METHOD] {GetIndent()}>> Entering {className}>>{selector}");
-        callDepth++;
+        isTracingEnabled = enableTracing;
     }
     
     /// <summary>
-    /// Logs method exit.
+    /// Gets or sets whether method tracing is currently enabled.
     /// </summary>
-    public static void LogMethodExit(string className, string selector, object? returnValue)
+    public bool IsTracingEnabled => isTracingEnabled;
+    
+    /// <summary>
+    /// Gets the current call stack depth.
+    /// </summary>
+    public int CallStackDepth => callStack.Count;
+    
+    /// <summary>
+    /// Traces method entry with proper indentation.
+    /// </summary>
+    /// <param name="className">The name of the class containing the method.</param>
+    /// <param name="selector">The method selector being called.</param>
+    /// <param name="receiver">The receiver object (optional).</param>
+    public void TraceMethodEntry(string className, string selector, object? receiver = null)
     {
-        if (!Enabled) return;
+        if (!isTracingEnabled) return;
         
-        callDepth = Math.Max(0, callDepth - 1);
-        Console.WriteLine($"[METHOD] {GetIndent()}<< Exiting {className}>>{selector}");
+        var methodSignature = $"{className}>>{selector}";
+        callStack.Push(methodSignature);
+        
+        var indent = new string(' ', indentLevel * 2);
+        var receiverInfo = receiver != null ? $" (receiver: {GetReceiverDescription(receiver)})" : "";
+        
+        Console.WriteLine($"{indent}→ {methodSignature}{receiverInfo}");
+        indentLevel++;
     }
     
     /// <summary>
-    /// Logs bytecode execution.
+    /// Traces method exit with proper indentation.
     /// </summary>
-    public static void LogBytecode(Bytecode bytecode, int pc, Context context)
+    /// <param name="className">The name of the class containing the method.</param>
+    /// <param name="selector">The method selector being exited.</param>
+    /// <param name="returnValue">The return value (optional).</param>
+    public void TraceMethodExit(string className, string selector, object? returnValue = null)
     {
-        if (!BytecodeTracingEnabled) return;
+        if (!isTracingEnabled) return;
         
-        var stackInfo = context.Stack.Count > 0 
-            ? $"Stack top: {DescribeObject(context.Stack.Peek())}" 
-            : "Stack empty";
-            
-        Console.WriteLine($"[BYTECODE] {GetIndent()}  PC:{pc:D3} {bytecode,-30} | {stackInfo}");
-    }
-    
-    private static string DescribeObject(object? obj)
-    {
-        if (obj == null) return "nil";
-        if (obj is int i) return $"SmallInteger({i})";
-        if (obj is bool b) return b ? "true" : "false";
-        if (obj is string s) return $"\"{s}\"";
-        if (obj is Symbol sym) return $"#{sym.Name}";
-        if (obj is SmalltalkObject so)
+        if (indentLevel > 0) indentLevel--;
+        
+        var methodSignature = $"{className}>>{selector}";
+        
+        // Verify we're exiting the correct method (stack integrity check)
+        if (callStack.Count > 0)
         {
-            // Get the class name for this object
-            string className = GetObjectClassName(so);
-            
-            // For class objects themselves, show as "Class" 
-            if (IsClassObject(so))
+            var expectedMethod = callStack.Pop();
+            if (expectedMethod != methodSignature)
             {
-                return $"a {className}";
-            }
-            
-            // For regular objects, show as "a ClassName"
-            return $"a {className}";
-        }
-        return obj.GetType().Name;
-    }
-    
-    /// <summary>
-    /// Gets the class name for a Smalltalk object.
-    /// </summary>
-    private static string GetObjectClassName(SmalltalkObject obj)
-    {
-        if (obj.ClassPointer != null)
-        {
-            // Use the improved class name lookup from Interpreter
-            string? className = GetClassNameFromOOP(obj.ClassPointer);
-            if (!string.IsNullOrEmpty(className))
-                return className;
-            
-            // Try to get the class name from the class's name field
-            if (obj.ClassPointer.TryGetField("name", out var nameObj))
-            {
-                // Handle different ways the name might be stored
-                if (nameObj is Symbol nameSym) 
-                    return nameSym.Name;
-                if (nameObj is string str) 
-                    return str;
-                if (nameObj is SmalltalkObject nameStrObj && nameStrObj.TryGetStringValue(out var nameStr))
-                    return nameStr;
+                // Stack mismatch - log warning but continue
+                Console.WriteLine($"Warning: Method exit mismatch. Expected {expectedMethod}, got {methodSignature}");
             }
         }
         
-        // Fallback - try to infer from OOP patterns or return generic name
-        return "Object";
+        var indent = new string(' ', indentLevel * 2);
+        var returnInfo = returnValue != null ? $" => {GetReturnValueDescription(returnValue)}" : "";
+        
+        Console.WriteLine($"{indent}← {methodSignature}{returnInfo}");
     }
     
     /// <summary>
-    /// Gets class name from OOP using similar logic to Interpreter.GetClassName
+    /// Traces a method call that includes both entry and immediate exit.
+    /// Useful for primitive methods or very short methods.
     /// </summary>
-    private static string? GetClassNameFromOOP(SmalltalkObject classObj)
+    /// <param name="className">The name of the class containing the method.</param>
+    /// <param name="selector">The method selector being called.</param>
+    /// <param name="receiver">The receiver object (optional).</param>
+    /// <param name="returnValue">The return value (optional).</param>
+    public void TraceMethodCall(string className, string selector, object? receiver = null, object? returnValue = null)
     {
-        // Use same OOP mapping as the Interpreter
-        var commonClasses = new Dictionary<string, int[]>
+        if (!isTracingEnabled) return;
+        
+        var indent = new string(' ', indentLevel * 2);
+        var methodSignature = $"{className}>>{selector}";
+        var receiverInfo = receiver != null ? $" (receiver: {GetReceiverDescription(receiver)})" : "";
+        var returnInfo = returnValue != null ? $" => {GetReturnValueDescription(returnValue)}" : "";
+        
+        Console.WriteLine($"{indent}• {methodSignature}{receiverInfo}{returnInfo}");
+    }
+    
+    /// <summary>
+    /// Traces bytecode execution (if enabled).
+    /// </summary>
+    /// <param name="bytecode">The bytecode being executed.</param>
+    /// <param name="pc">The program counter.</param>
+    /// <param name="stackSize">Current stack size (optional).</param>
+    public void TraceBytecode(byte bytecode, int pc, int? stackSize = null)
+    {
+        if (!isTracingEnabled) return;
+        
+        var indent = new string(' ', (indentLevel + 1) * 2);
+        var stackInfo = stackSize.HasValue ? $" [stack: {stackSize}]" : "";
+        
+        Console.WriteLine($"{indent}  #{pc:D3}: {bytecode:D3} (0x{bytecode:X2}){stackInfo}");
+    }
+    
+    /// <summary>
+    /// Clears the call stack and resets tracing state.
+    /// Used when execution is reset or errors occur.
+    /// </summary>
+    public void Reset()
+    {
+        callStack.Clear();
+        indentLevel = 0;
+    }
+    
+    /// <summary>
+    /// Gets a description of the current call stack for debugging.
+    /// </summary>
+    /// <returns>A formatted string showing the current call stack.</returns>
+    public string GetCallStackTrace()
+    {
+        if (callStack.Count == 0)
+            return "Call stack is empty";
+            
+        var trace = new List<string>();
+        var stack = callStack.ToArray();
+        Array.Reverse(stack); // Show from outermost to innermost
+        
+        for (int i = 0; i < stack.Length; i++)
         {
-            {"Array", new[] {16, 18}},
-            {"String", new[] {14, 20}},
-            {"Symbol", new[] {12, 22}},
-            {"Object", new[] {2, 26}},
-            {"Class", new[] {4, 28}},
-            {"Metaclass", new[] {6, 30}},
-            {"ByteArray", new[] {18, 24}},
-            {"MethodDictionary", new[] {10, 32}}
+            var indent = new string(' ', i * 2);
+            trace.Add($"{indent}{i + 1}. {stack[i]}");
+        }
+        
+        return string.Join("\n", trace);
+    }
+    
+    /// <summary>
+    /// Gets a concise description of a receiver object for tracing.
+    /// </summary>
+    /// <param name="receiver">The receiver object.</param>
+    /// <returns>A string description of the receiver.</returns>
+    private static string GetReceiverDescription(object receiver)
+    {
+        return receiver switch
+        {
+            null => "nil",
+            SmalltalkObject obj when obj.ClassPointer != null => GetClassName(obj.ClassPointer) ?? $"Object@{obj.Oop}",
+            SmalltalkObject obj => $"Object@{obj.Oop}",
+            int i => i.ToString(),
+            double d => d.ToString("F2"),
+            string s => $"\"{s}\"",
+            bool b => b.ToString().ToLower(),
+            _ => receiver.GetType().Name
         };
-        
-        foreach (var kvp in commonClasses)
-        {
-            foreach (var oop in kvp.Value)
-            {
-                if (classObj.Oop == oop)
-                    return kvp.Key;
-            }
-        }
-        
-        return null;
     }
     
     /// <summary>
-    /// Determines if a SmalltalkObject represents a class object.
+    /// Gets a concise description of a return value for tracing.
     /// </summary>
-    private static bool IsClassObject(SmalltalkObject obj)
+    /// <param name="returnValue">The return value.</param>
+    /// <returns>A string description of the return value.</returns>
+    private static string GetReturnValueDescription(object returnValue)
     {
-        // Heuristic: class objects typically have specific field patterns
-        // In Smalltalk-80, classes have fields like name, superclass, methodDict, etc.
-        if (obj.Fields.Length >= 6)
+        return returnValue switch
         {
-            // Check if this looks like a class by having typical class fields
-            // Field 5 is typically the name field in class objects
-            if (obj.Fields[5] != null)
-                return true;
-        }
-        return false;
+            null => "nil",
+            SmalltalkObject obj when obj.ClassPointer != null => GetClassName(obj.ClassPointer) ?? $"Object@{obj.Oop}",
+            SmalltalkObject obj => $"Object@{obj.Oop}",
+            int i => i.ToString(),
+            double d => d.ToString("F2"),
+            string s when s.Length <= 20 => $"\"{s}\"",
+            string s => $"\"{s.Substring(0, 17)}...\"",
+            bool b => b.ToString().ToLower(),
+            _ => returnValue.GetType().Name
+        };
+    }
+    
+    /// <summary>
+    /// Helper method to get class name from a SmalltalkObject.
+    /// This is a simplified version that doesn't duplicate the logic from Interpreter.
+    /// </summary>
+    /// <param name="classObj">The class object.</param>
+    /// <returns>The class name or null if not determinable.</returns>
+    private static string? GetClassName(SmalltalkObject? classObj)
+    {
+        if (classObj == null) return null;
+        
+        // Try to get class name from common field locations
+        // This is a simplified version - the full logic is in Interpreter.GetClassName
+        if (classObj.Fields.Length > 5 && classObj.Fields[5] is Symbol nameSym)
+            return nameSym.Name;
+            
+        if (classObj.Fields.Length > 0 && classObj.Fields[0] is Symbol fieldSym)
+            return fieldSym.Name;
+            
+        return $"Class@{classObj.Oop}";
     }
 }

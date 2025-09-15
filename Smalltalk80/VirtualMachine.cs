@@ -65,10 +65,10 @@ public sealed class VirtualMachine
         // Bootstrap: Core classes with methods
         ExecuteBootstrap(bootstrapDir);
         
-        // Extended library loading (if not skipped)
+        // Low-level class loading (if not skipped)
         if (!skipStandardLibrary)
         {
-            ExecuteExtendedLibrary(bootstrapDir);
+            ExecuteLowLevelClasses(bootstrapDir);
         }
         
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] JSON bootstrap complete!");
@@ -79,9 +79,7 @@ public sealed class VirtualMachine
     /// </summary>
     private void ExecuteBootstrap(string bootstrapDir)
     {
-        // Disable tracing during Phase 1 bootstrap
-        var wasTracingEnabled = Tracer.Enabled;
-        Tracer.Enabled = false;
+        // Tracing removed
         
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading core classes and methods...");
         
@@ -109,11 +107,8 @@ public sealed class VirtualMachine
         JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Created {ObjectMemory.Objects.Count} objects in VM memory");
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap complete: Core classes and methods loaded");
         
-        // Dump classes after bootstrap (only if bootstrap debug is enabled)
-        if (JsonBootstrapExecutor.EnableBootstrapDebugOutput)
-        {
-            DumpAllClasses("BOOTSTRAP CLASSES");
-        }
+        // Dump classes after bootstrap (debug output removed)
+        // DumpAllClasses("BOOTSTRAP CLASSES");
         
         // Now that we have methods installed (including at:put:), migrate to Smalltalk dictionary
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary using message sends...");
@@ -123,57 +118,91 @@ public sealed class VirtualMachine
         }
         
         // Restore tracing state after bootstrap
-        Tracer.Enabled = wasTracingEnabled;
+        // Tracing removed
     }
     
     /// <summary>
-    /// Executes extended library loading via bytecode execution.
+    /// Executes low-level class loading from complete system image.
     /// </summary>
-    private void ExecuteExtendedLibrary(string bootstrapDir)
+    private void ExecuteLowLevelClasses(string bootstrapDir)
     {
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading extended library classes...");
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Loading classes via low-level message sends...");
         
         if (bootstrapAdapter == null)
         {
             throw new InvalidOperationException("Bootstrap adapter not initialized. Run bootstrap first.");
         }
         
-        // Look for numbered extended class files (###_ClassName.json pattern)
-        var phase2Files = Directory.GetFiles(bootstrapDir, "*_*.json")
-            .Where(f => Path.GetFileName(f).Length > 4 && 
-                       char.IsDigit(Path.GetFileName(f)[0]) &&
-                       char.IsDigit(Path.GetFileName(f)[1]) &&
-                       char.IsDigit(Path.GetFileName(f)[2]) &&
-                       Path.GetFileName(f)[3] == '_')
-            .OrderBy(f => f)
-            .ToList();
-            
-        if (phase2Files.Count > 0)
+        // Look for complete_system_final.json in various locations
+        var systemImagePaths = new[]
         {
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Found {phase2Files.Count} extended class files");
-            var phase2Executor = new Phase2Executor(bootstrapAdapter);
-            
-            foreach (var file in phase2Files)
+            Path.Combine(Directory.GetCurrentDirectory(), "complete_system_final.json"),
+            Path.Combine(bootstrapDir, "..", "complete_system_final.json"),
+            Path.Combine(bootstrapDir, "..", "..", "complete_system_final.json"),
+            "complete_system_final.json"
+        };
+        
+        string? systemImagePath = null;
+        foreach (var path in systemImagePaths)
+        {
+            if (File.Exists(path))
             {
-                var fileName = Path.GetFileName(file);
-                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Loading extended class: {fileName}");
-                
-                try
-                {
-                    var jsonContent = File.ReadAllText(file);
-                    phase2Executor.ExecuteClassManifest(jsonContent);
-                }
-                catch (Exception ex)
-                {
-                    JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Error loading {fileName}: {ex.Message}");
-                }
+                systemImagePath = path;
+                break;
             }
-            
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Extended class loading complete");
         }
-        else
+        
+        if (systemImagePath == null)
         {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] No extended class files found - running with core classes only");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: complete_system_final.json not found, skipping low-level class loading");
+            return;
+        }
+        
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Found system image: {systemImagePath}");
+        
+        // Define essential extended classes to load
+        var essentialClasses = new List<string>
+        {
+            // Core system classes
+            "BlockContext", "MethodContext", "ContextPart",
+            "SmallInteger", "LargePositiveInteger", "LargeNegativeInteger", "Integer", "Number",
+            "Float", "Fraction",
+            
+            // Collections
+            "Set", "IdentitySet", "Bag", "OrderedCollection", "SortedCollection",
+            "LinkedList", "Interval",
+            
+            // Streams
+            "Stream", "PositionableStream", "ReadStream", "WriteStream", "ReadWriteStream",
+            
+            // Characters and Strings
+            "Character", "Text", "Paragraph", "TextStyle",
+            
+            // Processes and Scheduling
+            "Process", "ProcessorScheduler", "Semaphore", "Delay",
+            
+            // Exceptions
+            "Exception", "Error", "Halt", "MessageNotUnderstood",
+            
+            // Compiler and Parser
+            "Parser", "Scanner", "Compiler", "CompilationContext",
+            
+            // File System
+            "File", "FileDirectory", "FileStream",
+            
+            // Graphics (basic)
+            "Point", "Rectangle", "Form", "BitBlt"
+        };
+        
+        try
+        {
+            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
+            executor.ExecuteLowLevelClasses(systemImagePath, essentialClasses);
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Successfully loaded {essentialClasses.Count} essential classes");
+        }
+        catch (Exception ex)
+        {
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Error in low-level class loading: {ex.Message}");
         }
     }
     

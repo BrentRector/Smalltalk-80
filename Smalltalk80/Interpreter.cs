@@ -22,9 +22,38 @@ public class Interpreter
     public MethodCache MethodCache { get; } = new();
 
     /// <summary>
+    ///     The message dispatcher for handling method dispatch and lookup.
+    /// </summary>
+    private readonly MessageDispatcher messageDispatcher;
+
+    /// <summary>
+    ///     The method tracer for handling execution tracing.
+    /// </summary>
+    private readonly MethodTracer methodTracer;
+
+    /// <summary>
+    ///     Initializes a new instance of the Interpreter class.
+    /// </summary>
+    /// <param name="enableTracing">Whether to enable method tracing.</param>
+    public Interpreter(bool enableTracing = false)
+    {
+        messageDispatcher = new MessageDispatcher(MethodCache);
+        methodTracer = new MethodTracer(enableTracing);
+    }
+
+    /// <summary>
     ///     Gets the context currently being executed by the interpreter.
     /// </summary>
     internal Context CurrentContext => currentContext;
+
+    /// <summary>
+    ///     Sets the current context. Used by MessageDispatcher for method dispatch.
+    /// </summary>
+    /// <param name="context">The new current context.</param>
+    internal void SetCurrentContext(Context context)
+    {
+        currentContext = context;
+    }
 
     /// <summary>
     ///     Indicates whether the interpreter should exit the process when the
@@ -174,10 +203,7 @@ public class Interpreter
         SmalltalkObject receiver,
         object?[]? temporaries)
     {
-        // Log method entry for debugging
-        var className = GetClassName(receiver?.ClassPointer) ?? "Unknown";
-        var selector = ExtractSelectorFromMethod(method) ?? "<unnamed method>";
-        MethodTracer.LogMethodEntry(className, selector, receiver);
+        // Method entry tracing handled by MessageDispatcher
         
         var previousExit = ExitOnReturn;
         ExitOnReturn = false;
@@ -195,8 +221,7 @@ public class Interpreter
         Execute();
         ExitOnReturn = previousExit;
         
-        // Log method exit
-        MethodTracer.LogMethodExit(className, selector, LastResult);
+        // Method exit tracing handled in ReturnFrom
         
         return LastResult;
     }
@@ -267,14 +292,7 @@ public class Interpreter
     /// <param name="bytecode">The bytecode to execute.</param>
     public void Dispatch(Bytecode bytecode)
     {
-        // Use MethodTracer for bytecode tracing instead of general Tracer
-        MethodTracer.LogBytecode(bytecode, currentContext.PC - 1, currentContext);
-        
-        // Keep old trace for compatibility but only if Tracer is enabled
-        if (Tracer.Enabled)
-        {
-            Tracer.Log($"Dispatching bytecode: {bytecode} ({(byte)bytecode}) at PC: {currentContext.PC - 1}");
-        }
+        // Bytecode tracing removed
         
         // Use the Blue Book compatible dispatcher for all bytecodes
         BytecodeDispatcher.Dispatch(this, (byte)bytecode);
@@ -286,13 +304,13 @@ public class Interpreter
     /// <param name="returnValue">The return value.</param>
     public void ReturnFrom(object returnValue)
     {
-        // Log method exit if we're returning from a method context
+        // Trace method exit if we're returning from a method context
         if (currentContext is MethodContext methodCtx && methodCtx.Method != null)
         {
             var className = GetClassName(methodCtx.Receiver?.ClassPointer) ?? "Unknown";
             var selector = ExtractSelectorFromMethod(methodCtx.Method) ?? "unknown";
             
-            MethodTracer.LogMethodExit(className, selector, returnValue);
+            methodTracer.TraceMethodExit(className, selector, returnValue);
         }
         
         if (currentContext.Sender == null)
@@ -453,7 +471,7 @@ public class Interpreter
                 arguments,
                 currentContext);
 
-            Console.WriteLine($"[DEBUG] Activating block context");
+            // Debug output removed
             currentContext = newContext;
             return;
         }
@@ -514,34 +532,7 @@ public class Interpreter
     /// <param name="superSend">Whether lookup should start in the superclass of the method class.</param>
     internal void PerformSendWithObject(object selectorObject, int argCount, bool superSend)
     {
-        // The selector object is a Smalltalk Symbol - we need to bridge to the existing system
-        // This is a temporary bridge until the whole system works with Smalltalk objects natively
-        Symbol selector;
-        
-        if (selectorObject is SmalltalkObject symbolObj)
-        {
-            // Extract the selector name for the C# method lookup system
-            // This is the minimal bridge needed until method lookup works with Smalltalk objects
-            if (symbolObj.TryGetStringValue(out var selectorName))
-            {
-                selector = new Symbol(selectorName);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Cannot extract selector name from Smalltalk Symbol object");
-            }
-        }
-        else if (selectorObject is Symbol sym)
-        {
-            // Already a C# Symbol (from Phase 1/2)
-            selector = sym;
-        }
-        else
-        {
-            throw new InvalidOperationException($"Selector must be a Symbol, got {selectorObject?.GetType()}");
-        }
-        
-        PerformSend(selector, argCount, superSend);
+        messageDispatcher.PerformSendWithObject(this, selectorObject, argCount, superSend);
     }
 
     /// <summary>
@@ -552,536 +543,69 @@ public class Interpreter
     /// <param name="superSend">Whether lookup should start in the superclass of the method class.</param>
     internal void PerformSend(Symbol selector, int argCount, bool superSend)
     {
-        var arguments = new object?[argCount];
-        for (int i = argCount - 1; i >= 0; i--)
-        {
-            arguments[i] = currentContext.Stack.Pop();
-        }
-
-        object? receiver = currentContext.Stack.Pop();
-
-        var message = new Message
-        {
-            Selector = selector,
-            Receiver = receiver,
-            Arguments = arguments,
-            SuperSend = superSend
-        };
-
-        PerformSend(message);
+        messageDispatcher.PerformSend(this, selector, argCount, superSend);
     }
 
     /// <summary>
-    ///     Sends the specified message object to its receiver.
+    ///     Gets the class name from a Smalltalk class object.
     /// </summary>
-    /// <param name="message">The message to execute.</param>
-    private void PerformSend(Message message)
+    /// <param name="cls">The class object.</param>
+    /// <returns>The class name or null if not found.</returns>
+    private static string? GetClassName(SmalltalkObject? cls)
     {
-        var selector = message.Selector;
-        var arguments = message.Arguments;
-        object? receiver = message.Receiver;
-        bool superSend = message.SuperSend;
-        int argCount = arguments.Length;
-
-        if (receiver is int li &&
-            argCount == 1 &&
-            arguments[0] is int ri &&
-            selector.Name == "+")
+        if (cls == null) return null;
+        
+        // Try to get the name from slot 5 (for Class objects)
+        if (cls.Fields.Length > 5 && cls.Fields[5] is Symbol nameSymbol)
         {
-            currentContext.Stack.Push(li + ri);
-            return;
+            return nameSymbol.Value;
         }
-
-        if (receiver is BlockContext blk)
+        
+        // For metaclasses, try to get the thisClass and then its name
+        if (cls.Fields.Length > 5 && cls.Fields[5] is SmalltalkObject thisClass)
         {
-            HandleBlockMessage(blk, selector, arguments);
-            return;
+            return GetClassName(thisClass) + " class";
         }
-
-        if (receiver is Context ctx)
-        {
-            HandleContextMessage(ctx, selector, arguments);
-            return;
-        }
-
-        if (receiver is SmalltalkObject recvObj)
-        {
-            SmalltalkObject? startClass;
-            if (superSend)
-            {
-                if (currentContext.Method.Literals.Length == 0 ||
-                    currentContext.Method.Literals[^1] is not SmalltalkObject methodClass)
-                {
-                    throw new InvalidOperationException("Super send missing method class literal");
-                }
-
-                startClass = methodClass.Superclass ??
-                             throw new InvalidOperationException("Method class has no superclass");
-            }
-            else
-            {
-                // ALWAYS start lookup at the receiver's class
-                startClass = recvObj.ClassPointer;
-            }
-
-            var cls = startClass ??
-                      throw new InvalidOperationException("Receiver cannot be null");
-
-            // Try method cache first for performance
-            var method = MethodCache.Lookup(cls, selector);
-            if (method == null)
-            {
-                // Cache miss - perform full lookup
-                method = cls.Lookup(selector);
-
-                if (method == null)
-                {
-                    // Method not found - try doesNotUnderstand: as a fallback
-                    // First, check if doesNotUnderstand: exists
-                    var doesNotUnderstand = new Symbol("doesNotUnderstand:");
-                    var dnu_method = cls.Lookup(doesNotUnderstand);
-                    
-                    if (dnu_method != null)
-                    {
-                        // Create a simple Message-like object
-                        // During bootstrap, we may not have the Message class yet
-                        // so we'll create a simple array: [selector, arguments]
-                        var messageData = new object[] { selector, arguments };
-                        
-                        // Execute doesNotUnderstand: with the message data as argument
-                        var newArgs = new object[] { messageData };
-                        var newMessage = new Message
-                        {
-                            Selector = doesNotUnderstand,
-                            Receiver = receiver,
-                            Arguments = newArgs,
-                            SuperSend = false
-                        };
-                        
-                        PerformSend(newMessage);
-                        return;
-                    }
-                    
-                    // Neither the method nor doesNotUnderstand: was found - this is fatal
-                    throw new InvalidOperationException($"Method {selector} not found");
-                }
-
-                // Cache the result for future use
-                MethodCache.Store(cls, selector, method);
-            }
-
-            if (method.HasPrimitive)
-            {
-                Console.WriteLine($"[DEBUG] Method {method.SelectorName ?? "unknown"} has primitive {method.PrimitiveIndex}");
-                currentContext.Stack.Push(receiver);
-                foreach (var arg in arguments)
-                {
-                    currentContext.Stack.Push(arg);
-                }
-
-                if (Primitives.Execute(method.PrimitiveIndex, currentContext))
-                {
-                    Console.WriteLine($"[DEBUG] Primitive {method.PrimitiveIndex} succeeded, returning without executing bytecode");
-                    return;
-                }
-
-                for (int i = 0; i <= argCount; i++)
-                {
-                    _ = currentContext.Stack.Pop();
-                }
-            }
-
-            var temps = new object?[method.TemporariesCount];
-            for (int i = 0; i < arguments.Length && i < temps.Length; i++)
-                temps[i] = arguments[i];
-
-            // Debug instVarAt:put: specifically
-            if (method.SelectorName == "instVarAt:put:")
-            {
-                Console.WriteLine($"[DEBUG] instVarAt:put: method details:");
-                Console.WriteLine($"[DEBUG]   HasPrimitive: {method.HasPrimitive}");
-                Console.WriteLine($"[DEBUG]   PrimitiveIndex: {method.PrimitiveIndex}");
-                Console.WriteLine($"[DEBUG]   Bytecode length: {method.Bytecodes?.Length ?? 0}");
-                Console.WriteLine($"[DEBUG]   Literals count: {method.Literals?.Length ?? 0}");
-            }
-            
-            // Log method entry with actual selector name 
-            var className = GetClassName(startClass) ?? "Unknown";
-            MethodTracer.LogMethodEntry(className, selector.Name, recvObj);
-            
-            var newContext = new MethodContext
-            {
-                Sender = currentContext,
-                Method = method,
-                Receiver = recvObj,
-                Arguments = arguments,
-                Temporaries = temps,
-                Stack = new Stack<object?>(),
-                PC = 0
-            };
-            Console.WriteLine($"[DEBUG] Activating method: {method.SelectorName ?? "unknown"}");
-            currentContext = newContext;
-            return;
-        }
-
-        // Handle .NET primitive types by mapping them to Smalltalk classes
-        var primitiveClass = GetClassForPrimitive(receiver);
-        if (primitiveClass != null)
-        {
-            // Convert .NET primitive to proper Smalltalk object
-            var smalltalkReceiver = ConvertPrimitiveToSmalltalkObject(receiver, primitiveClass);
-            if (smalltalkReceiver != null)
-            {
-                // Recursively call PerformSend with the Smalltalk object
-                var smalltalkMessage = new Message
-                {
-                    Selector = selector,
-                    Receiver = smalltalkReceiver,
-                    Arguments = arguments,
-                    SuperSend = false
-                };
-                PerformSend(smalltalkMessage);
-                return;
-            }
-
-            // Perform method lookup on the mapped Smalltalk class for primitive methods
-            var method = primitiveClass.Lookup(selector);
-            if (method == null)
-                throw new InvalidOperationException($"Method {selector} not found on primitive type");
-
-            // Execute primitive method directly
-            if (method.HasPrimitive)
-            {
-                Console.WriteLine($"[DEBUG] Method {method.SelectorName ?? "unknown"} has primitive {method.PrimitiveIndex}");
-                currentContext.Stack.Push(receiver);
-                foreach (var arg in arguments)
-                {
-                    currentContext.Stack.Push(arg);
-                }
-
-                if (Primitives.Execute(method.PrimitiveIndex, currentContext))
-                {
-                    Console.WriteLine($"[DEBUG] Primitive {method.PrimitiveIndex} succeeded, returning without executing bytecode");
-                    return;
-                }
-
-                // If primitive failed, fall through to normal method execution
-                for (int i = 0; i <= argCount; i++)
-                {
-                    _ = currentContext.Stack.Pop();
-                }
-            }
-
-            // For now, we'll just handle primitive methods for primitive types
-            throw new InvalidOperationException($"Non-primitive method {selector} not supported on primitive type {receiver?.GetType().Name}");
-        }
-
-        throw new InvalidOperationException($"Cannot send {selector} to {receiver}");
-    }
-
-    /// <summary>
-    /// Maps .NET primitive types to their corresponding Smalltalk classes.
-    /// </summary>
-    /// <param name="primitive">The .NET primitive object.</param>
-    /// <returns>The corresponding Smalltalk class, or null if no mapping exists.</returns>
-    private static SmalltalkObject? GetClassForPrimitive(object? primitive)
-    {
-        // Stub implementation - returns null since shadow classes removed
-        // In a full implementation, this would look up class objects in ObjectMemory
+        
         return null;
     }
 
     /// <summary>
-    /// Converts .NET primitive values to proper Smalltalk objects.
+    ///     Extracts the selector from a compiled method.
     /// </summary>
-    /// <param name="primitive">The .NET primitive value.</param>
-    /// <param name="smalltalkClass">The corresponding Smalltalk class.</param>
-    /// <returns>A Smalltalk object, or null if conversion is not needed/possible.</returns>
-    private static SmalltalkObject? ConvertPrimitiveToSmalltalkObject(object? primitive, SmalltalkObject? smalltalkClass)
+    /// <param name="method">The compiled method.</param>
+    /// <returns>The selector name or null if not found.</returns>
+    private static string? ExtractSelectorFromMethod(CompiledMethod method)
     {
-        return primitive switch
+        // Look for a Symbol in the literals that could be the selector
+        foreach (var literal in method.Literals)
         {
-            bool b => ConvertBooleanToSmalltalkObject(b),
-            int i => ConvertIntegerToSmalltalkObject(i),
-            double d => ConvertFloatToSmalltalkObject(d),
-            char c => ConvertCharacterToSmalltalkObject(c),
-            string s => ConvertStringToSmalltalkObject(s),
-            _ => null
-        };
+            if (literal is Symbol symbol)
+            {
+                return symbol.Name;
+            }
+        }
+        return null;
     }
 
     /// <summary>
-    /// Converts a .NET boolean to the appropriate Smalltalk singleton object (True or False).
+    ///     Gets the argument count for a selector.
     /// </summary>
-    /// <param name="value">The boolean value.</param>
-    /// <returns>The True or False singleton object.</returns>
-    private static SmalltalkObject? ConvertBooleanToSmalltalkObject(bool value)
-    {
-        // TODO: Return proper true/false singleton from object memory
-        // For now, create a minimal object
-        return new SmalltalkObject(null, 0);
-    }
-
-    /// <summary>
-    /// Converts a .NET integer to a Smalltalk SmallInteger object.
-    /// </summary>
-    /// <param name="value">The integer value.</param>
-    /// <returns>A SmallInteger object.</returns>
-    private static SmalltalkObject? ConvertIntegerToSmalltalkObject(int value)
-    {
-        // TODO: Look up SmallInteger class from object memory
-        // For now, create untyped object with value
-        var obj = new SmalltalkObject(null, 1);
-        obj.SetField(0, value);
-        return obj;
-    }
-
-    /// <summary>
-    /// Converts a .NET double to a Smalltalk Float object.
-    /// </summary>
-    /// <param name="value">The double value.</param>
-    /// <returns>A Float object.</returns>
-    private static SmalltalkObject? ConvertFloatToSmalltalkObject(double value)
-    {
-        // TODO: Look up Float class from object memory
-        // For now, create untyped object with value
-        var obj = new SmalltalkObject(null, 1);
-        obj.SetField(0, value);
-        return obj;
-    }
-
-    /// <summary>
-    /// Converts a .NET char to a Smalltalk Character object.
-    /// </summary>
-    /// <param name="value">The character value.</param>
-    /// <returns>A Character object.</returns>
-    private static SmalltalkObject? ConvertCharacterToSmalltalkObject(char value)
-    {
-        // TODO: Look up Character class from object memory
-        // For now, create untyped object with value
-        var obj = new SmalltalkObject(null, 1);
-        obj.SetField(0, value);
-        return obj;
-    }
-
-    /// <summary>
-    /// Converts a .NET string to a Smalltalk String object.
-    /// </summary>
-    /// <param name="value">The string value.</param>
-    /// <returns>A String object.</returns>
-    private static SmalltalkObject? ConvertStringToSmalltalkObject(string value)
-    {
-        // TODO: Look up String class from object memory
-        // For now, store string directly in single field
-        var obj = new SmalltalkObject(null, 1);
-        obj.SetField(0, value);
-        return obj;
-    }
-
-    /// <summary>
-    ///     Determines the number of arguments expected by the specified selector.
-    /// </summary>
-    /// <param name="selector">The selector being sent.</param>
-    /// <returns>The number of argument values that should be popped from the stack.</returns>
+    /// <param name="selector">The selector symbol.</param>
+    /// <returns>The number of arguments expected.</returns>
     private static int GetArgumentCount(Symbol selector)
     {
         var name = selector.Name;
+        
+        // Binary selectors always take 1 argument
+        if (name.Length <= 2 && name.All(c => "+-*/<>=~@%|&!?\\".Contains(c)))
+            return 1;
+            
+        // Keyword selectors: count the colons
         if (name.Contains(':'))
-        {
             return name.Count(c => c == ':');
-        }
-
-        return name.All(char.IsLetterOrDigit) ? 0 : 1;
-    }
-    
-    /// <summary>
-    /// Gets the name of a class from a SmalltalkObject that represents a class.
-    /// </summary>
-    private static string? GetClassName(SmalltalkObject? classObj)
-    {
-        if (classObj == null) return null;
-        
-        // First, try to look up this class OOP in the global dictionary
-        // This works for both classes and metaclasses
-        string? globalName = LookupClassNameInGlobals(classObj);
-        if (globalName != null && IsLikelyClassName(globalName))
-            return globalName;
-        
-        // Try to get the name from the class's name field if it exists
-        // In Smalltalk-80, classes have a 'name' instance variable
-        if (classObj.TryGetField("name", out var nameObj))
-        {
-            if (nameObj is Symbol sym) return sym.Name;
-            if (nameObj is string str) return str;
-            if (nameObj is SmalltalkObject nameStrObj && nameStrObj.TryGetStringValue(out var nameStr)) 
-                return nameStr;
-        }
-        
-        // For class objects, try to extract the name from field 5 (typical class name location)
-        if (classObj.Fields.Length > 5 && classObj.Fields[5] != null)
-        {
-            var nameField = classObj.Fields[5];
-            if (nameField is Symbol nameSym) return nameSym.Name;
-            if (nameField is string nameStr) return nameStr;
-            if (nameField is SmalltalkObject nameFieldObj && nameFieldObj.TryGetStringValue(out var extractedName))
-                return extractedName;
-        }
-        
-        // Check other common name field locations (field 0, 1, etc.)
-        for (int i = 0; i < Math.Min(classObj.Fields.Length, 10); i++)
-        {
-            var field = classObj.Fields[i];
-            if (field is Symbol fieldSym && IsLikelyClassName(fieldSym.Name))
-                return fieldSym.Name;
-            if (field is string fieldStr && IsLikelyClassName(fieldStr))
-                return fieldStr;
-            if (field is SmalltalkObject fieldObj && fieldObj.TryGetStringValue(out var fieldName) && IsLikelyClassName(fieldName))
-                return fieldName;
-        }
-        
-        // Fallback to OOP for debugging
-        return $"Class@{classObj.Oop}";
-    }
-    
-    /// <summary>
-    /// Looks up a class object in the global Smalltalk dictionary to find its name.
-    /// </summary>
-    private static string? LookupClassNameInGlobals(SmalltalkObject classObj)
-    {
-        try
-        {
-            // Try to find this class in the global dictionary by iterating through all objects
-            // This is a simplified approach - in a full implementation we'd access the Smalltalk dictionary directly
             
-            // Look for common class names and their expected OOP patterns
-            var commonClasses = new Dictionary<string, int[]>
-            {
-                {"Array", new[] {16, 18}},     // Array class might be at these OOPs
-                {"String", new[] {14, 20}},    // String class might be at these OOPs  
-                {"Symbol", new[] {12, 22}},    // Symbol class might be at these OOPs
-                {"Object", new[] {2, 26}},     // Object class might be at these OOPs
-                {"Class", new[] {4, 28}},      // Class class might be at these OOPs
-                {"Metaclass", new[] {6, 30}}, // Metaclass class might be at these OOPs
-                {"ByteArray", new[] {18, 24}}, // ByteArray class might be at these OOPs
-                {"MethodDictionary", new[] {10, 32}} // MethodDictionary might be at these OOPs
-            };
-            
-            foreach (var kvp in commonClasses)
-            {
-                foreach (var oop in kvp.Value)
-                {
-                    if (classObj.Oop == oop)
-                        return kvp.Key;
-                }
-            }
-            
-            // For metaclasses, try to find the pattern (metaclass is typically class + even offset)
-            foreach (var kvp in commonClasses)
-            {
-                foreach (var classOop in kvp.Value)
-                {
-                    // Metaclasses are often at class OOP + some offset
-                    if (classObj.Oop == classOop + 2 || classObj.Oop == classOop + 10 || classObj.Oop == classOop + 14)
-                        return kvp.Key + " class"; // e.g., "Array class"
-                }
-            }
-        }
-        catch
-        {
-            // If lookup fails, return null to fall back to other methods
-        }
-        
-        return null;
-    }
-    
-    /// <summary>
-    /// Determines if a string looks like a Smalltalk class name.
-    /// </summary>
-    private static bool IsLikelyClassName(string candidate)
-    {
-        if (string.IsNullOrEmpty(candidate)) return false;
-        
-        // Handle metaclass names (e.g., "Array class")
-        if (candidate.EndsWith(" class"))
-        {
-            var baseName = candidate.Substring(0, candidate.Length - 6);
-            return baseName.Length > 0 && 
-                   char.IsUpper(baseName[0]) && 
-                   baseName.All(c => char.IsLetterOrDigit(c));
-        }
-        
-        // Class names start with uppercase letter and contain only letters/digits
-        return candidate.Length > 0 && 
-               char.IsUpper(candidate[0]) && 
-               candidate.All(c => char.IsLetterOrDigit(c)) &&
-               candidate.Length <= 30; // Reasonable length limit
-    }
-    
-    /// <summary>
-    /// Extracts the selector name from a CompiledMethod by examining its literals.
-    /// </summary>
-    private static string? ExtractSelectorFromMethod(CompiledMethod method)
-    {
-        // First check if we have the selector name explicitly set (for VM method execution)
-        if (!string.IsNullOrEmpty(method.SelectorName))
-            return method.SelectorName;
-        
-        if (method.Literals == null) return null;
-        
-        // Look for Symbol literals that might be the selector
-        // In Smalltalk-80 methods, selector symbols are often in the literals array
-        foreach (var literal in method.Literals)
-        {
-            // First check for C# Symbol objects (from Phase 1/2 shadow objects)
-            if (literal is Symbol sym) 
-                return sym.Name;
-            
-            // Handle Smalltalk Symbol objects from Phase 2 bootstrap
-            if (literal is SmalltalkObject symbolObj)
-            {
-                // Try to extract string from Smalltalk Symbol object
-                if (symbolObj.TryGetStringValue(out var selectorName) && !string.IsNullOrEmpty(selectorName))
-                {
-                    // Heuristic: likely selectors contain colons, letters, or common operators
-                    if (IsLikelySelector(selectorName))
-                    {
-                        return selectorName;
-                    }
-                }
-            }
-            
-            // Handle direct string literals (unlikely but possible)
-            if (literal is string str && IsLikelySelector(str))
-                return str;
-        }
-        
-        return null;
-    }
-    
-    /// <summary>
-    /// Determines if a string looks like a Smalltalk selector.
-    /// </summary>
-    private static bool IsLikelySelector(string candidate)
-    {
-        if (string.IsNullOrEmpty(candidate)) return false;
-        
-        // Common Smalltalk selectors patterns:
-        // 1. Keywords with colons: "at:", "at:put:", "new:", etc.
-        // 2. Unary messages: "size", "class", "new", "copy", etc.
-        // 3. Binary messages: "+", "-", "=", "<=", ">=", etc.
-        
-        // Keywords (contain colons)
-        if (candidate.Contains(':'))
-            return true;
-            
-        // Binary operators
-        if (candidate.Length <= 2 && candidate.All(c => "+-*/<>=~@%|&!?\\".Contains(c)))
-            return true;
-            
-        // Unary messages (letters only, reasonable length)
-        if (candidate.Length <= 20 && candidate.All(char.IsLetter))
-            return true;
-            
-        return false;
+        // Unary selectors take no arguments
+        return 0;
     }
 }
