@@ -22,11 +22,17 @@ public sealed class VirtualMachine
     public Interpreter Interpreter { get; } = new() { ExitOnReturn = false };
     
     private VMPrimitiveAdapter? bootstrapAdapter;
+    private BootstrapOrchestrator? bootstrapOrchestrator;
     
     /// <summary>
     /// Gets the bootstrap adapter for accessing VM primitives.
     /// </summary>
     public VMPrimitiveAdapter? Adapter => bootstrapAdapter;
+    
+    /// <summary>
+    /// Gets the bootstrap orchestrator if it was used for initialization.
+    /// </summary>
+    public BootstrapOrchestrator? BootstrapOrchestrator => bootstrapOrchestrator;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using JSON bootstrap.
@@ -34,6 +40,25 @@ public sealed class VirtualMachine
     public VirtualMachine(bool skipStandardLibrary = false)
     {
         InitializeWithJsonBootstrap(skipStandardLibrary);
+    }
+    
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VirtualMachine"/> class using the BootstrapOrchestrator.
+    /// This provides enhanced bootstrap management with phase tracking, validation, and rollback capabilities.
+    /// </summary>
+    /// <param name="useOrchestrator">Whether to use the BootstrapOrchestrator for initialization.</param>
+    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
+    /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
+    public VirtualMachine(bool useOrchestrator, bool skipExtendedSystem = false, string? bootstrapDirectory = null)
+    {
+        if (useOrchestrator)
+        {
+            InitializeWithBootstrapOrchestrator(skipExtendedSystem, bootstrapDirectory);
+        }
+        else
+        {
+            InitializeWithJsonBootstrap(!skipExtendedSystem);
+        }
     }
     
     /// <summary>
@@ -72,6 +97,57 @@ public sealed class VirtualMachine
         }
         
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] JSON bootstrap complete!");
+    }
+    
+    /// <summary>
+    /// Initializes the VM using the BootstrapOrchestrator for enhanced bootstrap management.
+    /// </summary>
+    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
+    /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
+    private void InitializeWithBootstrapOrchestrator(bool skipExtendedSystem, string? bootstrapDirectory)
+    {
+        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting BootstrapOrchestrator-managed bootstrap...");
+        
+        try
+        {
+            // Create and configure the bootstrap orchestrator
+            bootstrapOrchestrator = new BootstrapOrchestrator(this);
+            
+            // Execute the complete bootstrap process
+            var result = bootstrapOrchestrator.ExecuteCompleteBootstrap(bootstrapDirectory, skipExtendedSystem);
+            
+            // Store the bootstrap adapter for compatibility
+            bootstrapAdapter = bootstrapOrchestrator.Adapter;
+            
+            // Log the results
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] BootstrapOrchestrator completed in {result.TotalTime.TotalMilliseconds:F1}ms");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Final object count: {result.ObjectCount}");
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] GC statistics: {result.GCStats.Summary}");
+            
+            // Log phase statistics if available
+            if (result.Phase1Stats != null)
+            {
+                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 1: {result.Phase1Stats.ObjectCount} objects");
+            }
+            if (result.Phase2Stats != null)
+            {
+                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2: {result.Phase2Stats.ObjectCount} objects");
+            }
+            if (result.Phase3Stats != null)
+            {
+                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 3: {result.Phase3Stats.ObjectCount} objects");
+            }
+            
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] BootstrapOrchestrator initialization complete!");
+        }
+        catch (Exception ex)
+        {
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] BootstrapOrchestrator failed: {ex.Message}");
+            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Falling back to traditional JSON bootstrap...");
+            
+            // Fallback to traditional bootstrap
+            InitializeWithJsonBootstrap(!skipExtendedSystem);
+        }
     }
     
     /// <summary>
@@ -687,5 +763,58 @@ public sealed class VirtualMachine
         // In a full implementation, we would have a proper global dictionary
         // For now, return just the basic globals
         return globals;
+    }
+    
+    /// <summary>
+    /// Gets bootstrap information if the BootstrapOrchestrator was used.
+    /// </summary>
+    /// <returns>Bootstrap phase and log information, or null if not using orchestrator.</returns>
+    public (BootstrapOrchestrator.BootstrapPhase phase, IReadOnlyList<string> log)? GetBootstrapInfo()
+    {
+        return bootstrapOrchestrator != null 
+            ? (bootstrapOrchestrator.CurrentPhase, bootstrapOrchestrator.BootstrapLog)
+            : null;
+    }
+    
+    /// <summary>
+    /// Attempts to rollback the bootstrap process to a previous phase.
+    /// Only available when using BootstrapOrchestrator.
+    /// </summary>
+    /// <param name="targetPhase">The phase to roll back to.</param>
+    /// <returns>True if rollback was successful, false if not using orchestrator.</returns>
+    public bool TryRollbackBootstrap(BootstrapOrchestrator.BootstrapPhase targetPhase)
+    {
+        if (bootstrapOrchestrator == null)
+            return false;
+            
+        try
+        {
+            bootstrapOrchestrator.RollbackToPhase(targetPhase);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Gets detailed bootstrap statistics if BootstrapOrchestrator was used.
+    /// </summary>
+    /// <returns>Bootstrap performance metrics or null if not using orchestrator.</returns>
+    public object? GetBootstrapStatistics()
+    {
+        if (bootstrapOrchestrator == null)
+            return null;
+            
+        return new
+        {
+            Phase = bootstrapOrchestrator.CurrentPhase,
+            IsComplete = bootstrapOrchestrator.IsComplete,
+            LogEntries = bootstrapOrchestrator.BootstrapLog.Count,
+            ObjectMemoryStats = ObjectMemory.GetMemoryStats(),
+            TypeIndexStats = ObjectMemory.GetTypeIndexStats(),
+            GCStats = ObjectMemory.GetAdaptiveGCStats()
+        };
     }
 }
