@@ -23,7 +23,6 @@ public class Program
             var jsonManifests = new List<string>();
             var sourceFiles = new List<string>();
             var classesToPrint = new List<string>();
-            bool listBootstrapClasses = false;
             var verbosityLevel = SmalltalkPrettyPrinterUnified.VerbosityLevel.Overview;
             bool showBytecode = true;
             bool showMnemonics = true;
@@ -38,10 +37,6 @@ public class Program
                 else if (args[i] == "--json" && i + 1 < args.Length)
                 {
                     jsonManifests.Add(args[++i]);
-                }
-                else if (args[i] == "--list-bootstrap-classes")
-                {
-                    listBootstrapClasses = true;
                 }
                 else if (args[i] == "--print-classes")
                 {
@@ -92,7 +87,7 @@ public class Program
             Console.WriteLine("Initializing Virtual Machine...");
             
             // Create the VM with BootstrapOrchestrator
-            var vm = new VirtualMachine(skipExtendedSystem: false);
+            var vm = new VirtualMachine();
             
             Console.WriteLine("✓ Virtual Machine created");
             Console.WriteLine();
@@ -113,13 +108,6 @@ public class Program
                         Console.WriteLine($"✗ Failed to load JSON manifest {jsonFile}: {ex.Message}");
                     }
                 }
-            }
-            
-            // If listing bootstrap classes, do that and exit
-            if (listBootstrapClasses)
-            {
-                ListBootstrapClasses(vm);
-                return 0;
             }
             
             
@@ -412,64 +400,6 @@ public class Program
         return $"<{obj.GetType().Name}@{obj.GetHashCode():X}>";
     }
     
-    private static void ListBootstrapClasses(VirtualMachine vm)
-    {
-        Console.WriteLine("\n=== Classes Present After Bootstrap ===");
-        
-        // Get all objects and find the ones that look like classes
-        var allObjects = ObjectMemory.Objects.ToList();
-        var classNames = new List<string>();
-        
-        // Try to get all class names by checking all objects that look like symbols
-        // and seeing if they resolve to class objects
-        var potentialClassNames = new HashSet<string>();
-        
-        // First add all known classes from bootstrap
-        var knownClasses = new[] {
-            // Bootstrap classes - Object is the root!
-            "Object", "Behavior", "Class", "Metaclass",
-            "CompiledMethod", "MethodDictionary",
-            "Symbol", "String", "Array", "ByteArray",
-            "Collection", "Dictionary", "SystemDictionary",
-            // Phase 2 classes - including intermediate classes
-            "UndefinedObject", "SmallInteger", "Boolean", "True", "False",
-            "ClassDescription", "Message", "MethodContext", "BlockContext",
-            "Association", "SequenceableCollection", 
-            "ArrayedCollection", "Set", "IdentityDictionary",
-            // Intermediate classes from system image hierarchy
-            "Magnitude", "Number", "Integer", "LookupKey",
-            "InstructionStream", "ContextPart"
-        };
-        
-        foreach (var name in knownClasses)
-        {
-            potentialClassNames.Add(name);
-        }
-        
-        // Check which classes actually exist
-        foreach (var className in potentialClassNames.OrderBy(n => n))
-        {
-            var oop = vm.Adapter?.PrimitiveLookupGlobal(className) ?? -1;
-            if (oop >= 0)  // Object has OOP 0, so we need >= not >
-            {
-                classNames.Add(className);
-            }
-        }
-        
-        Console.WriteLine($"\nFound {classNames.Count} classes:");
-        Console.WriteLine("------------------------");
-        foreach (var name in classNames)
-        {
-            Console.WriteLine($"  - {name}");
-        }
-        
-        // Generate the command to extract these classes
-        Console.WriteLine("\n=== Compiler Extraction Command ===");
-        Console.WriteLine("To extract these classes from the system image, run:");
-        Console.WriteLine();
-        var classArgs = string.Join(" ", classNames.Select(n => $"-c {n}"));
-        Console.WriteLine($"dotnet run --project Smalltalk80.Compiler -- --compile-classes {classArgs} -o bootstrap_phase2_complete.json \"Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st\"");
-    }
     
     /// <summary>
     /// Prints the help message for the interpreter.
@@ -484,7 +414,6 @@ public class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --help, -h                      Show this help message");
         Console.WriteLine("  --json <file>                   Load additional JSON manifest");
-        Console.WriteLine("  --list-bootstrap-classes        List all classes in bootstrap");
         Console.WriteLine("  --print-classes                 Show class overview (verbosity level 1)");
         Console.WriteLine("  --inspect-class <name>          Inspect specific class with full details");
         Console.WriteLine("  --verbose-level <1-3>           Set output detail level:");

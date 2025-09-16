@@ -68,9 +68,8 @@ public class BootstrapOrchestrator
     /// Performs the complete bootstrap process with all phases.
     /// </summary>
     /// <param name="bootstrapDirectory">Directory containing bootstrap files.</param>
-    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
     /// <returns>Bootstrap statistics and performance information.</returns>
-    public BootstrapResult ExecuteCompleteBootstrap(string? bootstrapDirectory = null, bool skipExtendedSystem = false)
+    public BootstrapResult ExecuteCompleteBootstrap(string? bootstrapDirectory = null)
     {
         var stopwatch = Stopwatch.StartNew();
         var result = new BootstrapResult();
@@ -83,15 +82,9 @@ public class BootstrapOrchestrator
             var bootstrapDir = ResolveBootstrapDirectory(bootstrapDirectory);
             result.BootstrapDirectory = bootstrapDir;
             
-            // Execute consolidated bootstrap
+            // Execute consolidated bootstrap (now includes all classes)
             ExecuteConsolidatedBootstrap(bootstrapDir);
             result.Phase1Stats = CapturePhaseStats("Bootstrap");
-            
-            if (!skipExtendedSystem)
-            {
-                ExecutePhase3_ExtendedSystem(bootstrapDir);
-                result.Phase3Stats = CapturePhaseStats("Phase 3");
-            }
             
             CompleteBootstrap();
             result.Success = true;
@@ -150,7 +143,7 @@ public class BootstrapOrchestrator
             // Migrate to Smalltalk dictionary now that message sends are available
             bootstrapAdapter.CompleteBootstrapWithMessageSends();
             
-            currentPhase = BootstrapPhase.Phase2_CoreMethods; // Mark as complete
+            currentPhase = BootstrapPhase.Complete; // Mark as complete
             SaveCheckpoint(currentPhase);
             
             LogMessage($"Consolidated bootstrap complete: Created {ObjectMemory.AllocatedObjectCount} objects");
@@ -241,60 +234,16 @@ public class BootstrapOrchestrator
         }
     }
     
-    /// <summary>
-    /// Executes Phase 3: Load extended system classes.
-    /// </summary>
-    /// <param name="bootstrapDir">Bootstrap directory path.</param>
-    public void ExecutePhase3_ExtendedSystem(string bootstrapDir)
-    {
-        if (currentPhase != BootstrapPhase.Phase2_CoreMethods)
-            throw new InvalidOperationException($"Cannot execute Phase 3 from current phase: {currentPhase}");
-            
-        LogMessage("Phase 3: Loading extended system classes");
-        
-        try
-        {
-            if (bootstrapAdapter == null)
-                throw new InvalidOperationException("Bootstrap adapter not initialized");
-                
-            // Look for extended system image
-            var systemImagePath = FindExtendedSystemImage(bootstrapDir);
-            if (systemImagePath == null)
-            {
-                LogMessage("Warning: Extended system image not found, skipping Phase 3");
-                currentPhase = BootstrapPhase.Phase3_ExtendedSystem;
-                return;
-            }
-            
-            LogMessage($"Loading extended system from: {systemImagePath}");
-            
-            // Define essential classes to load
-            var essentialClasses = GetEssentialExtendedClasses();
-            
-            // Load extended classes
-            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteLowLevelClasses(systemImagePath, essentialClasses);
-            
-            currentPhase = BootstrapPhase.Phase3_ExtendedSystem;
-            SaveCheckpoint(currentPhase);
-            
-            LogMessage($"Phase 3 complete: Extended system loaded with {ObjectMemory.AllocatedObjectCount} objects");
-        }
-        catch (Exception ex)
-        {
-            throw new BootstrapException("Phase 3 failed", "Phase3_ExtendedSystem", bootstrapDir, ex);
-        }
-    }
     
     /// <summary>
     /// Completes the bootstrap process and performs final validation.
     /// </summary>
     public void CompleteBootstrap()
     {
-        if (currentPhase != BootstrapPhase.Phase3_ExtendedSystem && currentPhase != BootstrapPhase.Phase2_CoreMethods)
+        if (currentPhase != BootstrapPhase.Complete)
             throw new InvalidOperationException($"Cannot complete bootstrap from current phase: {currentPhase}");
             
-        LogMessage("Completing bootstrap and performing final validation");
+        LogMessage("Bootstrap already complete, performing final validation");
         
         try
         {
@@ -437,101 +386,6 @@ public class BootstrapOrchestrator
         throw BootstrapException.FileNotFound(fileNames[0], bootstrapDir);
     }
     
-    /// <summary>
-    /// Finds the extended system image file.
-    /// </summary>
-    private string? FindExtendedSystemImage(string bootstrapDir)
-    {
-        var searchPaths = new[]
-        {
-            Path.Combine(Directory.GetCurrentDirectory(), "complete_system_final.json"),
-            Path.Combine(bootstrapDir, "..", "complete_system_final.json"),
-            Path.Combine(bootstrapDir, "..", "..", "complete_system_final.json"),
-            "complete_system_final.json"
-        };
-        
-        return searchPaths.FirstOrDefault(File.Exists);
-    }
-    
-    /// <summary>
-    /// Gets the list of essential extended classes to load in Phase 3.
-    /// Classes are ordered to ensure all superclasses are created before subclasses.
-    /// </summary>
-    private List<string> GetEssentialExtendedClasses()
-    {
-        return new List<string>
-        {
-            // Missing superclass dependencies (must come first)
-            "InstructionStream",
-            "Magnitude", 
-            "Collection",
-            "SequenceableCollection",
-            "ArrayedCollection", 
-            "Link",
-            "DisplayObject",
-            "DisplayMedium",
-            "DisplayText",
-            
-            // Classes with no dependencies (besides Object) - topologically sorted
-            "Exception",
-            "Halt",
-            "CompilationContext",
-            "MessageNotUnderstood",
-            "Error",
-            "Stream",
-            "TextStyle",
-            "Compiler",
-            "File",
-            "Delay",
-            "FileDirectory",
-            "ProcessorScheduler",
-            "Scanner",
-            
-            // Classes depending on single superclasses
-            "PositionableStream", // depends on Stream
-            "ContextPart", // depends on InstructionStream  
-            "Character", // depends on Magnitude
-            "Number", // depends on Magnitude
-            "Bag", // depends on Collection
-            "Set", // depends on Collection
-            "Process", // depends on Link
-            "Parser", // depends on Scanner
-            
-            // Stream hierarchy
-            "ReadStream", // depends on PositionableStream
-            "WriteStream", // depends on PositionableStream
-            
-            // Context hierarchy
-            "MethodContext", // depends on ContextPart
-            "BlockContext", // depends on ContextPart
-            
-            // Number hierarchy
-            "Fraction", // depends on Number
-            "Float", // depends on Number
-            "Integer", // depends on Number
-            
-            // Collection hierarchy (depends on SequenceableCollection)
-            "Interval", // depends on SequenceableCollection
-            "LinkedList", // depends on SequenceableCollection
-            "OrderedCollection", // depends on SequenceableCollection
-            
-            // More specific classes
-            "IdentitySet", // depends on Set
-            "ReadWriteStream", // depends on WriteStream
-            "ExternalStream", // depends on ReadWriteStream - must come after ReadWriteStream
-            "LargePositiveInteger", // depends on Integer
-            "LargeNegativeInteger", // depends on Integer
-            "SmallInteger", // depends on Integer
-            "Semaphore", // depends on LinkedList
-            "SortedCollection", // depends on OrderedCollection
-            "Text", // depends on ArrayedCollection
-            "FileStream", // depends on ExternalStream
-            "Paragraph", // depends on DisplayText
-            
-            // Graphics (basic)
-            "Point", "Rectangle", "Form", "BitBlt"
-        };
-    }
     
     /// <summary>
     /// Captures statistics for a completed phase.

@@ -38,30 +38,27 @@ public sealed class VirtualMachine
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using the BootstrapOrchestrator.
     /// This provides enhanced bootstrap management with phase tracking, validation, and rollback capabilities.
     /// </summary>
-    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
-    public VirtualMachine(bool skipExtendedSystem = false)
+    public VirtualMachine()
     {
-        InitializeWithBootstrapOrchestrator(skipExtendedSystem, null);
+        InitializeWithBootstrapOrchestrator(null);
     }
     
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualMachine"/> class using the BootstrapOrchestrator.
     /// This provides enhanced bootstrap management with phase tracking, validation, and rollback capabilities.
     /// </summary>
-    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
     /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
-    public VirtualMachine(bool skipExtendedSystem, string? bootstrapDirectory)
+    public VirtualMachine(string? bootstrapDirectory)
     {
-        InitializeWithBootstrapOrchestrator(skipExtendedSystem, bootstrapDirectory);
+        InitializeWithBootstrapOrchestrator(bootstrapDirectory);
     }
     
     
     /// <summary>
     /// Initializes the VM using the BootstrapOrchestrator for enhanced bootstrap management.
     /// </summary>
-    /// <param name="skipExtendedSystem">Whether to skip Phase 3 extended system loading.</param>
     /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
-    private void InitializeWithBootstrapOrchestrator(bool skipExtendedSystem, string? bootstrapDirectory)
+    private void InitializeWithBootstrapOrchestrator(string? bootstrapDirectory)
     {
         JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting BootstrapOrchestrator-managed bootstrap...");
         
@@ -71,7 +68,7 @@ public sealed class VirtualMachine
             bootstrapOrchestrator = new BootstrapOrchestrator(this);
             
             // Execute the complete bootstrap process
-            var result = bootstrapOrchestrator.ExecuteCompleteBootstrap(bootstrapDirectory, skipExtendedSystem);
+            var result = bootstrapOrchestrator.ExecuteCompleteBootstrap(bootstrapDirectory);
             
             // Store the bootstrap adapter for compatibility
             bootstrapAdapter = bootstrapOrchestrator.Adapter;
