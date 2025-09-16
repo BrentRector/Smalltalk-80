@@ -1,0 +1,205 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-15 17:53:12",
+  "classes": [
+    {
+      "name": "TestBase",
+      "superclass": "Object",
+      "instanceVariables": [
+        "base1",
+        "base2"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Inheritance"
+    },
+    {
+      "name": "TestDerived",
+      "superclass": "TestBase",
+      "instanceVariables": [
+        "derived1"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Inheritance"
+    },
+    {
+      "name": "TestLookupKey",
+      "superclass": "Magnitude",
+      "instanceVariables": [
+        "testKey"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Inheritance"
+    },
+    {
+      "name": "TestAssociation",
+      "superclass": "TestLookupKey",
+      "instanceVariables": [
+        "testValue"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Inheritance"
+    }
+  ],
+  "methods": [
+    {
+      "class": "TestBase",
+      "selector": "base1",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestBase",
+      "selector": "base1:base1:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestBase",
+      "selector": "base2",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestBase",
+      "selector": "base2:base2:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestDerived",
+      "selector": "derived1",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestDerived",
+      "selector": "derived1:derived1:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestDerived",
+      "selector": "testAllFields",
+      "bytecode": [
+        0,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestLookupKey",
+      "selector": "testKey",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestLookupKey",
+      "selector": "testKey:testKey:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestAssociation",
+      "selector": "testValue",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestAssociation",
+      "selector": "testValue:testValue:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestAssociation",
+      "selector": "testBothFields",
+      "bytecode": [
+        0,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    }
+  ]
+}

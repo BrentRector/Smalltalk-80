@@ -118,6 +118,15 @@ internal sealed class BootstrapContext
     {
         return new Dictionary<string, int>(temporaryGlobals);
     }
+    
+    /// <summary>
+    /// Get temporary classes dictionary for reverse lookup during bootstrap.
+    /// Returns a copy to prevent external modification.
+    /// </summary>
+    public Dictionary<string, int> GetTemporaryClasses()
+    {
+        return new Dictionary<string, int>(temporaryClasses);
+    }
 
     /// <summary>
     /// Migrate all temporary entries to the Smalltalk SystemDictionary

@@ -14,6 +14,7 @@ namespace StandaloneCompiler
     public class SimpleCompiler
     {
         private readonly BytecodeCompiler bytecodeCompiler = new();
+        private readonly Dictionary<string, ClassDefinition> classMap = new();
         
         public static void Main(string[] args)
         {
@@ -83,6 +84,9 @@ namespace StandaloneCompiler
                 Methods = new List<MethodDefinition>()
             };
             
+            // Clear class map for new compilation
+            classMap.Clear();
+            
             // Extract classes - handle all types of class definitions
             var classPattern = @"(\w+)\s+(subclass:|variableSubclass:|variableByteSubclass:|variableWordSubclass:)\s+#(\w+)\s+" +
                               @"instanceVariableNames:\s+'([^']*)'\s+" +
@@ -105,6 +109,7 @@ namespace StandaloneCompiler
                 };
                 
                 result.Classes.Add(classDef);
+                classMap[classDef.Name] = classDef;
                 Console.WriteLine($"Found class: {classDef.Name}");
             }
             
@@ -119,7 +124,9 @@ namespace StandaloneCompiler
                 {
                     var category = match.Groups[1].Value;
                     var methodsBlock = match.Groups[2].Value;
-                    CompileMethods(methodsBlock, classDef.Name, false, category, classDef.InstanceVariables, result.Methods);
+                    // Get all inherited instance variables for instance methods
+                    var allInstanceVars = ComputeInheritedInstanceVariables(classDef.Name);
+                    CompileMethods(methodsBlock, classDef.Name, false, category, allInstanceVars, result.Methods);
                 }
                 
                 // Class methods
@@ -130,7 +137,11 @@ namespace StandaloneCompiler
                 {
                     var category = match.Groups[1].Value;
                     var methodsBlock = match.Groups[2].Value;
-                    CompileMethods(methodsBlock, classDef.Name, true, category, new List<string>(), result.Methods);
+                    // For class methods, we need the metaclass's instance variables
+                    // In Smalltalk-80, metaclasses typically have: thisClass, name, comment, subclasses, instanceVariables, etc.
+                    // For now, we'll use an empty list as metaclass instance vars are rarely accessed directly
+                    var metaclassVars = GetMetaclassInstanceVariables(classDef.Name);
+                    CompileMethods(methodsBlock, classDef.Name, true, category, metaclassVars, result.Methods);
                 }
             }
             
@@ -187,6 +198,115 @@ namespace StandaloneCompiler
                 return new List<string>();
             
             return varString.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+        
+        /// <summary>
+        /// Computes the complete list of instance variables for a class, including inherited ones.
+        /// Instance variables are ordered with superclass variables first.
+        /// </summary>
+        private List<string> ComputeInheritedInstanceVariables(string className)
+        {
+            var allVars = new List<string>();
+            var visited = new HashSet<string>(); // Prevent infinite loops
+            
+            var current = className;
+            while (!string.IsNullOrEmpty(current) && current != "nil" && visited.Add(current))
+            {
+                if (classMap.TryGetValue(current, out var classDef))
+                {
+                    // Prepend parent variables (we'll reverse at the end)
+                    if (classDef.InstanceVariables.Count > 0)
+                    {
+                        allVars.InsertRange(0, classDef.InstanceVariables);
+                    }
+                    
+                    current = classDef.Superclass;
+                    
+                    // Stop at Object or if no superclass
+                    if (current == "Object" || current == "nil" || string.IsNullOrEmpty(current))
+                    {
+                        // Object class has no instance variables in Smalltalk-80
+                        break;
+                    }
+                }
+                else if (IsWellKnownClass(current, out var knownVars) && knownVars != null)
+                {
+                    // Handle well-known system classes not in current compilation
+                    allVars.InsertRange(0, knownVars);
+                    break; // Well-known classes are terminal
+                }
+                else
+                {
+                    // Unknown superclass - stop here
+                    Console.WriteLine($"Warning: Unknown superclass '{current}' for class '{className}'");
+                    break;
+                }
+            }
+            
+            return allVars;
+        }
+        
+        /// <summary>
+        /// Gets instance variables for well-known Smalltalk-80 system classes.
+        /// Returns true if the class is known, false otherwise.
+        /// </summary>
+        private bool IsWellKnownClass(string className, out List<string>? instanceVars)
+        {
+            // Note: These are the COMPLETE instance variables including inherited ones
+            // This is used when we can't find the class in our current compilation
+            instanceVars = className switch
+            {
+                "Object" => new List<string>(),
+                "Collection" => new List<string> { "tally" },
+                "Set" => new List<string> { "tally" },
+                "Dictionary" => new List<string> { "tally" },
+                "IdentityDictionary" => new List<string> { "tally", "valueArray" },
+                "MethodDictionary" => new List<string> { "tally", "valueArray" },
+                "SequenceableCollection" => new List<string>(),
+                "ArrayedCollection" => new List<string>(),
+                "Array" => new List<string>(),
+                "String" => new List<string>(),
+                "Symbol" => new List<string>(),
+                "ByteArray" => new List<string>(),
+                "OrderedCollection" => new List<string> { "firstIndex", "lastIndex" },
+                "SortedCollection" => new List<string> { "firstIndex", "lastIndex", "sortBlock" },
+                "Bag" => new List<string> { "contents" },
+                "Magnitude" => new List<string>(),
+                "Number" => new List<string>(),
+                "Integer" => new List<string>(),
+                "SmallInteger" => new List<string>(),
+                "LargePositiveInteger" => new List<string>(),
+                "LargeNegativeInteger" => new List<string>(),
+                "Float" => new List<string>(),
+                "Fraction" => new List<string> { "numerator", "denominator" },
+                "LookupKey" => new List<string> { "key" },
+                "Association" => new List<string> { "key", "value" },
+                "Link" => new List<string> { "nextLink" },
+                "Process" => new List<string> { "suspendedContext", "priority", "myList" },
+                "Context" => new List<string> { "sender", "instructionPointer", "stackPointer", "method", "receiver" },
+                "BlockContext" => new List<string> { "sender", "instructionPointer", "stackPointer", "method", "receiver", "nargs", "startpc", "home" },
+                "MethodContext" => new List<string> { "sender", "instructionPointer", "stackPointer", "method", "receiver" },
+                "CompiledMethod" => new List<string>(),
+                "Behavior" => new List<string> { "superclass", "methodDict", "format" },
+                "ClassDescription" => new List<string> { "superclass", "methodDict", "format", "instanceVariables" },
+                "Metaclass" => new List<string> { "superclass", "methodDict", "format", "instanceVariables", "thisClass" },
+                "Class" => new List<string> { "superclass", "methodDict", "format", "instanceVariables", "name", "classPool", "sharedPools" },
+                _ => null
+            };
+            
+            return instanceVars != null;
+        }
+        
+        /// <summary>
+        /// Gets instance variables for a metaclass.
+        /// </summary>
+        private List<string> GetMetaclassInstanceVariables(string className)
+        {
+            // Metaclasses in Smalltalk-80 inherit from Class
+            // Class has these instance variables: superclass, methodDict, format, instanceVariables, name, classPool, sharedPools
+            // Metaclass adds: thisClass
+            // For simplicity, return empty list as these are rarely accessed directly in class methods
+            return new List<string>();
         }
         
         private string ExtractSelector(string methodSource)

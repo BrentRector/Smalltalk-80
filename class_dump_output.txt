@@ -1,0 +1,15 @@
+Testing Low-Level Class Loading
+===============================
+[00:12:17.740] Starting complete Smalltalk-80 bootstrap process
+[00:12:17.751] Phase 1: Creating core class structures
+[00:12:17.755] Saved checkpoint for phase None with 0 objects
+[00:12:17.755] Cleared VM object memory
+[00:12:17.787] Saved checkpoint for phase Phase1_CoreClasses with 0 objects
+[00:12:17.787] Phase 1 complete: Created 0 objects
+[00:12:17.788] Phase 2: Installing methods on core classes
+[GC] Collection #1: Freed 1 objects in 0ms. Live objects: 99, Total freed: 1, Efficiency: 1.0%
+[00:12:17.820] Bootstrap failed: Phase 2 failed
+? Error: BootstrapOrchestrator initialization failed: Bootstrap failed in Phase1_CoreClasses
+Stack trace:    at VirtualMachine.InitializeWithBootstrapOrchestrator(Boolean skipExtendedSystem, String bootstrapDirectory) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80\VirtualMachine.cs:line 102
+   at VirtualMachine..ctor(Boolean skipExtendedSystem) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80\VirtualMachine.cs:line 44
+   at TestLowLevelClasses.Program.Main(String[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\TestLowLevelClasses\Program.cs:line 18

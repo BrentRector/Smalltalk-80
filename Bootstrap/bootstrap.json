@@ -1,10 +1,11 @@
 {
-  "timestamp": "2025-08-10 20:08:32",
+  "timestamp": "2025-09-15 18:14:29",
   "comments": [
-    "This is the consolidated bootstrap that replaces the old Phase 1/Phase 2 split",
-    "All classes are created with full structure and methods in a single phase",
-    "Classes are ordered with superclasses before subclasses",
-    "Generated from clean extraction of Smalltalk-80 system image"
+    "This is the consolidated bootstrap updated from corrected system image",
+    "All classes have proper inherited instance variable layouts",
+    "Method bytecodes use correct field offsets for inheritance",
+    "Generated from complete_system_final.json with field offset corrections",
+    "Updated: 2025-09-15 18:14:29"
   ],
   "classes": [
     {
@@ -22115,7 +22116,9 @@
     {
       "name": "Dictionary",
       "superclass": "Set",
-      "instanceVariables": [],
+      "instanceVariables": [
+        "tally"
+      ],
       "methods": [
         {
           "bytecode": [
@@ -27496,6 +27499,12 @@
       "name": "Class",
       "superclass": "ClassDescription",
       "instanceVariables": [
+        "superclass",
+        "methodDict",
+        "format",
+        "subclasses",
+        "instanceVariables",
+        "organization",
         "name",
         "classPool",
         "sharedPools"
@@ -29854,6 +29863,12 @@
       "name": "Metaclass",
       "classVariables": [],
       "instanceVariables": [
+        "superclass",
+        "methodDict",
+        "format",
+        "subclasses",
+        "instanceVariables",
+        "organization",
         "thisClass"
       ],
       "classMethods": [
@@ -32191,7 +32206,10 @@
     {
       "name": "MethodDictionary",
       "superclass": "IdentityDictionary",
-      "instanceVariables": [],
+      "instanceVariables": [
+        "tally",
+        "valueArray"
+      ],
       "methods": [
         {
           "bytecode": [
@@ -32244,7 +32262,9 @@
     {
       "name": "SystemDictionary",
       "superclass": "Dictionary",
-      "instanceVariables": [],
+      "instanceVariables": [
+        "tally"
+      ],
       "methods": [
         {
           "bytecode": [
@@ -36003,6 +36023,7 @@
       "name": "IdentityDictionary",
       "superclass": "Dictionary",
       "instanceVariables": [
+        "tally",
         "valueArray"
       ],
       "classVariables": [],
@@ -37171,6 +37192,7 @@
       "name": "Association",
       "superclass": "LookupKey",
       "instanceVariables": [
+        "key",
         "value"
       ],
       "methods": [

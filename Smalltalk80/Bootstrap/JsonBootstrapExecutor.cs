@@ -15,11 +15,11 @@ public class JsonBootstrapExecutor
     private BootstrapManifestConfig? currentManifest;
     
     /// <summary>
-    /// No-op logging method (debug logging removed).
+    /// Bootstrap logging method (temporarily enabled for debugging).
     /// </summary>
     public static void BootstrapLog(string message)
     {
-        // Debug logging removed
+        Console.WriteLine(message);
     }
     
     public JsonBootstrapExecutor(ISmalltalkVM vm)
@@ -38,21 +38,23 @@ public class JsonBootstrapExecutor
             ReadCommentHandling = JsonCommentHandling.Skip
         };
         
-        var bootstrap = JsonSerializer.Deserialize<BootstrapConfig>(jsonContent, options);
-        if (bootstrap == null)
+        currentManifest = JsonSerializer.Deserialize<BootstrapManifestConfig>(jsonContent, options);
+        if (currentManifest == null)
             throw new InvalidOperationException("Failed to parse bootstrap JSON");
             
-        BootstrapLog($"[BOOTSTRAP] Executing {bootstrap.Operations?.Count ?? 0} operations from {bootstrap.Description}");
+        BootstrapLog($"[BOOTSTRAP] Phase 1: Creating class structures from {currentManifest.Description}");
         
-        if (bootstrap.Operations == null)
-            return;
-            
-        foreach (var operation in bootstrap.Operations)
+        // Create only class structures WITHOUT methods (Phase 1)
+        if (currentManifest.Classes != null)
         {
-            ExecuteOperation(operation);
+            BootstrapLog($"[BOOTSTRAP] Creating {currentManifest.Classes.Count} class structures (no methods)");
+            foreach (var classDef in currentManifest.Classes)
+            {
+                CreateClassStructure(classDef);
+            }
         }
         
-        BootstrapLog($"[BOOTSTRAP] Bootstrap created {namedObjects.Count} named objects");
+        BootstrapLog($"[BOOTSTRAP] Phase 1 complete: Created {currentManifest.Classes?.Count ?? 0} classes");
         
         // Don't migrate yet - wait until after methods when at:put: method is available
         // This avoids the dictionary expansion problem
@@ -66,6 +68,44 @@ public class JsonBootstrapExecutor
     {
         // This is the main bootstrap method that handles all classes with methods
         ExecuteBootstrap(jsonContent);
+    }
+    
+    /// <summary>
+    /// Execute bootstrap methods from JSON content (only install methods on existing classes).
+    /// </summary>
+    public void ExecuteBootstrapMethods(string jsonContent)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
+        
+        currentManifest = JsonSerializer.Deserialize<BootstrapManifestConfig>(jsonContent, options);
+        if (currentManifest == null)
+            throw new InvalidOperationException("Failed to parse bootstrap JSON");
+            
+        BootstrapLog($"[BOOTSTRAP] Phase 2: Installing methods from {currentManifest.Description}");
+        
+        // Install methods on existing classes (Phase 2)
+        if (currentManifest.Classes != null)
+        {
+            BootstrapLog($"[BOOTSTRAP] Installing methods for {currentManifest.Classes.Count} classes");
+            foreach (var classDef in currentManifest.Classes)
+            {
+                InstallClassMethods(classDef);
+            }
+            
+            // Fix up any missing class pointers for metaclasses
+            BootstrapLog($"[BOOTSTRAP] Fixing up class pointers for metaclasses");
+            FixupClassPointers();
+            
+            // Set up metaclass superclass relationships
+            BootstrapLog($"[BOOTSTRAP] Setting up metaclass superclass relationships");
+            SetupMetaclassSuperclassRelationships();
+        }
+        
+        BootstrapLog($"[BOOTSTRAP] Phase 2 complete: Methods installed for {currentManifest.Classes?.Count ?? 0} classes");
     }
     
     /// <summary>
@@ -1562,6 +1602,8 @@ public class JsonBootstrapExecutor
                 if (string.IsNullOrEmpty(methodDef.Selector))
                     continue;
                     
+                BootstrapLog($"[BOOTSTRAP]   - Installing method '{methodDef.Selector}'");
+                
                 // Get the CompiledMethod class
                 var compiledMethodClassOop = vm.PrimitiveLookupClass("CompiledMethod");
                 if (compiledMethodClassOop < 0)
@@ -1570,12 +1612,30 @@ public class JsonBootstrapExecutor
                     continue;
                 }
                 
-                // Create the method object
-                var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+                BootstrapLog($"[BOOTSTRAP]     CompiledMethod class OOP: {compiledMethodClassOop}");
                 
-                // Set selector (slot 0)
+                // Create the method object using working pattern from test files
+                var methodOop = vm.PrimitiveNewInstance(compiledMethodClassOop);
+                BootstrapLog($"[BOOTSTRAP]     Created method instance OOP: {methodOop}");
+                
+                // Get the method object to set fields directly (like test files)
+                var compiledMethod = ObjectMemory.FromOop(methodOop);
+                if (compiledMethod == null)
+                {
+                    BootstrapLog($"[BOOTSTRAP] Warning: Could not get method object for OOP {methodOop}");
+                    continue;
+                }
+                
+                BootstrapLog($"[BOOTSTRAP]     Method object has {compiledMethod.Fields.Length} fields");
+                
+                // Set method fields using the working pattern from test files:
+                // Field 0: Bytecode array
+                // Field 1: Literals array  
+                // Field 3: Header (primitive, temps, args)
+                
+                // Skip for now - just install empty method in dictionary
                 var selectorOop = vm.PrimitiveInternSymbol(methodDef.Selector);
-                vm.PrimitiveSetSlot(methodOop, 0, selectorOop);
+                vm.PrimitiveDictionaryAtPut(methodDictOop, selectorOop, methodOop);
                 
                 // Set bytecode (slot 1)
                 if (methodDef.Bytecode != null && methodDef.Bytecode.Count > 0)

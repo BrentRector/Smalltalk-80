@@ -1,0 +1,93 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-15 17:54:38",
+  "classes": [
+    {
+      "name": "TestKey",
+      "superclass": "Magnitude",
+      "instanceVariables": [
+        "myKey"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Simple"
+    },
+    {
+      "name": "TestPair",
+      "superclass": "TestKey",
+      "instanceVariables": [
+        "myValue"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test-Simple"
+    }
+  ],
+  "methods": [
+    {
+      "class": "TestKey",
+      "selector": "getKey",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestKey",
+      "selector": "setKey:myKey:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestPair",
+      "selector": "getValue",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestPair",
+      "selector": "setValue:myValue:",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "isClassMethod": false
+    },
+    {
+      "class": "TestPair",
+      "selector": "getBoth",
+      "bytecode": [
+        112,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "isClassMethod": false
+    }
+  ]
+}

@@ -170,3 +170,174 @@ If validation fails:
 3. **Bytecode mismatches**: Ensure bytecode is in hex format (e.g., "40 88 68 7C") and that the extractor and validator use consistent formatting.
 
 4. **Dictionary sizing**: Run `AnalyzeDictionarySizes.ps1` to ensure Phase 1 pre-allocates sufficient capacity for Phase 2 methods.
+
+## System Image Regeneration and Field Offset Correction
+
+When changes are made to the standalone compiler that affect field offset calculation or bytecode generation, the entire system must be regenerated to ensure correctness. This is a multi-step process that must be completed in full to achieve 100% validation.
+
+### 1. Regenerate System Image JSON
+
+First, use the fixed standalone compiler to regenerate the system image JSON with corrected field offsets and bytecodes:
+
+```bash
+dotnet bin/Debug/net9.0/StandaloneCompiler.dll "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st" complete_system_final.json
+```
+
+This step:
+- Processes the original Smalltalk-80 source code with the corrected compiler
+- Generates bytecode with proper field offsets for inherited instance variables
+- Creates the canonical `complete_system_final.json` that all other processes depend on
+- Must complete without errors to proceed
+
+### 2. Update Bootstrap Configuration
+
+Extract the core bootstrap classes from the corrected system image and update bootstrap files:
+
+```powershell
+cd scripts
+pwsh UpdateBootstrapFromSystemImage.ps1
+```
+
+**Script: `UpdateBootstrapFromSystemImage.ps1`**
+- **Purpose**: Updates bootstrap.json with corrected class definitions and method bytecodes from system image
+- **Usage**: `pwsh UpdateBootstrapFromSystemImage.ps1 [-SystemImagePath "complete_system_final.json"] [-BootstrapPath "../Bootstrap/bootstrap.json"]`
+- **Function**: 
+  - Reads class definitions, instance variables, and method bytecodes from complete_system_final.json
+  - Updates class instance variable counts with complete inheritance chains
+  - Updates method dictionary sizes based on actual method counts  
+  - Updates bytecode arrays with corrected field access instructions
+  - Updates literal arrays with proper formatting
+  - Generates bootstrap_updated.json with timestamp and change comments
+
+Key classes that must be updated in bootstrap.json:
+- Object, Behavior, Class, Metaclass (core hierarchy)
+- CompiledMethod, MethodDictionary (method infrastructure) 
+- Symbol, String, Array, ByteArray (essential data types)
+- Collection, Dictionary, SystemDictionary (collection hierarchy)
+- UndefinedObject, Boolean, True, False (fundamental objects)
+- Magnitude, LookupKey, Association (supporting types)
+
+### 3. Update Low-Level Class Installation
+
+Process the system image JSON to update any low-level class installation data:
+
+```bash
+# Update extended class manifests and phase 3 data
+# Ensure all class hierarchies have correct field layouts
+# Verify that method bytecodes use proper field offsets
+```
+
+### 4. Complete Verification Process
+
+The update process is **NOT COMPLETE** until 100% verification is achieved:
+
+#### 4.1 Complete Verification Process
+```powershell
+cd scripts  
+pwsh VerifySystemImageMatches.ps1
+```
+
+**Script: `VerifySystemImageMatches.ps1`**
+- **Purpose**: Performs complete verification between interpreter-loaded classes and system image reference
+- **Usage**: `pwsh VerifySystemImageMatches.ps1 [-SystemImagePath "complete_system_final.json"] [-DumpOutput "interpreter_class_dump.txt"]`
+- **Function**:
+  - Loads all classes in interpreter with `--list-bootstrap-classes`
+  - Dumps all loaded classes with `--dump-all-classes interpreter_class_dump.txt`
+  - Parses interpreter dump to extract class information
+  - Loads system image JSON as reference specification
+  - Compares interpreter state vs system image for all core classes
+  - Generates verification_report.txt with detailed analysis
+  - Returns exit code 0 for 100% match, 1 for any mismatches
+
+This creates a detailed comparison of:
+- Class hierarchies and superclass relationships
+- Instance variable counts and field layouts  
+- Method dictionary contents and counts
+- Inherited field offset calculations
+- Object memory layout verification
+
+#### 4.4 Validation Success Criteria
+
+The update process is complete ONLY when:
+- ✅ All bootstrap classes load without errors
+- ✅ All extended classes load without errors  
+- ✅ Field access bytecodes use correct offsets
+- ✅ Instance sizes match calculated inheritance totals
+- ✅ Method dictionaries have proper capacity
+- ✅ 100% match between interpreter dump and system image JSON
+- ✅ No field offset mismatches in any class hierarchy
+- ✅ All bytecode sequences match reference specification
+
+Any mismatch requires returning to step 1 and regenerating the system image.
+
+### Field Offset Calculation Details
+
+The corrected field offset calculation follows Smalltalk-80 Blue Book specification:
+
+```
+For class hierarchy: Object -> A -> B -> C
+Where: A has fields [a1, a2]
+       B has fields [b1]  
+       C has fields [c1, c2]
+
+Instance of C has layout:
+  Offset 0: a1 (inherited from A)
+  Offset 1: a2 (inherited from A)
+  Offset 2: b1 (inherited from B)  
+  Offset 3: c1 (declared in C)
+  Offset 4: c2 (declared in C)
+```
+
+When compiling methods in class C:
+- `a1` access generates `pushInstVar: 0` 
+- `a2` access generates `pushInstVar: 1`
+- `b1` access generates `pushInstVar: 2`
+- `c1` access generates `pushInstVar: 3` 
+- `c2` access generates `pushInstVar: 4`
+
+The standalone compiler now correctly computes this full inheritance chain when generating bytecode.
+
+## Complete System Image Regeneration Workflow
+
+### Full Process Summary
+
+When field offset corrections or compiler changes are made, follow this complete workflow:
+
+```powershell
+# Step 1: Regenerate system image with corrected compiler
+dotnet bin/Debug/net9.0/StandaloneCompiler.dll "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st" complete_system_final.json
+
+# Step 2: Update bootstrap from corrected system image  
+cd scripts
+pwsh UpdateBootstrapFromSystemImage.ps1
+
+# Step 3: Copy updated bootstrap if verification succeeds
+cp ../Bootstrap/bootstrap_updated.json ../Bootstrap/bootstrap.json
+
+# Step 4: Rebuild with updated bootstrap
+cd ..
+dotnet build --no-restore
+
+# Step 5: Verify 100% compatibility 
+cd scripts
+pwsh ValidateFieldOffsets.ps1
+```
+
+### Required Scripts
+
+All scripts are located in the `scripts/` directory:
+
+1. **`UpdateBootstrapFromSystemImage.ps1`** - Updates bootstrap.json from system image
+2. **`VerifySystemImageMatches.ps1`** - Verifies 100% interpreter/system image match
+3. **`ValidateFieldOffsets.ps1`** - Validates field offset corrections are working correctly
+
+### Validation Requirements
+
+The process must achieve **100% verification** or the system is incomplete:
+- All bootstrap classes must load without errors
+- Field counts must match calculated inheritance totals  
+- Method counts must match system image specification
+- No field offset mismatches in any class hierarchy
+- Interpreter dump must match system image JSON exactly
+
+Any mismatch requires returning to Step 1 and regenerating the entire system.

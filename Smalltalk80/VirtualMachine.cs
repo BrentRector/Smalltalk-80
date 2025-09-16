@@ -99,6 +99,24 @@ public sealed class VirtualMachine
         }
         catch (Exception ex)
         {
+            // Log the full exception details for debugging
+            Console.Error.WriteLine($"BOOTSTRAP FAILURE DETAILS:");
+            Console.Error.WriteLine($"Exception Type: {ex.GetType().Name}");
+            Console.Error.WriteLine($"Message: {ex.Message}");
+            Console.Error.WriteLine($"Stack Trace: {ex.StackTrace}");
+            
+            // Check for inner exceptions
+            var innerEx = ex.InnerException;
+            int depth = 1;
+            while (innerEx != null)
+            {
+                Console.Error.WriteLine($"Inner Exception {depth}: {innerEx.GetType().Name}");
+                Console.Error.WriteLine($"Inner Message {depth}: {innerEx.Message}");
+                Console.Error.WriteLine($"Inner Stack {depth}: {innerEx.StackTrace}");
+                innerEx = innerEx.InnerException;
+                depth++;
+            }
+            
             throw new InvalidOperationException($"BootstrapOrchestrator initialization failed: {ex.Message}", ex);
         }
     }

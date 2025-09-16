@@ -34,11 +34,16 @@ class Program
                 "Set", "OrderedCollection", "Stream", "Character", "Point"
             };
             
-            string systemImagePath = "../../../complete_system_final.json";
+            string systemImagePath = "../complete_system_final.json";
             if (!System.IO.File.Exists(systemImagePath))
             {
-                Console.WriteLine($"✗ System image not found at {systemImagePath}");
-                return;
+                // Try alternate path
+                systemImagePath = "../../complete_system_final.json";
+                if (!System.IO.File.Exists(systemImagePath))
+                {
+                    Console.WriteLine($"✗ System image not found");
+                    return;
+                }
             }
             
             executor.ExecuteLowLevelClasses(systemImagePath, testClasses);

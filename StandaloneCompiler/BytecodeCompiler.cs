@@ -518,7 +518,10 @@ namespace StandaloneCompiler
             nextCascadeTemp = 0;
             scratchTempIndex = -1;
             
-            // Set up instance variables
+            // Set up instance variables with correct offsets
+            // IMPORTANT: The instanceVars list must contain ALL instance variables,
+            // including inherited ones, in the correct order (superclass vars first).
+            // The caller (SimpleCompiler) is responsible for computing the full list.
             for (int i = 0; i < instanceVars.Count; i++)
             {
                 environment.InstanceVariables[instanceVars[i]] = i;

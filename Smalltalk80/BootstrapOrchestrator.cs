@@ -83,12 +83,9 @@ public class BootstrapOrchestrator
             var bootstrapDir = ResolveBootstrapDirectory(bootstrapDirectory);
             result.BootstrapDirectory = bootstrapDir;
             
-            // Execute bootstrap phases in sequence
-            ExecutePhase1_CoreClasses(bootstrapDir);
-            result.Phase1Stats = CapturePhaseStats("Phase 1");
-            
-            ExecutePhase2_CoreMethods(bootstrapDir);
-            result.Phase2Stats = CapturePhaseStats("Phase 2");
+            // Execute consolidated bootstrap
+            ExecuteConsolidatedBootstrap(bootstrapDir);
+            result.Phase1Stats = CapturePhaseStats("Bootstrap");
             
             if (!skipExtendedSystem)
             {
@@ -116,6 +113,51 @@ public class BootstrapOrchestrator
             
             LogMessage($"Bootstrap failed: {ex.Message}");
             throw new BootstrapException($"Bootstrap failed in {currentPhase}", currentPhase.ToString(), null, ex);
+        }
+    }
+    
+    /// <summary>
+    /// Executes the consolidated bootstrap process (replaces Phase 1/Phase 2 split).
+    /// </summary>
+    /// <param name="bootstrapDir">Bootstrap directory path.</param>
+    public void ExecuteConsolidatedBootstrap(string bootstrapDir)
+    {
+        if (currentPhase != BootstrapPhase.None)
+            throw new InvalidOperationException($"Cannot execute consolidated bootstrap from current phase: {currentPhase}");
+            
+        LogMessage("Executing consolidated bootstrap");
+        
+        try
+        {
+            // Save checkpoint before starting
+            SaveCheckpoint(BootstrapPhase.None);
+            
+            // Clear object memory for fresh start
+            ObjectMemory.Reset();
+            LogMessage("Cleared VM object memory");
+            
+            // Load consolidated bootstrap file
+            var bootstrapPath = FindBootstrapFile(bootstrapDir, "bootstrap.json");
+            var jsonContent = File.ReadAllText(bootstrapPath);
+            
+            // Initialize bootstrap adapter
+            bootstrapAdapter = new VMPrimitiveAdapter(virtualMachine);
+            
+            // Execute consolidated bootstrap (creates classes and installs methods)
+            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
+            executor.ExecuteUnifiedBootstrap(jsonContent);
+            
+            // Migrate to Smalltalk dictionary now that message sends are available
+            bootstrapAdapter.CompleteBootstrapWithMessageSends();
+            
+            currentPhase = BootstrapPhase.Phase2_CoreMethods; // Mark as complete
+            SaveCheckpoint(currentPhase);
+            
+            LogMessage($"Consolidated bootstrap complete: Created {ObjectMemory.AllocatedObjectCount} objects");
+        }
+        catch (Exception ex)
+        {
+            throw new BootstrapException("Consolidated bootstrap failed", "ConsolidatedBootstrap", bootstrapDir, ex);
         }
     }
     
@@ -183,7 +225,7 @@ public class BootstrapOrchestrator
             
             // Execute method installation
             var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteUnifiedBootstrap(jsonContent);
+            executor.ExecuteBootstrapMethods(jsonContent);
             
             // Migrate to Smalltalk dictionary now that at:put: method is available
             bootstrapAdapter.CompleteBootstrapWithMessageSends();
@@ -413,37 +455,78 @@ public class BootstrapOrchestrator
     
     /// <summary>
     /// Gets the list of essential extended classes to load in Phase 3.
+    /// Classes are ordered to ensure all superclasses are created before subclasses.
     /// </summary>
     private List<string> GetEssentialExtendedClasses()
     {
         return new List<string>
         {
-            // Core system classes
-            "BlockContext", "MethodContext", "ContextPart",
-            "SmallInteger", "LargePositiveInteger", "LargeNegativeInteger", "Integer", "Number",
-            "Float", "Fraction",
+            // Missing superclass dependencies (must come first)
+            "InstructionStream",
+            "Magnitude", 
+            "Collection",
+            "SequenceableCollection",
+            "ArrayedCollection", 
+            "Link",
+            "DisplayObject",
+            "DisplayMedium",
+            "DisplayText",
             
-            // Collections
-            "Set", "IdentitySet", "Bag", "OrderedCollection", "SortedCollection",
-            "LinkedList", "Interval",
+            // Classes with no dependencies (besides Object) - topologically sorted
+            "Exception",
+            "Halt",
+            "CompilationContext",
+            "MessageNotUnderstood",
+            "Error",
+            "Stream",
+            "TextStyle",
+            "Compiler",
+            "File",
+            "Delay",
+            "FileDirectory",
+            "ProcessorScheduler",
+            "Scanner",
             
-            // Streams
-            "Stream", "PositionableStream", "ReadStream", "WriteStream", "ReadWriteStream",
+            // Classes depending on single superclasses
+            "PositionableStream", // depends on Stream
+            "ContextPart", // depends on InstructionStream  
+            "Character", // depends on Magnitude
+            "Number", // depends on Magnitude
+            "Bag", // depends on Collection
+            "Set", // depends on Collection
+            "Process", // depends on Link
+            "Parser", // depends on Scanner
             
-            // Characters and Strings
-            "Character", "Text", "Paragraph", "TextStyle",
+            // Stream hierarchy
+            "ReadStream", // depends on PositionableStream
+            "WriteStream", // depends on PositionableStream
             
-            // Processes and Scheduling
-            "Process", "ProcessorScheduler", "Semaphore", "Delay",
+            // Context hierarchy
+            "MethodContext", // depends on ContextPart
+            "BlockContext", // depends on ContextPart
             
-            // Exceptions
-            "Exception", "Error", "Halt", "MessageNotUnderstood",
+            // Number hierarchy
+            "Fraction", // depends on Number
+            "Float", // depends on Number
+            "Integer", // depends on Number
             
-            // Compiler and Parser
-            "Parser", "Scanner", "Compiler", "CompilationContext",
+            // Collection hierarchy (depends on SequenceableCollection)
+            "Interval", // depends on SequenceableCollection
+            "LinkedList", // depends on SequenceableCollection
+            "OrderedCollection", // depends on SequenceableCollection
             
-            // File System
-            "File", "FileDirectory", "FileStream",
+            // More specific classes
+            "IdentitySet", // depends on Set
+            "ReadWriteStream", // depends on WriteStream
+            "ExternalStream", // depends on ReadWriteStream - must come after ReadWriteStream
+            "LargePositiveInteger", // depends on Integer
+            "LargeNegativeInteger", // depends on Integer
+            "SmallInteger", // depends on Integer
+            "Semaphore", // depends on LinkedList
+            "SortedCollection", // depends on OrderedCollection
+            "Text", // depends on ArrayedCollection
+            "FileStream", // depends on ExternalStream
+            "Paragraph", // depends on DisplayText
             
             // Graphics (basic)
             "Point", "Rectangle", "Form", "BitBlt"

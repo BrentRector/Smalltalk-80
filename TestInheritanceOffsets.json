@@ -1,0 +1,48 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-15 17:55:03",
+  "classes": [
+    {
+      "name": "Base",
+      "superclass": "Object",
+      "instanceVariables": [
+        "var1",
+        "var2"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    },
+    {
+      "name": "Derived",
+      "superclass": "Base",
+      "instanceVariables": [
+        "var3"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    },
+    {
+      "name": "MyKey",
+      "superclass": "Magnitude",
+      "instanceVariables": [
+        "key"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    },
+    {
+      "name": "MyPair",
+      "superclass": "MyKey",
+      "instanceVariables": [
+        "value"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    }
+  ],
+  "methods": []
+}

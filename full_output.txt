@@ -1,0 +1,44 @@
+Testing Smalltalk Compiler Integration
+=======================================
+
+Test 1: Compile simple getter method
+  Success! Method compiled:
+    Selector: name
+    Bytecodes: 2 bytes
+    Literals: 1
+
+Test 2: Compile setter method with argument
+  Success! Method compiled:
+    Selector: name:
+    Bytecodes: 6 bytes
+    Literals: 1
+
+Test 3: Compile method with literals
+  Success! Method compiled:
+    Selector: initialize
+    Bytecodes: 11 bytes
+    Literals: 3
+    Bytecode sequence: 75-81-E0-00-87-21-81-E0-02-87-78
+
+Test 4: Compile method with message sends
+  Success! Method compiled:
+    Selector: displayName
+    Bytecodes: 8 bytes
+    Literals: 5
+
+Test 5: Compile doIt expression
+  Success! DoIt compiled:
+    Selector: doIt
+    Bytecodes: 4 bytes
+    Bytecode sequence: 20-21-C2-7C
+
+Test 6: Compile method with block
+  Success! Method with block compiled:
+    Selector: select:
+    Bytecodes: 34 bytes
+    Literals: 10
+
+Test 7: Register interpreter for primitives
+  Success! Interpreter registered for compiler primitives
+
+û All compiler tests passed!

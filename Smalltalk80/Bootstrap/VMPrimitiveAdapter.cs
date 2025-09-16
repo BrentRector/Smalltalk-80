@@ -28,6 +28,17 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         // Bootstrap context is only created when needed during Phase 1
         // and is deactivated after Phase 1 completes
         this.bootstrapContext = new BootstrapContext();
+        
+        // DEBUG: Track lifecycle
+        JsonBootstrapExecutor.BootstrapLog($"[DEBUG] VMPrimitiveAdapter created, smalltalkDictOop = {smalltalkDictOop}");
+    }
+    
+    /// <summary>
+    /// Debug method to get the current state of the adapter.
+    /// </summary>
+    public void DebugState(string context)
+    {
+        JsonBootstrapExecutor.BootstrapLog($"[DEBUG-STATE] {context}: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}, usesSmalltalkDictionary={usesSmalltalkDictionary}");
     }
     
     
@@ -436,34 +447,8 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (classOop < 0) return "<invalid>";
         
-        // First check if this is registered as a global
-        // During bootstrap, check temporary context
-        if (bootstrapContext != null && bootstrapContext.IsActive)
-        {
-            // Can't iterate during bootstrap phase
-            return $"<class OOP {classOop}>";
-        }
-        
-        // After bootstrap, would need to iterate Smalltalk dictionary
-        // For now, return a placeholder
-        return $"<class OOP {classOop}>";
-        
-        /* TODO: Once we have proper dictionary iteration:
-        foreach (var kvp in SmalltalkDictionary)
-        {
-            if (kvp.Value == classOop)
-            {
-                // Convert FooClass to "Foo class" for metaclasses
-                var name = kvp.Key;
-                if (name.EndsWith("Class") && name != "Class" && name != "Metaclass")
-                {
-                    return name.Substring(0, name.Length - 5) + " class";
-                }
-                return name;
-            }
-        }
-        
         // Try to get the name from the class object's name field (slot 5 for Class objects)
+        // This works during bootstrap and after
         var classObj = ObjectMemory.FromOop(classOop);
         if (classObj != null && classObj.Fields.Length > 5)
         {
@@ -477,8 +462,24 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             }
         }
         
+        // Fallback: during bootstrap, check temporary context
+        if (bootstrapContext != null && bootstrapContext.IsActive)
+        {
+            // Try to find the class name by looking it up in reverse
+            // This is less efficient but works during bootstrap
+            var tempClasses = bootstrapContext.GetTemporaryClasses();
+            foreach (var kvp in tempClasses)
+            {
+                if (kvp.Value == classOop)
+                {
+                    return kvp.Key;
+                }
+            }
+        }
+        
+        // After bootstrap, could iterate Smalltalk dictionary
+        // For now, return a placeholder
         return $"<class OOP {classOop}>";
-        */
     }
     
     /// <summary>
@@ -1007,6 +1008,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (name == "Smalltalk")
         {
             smalltalkDictOop = valueId;
+            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Tracked Smalltalk dictionary OOP: {valueId}");
         }
         // Special case: track MethodDictionary class
         else if (name == "MethodDictionary")
@@ -1084,6 +1086,9 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             var result = LookupInSmalltalkDictionary(name);
             return result;
         }
+        
+        // DEBUG: Log why lookup failed
+        JsonBootstrapExecutor.BootstrapLog($"[DEBUG] PrimitiveLookupGlobal('{name}') failed: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}");
         
         return -1;
     }
@@ -1778,6 +1783,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         
         // Get the Smalltalk dictionary OOP
         smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
+        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] CompleteBootstrap: smalltalkDictOop = {smalltalkDictOop}");
         if (smalltalkDictOop < 0)
         {
             JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
@@ -1808,7 +1814,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (smalltalkDictOop < 0)
         {
-            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): smalltalkDictOop not set");
+            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): smalltalkDictOop not set (value={smalltalkDictOop})");
+            // Try to find it by name
+            if (name == "Smalltalk")
+            {
+                // Return the dictionary itself
+                return smalltalkDictOop;
+            }
             return -1;
         }
             
