@@ -60,7 +60,7 @@ public sealed class VirtualMachine
     /// <param name="bootstrapDirectory">Optional directory containing bootstrap files.</param>
     private void InitializeWithBootstrapOrchestrator(string? bootstrapDirectory)
     {
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Starting BootstrapOrchestrator-managed bootstrap...");
+        Console.WriteLine("[BOOTSTRAP] Starting BootstrapOrchestrator-managed bootstrap...");
         
         try
         {
@@ -74,25 +74,25 @@ public sealed class VirtualMachine
             bootstrapAdapter = bootstrapOrchestrator.Adapter;
             
             // Log the results
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] BootstrapOrchestrator completed in {result.TotalTime.TotalMilliseconds:F1}ms");
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Final object count: {result.ObjectCount}");
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] GC statistics: {result.GCStats.Summary}");
+            Console.WriteLine($"[BOOTSTRAP] BootstrapOrchestrator completed in {result.TotalTime.TotalMilliseconds:F1}ms");
+            Console.WriteLine($"[BOOTSTRAP] Final object count: {result.ObjectCount}");
+            Console.WriteLine($"[BOOTSTRAP] GC statistics: {result.GCStats.Summary}");
             
             // Log phase statistics if available
             if (result.Phase1Stats != null)
             {
-                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 1: {result.Phase1Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Phase 1: {result.Phase1Stats.ObjectCount} objects");
             }
             if (result.Phase2Stats != null)
             {
-                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 2: {result.Phase2Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Phase 2: {result.Phase2Stats.ObjectCount} objects");
             }
             if (result.Phase3Stats != null)
             {
-                JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Phase 3: {result.Phase3Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Phase 3: {result.Phase3Stats.ObjectCount} objects");
             }
             
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] BootstrapOrchestrator initialization complete!");
+            Console.WriteLine("[BOOTSTRAP] BootstrapOrchestrator initialization complete!");
         }
         catch (Exception ex)
         {
@@ -129,8 +129,9 @@ public sealed class VirtualMachine
     }
     
     /// <summary>
-    /// Loads a JSON manifest file for Phase 2 bootstrap.
-    /// Automatically detects single-class vs multi-class manifest format.
+    /// Loads a JSON manifest file for additional bootstrap.
+    /// Note: This method is deprecated as Phase2Executor has been removed.
+    /// Use SystemImageBootstrapExecutor instead.
     /// </summary>
     public void LoadJsonManifest(string filePath)
     {
@@ -139,26 +140,8 @@ public sealed class VirtualMachine
             throw new FileNotFoundException($"JSON manifest file not found: {filePath}");
         }
         
-        var jsonContent = File.ReadAllText(filePath);
-        
-        if (bootstrapAdapter == null)
-        {
-            throw new InvalidOperationException("Bootstrap adapter not initialized. Bootstrap must be run first.");
-        }
-        
-        var phase2Executor = new Phase2Executor(bootstrapAdapter);
-        
-        // Detect manifest format and call appropriate method
-        if (IsSingleClassManifest(jsonContent))
-        {
-            phase2Executor.ExecuteClassManifest(jsonContent);
-        }
-        else
-        {
-            phase2Executor.ExecuteManifest(jsonContent);
-        }
-        
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Additional JSON manifest executed: {Path.GetFileName(filePath)}");
+        // This functionality has been removed with the legacy bootstrap classes
+        throw new NotSupportedException("JSON manifest loading is no longer supported. Use SystemImageBootstrapExecutor for all bootstrap operations.");
     }
     
     /// <summary>

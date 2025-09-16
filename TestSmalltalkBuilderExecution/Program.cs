@@ -56,7 +56,7 @@ public class Program
         
         // Create a real VM instance (this automatically bootstraps)
         Console.WriteLine("\nInitializing VM with bootstrap...");
-        var vm = new VirtualMachine(skipExtendedSystem: true); // Skip Phase 3 to keep it minimal
+        var vm = new VirtualMachine(); // Initialize the VM with bootstrap
         
         Console.WriteLine("VM initialized and bootstrapped successfully");
         

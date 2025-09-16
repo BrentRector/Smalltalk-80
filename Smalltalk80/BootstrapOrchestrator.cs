@@ -118,7 +118,7 @@ public class BootstrapOrchestrator
         if (currentPhase != BootstrapPhase.None)
             throw new InvalidOperationException($"Cannot execute consolidated bootstrap from current phase: {currentPhase}");
             
-        LogMessage("Executing consolidated bootstrap");
+        LogMessage("Executing clean slate system image bootstrap");
         
         try
         {
@@ -129,24 +129,32 @@ public class BootstrapOrchestrator
             ObjectMemory.Reset();
             LogMessage("Cleared VM object memory");
             
-            // Load consolidated bootstrap file
-            var bootstrapPath = FindBootstrapFile(bootstrapDir, "bootstrap.json");
-            var jsonContent = File.ReadAllText(bootstrapPath);
+            // Determine system image path (complete_system_final.json is the single source of truth)
+            var systemImagePath = Path.Combine(
+                Path.GetDirectoryName(bootstrapDir) ?? "", 
+                "complete_system_final.json");
             
-            // Initialize bootstrap adapter
+            if (!File.Exists(systemImagePath))
+            {
+                // Fallback to local system image
+                systemImagePath = "complete_system_final.json";
+                if (!File.Exists(systemImagePath))
+                {
+                    throw new FileNotFoundException($"System image not found. Tried: {systemImagePath}");
+                }
+            }
+            
+            // Create bootstrap adapter for VM operations
             bootstrapAdapter = new VMPrimitiveAdapter(virtualMachine);
             
-            // Execute consolidated bootstrap (creates classes and installs methods)
-            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteUnifiedBootstrap(jsonContent);
-            
-            // Migrate to Smalltalk dictionary now that message sends are available
-            bootstrapAdapter.CompleteBootstrapWithMessageSends();
+            // Execute clean slate bootstrap directly from system image JSON
+            var executor = new SystemImageBootstrapExecutor(virtualMachine, systemImagePath);
+            executor.ExecuteBootstrap();
             
             currentPhase = BootstrapPhase.Complete; // Mark as complete
             SaveCheckpoint(currentPhase);
             
-            LogMessage($"Consolidated bootstrap complete: Created {ObjectMemory.AllocatedObjectCount} objects");
+            LogMessage($"Clean slate bootstrap complete: Created {ObjectMemory.AllocatedObjectCount} objects");
         }
         catch (Exception ex)
         {
@@ -155,83 +163,21 @@ public class BootstrapOrchestrator
     }
     
     /// <summary>
-    /// Executes Phase 1: Core class structures without methods.
+    /// Legacy Phase 1 method - deprecated in favor of clean slate bootstrap.
     /// </summary>
-    /// <param name="bootstrapDir">Bootstrap directory path.</param>
+    [Obsolete("Use ExecuteConsolidatedBootstrap instead")]
     public void ExecutePhase1_CoreClasses(string bootstrapDir)
     {
-        if (currentPhase != BootstrapPhase.None)
-            throw new InvalidOperationException($"Cannot execute Phase 1 from current phase: {currentPhase}");
-            
-        LogMessage("Phase 1: Creating core class structures");
-        
-        try
-        {
-            // Save checkpoint before starting
-            SaveCheckpoint(BootstrapPhase.None);
-            
-            // Clear object memory for fresh start
-            ObjectMemory.Reset();
-            LogMessage("Cleared VM object memory");
-            
-            // Load bootstrap file
-            var bootstrapPath = FindBootstrapFile(bootstrapDir, "bootstrap.json", "bootstrap_phase1.json");
-            var jsonContent = File.ReadAllText(bootstrapPath);
-            
-            // Initialize bootstrap adapter
-            bootstrapAdapter = new VMPrimitiveAdapter(virtualMachine);
-            
-            // Execute core class creation
-            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteBootstrapClasses(jsonContent);
-            
-            currentPhase = BootstrapPhase.Phase1_CoreClasses;
-            SaveCheckpoint(currentPhase);
-            
-            LogMessage($"Phase 1 complete: Created {ObjectMemory.AllocatedObjectCount} objects");
-        }
-        catch (Exception ex)
-        {
-            throw new BootstrapException("Phase 1 failed", "Phase1_CoreClasses", bootstrapDir, ex);
-        }
+        throw new NotSupportedException("Legacy Phase 1 bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for clean slate bootstrap.");
     }
     
     /// <summary>
-    /// Executes Phase 2: Install methods on core classes.
+    /// Legacy Phase 2 method - deprecated in favor of clean slate bootstrap.
     /// </summary>
-    /// <param name="bootstrapDir">Bootstrap directory path.</param>
+    [Obsolete("Use ExecuteConsolidatedBootstrap instead")]
     public void ExecutePhase2_CoreMethods(string bootstrapDir)
     {
-        if (currentPhase != BootstrapPhase.Phase1_CoreClasses)
-            throw new InvalidOperationException($"Cannot execute Phase 2 from current phase: {currentPhase}");
-            
-        LogMessage("Phase 2: Installing methods on core classes");
-        
-        try
-        {
-            if (bootstrapAdapter == null)
-                throw new InvalidOperationException("Bootstrap adapter not initialized");
-                
-            // Load bootstrap file with methods
-            var bootstrapPath = FindBootstrapFile(bootstrapDir, "bootstrap.json", "bootstrap_phase2.json");
-            var jsonContent = File.ReadAllText(bootstrapPath);
-            
-            // Execute method installation
-            var executor = new JsonBootstrapExecutor(bootstrapAdapter);
-            executor.ExecuteBootstrapMethods(jsonContent);
-            
-            // Migrate to Smalltalk dictionary now that at:put: method is available
-            bootstrapAdapter.CompleteBootstrapWithMessageSends();
-            
-            currentPhase = BootstrapPhase.Phase2_CoreMethods;
-            SaveCheckpoint(currentPhase);
-            
-            LogMessage($"Phase 2 complete: Core system operational with {ObjectMemory.AllocatedObjectCount} objects");
-        }
-        catch (Exception ex)
-        {
-            throw new BootstrapException("Phase 2 failed", "Phase2_CoreMethods", bootstrapDir, ex);
-        }
+        throw new NotSupportedException("Legacy Phase 2 bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for clean slate bootstrap.");
     }
     
     
@@ -240,10 +186,16 @@ public class BootstrapOrchestrator
     /// </summary>
     public void CompleteBootstrap()
     {
-        if (currentPhase != BootstrapPhase.Complete)
-            throw new InvalidOperationException($"Cannot complete bootstrap from current phase: {currentPhase}");
+        // If already complete, just return - don't re-validate
+        if (currentPhase == BootstrapPhase.Complete)
+        {
+            LogMessage("Bootstrap already complete, skipping re-validation");
+            return;
+        }
             
-        LogMessage("Bootstrap already complete, performing final validation");
+        // Bootstrap can be completed from various phases
+        // (Phase1, Phase2, Phase3, or after consolidated bootstrap)
+        LogMessage("Completing bootstrap and performing validation");
         
         try
         {

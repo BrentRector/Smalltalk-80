@@ -177,11 +177,8 @@ public static class Primitives
         [172] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.EvaluateExpression,
         [173] = Smalltalk80.Primitives.Compiler.CompilerPrimitives.ParseMethodToAst,
         
-        // Legacy bootstrap primitives (moved to 174-179)
-        [174] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateSubclass,
-        [175] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.CreateClassFull,
-        [176] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.InstallMethodInClass,
-        [177] = Smalltalk80.Primitives.Bootstrap.BootstrapPrimitives.NewMethodFromSource,
+        // Legacy bootstrap primitives removed - use SystemImageBootstrapExecutor instead
+        // Primitives 174-177 are no longer available
         
         // Object creation primitives for Phase 1 bootstrap
         [180] = Smalltalk80.Primitives.Bootstrap.ObjectCreationPrimitives.NewSmallInteger,

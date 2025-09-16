@@ -30,7 +30,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         this.bootstrapContext = new BootstrapContext();
         
         // DEBUG: Track lifecycle
-        JsonBootstrapExecutor.BootstrapLog($"[DEBUG] VMPrimitiveAdapter created, smalltalkDictOop = {smalltalkDictOop}");
+        Console.WriteLine($"[DEBUG] VMPrimitiveAdapter created, smalltalkDictOop = {smalltalkDictOop}");
     }
     
     /// <summary>
@@ -38,7 +38,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public void DebugState(string context)
     {
-        JsonBootstrapExecutor.BootstrapLog($"[DEBUG-STATE] {context}: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}, usesSmalltalkDictionary={usesSmalltalkDictionary}");
+        Console.WriteLine($"[DEBUG-STATE] {context}: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}, usesSmalltalkDictionary={usesSmalltalkDictionary}");
     }
     
     
@@ -613,6 +613,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     }
     
     /// <summary>
+    /// Get the integer value from a SmallInteger OOP.
+    /// </summary>
+    public int GetSmallIntegerValue(int oop)
+    {
+        return SmallIntegerValue(oop);
+    }
+    
+    /// <summary>
     /// Create a new ByteArray.
     /// </summary>
     public int PrimitiveNewByteArray(int size)
@@ -969,9 +977,8 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     public void PrimitiveInstallMethod(int classId, string selector, string sourceCode)
     {
         // For bootstrap, we don't actually install here - just log the request
-        // Actual method installation happens in JsonBootstrapExecutor.InstallClassMethods
-        // via PrimitiveDictionaryAtPut which properly maintains SmallInteger tallies
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Method {selector} requested for class {classId} (will be installed via InstallClassMethods)");
+        // Actual method installation happens via PrimitiveDictionaryAtPut which properly maintains SmallInteger tallies
+        Console.WriteLine($"[BOOTSTRAP] Method {selector} requested for class {classId} (will be installed via InstallClassMethods)");
     }
     
     /// <summary>
@@ -1008,13 +1015,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         if (name == "Smalltalk")
         {
             smalltalkDictOop = valueId;
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Tracked Smalltalk dictionary OOP: {valueId}");
+            Console.WriteLine($"[BOOTSTRAP] Tracked Smalltalk dictionary OOP: {valueId}");
         }
         // Special case: track MethodDictionary class
         else if (name == "MethodDictionary")
         {
             methodDictionaryClassOop = valueId;
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Cached MethodDictionary class OOP: {valueId}");
+            Console.WriteLine($"[BOOTSTRAP] Cached MethodDictionary class OOP: {valueId}");
         }
         
         // Phase 1: Use bootstrap context
@@ -1028,14 +1035,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                 bootstrapContext.RegisterTemporaryClass(name, valueId);
             }
             
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered temporary global '{name}' -> OOP {valueId}");
+            Console.WriteLine($"[BOOTSTRAP] Registered temporary global '{name}' -> OOP {valueId}");
         }
         // After Phase 1: Register directly in Smalltalk dictionary
         else if (smalltalkDictOop > 0)
         {
             var keySymbol = PrimitiveInternSymbol(name);
             PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, valueId);
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary -> OOP {valueId}");
+            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary -> OOP {valueId}");
         }
         else
         {
@@ -1088,7 +1095,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         }
         
         // DEBUG: Log why lookup failed
-        JsonBootstrapExecutor.BootstrapLog($"[DEBUG] PrimitiveLookupGlobal('{name}') failed: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}");
+        Console.WriteLine($"[DEBUG] PrimitiveLookupGlobal('{name}') failed: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}");
         
         return -1;
     }
@@ -1745,7 +1752,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (bootstrapContext == null || !bootstrapContext.IsActive)
         {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 already completed or not started");
+            Console.WriteLine("[BOOTSTRAP] Phase 1 already completed or not started");
             return;
         }
         
@@ -1753,7 +1760,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
         if (smalltalkDictOop < 0)
         {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
+            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
             return;
         }
         
@@ -1766,7 +1773,7 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         
         // Switch to using Smalltalk dictionary
         usesSmalltalkDictionary = true;
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Phase 1 complete. All lookups now use Smalltalk SystemDictionary.");
+        Console.WriteLine("[BOOTSTRAP] Phase 1 complete. All lookups now use Smalltalk SystemDictionary.");
     }
     
     /// <summary>
@@ -1777,21 +1784,21 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (bootstrapContext == null || !bootstrapContext.IsActive)
         {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap already completed or not started");
+            Console.WriteLine("[BOOTSTRAP] Bootstrap already completed or not started");
             return;
         }
         
         // Get the Smalltalk dictionary OOP
         smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] CompleteBootstrap: smalltalkDictOop = {smalltalkDictOop}");
+        Console.WriteLine($"[BOOTSTRAP] CompleteBootstrap: smalltalkDictOop = {smalltalkDictOop}");
         if (smalltalkDictOop < 0)
         {
-            JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
+            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
             return;
         }
         
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary...");
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Note: Dictionary at:put: is not a primitive - using VM operations");
+        Console.WriteLine("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary...");
+        Console.WriteLine("[BOOTSTRAP] Note: Dictionary at:put: is not a primitive - using VM operations");
         
         // Use primitive operations to populate the dictionary
         // Dictionary's at:put: method is implemented in Smalltalk bytecode, not as a primitive
@@ -1799,12 +1806,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         {
             var keySymbol = PrimitiveInternSymbol(name);
             PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, oop);
-            JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary");
+            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary");
         });
         
         // Switch to using Smalltalk dictionary
         usesSmalltalkDictionary = true;
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap complete. All lookups now use Smalltalk SystemDictionary.");
+        Console.WriteLine("[BOOTSTRAP] Bootstrap complete. All lookups now use Smalltalk SystemDictionary.");
     }
     
     /// <summary>
@@ -1814,7 +1821,6 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     {
         if (smalltalkDictOop < 0)
         {
-            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): smalltalkDictOop not set (value={smalltalkDictOop})");
             // Try to find it by name
             if (name == "Smalltalk")
             {
@@ -1824,41 +1830,290 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             return -1;
         }
             
-        // During migration or when symbol doesn't exist yet, create it directly
-        // to avoid circular dependency
-        if (!symbolCache.TryGetValue(name, out var keySymbol))
-        {
-            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Symbol not in cache, creating new");
-            // Create symbol directly without going through PrimitiveInternSymbol
-            var symbolClassOop = -1;
-            
-            // Try to find Symbol class in Smalltalk dictionary
-            // We can't use PrimitiveLookupClass here to avoid recursion
-            var symbolKeyForClass = symbolCache.GetValueOrDefault("Symbol", -1);
-            if (symbolKeyForClass > 0)
-            {
-                symbolClassOop = PrimitiveDictionaryAt(smalltalkDictOop, symbolKeyForClass);
-                DebugLog($"[VM] LookupInSmalltalkDictionary: Found Symbol class OOP {symbolClassOop}");
-            }
-            else
-            {
-                DebugLog($"[VM] LookupInSmalltalkDictionary: 'Symbol' key not in cache");
-            }
-            
-            SmalltalkObject? symbolClass = symbolClassOop > 0 ? ObjectMemory.FromOop(symbolClassOop) : null;
-            var symbol = new SmalltalkObject(symbolClass, 1);
-            symbol.SetField(0, name);
-            keySymbol = symbol.Oop;
-            symbolCache[name] = keySymbol;
-            DebugLog($"[VM] LookupInSmalltalkDictionary: Created symbol '{name}' with OOP {keySymbol}");
-        }
-        else
-        {
-            DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Using cached symbol OOP {keySymbol}");
-        }
-        
+        // Use PrimitiveInternSymbol which handles caching and creation properly
+        var keySymbol = PrimitiveInternSymbol(name);
         var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
-        DebugLog($"[VM] LookupInSmalltalkDictionary('{name}'): Dictionary lookup returned OOP {result}");
         return result;
     }
+
+    #region Extended Primitives for SystemImageBootstrapExecutor
+
+    /// <summary>
+    /// Create a new class with proper Smalltalk structure.
+    /// </summary>
+    public int PrimitiveNewClass(string className, int superclass, string[] instanceVariables, 
+                                string[] classVariables, string[] poolDictionaries)
+    {
+        // Create class object with proper structure
+        var classOop = PrimitiveNewClass(); // Basic class structure
+        
+        // Set class pointer (classes are instances of their metaclass)
+        var metaclassOop = CreateMetaclass(className, superclass);
+        PrimitiveSetClass(classOop, metaclassOop);
+        
+        // Initialize class structure:
+        // Slot 0: superclass
+        PrimitiveSetSlot(classOop, 0, superclass);
+        
+        // Slot 1: method dictionary (initially empty)
+        var methodDictOop = PrimitiveNewMethodDictionary(32);
+        PrimitiveSetSlot(classOop, 1, methodDictOop);
+        
+        // Slot 2: instance variables (array of symbols)
+        var instVarsOop = CreateStringArray(instanceVariables);
+        PrimitiveSetSlot(classOop, 2, instVarsOop);
+        
+        // Slot 3: class variables (dictionary)
+        var classVarsOop = CreateClassVariablesDictionary(classVariables);
+        PrimitiveSetSlot(classOop, 3, classVarsOop);
+        
+        // Slot 4: pool dictionaries
+        var poolDictsOop = CreateStringArray(poolDictionaries);
+        PrimitiveSetSlot(classOop, 4, poolDictsOop);
+        
+        // Slot 5: subclasses (initially empty set)
+        var subclassesOop = PrimitiveNewSet(8);
+        PrimitiveSetSlot(classOop, 5, subclassesOop);
+        
+        return classOop;
+    }
+
+    /// <summary>
+    /// Get the class of a class (its metaclass).
+    /// </summary>
+    public int GetClassOfClass(int classOop)
+    {
+        var classObj = ObjectMemory.FromOop(classOop);
+        if (classObj?.ClassPointer != null)
+            return classObj.ClassPointer.Oop;
+        return PrimitiveNil();
+    }
+
+    /// <summary>
+    /// Create a new compiled method from components.
+    /// </summary>
+    public int PrimitiveNewCompiledMethod(int selectorOop, int bytecodeOop, int literalsOop, int headerOop)
+    {
+        var methodOop = PrimitiveNewInstance(PrimitiveLookupClass("CompiledMethod"));
+        
+        // CompiledMethod structure:
+        // Slot 0: selector
+        PrimitiveSetSlot(methodOop, 0, selectorOop);
+        
+        // Slot 1: bytecode
+        PrimitiveSetSlot(methodOop, 1, bytecodeOop);
+        
+        // Slot 2: literals
+        PrimitiveSetSlot(methodOop, 2, literalsOop);
+        
+        // Slot 3: header
+        PrimitiveSetSlot(methodOop, 3, headerOop);
+        
+        return methodOop;
+    }
+
+    /// <summary>
+    /// Create a new method dictionary.
+    /// </summary>
+    public int PrimitiveNewMethodDictionary(int capacity)
+    {
+        var methodDictOop = PrimitiveNewArray(capacity);
+        
+        // Set class to MethodDictionary if available
+        if (methodDictionaryClassOop == -1)
+        {
+            methodDictionaryClassOop = PrimitiveLookupClass("MethodDictionary");
+        }
+        
+        if (methodDictionaryClassOop > 0)
+        {
+            PrimitiveSetClass(methodDictOop, methodDictionaryClassOop);
+        }
+        
+        // Initialize with tally = 0
+        var tallyOop = PrimitiveNewSmallInteger(0);
+        PrimitiveArrayAtPut(methodDictOop, 0, tallyOop);
+        
+        // Initialize remaining slots to nil
+        var nilOop = PrimitiveNil();
+        for (int i = 1; i < capacity; i++)
+        {
+            PrimitiveArrayAtPut(methodDictOop, i, nilOop);
+        }
+        
+        return methodDictOop;
+    }
+
+    /// <summary>
+    /// Create a new set collection.
+    /// </summary>
+    public int PrimitiveNewSet(int capacity)
+    {
+        var setOop = PrimitiveNewArray(capacity + 1); // +1 for tally
+        
+        // Set class to Set if available
+        var setClassOop = PrimitiveLookupClass("Set");
+        if (setClassOop > 0)
+        {
+            PrimitiveSetClass(setOop, setClassOop);
+        }
+        
+        // Initialize with tally = 0
+        var tallyOop = PrimitiveNewSmallInteger(0);
+        PrimitiveArrayAtPut(setOop, 0, tallyOop);
+        
+        return setOop;
+    }
+
+    /// <summary>
+    /// Create a new dictionary.
+    /// </summary>
+    public int PrimitiveNewDictionary(int capacity)
+    {
+        var dictOop = PrimitiveNewArray(capacity);
+        
+        // Set class to Dictionary if available
+        var dictClassOop = PrimitiveLookupClass("Dictionary");
+        if (dictClassOop > 0)
+        {
+            PrimitiveSetClass(dictOop, dictClassOop);
+        }
+        
+        // Initialize with tally = 0
+        var tallyOop = PrimitiveNewSmallInteger(0);
+        PrimitiveArrayAtPut(dictOop, 0, tallyOop);
+        
+        return dictOop;
+    }
+
+    /// <summary>
+    /// Get the method dictionary of a class.
+    /// </summary>
+    public int GetClassMethodDictionary(int classOop)
+    {
+        return GetSlot(classOop, 1);
+    }
+
+    /// <summary>
+    /// Set the method dictionary of a class.
+    /// </summary>
+    public void SetClassMethodDictionary(int classOop, int methodDictOop)
+    {
+        PrimitiveSetSlot(classOop, 1, methodDictOop);
+    }
+
+    /// <summary>
+    /// Install a method in a method dictionary.
+    /// </summary>
+    public void MethodDictionaryAtPut(int methodDictOop, int selectorOop, int methodOop)
+    {
+        // Simple linear probe implementation for MethodDictionary
+        var capacity = GetArraySize(methodDictOop);
+        var tallyOop = GetSlot(methodDictOop, 0);
+        var currentTally = IsSmallInteger(tallyOop) ? SmallIntegerValue(tallyOop) : 0;
+
+        // Find slot using hash of selector
+        var hash = Math.Abs(GetObjectHashCode(selectorOop)) % ((capacity - 1) / 2);
+        var startIndex = 1 + (hash * 2);
+
+        for (int probe = 0; probe < capacity / 2; probe++)
+        {
+            var keyIndex = 1 + ((startIndex - 1 + probe * 2) % (capacity - 1));
+            var valueIndex = keyIndex + 1;
+
+            if (keyIndex >= capacity || valueIndex >= capacity) continue;
+
+            var existingKey = GetSlot(methodDictOop, keyIndex);
+            if (existingKey == PrimitiveNil() || existingKey == selectorOop)
+            {
+                // Found empty slot or updating existing
+                var wasEmpty = existingKey == PrimitiveNil();
+                
+                PrimitiveArrayAtPut(methodDictOop, keyIndex, selectorOop);
+                PrimitiveArrayAtPut(methodDictOop, valueIndex, methodOop);
+                
+                if (wasEmpty)
+                {
+                    // Update tally
+                    var newTallyOop = PrimitiveNewSmallInteger(currentTally + 1);
+                    PrimitiveArrayAtPut(methodDictOop, 0, newTallyOop);
+                }
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get array size.
+    /// </summary>
+    public int GetArraySize(int arrayOop)
+    {
+        var obj = ObjectMemory.FromOop(arrayOop);
+        if (obj != null)
+            return obj.Fields.Length;
+        return 0;
+    }
+
+    /// <summary>
+    /// Get object hash code for hash table operations.
+    /// </summary>
+    public int GetObjectHashCode(int oop)
+    {
+        // Simple hash based on OOP value
+        return oop.GetHashCode();
+    }
+
+    #endregion
+
+    #region Helper Methods for Class Creation
+
+    private int CreateMetaclass(string className, int superclass)
+    {
+        // Create metaclass for the class
+        var metaclassOop = PrimitiveNewMetaclass();
+        
+        // Metaclass structure is similar to class
+        // For simplicity, we'll set it up minimally
+        PrimitiveSetSlot(metaclassOop, 0, superclass); // superclass
+        
+        var methodDictOop = PrimitiveNewMethodDictionary(16);
+        PrimitiveSetSlot(metaclassOop, 1, methodDictOop); // method dictionary
+        
+        return metaclassOop;
+    }
+
+    private int CreateStringArray(string[] strings)
+    {
+        var arrayOop = PrimitiveNewArray(strings.Length);
+        
+        for (int i = 0; i < strings.Length; i++)
+        {
+            var stringOop = PrimitiveInternSymbol(strings[i]);
+            PrimitiveArrayAtPut(arrayOop, i, stringOop);
+        }
+        
+        return arrayOop;
+    }
+
+    private int CreateClassVariablesDictionary(string[] classVars)
+    {
+        if (classVars.Length == 0)
+        {
+            return PrimitiveNil();
+        }
+        
+        var dictOop = PrimitiveNewDictionary(classVars.Length * 2 + 1);
+        
+        // Add each class variable with nil value
+        foreach (var varName in classVars)
+        {
+            var varSymbol = PrimitiveInternSymbol(varName);
+            var nilOop = PrimitiveNil();
+            // TODO: Add to dictionary (implement dictionary at:put:)
+        }
+        
+        return dictOop;
+    }
+
+    #endregion
 }

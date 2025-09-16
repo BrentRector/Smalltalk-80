@@ -138,7 +138,7 @@ internal sealed class BootstrapContext
         if (!isActive)
             return;
 
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Migrating temporary bootstrap dictionaries to Smalltalk SystemDictionary...");
+        Console.WriteLine("[BOOTSTRAP] Migrating temporary bootstrap dictionaries to Smalltalk SystemDictionary...");
         
         // Migrate all globals to Smalltalk dictionary
         foreach (var kvp in temporaryGlobals)
@@ -154,7 +154,7 @@ internal sealed class BootstrapContext
             registerInSmalltalk(kvp.Key, kvp.Value);
         }
         
-        JsonBootstrapExecutor.BootstrapLog($"[BOOTSTRAP] Migrated {temporaryGlobals.Count} globals and {temporaryClasses.Count} classes");
+        Console.WriteLine($"[BOOTSTRAP] Migrated {temporaryGlobals.Count} globals and {temporaryClasses.Count} classes");
         
         // Clear and deactivate
         temporaryGlobals.Clear();
@@ -162,7 +162,7 @@ internal sealed class BootstrapContext
         temporarySymbols.Clear();
         isActive = false;
         
-        JsonBootstrapExecutor.BootstrapLog("[BOOTSTRAP] Bootstrap context deactivated. All lookups now use Smalltalk SystemDictionary.");
+        Console.WriteLine("[BOOTSTRAP] Bootstrap context deactivated. All lookups now use Smalltalk SystemDictionary.");
     }
 
     /// <summary>

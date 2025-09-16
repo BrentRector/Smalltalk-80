@@ -1,0 +1,239 @@
+#!/usr/bin/env pwsh
+# ValidateConsolidatedBootstrap.ps1 - Validate consolidated bootstrap against system image
+
+param(
+    [string[]]$Classes = @("Object", "Behavior", "Class", "Symbol", "String", "Array", "Dictionary", "CompiledMethod", 
+                          "OrderedCollection", "Scanner", "Parser", "Compiler", "Float", "Integer")
+)
+
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "Consolidated Bootstrap Validation" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Change to project root
+$projectRoot = Split-Path $PSScriptRoot -Parent
+Push-Location $projectRoot
+
+try {
+    # Ensure output directory exists
+    New-Item -Path "temp/validation" -ItemType Directory -Force | Out-Null
+    
+    # Build projects
+    Write-Host "Building projects..." -ForegroundColor Yellow
+    dotnet build --no-restore *>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed"
+    }
+    Write-Host "✓ Build complete" -ForegroundColor Green
+    Write-Host ""
+    
+    $validationResults = @()
+    
+    foreach ($className in $Classes) {
+        Write-Host "Validating $className..." -ForegroundColor Yellow
+        
+        $result = @{
+            Class = $className
+            BootstrapMethods = @{}
+            ExtractedMethods = @{}
+            Matches = @()
+            Mismatches = @()
+            Missing = @()
+            Extra = @()
+        }
+        
+        # Step 1: Get bootstrap bytecode from consolidated bootstrap
+        Write-Host "  Getting consolidated bootstrap state..." -ForegroundColor Gray
+        $bootstrapOutput = & dotnet bin/Debug/net9.0/Smalltalk80.Interpreter.dll --inspect-class $className 2>&1
+        $bootstrapFile = "temp/validation/${className}_bootstrap.txt"
+        $bootstrapOutput | Out-File -FilePath $bootstrapFile -Encoding UTF8
+        
+        # Parse bootstrap methods and bytecode
+        $inMethod = $false
+        $currentMethod = ""
+        $currentBytecode = @()
+        
+        foreach ($line in $bootstrapOutput) {
+            # Method name (two spaces indent) - can be alphanumeric or operators
+            if ($line -match '^\s{2}([^:\s][\S]*)\s*$' -and $line -notmatch '^\s*-+\s*$') {
+                # Skip if it looks like bytecode
+                if ($matches[1] -match '^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})+$') {
+                    continue
+                }
+                if ($inMethod -and $currentMethod) {
+                    if ($currentBytecode -is [string]) {
+                        $result.BootstrapMethods[$currentMethod] = $currentBytecode
+                    } else {
+                        $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
+                        $result.BootstrapMethods[$currentMethod] = $hexBytes -join " "
+                    }
+                }
+                $currentMethod = $matches[1]
+                $currentBytecode = @()
+                $inMethod = $true
+            }
+            # Bytecode array (decimal format with brackets)
+            elseif ($inMethod -and $line -match '^\s+Bytecode:\s+\[([^\]]+)\]') {
+                $bytecodeStr = $matches[1]
+                if ($bytecodeStr.Trim()) {
+                    $currentBytecode = $bytecodeStr -split ',\s*' | ForEach-Object { [int]$_.Trim() }
+                }
+            }
+            # Bytecode hex format (no brackets)
+            elseif ($inMethod -and $line -match '^\s+Bytecode:\s+([0-9A-Fa-f\s]+)\s*$') {
+                $bytecodeStr = $matches[1]
+                if ($bytecodeStr.Trim()) {
+                    $currentBytecode = $bytecodeStr.Trim()
+                }
+            }
+        }
+        # Save last method
+        if ($inMethod -and $currentMethod) {
+            if ($currentBytecode -is [string]) {
+                $result.BootstrapMethods[$currentMethod] = $currentBytecode
+            } else {
+                $hexBytes = $currentBytecode | ForEach-Object { "{0:X2}" -f $_ }
+                $result.BootstrapMethods[$currentMethod] = $hexBytes -join " "
+            }
+        }
+        
+        Write-Host "    Found $($result.BootstrapMethods.Count) methods in consolidated bootstrap" -ForegroundColor Gray
+        
+        # Step 2: Extract class from system image  
+        Write-Host "  Extracting from system image..." -ForegroundColor Gray
+        $extractOutput = & dotnet bin/Debug/net9.0/Smalltalk80.ExtractClass.dll `
+            --class $className `
+            --output "temp/validation" `
+            2>&1
+        
+        $jsonFile = "temp/validation/${className}.json"
+        if (Test-Path $jsonFile) {
+            $extractedData = Get-Content $jsonFile -Raw | ConvertFrom-Json
+            
+            # Get instance methods from extracted data
+            if ($extractedData.methods) {
+                foreach ($method in $extractedData.methods) {
+                    if (-not $method.isClassMethod) {  # Only instance methods for now
+                        $bytecodeStr = ""
+                        if ($method.bytecode) {
+                            if ($method.bytecode -is [array]) {
+                                $hexBytes = $method.bytecode | ForEach-Object { "{0:X2}" -f [int]$_ }
+                                $bytecodeStr = $hexBytes -join " "
+                            }
+                            elseif ($method.bytecode -is [string]) {
+                                $bytecodeStr = ($method.bytecode -split '\s+' | Where-Object { $_ }) -join " "
+                            }
+                        }
+                        # Validate selector is not bytecode
+                        if ($method.selector -notmatch '^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})+$') {
+                            $result.ExtractedMethods[$method.selector] = $bytecodeStr
+                        }
+                    }
+                }
+            }
+            
+            Write-Host "    Found $($result.ExtractedMethods.Count) methods in extraction" -ForegroundColor Gray
+        } else {
+            Write-Host "    ✗ Extraction failed" -ForegroundColor Red
+        }
+        
+        # Step 3: Compare methods
+        foreach ($entry in $result.BootstrapMethods.GetEnumerator()) {
+            $selector = $entry.Key
+            if ($result.ExtractedMethods.ContainsKey($selector)) {
+                $bootstrapBytes = $result.BootstrapMethods[$selector]
+                $extractedBytes = $result.ExtractedMethods[$selector]
+                
+                if ($bootstrapBytes -eq $extractedBytes) {
+                    $result.Matches += $selector
+                } else {
+                    $result.Mismatches += @{
+                        Method = $selector
+                        Bootstrap = $bootstrapBytes
+                        Extracted = $extractedBytes
+                    }
+                }
+            } else {
+                $result.Extra += $selector
+            }
+        }
+        
+        foreach ($entry in $result.ExtractedMethods.GetEnumerator()) {
+            $selector = $entry.Key
+            if (-not $result.BootstrapMethods.ContainsKey($selector)) {
+                $result.Missing += $selector
+            }
+        }
+        
+        # Display result
+        if ($result.Matches.Count -eq $result.BootstrapMethods.Count -and 
+            $result.Matches.Count -eq $result.ExtractedMethods.Count) {
+            Write-Host "  ✓ VALID: All $($result.Matches.Count) methods match" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠ ISSUES FOUND:" -ForegroundColor Yellow
+            if ($result.Matches.Count -gt 0) {
+                Write-Host "    ✓ Matching: $($result.Matches.Count)" -ForegroundColor Green
+            }
+            if ($result.Mismatches.Count -gt 0) {
+                Write-Host "    ✗ Bytecode mismatches: $($result.Mismatches.Count)" -ForegroundColor Red
+                foreach ($mismatch in $result.Mismatches | Select-Object -First 3) {
+                    Write-Host "      - $($mismatch.Method)" -ForegroundColor Red
+                    $bs = if ($mismatch.Bootstrap.Length -gt 30) { $mismatch.Bootstrap.Substring(0,30) + "..." } else { $mismatch.Bootstrap }
+                    $ex = if ($mismatch.Extracted.Length -gt 30) { $mismatch.Extracted.Substring(0,30) + "..." } else { $mismatch.Extracted }
+                    Write-Host "        Bootstrap:  [$bs]" -ForegroundColor Gray
+                    Write-Host "        Extracted:  [$ex]" -ForegroundColor Gray
+                }
+            }
+            if ($result.Missing.Count -gt 0) {
+                Write-Host "    - Missing from bootstrap: $($result.Missing -join ', ')" -ForegroundColor Yellow
+            }
+            if ($result.Extra.Count -gt 0) {
+                Write-Host "    - Extra in bootstrap: $($result.Extra -join ', ')" -ForegroundColor Yellow
+            }
+        }
+        
+        $validationResults += $result
+        Write-Host ""
+    }
+    
+    # Summary
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host "Summary" -ForegroundColor Cyan
+    Write-Host "============================================" -ForegroundColor Cyan
+    
+    $totalClasses = $validationResults.Count
+    $validClasses = ($validationResults | Where-Object { 
+        $_.Matches.Count -eq $_.BootstrapMethods.Count -and 
+        $_.Matches.Count -eq $_.ExtractedMethods.Count 
+    }).Count
+    
+    Write-Host "Classes analyzed: $totalClasses" -ForegroundColor Yellow
+    Write-Host "Fully valid: $validClasses" -ForegroundColor $(if ($validClasses -eq $totalClasses) { "Green" } else { "Yellow" })
+    
+    $totalMethods = ($validationResults | ForEach-Object { $_.BootstrapMethods.Count } | Measure-Object -Sum).Sum
+    $matchingMethods = ($validationResults | ForEach-Object { $_.Matches.Count } | Measure-Object -Sum).Sum
+    
+    Write-Host "Total methods: $totalMethods" -ForegroundColor Yellow
+    Write-Host "Matching bytecode: $matchingMethods" -ForegroundColor $(if ($matchingMethods -eq $totalMethods) { "Green" } else { "Yellow" })
+    
+    $matchPercentage = if ($totalMethods -gt 0) { [math]::Round(($matchingMethods / $totalMethods) * 100, 1) } else { 0 }
+    Write-Host "Match percentage: $matchPercentage%" -ForegroundColor $(if ($matchPercentage -eq 100) { "Green" } else { "Yellow" })
+    
+    if ($validClasses -eq $totalClasses) {
+        Write-Host ""
+        Write-Host "✅ VALIDATION PASSED - All classes have matching bytecode!" -ForegroundColor Green
+        Write-Host "Consolidated bootstrap maintains 100% compatibility!" -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "⚠️ VALIDATION INCOMPLETE - Some differences found" -ForegroundColor Yellow
+        Write-Host "Check temp/validation/ for detailed output files" -ForegroundColor Gray
+    }
+    
+} catch {
+    Write-Host "Error: $_" -ForegroundColor Red
+    Write-Host "Stack trace: $($_.Exception.StackTrace)" -ForegroundColor Gray
+    exit 1
+} finally {
+    Pop-Location
+}
