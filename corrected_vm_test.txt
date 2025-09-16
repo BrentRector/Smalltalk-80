@@ -1,0 +1,4 @@
+Smalltalk-80 Class Extractor
+=============================
+
+Unknown option: --verbose-level

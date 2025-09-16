@@ -1,0 +1,308 @@
+# VM System Comparison Report
+
+Generated at: D:\Users\brent\OneDrive\Src\Smalltalk-80
+Bootstrap JSON: 34 classes
+System JSON: 223 classes
+
+## Bootstrap Log Analysis
+
+- Bootstrap phases: 6
+- Class creation attempts: 80
+- Failed class creations: 42
+- Methods installed: 1064
+- Failed method installations: 1064
+- Object counts by phase:
+  - None: 0 objects
+  - Phase1_CoreClasses: 0 objects
+  - Phase2_CoreMethods: 3717 objects
+  - Phase3_ExtendedSystem: 3745 objects
+
+### Failed Class Creations
+
+- BlockContext: Superclass ContextPart not found
+- MethodContext: Superclass ContextPart not found
+- ContextPart: Superclass InstructionStream not found
+- SmallInteger: Superclass Integer not found
+- LargePositiveInteger: Superclass Integer not found
+- LargeNegativeInteger: Superclass Integer not found
+- Integer: Superclass Number not found
+- Float: Superclass Number not found
+- Fraction: Superclass Number not found
+- IdentitySet: Superclass Set not found
+- SortedCollection: Superclass OrderedCollection not found
+- PositionableStream: Superclass Stream not found
+- ReadStream: Superclass PositionableStream not found
+- WriteStream: Superclass PositionableStream not found
+- ReadWriteStream: Superclass WriteStream not found
+- Paragraph: Superclass DisplayText not found
+- Process: Superclass Link not found
+- Semaphore: Superclass LinkedList not found
+- Parser: Superclass Scanner not found
+- FileStream: Superclass ExternalStream not found
+- Form: Superclass DisplayMedium not found
+- BlockContext: Superclass ContextPart not found
+- MethodContext: Superclass ContextPart not found
+- ContextPart: Superclass InstructionStream not found
+- SmallInteger: Superclass Integer not found
+- LargePositiveInteger: Superclass Integer not found
+- LargeNegativeInteger: Superclass Integer not found
+- Integer: Superclass Number not found
+- Float: Superclass Number not found
+- Fraction: Superclass Number not found
+- IdentitySet: Superclass Set not found
+- SortedCollection: Superclass OrderedCollection not found
+- PositionableStream: Superclass Stream not found
+- ReadStream: Superclass PositionableStream not found
+- WriteStream: Superclass PositionableStream not found
+- ReadWriteStream: Superclass WriteStream not found
+- Paragraph: Superclass DisplayText not found
+- Process: Superclass Link not found
+- Semaphore: Superclass LinkedList not found
+- Parser: Superclass Scanner not found
+- FileStream: Superclass ExternalStream not found
+- Form: Superclass DisplayMedium not found
+
+## Overall Statistics
+
+- Bootstrap classes: 34
+- System classes: 223
+- Common classes: 34
+- Perfect matches: 34
+- Structural matches: 0
+- Mismatches: 0
+- Bootstrap-only classes: 0
+- System-only classes: 189
+
+**Perfect Match Rate: 100.0%**
+
+## Perfect Matches
+
+These classes match exactly between bootstrap and system:
+
+- **Array**: 6 methods
+- **ArrayedCollection**: 11 methods
+- **Association**: 5 methods
+- **Behavior**: 116 methods
+- **Boolean**: 15 methods
+- **ByteArray**: 12 methods
+- **Class**: 39 methods
+- **ClassDescription**: 55 methods
+- **ClassOrganizer**: 28 methods
+- **Collection**: 35 methods
+- **CompiledMethod**: 48 methods
+- **ContextPart**: 59 methods
+- **Dictionary**: 37 methods
+- **False**: 10 methods
+- **IdentityDictionary**: 16 methods
+- **InstructionStream**: 16 methods
+- **Integer**: 64 methods
+- **LookupKey**: 8 methods
+- **Magnitude**: 10 methods
+- **Metaclass**: 26 methods
+- **MethodDictionary**: 2 methods
+- **Number**: 51 methods
+- **Object**: 84 methods
+- **PositionableStream**: 20 methods
+- **ReadStream**: 4 methods
+- **SequenceableCollection**: 33 methods
+- **Set**: 21 methods
+- **Stream**: 10 methods
+- **String**: 44 methods
+- **Symbol**: 31 methods
+- **SystemDictionary**: 71 methods
+- **True**: 10 methods
+- **UndefinedObject**: 9 methods
+- **WriteStream**: 23 methods
+
+## System-Only Classes
+
+- **ActionMenu**: 5 methods
+- **AltoFile**: 24 methods
+- **AltoFileAddressArray**: 4 methods
+- **AltoFileDirectory**: 32 methods
+- **AltoFilePage**: 13 methods
+- **AlwaysAcceptCodeController**: 1 methods
+- **Arc**: 11 methods
+- **AssignmentNode**: 8 methods
+- **Bag**: 13 methods
+- **Benchmark**: 81 methods
+- **BinaryChoice**: 13 methods
+- **BinaryChoiceController**: 3 methods
+- **BinaryChoiceView**: 4 methods
+- **BitBlt**: 31 methods
+- **BitEditor**: 21 methods
+- **BlockContext**: 25 methods
+- **BlockNode**: 25 methods
+- **BooleanView**: 3 methods
+- **Browser**: 79 methods
+- **BrowserView**: 16 methods
+- **Button**: 3 methods
+- **CRFillInTheBlankController**: 4 methods
+- **CascadeNode**: 4 methods
+- **Change**: 18 methods
+- **ChangeController**: 1 methods
+- **ChangeList**: 53 methods
+- **ChangeListController**: 24 methods
+- **ChangeListView**: 15 methods
+- **ChangeScanner**: 12 methods
+- **ChangeSet**: 30 methods
+- **Character**: 35 methods
+- **CharacterBlock**: 13 methods
+- **CharacterBlockScanner**: 12 methods
+- **CharacterScanner**: 5 methods
+- **Checker**: 36 methods
+- **Circle**: 5 methods
+- **ClassCategoryReader**: 3 methods
+- **ClassChange**: 0 methods
+- **ClassCommentChange**: 3 methods
+- **ClassDefinitionChange**: 4 methods
+- **ClassOtherChange**: 4 methods
+- **ClassRelatedChange**: 5 methods
+- **CodeController**: 6 methods
+- **CodeView**: 5 methods
+- **Compiler**: 15 methods
+- **CompositionScanner**: 12 methods
+- **ContextInspector**: 8 methods
+- **ControlManager**: 23 methods
+- **Controller**: 19 methods
+- **Cursor**: 25 methods
+- **Curve**: 4 methods
+- **Date**: 40 methods
+- **Debugger**: 37 methods
+- **Decompiler**: 32 methods
+- **DecompilerConstructor**: 18 methods
+- **Delay**: 23 methods
+- **DictionaryInspector**: 11 methods
+- **DisplayBitmap**: 0 methods
+- **DisplayMedium**: 24 methods
+- **DisplayObject**: 27 methods
+- **DisplayScanner**: 13 methods
+- **DisplayScreen**: 6 methods
+- **DisplayText**: 21 methods
+- **DisplayTextView**: 24 methods
+- **Encoder**: 35 methods
+- **Explainer**: 15 methods
+- **ExternalStream**: 17 methods
+- **File**: 45 methods
+- **FileDirectory**: 58 methods
+- **FileList**: 19 methods
+- **FileModel**: 15 methods
+- **FilePage**: 49 methods
+- **FileStream**: 52 methods
+- **FillInTheBlank**: 14 methods
+- **FillInTheBlankController**: 5 methods
+- **FillInTheBlankView**: 6 methods
+- **Float**: 45 methods
+- **Form**: 72 methods
+- **FormButtonCache**: 8 methods
+- **FormEditor**: 55 methods
+- **FormHolderView**: 8 methods
+- **FormMenuController**: 4 methods
+- **FormMenuView**: 10 methods
+- **FormView**: 15 methods
+- **Fraction**: 20 methods
+- **IdentitySet**: 1 methods
+- **IndicatorOnSwitchController**: 1 methods
+- **InfiniteForm**: 5 methods
+- **InputSensor**: 34 methods
+- **InputState**: 19 methods
+- **Inspector**: 20 methods
+- **InspectorView**: 4 methods
+- **InstructionPrinter**: 23 methods
+- **Interval**: 22 methods
+- **KeyboardEvent**: 7 methods
+- **LargeNegativeInteger**: 12 methods
+- **LargePositiveInteger**: 28 methods
+- **LeafNode**: 13 methods
+- **Line**: 9 methods
+- **LinearFit**: 3 methods
+- **Link**: 3 methods
+- **LinkedList**: 11 methods
+- **ListController**: 11 methods
+- **ListView**: 30 methods
+- **LiteralDictionary**: 1 methods
+- **LiteralNode**: 2 methods
+- **LockedListController**: 3 methods
+- **LockedSwitchController**: 1 methods
+- **MappedCollection**: 14 methods
+- **Message**: 8 methods
+- **MessageNode**: 34 methods
+- **MessageTally**: 29 methods
+- **MetaclassForMultipleInheritance**: 5 methods
+- **MethodChange**: 5 methods
+- **MethodContext**: 10 methods
+- **MethodDefinitionChange**: 12 methods
+- **MethodDescription**: 14 methods
+- **MethodListBrowser**: 7 methods
+- **MethodNode**: 9 methods
+- **MethodOtherChange**: 4 methods
+- **MouseMenuController**: 11 methods
+- **NoController**: 3 methods
+- **NotifierController**: 7 methods
+- **NotifierView**: 11 methods
+- **OneOnSwitch**: 7 methods
+- **OnlyWhenSelectedCodeController**: 1 methods
+- **OnlyWhenSelectedCodeView**: 4 methods
+- **OpaqueForm**: 17 methods
+- **OrderedCollection**: 42 methods
+- **OtherChange**: 5 methods
+- **Paragraph**: 88 methods
+- **ParagraphEditor**: 73 methods
+- **ParseNode**: 30 methods
+- **ParseStack**: 6 methods
+- **Parser**: 36 methods
+- **Path**: 29 methods
+- **Pen**: 27 methods
+- **Point**: 44 methods
+- **PopUpMenu**: 25 methods
+- **Process**: 13 methods
+- **ProcessHandle**: 12 methods
+- **ProcessorScheduler**: 24 methods
+- **Project**: 12 methods
+- **ProjectController**: 3 methods
+- **ProjectView**: 4 methods
+- **Quadrangle**: 23 methods
+- **Random**: 6 methods
+- **ReadWriteStream**: 7 methods
+- **Rectangle**: 62 methods
+- **RemoteString**: 9 methods
+- **ReturnNode**: 12 methods
+- **RunArray**: 18 methods
+- **Scanner**: 22 methods
+- **ScreenController**: 16 methods
+- **ScrollController**: 25 methods
+- **SelectionInListController**: 3 methods
+- **SelectionInListView**: 12 methods
+- **SelectorNode**: 4 methods
+- **Semaphore**: 7 methods
+- **SharedQueue**: 10 methods
+- **SmallInteger**: 43 methods
+- **SortedCollection**: 16 methods
+- **Spline**: 7 methods
+- **StandardSystemController**: 20 methods
+- **StandardSystemView**: 28 methods
+- **StrikeFont**: 30 methods
+- **StringHolder**: 13 methods
+- **StringHolderController**: 17 methods
+- **StringHolderView**: 21 methods
+- **Switch**: 17 methods
+- **SwitchController**: 13 methods
+- **SwitchView**: 26 methods
+- **SyntaxError**: 11 methods
+- **SystemOrganizer**: 5 methods
+- **SystemTracer**: 38 methods
+- **Text**: 34 methods
+- **TextCollector**: 21 methods
+- **TextCollectorController**: 4 methods
+- **TextCollectorView**: 4 methods
+- **TextController**: 7 methods
+- **TextLineInterval**: 12 methods
+- **TextList**: 5 methods
+- **TextStyle**: 49 methods
+- **TextView**: 14 methods
+- **Time**: 24 methods
+- **VariableNode**: 18 methods
+- **View**: 99 methods
+- **WindowingTransformation**: 18 methods
+- **WordArray**: 5 methods
+

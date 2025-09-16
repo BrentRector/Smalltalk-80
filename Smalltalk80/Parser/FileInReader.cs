@@ -27,7 +27,7 @@ public static class FileInReader
         parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL_EXACT_AMBIG_DETECTION;
         parser.RemoveErrorListeners();
         var fileCtx = parser.fileIn();
-        var visitor = new ClassDefBuildingVisitor();
+        var visitor = new ClassDefBuildingVisitor(input, tokens);
 
         return (FileNode)visitor.VisitFileIn(fileCtx)!;
     }

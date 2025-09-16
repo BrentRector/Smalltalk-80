@@ -1,3 +1,4 @@
+using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Smalltalk80.Generated;
 
@@ -9,6 +10,29 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
 {
+    /// <summary>
+    /// Initializes a new instance of the ClassDefBuildingVisitor.
+    /// </summary>
+    public ClassDefBuildingVisitor() : base()
+    {
+    }
+    
+    /// <summary>
+    /// Initializes a new instance with a token stream for preserving source formatting.
+    /// </summary>
+    /// <param name="tokens">The token stream to use for getting original text.</param>
+    public ClassDefBuildingVisitor(ITokenStream tokens) : base(tokens)
+    {
+    }
+    
+    /// <summary>
+    /// Initializes a new instance with both input and token streams for full source preservation.
+    /// </summary>
+    /// <param name="input">The input stream containing the original source.</param>
+    /// <param name="tokens">The token stream for token access.</param>
+    public ClassDefBuildingVisitor(ICharStream input, ITokenStream tokens) : base(input, tokens)
+    {
+    }
     /// <summary>
     /// Visit a file-in context and create a FileNode containing all chunks.
     /// </summary>
@@ -169,7 +193,27 @@ public class ClassDefBuildingVisitor : SimpleAstBuildingVisitor
         var sequence = new SequenceNode(temporaries, statements);
 
         // Extract just the method body source (not the header), and remove trailing BANG
-        var methodBodySource = body?.GetText() ?? "";
+        // Use input stream to preserve original spacing if available
+        var methodBodySource = "";
+        if (body != null)
+        {
+            if (inputStream != null)
+            {
+                // Get original text with spacing preserved from input stream
+                var interval = new Antlr4.Runtime.Misc.Interval(body.Start.StartIndex, body.Stop.StopIndex);
+                methodBodySource = inputStream.GetText(interval);
+            }
+            else if (tokenStream != null)
+            {
+                // Try token stream (but whitespace will be missing due to skip rule)
+                methodBodySource = tokenStream.GetText(body);
+            }
+            else
+            {
+                // Fallback to GetText() for backward compatibility
+                methodBodySource = body.GetText();
+            }
+        }
         if (methodBodySource.EndsWith("!"))
         {
             methodBodySource = methodBodySource.Substring(0, methodBodySource.Length - 1);

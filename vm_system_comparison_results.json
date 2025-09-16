@@ -1,0 +1,3459 @@
+{
+  "timestamp": "Smalltalk-80",
+  "bootstrap_log_info": {
+    "bootstrap_phases": [
+      {
+        "phase": "Phase 1",
+        "description": "Creating core class structures",
+        "line": 6
+      },
+      {
+        "phase": "Phase 2",
+        "description": "Installing methods on core classes",
+        "line": 11
+      },
+      {
+        "phase": "Phase 3",
+        "description": "Loading extended system classes",
+        "line": 15
+      },
+      {
+        "phase": "Phase 1",
+        "description": "Creating core class structures",
+        "line": 6
+      },
+      {
+        "phase": "Phase 2",
+        "description": "Installing methods on core classes",
+        "line": 11
+      },
+      {
+        "phase": "Phase 3",
+        "description": "Loading extended system classes",
+        "line": 15
+      }
+    ],
+    "created_classes": [
+      {
+        "name": "BlockContext",
+        "superclass": "ContextPart",
+        "line": 20
+      },
+      {
+        "name": "MethodContext",
+        "superclass": "ContextPart",
+        "line": 22
+      },
+      {
+        "name": "ContextPart",
+        "superclass": "InstructionStream",
+        "line": 24
+      },
+      {
+        "name": "SmallInteger",
+        "superclass": "Integer",
+        "line": 26
+      },
+      {
+        "name": "LargePositiveInteger",
+        "superclass": "Integer",
+        "line": 28
+      },
+      {
+        "name": "LargeNegativeInteger",
+        "superclass": "Integer",
+        "line": 30
+      },
+      {
+        "name": "Integer",
+        "superclass": "Number",
+        "line": 32
+      },
+      {
+        "name": "Number",
+        "superclass": "Magnitude",
+        "line": 34
+      },
+      {
+        "name": "Float",
+        "superclass": "Number",
+        "line": 87
+      },
+      {
+        "name": "Fraction",
+        "superclass": "Number",
+        "line": 89
+      },
+      {
+        "name": "Set",
+        "superclass": "Collection",
+        "line": 91
+      },
+      {
+        "name": "IdentitySet",
+        "superclass": "Set",
+        "line": 113
+      },
+      {
+        "name": "Bag",
+        "superclass": "Collection",
+        "line": 115
+      },
+      {
+        "name": "OrderedCollection",
+        "superclass": "SequenceableCollection",
+        "line": 130
+      },
+      {
+        "name": "SortedCollection",
+        "superclass": "OrderedCollection",
+        "line": 173
+      },
+      {
+        "name": "LinkedList",
+        "superclass": "SequenceableCollection",
+        "line": 175
+      },
+      {
+        "name": "Interval",
+        "superclass": "SequenceableCollection",
+        "line": 189
+      },
+      {
+        "name": "Stream",
+        "superclass": "Object",
+        "line": 211
+      },
+      {
+        "name": "PositionableStream",
+        "superclass": "Stream",
+        "line": 223
+      },
+      {
+        "name": "ReadStream",
+        "superclass": "PositionableStream",
+        "line": 225
+      },
+      {
+        "name": "WriteStream",
+        "superclass": "PositionableStream",
+        "line": 227
+      },
+      {
+        "name": "ReadWriteStream",
+        "superclass": "WriteStream",
+        "line": 229
+      },
+      {
+        "name": "Character",
+        "superclass": "Magnitude",
+        "line": 231
+      },
+      {
+        "name": "Text",
+        "superclass": "ArrayedCollection",
+        "line": 258
+      },
+      {
+        "name": "Paragraph",
+        "superclass": "DisplayText",
+        "line": 287
+      },
+      {
+        "name": "TextStyle",
+        "superclass": "Object",
+        "line": 289
+      },
+      {
+        "name": "Process",
+        "superclass": "Link",
+        "line": 339
+      },
+      {
+        "name": "ProcessorScheduler",
+        "superclass": "Object",
+        "line": 341
+      },
+      {
+        "name": "Semaphore",
+        "superclass": "LinkedList",
+        "line": 363
+      },
+      {
+        "name": "Delay",
+        "superclass": "Object",
+        "line": 365
+      },
+      {
+        "name": "Parser",
+        "superclass": "Scanner",
+        "line": 384
+      },
+      {
+        "name": "Scanner",
+        "superclass": "Object",
+        "line": 386
+      },
+      {
+        "name": "Compiler",
+        "superclass": "Object",
+        "line": 408
+      },
+      {
+        "name": "File",
+        "superclass": "Object",
+        "line": 421
+      },
+      {
+        "name": "FileDirectory",
+        "superclass": "Object",
+        "line": 467
+      },
+      {
+        "name": "FileStream",
+        "superclass": "ExternalStream",
+        "line": 520
+      },
+      {
+        "name": "Point",
+        "superclass": "Object",
+        "line": 522
+      },
+      {
+        "name": "Rectangle",
+        "superclass": "Object",
+        "line": 568
+      },
+      {
+        "name": "Form",
+        "superclass": "DisplayMedium",
+        "line": 625
+      },
+      {
+        "name": "BitBlt",
+        "superclass": "Object",
+        "line": 627
+      },
+      {
+        "name": "BlockContext",
+        "superclass": "ContextPart",
+        "line": 20
+      },
+      {
+        "name": "MethodContext",
+        "superclass": "ContextPart",
+        "line": 22
+      },
+      {
+        "name": "ContextPart",
+        "superclass": "InstructionStream",
+        "line": 24
+      },
+      {
+        "name": "SmallInteger",
+        "superclass": "Integer",
+        "line": 26
+      },
+      {
+        "name": "LargePositiveInteger",
+        "superclass": "Integer",
+        "line": 28
+      },
+      {
+        "name": "LargeNegativeInteger",
+        "superclass": "Integer",
+        "line": 30
+      },
+      {
+        "name": "Integer",
+        "superclass": "Number",
+        "line": 32
+      },
+      {
+        "name": "Number",
+        "superclass": "Magnitude",
+        "line": 34
+      },
+      {
+        "name": "Float",
+        "superclass": "Number",
+        "line": 87
+      },
+      {
+        "name": "Fraction",
+        "superclass": "Number",
+        "line": 89
+      },
+      {
+        "name": "Set",
+        "superclass": "Collection",
+        "line": 91
+      },
+      {
+        "name": "IdentitySet",
+        "superclass": "Set",
+        "line": 113
+      },
+      {
+        "name": "Bag",
+        "superclass": "Collection",
+        "line": 115
+      },
+      {
+        "name": "OrderedCollection",
+        "superclass": "SequenceableCollection",
+        "line": 130
+      },
+      {
+        "name": "SortedCollection",
+        "superclass": "OrderedCollection",
+        "line": 173
+      },
+      {
+        "name": "LinkedList",
+        "superclass": "SequenceableCollection",
+        "line": 175
+      },
+      {
+        "name": "Interval",
+        "superclass": "SequenceableCollection",
+        "line": 189
+      },
+      {
+        "name": "Stream",
+        "superclass": "Object",
+        "line": 211
+      },
+      {
+        "name": "PositionableStream",
+        "superclass": "Stream",
+        "line": 223
+      },
+      {
+        "name": "ReadStream",
+        "superclass": "PositionableStream",
+        "line": 225
+      },
+      {
+        "name": "WriteStream",
+        "superclass": "PositionableStream",
+        "line": 227
+      },
+      {
+        "name": "ReadWriteStream",
+        "superclass": "WriteStream",
+        "line": 229
+      },
+      {
+        "name": "Character",
+        "superclass": "Magnitude",
+        "line": 231
+      },
+      {
+        "name": "Text",
+        "superclass": "ArrayedCollection",
+        "line": 258
+      },
+      {
+        "name": "Paragraph",
+        "superclass": "DisplayText",
+        "line": 287
+      },
+      {
+        "name": "TextStyle",
+        "superclass": "Object",
+        "line": 289
+      },
+      {
+        "name": "Process",
+        "superclass": "Link",
+        "line": 339
+      },
+      {
+        "name": "ProcessorScheduler",
+        "superclass": "Object",
+        "line": 341
+      },
+      {
+        "name": "Semaphore",
+        "superclass": "LinkedList",
+        "line": 363
+      },
+      {
+        "name": "Delay",
+        "superclass": "Object",
+        "line": 365
+      },
+      {
+        "name": "Parser",
+        "superclass": "Scanner",
+        "line": 384
+      },
+      {
+        "name": "Scanner",
+        "superclass": "Object",
+        "line": 386
+      },
+      {
+        "name": "Compiler",
+        "superclass": "Object",
+        "line": 408
+      },
+      {
+        "name": "File",
+        "superclass": "Object",
+        "line": 421
+      },
+      {
+        "name": "FileDirectory",
+        "superclass": "Object",
+        "line": 467
+      },
+      {
+        "name": "FileStream",
+        "superclass": "ExternalStream",
+        "line": 520
+      },
+      {
+        "name": "Point",
+        "superclass": "Object",
+        "line": 522
+      },
+      {
+        "name": "Rectangle",
+        "superclass": "Object",
+        "line": 568
+      },
+      {
+        "name": "Form",
+        "superclass": "DisplayMedium",
+        "line": 625
+      },
+      {
+        "name": "BitBlt",
+        "superclass": "Object",
+        "line": 627
+      }
+    ],
+    "failed_classes": [
+      {
+        "name": "BlockContext",
+        "reason": "Superclass ContextPart not found",
+        "line": 21
+      },
+      {
+        "name": "MethodContext",
+        "reason": "Superclass ContextPart not found",
+        "line": 23
+      },
+      {
+        "name": "ContextPart",
+        "reason": "Superclass InstructionStream not found",
+        "line": 25
+      },
+      {
+        "name": "SmallInteger",
+        "reason": "Superclass Integer not found",
+        "line": 27
+      },
+      {
+        "name": "LargePositiveInteger",
+        "reason": "Superclass Integer not found",
+        "line": 29
+      },
+      {
+        "name": "LargeNegativeInteger",
+        "reason": "Superclass Integer not found",
+        "line": 31
+      },
+      {
+        "name": "Integer",
+        "reason": "Superclass Number not found",
+        "line": 33
+      },
+      {
+        "name": "Float",
+        "reason": "Superclass Number not found",
+        "line": 88
+      },
+      {
+        "name": "Fraction",
+        "reason": "Superclass Number not found",
+        "line": 90
+      },
+      {
+        "name": "IdentitySet",
+        "reason": "Superclass Set not found",
+        "line": 114
+      },
+      {
+        "name": "SortedCollection",
+        "reason": "Superclass OrderedCollection not found",
+        "line": 174
+      },
+      {
+        "name": "PositionableStream",
+        "reason": "Superclass Stream not found",
+        "line": 224
+      },
+      {
+        "name": "ReadStream",
+        "reason": "Superclass PositionableStream not found",
+        "line": 226
+      },
+      {
+        "name": "WriteStream",
+        "reason": "Superclass PositionableStream not found",
+        "line": 228
+      },
+      {
+        "name": "ReadWriteStream",
+        "reason": "Superclass WriteStream not found",
+        "line": 230
+      },
+      {
+        "name": "Paragraph",
+        "reason": "Superclass DisplayText not found",
+        "line": 288
+      },
+      {
+        "name": "Process",
+        "reason": "Superclass Link not found",
+        "line": 340
+      },
+      {
+        "name": "Semaphore",
+        "reason": "Superclass LinkedList not found",
+        "line": 364
+      },
+      {
+        "name": "Parser",
+        "reason": "Superclass Scanner not found",
+        "line": 385
+      },
+      {
+        "name": "FileStream",
+        "reason": "Superclass ExternalStream not found",
+        "line": 521
+      },
+      {
+        "name": "Form",
+        "reason": "Superclass DisplayMedium not found",
+        "line": 626
+      },
+      {
+        "name": "BlockContext",
+        "reason": "Superclass ContextPart not found",
+        "line": 21
+      },
+      {
+        "name": "MethodContext",
+        "reason": "Superclass ContextPart not found",
+        "line": 23
+      },
+      {
+        "name": "ContextPart",
+        "reason": "Superclass InstructionStream not found",
+        "line": 25
+      },
+      {
+        "name": "SmallInteger",
+        "reason": "Superclass Integer not found",
+        "line": 27
+      },
+      {
+        "name": "LargePositiveInteger",
+        "reason": "Superclass Integer not found",
+        "line": 29
+      },
+      {
+        "name": "LargeNegativeInteger",
+        "reason": "Superclass Integer not found",
+        "line": 31
+      },
+      {
+        "name": "Integer",
+        "reason": "Superclass Number not found",
+        "line": 33
+      },
+      {
+        "name": "Float",
+        "reason": "Superclass Number not found",
+        "line": 88
+      },
+      {
+        "name": "Fraction",
+        "reason": "Superclass Number not found",
+        "line": 90
+      },
+      {
+        "name": "IdentitySet",
+        "reason": "Superclass Set not found",
+        "line": 114
+      },
+      {
+        "name": "SortedCollection",
+        "reason": "Superclass OrderedCollection not found",
+        "line": 174
+      },
+      {
+        "name": "PositionableStream",
+        "reason": "Superclass Stream not found",
+        "line": 224
+      },
+      {
+        "name": "ReadStream",
+        "reason": "Superclass PositionableStream not found",
+        "line": 226
+      },
+      {
+        "name": "WriteStream",
+        "reason": "Superclass PositionableStream not found",
+        "line": 228
+      },
+      {
+        "name": "ReadWriteStream",
+        "reason": "Superclass WriteStream not found",
+        "line": 230
+      },
+      {
+        "name": "Paragraph",
+        "reason": "Superclass DisplayText not found",
+        "line": 288
+      },
+      {
+        "name": "Process",
+        "reason": "Superclass Link not found",
+        "line": 340
+      },
+      {
+        "name": "Semaphore",
+        "reason": "Superclass LinkedList not found",
+        "line": 364
+      },
+      {
+        "name": "Parser",
+        "reason": "Superclass Scanner not found",
+        "line": 385
+      },
+      {
+        "name": "FileStream",
+        "reason": "Superclass ExternalStream not found",
+        "line": 521
+      },
+      {
+        "name": "Form",
+        "reason": "Superclass DisplayMedium not found",
+        "line": 626
+      }
+    ],
+    "installed_methods": 1064,
+    "failed_methods": 1064,
+    "object_counts": {
+      "None": 0,
+      "Phase1_CoreClasses": 0,
+      "Phase2_CoreMethods": 3717,
+      "Phase3_ExtendedSystem": 3745
+    },
+    "errors": []
+  },
+  "comparison_results": {
+    "perfect_matches": [
+      {
+        "class_name": "Array",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 6,
+            "system_count": 6,
+            "common_count": 6,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 6,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "hashMappedBy:": "exact_match",
+              "hash": "exact_match",
+              "storeOn:": "exact_match",
+              "asArray": "exact_match",
+              "printOn:": "exact_match",
+              "isLiteral": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 6,
+          "system_methods": 6,
+          "matching_methods": 6,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ArrayedCollection",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 5,
+            "system_count": 5,
+            "common_count": 5,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 5,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "add:": "exact_match",
+              "storeOn:": "exact_match",
+              "size": "exact_match",
+              "defaultElement": "exact_match",
+              "storeElementsFrom:to:on:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 6,
+            "system_count": 6,
+            "common_count": 6,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 6,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new": "exact_match",
+              "with:with:with:with:": "exact_match",
+              "with:with:": "exact_match",
+              "new:withAll:": "exact_match",
+              "with:": "exact_match",
+              "with:with:with:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 11,
+          "system_methods": 11,
+          "matching_methods": 11,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Association",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 4,
+            "system_count": 4,
+            "common_count": 4,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 4,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "printOn:": "exact_match",
+              "value": "exact_match",
+              "key:value:": "exact_match",
+              "value:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "key:value:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 5,
+          "system_methods": 5,
+          "matching_methods": 5,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Behavior",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 115,
+            "system_count": 115,
+            "common_count": 115,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 115,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "allSharedPools": "exact_match",
+              "evaluatorClass": "exact_match",
+              "printMethodChunk:on:moveSource:toFile:": "exact_match",
+              "allInstances": "exact_match",
+              "allInstVarNames": "exact_match",
+              "methodDescriptionAt:": "exact_match",
+              "compileUnchecked:": "exact_match",
+              "subclassDefinerClass": "exact_match",
+              "compileConflictCodeFor:": "exact_match",
+              "printOn:": "exact_match",
+              "instVarNames": "exact_match",
+              "addSubclass:": "exact_match",
+              "scopeHas:ifTrue:": "exact_match",
+              "selectors": "exact_match",
+              "format:variable:words:pointers:": "exact_match",
+              "updateInheritanceTable:oldSelf:": "exact_match",
+              "instSize": "exact_match",
+              "decompilerClass": "exact_match",
+              "format": "exact_match",
+              "addSelector:withMethod:": "exact_match",
+              "basicNew": "exact_match",
+              "allSuperclasses": "exact_match",
+              "basicNew:": "exact_match",
+              "allSubclasses": "exact_match",
+              "dynamicSuperclass": "exact_match",
+              "new:": "exact_match",
+              "new": "exact_match",
+              "superclass:": "exact_match",
+              "selectorAtMethod:setClass:": "exact_match",
+              "removeSubclass:": "exact_match",
+              "sourceCodeAt:": "exact_match",
+              "compile:notifying:trailer:ifFail:": "exact_match",
+              "flushCache": "exact_match",
+              "allCallsOn:": "exact_match",
+              "browseAllAccessesTo:": "exact_match",
+              "compileAllSubclasses": "exact_match",
+              "methodDictionary:": "exact_match",
+              "superMethodDescriptionAt:": "exact_match",
+              "classVarNames": "exact_match",
+              "allAccessesTo:": "exact_match",
+              "parserClass": "exact_match",
+              "crossReference": "exact_match",
+              "allSubInstancesDo:": "exact_match",
+              "removeSelector:": "exact_match",
+              "dynamicMethodDescriptionAt:": "exact_match",
+              "recompile:": "exact_match",
+              "poolHas:ifTrue:": "exact_match",
+              "removeClass:selector:in:": "exact_match",
+              "defaultSelectorForMethod:": "exact_match",
+              "whichSelectorsAccess:": "exact_match",
+              "sourceCodeTemplate": "exact_match",
+              "insertClass:selector:in:": "exact_match",
+              "allVarNamesSelect:": "exact_match",
+              "compileBroadcastCodeFor:": "exact_match",
+              "isBytes": "exact_match",
+              "kindOfSubclass": "exact_match",
+              "inheritsFrom:": "exact_match",
+              "whichSelectorsReferTo:special:byte:": "exact_match",
+              "compile:notifying:trailer:": "exact_match",
+              "withAllSuperclasses": "exact_match",
+              "browseAllCallsOn:": "exact_match",
+              "sourceTextAt:": "exact_match",
+              "removeSelectorUnchecked:": "exact_match",
+              "allClassVarNames": "exact_match",
+              "sharedPools": "exact_match",
+              "unmovedVarsFrom:": "exact_match",
+              "includesSelector:": "exact_match",
+              "showVariableMenu:collect:": "exact_match",
+              "addSelectorUnchecked:withMethod:": "exact_match",
+              "conflictCodeFor:": "exact_match",
+              "checkSuperAddSelector:": "exact_match",
+              "allSubclassesDo:": "exact_match",
+              "removeFromInheritanceTable:": "exact_match",
+              "compoundSelectorsMatching:": "exact_match",
+              "canUnderstand:": "exact_match",
+              "decompile:": "exact_match",
+              "allSuperclassesInto:": "exact_match",
+              "tryCopyingCodeFor:": "exact_match",
+              "removeSelectorSimply:": "exact_match",
+              "subclassInstVarNames": "exact_match",
+              "instanceCount": "exact_match",
+              "sourceMethodAt:": "exact_match",
+              "hasMethods": "exact_match",
+              "someInstance": "exact_match",
+              "whichClassIncludesSelector:": "exact_match",
+              "checkMethodFor:": "exact_match",
+              "isFixed": "exact_match",
+              "copyMethods": "exact_match",
+              "isWords": "exact_match",
+              "printHierarchy": "exact_match",
+              "allSelectors": "exact_match",
+              "isBits": "exact_match",
+              "recompile:from:": "exact_match",
+              "compileAllFrom:": "exact_match",
+              "superclass": "exact_match",
+              "isVariable": "exact_match",
+              "updateInheritanceTables:": "exact_match",
+              "allInstancesDo:": "exact_match",
+              "hasMultipleSuperclasses": "exact_match",
+              "allDynamicSuperclasses": "exact_match",
+              "withAllSubclasses": "exact_match",
+              "superclasses": "exact_match",
+              "removeFromInheritanceTables": "exact_match",
+              "obsolete": "exact_match",
+              "isPointers": "exact_match",
+              "compileAll": "exact_match",
+              "sourceCodeForMethod:at:": "exact_match",
+              "checkChangeSelector:": "exact_match",
+              "copy": "exact_match",
+              "printSubclassesOn:callingSuperclass:level:": "exact_match",
+              "compiledMethodAt:": "exact_match",
+              "whichSelectorsReferTo:": "exact_match",
+              "compilerClass": "exact_match",
+              "subclasses": "exact_match",
+              "accumulateInstVarNames:traversedClasses:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "init": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 116,
+          "system_methods": 116,
+          "matching_methods": 116,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Boolean",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 14,
+            "system_count": 14,
+            "common_count": 14,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 14,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "storeOn:": "exact_match",
+              "and:": "exact_match",
+              "xor:": "exact_match",
+              "ifTrue:ifFalse:": "exact_match",
+              "shallowCopy": "exact_match",
+              "&": "exact_match",
+              "|": "exact_match",
+              "or:": "exact_match",
+              "not": "exact_match",
+              "ifTrue:": "exact_match",
+              "deepCopy": "exact_match",
+              "ifFalse:": "exact_match",
+              "eqv:": "exact_match",
+              "ifFalse:ifTrue:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 15,
+          "system_methods": 15,
+          "matching_methods": 15,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ByteArray",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 12,
+            "system_count": 12,
+            "common_count": 12,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 12,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "replaceFrom:to:with:startingAt:": "exact_match",
+              "doubleWordAt:put:": "exact_match",
+              "unpackBits:into:": "exact_match",
+              "asString": "exact_match",
+              "replaceFrom:to:withString:startingAt:": "exact_match",
+              "wordAt:put:": "exact_match",
+              "defaultElement": "exact_match",
+              "packBits:into:": "exact_match",
+              "doubleWordAt:": "exact_match",
+              "wordAt:": "exact_match",
+              "primReplaceFrom:to:with:startingAt:": "exact_match",
+              "packBits:startBit:into:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 12,
+          "system_methods": 12,
+          "matching_methods": 12,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Class",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 36,
+            "system_count": 36,
+            "common_count": 36,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 36,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "declare:": "exact_match",
+              "fileOut": "exact_match",
+              "allSharedPools": "exact_match",
+              "classPool": "exact_match",
+              "hasMethods": "exact_match",
+              "name": "exact_match",
+              "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:": "exact_match",
+              "allClassVarNames": "exact_match",
+              "rename:": "exact_match",
+              "variableWordSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:": "exact_match",
+              "variableSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:": "exact_match",
+              "sharedPools": "exact_match",
+              "compileAllFrom:": "exact_match",
+              "hasMultipleSuperclasses": "exact_match",
+              "removeFromChanges": "exact_match",
+              "superclass:methodDict:format:name:organization:instVarNames:classPool:sharedPools:": "exact_match",
+              "obsolete": "exact_match",
+              "removeInstVarName:": "exact_match",
+              "classVarNames": "exact_match",
+              "sharing:": "exact_match",
+              "fileOutOn:moveSource:toFile:": "exact_match",
+              "addSharedPool:": "exact_match",
+              "isObsolete": "exact_match",
+              "validateFrom:in:instanceVariableNames:methods:": "exact_match",
+              "removeFromSystem": "exact_match",
+              "removeSharedPool:": "exact_match",
+              "subclass:otherSupers:instanceVariableNames:classVariableNames:category:": "exact_match",
+              "copy": "exact_match",
+              "printOut": "exact_match",
+              "poolHas:ifTrue:": "exact_match",
+              "addClassVarName:": "exact_match",
+              "removeClassVarName:": "exact_match",
+              "initialize": "exact_match",
+              "addInstVarName:": "exact_match",
+              "copyForValidation": "exact_match",
+              "variableByteSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "template:": "exact_match",
+              "getSuperclasses:": "exact_match",
+              "named:superclasses:instanceVariableNames:classVariableNames:category:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 39,
+          "system_methods": 39,
+          "matching_methods": 39,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ClassDescription",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 55,
+            "system_count": 55,
+            "common_count": 55,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 55,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "copyAll:from:classified:": "exact_match",
+              "commentTemplate": "exact_match",
+              "printOutCategory:": "exact_match",
+              "kindOfSubclass": "exact_match",
+              "classVariablesString": "exact_match",
+              "fileOutMessage:fileName:": "exact_match",
+              "logOrganizationChange": "exact_match",
+              "name": "exact_match",
+              "copy:from:classified:": "exact_match",
+              "subclassOf:oldClass:instanceVariableNames:variable:words:pointers:ifBad:": "exact_match",
+              "compile:classified:notifying:": "exact_match",
+              "printMethodChunk:on:moveSource:toFile:": "exact_match",
+              "printCategoryChunk:on:": "exact_match",
+              "copy:from:": "exact_match",
+              "definition": "exact_match",
+              "category:": "exact_match",
+              "fileOutOn:": "exact_match",
+              "copyAll:from:": "exact_match",
+              "instanceVariablesString": "exact_match",
+              "storeOn:": "exact_match",
+              "compile:classified:": "exact_match",
+              "copyCategory:from:classified:": "exact_match",
+              "fileOutOrganizationOn:": "exact_match",
+              "compile:notifying:trailer:ifFail:": "exact_match",
+              "fileOutCategory:": "exact_match",
+              "fileOutChangedMessages:on:moveSource:toFile:": "exact_match",
+              "printOn:": "exact_match",
+              "instVarNames": "exact_match",
+              "fileOutCategory:on:moveSource:toFile:": "exact_match",
+              "fileOutMessage:": "exact_match",
+              "obsolete": "exact_match",
+              "removeInstVarName:": "exact_match",
+              "whichCategoryIncludesSelector:": "exact_match",
+              "fileOutChangedMessages:on:": "exact_match",
+              "errorCategoryName": "exact_match",
+              "printOutMessage:": "exact_match",
+              "fileOutOn:moveSource:toFile:": "exact_match",
+              "methodsFor:": "exact_match",
+              "copyCategory:from:": "exact_match",
+              "isMeta": "exact_match",
+              "removeCategory:": "exact_match",
+              "validateFrom:in:instanceVariableNames:methods:": "exact_match",
+              "removeSelector:": "exact_match",
+              "comment:": "exact_match",
+              "sharedPoolsString": "exact_match",
+              "updateInstancesFrom:": "exact_match",
+              "superclassesString": "exact_match",
+              "category": "exact_match",
+              "addInstVarName:": "exact_match",
+              "fileOutMessage:on:moveSource:toFile:": "exact_match",
+              "copyAllCategoriesFrom:": "exact_match",
+              "reorganize": "exact_match",
+              "organization": "exact_match",
+              "moveChangesTo:": "exact_match",
+              "comment": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 55,
+          "system_methods": 55,
+          "matching_methods": 55,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ClassOrganizer",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 25,
+            "system_count": 25,
+            "common_count": 25,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 25,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "renameCategory:to:": "exact_match",
+              "setDefaultList:": "exact_match",
+              "classComment": "exact_match",
+              "hasNoComment": "exact_match",
+              "classify:under:": "exact_match",
+              "categoryOfElement:": "exact_match",
+              "printOn:": "exact_match",
+              "addCategory:before:": "exact_match",
+              "scanFrom:": "exact_match",
+              "addCategory:": "exact_match",
+              "changeFromString:": "exact_match",
+              "numberOfCategoryOfElement:": "exact_match",
+              "includesElement:": "exact_match",
+              "removeElement:": "exact_match",
+              "removeCategory:": "exact_match",
+              "classComment:": "exact_match",
+              "categories": "exact_match",
+              "moveChangedCommentToFile:numbered:": "exact_match",
+              "categories:": "exact_match",
+              "removeEmptyCategories": "exact_match",
+              "setDefaultList": "exact_match",
+              "listAtCategoryNumber:": "exact_match",
+              "listAtCategoryNamed:": "exact_match",
+              "putCommentOnFile:numbered:moveSource:": "exact_match",
+              "classifyAll:under:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new": "exact_match",
+              "defaultProtocol": "exact_match",
+              "initialize": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 28,
+          "system_methods": 28,
+          "matching_methods": 28,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Collection",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 31,
+            "system_count": 31,
+            "common_count": 31,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 31,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "includes:": "exact_match",
+              "addAll:": "exact_match",
+              "errorEmptyCollection": "exact_match",
+              "detect:": "exact_match",
+              "asOrderedCollection": "exact_match",
+              "removeAll:": "exact_match",
+              "occurrencesOf:": "exact_match",
+              "errorNotFound": "exact_match",
+              "add:": "exact_match",
+              "do:": "exact_match",
+              "storeOn:": "exact_match",
+              "errorNoMatch": "exact_match",
+              "collect:": "exact_match",
+              "growSize": "exact_match",
+              "reject:": "exact_match",
+              "printOn:": "exact_match",
+              "remove:": "exact_match",
+              "select:": "exact_match",
+              "remove:ifAbsent:": "exact_match",
+              "maxSize": "exact_match",
+              "size": "exact_match",
+              "maxPrint": "exact_match",
+              "asSortedCollection:": "exact_match",
+              "asSet": "exact_match",
+              "asSortedCollection": "exact_match",
+              "detect:ifNone:": "exact_match",
+              "asBag": "exact_match",
+              "isEmpty": "exact_match",
+              "emptyCheck": "exact_match",
+              "errorNotKeyed": "exact_match",
+              "inject:into:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 4,
+            "system_count": 4,
+            "common_count": 4,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 4,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "with:": "exact_match",
+              "with:with:": "exact_match",
+              "with:with:with:with:": "exact_match",
+              "with:with:with:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 35,
+          "system_methods": 35,
+          "matching_methods": 35,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "CompiledMethod",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 43,
+            "system_count": 43,
+            "common_count": 43,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 43,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "readsField:": "exact_match",
+              "objectAt:put:": "exact_match",
+              "writesRef:": "exact_match",
+              "scanLongStore:": "exact_match",
+              "fieldsTouched": "exact_match",
+              "numArgs": "exact_match",
+              "readsRef:": "exact_match",
+              "cacheTempNames:": "exact_match",
+              "header": "exact_match",
+              "endPC": "exact_match",
+              "literals": "exact_match",
+              "frameSize": "exact_match",
+              "numStack": "exact_match",
+              "returnField": "exact_match",
+              "scanFor:": "exact_match",
+              "who": "exact_match",
+              "storeOn:": "exact_match",
+              "numTemps": "exact_match",
+              "isReturnSelf": "exact_match",
+              "needsStack:encoder:": "exact_match",
+              "symbolic": "exact_match",
+              "printOn:": "exact_match",
+              "refersToLiteral:": "exact_match",
+              "writesField:": "exact_match",
+              "primitive": "exact_match",
+              "literalAt:": "exact_match",
+              "numLiterals": "exact_match",
+              "isQuick": "exact_match",
+              "scanLongLoad:": "exact_match",
+              "flags": "exact_match",
+              "putSource:inFile:": "exact_match",
+              "setSourcePosition:inFile:": "exact_match",
+              "fileIndex": "exact_match",
+              "getSource": "exact_match",
+              "numTempsField": "exact_match",
+              "setTempNamesIfCached:": "exact_match",
+              "isReturnField": "exact_match",
+              "needsLargeFrame": "exact_match",
+              "initialPC": "exact_match",
+              "objectAt:": "exact_match",
+              "putSource:class:category:inFile:": "exact_match",
+              "messages": "exact_match",
+              "literalAt:put:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 5,
+            "system_count": 5,
+            "common_count": 5,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 5,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "newMethod:header:": "exact_match",
+              "initialize": "exact_match",
+              "toReturnSelf": "exact_match",
+              "toReturnField:": "exact_match",
+              "newBytes:flags:nTemps:nStack:nLits:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 48,
+          "system_methods": 48,
+          "matching_methods": 48,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ContextPart",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 54,
+            "system_count": 54,
+            "common_count": 54,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 54,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "pushLiteralVariable:": "exact_match",
+              "blockCopy:": "exact_match",
+              "top": "exact_match",
+              "releaseTo:": "exact_match",
+              "pushActiveContext": "exact_match",
+              "sourceCode": "exact_match",
+              "singleRelease": "exact_match",
+              "storeIntoLiteralVariable:": "exact_match",
+              "release": "exact_match",
+              "shortStack": "exact_match",
+              "tryPrimitiveFor:receiver:args:": "exact_match",
+              "hasSender:": "exact_match",
+              "receiver": "exact_match",
+              "method": "exact_match",
+              "tempNames": "exact_match",
+              "step": "exact_match",
+              "selector": "exact_match",
+              "tempAt:": "exact_match",
+              "methodReturnTop": "exact_match",
+              "send:super:numArgs:": "exact_match",
+              "storeIntoTemporaryVariable:": "exact_match",
+              "pc": "exact_match",
+              "jump:": "exact_match",
+              "pop": "exact_match",
+              "runSimulated:contextAtEachStep:": "exact_match",
+              "activateMethod:withArgs:receiver:class:": "exact_match",
+              "pushConstant:": "exact_match",
+              "printOn:": "exact_match",
+              "push:": "exact_match",
+              "methodReturnConstant:": "exact_match",
+              "stack": "exact_match",
+              "jump:if:": "exact_match",
+              "pushTemporaryVariable:": "exact_match",
+              "stackOfSize:": "exact_match",
+              "doPrimitive:receiver:args:": "exact_match",
+              "pushReceiverVariable:": "exact_match",
+              "doDup": "exact_match",
+              "return:to:": "exact_match",
+              "pushReceiver": "exact_match",
+              "tempAt:put:": "exact_match",
+              "popIntoLiteralVariable:": "exact_match",
+              "popIntoReceiverVariable:": "exact_match",
+              "popIntoTemporaryVariable:": "exact_match",
+              "home": "exact_match",
+              "sender": "exact_match",
+              "stepToSendOrReturn": "exact_match",
+              "methodReturnReceiver": "exact_match",
+              "storeIntoReceiverVariable:": "exact_match",
+              "doPop": "exact_match",
+              "mclass": "exact_match",
+              "send:to:with:super:": "exact_match",
+              "swapSender:": "exact_match",
+              "completeCallee:": "exact_match",
+              "depthBelow:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 5,
+            "system_count": 5,
+            "common_count": 5,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 5,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "trace:": "exact_match",
+              "initPrimitives": "exact_match",
+              "tallyMethods:": "exact_match",
+              "runSimulated:": "exact_match",
+              "tallyInstructions:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 59,
+          "system_methods": 59,
+          "matching_methods": 59,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Dictionary",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 37,
+            "system_count": 37,
+            "common_count": 37,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 37,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "rehash": "exact_match",
+              "includes:": "exact_match",
+              "errorValueNotFound": "exact_match",
+              "keys": "exact_match",
+              "occurrencesOf:": "exact_match",
+              "removeAssociation:": "exact_match",
+              "findKey:ifAbsent:": "exact_match",
+              "includesKey:": "exact_match",
+              "at:ifAbsent:": "exact_match",
+              "at:": "exact_match",
+              "add:": "exact_match",
+              "do:": "exact_match",
+              "removeKey:": "exact_match",
+              "keyAtValue:": "exact_match",
+              "storeOn:": "exact_match",
+              "inspect": "exact_match",
+              "collect:": "exact_match",
+              "associationAt:ifAbsent:": "exact_match",
+              "grow": "exact_match",
+              "removeAssociation:ifAbsent:": "exact_match",
+              "associationAt:": "exact_match",
+              "printOn:": "exact_match",
+              "remove:": "exact_match",
+              "associationsDo:": "exact_match",
+              "select:": "exact_match",
+              "findKeyOrNil:": "exact_match",
+              "remove:ifAbsent:": "exact_match",
+              "values": "exact_match",
+              "at:put:": "exact_match",
+              "removeKey:ifAbsent:": "exact_match",
+              "keyAtValue:ifAbsent:": "exact_match",
+              "associations": "exact_match",
+              "keysDo:": "exact_match",
+              "errorKeyNotFound": "exact_match",
+              "asSortedCollection": "exact_match",
+              "declare:from:": "exact_match",
+              "includesAssociation:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 37,
+          "system_methods": 37,
+          "matching_methods": 37,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "False",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 10,
+            "system_count": 10,
+            "common_count": 10,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 10,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "and:": "exact_match",
+              "ifTrue:ifFalse:": "exact_match",
+              "or:": "exact_match",
+              "&": "exact_match",
+              "|": "exact_match",
+              "not": "exact_match",
+              "ifTrue:": "exact_match",
+              "ifFalse:": "exact_match",
+              "ifFalse:ifTrue:": "exact_match",
+              "printOn:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 10,
+          "system_methods": 10,
+          "matching_methods": 10,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "IdentityDictionary",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 15,
+            "system_count": 15,
+            "common_count": 15,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 15,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "do:": "exact_match",
+              "add:": "exact_match",
+              "removeDangerouslyKey:ifAbsent:": "exact_match",
+              "findKeyOrNil:": "exact_match",
+              "copy": "exact_match",
+              "associationAt:ifAbsent:": "exact_match",
+              "swap:with:": "exact_match",
+              "setTally": "exact_match",
+              "keyAtValue:ifAbsent:": "exact_match",
+              "noCheckAdd:with:": "exact_match",
+              "noCheckAdd:": "exact_match",
+              "at:ifAbsent:": "exact_match",
+              "at:put:": "exact_match",
+              "removeKey:ifAbsent:": "exact_match",
+              "associationsDo:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 16,
+          "system_methods": 16,
+          "matching_methods": 16,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "InstructionStream",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 14,
+            "system_count": 14,
+            "common_count": 14,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 14,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "followingByte": "exact_match",
+              "willStorePop": "exact_match",
+              "scanFor:": "exact_match",
+              "interpretExtension:in:for:": "exact_match",
+              "willReturn": "exact_match",
+              "willSend": "exact_match",
+              "pc": "exact_match",
+              "interpretJump": "exact_match",
+              "interpretNextInstructionFor:": "exact_match",
+              "method:pc:": "exact_match",
+              "addSelectorTo:": "exact_match",
+              "addFieldIndexTo:": "exact_match",
+              "nextByte": "exact_match",
+              "method": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 2,
+            "system_count": 2,
+            "common_count": 2,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 2,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "on:": "exact_match",
+              "initialize": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 16,
+          "system_methods": 16,
+          "matching_methods": 16,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Integer",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 61,
+            "system_count": 61,
+            "common_count": 61,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 61,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "bitOr:": "exact_match",
+              "<=": "exact_match",
+              "+": "exact_match",
+              "truncated": "exact_match",
+              "digitLogic:op:length:": "exact_match",
+              "anyMask:": "exact_match",
+              "factorial": "exact_match",
+              "bitAnd:": "exact_match",
+              ">=": "exact_match",
+              "\\\\": "exact_match",
+              ">": "exact_match",
+              "denominator": "exact_match",
+              "lcm:": "exact_match",
+              "noMask:": "exact_match",
+              "lastDigit": "exact_match",
+              "anyBitTo:": "exact_match",
+              "digitSubtract:": "exact_match",
+              "/": "exact_match",
+              "digitDiv:neg:": "exact_match",
+              "quo:": "exact_match",
+              "-": "exact_match",
+              "bitAt:": "exact_match",
+              "printOn:": "exact_match",
+              "allMask:": "exact_match",
+              "numerator": "exact_match",
+              "isLiteral": "exact_match",
+              "digitAdd:": "exact_match",
+              "coerce:": "exact_match",
+              "printOn:base:": "exact_match",
+              "even": "exact_match",
+              "<": "exact_match",
+              "isInteger": "exact_match",
+              "asFraction": "exact_match",
+              "digitCompare:": "exact_match",
+              "highBit": "exact_match",
+              "~=": "exact_match",
+              "floor": "exact_match",
+              "timesRepeat:": "exact_match",
+              "digitLshift:bytes:lookfirst:": "exact_match",
+              "growby:": "exact_match",
+              "generality": "exact_match",
+              "growto:": "exact_match",
+              "asFloat": "exact_match",
+              "printStringRadix:": "exact_match",
+              "digitMultiply:neg:": "exact_match",
+              "hash": "exact_match",
+              "rounded": "exact_match",
+              "storeStringRadix:": "exact_match",
+              "lastDigitGet:": "exact_match",
+              "//": "exact_match",
+              "ceiling": "exact_match",
+              "bitXor:": "exact_match",
+              "bitInvert": "exact_match",
+              "gcd:": "exact_match",
+              "digitRshift:bytes:lookfirst:": "exact_match",
+              "=": "exact_match",
+              "copyto:": "exact_match",
+              "asCharacter": "exact_match",
+              "asInteger": "exact_match",
+              "*": "exact_match",
+              "bitShift:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "readFrom:": "exact_match",
+              "new:neg:": "exact_match",
+              "readFrom:radix:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 64,
+          "system_methods": 64,
+          "matching_methods": 64,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "LookupKey",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 7,
+            "system_count": 7,
+            "common_count": 7,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 7,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "hashMappedBy:": "exact_match",
+              "key": "exact_match",
+              "hash": "exact_match",
+              "<": "exact_match",
+              "=": "exact_match",
+              "printOn:": "exact_match",
+              "key:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "key:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 8,
+          "system_methods": 8,
+          "matching_methods": 8,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Magnitude",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 10,
+            "system_count": 10,
+            "common_count": 10,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 10,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "hashMappedBy:": "exact_match",
+              "hash": "exact_match",
+              "<=": "exact_match",
+              "<": "exact_match",
+              "max:": "exact_match",
+              "between:and:": "exact_match",
+              "=": "exact_match",
+              ">=": "exact_match",
+              ">": "exact_match",
+              "min:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 10,
+          "system_methods": 10,
+          "matching_methods": 10,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Metaclass",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 25,
+            "system_count": 25,
+            "common_count": 25,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 25,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "classPool": "exact_match",
+              "soleInstance": "exact_match",
+              "name:inEnvironment:subclassOf:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:": "exact_match",
+              "subclassOf:": "exact_match",
+              "name": "exact_match",
+              "name:inEnvironment:subclassOf:and:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:": "exact_match",
+              "instHasMultipleSuperclasses": "exact_match",
+              "definition": "exact_match",
+              "new": "exact_match",
+              "superclass:": "exact_match",
+              "newNamed:": "exact_match",
+              "scopeHas:ifTrue:": "exact_match",
+              "obsolete": "exact_match",
+              "removeInstVarName:": "exact_match",
+              "instanceVariableNames:": "exact_match",
+              "fileOutOn:moveSource:toFile:": "exact_match",
+              "isObsolete": "exact_match",
+              "nonTrivial": "exact_match",
+              "isMeta": "exact_match",
+              "newNamed:otherSupers:": "exact_match",
+              "copy": "exact_match",
+              "addClassVarName:": "exact_match",
+              "addInstVarName:": "exact_match",
+              "subclasses": "exact_match",
+              "copyForValidation": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "subclassOf:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 26,
+          "system_methods": 26,
+          "matching_methods": 26,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "MethodDictionary",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 2,
+            "system_count": 2,
+            "common_count": 2,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 2,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "methodArray": "exact_match",
+              "removeKey:ifAbsent:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 2,
+          "system_methods": 2,
+          "matching_methods": 2,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Number",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 50,
+            "system_count": 50,
+            "common_count": 50,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 50,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "to:do:": "exact_match",
+              "+": "exact_match",
+              "truncated": "exact_match",
+              "arcCos": "exact_match",
+              "floorLog:": "exact_match",
+              "arcTan": "exact_match",
+              "positive": "exact_match",
+              "to:by:": "exact_match",
+              "negative": "exact_match",
+              "sin": "exact_match",
+              "storeOn:": "exact_match",
+              "asPoint": "exact_match",
+              "strictlyPositive": "exact_match",
+              "/": "exact_match",
+              "negated": "exact_match",
+              "quo:": "exact_match",
+              "odd": "exact_match",
+              "log:": "exact_match",
+              "-": "exact_match",
+              "retry:coercing:": "exact_match",
+              "squared": "exact_match",
+              "ln": "exact_match",
+              "raisedTo:": "exact_match",
+              "exp": "exact_match",
+              "arcSin": "exact_match",
+              "coerce:": "exact_match",
+              "even": "exact_match",
+              "reciprocal": "exact_match",
+              "to:": "exact_match",
+              "sign": "exact_match",
+              "floor": "exact_match",
+              "sqrt": "exact_match",
+              "rem:": "exact_match",
+              "tan": "exact_match",
+              "to:by:do:": "exact_match",
+              "roundTo:": "exact_match",
+              "generality": "exact_match",
+              "abs": "exact_match",
+              "rounded": "exact_match",
+              "*": "exact_match",
+              "//": "exact_match",
+              "ceiling": "exact_match",
+              "@": "exact_match",
+              "radiansToDegrees": "exact_match",
+              "raisedToInteger:": "exact_match",
+              "asInteger": "exact_match",
+              "cos": "exact_match",
+              "degreesToRadians": "exact_match",
+              "\\\\": "exact_match",
+              "truncateTo:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "readFrom:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 51,
+          "system_methods": 51,
+          "matching_methods": 51,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Object",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 78,
+            "system_count": 78,
+            "common_count": 78,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 78,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "tryPrimitive4:with:with:with:": "exact_match",
+              "tryPrimitive2:with:": "exact_match",
+              "confirm:": "exact_match",
+              "respondsTo:": "exact_match",
+              "basicAt:put:": "exact_match",
+              "~~": "exact_match",
+              "perform:with:": "exact_match",
+              "==": "exact_match",
+              "removeDependent:": "exact_match",
+              "printOn:": "exact_match",
+              "subclassResponsibility": "exact_match",
+              "perform:with:with:": "exact_match",
+              "hash": "exact_match",
+              "nilFields": "exact_match",
+              "perform:withArguments:": "exact_match",
+              "shallowCopy": "exact_match",
+              "errorNonIntegerIndex": "exact_match",
+              "addDependent:": "exact_match",
+              "perform:": "exact_match",
+              "primitiveError:": "exact_match",
+              "notNil": "exact_match",
+              "inspect": "exact_match",
+              "asOop": "exact_match",
+              "isNil": "exact_match",
+              "tryPrimitive3:with:with:": "exact_match",
+              "error:": "exact_match",
+              "class": "exact_match",
+              "isInteger": "exact_match",
+              "basicAt:": "exact_match",
+              "dependents": "exact_match",
+              "errorSubscriptBounds:": "exact_match",
+              "at:put:": "exact_match",
+              "halt": "exact_match",
+              "become:": "exact_match",
+              "perform:with:with:with:": "exact_match",
+              "instVarAt:put:": "exact_match",
+              "isKindOf:": "exact_match",
+              "yourself": "exact_match",
+              "conflictingInheritanceError": "exact_match",
+              "release": "exact_match",
+              "printString": "exact_match",
+              "tryPrimitive0": "exact_match",
+              "broadcast:with:": "exact_match",
+              "basicSize": "exact_match",
+              "storeString": "exact_match",
+              "basicInspect": "exact_match",
+              "updateRequest": "exact_match",
+              "changeRequestFrom:": "exact_match",
+              "shouldNotImplement": "exact_match",
+              "readFromString:": "exact_match",
+              "size": "exact_match",
+              "species": "exact_match",
+              "=": "exact_match",
+              "mustBeBoolean": "exact_match",
+              "changed:": "exact_match",
+              "nextInstance": "exact_match",
+              "tryPrimitive1:": "exact_match",
+              "breakDependents": "exact_match",
+              "at:": "exact_match",
+              "instVarAt:": "exact_match",
+              "storeOn:": "exact_match",
+              "broadcast:": "exact_match",
+              "isMemberOf:": "exact_match",
+              "update:": "exact_match",
+              "changeRequest": "exact_match",
+              "isLiteral": "exact_match",
+              "hashMappedBy:": "exact_match",
+              "errorImproperStore": "exact_match",
+              "setDependents": "exact_match",
+              "changed": "exact_match",
+              "forkEmergencyEvaluatorAt:": "exact_match",
+              "deepCopy": "exact_match",
+              "~=": "exact_match",
+              "primitiveFailed": "exact_match",
+              "copy": "exact_match",
+              "doesNotUnderstand:": "exact_match",
+              "notify:": "exact_match",
+              "halt:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 6,
+            "system_count": 6,
+            "common_count": 6,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 6,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "howToModifyPrimitives": "exact_match",
+              "initialize": "exact_match",
+              "readFrom:": "exact_match",
+              "whatIsAPrimitive": "exact_match",
+              "initializeDependentsFields": "exact_match",
+              "initializeErrorRecursion": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 84,
+          "system_methods": 84,
+          "matching_methods": 84,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "PositionableStream",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 18,
+            "system_count": 18,
+            "common_count": 18,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 18,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "setToEnd": "exact_match",
+              "skipTo:": "exact_match",
+              "peekFor:": "exact_match",
+              "atEnd": "exact_match",
+              "position": "exact_match",
+              "reset": "exact_match",
+              "skip:": "exact_match",
+              "through:": "exact_match",
+              "isEmpty": "exact_match",
+              "positionError": "exact_match",
+              "skipSeparators": "exact_match",
+              "contents": "exact_match",
+              "next:": "exact_match",
+              "nextChunk": "exact_match",
+              "upTo:": "exact_match",
+              "peek": "exact_match",
+              "on:": "exact_match",
+              "position:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 2,
+            "system_count": 2,
+            "common_count": 2,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 2,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "on:": "exact_match",
+              "on:from:to:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 20,
+          "system_methods": 20,
+          "matching_methods": 20,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "ReadStream",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "next": "exact_match",
+              "nextPut:": "exact_match",
+              "on:from:to:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "on:from:to:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 4,
+          "system_methods": 4,
+          "matching_methods": 4,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "SequenceableCollection",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 33,
+            "system_count": 33,
+            "common_count": 33,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 33,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              ",": "exact_match",
+              "atAll:put:": "exact_match",
+              "replaceFrom:to:with:": "exact_match",
+              "copyWith:": "exact_match",
+              "findLast:": "exact_match",
+              "copyFrom:to:": "exact_match",
+              "first": "exact_match",
+              "replaceFrom:to:with:startingAt:": "exact_match",
+              "do:": "exact_match",
+              "atAllPut:": "exact_match",
+              "findFirst:": "exact_match",
+              "indexOfSubCollection:startingAt:ifAbsent:": "exact_match",
+              "collect:": "exact_match",
+              "reverseDo:": "exact_match",
+              "with:do:": "exact_match",
+              "grow": "exact_match",
+              "select:": "exact_match",
+              "last": "exact_match",
+              "remove:ifAbsent:": "exact_match",
+              "asArray": "exact_match",
+              "reverse": "exact_match",
+              "size": "exact_match",
+              "swap:with:": "exact_match",
+              "copyWithout:": "exact_match",
+              "copyReplaceAll:with:": "exact_match",
+              "indexOfSubCollection:startingAt:": "exact_match",
+              "indexOf:ifAbsent:": "exact_match",
+              "indexOf:": "exact_match",
+              "shallowCopy": "exact_match",
+              "=": "exact_match",
+              "errorOutOfBounds": "exact_match",
+              "copyReplaceFrom:to:with:": "exact_match",
+              "mappedBy:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 33,
+          "system_methods": 33,
+          "matching_methods": 33,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Set",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 19,
+            "system_count": 19,
+            "common_count": 19,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 19,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "findElementOrNil:": "exact_match",
+              "rehash": "exact_match",
+              "includes:": "exact_match",
+              "find:ifAbsent:": "exact_match",
+              "occurrencesOf:": "exact_match",
+              "at:": "exact_match",
+              "fixCollisionsFrom:": "exact_match",
+              "add:": "exact_match",
+              "do:": "exact_match",
+              "fullCheck": "exact_match",
+              "collect:": "exact_match",
+              "grow": "exact_match",
+              "atNewIndex:put:": "exact_match",
+              "remove:ifAbsent:": "exact_match",
+              "swap:with:": "exact_match",
+              "size": "exact_match",
+              "setTally": "exact_match",
+              "at:put:": "exact_match",
+              "noCheckAdd:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 2,
+            "system_count": 2,
+            "common_count": 2,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 2,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new:": "exact_match",
+              "new": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 21,
+          "system_methods": 21,
+          "matching_methods": 21,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Stream",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 9,
+            "system_count": 9,
+            "common_count": 9,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 9,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "nextPut:": "exact_match",
+              "do:": "exact_match",
+              "atEnd": "exact_match",
+              "next:put:": "exact_match",
+              "nextMatchFor:": "exact_match",
+              "contents": "exact_match",
+              "next:": "exact_match",
+              "nextPutAll:": "exact_match",
+              "next": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 10,
+          "system_methods": 10,
+          "matching_methods": 10,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "String",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 41,
+            "system_count": 41,
+            "common_count": 41,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 41,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "oldRunDecodeOn:": "exact_match",
+              "contractTo:": "exact_match",
+              "withCRs": "exact_match",
+              "findString:startingAt:": "exact_match",
+              "<=": "exact_match",
+              "asString": "exact_match",
+              "string": "exact_match",
+              "stringhash": "exact_match",
+              "asText": "exact_match",
+              "match:": "exact_match",
+              "asUppercase": "exact_match",
+              ">=": "exact_match",
+              "asFileName": "exact_match",
+              "replaceFrom:to:withByteArray:startingAt:": "exact_match",
+              ">": "exact_match",
+              "displayAt:": "exact_match",
+              "asLowercase": "exact_match",
+              "at:": "exact_match",
+              "replaceFrom:to:with:startingAt:": "exact_match",
+              "asSymbol": "exact_match",
+              "storeOn:": "exact_match",
+              "basicAt:put:": "exact_match",
+              "sameAs:": "exact_match",
+              "asDisplayText": "exact_match",
+              "printOn:": "exact_match",
+              "copyUpTo:": "exact_match",
+              "compare:": "exact_match",
+              "isLiteral": "exact_match",
+              "hashMappedBy:": "exact_match",
+              "<": "exact_match",
+              "spellAgainst:": "exact_match",
+              "size": "exact_match",
+              "basicAt:": "exact_match",
+              "deepCopy": "exact_match",
+              "asParagraph": "exact_match",
+              "oldRunEncoded": "exact_match",
+              "at:put:": "exact_match",
+              "asNumber": "exact_match",
+              "hash": "exact_match",
+              "primReplaceFrom:to:with:startingAt:": "exact_match",
+              "displayOn:at:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "readFrom:": "exact_match",
+              "fromString:": "exact_match",
+              "example": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 44,
+          "system_methods": 44,
+          "matching_methods": 44,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "Symbol",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 23,
+            "system_count": 23,
+            "common_count": 23,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 23,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "keywords": "exact_match",
+              "asString": "exact_match",
+              "stringhash": "exact_match",
+              "numArgs": "exact_match",
+              "replaceFrom:to:with:startingAt:": "exact_match",
+              "asSymbol": "exact_match",
+              "storeOn:": "exact_match",
+              "string:": "exact_match",
+              "classPart": "exact_match",
+              "printOn:": "exact_match",
+              "isInfix": "exact_match",
+              "isLiteral": "exact_match",
+              "hashMappedBy:": "exact_match",
+              "errorNoModification": "exact_match",
+              "isKeyword": "exact_match",
+              "species": "exact_match",
+              "at:put:": "exact_match",
+              "hash": "exact_match",
+              "copy": "exact_match",
+              "selectorPart": "exact_match",
+              "shallowCopy": "exact_match",
+              "=": "exact_match",
+              "isCompound": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 8,
+            "system_count": 8,
+            "common_count": 8,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 8,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "intern:": "exact_match",
+              "rehash": "exact_match",
+              "correctMessage:": "exact_match",
+              "initialize": "exact_match",
+              "table:": "exact_match",
+              "hasInterned:ifTrue:": "exact_match",
+              "internCharacter:": "exact_match",
+              "table": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 31,
+          "system_methods": 31,
+          "matching_methods": 31,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "SystemDictionary",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 70,
+            "system_count": 70,
+            "common_count": 70,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 70,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "browseAllCallsOn:and:": "exact_match",
+              "allBehaviorsDo:": "exact_match",
+              "recompileAllFrom:": "exact_match",
+              "recompileCallsOn:": "exact_match",
+              "browseChangedMessages": "exact_match",
+              "newSourceFile:without:": "exact_match",
+              "allImplementedMessages": "exact_match",
+              "resetSpaceLimits": "exact_match",
+              "install": "exact_match",
+              "browseAllCallsOn:": "exact_match",
+              "allClassesImplementing:": "exact_match",
+              "copyright": "exact_match",
+              "oopsLeft": "exact_match",
+              "snapshotAs:thenQuit:": "exact_match",
+              "lowSpaceNotificationLoop": "exact_match",
+              "oopsLeftLimit": "exact_match",
+              "frills": "exact_match",
+              "coreLeft": "exact_match",
+              "shutdown": "exact_match",
+              "coreLeftLimit": "exact_match",
+              "recompileMethodsForWhich:": "exact_match",
+              "core": "exact_match",
+              "copyChangesTo:": "exact_match",
+              "browseAllImplementorsOf:": "exact_match",
+              "releaseExternalViews": "exact_match",
+              "oopsLeftLimit:": "exact_match",
+              "changes": "exact_match",
+              "specialNargsAt:": "exact_match",
+              "showMenuThenBrowse:": "exact_match",
+              "specialSelectorSize": "exact_match",
+              "allCallsOn:": "exact_match",
+              "hasSpecialSelector:ifTrueSetByte:": "exact_match",
+              "versionName": "exact_match",
+              "printOn:": "exact_match",
+              "logChange:": "exact_match",
+              "pointersTo:do:": "exact_match",
+              "allImplementorsOf:": "exact_match",
+              "newChanges:": "exact_match",
+              "noChanges": "exact_match",
+              "resetLowSpaceSignal": "exact_match",
+              "valueAtNewKey:put:atIndex:declareFrom:": "exact_match",
+              "timeStamp:": "exact_match",
+              "condenseChanges": "exact_match",
+              "quitPrimitive": "exact_match",
+              "saveAs:thenQuit:": "exact_match",
+              "removeClassNamed:": "exact_match",
+              "renameClass:as:": "exact_match",
+              "snapshotPrimitive": "exact_match",
+              "allCallsOn:and:": "exact_match",
+              "specialSelectorAt:": "exact_match",
+              "frills:": "exact_match",
+              "quit": "exact_match",
+              "newClassNames": "exact_match",
+              "at:put:": "exact_match",
+              "collectPointersTo:": "exact_match",
+              "renameSystemFiles:": "exact_match",
+              "snapshot": "exact_match",
+              "specialSelectors": "exact_match",
+              "exitToDebugger": "exact_match",
+              "classNames": "exact_match",
+              "version": "exact_match",
+              "recover:": "exact_match",
+              "getImagePrefix": "exact_match",
+              "allClassesDo:": "exact_match",
+              "flushClassNameCache": "exact_match",
+              "allSelect:": "exact_match",
+              "forgetDoIts": "exact_match",
+              "browseAllSelect:": "exact_match",
+              "signal:atOopsLeft:wordsLeft:": "exact_match",
+              "coreLeftLimit:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "initialize": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 71,
+          "system_methods": 71,
+          "matching_methods": 71,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "True",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 10,
+            "system_count": 10,
+            "common_count": 10,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 10,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "and:": "exact_match",
+              "ifTrue:ifFalse:": "exact_match",
+              "or:": "exact_match",
+              "&": "exact_match",
+              "|": "exact_match",
+              "not": "exact_match",
+              "ifTrue:": "exact_match",
+              "ifFalse:": "exact_match",
+              "ifFalse:ifTrue:": "exact_match",
+              "printOn:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 0,
+            "system_count": 0,
+            "common_count": 0,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 0,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {},
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 10,
+          "system_methods": 10,
+          "matching_methods": 10,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "UndefinedObject",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 8,
+            "system_count": 8,
+            "common_count": 8,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 8,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "isNil": "exact_match",
+              "storeOn:": "exact_match",
+              "notNil": "exact_match",
+              "release": "exact_match",
+              "shallowCopy": "exact_match",
+              "deepCopy": "exact_match",
+              "printOn:": "exact_match",
+              "addDependent:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 1,
+            "system_count": 1,
+            "common_count": 1,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 1,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "new": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 9,
+          "system_methods": 9,
+          "matching_methods": 9,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      },
+      {
+        "class_name": "WriteStream",
+        "structure_matches": true,
+        "is_perfect_match": true,
+        "differences": [],
+        "method_comparison": {
+          "instance": {
+            "method_type": "instance",
+            "bootstrap_count": 20,
+            "system_count": 20,
+            "common_count": 20,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 20,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "nextPut:": "exact_match",
+              "contents": "exact_match",
+              "nextChunkPut:": "exact_match",
+              "next": "exact_match",
+              "with:": "exact_match",
+              "position:": "exact_match",
+              "reset": "exact_match",
+              "space": "exact_match",
+              "pastEndPut:": "exact_match",
+              "print:": "exact_match",
+              "on:": "exact_match",
+              "emphasis": "exact_match",
+              "store:": "exact_match",
+              "size": "exact_match",
+              "tab": "exact_match",
+              "cr": "exact_match",
+              "crtab:": "exact_match",
+              "on:from:to:": "exact_match",
+              "emphasis:": "exact_match",
+              "crtab": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          },
+          "class": {
+            "method_type": "class",
+            "bootstrap_count": 3,
+            "system_count": 3,
+            "common_count": 3,
+            "bootstrap_only": 0,
+            "system_only": 0,
+            "matching_count": 3,
+            "different_bytecode": 0,
+            "perfect_match": true,
+            "method_details": {
+              "with:": "exact_match",
+              "on:from:to:": "exact_match",
+              "with:from:to:": "exact_match"
+            },
+            "bootstrap_only_methods": [],
+            "system_only_methods": []
+          }
+        },
+        "statistics": {
+          "bootstrap_methods": 23,
+          "system_methods": 23,
+          "matching_methods": 23,
+          "different_bytecode": 0,
+          "bootstrap_only_methods": 0,
+          "system_only_methods": 0
+        }
+      }
+    ],
+    "structural_matches": [],
+    "mismatches": [],
+    "bootstrap_only": [],
+    "system_only": [
+      "BinaryChoice",
+      "StrikeFont",
+      "BlockContext",
+      "StringHolder",
+      "TextList",
+      "ClassCategoryReader",
+      "TextCollectorController",
+      "DisplayObject",
+      "FormHolderView",
+      "Controller",
+      "Debugger",
+      "FileList",
+      "ChangeList",
+      "LeafNode",
+      "ControlManager",
+      "RunArray",
+      "InputSensor",
+      "BrowserView",
+      "ClassRelatedChange",
+      "Button",
+      "Explainer",
+      "MethodDefinitionChange",
+      "AltoFileAddressArray",
+      "TextStyle",
+      "Arc",
+      "Process",
+      "ReturnNode",
+      "MetaclassForMultipleInheritance",
+      "RemoteString",
+      "TextCollector",
+      "MethodOtherChange",
+      "Pen",
+      "ParseNode",
+      "DisplayMedium",
+      "FileStream",
+      "LiteralDictionary",
+      "ProjectView",
+      "AlwaysAcceptCodeController",
+      "ListController",
+      "StringHolderController",
+      "LinearFit",
+      "ActionMenu",
+      "PopUpMenu",
+      "Change",
+      "DisplayText",
+      "ScreenController",
+      "LinkedList",
+      "Interval",
+      "OtherChange",
+      "Rectangle",
+      "LiteralNode",
+      "IdentitySet",
+      "LockedSwitchController",
+      "Compiler",
+      "InspectorView",
+      "MessageNode",
+      "MethodListBrowser",
+      "StringHolderView",
+      "ProcessorScheduler",
+      "MessageTally",
+      "MethodNode",
+      "MethodContext",
+      "BitBlt",
+      "Encoder",
+      "ListView",
+      "TextView",
+      "SystemOrganizer",
+      "AltoFile",
+      "ClassDefinitionChange",
+      "Float",
+      "Fraction",
+      "MethodDescription",
+      "ClassOtherChange",
+      "OneOnSwitch",
+      "SharedQueue",
+      "ChangeController",
+      "WordArray",
+      "FormMenuController",
+      "NoController",
+      "CRFillInTheBlankController",
+      "OnlyWhenSelectedCodeView",
+      "Spline",
+      "Link",
+      "Parser",
+      "AltoFileDirectory",
+      "FormView",
+      "InfiniteForm",
+      "StandardSystemController",
+      "ExternalStream",
+      "SelectionInListView",
+      "NotifierView",
+      "Semaphore",
+      "Character",
+      "FormMenuView",
+      "WindowingTransformation",
+      "Random",
+      "CharacterScanner",
+      "ChangeListController",
+      "LargePositiveInteger",
+      "LargeNegativeInteger",
+      "ProjectController",
+      "BooleanView",
+      "IndicatorOnSwitchController",
+      "Date",
+      "DisplayBitmap",
+      "Browser",
+      "NotifierController",
+      "VariableNode",
+      "BinaryChoiceController",
+      "Cursor",
+      "Bag",
+      "ReadWriteStream",
+      "ChangeScanner",
+      "Paragraph",
+      "DecompilerConstructor",
+      "FillInTheBlank",
+      "OrderedCollection",
+      "CharacterBlock",
+      "ChangeSet",
+      "AssignmentNode",
+      "DictionaryInspector",
+      "Message",
+      "SystemTracer",
+      "DisplayTextView",
+      "Text",
+      "Scanner",
+      "Quadrangle",
+      "MethodChange",
+      "MouseMenuController",
+      "ClassChange",
+      "ParseStack",
+      "TextLineInterval",
+      "StandardSystemView",
+      "DisplayScreen",
+      "Switch",
+      "Form",
+      "Inspector",
+      "AltoFilePage",
+      "FileDirectory",
+      "Circle",
+      "CodeController",
+      "OnlyWhenSelectedCodeController",
+      "CascadeNode",
+      "InstructionPrinter",
+      "BlockNode",
+      "LockedListController",
+      "Delay",
+      "Line",
+      "TextController",
+      "Decompiler",
+      "InputState",
+      "KeyboardEvent",
+      "SelectionInListController",
+      "SmallInteger",
+      "ScrollController",
+      "SwitchView",
+      "FillInTheBlankView",
+      "CharacterBlockScanner",
+      "FilePage",
+      "CodeView",
+      "FormButtonCache",
+      "Project",
+      "SwitchController",
+      "BinaryChoiceView",
+      "Benchmark",
+      "SortedCollection",
+      "Path",
+      "Checker",
+      "DisplayScanner",
+      "FillInTheBlankController",
+      "Curve",
+      "BitEditor",
+      "ClassCommentChange",
+      "SyntaxError",
+      "Time",
+      "FormEditor",
+      "Point",
+      "ProcessHandle",
+      "ChangeListView",
+      "ContextInspector",
+      "OpaqueForm",
+      "File",
+      "SelectorNode",
+      "MappedCollection",
+      "ParagraphEditor",
+      "TextCollectorView",
+      "View",
+      "CompositionScanner",
+      "FileModel"
+    ],
+    "statistics": {
+      "bootstrap_classes": 34,
+      "system_classes": 223,
+      "common_classes": 34,
+      "perfect_match_count": 34,
+      "structural_match_count": 0,
+      "mismatch_count": 0
+    }
+  },
+  "summary": {
+    "bootstrap_classes": 34,
+    "system_classes": 223,
+    "perfect_matches": 34,
+    "structural_matches": 0,
+    "mismatches": 0,
+    "bootstrap_only": 0,
+    "system_only": 189
+  }
+}

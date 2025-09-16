@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Generated;
@@ -11,6 +12,43 @@ namespace Smalltalk80.Parser;
 /// </summary>
 public class SimpleAstBuildingVisitor : Smalltalk80BaseVisitor<object?>
 {
+    /// <summary>
+    /// The token stream for accessing original source text with spacing.
+    /// </summary>
+    protected readonly ITokenStream? tokenStream;
+    
+    /// <summary>
+    /// The input stream for accessing original source text with spacing preserved.
+    /// </summary>
+    protected readonly ICharStream? inputStream;
+    
+    /// <summary>
+    /// Initializes a new instance of the SimpleAstBuildingVisitor.
+    /// </summary>
+    public SimpleAstBuildingVisitor()
+    {
+        // Default constructor for backward compatibility
+    }
+    
+    /// <summary>
+    /// Initializes a new instance with a token stream for preserving source formatting.
+    /// </summary>
+    /// <param name="tokens">The token stream to use for getting original text.</param>
+    public SimpleAstBuildingVisitor(ITokenStream tokens)
+    {
+        this.tokenStream = tokens;
+    }
+    
+    /// <summary>
+    /// Initializes a new instance with both input and token streams for full source preservation.
+    /// </summary>
+    /// <param name="input">The input stream containing the original source.</param>
+    /// <param name="tokens">The token stream for token access.</param>
+    public SimpleAstBuildingVisitor(ICharStream input, ITokenStream tokens)
+    {
+        this.inputStream = input;
+        this.tokenStream = tokens;
+    }
     /// <summary>
     /// Visit a method entry context and create a MethodNode.
     /// </summary>
