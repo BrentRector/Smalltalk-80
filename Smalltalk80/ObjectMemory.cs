@@ -26,6 +26,9 @@ public static class ObjectMemory
     // GC configuration - adaptive thresholds
     private const int GROWTH_FACTOR = 2;        // How much to grow object table when full
     
+    // Special Objects Array protection - prevent GC until Smalltalk-80 GC roots are established
+    private static bool isSpecialObjectsArrayComplete = false;
+    
     // Adaptive GC thresholds
     private static int adaptiveHighWaterMark = 50000;    // Dynamic threshold for triggering GC
     private static int adaptiveLowFreeCount = 1000;     // Dynamic threshold for free list size
@@ -125,9 +128,9 @@ public static class ObjectMemory
     /// </summary>
     private static bool ShouldTriggerGC()
     {
-        // Don't GC during very early bootstrap (first 100 objects)
-        // These are critical system objects that shouldn't be collected
-        if (totalAllocations < 100)
+        // CRITICAL: Don't GC until Special Objects Array is complete with Behavior and Metaclass classes
+        // This is required for proper Smalltalk-80 GC root traversal
+        if (!isSpecialObjectsArrayComplete)
             return false;
             
         // Don't GC too frequently
@@ -181,25 +184,29 @@ public static class ObjectMemory
         var stopwatch = Stopwatch.StartNew();
         var reachable = new HashSet<int>();
         
-        // Phase 1: Mark all reachable objects from roots
+        // Phase 1: Mark all reachable objects from Smalltalk-80 root set
+        
+        // 1. Permanent roots (includes Special Objects Array)
         foreach (var root in permanentRoots)
         {
             if (root != null)
                 MarkReachable(root, reachable);
         }
         
+        // 2. Transient roots (active interpreter state, contexts)
         foreach (var root in transientRoots)
         {
             if (root != null)
                 MarkReachable(root, reachable);
         }
         
-        // Always mark the special objects as roots
+        // 3. Legacy fallback: individual special objects if Special Objects Array isn't available
+        // This ensures backward compatibility and handles the transition period
         if (NilObject != null) MarkReachable(NilObject, reachable);
         if (TrueObject != null) MarkReachable(TrueObject, reachable);
         if (FalseObject != null) MarkReachable(FalseObject, reachable);
         
-        // Mark the Smalltalk system dictionary if it exists
+        // 4. Legacy fallback: SystemDictionary lookup if not in Special Objects Array
         var smalltalkDict = FindSystemDictionary();
         if (smalltalkDict != null)
             MarkReachable(smalltalkDict, reachable);
@@ -258,11 +265,20 @@ public static class ObjectMemory
         if (obj.ClassPointer != null)
             MarkReachable(obj.ClassPointer, reachable);
         
-        // Mark all fields
+        // Mark all fields (handle both SmalltalkObject references and OOP integers)
         foreach (var field in obj.Fields)
         {
             if (field is SmalltalkObject fieldObj)
+            {
                 MarkReachable(fieldObj, reachable);
+            }
+            else if (field is int oop && oop > 0 && HasObject(oop))
+            {
+                // Handle OOP references stored as integers
+                var referencedObj = FromOop(oop);
+                if (referencedObj != null)
+                    MarkReachable(referencedObj, reachable);
+            }
         }
     }
     
@@ -345,6 +361,9 @@ public static class ObjectMemory
         recentGcEfficiencies.Clear();
         recentGcTimes.Clear();
         gcAdaptationCycle = 0;
+        
+        // Reset Special Objects Array completion flag
+        isSpecialObjectsArrayComplete = false;
     }
 
     /// <summary>Determines whether an object exists for the specified pointer.</summary>
@@ -711,6 +730,19 @@ public static class ObjectMemory
         gcTimeTarget = timeTarget;
         
         Console.WriteLine($"[GC Adapt] Updated targets: Efficiency={efficiencyTarget:P1}, Time={timeTarget:F1}ms");
+    }
+    
+    /// <summary>
+    /// Marks the Special Objects Array as complete, allowing GC to proceed.
+    /// Should be called after Behavior and Metaclass classes are installed in the Special Objects Array.
+    /// </summary>
+    public static void MarkSpecialObjectsArrayComplete()
+    {
+        if (!isSpecialObjectsArrayComplete)
+        {
+            isSpecialObjectsArrayComplete = true;
+            Console.WriteLine("[GC] Special Objects Array complete - GC now enabled");
+        }
     }
 }
 

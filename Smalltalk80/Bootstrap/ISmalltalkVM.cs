@@ -54,6 +54,12 @@ public interface ISmalltalkVM
     /// <param name="name">The symbol name to intern.</param>
     /// <returns>The OOP of the interned symbol.</returns>
     int PrimitiveInternSymbol(string name);
+    
+    /// <summary>
+    /// Get all currently interned symbol OOPs for the Symbol Table.
+    /// </summary>
+    /// <returns>Array of OOPs for all interned symbols.</returns>
+    int[] GetInternedSymbolOOPs();
 
     /// <summary>
     /// Create a SmallInteger object.
