@@ -21,6 +21,7 @@ namespace Smalltalk80.Interpreter.VM
         private readonly ClassBuilder classBuilder;
         private readonly BytecodeDispatcher bytecodeDispatcher;
         private readonly MessageDispatcher messageDispatcher;
+        private readonly ProcessScheduler processScheduler;
         private readonly OOP[] specialObjectsArray;
         private readonly Dictionary<string, OOP> symbolTable;
         private readonly Stack<MethodContext> executionStack;
@@ -29,11 +30,13 @@ namespace Smalltalk80.Interpreter.VM
         private bool bootstrapComplete = false;
         private int recursionDepth = 0;
         private const int MaxRecursionDepth = 1000;
+        private bool schedulerEnabled = false;
 
         /// <summary>
         /// Creates a new virtual machine instance.
         /// </summary>
-        public VirtualMachine(int initialMemorySize = 65536)
+        /// <param name="initialMemorySize">Initial object memory size. Default is 262144 for complete system.</param>
+        public VirtualMachine(int initialMemorySize = 262144)
         {
             memory = new ObjectMemory(initialMemorySize);
             primitiveTable = new PrimitiveTable();
@@ -41,6 +44,7 @@ namespace Smalltalk80.Interpreter.VM
             classBuilder = new ClassBuilder(memory);
             bytecodeDispatcher = new BytecodeDispatcher(this);
             messageDispatcher = new MessageDispatcher(memory, primitiveTable, this);
+            processScheduler = new ProcessScheduler(this, memory);
             specialObjectsArray = new OOP[SpecialObjects.Count];
             symbolTable = new Dictionary<string, OOP>();
             executionStack = new Stack<MethodContext>();
@@ -63,6 +67,30 @@ namespace Smalltalk80.Interpreter.VM
         /// Gets whether bootstrap has completed.
         /// </summary>
         public bool IsBootstrapped => bootstrapComplete;
+        
+        /// <summary>
+        /// Gets the process scheduler.
+        /// </summary>
+        public ProcessScheduler ProcessScheduler => processScheduler;
+        
+        /// <summary>
+        /// Gets or sets whether process scheduling is enabled.
+        /// </summary>
+        public bool IsSchedulerEnabled
+        {
+            get => schedulerEnabled;
+            set => schedulerEnabled = value;
+        }
+        
+        /// <summary>
+        /// Gets the currently active context.
+        /// </summary>
+        internal MethodContext? GetActiveContext() => activeContext;
+        
+        /// <summary>
+        /// Sets the active context.
+        /// </summary>
+        internal void SetActiveContext(MethodContext? context) => activeContext = context;
 
         /// <summary>
         /// Executes the bootstrap process.
@@ -150,6 +178,9 @@ namespace Smalltalk80.Interpreter.VM
             
             // Run garbage collection to verify everything is reachable
             RunGarbageCollection();
+            
+            // Start execution with an initial process
+            StartExecution();
         }
 
         /// <summary>
@@ -204,6 +235,51 @@ namespace Smalltalk80.Interpreter.VM
             
             // Metaclass class
             specialObjectsArray[SpecialObjects.MetaclassClass] = classBuilder.GetClass("Metaclass");
+            
+            // Create ProcessorScheduler if the class exists
+            var processorSchedulerClass = classBuilder.GetClass("ProcessorScheduler");
+            if (!processorSchedulerClass.IsNil)
+            {
+                // Create the singleton ProcessorScheduler instance
+                var schedulerOop = memory.AllocateObject(processorSchedulerClass, 2);
+                specialObjectsArray[SpecialObjects.ProcessorScheduler] = schedulerOop;
+                processScheduler.ProcessorSchedulerOop = schedulerOop;
+                
+                // Initialize the scheduler's fields
+                var schedulerObj = memory.GetObject(schedulerOop);
+                if (schedulerObj != null)
+                {
+                    // Create array of process lists (one for each priority)
+                    var arrayClass = classBuilder.GetClass("Array");
+                    var linkedListClass = classBuilder.GetClass("LinkedList");
+                    
+                    if (!arrayClass.IsNil && !linkedListClass.IsNil)
+                    {
+                        // Create array of 100 priority queues
+                        var priorityListsArray = memory.AllocateWordArray(arrayClass, 100);
+                        var priorityListsObj = memory.GetObject(priorityListsArray);
+                        
+                        if (priorityListsObj != null)
+                        {
+                            // Initialize each priority queue as a LinkedList
+                            for (int i = 0; i < 100; i++)
+                            {
+                                var list = memory.AllocateObject(linkedListClass, 2);
+                                var listObj = memory.GetObject(list);
+                                if (listObj != null)
+                                {
+                                    listObj.Fields[0] = OOP.Nil; // firstLink
+                                    listObj.Fields[1] = OOP.Nil; // lastLink
+                                }
+                                priorityListsObj.Fields[i] = list;
+                            }
+                            
+                            schedulerObj.Fields[0] = priorityListsArray; // quiescentProcessLists
+                            schedulerObj.Fields[1] = OOP.Nil; // activeProcess (initially nil)
+                        }
+                    }
+                }
+            }
         }
 
         private void CreateInitialSymbolTable()
@@ -329,6 +405,7 @@ namespace Smalltalk80.Interpreter.VM
             ArrayPrimitives.RegisterAll(primitiveTable);
             ClassPrimitives.RegisterAll(primitiveTable);
             ControlPrimitives.RegisterAll(primitiveTable);
+            ProcessPrimitives.RegisterAll(primitiveTable);
             StringPrimitives.RegisterAll(primitiveTable);
             SystemPrimitives.RegisterAll(primitiveTable);
             IOPrimitives.RegisterAll(primitiveTable);
@@ -631,6 +708,16 @@ namespace Smalltalk80.Interpreter.VM
             // Execute bytecodes until return or end
             while (context.PC < bytecodeArray.Fields.Length)
             {
+                // Check for process switch if scheduler is enabled
+                if (schedulerEnabled && ShouldCheckForProcessSwitch())
+                {
+                    CheckForProcessSwitch();
+                    
+                    // Context may have changed after process switch
+                    if (activeContext != context)
+                        break;
+                }
+                
                 var byteOop = bytecodeArray.Fields[context.PC++];
                 if (!byteOop.IsSmallInteger)
                     break;
@@ -640,6 +727,89 @@ namespace Smalltalk80.Interpreter.VM
                 // Execute bytecode - returns false on return instructions
                 if (!bytecodeDispatcher.ExecuteBytecode(context, bytecode))
                     break;
+            }
+        }
+        
+        /// <summary>
+        /// Determines if we should check for process switching.
+        /// </summary>
+        private bool ShouldCheckForProcessSwitch()
+        {
+            // Check every N bytecodes or on specific conditions
+            // This is a simplified implementation
+            return recursionDepth == 0 && executionStack.Count % 10 == 0;
+        }
+        
+        /// <summary>
+        /// Checks if a process switch is needed and performs it.
+        /// </summary>
+        private void CheckForProcessSwitch()
+        {
+            // This would be called by primitives that affect scheduling
+            // For now, it's a hook for future integration
+            if (!processScheduler.HasRunnableProcesses())
+                return;
+            
+            // Check if a higher priority process is ready
+            // This requires more integration with the Smalltalk process system
+        }
+        
+        /// <summary>
+        /// Performs a process switch to the specified process.
+        /// </summary>
+        /// <param name="newProcess">The process to switch to.</param>
+        public void SwitchToProcess(OOP newProcess)
+        {
+            if (!schedulerEnabled)
+                return;
+            
+            try
+            {
+                processScheduler.SwitchToProcess(newProcess);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Process switch failed: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Suspends the specified process.
+        /// </summary>
+        /// <param name="process">The process to suspend.</param>
+        /// <returns>The suspended context.</returns>
+        public OOP SuspendProcess(OOP process)
+        {
+            if (!schedulerEnabled)
+                return OOP.Nil;
+            
+            try
+            {
+                return processScheduler.SuspendProcess(process);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Process suspend failed: {ex.Message}");
+                return OOP.Nil;
+            }
+        }
+        
+        /// <summary>
+        /// Resumes the specified process.
+        /// </summary>
+        /// <param name="process">The process to resume.</param>
+        public void ResumeProcess(OOP process)
+        {
+            if (!schedulerEnabled)
+                return;
+            
+            try
+            {
+                processScheduler.ResumeProcess(process);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Process resume failed: {ex.Message}");
             }
         }
         
@@ -709,6 +879,267 @@ namespace Smalltalk80.Interpreter.VM
             }
             
             return false;
+        }
+
+        #endregion
+
+        #region System Startup
+
+        /// <summary>
+        /// Starts system execution by creating an initial process and context.
+        /// </summary>
+        private void StartExecution()
+        {
+            Console.WriteLine("[VM] Starting system execution...");
+            
+            try
+            {
+                // Create the initial process
+                var initialProcess = CreateInitialProcess();
+                if (initialProcess.IsNil)
+                {
+                    Console.WriteLine("[VM] Warning: Could not create initial process (Process class may not be loaded)");
+                    return;
+                }
+                
+                // Create the startup context that will execute system initialization
+                var startupContext = CreateStartupContext();
+                if (startupContext == null)
+                {
+                    Console.WriteLine("[VM] Warning: Could not create startup context");
+                    return;
+                }
+                
+                // Set the process's suspended context to our startup context
+                var processObj = memory.GetObject(initialProcess);
+                if (processObj != null && processObj.Fields.Length >= 3)
+                {
+                    // Process has fields: suspendedContext, priority, myList (from superclass Link)
+                    // Actually Link has nextLink field, so Process fields are at indices 1, 2, 3
+                    processObj.Fields[1] = CreateContextObject(startupContext); // suspendedContext
+                    processObj.Fields[2] = OOP.FromSmallInteger(50); // priority (normal user priority)
+                    processObj.Fields[3] = OOP.Nil; // myList (not on any list initially)
+                }
+                
+                // Set as the active process
+                activeContext = startupContext;
+                processScheduler.SetActiveProcess(initialProcess);
+                
+                // Update the ProcessorScheduler's activeProcess field
+                var schedulerOop = GetSpecialObject(SpecialObjects.ProcessorScheduler);
+                if (!schedulerOop.IsNil)
+                {
+                    var schedulerObj = memory.GetObject(schedulerOop);
+                    if (schedulerObj != null && schedulerObj.Fields.Length >= 2)
+                    {
+                        schedulerObj.Fields[1] = initialProcess; // activeProcess field
+                    }
+                }
+                
+                Console.WriteLine("[VM] Initial process created and activated");
+                
+                // Begin executing the startup context
+                Console.WriteLine("[VM] Beginning bytecode execution...");
+                ExecuteStartup(startupContext);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Error during startup: {ex.Message}");
+                Console.WriteLine($"[VM] Stack trace: {ex.StackTrace}");
+            }
+        }
+        
+        /// <summary>
+        /// Creates the initial Process object.
+        /// </summary>
+        private OOP CreateInitialProcess()
+        {
+            var processClass = classBuilder.GetClass("Process");
+            if (processClass.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            // Process inherits from Link which has 1 field (nextLink)
+            // Process adds 3 fields: suspendedContext, priority, myList
+            // Total: 4 fields
+            var process = memory.AllocateObject(processClass, 4);
+            var processObj = memory.GetObject(process);
+            
+            if (processObj != null)
+            {
+                // Initialize all fields to nil
+                for (int i = 0; i < processObj.Fields.Length; i++)
+                {
+                    processObj.Fields[i] = OOP.Nil;
+                }
+            }
+            
+            return process;
+        }
+        
+        /// <summary>
+        /// Creates the startup method context that will execute system initialization.
+        /// </summary>
+        private MethodContext? CreateStartupContext()
+        {
+            // Create a synthetic startup method that will initialize the system
+            var startupMethod = CreateStartupMethod();
+            if (startupMethod.IsNil)
+            {
+                return null;
+            }
+            
+            // The receiver will be the Smalltalk system dictionary
+            var receiver = GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+            if (receiver.IsNil)
+            {
+                // Fall back to nil as receiver
+                receiver = OOP.Nil;
+            }
+            
+            // Create context with no arguments
+            var context = new MethodContext(
+                sender: null, // No sender, this is the top-level context
+                receiver: receiver,
+                method: startupMethod,
+                arguments: [],
+                tempCount: 0,
+                stackSize: 16
+            );
+            
+            return context;
+        }
+        
+        /// <summary>
+        /// Creates a synthetic CompiledMethod for system startup.
+        /// </summary>
+        private OOP CreateStartupMethod()
+        {
+            var compiledMethodClass = classBuilder.GetClass("CompiledMethod");
+            if (compiledMethodClass.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            // Create a simple startup method that:
+            // 1. Pushes a greeting string
+            // 2. Sends #print to it
+            // 3. Returns nil
+            
+            // Create the method object with 3 fields: header, bytecode, literals
+            var method = memory.AllocateObject(compiledMethodClass, 3);
+            var methodObj = memory.GetObject(method);
+            
+            if (methodObj == null)
+            {
+                return OOP.Nil;
+            }
+            
+            // Create method header
+            // Format: primitive (bits 1-8), argCount (bits 9-13), tempCount (bits 14-18), stackSize (bits 19-24)
+            int primitiveIndex = 0; // No primitive
+            int argCount = 0;       // No arguments
+            int tempCount = 0;      // No temporaries
+            int stackSize = 4;      // Small stack needed
+            
+            int header = (primitiveIndex << 1) | (argCount << 9) | (tempCount << 14) | (stackSize << 19);
+            methodObj.Fields[0] = OOP.FromSmallInteger(header);
+            
+            // Create bytecode array
+            var byteArrayClass = classBuilder.GetClass("ByteArray");
+            if (!byteArrayClass.IsNil)
+            {
+                // Simple bytecode sequence:
+                // Push literal 0 (the string "Smalltalk system initialized")
+                // Send selector #print (literal 1)
+                // Push nil
+                // Return top
+                byte[] bytecodes = [
+                    32,  // Push literal constant 0
+                    209, // Send literal selector 1 with 0 arguments (192 + 17)
+                    115, // Push nil
+                    124  // Return top
+                ];
+                
+                var bytecodeArray = memory.AllocateByteArray(byteArrayClass, bytecodes.Length);
+                var bytecodeObj = memory.GetObject(bytecodeArray);
+                if (bytecodeObj != null)
+                {
+                    for (int i = 0; i < bytecodes.Length; i++)
+                    {
+                        bytecodeObj.Fields[i] = OOP.FromSmallInteger(bytecodes[i]);
+                    }
+                }
+                methodObj.Fields[1] = bytecodeArray;
+                
+                // Create literals array
+                var arrayClass = classBuilder.GetClass("Array");
+                if (!arrayClass.IsNil)
+                {
+                    var literalsArray = memory.AllocateWordArray(arrayClass, 2);
+                    var literalsObj = memory.GetObject(literalsArray);
+                    if (literalsObj != null)
+                    {
+                        // Literal 0: String "Smalltalk system initialized"
+                        var stringClass = classBuilder.GetClass("String");
+                        if (!stringClass.IsNil)
+                        {
+                            var message = "Smalltalk-80 system initialized";
+                            var stringObj = memory.AllocateByteArray(stringClass, message.Length);
+                            var strObj = memory.GetObject(stringObj);
+                            if (strObj != null)
+                            {
+                                for (int i = 0; i < message.Length; i++)
+                                {
+                                    strObj.Fields[i] = OOP.FromSmallInteger(message[i]);
+                                }
+                            }
+                            literalsObj.Fields[0] = stringObj;
+                        }
+                        else
+                        {
+                            literalsObj.Fields[0] = OOP.Nil;
+                        }
+                        
+                        // Literal 1: Symbol #print (or #printString)
+                        literalsObj.Fields[1] = Intern("printString");
+                    }
+                    methodObj.Fields[2] = literalsArray;
+                }
+                else
+                {
+                    methodObj.Fields[2] = OOP.Nil;
+                }
+            }
+            else
+            {
+                // No ByteArray class, create empty bytecode
+                methodObj.Fields[1] = OOP.Nil;
+                methodObj.Fields[2] = OOP.Nil;
+            }
+            
+            return method;
+        }
+        
+        /// <summary>
+        /// Executes the startup context to initialize the system.
+        /// </summary>
+        private void ExecuteStartup(MethodContext startupContext)
+        {
+            try
+            {
+                // Set as active context and execute
+                activeContext = startupContext;
+                ExecuteBytecodes(startupContext);
+                
+                Console.WriteLine("[VM] Startup execution completed");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Error during startup execution: {ex.Message}");
+                // Don't rethrow - allow the system to continue even if startup fails
+            }
         }
 
         #endregion

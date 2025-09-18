@@ -8,7 +8,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
 {
     /// <summary>
     /// Builds classes in multiple passes to ensure no null class pointers.
-    /// Implements the clean bootstrap design from BOOTSTRAP_DESIGN.md.
+    /// Implements the clean bootstrap design from ../../BOOTSTRAP_DESIGN.md.
     /// </summary>
     public sealed class ClassBuilder
     {

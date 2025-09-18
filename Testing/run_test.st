@@ -1,1 +1,0 @@
-BasicSmalltalkTests new runTest

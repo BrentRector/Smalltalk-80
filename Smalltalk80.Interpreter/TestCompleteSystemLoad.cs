@@ -5,10 +5,11 @@ using Smalltalk80.Interpreter.VM;
 namespace Smalltalk80.Interpreter
 {
     /// <summary>
-    /// Test program to attempt loading the complete Smalltalk-80 system image.
-    /// This is a temporary test to see what happens when we load all 223 classes
-    /// instead of just the 85 bootstrap classes.
+    /// [DEPRECATED] Test program for loading the complete Smalltalk-80 system image.
+    /// The main Program.cs now loads the complete system by default.
+    /// This test is kept for backward compatibility only.
     /// </summary>
+    [Obsolete("Use the main program which now loads the complete system by default")]
     public static class TestCompleteSystemLoad
     {
         public static void Run(string[] args)

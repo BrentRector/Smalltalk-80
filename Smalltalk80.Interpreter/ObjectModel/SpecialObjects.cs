@@ -41,12 +41,12 @@ public static class SpecialObjects
     public const int SymbolTable = 6;
 
     /// <summary>
-    /// Index of Process list in Special Objects Array (future support).
+    /// Index of Process list in Special Objects Array.
     /// </summary>
     public const int ProcessList = 7;
 
     /// <summary>
-    /// Index of ProcessorScheduler in Special Objects Array (future support).
+    /// Index of ProcessorScheduler singleton instance in Special Objects Array.
     /// </summary>
     public const int ProcessorScheduler = 8;
 
