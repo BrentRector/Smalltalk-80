@@ -107,6 +107,13 @@ public sealed class GarbageCollector(ObjectMemory objectMemory)
         {
             if (!layout.Header.IsMarked && !layout.Header.IsPermanent)
             {
+                // Only show debug for unexpected cases
+                if (layout.Fields.Length > 0)
+                {
+                    Console.WriteLine($"[GC] Collecting unreachable object: OOP={oop}, Class={layout.Header.ClassOOP}, " +
+                                    $"FieldCount={layout.Fields.Length}");
+                }
+                
                 toRemove.Add(oop.ObjectIndex);
             }
         }

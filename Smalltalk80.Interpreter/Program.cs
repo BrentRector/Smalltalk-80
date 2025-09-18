@@ -12,6 +12,13 @@ namespace Smalltalk80.Interpreter
     {
         public static void Main(string[] args)
         {
+            // Check if we want to run the complete system load test
+            if (args.Length > 0 && args[0] == "--test-complete-load")
+            {
+                TestCompleteSystemLoad.Run(args);
+                return;
+            }
+            
             try
             {
                 // Create VM with default memory size

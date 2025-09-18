@@ -28,12 +28,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// <param name="memory">The object memory for allocations.</param>
         /// <param name="classBuilder">The class builder for class creation.</param>
         /// <param name="symbolTable">The symbol table for interning.</param>
-        public ImageLoader(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable)
+        /// <param name="getSpecialObject">Optional function to get special objects.</param>
+        public ImageLoader(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable, Func<int, OOP>? getSpecialObject = null)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
             this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
-            this.methodInstaller = new MethodInstaller(memory, classBuilder, symbolTable);
+            this.methodInstaller = new MethodInstaller(memory, classBuilder, symbolTable, getSpecialObject);
             
             // Configure JSON options for flexible parsing
             this.jsonOptions = new JsonSerializerOptions
@@ -139,7 +140,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// <summary>
         /// Loads and parses a manifest file.
         /// </summary>
-        private BootstrapManifest LoadManifestFromFile(string filePath)
+        public BootstrapManifest LoadManifestFromFile(string filePath)
         {
             try
             {
@@ -197,6 +198,21 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
         }
 
+        /// <summary>
+        /// Processes only the class creation part of a manifest (no method installation).
+        /// </summary>
+        public void ProcessClasses(BootstrapManifest manifest)
+        {
+            Console.WriteLine($"[ImageLoader] Processing classes from manifest");
+            ProcessBootstrapClasses(manifest);
+            
+            // Store the manifest so statistics are tracked
+            if (!loadedManifests.ContainsKey("bootstrap"))
+            {
+                loadedManifests["bootstrap"] = manifest;
+            }
+        }
+        
         /// <summary>
         /// Processes a loaded manifest to create classes and install methods.
         /// </summary>
@@ -408,17 +424,26 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public LoadStatistics GetStatistics()
         {
-            // Calculate total methods from all sources
+            // The actual installed methods are tracked by MethodInstaller
             int totalMethods = methodInstaller.GetAllCachedMethods().Count;
             
-            foreach (var manifest in loadedManifests.Values)
+            // If no methods were tracked by MethodInstaller, count from manifests
+            if (totalMethods == 0)
             {
-                totalMethods += manifest.Classes.Sum(c => 
-                    (c.Methods?.Count ?? 0) + (c.ClassMethods?.Count ?? 0));
-                
-                if (manifest.Methods != null)
+                foreach (var manifest in loadedManifests.Values)
                 {
-                    totalMethods += manifest.Methods.Count;
+                    // Count inline methods from class definitions
+                    foreach (var classDef in manifest.Classes)
+                    {
+                        totalMethods += classDef.Methods?.Count ?? 0;
+                        totalMethods += classDef.ClassMethods?.Count ?? 0;
+                    }
+                    
+                    // Count flat methods array
+                    if (manifest.Methods != null)
+                    {
+                        totalMethods += manifest.Methods.Count;
+                    }
                 }
             }
             

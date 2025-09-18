@@ -116,14 +116,21 @@ namespace Smalltalk80.Interpreter.VM
         {
             Console.WriteLine($"[VM] Loading bootstrap from JSON: {bootstrapPath}");
             
-            // Create the image loader
+            // Create the image loader 
+            // We'll pass GetSpecialObject later after special objects are created
             var imageLoader = new ImageLoader(memory, classBuilder, this);
             
-            // Load the bootstrap manifest
-            var manifest = imageLoader.LoadBootstrap(bootstrapPath);
+            // First, just load and create the classes (without installing methods)
+            var manifest = imageLoader.LoadManifestFromFile(bootstrapPath);
+            imageLoader.ProcessClasses(manifest);
             
-            // Create special objects after classes are loaded
+            // Create special objects now that classes exist
             CreateSpecialObjects();
+            
+            // NOW create a new MethodInstaller with access to special objects
+            // and install the methods
+            var methodInstaller = new MethodInstaller(memory, classBuilder, this, GetSpecialObject);
+            methodInstaller.InstallMethods(manifest);
             
             // Create initial symbol table
             CreateInitialSymbolTable();
@@ -158,8 +165,8 @@ namespace Smalltalk80.Interpreter.VM
             
             Console.WriteLine($"[VM] Loading extended manifests from: {manifestDirectory}");
             
-            // Create the image loader
-            var imageLoader = new ImageLoader(memory, classBuilder, this);
+            // Create the image loader with getSpecialObject function
+            var imageLoader = new ImageLoader(memory, classBuilder, this, GetSpecialObject);
             
             // Load all manifests from directory
             imageLoader.LoadManifestsFromDirectory(manifestDirectory);
@@ -211,17 +218,19 @@ namespace Smalltalk80.Interpreter.VM
                 specialObjectsArray[SpecialObjects.SymbolTable] = symbolTableObj;
                 
                 // Initialize with basic capacity
+                // Dictionary uses a single array for storing Associations (key-value pairs)
                 var arrayClass = classBuilder.GetClass("Array");
                 if (!arrayClass.IsNil)
                 {
-                    var keysArray = memory.AllocateWordArray(arrayClass, 32);
-                    var valuesArray = memory.AllocateWordArray(arrayClass, 32);
+                    // Dictionary/Set stores elements in a single array
+                    // For symbols, we'll need space for Association objects
+                    var dictArray = memory.AllocateWordArray(arrayClass, 64); // Initial capacity
                     
                     var symbolTableLayout = memory.GetObject(symbolTableObj);
                     if (symbolTableLayout != null)
                     {
                         symbolTableLayout.Fields[0] = OOP.FromSmallInteger(0); // tally
-                        symbolTableLayout.Fields[1] = keysArray; // array for dictionary
+                        symbolTableLayout.Fields[1] = dictArray; // array for dictionary
                     }
                 }
             }

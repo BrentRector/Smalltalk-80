@@ -16,6 +16,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         private readonly ClassBuilder classBuilder;
         private readonly ISymbolTable symbolTable;
         private readonly Dictionary<string, OOP> methodCache = new();
+        private readonly Func<int, OOP>? getSpecialObject;
         
         /// <summary>
         /// Initializes a new instance of the MethodInstaller class.
@@ -23,11 +24,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// <param name="memory">The object memory to use for allocations.</param>
         /// <param name="classBuilder">The class builder for class lookups.</param>
         /// <param name="symbolTable">The symbol table for selector interning.</param>
-        public MethodInstaller(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable)
+        /// <param name="getSpecialObject">Optional function to get special objects (true, false, nil).</param>
+        public MethodInstaller(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable, Func<int, OOP>? getSpecialObject = null)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
             this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
+            this.getSpecialObject = getSpecialObject;
         }
 
         /// <summary>
@@ -323,15 +326,16 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         private OOP GetTrueObject()
         {
-            // Try to get true instance from True class
-            var trueClass = classBuilder.GetClass("True");
-            if (!trueClass.IsNil)
+            // Use the singleton true object from Special Objects Array if available
+            if (getSpecialObject != null)
             {
-                // True class should have a single instance
-                // For bootstrap, we allocate it if needed
-                var trueObj = memory.AllocateObject(trueClass, 0);
-                return trueObj;
+                var trueObj = getSpecialObject(SpecialObjects.TrueObject);
+                if (!trueObj.IsNil)
+                    return trueObj;
             }
+            
+            // Fallback: should not happen after bootstrap is complete
+            Console.WriteLine("[MethodInstaller] Warning: true object not found in Special Objects Array");
             return OOP.Nil;
         }
 
@@ -340,15 +344,16 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         private OOP GetFalseObject()
         {
-            // Try to get false instance from False class
-            var falseClass = classBuilder.GetClass("False");
-            if (!falseClass.IsNil)
+            // Use the singleton false object from Special Objects Array if available
+            if (getSpecialObject != null)
             {
-                // False class should have a single instance
-                // For bootstrap, we allocate it if needed
-                var falseObj = memory.AllocateObject(falseClass, 0);
-                return falseObj;
+                var falseObj = getSpecialObject(SpecialObjects.FalseObject);
+                if (!falseObj.IsNil)
+                    return falseObj;
             }
+            
+            // Fallback: should not happen after bootstrap is complete
+            Console.WriteLine("[MethodInstaller] Warning: false object not found in Special Objects Array");
             return OOP.Nil;
         }
 

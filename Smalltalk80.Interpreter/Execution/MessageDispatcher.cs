@@ -20,8 +20,6 @@ public sealed class MessageDispatcher
     
     // Pre-interned common selectors
     private OOP doesNotUnderstandSelector = OOP.Nil;
-    private OOP messageSelector = OOP.Nil;
-    private OOP messageArgumentsSelector = OOP.Nil;
     
     /// <summary>
     /// Creates a new message dispatcher.
@@ -43,8 +41,10 @@ public sealed class MessageDispatcher
     public void Initialize()
     {
         doesNotUnderstandSelector = symbolTable.Intern("doesNotUnderstand:");
-        messageSelector = symbolTable.Intern("message");
-        messageArgumentsSelector = symbolTable.Intern("arguments");
+        // Don't pre-intern selectors we're not actually using yet
+        // These would be leaked since MessageDispatcher is not traced by GC
+        // messageSelector = symbolTable.Intern("message");
+        // messageArgumentsSelector = symbolTable.Intern("arguments");
     }
     
     /// <summary>
