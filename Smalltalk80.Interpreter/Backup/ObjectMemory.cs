@@ -26,8 +26,11 @@ public static class ObjectMemory
     // GC configuration - adaptive thresholds
     private const int GROWTH_FACTOR = 2;        // How much to grow object table when full
     
-    // Special Objects Array protection - prevent GC until Smalltalk-80 GC roots are established
-    private static bool isSpecialObjectsArrayComplete = false;
+    // VM reference for accessing Special Objects Array
+    private static VirtualMachine? vm;
+    
+    // Flag to indicate if GC can run (special objects are set up)
+    private static bool isGCEnabled = false;
     
     // Adaptive GC thresholds
     private static int adaptiveHighWaterMark = 50000;    // Dynamic threshold for triggering GC
@@ -128,17 +131,14 @@ public static class ObjectMemory
     /// </summary>
     private static bool ShouldTriggerGC()
     {
-        // CRITICAL: Don't GC until Special Objects Array is complete with Behavior and Metaclass classes
-        // This is required for proper Smalltalk-80 GC root traversal
-        if (!isSpecialObjectsArrayComplete)
+        // CRITICAL: During bootstrap, never auto-trigger GC
+        // GC will only run when explicitly enabled
+        if (!isGCEnabled)
             return false;
             
-        // Don't GC too frequently
-        if ((DateTime.Now - lastGCTime).TotalSeconds < 1.0)
-            return false;
-            
-        return AllocatedObjectCount > adaptiveHighWaterMark || 
-               freeList.Count < adaptiveLowFreeCount;
+        // For now, disable automatic GC entirely during bootstrap
+        // Future enhancement: enable automatic GC after bootstrap with proper Process/Context roots
+        return false;
     }
 
     /// <summary>
@@ -181,6 +181,14 @@ public static class ObjectMemory
     /// </summary>
     public static int ManualGC()
     {
+        return ManualGCInternal(isValidationGC: false);
+    }
+    
+    /// <summary>
+    /// Internal GC implementation with diagnostic flag.
+    /// </summary>
+    private static int ManualGCInternal(bool isValidationGC)
+    {
         var stopwatch = Stopwatch.StartNew();
         var reachable = new HashSet<int>();
         
@@ -200,28 +208,140 @@ public static class ObjectMemory
                 MarkReachable(root, reachable);
         }
         
-        // 3. Legacy fallback: individual special objects if Special Objects Array isn't available
+        // 3. VM's Special Objects Array contents - each slot is a GC root
+        if (vm != null)
+        {
+            var specialObjects = vm.GetSpecialObjectsArray();
+            if (specialObjects != null)
+            {
+                int nonNullCount = specialObjects.Count(o => o != null);
+                Console.WriteLine($"[GC] Marking VM Special Objects Array as roots ({nonNullCount} non-null objects)");
+                for (int i = 0; i < specialObjects.Length; i++)
+                {
+                    var obj = specialObjects[i];
+                    if (obj != null)
+                    {
+                        MarkReachable(obj, reachable);
+                        Console.WriteLine($"[GC]   Slot {i}: marked object OOP {obj.Oop} as root");
+                    }
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine("[GC] WARNING: No VM reference for Special Objects Array");
+        }
+        
+        // 4. Legacy fallback: individual special objects if Special Objects Array isn't available
         // This ensures backward compatibility and handles the transition period
         if (NilObject != null) MarkReachable(NilObject, reachable);
         if (TrueObject != null) MarkReachable(TrueObject, reachable);
         if (FalseObject != null) MarkReachable(FalseObject, reachable);
         
-        // 4. Legacy fallback: SystemDictionary lookup if not in Special Objects Array
+        // 5. Legacy fallback: SystemDictionary lookup if not in Special Objects Array
         var smalltalkDict = FindSystemDictionary();
         if (smalltalkDict != null)
             MarkReachable(smalltalkDict, reachable);
         
+        // Debug: Log how many objects are marked as reachable
+        Console.WriteLine($"[GC] Marked {reachable.Count} objects as reachable");
+        
         // Phase 2: Sweep unreachable objects
         int freedCount = 0;
+        var freedByType = new Dictionary<string, int>();
+        var freedExamples = new Dictionary<string, List<string>>();
+        
         for (int i = 0; i < nextFreeIndex; i++)
         {
             if (objects[i] != null && !reachable.Contains(i))
             {
                 var objToFree = objects[i]!;
+                
+                // Collect diagnostic information about what's being freed
+                string typeName = "Unknown";
+                string details = "";
+                
+                if (objToFree.ClassPointer != null)
+                {
+                    // Try to get class name - for Class objects, the name is in field 5
+                    // But first check if this is a class or metaclass
+                    var classPtr = objToFree.ClassPointer;
+                    
+                    // Get the name from the class object
+                    if (classPtr.Fields.Length > 5)
+                    {
+                        // Class name is in field 5 for Class objects
+                        if (classPtr.Fields[5] is string className)
+                        {
+                            typeName = className;
+                        }
+                        else if (classPtr.Fields[5] is SmalltalkObject nameSymbol && 
+                                 nameSymbol.Fields.Length > 0 && 
+                                 nameSymbol.Fields[0] is string symName)
+                        {
+                            // Sometimes the name is a Symbol object
+                            typeName = symName;
+                        }
+                    }
+                    
+                    // Collect details for specific types
+                    if (typeName == "String" && objToFree.Fields.Length > 0 && objToFree.Fields[0] is string strValue)
+                    {
+                        details = $"'{strValue}'";
+                    }
+                    else if (typeName == "Symbol" && objToFree.Fields.Length > 0 && objToFree.Fields[0] is string symValue)
+                    {
+                        details = $"#{symValue}";
+                    }
+                    else if (typeName == "CompiledMethod" && objToFree.Fields.Length >= 2)
+                    {
+                        var selectorField = objToFree.Fields[0];
+                        if (selectorField is SmalltalkObject selObj && selObj.Fields.Length > 0 && selObj.Fields[0] is string selector)
+                        {
+                            details = $"selector: {selector}";
+                        }
+                    }
+                    else if (typeName == "Array")
+                    {
+                        details = $"size: {objToFree.Fields.Length}";
+                    }
+                }
+                
+                // Track freed objects by type
+                if (!freedByType.ContainsKey(typeName))
+                {
+                    freedByType[typeName] = 0;
+                    freedExamples[typeName] = new List<string>();
+                }
+                freedByType[typeName]++;
+                
+                // Collect up to 3 examples per type
+                if (freedExamples[typeName].Count < 3 && !string.IsNullOrEmpty(details))
+                {
+                    freedExamples[typeName].Add($"OOP {objToFree.Oop} {details}");
+                }
+                
                 UpdateTypeIndex(objToFree, i, isRegistration: false);
                 objects[i] = null;
                 freeList.Enqueue(i);
                 freedCount++;
+            }
+        }
+        
+        // Log what was freed if validation GC
+        if (isValidationGC && freedCount > 0)
+        {
+            Console.WriteLine($"[GC-DIAGNOSTIC] Objects freed by type:");
+            foreach (var kvp in freedByType.OrderByDescending(x => x.Value))
+            {
+                Console.WriteLine($"  {kvp.Key}: {kvp.Value} objects");
+                if (freedExamples.ContainsKey(kvp.Key) && freedExamples[kvp.Key].Count > 0)
+                {
+                    foreach (var example in freedExamples[kvp.Key])
+                    {
+                        Console.WriteLine($"    Example: {example}");
+                    }
+                }
             }
         }
         
@@ -250,8 +370,9 @@ public static class ObjectMemory
     
     /// <summary>
     /// Marks an object and all objects reachable from it.
+    /// Special handling for MethodDictionary, Association, and CompiledMethod objects.
     /// </summary>
-    private static void MarkReachable(SmalltalkObject obj, HashSet<int> reachable)
+    private static void MarkReachable(SmalltalkObject obj, HashSet<int> reachable, int depth = 0)
     {
         if (obj == null) return;
         
@@ -261,24 +382,72 @@ public static class ObjectMemory
             
         reachable.Add(index);
         
+        // Optional deep tracing for debugging (controlled by environment variable or flag)
+        bool deepTrace = Environment.GetEnvironmentVariable("SMALLTALK_GC_TRACE") == "deep";
+        string? className = null;
+        if (deepTrace && depth < 3)
+        {
+            className = obj.ClassPointer != null ? TryGetClassName(obj.ClassPointer) : null;
+            className = className ?? obj.ClassPointer?.ToString() ?? "Unknown";
+            Console.WriteLine($"[GC]   {"  ".PadLeft(depth * 2)}Marking OOP {obj.Oop} (class: {className}, {obj.Fields.Length} fields)");
+        }
+        
         // Mark the class pointer
         if (obj.ClassPointer != null)
-            MarkReachable(obj.ClassPointer, reachable);
+            MarkReachable(obj.ClassPointer, reachable, depth + 1);
         
-        // Mark all fields (handle both SmalltalkObject references and OOP integers)
-        foreach (var field in obj.Fields)
+        // Simple GC: Just mark ALL fields that could be object pointers
+        // The format word in the class tells us how many fields to scan, but
+        // for simplicity, we'll scan all fields and check if they're valid OOPs
+        
+        // Debug for SystemDictionary
+        if (obj.Oop == 412)
         {
-            if (field is SmalltalkObject fieldObj)
+            int objectFields = 0;
+            int oopFields = 0;
+            int nilFields = 0;
+            
+            foreach (var field in obj.Fields)
             {
-                MarkReachable(fieldObj, reachable);
+                if (field == null) nilFields++;
+                else if (field is SmalltalkObject so) 
+                {
+                    objectFields++;
+                    // Check if it's the nil object
+                    if (so.Oop == 42) nilFields++; // nil is OOP 42
+                }
+                else if (field is int oop && oop > 0 && (oop & 1) == 0) oopFields++;
+                
+                MarkFieldAsReachable(field, reachable, depth + 1);
             }
-            else if (field is int oop && oop > 0 && HasObject(oop))
+            
+            Console.WriteLine($"[GC] SystemDictionary fields: {objectFields} objects, {oopFields} OOPs, {nilFields} nils");
+        }
+        else
+        {
+            foreach (var field in obj.Fields)
             {
-                // Handle OOP references stored as integers
-                var referencedObj = FromOop(oop);
-                if (referencedObj != null)
-                    MarkReachable(referencedObj, reachable);
+                MarkFieldAsReachable(field, reachable, depth + 1);
             }
+        }
+    }
+    
+    /// <summary>
+    /// Helper method to mark a field as reachable, handling both object references and OOP integers.
+    /// </summary>
+    private static void MarkFieldAsReachable(object? field, HashSet<int> reachable, int depth)
+    {
+        if (field is SmalltalkObject fieldObj)
+        {
+            MarkReachable(fieldObj, reachable, depth);
+        }
+        else if (field is int oop && oop >= 0 && (oop & 1) == 0 && HasObject(oop))
+        {
+            // Handle OOP references stored as integers
+            // OOPs are even numbers (including 0), SmallIntegers have low bit set
+            var referencedObj = FromOop(oop);
+            if (referencedObj != null)
+                MarkReachable(referencedObj, reachable, depth);
         }
     }
     
@@ -287,19 +456,9 @@ public static class ObjectMemory
     /// </summary>
     private static SmalltalkObject? FindSystemDictionary()
     {
-        // Look for an object that might be the Smalltalk dictionary
-        // This is typically a SystemDictionary instance
-        for (int i = 0; i < nextFreeIndex; i++)
-        {
-            var obj = objects[i];
-            if (obj?.ClassPointer != null)
-            {
-                // Check if this might be SystemDictionary
-                var className = TryGetClassName(obj.ClassPointer);
-                if (className == "SystemDictionary")
-                    return obj;
-            }
-        }
+        // The SystemDictionary is now marked directly through VM's Special Objects Array
+        // This method is kept for legacy compatibility but may not be needed
+        Console.WriteLine("[GC] SystemDictionary now marked through VM Special Objects Array");
         return null;
     }
     
@@ -308,10 +467,33 @@ public static class ObjectMemory
     /// </summary>
     private static string? TryGetClassName(SmalltalkObject cls)
     {
-        // This is a simplified version - you might have a better way
-        // to get class names in your implementation
-        if (cls.Fields.Length > 6 && cls.Fields[6] is string name)
-            return name;
+        // Class name is in field 5 as a Symbol object
+        if (cls.Fields.Length > 5)
+        {
+            if (cls.Fields[5] is string name)
+                return name;
+            else if (cls.Fields[5] is SmalltalkObject nameSymbol && 
+                     nameSymbol.Fields.Length > 0 && 
+                     nameSymbol.Fields[0] is string symName)
+                return symName;
+            else if (cls.Fields[5] is int nameOop && nameOop > 0 && (nameOop & 1) == 0)
+            {
+                // Sometimes the name is stored as an OOP
+                var nameObj = FromOop(nameOop);
+                if (nameObj != null && nameObj.Fields.Length > 0 && nameObj.Fields[0] is string symStr)
+                    return symStr;
+            }
+        }
+        // Try field 6 as fallback (some inconsistency in the codebase)
+        if (cls.Fields.Length > 6)
+        {
+            if (cls.Fields[6] is string name)
+                return name;
+            else if (cls.Fields[6] is SmalltalkObject nameSymbol && 
+                     nameSymbol.Fields.Length > 0 && 
+                     nameSymbol.Fields[0] is string symName)
+                return symName;
+        }
         return null;
     }
     
@@ -362,8 +544,9 @@ public static class ObjectMemory
         recentGcTimes.Clear();
         gcAdaptationCycle = 0;
         
-        // Reset Special Objects Array completion flag
-        isSpecialObjectsArrayComplete = false;
+        // Reset GC and VM state
+        isGCEnabled = false;
+        vm = null;
     }
 
     /// <summary>Determines whether an object exists for the specified pointer.</summary>
@@ -733,15 +916,33 @@ public static class ObjectMemory
     }
     
     /// <summary>
-    /// Marks the Special Objects Array as complete, allowing GC to proceed.
-    /// Should be called after Behavior and Metaclass classes are installed in the Special Objects Array.
+    /// Manual GC for bootstrap validation - should collect 0 objects when system is stable.
     /// </summary>
-    public static void MarkSpecialObjectsArrayComplete()
+    public static int ManualGCForBootstrapValidation()
     {
-        if (!isSpecialObjectsArrayComplete)
+        Console.WriteLine("[GC] Running explicit GC for bootstrap validation...");
+        return ManualGCInternal(isValidationGC: true);
+    }
+    
+    /// <summary>
+    /// Registers the VM reference for accessing Special Objects Array.
+    /// Must be called before GC can run.
+    /// </summary>
+    public static void RegisterVM(VirtualMachine virtualMachine)
+    {
+        vm = virtualMachine;
+        Console.WriteLine("[GC] VM registered for Special Objects Array access");
+    }
+    
+    /// <summary>
+    /// Enables garbage collection once the Special Objects Array is populated.
+    /// </summary>
+    public static void EnableGC()
+    {
+        if (!isGCEnabled)
         {
-            isSpecialObjectsArrayComplete = true;
-            Console.WriteLine("[GC] Special Objects Array complete - GC now enabled");
+            isGCEnabled = true;
+            Console.WriteLine("[GC] Garbage collection enabled");
         }
     }
 }

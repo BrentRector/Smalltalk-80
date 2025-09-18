@@ -140,21 +140,23 @@ internal sealed class BootstrapContext
 
         Console.WriteLine("[BOOTSTRAP] Migrating temporary bootstrap dictionaries to Smalltalk SystemDictionary...");
         
-        // Migrate all globals to Smalltalk dictionary
+        // Only migrate globals that are NOT classes (since classes are handled by SystemImageBootstrapExecutor)
+        int migratedCount = 0;
         foreach (var kvp in temporaryGlobals)
         {
-            // Register all globals including Smalltalk itself
-            // It's important to have "Smalltalk" as an entry in the Smalltalk dictionary
+            // Skip classes (capitalized names) that were already registered by SystemImageBootstrapExecutor
+            if (kvp.Key.Length > 0 && char.IsUpper(kvp.Key[0]) && temporaryClasses.ContainsKey(kvp.Key))
+            {
+                Console.WriteLine($"[BOOTSTRAP] Skipping class '{kvp.Key}' - already registered by SystemImageBootstrapExecutor");
+                continue;
+            }
+            
+            // Register non-class globals (including 'Smalltalk' itself which is important)
             registerInSmalltalk(kvp.Key, kvp.Value);
+            migratedCount++;
         }
         
-        // Migrate all classes to Smalltalk dictionary
-        foreach (var kvp in temporaryClasses)
-        {
-            registerInSmalltalk(kvp.Key, kvp.Value);
-        }
-        
-        Console.WriteLine($"[BOOTSTRAP] Migrated {temporaryGlobals.Count} globals and {temporaryClasses.Count} classes");
+        // Individual migration messages already logged above
         
         // Clear and deactivate
         temporaryGlobals.Clear();
@@ -163,6 +165,15 @@ internal sealed class BootstrapContext
         isActive = false;
         
         Console.WriteLine("[BOOTSTRAP] Bootstrap context deactivated. All lookups now use Smalltalk SystemDictionary.");
+    }
+
+    /// <summary>
+    /// Get all temporary symbols for migration to SymbolTable.
+    /// Returns a copy to prevent external modification.
+    /// </summary>
+    public Dictionary<string, int> GetAllSymbols()
+    {
+        return new Dictionary<string, int>(temporarySymbols);
     }
 
     /// <summary>

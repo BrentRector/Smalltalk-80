@@ -1,0 +1,184 @@
+using System;
+using System.Collections.Generic;
+using Smalltalk80.Interpreter.ObjectModel;
+
+namespace Smalltalk80.Interpreter.Memory;
+/// <summary>
+/// Raw object memory management - allocation and access only.
+/// No semantic knowledge of Smalltalk classes or methods.
+/// This is the lowest level of memory management.
+/// </summary>
+public sealed class ObjectMemory
+{
+    private readonly ObjectTable objectTable;
+    private uint nextObjectIndex = 1; // Start at 1, 0 is reserved for nil
+
+    /// <summary>
+    /// Creates a new object memory with the given initial capacity.
+    /// </summary>
+    /// <param name="initialCapacity">Initial capacity for the object table.</param>
+    public ObjectMemory(int initialCapacity = 65536)
+    {
+        objectTable = new(initialCapacity);
+        
+        // Pre-allocate nil object at index 0
+        var nilHeader = new ObjectHeader(OOP.Nil, 0, format: 0)
+        {
+            IsPermanent = true // nil is never collected
+        };
+        var nilObject = new ObjectLayout(nilHeader, 0);
+        objectTable.StoreObject(0, nilObject);
+    }
+
+    /// <summary>
+    /// Allocates a raw object with the given number of fields.
+    /// Class OOP can be a placeholder during bootstrap Phase 0-1.
+    /// </summary>
+    public OOP AllocateObject(OOP classOOP, int fieldCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(fieldCount);
+
+        var header = new ObjectHeader(classOOP, fieldCount, format: 0x10); // Has pointers
+        var layout = new ObjectLayout(header, fieldCount);
+        
+        uint index = AllocateIndex();
+        objectTable.StoreObject(index, layout);
+        
+        return OOP.FromObjectIndex(index);
+    }
+
+    /// <summary>
+    /// Allocates a byte array object.
+    /// </summary>
+    public OOP AllocateByteArray(OOP byteArrayClassOOP, int byteCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(byteCount);
+
+        var layout = ObjectLayout.ForByteArray(byteArrayClassOOP, byteCount);
+        
+        uint index = AllocateIndex();
+        objectTable.StoreObject(index, layout);
+        
+        return OOP.FromObjectIndex(index);
+    }
+
+    /// <summary>
+    /// Allocates a word array object.
+    /// </summary>
+    public OOP AllocateWordArray(OOP arrayClassOOP, int elementCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(elementCount);
+
+        var layout = ObjectLayout.ForWordArray(arrayClassOOP, elementCount);
+        
+        uint index = AllocateIndex();
+        objectTable.StoreObject(index, layout);
+        
+        return OOP.FromObjectIndex(index);
+    }
+
+    /// <summary>
+    /// Gets the object layout for the given OOP.
+    /// Returns null if OOP is not a valid object pointer.
+    /// </summary>
+    public ObjectLayout? GetObject(OOP oop) =>
+        oop.IsSmallInteger ? null : objectTable.GetObject(oop.ObjectIndex);
+
+    /// <summary>
+    /// Updates the class OOP for an object.
+    /// Used during bootstrap Phase 2 to fix temporary class pointers.
+    /// </summary>
+    public void UpdateClassPointer(OOP objectOOP, OOP newClassOOP)
+    {
+        var layout = GetObject(objectOOP)
+            ?? throw new ArgumentException("Invalid object OOP", nameof(objectOOP));
+        
+        layout.Header.ClassOOP = newClassOOP;
+    }
+
+    /// <summary>
+    /// Gets a field value from an object.
+    /// </summary>
+    public OOP GetField(OOP objectOOP, int fieldIndex)
+    {
+        var layout = GetObject(objectOOP)
+            ?? throw new ArgumentException("Invalid object OOP", nameof(objectOOP));
+        
+        return layout.GetField(fieldIndex);
+    }
+
+    /// <summary>
+    /// Sets a field value in an object.
+    /// </summary>
+    public void SetField(OOP objectOOP, int fieldIndex, OOP value)
+    {
+        var layout = GetObject(objectOOP)
+            ?? throw new ArgumentException("Invalid object OOP", nameof(objectOOP));
+        
+        layout.SetField(fieldIndex, value);
+    }
+
+    /// <summary>
+    /// Gets the class OOP for an object.
+    /// </summary>
+    public OOP GetClass(OOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+        {
+            // SmallIntegers don't have a class pointer stored
+            // The VM must handle this specially
+            throw new InvalidOperationException("SmallInteger class must be handled by VM");
+        }
+        
+        var layout = GetObject(objectOOP)
+            ?? throw new ArgumentException("Invalid object OOP", nameof(objectOOP));
+        
+        return layout.Header.ClassOOP;
+    }
+
+    /// <summary>
+    /// Gets the size (field count) of an object.
+    /// </summary>
+    public int GetSize(OOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+            return 0; // SmallIntegers have no fields
+        
+        var layout = GetObject(objectOOP)
+            ?? throw new ArgumentException("Invalid object OOP", nameof(objectOOP));
+        
+        return layout.Fields.Length;
+    }
+
+    /// <summary>
+    /// Enumerates all allocated objects for GC or debugging.
+    /// </summary>
+    public IEnumerable<(OOP oop, ObjectLayout layout)> EnumerateObjects() =>
+        objectTable.EnumerateObjects();
+
+    /// <summary>
+    /// Gets memory statistics.
+    /// </summary>
+    public MemoryStatistics GetStatistics() => new()
+    {
+        TotalObjects = objectTable.Count,
+        TotalCapacity = objectTable.Capacity,
+        NextIndex = nextObjectIndex
+    };
+
+    /// <summary>
+    /// Compacts the object table after GC.
+    /// </summary>
+    internal void Compact()
+    {
+        // TODO: Implement compaction if needed
+        // For now, we rely on the object table's internal management
+    }
+
+    private uint AllocateIndex()
+    {
+        // Simple linear allocation for now
+        // TODO: Reuse freed indices after GC
+        return nextObjectIndex++;
+    }
+}

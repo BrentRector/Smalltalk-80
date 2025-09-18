@@ -5,13 +5,18 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>Smalltalk80.Interpreter</AssemblyName>
     <RootNamespace>Smalltalk80.Interpreter</RootNamespace>
+    <AssemblyName>Smalltalk80.Interpreter</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Backup\**" />
+    <EmbeddedResource Remove="Backup\**" />
+    <None Remove="Backup\**" />
+  </ItemGroup>
 
 </Project>

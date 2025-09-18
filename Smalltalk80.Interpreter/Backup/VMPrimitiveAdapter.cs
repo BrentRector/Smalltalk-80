@@ -17,6 +17,8 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     private int? nilOop = null;
     private int smalltalkDictOop = -1;
     private int symbolClassOop = -1; // Cache Symbol class OOP to avoid lookup during interning
+    private bool isMigrating = false; // Prevent recursion during migration
+    private bool isBootstrapComplete = false; // Track when bootstrap is fully complete and safe to use lookups
     #pragma warning disable CS0414 // Field is assigned but its value is never used
     private bool usesSmalltalkDictionary = false; // Track when we switch to Smalltalk dictionary (for debugging)
     #pragma warning restore CS0414
@@ -368,7 +370,29 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             }
         }
         
-        // After Phase 1, try to use proper Smalltalk-80 SymbolTable if available
+        // During bootstrap or migration, avoid lookups that could cause recursion
+        // Create symbols directly until the system is fully operational
+        if (!isBootstrapComplete)
+        {
+            // Direct symbol creation without lookups to avoid recursion
+            var symbolObj = new SmalltalkObject(null, 1);
+            symbolObj.SetField(0, name);
+            var symbolOop = symbolObj.Oop;
+            
+            // Cache for future use
+            symbolCache[name] = symbolOop;
+            reverseSymbolCache[symbolOop] = name;
+            
+            if (bootstrapContext != null && bootstrapContext.IsActive)
+            {
+                bootstrapContext.RegisterTemporarySymbol(name, symbolOop);
+            }
+            
+            DebugLog($"[VM] Created symbol '{name}' directly as OOP {symbolOop}");
+            return symbolOop;
+        }
+        
+        // After bootstrap is complete, try to use proper Smalltalk-80 SymbolTable if available
         var symbolTableOop = PrimitiveLookupGlobal("SymbolTable");
         if (symbolTableOop > 0)
         {
@@ -393,10 +417,6 @@ public class VMPrimitiveAdapter : ISmalltalkVM
                     var resultOop = PrimitiveSendMessage(symbolClassOop, newSelector, new[] { nameStringOop });
                     // Register in caches
                     symbolCache[name] = resultOop;
-                    if (bootstrapContext != null && bootstrapContext.IsActive)
-                    {
-                        bootstrapContext.RegisterTemporarySymbol(name, resultOop);
-                    }
                     DebugLog($"[VM] Interned symbol '{name}' via message send as OOP {resultOop}");
                     return resultOop;
                 }
@@ -725,6 +745,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public void PrimitiveArrayAtPut(int arrayId, int index, int valueId)
     {
+        // DEBUG: Log all modifications to SystemDictionary with stack traces
+        if (arrayId == smalltalkDictOop && smalltalkDictOop > 0)
+        {
+            LogSystemDictionaryModification("PrimitiveArrayAtPut", arrayId, index, valueId);
+        }
+        
         PrimitiveSetSlot(arrayId, index, valueId);
     }
     
@@ -761,6 +787,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public void PrimitiveDictionaryAtPut(int dictId, int keyId, int valueId)
     {
+        // DEBUG: Log all modifications to SystemDictionary with stack traces
+        if (dictId == smalltalkDictOop && smalltalkDictOop > 0)
+        {
+            LogSystemDictionaryModification("PrimitiveDictionaryAtPut", dictId, -1, valueId, keyId);
+        }
+        
         var dict = ObjectMemory.FromOop(dictId);
         if (dict == null)
             throw new InvalidOperationException($"Dictionary with OOP {dictId} not found");
@@ -1042,11 +1074,12 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public void PrimitiveRegisterGlobal(string name, int valueId)
     {
-        // Special case: track Smalltalk dictionary
+        // Special case: track Smalltalk dictionary but defer migration
+        bool shouldMigrate = false;
         if (name == "Smalltalk")
         {
             smalltalkDictOop = valueId;
-            // Note: logging handled by caller
+            shouldMigrate = (bootstrapContext != null && bootstrapContext.IsActive);
         }
         // Special case: track MethodDictionary class
         else if (name == "MethodDictionary")
@@ -1055,29 +1088,29 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             Console.WriteLine($"[BOOTSTRAP] Cached MethodDictionary class OOP: {valueId}");
         }
         
-        // Phase 1: Use bootstrap context
-        if (bootstrapContext != null && bootstrapContext.IsActive)
+        // Simplified logic: If SystemDictionary exists AND we're not currently migrating, use it. Otherwise, use temporary.
+        if (smalltalkDictOop > 0 && (!shouldMigrate && !isMigrating))
         {
-            bootstrapContext.RegisterTemporaryGlobal(name, valueId);
-            
-            // Also track classes separately for easy lookup
-            if (name.Length > 0 && char.IsUpper(name[0]))
-            {
-                bootstrapContext.RegisterTemporaryClass(name, valueId);
-            }
-            
-            // Legacy bootstrap context logging suppressed (clean slate approach handles logging)
-        }
-        // After Phase 1: Register directly in Smalltalk dictionary
-        else if (smalltalkDictOop > 0)
-        {
+            // Use SystemDictionary directly
             var keySymbol = PrimitiveInternSymbol(name);
             PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, valueId);
-            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary -> OOP {valueId}");
+            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in SystemDictionary -> OOP {valueId}");
+        }
+        else if (bootstrapContext != null && bootstrapContext.IsActive)
+        {
+            // Use temporary bootstrap context
+            bootstrapContext.RegisterTemporaryGlobal(name, valueId);
+            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in temporary context -> OOP {valueId}");
         }
         else
         {
-            throw new InvalidOperationException($"Cannot register global '{name}': No bootstrap context or Smalltalk dictionary available");
+            throw new InvalidOperationException($"Cannot register global '{name}': No SystemDictionary or temporary context available");
+        }
+        
+        // Perform migration AFTER the registration is complete
+        if (shouldMigrate)
+        {
+            MigrateTemporaryToSystemDictionaryAndCleanup();
         }
     }
     
@@ -1110,23 +1143,22 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     public int PrimitiveLookupGlobal(string name)
     {
-        // Phase 1: Use bootstrap context
-        if (bootstrapContext != null && bootstrapContext.IsActive)
-        {
-            var result = bootstrapContext.LookupTemporaryGlobal(name);
-            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in bootstrap context -> OOP {result}");
-            return result;
-        }
-        
-        // After Phase 1: Look up in Smalltalk dictionary
+        // Simplified logic: If SystemDictionary exists, use it. Otherwise, use temporary.
         if (smalltalkDictOop > 0)
         {
             var result = LookupInSmalltalkDictionary(name);
+            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in SystemDictionary -> OOP {result}");
+            return result;
+        }
+        else if (bootstrapContext != null && bootstrapContext.IsActive)
+        {
+            var result = bootstrapContext.LookupTemporaryGlobal(name);
+            DebugLog($"[VM] PrimitiveLookupGlobal('{name}'): Found in temporary context -> OOP {result}");
             return result;
         }
         
         // DEBUG: Log why lookup failed
-        Console.WriteLine($"[DEBUG] PrimitiveLookupGlobal('{name}') failed: bootstrapContext.IsActive={bootstrapContext?.IsActive}, smalltalkDictOop={smalltalkDictOop}");
+        Console.WriteLine($"[DEBUG] PrimitiveLookupGlobal('{name}') failed: No SystemDictionary or temporary context available");
         
         return -1;
     }
@@ -1773,77 +1805,6 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         return result;
     }
     
-    /// <summary>
-    /// Complete Phase 1 bootstrap and migrate to Smalltalk dictionary.
-    /// This should be called after Phase 1 creates the Smalltalk SystemDictionary.
-    /// NOTE: This uses primitive operations which don't handle dictionary expansion.
-    /// Use CompleteBootstrapWithMessageSends after Phase 3 instead.
-    /// </summary>
-    public void CompletePhase1Bootstrap()
-    {
-        if (bootstrapContext == null || !bootstrapContext.IsActive)
-        {
-            Console.WriteLine("[BOOTSTRAP] Phase 1 already completed or not started");
-            return;
-        }
-        
-        // Get the Smalltalk dictionary OOP
-        smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
-        if (smalltalkDictOop < 0)
-        {
-            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
-            return;
-        }
-        
-        // Migrate all temporary entries to Smalltalk dictionary
-        bootstrapContext.MigrateToSmalltalkDictionary((name, oop) =>
-        {
-            var keySymbol = PrimitiveInternSymbol(name);
-            PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, oop);
-        });
-        
-        // Switch to using Smalltalk dictionary
-        usesSmalltalkDictionary = true;
-        Console.WriteLine("[BOOTSTRAP] Phase 1 complete. All lookups now use Smalltalk SystemDictionary.");
-    }
-    
-    /// <summary>
-    /// Complete bootstrap using message sends (after Phase 2/3 when at:put: might be available).
-    /// Falls back to primitive operations if at:put: is not available.
-    /// </summary>
-    public void CompleteBootstrapWithMessageSends()
-    {
-        if (bootstrapContext == null || !bootstrapContext.IsActive)
-        {
-            Console.WriteLine("[BOOTSTRAP] Bootstrap already completed or not started");
-            return;
-        }
-        
-        // Get the Smalltalk dictionary OOP
-        smalltalkDictOop = bootstrapContext.GetSmalltalkDictionaryOop();
-        Console.WriteLine($"[BOOTSTRAP] CompleteBootstrap: smalltalkDictOop = {smalltalkDictOop}");
-        if (smalltalkDictOop < 0)
-        {
-            Console.WriteLine("[BOOTSTRAP] Warning: Smalltalk SystemDictionary not found, continuing with bootstrap context");
-            return;
-        }
-        
-        Console.WriteLine("[BOOTSTRAP] Migrating from C# dictionaries to Smalltalk SystemDictionary...");
-        Console.WriteLine("[BOOTSTRAP] Note: Dictionary at:put: is not a primitive - using VM operations");
-        
-        // Use primitive operations to populate the dictionary
-        // Dictionary's at:put: method is implemented in Smalltalk bytecode, not as a primitive
-        bootstrapContext.MigrateToSmalltalkDictionary((name, oop) =>
-        {
-            var keySymbol = PrimitiveInternSymbol(name);
-            PrimitiveDictionaryAtPut(smalltalkDictOop, keySymbol, oop);
-            Console.WriteLine($"[BOOTSTRAP] Registered '{name}' in Smalltalk dictionary");
-        });
-        
-        // Switch to using Smalltalk dictionary
-        usesSmalltalkDictionary = true;
-        Console.WriteLine("[BOOTSTRAP] Bootstrap complete. All lookups now use Smalltalk SystemDictionary.");
-    }
     
     /// <summary>
     /// Look up an entry in the Smalltalk SystemDictionary.
@@ -1861,10 +1822,45 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             return -1;
         }
             
-        // Use PrimitiveInternSymbol which handles caching and creation properly
-        var keySymbol = PrimitiveInternSymbol(name);
-        var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
-        return result;
+        // Handle symbol lookup carefully to avoid recursion
+        int keySymbol;
+        if (isMigrating)
+        {
+            // During migration, use cached symbols only to avoid recursion
+            if (symbolCache.TryGetValue(name, out keySymbol))
+            {
+                var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
+                return result;
+            }
+            else
+            {
+                // Symbol not cached yet, return not found to avoid recursion
+                return -1;
+            }
+        }
+        else if (!isBootstrapComplete)
+        {
+            // After migration but before bootstrap complete - use cached symbols if available
+            if (symbolCache.TryGetValue(name, out keySymbol))
+            {
+                var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
+                return result;
+            }
+            else
+            {
+                // For critical lookups during bootstrap, create symbol directly without recursive lookups
+                keySymbol = CreateDirectSymbol(name);
+                var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
+                return result;
+            }
+        }
+        else
+        {
+            // Bootstrap complete - normal operation using full symbol interning
+            keySymbol = PrimitiveInternSymbol(name);
+            var result = PrimitiveDictionaryAt(smalltalkDictOop, keySymbol);
+            return result;
+        }
     }
 
     #region Extended Primitives for SystemImageBootstrapExecutor
@@ -1938,7 +1934,10 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             DebugLog($"[VM] Setup {poolDictionaries.Length} shared pools for {className}");
         }
         
-        // Step 10: Change tracking - DEFERRED until Smalltalk changes system available
+        // Step 10: Update Special Objects Array for key classes (Behavior, Metaclass, etc.)
+        UpdateSpecialObjectsArrayForClass(className, classOop);
+        
+        // Step 11: Change tracking - DEFERRED until Smalltalk changes system available
         AddDeferredChangeTracking(className, wasPresent ? "class_replaced" : "class_added");
         
         DebugLog($"[VM] Created class with complete Smalltalk semantics: {className} (OOP {classOop})");
@@ -2055,6 +2054,14 @@ public class VMPrimitiveAdapter : ISmalltalkVM
     /// </summary>
     private void RegisterClassInEnvironment(string className, int classOop, int environOop)
     {
+        // Special case: SystemDictionary class creates the Smalltalk global instance
+        // This must happen here during class creation to match Smalltalk semantics
+        if (className == "SystemDictionary")
+        {
+            CreateSmalltalkGlobalInstanceFromVM(classOop);
+            return; // SystemDictionary registration handled in CreateSmalltalkGlobalInstanceFromVM
+        }
+        
         if (environOop > 0)
         {
             var classNameSymbol = PrimitiveInternSymbol(className);
@@ -3681,7 +3688,13 @@ public class VMPrimitiveAdapter : ISmalltalkVM
             var compiledMethodClassOop = PrimitiveLookupClass("CompiledMethod");
             if (compiledMethodClassOop <= 0)
             {
-                DebugLog("[VM] Primitive 79 failed: CompiledMethod class not found");
+                Console.WriteLine($"[DEBUG] Primitive 79 failed: CompiledMethod class not found. Bootstrap context active: {bootstrapContext?.IsActive}, smalltalkDictOop: {smalltalkDictOop}");
+                
+                // Debug: try alternative lookup methods
+                var globalLookup = PrimitiveLookupGlobal("CompiledMethod");
+                var dictLookup = LookupInSmalltalkDictionary("CompiledMethod");
+                Console.WriteLine($"[DEBUG] Alternative lookups - Global: {globalLookup}, Dictionary: {dictLookup}");
+                
                 return PrimitiveNil();
             }
 
@@ -4319,5 +4332,449 @@ public class VMPrimitiveAdapter : ISmalltalkVM
         }
     }
 
+    #endregion
+    
+    #region Simplified SystemDictionary Transition
+    
+    /// <summary>
+    /// Mark the bootstrap as complete and enable full lookup capabilities.
+    /// </summary>
+    public void MarkBootstrapComplete()
+    {
+        isBootstrapComplete = true;
+        Console.WriteLine("[BOOTSTRAP] Bootstrap marked as complete - full lookup capabilities enabled");
+    }
+    
+    /// <summary>
+    /// Immediately migrate all temporary entries to SystemDictionary and deactivate temporary context.
+    /// Called automatically when SystemDictionary is created.
+    /// </summary>
+    private void MigrateTemporaryToSystemDictionaryAndCleanup()
+    {
+        if (bootstrapContext == null || !bootstrapContext.IsActive || smalltalkDictOop <= 0 || isMigrating)
+            return;
+
+        isMigrating = true; // Prevent recursion
+        try
+        {
+            Console.WriteLine("[BOOTSTRAP] Migrating all temporary entries to SystemDictionary and cleaning up...");
+            
+            // Get all temporary entries before deactivation
+            var temporaryGlobals = bootstrapContext.GetAllGlobals();
+            
+            // Migrate all entries to SystemDictionary
+            // Classes that are already installed need to be available for lookups
+            foreach (var (name, oop) in temporaryGlobals)
+            {
+                // Use cached symbols or create them carefully during migration
+                var keySymbol = GetOrCreateSymbolForMigration(name);
+                if (keySymbol > 0)
+                {
+                    // Use proper SystemDictionary insertion with full debugging
+                    PutInSystemDictionaryWithLogging(keySymbol, oop, name);
+                    Console.WriteLine($"[BOOTSTRAP] Migrated '{name}' -> OOP {oop} to SystemDictionary");
+                }
+            }
+            
+            // Deactivate and cleanup temporary context completely
+            bootstrapContext.MigrateToSmalltalkDictionary((name, oop) => {
+                // No-op since we already migrated above
+            });
+            
+            // Individual migration messages already logged above
+            Console.WriteLine("[BOOTSTRAP] All future registrations will use SystemDictionary directly");
+            
+            // DEBUG: Verify migration worked by testing lookup
+            var testLookup = LookupInSmalltalkDictionary("Smalltalk");
+            Console.WriteLine($"[BOOTSTRAP] DEBUG: Lookup test for 'Smalltalk' after migration: {testLookup} (expected: {smalltalkDictOop})");
+        }
+        finally
+        {
+            isMigrating = false;
+        }
+    }
+    
+    /// <summary>
+    /// Put a key-value pair in SystemDictionary with proper hash table logic and debugging.
+    /// This replicates the logic from SystemImageBootstrapExecutor.PutInSystemDictionary.
+    /// </summary>
+    private void PutInSystemDictionaryWithLogging(int keyOop, int valueOop, string keyName)
+    {
+        // Migration debug logging removed - consolidation working correctly
+        
+        // Always get the current SystemDictionary OOP to avoid stale references after GC
+        var currentSmalltalkOop = smalltalkDictOop;
+        if (currentSmalltalkOop <= 0)
+        {
+            throw new InvalidOperationException("Smalltalk SystemDictionary not found during migration");
+        }
+        
+        // Implement hash table insertion into SystemDictionary
+        // Structure: [tally, key1, value1, key2, value2, ...]
+        var capacity = GetArraySize(currentSmalltalkOop);
+        var tallyOop = GetSlot(currentSmalltalkOop, 0);
+        int currentTally = 0;
+        if (IsSmallInteger(tallyOop))
+        {
+            currentTally = SmallIntegerValue(tallyOop);
+        }
+
+        // Find slot using linear probing (check for existing key or empty slot)
+        var hashTableSize = (capacity - 1) / 2;
+        if (hashTableSize <= 0)
+        {
+            throw new InvalidOperationException($"Invalid hash table size during migration: {hashTableSize}. Capacity: {capacity}");
+        }
+        
+        var hash = Math.Abs(GetObjectHashCode(keyOop)) % hashTableSize;
+        var startIndex = 1 + (hash * 2);
+
+        for (int probe = 0; probe < hashTableSize; probe++)
+        {
+            var keyIndex = 1 + ((startIndex - 1 + probe * 2) % (capacity - 1));
+            var valueIndex = keyIndex + 1;
+
+            if (keyIndex >= capacity || valueIndex >= capacity) continue;
+
+            var existingKey = GetSlot(currentSmalltalkOop, keyIndex);
+            
+            // Check if key already exists (update existing entry)
+            if (existingKey == keyOop)
+            {
+                // Migration debug logging removed - consolidation working correctly
+                Console.WriteLine($"[MIGRATION-ERROR] Key {keyName} already exists during migration - this should not happen!");
+                PrimitiveArrayAtPut(currentSmalltalkOop, valueIndex, valueOop);
+                return; // Don't increment tally for updates
+            }
+            
+            // Insert into empty slot
+            if (existingKey == PrimitiveNil())
+            {
+                // Migration debug logging removed - consolidation working correctly
+                PrimitiveArrayAtPut(currentSmalltalkOop, keyIndex, keyOop);
+                PrimitiveArrayAtPut(currentSmalltalkOop, valueIndex, valueOop);
+                
+                // Update tally
+                var newTallyOop = PrimitiveNewSmallInteger(currentTally + 1);
+                PrimitiveArrayAtPut(currentSmalltalkOop, 0, newTallyOop);
+                return;
+            }
+            else
+            {
+                // Debug: Show what key is occupying this slot
+                var occupyingKeyObj = ObjectMemory.FromOop(existingKey);
+                string occupyingKeyName = "unknown";
+                if (occupyingKeyObj?.Fields.Length > 0 && occupyingKeyObj.Fields[0] is string symbolStr)
+                {
+                    occupyingKeyName = symbolStr;
+                }
+                var existingValue = GetSlot(currentSmalltalkOop, valueIndex);
+                // Migration debug logging removed - consolidation working correctly
+            }
+        }
+        
+        throw new InvalidOperationException($"Failed to find empty slot for key {keyName} in SystemDictionary during migration");
+    }
+    
+    /// <summary>
+    /// Get or create a symbol during migration without causing recursive lookups.
+    /// </summary>
+    private int GetOrCreateSymbolForMigration(string name)
+    {
+        // Check if we already have this symbol cached
+        if (symbolCache.TryGetValue(name, out var cachedSymbol))
+        {
+            return cachedSymbol;
+        }
+        
+        // During migration, create symbols directly without lookups
+        var symbolObj = new SmalltalkObject(null, 1);
+        symbolObj.SetField(0, name);
+        var symbolOop = symbolObj.Oop;
+        
+        // Cache it for future use
+        symbolCache[name] = symbolOop;
+        reverseSymbolCache[symbolOop] = name;
+        
+        return symbolOop;
+    }
+    
+    /// <summary>
+    /// Create a symbol directly without recursive lookups - for use during bootstrap.
+    /// </summary>
+    private int CreateDirectSymbol(string name)
+    {
+        // Create symbols directly without lookups to avoid recursion
+        var symbolObj = new SmalltalkObject(null, 1);
+        symbolObj.SetField(0, name);
+        var symbolOop = symbolObj.Oop;
+        
+        // Cache it for future use
+        symbolCache[name] = symbolOop;
+        reverseSymbolCache[symbolOop] = name;
+        
+        return symbolOop;
+    }
+    
+    /// <summary>
+    /// Determine if a name looks like a class name (starts with uppercase letter).
+    /// </summary>
+    private bool IsLikelyClassName(string name)
+    {
+        return !string.IsNullOrEmpty(name) && char.IsUpper(name[0]);
+    }
+    
+    /// <summary>
+    /// Log all modifications to SystemDictionary with stack traces for debugging.
+    /// </summary>
+    private void LogSystemDictionaryModification(string operation, int dictOop, int index, int valueOop, int keyOop = -1)
+    {
+        // Get key name for debugging
+        string keyName = "unknown";
+        if (keyOop > 0)
+        {
+            var keyObj = ObjectMemory.FromOop(keyOop);
+            if (keyObj?.Fields.Length > 0 && keyObj.Fields[0] is string symbolString)
+            {
+                keyName = symbolString;
+            }
+        }
+        else if (index > 0)
+        {
+            // For array operations, try to determine what's being modified
+            // Even slots are keys, odd slots are values in SystemDictionary
+            if (index % 2 == 1) // Odd index = key slot
+            {
+                var keyObj = ObjectMemory.FromOop(valueOop);
+                if (keyObj?.Fields.Length > 0 && keyObj.Fields[0] is string symbolString)
+                {
+                    keyName = symbolString;
+                }
+            }
+            else if (index % 2 == 0 && index > 1) // Even index = value slot, get the key from previous slot
+            {
+                var keySlot = GetSlot(dictOop, index - 1);
+                var keyObj = ObjectMemory.FromOop(keySlot);
+                if (keyObj?.Fields.Length > 0 && keyObj.Fields[0] is string symbolString)
+                {
+                    keyName = symbolString;
+                }
+            }
+        }
+        
+        // Removed verbose debug logging - consolidation working correctly
+        
+        // BlockContext debugging removed - consolidation working correctly
+    }
+    
+    /// <summary>
+    /// Create the Smalltalk global SystemDictionary instance during SystemDictionary class creation.
+    /// This replicates the SystemDictionary special handling from SystemImageBootstrapExecutor.
+    /// </summary>
+    private void CreateSmalltalkGlobalInstanceFromVM(int systemDictionaryClassOop)
+    {
+        Console.WriteLine("[VM] Creating Smalltalk global SystemDictionary instance...");
+
+        // Create the SystemDictionary instance with proper class
+        var capacity = 500; // Large enough for all classes and globals
+        var smalltalkOop = PrimitiveNewArray(capacity);
+        PrimitiveSetClass(smalltalkOop, systemDictionaryClassOop);
+
+        // Initialize SystemDictionary structure: [tally, key1, value1, key2, value2, ...]
+        var tallyOop = PrimitiveNewSmallInteger(0);
+        PrimitiveArrayAtPut(smalltalkOop, 0, tallyOop);
+
+        // Initialize remaining slots to nil
+        var nilOop = PrimitiveNil();
+        for (int i = 1; i < capacity; i++)
+        {
+            PrimitiveArrayAtPut(smalltalkOop, i, nilOop);
+        }
+
+        Console.WriteLine("[VM] SystemDictionary instance created - registering as 'Smalltalk' global (will trigger migration)");
+        
+        // Add the SystemDictionary instance to the Special Objects Array for GC roots
+        var systemDictObj = ObjectMemory.FromOop(smalltalkOop);
+        if (systemDictObj != null)
+        {
+            vm.SetSpecialObject(VirtualMachine.SpecialObjectIndex.SystemDictionaryInstance, systemDictObj);
+            Console.WriteLine($"[VM] SystemDictionary instance added to Special Objects Array -> OOP {smalltalkOop}");
+        }
+        
+        // Register as global "Smalltalk" - this will trigger migration from temporary context
+        PrimitiveRegisterGlobal("Smalltalk", smalltalkOop);
+        
+        // Register the SystemDictionary class itself in the new dictionary
+        var systemDictNameSymbol = PrimitiveInternSymbol("SystemDictionary");
+        PrimitiveDictionaryAtPut(smalltalkOop, systemDictNameSymbol, systemDictionaryClassOop);
+
+        Console.WriteLine($"[VM] Created Smalltalk global (OOP {smalltalkOop}) and registered SystemDictionary class");
+    }
+    
+    /// <summary>
+    /// Update Special Objects Array for key classes during class creation.
+    /// This replicates the special object management from SystemImageBootstrapExecutor.
+    /// </summary>
+    private void UpdateSpecialObjectsArrayForClass(string className, int classOop)
+    {
+        // Check if special objects array exists (it may not during early bootstrap)  
+        var specialArrayOop = PrimitiveLookupGlobal("_special_objects_array");
+        if (specialArrayOop < 0) // Note: OOP 0 is valid, so only return if negative
+            return;
+
+        switch (className)
+        {
+            case "UndefinedObject":
+                // Create the singleton nil object
+                var nilInstance = PrimitiveNewInstance(classOop);
+                PrimitiveArrayAtPut(specialArrayOop, 0, nilInstance);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated nil slot 0 -> {nilInstance}");
+                break;
+                
+            case "False":
+                // Create the singleton false object
+                var falseInstance = PrimitiveNewInstance(classOop);
+                PrimitiveArrayAtPut(specialArrayOop, 1, falseInstance);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated false slot 1 -> {falseInstance}");
+                break;
+                
+            case "True":
+                // Create the singleton true object
+                var trueInstance = PrimitiveNewInstance(classOop);
+                PrimitiveArrayAtPut(specialArrayOop, 2, trueInstance);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated true slot 2 -> {trueInstance}");
+                break;
+                
+            case "Behavior":
+                // Update Behavior class reference (slot 3)
+                PrimitiveArrayAtPut(specialArrayOop, 3, classOop);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated Behavior slot 3 -> {classOop}");
+                break;
+                
+            case "Metaclass":
+                // Update Metaclass class reference (slot 4)
+                PrimitiveArrayAtPut(specialArrayOop, 4, classOop);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated Metaclass slot 4 -> {classOop}");
+                break;
+                
+            case "SystemDictionary":
+                // Update SystemDictionary instance reference (slot 5)
+                var smalltalkOop = PrimitiveLookupGlobal("Smalltalk");
+                if (smalltalkOop > 0)
+                {
+                    PrimitiveArrayAtPut(specialArrayOop, 5, smalltalkOop);
+                    Console.WriteLine($"[SPECIAL-OBJECTS] Updated SystemDictionary slot 5 -> {smalltalkOop}");
+                }
+                break;
+                
+            case "IdentityDictionary":
+                // Create the SymbolTable as an IdentityDictionary instance for symbol interning
+                var symbolTableOop = CreateSymbolTableAsIdentityDictionary(classOop);
+                PrimitiveArrayAtPut(specialArrayOop, 6, symbolTableOop);
+                Console.WriteLine($"[SPECIAL-OBJECTS] Updated SymbolTable slot 6 -> {symbolTableOop}");
+                break;
+        }
+        
+        // Check if all critical slots are now populated and enable GC if so
+        CheckSpecialObjectsArrayCompletion(specialArrayOop);
+    }
+    
+    /// <summary>
+    /// Check if all critical slots in the special objects array are populated and enable GC if complete.
+    /// </summary>
+    private void CheckSpecialObjectsArrayCompletion(int specialArrayOop)
+    {
+        var nilOop = GetSlot(specialArrayOop, 0);
+        var falseOop = GetSlot(specialArrayOop, 1);
+        var trueOop = GetSlot(specialArrayOop, 2);
+        var behaviorOop = GetSlot(specialArrayOop, 3);
+        var metaclassOop = GetSlot(specialArrayOop, 4);
+        var systemDictOop = GetSlot(specialArrayOop, 5);
+        var symbolTableOop = GetSlot(specialArrayOop, 6);
+        
+        if (nilOop != PrimitiveNil() && falseOop != PrimitiveNil() && trueOop != PrimitiveNil() &&
+            behaviorOop != PrimitiveNil() && metaclassOop != PrimitiveNil() && 
+            systemDictOop != PrimitiveNil() && symbolTableOop != PrimitiveNil())
+        {
+            // All critical objects and classes are installed - enable GC
+            Console.WriteLine("[SPECIAL-OBJECTS] All slots populated - enabling garbage collection");
+            ObjectMemory.EnableGC();
+        }
+    }
+    
+    /// <summary>
+    /// Gets the symbol cache for multi-pass bootstrap processing.
+    /// </summary>
+    public Dictionary<string, int> GetSymbolCache()
+    {
+        return symbolCache;
+    }
+    
+    /// <summary>
+    /// Updates the VM's reference to the SystemDictionary instance.
+    /// </summary>
+    public void UpdateSystemDictionaryReference(int systemDictOop)
+    {
+        systemDictionaryOop = systemDictOop;
+        DebugLog($"[VM] Updated SystemDictionary reference to OOP {systemDictOop}");
+    }
+    
+    /// <summary>
+    /// Registers a global in the temporary bootstrap context.
+    /// </summary>
+    public void RegisterInTemporaryContext(string name, int valueOop)
+    {
+        if (bootstrapContext != null && bootstrapContext.IsActive)
+        {
+            bootstrapContext.RegisterGlobal(name, valueOop);
+            DebugLog($"[VM] Registered '{name}' in temporary context -> OOP {valueOop}");
+        }
+    }
+    
+    /// <summary>
+    /// Creates the SymbolTable as an IdentityDictionary instance for symbol interning.
+    /// This replicates the authentic Smalltalk-80 VM bootstrap behavior.
+    /// Migrates all cached symbols from temporary storage to the SymbolTable.
+    /// </summary>
+    private int CreateSymbolTableAsIdentityDictionary(int identityDictionaryClassOop)
+    {
+        Console.WriteLine("[SYMBOL-TABLE] Creating SymbolTable as IdentityDictionary for symbol interning...");
+        
+        // Create an IdentityDictionary instance to serve as the SymbolTable
+        var symbolTableOop = PrimitiveNewInstance(identityDictionaryClassOop);
+        
+        // Initialize the IdentityDictionary with appropriate capacity for symbol interning
+        // TODO: Initialize IdentityDictionary internal structure if needed
+        
+        // Migrate all cached symbols to the SymbolTable
+        Console.WriteLine("[SYMBOL-TABLE] Migrating cached symbols to SymbolTable...");
+        var migratedCount = 0;
+        
+        // Migrate all cached symbols to the SymbolTable
+        Console.WriteLine($"[SYMBOL-TABLE] Found {symbolCache.Count} symbols in cache to migrate");
+        
+        foreach (var (symbolName, symbolOop) in symbolCache)
+        {
+            // Add String -> Symbol mapping to SymbolTable using identity dictionary semantics
+            // Create String key for the SymbolTable (IdentityDictionary uses String keys to intern Symbols)
+            var keyStringOop = PrimitiveInternString(symbolName);
+            
+            // Add to SymbolTable: SymbolTable at: aString put: aSymbol
+            PrimitiveDictionaryAtPut(symbolTableOop, keyStringOop, symbolOop);
+            
+            Console.WriteLine($"[SYMBOL-TABLE] Migrated symbol '{symbolName}' -> OOP {symbolOop}");
+            migratedCount++;
+        }
+        
+        // Register the SymbolTable as a global so Symbol>>intern: can find it
+        PrimitiveRegisterGlobal("SymbolTable", symbolTableOop);
+        
+        Console.WriteLine($"[SYMBOL-TABLE] Created SymbolTable IdentityDictionary: OOP {symbolTableOop}");
+        Console.WriteLine($"[SYMBOL-TABLE] Migrated {migratedCount} symbols from temporary cache");
+        Console.WriteLine("[SYMBOL-TABLE] All future Symbol>>intern: operations will use SymbolTable directly");
+        
+        return symbolTableOop;
+    }
+    
     #endregion
 }

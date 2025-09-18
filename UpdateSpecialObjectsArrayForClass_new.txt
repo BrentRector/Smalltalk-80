@@ -1,0 +1,150 @@
+    /// <summary>
+    /// Updates the VM's Special Objects Array when key classes are installed.
+    /// Creates singleton instances and enables GC once all required classes are available.
+    /// </summary>
+    private void UpdateSpecialObjectsArrayForClass(string className, int classOop)
+    {
+        SmalltalkObject? objToStore = null;
+        
+        switch (className)
+        {
+            case "UndefinedObject":
+                // Create the singleton nil object
+                var nilInstance = vm.PrimitiveNewInstance(classOop);
+                objToStore = ObjectMemory.FromOop(nilInstance);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.NilObject, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated nil object -> OOP {nilInstance}");
+                }
+                break;
+                
+            case "False":
+                // Create the singleton false object
+                var falseInstance = vm.PrimitiveNewInstance(classOop);
+                objToStore = ObjectMemory.FromOop(falseInstance);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.FalseObject, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated false object -> OOP {falseInstance}");
+                }
+                break;
+                
+            case "True":
+                // Create the singleton true object
+                var trueInstance = vm.PrimitiveNewInstance(classOop);
+                objToStore = ObjectMemory.FromOop(trueInstance);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.TrueObject, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated true object -> OOP {trueInstance}");
+                }
+                break;
+                
+            case "Behavior":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.BehaviorClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated Behavior class -> OOP {classOop}");
+                }
+                break;
+                
+            case "SmallInteger":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.SmallIntegerClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated SmallInteger class -> OOP {classOop}");
+                }
+                break;
+                
+            case "MethodContext":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.MethodContextClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated MethodContext class -> OOP {classOop}");
+                }
+                break;
+                
+            case "BlockContext":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.BlockContextClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated BlockContext class -> OOP {classOop}");
+                }
+                break;
+                
+            case "Point":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.PointClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated Point class -> OOP {classOop}");
+                }
+                break;
+                
+            case "LargePositiveInteger":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.LargePositiveIntegerClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated LargePositiveInteger class -> OOP {classOop}");
+                }
+                break;
+                
+            case "CompiledMethod":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.CompiledMethodClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated CompiledMethod class -> OOP {classOop}");
+                }
+                break;
+                
+            case "Semaphore":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.SemaphoreClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated Semaphore class -> OOP {classOop}");
+                }
+                break;
+                
+            case "Character":
+                objToStore = ObjectMemory.FromOop(classOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.CharacterClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Updated Character class -> OOP {classOop}");
+                }
+                break;
+                
+            case "IdentityDictionary":
+                // Create the SymbolTable as an IdentityDictionary instance for symbol interning
+                var createdSymbolTableOop = CreateSymbolTableAsIdentityDictionary(classOop);
+                objToStore = ObjectMemory.FromOop(createdSymbolTableOop);
+                if (objToStore != null)
+                {
+                    virtualMachine.SetSpecialObject(VirtualMachine.SpecialObjectIndex.SymbolTableClass, objToStore);
+                    BootstrapLog($"[SPECIAL-OBJECTS] Created SymbolTable (IdentityDictionary) -> OOP {createdSymbolTableOop}");
+                }
+                break;
+        }
+        
+        // Check if we have enough special objects populated to enable GC
+        // For now, enable GC once we have nil, true, false, and Behavior
+        var nil = virtualMachine.GetSpecialObject(VirtualMachine.SpecialObjectIndex.NilObject);
+        var falseObj = virtualMachine.GetSpecialObject(VirtualMachine.SpecialObjectIndex.FalseObject);
+        var trueObj = virtualMachine.GetSpecialObject(VirtualMachine.SpecialObjectIndex.TrueObject);
+        var behavior = virtualMachine.GetSpecialObject(VirtualMachine.SpecialObjectIndex.BehaviorClass);
+        
+        if (nil != null && falseObj != null && trueObj != null && behavior != null)
+        {
+            // Enable GC once we have the critical objects
+            ObjectMemory.EnableGC();
+            BootstrapLog("[SPECIAL-OBJECTS] Critical objects populated - garbage collection enabled");
+        }
+    }

@@ -25,6 +25,55 @@ public sealed class VirtualMachine
     private BootstrapOrchestrator? bootstrapOrchestrator;
     
     /// <summary>
+    /// Special Objects Array - VM-maintained array of critical system objects used as GC roots.
+    /// This is a VM construct, not a Smalltalk object, ensuring it's never collected.
+    /// Indices match the Blue Book specification.
+    /// </summary>
+    private readonly SmalltalkObject?[] specialObjectsArray = new SmalltalkObject?[32];
+    
+    /// <summary>
+    /// Special Objects Array indices per Blue Book specification.
+    /// </summary>
+    public enum SpecialObjectIndex
+    {
+        NilObject = 0,
+        FalseObject = 1,
+        TrueObject = 2,
+        BehaviorClass = 3,        // The class Behavior
+        MetaclassClass = 4,        // The class Metaclass  
+        SystemDictionaryInstance = 5,  // The Smalltalk global dictionary instance
+        SymbolTable = 6,           // The symbol table instance
+        ProcessList = 7,           // Future support
+        ProcessorScheduler = 8,    // Future support
+        // Indices 9-31 are reserved for future use
+    }
+    
+    /// <summary>
+    /// Gets or sets a special object in the VM's special objects array.
+    /// </summary>
+    public void SetSpecialObject(SpecialObjectIndex index, SmalltalkObject? obj)
+    {
+        specialObjectsArray[(int)index] = obj;
+        Console.WriteLine($"[VM] Special object {index} set to OOP {obj?.Oop ?? -1}");
+    }
+    
+    /// <summary>
+    /// Gets a special object from the VM's special objects array.
+    /// </summary>
+    public SmalltalkObject? GetSpecialObject(SpecialObjectIndex index)
+    {
+        return specialObjectsArray[(int)index];
+    }
+    
+    /// <summary>
+    /// Gets the entire special objects array for GC root marking.
+    /// </summary>
+    internal SmalltalkObject?[] GetSpecialObjectsArray()
+    {
+        return specialObjectsArray;
+    }
+    
+    /// <summary>
     /// Gets the bootstrap adapter for accessing VM primitives.
     /// </summary>
     public VMPrimitiveAdapter? Adapter => bootstrapAdapter;
@@ -79,17 +128,17 @@ public sealed class VirtualMachine
             Console.WriteLine($"[BOOTSTRAP] GC statistics: {result.GCStats.Summary}");
             
             // Log phase statistics if available
-            if (result.Phase1Stats != null)
+            if (result.BootstrapStats != null)
             {
-                Console.WriteLine($"[BOOTSTRAP] Phase 1: {result.Phase1Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Bootstrap: {result.BootstrapStats.ObjectCount} objects");
             }
-            if (result.Phase2Stats != null)
+            if (result.LegacyStats != null)
             {
-                Console.WriteLine($"[BOOTSTRAP] Phase 2: {result.Phase2Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Legacy: {result.LegacyStats.ObjectCount} objects");
             }
-            if (result.Phase3Stats != null)
+            if (result.ExtendedStats != null)
             {
-                Console.WriteLine($"[BOOTSTRAP] Phase 3: {result.Phase3Stats.ObjectCount} objects");
+                Console.WriteLine($"[BOOTSTRAP] Extended: {result.ExtendedStats.ObjectCount} objects");
             }
             
             Console.WriteLine("[BOOTSTRAP] BootstrapOrchestrator initialization complete!");
@@ -588,11 +637,11 @@ public sealed class VirtualMachine
     /// <summary>
     /// Gets bootstrap information if the BootstrapOrchestrator was used.
     /// </summary>
-    /// <returns>Bootstrap phase and log information, or null if not using orchestrator.</returns>
-    public (BootstrapOrchestrator.BootstrapPhase phase, IReadOnlyList<string> log)? GetBootstrapInfo()
+    /// <returns>Bootstrap state and log information, or null if not using orchestrator.</returns>
+    public (BootstrapOrchestrator.BootstrapState state, IReadOnlyList<string> log)? GetBootstrapInfo()
     {
         return bootstrapOrchestrator != null 
-            ? (bootstrapOrchestrator.CurrentPhase, bootstrapOrchestrator.BootstrapLog)
+            ? (bootstrapOrchestrator.CurrentState, bootstrapOrchestrator.BootstrapLog)
             : null;
     }
     
@@ -600,16 +649,16 @@ public sealed class VirtualMachine
     /// Attempts to rollback the bootstrap process to a previous phase.
     /// Only available when using BootstrapOrchestrator.
     /// </summary>
-    /// <param name="targetPhase">The phase to roll back to.</param>
+    /// <param name="targetState">The state to roll back to.</param>
     /// <returns>True if rollback was successful, false if not using orchestrator.</returns>
-    public bool TryRollbackBootstrap(BootstrapOrchestrator.BootstrapPhase targetPhase)
+    public bool TryRollbackBootstrap(BootstrapOrchestrator.BootstrapState targetState)
     {
         if (bootstrapOrchestrator == null)
             return false;
             
         try
         {
-            bootstrapOrchestrator.RollbackToPhase(targetPhase);
+            bootstrapOrchestrator.RollbackToState(targetState);
             return true;
         }
         catch
@@ -629,7 +678,7 @@ public sealed class VirtualMachine
             
         return new
         {
-            Phase = bootstrapOrchestrator.CurrentPhase,
+            State = bootstrapOrchestrator.CurrentState,
             IsComplete = bootstrapOrchestrator.IsComplete,
             LogEntries = bootstrapOrchestrator.BootstrapLog.Count,
             ObjectMemoryStats = ObjectMemory.GetMemoryStats(),

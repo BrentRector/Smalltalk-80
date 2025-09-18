@@ -7,38 +7,38 @@ using Smalltalk80.Bootstrap;
 using Smalltalk80.Exceptions;
 
 /// <summary>
-/// Orchestrates the complete Smalltalk-80 bootstrap process with proper phase management,
+/// Orchestrates the complete Smalltalk-80 bootstrap process with proper state management,
 /// validation, and error recovery capabilities.
 /// </summary>
 public class BootstrapOrchestrator
 {
     /// <summary>
-    /// Represents the different phases of the bootstrap process.
+    /// Represents the different states of the bootstrap process.
     /// </summary>
-    public enum BootstrapPhase
+    public enum BootstrapState
     {
         /// <summary>No bootstrap has been performed.</summary>
         None,
-        /// <summary>Phase 1: Core classes without methods.</summary>
-        Phase1_CoreClasses,
-        /// <summary>Phase 2: Methods installed on core classes.</summary>
-        Phase2_CoreMethods,
-        /// <summary>Phase 3: Extended system classes and full functionality.</summary>
-        Phase3_ExtendedSystem,
+        /// <summary>Legacy: Core classes without methods (deprecated).</summary>
+        LegacyCoreClasses,
+        /// <summary>Legacy: Methods installed on core classes (deprecated).</summary>
+        LegacyCoreMethods,
+        /// <summary>Legacy: Extended system classes and full functionality (deprecated).</summary>
+        LegacyExtendedSystem,
         /// <summary>Bootstrap completed successfully.</summary>
         Complete
     }
     
     private readonly VirtualMachine virtualMachine;
-    private readonly Dictionary<BootstrapPhase, BootstrapCheckpoint> checkpoints = new();
-    private BootstrapPhase currentPhase = BootstrapPhase.None;
+    private readonly Dictionary<BootstrapState, BootstrapCheckpoint> checkpoints = new();
+    private BootstrapState currentState = BootstrapState.None;
     private readonly List<string> bootstrapLog = new();
     private VMPrimitiveAdapter? bootstrapAdapter;
     
     /// <summary>
-    /// Gets the current bootstrap phase.
+    /// Gets the current bootstrap state.
     /// </summary>
-    public BootstrapPhase CurrentPhase => currentPhase;
+    public BootstrapState CurrentState => currentState;
     
     /// <summary>
     /// Gets the bootstrap log messages.
@@ -48,7 +48,7 @@ public class BootstrapOrchestrator
     /// <summary>
     /// Gets whether the bootstrap process is complete.
     /// </summary>
-    public bool IsComplete => currentPhase == BootstrapPhase.Complete;
+    public bool IsComplete => currentState == BootstrapState.Complete;
     
     /// <summary>
     /// Gets the bootstrap adapter for VM operations.
@@ -84,7 +84,7 @@ public class BootstrapOrchestrator
             
             // Execute consolidated bootstrap (now includes all classes)
             ExecuteConsolidatedBootstrap(bootstrapDir);
-            result.Phase1Stats = CapturePhaseStats("Bootstrap");
+            result.BootstrapStats = CaptureStats("Bootstrap");
             
             CompleteBootstrap();
             result.Success = true;
@@ -105,25 +105,25 @@ public class BootstrapOrchestrator
             result.TotalTime = stopwatch.Elapsed;
             
             LogMessage($"Bootstrap failed: {ex.Message}");
-            throw new BootstrapException($"Bootstrap failed in {currentPhase}", currentPhase.ToString(), null, ex);
+            throw new BootstrapException($"Bootstrap failed in {currentState}", currentState.ToString(), null, ex);
         }
     }
     
     /// <summary>
-    /// Executes the consolidated bootstrap process (replaces Phase 1/Phase 2 split).
+    /// Executes the unified bootstrap process.
     /// </summary>
     /// <param name="bootstrapDir">Bootstrap directory path.</param>
     public void ExecuteConsolidatedBootstrap(string bootstrapDir)
     {
-        if (currentPhase != BootstrapPhase.None)
-            throw new InvalidOperationException($"Cannot execute consolidated bootstrap from current phase: {currentPhase}");
+        if (currentState != BootstrapState.None)
+            throw new InvalidOperationException($"Cannot execute consolidated bootstrap from current state: {currentState}");
             
         LogMessage("Executing clean slate system image bootstrap");
         
         try
         {
             // Save checkpoint before starting
-            SaveCheckpoint(BootstrapPhase.None);
+            SaveCheckpoint(BootstrapState.None);
             
             // Clear object memory for fresh start
             ObjectMemory.Reset();
@@ -148,11 +148,11 @@ public class BootstrapOrchestrator
             bootstrapAdapter = new VMPrimitiveAdapter(virtualMachine);
             
             // Execute clean slate bootstrap directly from system image JSON
-            var executor = new SystemImageBootstrapExecutor(virtualMachine, systemImagePath);
+            var executor = new SystemImageBootstrapExecutor(virtualMachine, bootstrapAdapter, systemImagePath);
             executor.ExecuteBootstrap();
             
-            currentPhase = BootstrapPhase.Complete; // Mark as complete
-            SaveCheckpoint(currentPhase);
+            currentState = BootstrapState.Complete; // Mark as complete
+            SaveCheckpoint(currentState);
             
             LogMessage($"Clean slate bootstrap complete: Created {ObjectMemory.AllocatedObjectCount} objects");
         }
@@ -163,21 +163,21 @@ public class BootstrapOrchestrator
     }
     
     /// <summary>
-    /// Legacy Phase 1 method - deprecated in favor of clean slate bootstrap.
+    /// Legacy method - deprecated in favor of unified bootstrap.
     /// </summary>
     [Obsolete("Use ExecuteConsolidatedBootstrap instead")]
-    public void ExecutePhase1_CoreClasses(string bootstrapDir)
+    public void ExecuteLegacyCoreClasses(string bootstrapDir)
     {
-        throw new NotSupportedException("Legacy Phase 1 bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for clean slate bootstrap.");
+        throw new NotSupportedException("Legacy bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for unified bootstrap.");
     }
     
     /// <summary>
-    /// Legacy Phase 2 method - deprecated in favor of clean slate bootstrap.
+    /// Legacy method - deprecated in favor of unified bootstrap.
     /// </summary>
     [Obsolete("Use ExecuteConsolidatedBootstrap instead")]
-    public void ExecutePhase2_CoreMethods(string bootstrapDir)
+    public void ExecuteLegacyCoreMethods(string bootstrapDir)
     {
-        throw new NotSupportedException("Legacy Phase 2 bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for clean slate bootstrap.");
+        throw new NotSupportedException("Legacy bootstrap is deprecated. Use ExecuteConsolidatedBootstrap for unified bootstrap.");
     }
     
     
@@ -187,14 +187,14 @@ public class BootstrapOrchestrator
     public void CompleteBootstrap()
     {
         // If already complete, just return - don't re-validate
-        if (currentPhase == BootstrapPhase.Complete)
+        if (currentState == BootstrapState.Complete)
         {
             LogMessage("Bootstrap already complete, skipping re-validation");
             return;
         }
             
-        // Bootstrap can be completed from various phases
-        // (Phase1, Phase2, Phase3, or after consolidated bootstrap)
+        // Bootstrap can be completed from various states
+        // (legacy states or after unified bootstrap)
         LogMessage("Completing bootstrap and performing validation");
         
         try
@@ -205,7 +205,7 @@ public class BootstrapOrchestrator
             // Optimize memory after bootstrap
             ObjectMemory.ForceGC();
             
-            currentPhase = BootstrapPhase.Complete;
+            currentState = BootstrapState.Complete;
             LogMessage("Bootstrap completed successfully");
         }
         catch (Exception ex)
@@ -243,47 +243,52 @@ public class BootstrapOrchestrator
     }
     
     /// <summary>
-    /// Rolls back to a previous bootstrap phase.
+    /// Rolls back to a previous bootstrap state.
     /// </summary>
-    /// <param name="targetPhase">The phase to roll back to.</param>
-    public void RollbackToPhase(BootstrapPhase targetPhase)
+    /// <param name="targetState">The state to roll back to.</param>
+    public void RollbackToState(BootstrapState targetState)
     {
-        if (targetPhase > currentPhase)
-            throw new ArgumentException($"Cannot roll back from {currentPhase} to future phase {targetPhase}");
+        if (targetState > currentState)
+            throw new ArgumentException($"Cannot roll back from {currentState} to future state {targetState}");
             
-        if (!checkpoints.TryGetValue(targetPhase, out var checkpoint))
-            throw new InvalidOperationException($"No checkpoint available for phase {targetPhase}");
+        if (!checkpoints.TryGetValue(targetState, out var checkpoint))
+            throw new InvalidOperationException($"No checkpoint available for state {targetState}");
             
-        LogMessage($"Rolling back from {currentPhase} to {targetPhase}");
+        LogMessage($"Rolling back from {currentState} to {targetState}");
         
         try
         {
             RestoreCheckpoint(checkpoint);
-            currentPhase = targetPhase;
-            LogMessage($"Rollback completed to phase {targetPhase}");
+            currentState = targetState;
+            LogMessage($"Rollback completed to state {targetState}");
         }
         catch (Exception ex)
         {
-            throw new BootstrapException($"Rollback to {targetPhase} failed", targetPhase.ToString(), null, ex);
+            throw new BootstrapException($"Rollback to {targetState} failed", targetState.ToString(), null, ex);
         }
     }
     
     /// <summary>
     /// Saves a checkpoint of the current system state.
     /// </summary>
-    /// <param name="phase">The phase to checkpoint.</param>
-    private void SaveCheckpoint(BootstrapPhase phase)
+    /// <param name="state">The state to checkpoint.</param>
+    private void SaveCheckpoint(BootstrapState state)
     {
         var checkpoint = new BootstrapCheckpoint
         {
-            Phase = phase,
+            State = state,
             ObjectCount = ObjectMemory.AllocatedObjectCount,
             GCStats = ObjectMemory.GetAdaptiveGCStats(),
             Timestamp = DateTime.UtcNow
         };
         
-        checkpoints[phase] = checkpoint;
-        LogMessage($"Saved checkpoint for phase {phase} with {checkpoint.ObjectCount} objects");
+        checkpoints[state] = checkpoint;
+        
+        // Only log meaningful checkpoints (skip empty "None" state)
+        if (state != BootstrapState.None || checkpoint.ObjectCount > 0)
+        {
+            LogMessage($"Saved checkpoint for state {state} with {checkpoint.ObjectCount} objects");
+        }
     }
     
     /// <summary>
@@ -295,7 +300,7 @@ public class BootstrapOrchestrator
         // For now, this is a simplified implementation that resets memory
         // A full implementation would save/restore actual object state
         ObjectMemory.Reset();
-        LogMessage($"Restored checkpoint for phase {checkpoint.Phase}");
+        LogMessage($"Restored checkpoint for state {checkpoint.State}");
     }
     
     /// <summary>
@@ -340,13 +345,13 @@ public class BootstrapOrchestrator
     
     
     /// <summary>
-    /// Captures statistics for a completed phase.
+    /// Captures statistics for completed operations.
     /// </summary>
-    private BootstrapPhaseStats CapturePhaseStats(string phaseName)
+    private BootstrapStats CaptureStats(string operationName)
     {
-        return new BootstrapPhaseStats
+        return new BootstrapStats
         {
-            Phase = phaseName,
+            Operation = operationName,
             ObjectCount = ObjectMemory.AllocatedObjectCount,
             MemoryStats = ObjectMemory.GetMemoryStats(),
             TypeIndexStats = ObjectMemory.GetTypeIndexStats(),
@@ -371,7 +376,7 @@ public class BootstrapOrchestrator
 /// </summary>
 public record BootstrapCheckpoint
 {
-    public BootstrapOrchestrator.BootstrapPhase Phase { get; init; }
+    public BootstrapOrchestrator.BootstrapState State { get; init; }
     public int ObjectCount { get; init; }
     public AdaptiveGCStats GCStats { get; init; } = new();
     public DateTime Timestamp { get; init; }
@@ -388,17 +393,17 @@ public record BootstrapResult
     public string? BootstrapDirectory { get; set; }
     public int ObjectCount { get; set; }
     public AdaptiveGCStats GCStats { get; set; } = new();
-    public BootstrapPhaseStats? Phase1Stats { get; set; }
-    public BootstrapPhaseStats? Phase2Stats { get; set; }
-    public BootstrapPhaseStats? Phase3Stats { get; set; }
+    public BootstrapStats? BootstrapStats { get; set; }
+    public BootstrapStats? LegacyStats { get; set; }
+    public BootstrapStats? ExtendedStats { get; set; }
 }
 
 /// <summary>
-/// Statistics for a completed bootstrap phase.
+/// Statistics for completed bootstrap operations.
 /// </summary>
-public record BootstrapPhaseStats
+public record BootstrapStats
 {
-    public string Phase { get; init; } = string.Empty;
+    public string Operation { get; init; } = string.Empty;
     public int ObjectCount { get; init; }
     public (int allocated, int free, int total, int collections) MemoryStats { get; init; }
     public (int classesIndexed, int totalInstances) TypeIndexStats { get; init; }

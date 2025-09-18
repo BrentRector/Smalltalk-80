@@ -370,6 +370,7 @@ public class SmalltalkPrettyPrinterUnified
         {
             if (obj != null && IsSystemDictionary(obj))
             {
+                Console.WriteLine($"[DEBUG] Found SystemDictionary via fallback at OOP {obj.Oop}");
                 return obj;
             }
         }
