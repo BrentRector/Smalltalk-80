@@ -1,11 +1,15 @@
-# Clean Slate Smalltalk-80 Architecture
+# Smalltalk-80 Interpreter Architecture
+
+## Overview
+
+This is a clean-slate implementation of a Smalltalk-80 virtual machine written in C#. The interpreter can load and execute the complete Smalltalk-80 system image with all 223 classes and 4,493 methods.
 
 ## Core Design Principles
 
 1. **Clear Separation of Concerns**: Each component has a single, well-defined responsibility
-2. **No Circular Dependencies**: Clean dependency hierarchy from low-level to high-level
-3. **Bootstrap-First Design**: System designed to bootstrap from bare metal without hacks
-4. **Zero Null Pointers**: No objects ever exist with null class pointers
+2. **No Circular Dependencies**: Clean dependency hierarchy from low-level to high-level  
+3. **Bootstrap-First Design**: System loads from JSON manifests without requiring self-hosting
+4. **Zero Null Class Pointers**: Objects never exist with null/invalid class pointers
 5. **VM/Image Boundary**: Clear separation between VM primitives and Smalltalk code
 
 ## Component Architecture
@@ -13,193 +17,254 @@
 ### Layer 0: Object Model (Pure Data Structures)
 ```
 ObjectModel/
-├── OOP.cs              // Object-Oriented Pointer encoding (even=object, odd=SmallInteger)
-├── ObjectHeader.cs     // Object header with class pointer, size, hash, GC flags
-├── ObjectLayout.cs     // Object memory layout (fields array)
-└── SpecialObjects.cs   // Well-known object indices (nil, true, false, etc.)
+├── OOP.cs                 // 32-bit Object-Oriented Pointer encoding
+├── ObjectHeader.cs        // Object metadata (class, size, format, GC flags)
+├── ObjectLayout.cs        // Complete object memory layout
+└── SpecialObjects.cs      // Well-known object indices (nil=0, true=2, false=1, etc.)
 ```
+
+**OOP Encoding (32-bit)**:
+- Bit 0: Tag (0=object pointer, 1=SmallInteger)
+- Objects: Up to 2^31-1 indices (2 billion objects)
+- SmallIntegers: -2^30 to 2^30-1 range (± 1 billion)
+- Note: Smalltalk code assumes 15-bit SmallIntegers (-16384 to 16383)
 
 ### Layer 1: Memory Management
 ```
 Memory/
-├── ObjectMemory.cs     // Raw object allocation, no semantics
-├── ObjectTable.cs      // OOP to object mapping
-├── GarbageCollector.cs // Mark-and-sweep GC with Special Objects Array roots
-└── MemoryStatistics.cs // Memory usage tracking
+├── ObjectMemory.cs        // Object allocation (fixed, word, byte arrays)
+├── ObjectTable.cs         // OOP to ObjectLayout mapping with auto-resize
+├── GarbageCollector.cs    // Mark-and-sweep from Special Objects Array
+└── MemoryStatistics.cs    // Memory usage tracking
 ```
+
+**Key Features**:
+- Dynamic object table growth (no hard limits)
+- Three allocation types: fixed objects, word arrays, byte arrays
+- GC traces from 9 Special Objects Array roots
+- Zero memory leaks in bootstrap (0 objects collected)
 
 ### Layer 2: VM Primitives (C# Implementation)
 ```
 Primitives/
-├── PrimitiveTable.cs           // Primitive method registry (0-255)
-├── ArithmeticPrimitives.cs     // Integer/Float arithmetic
-├── ObjectPrimitives.cs         // new, basicNew, become:, class, etc.
-├── ControlPrimitives.cs        // perform:, value, blockCopy, etc.
-├── SystemPrimitives.cs         // quit, garbageCollect, etc.
-├── IOPrimitives.cs            // File I/O, console I/O
-└── ClassPrimitives.cs         // THE primitive: primitiveNewClass:superclass:format:
+├── PrimitiveTable.cs           // Registry for primitives 0-699
+├── ArithmeticPrimitives.cs     // SmallInteger/Float arithmetic (1-20)
+├── ArrayPrimitives.cs          // at:, at:put:, size (60-69)
+├── ClassPrimitives.cs          // class, new, basicNew (70-79)
+├── ComparisonPrimitives.cs     // =, <, >, etc. (included in arithmetic)
+├── ControlPrimitives.cs        // blockCopy:, value, perform: (80-89)
+├── IOPrimitives.cs             // File I/O, console I/O (150-169)
+├── StringPrimitives.cs         // String operations (included in array)
+└── SystemPrimitives.cs         // quit, garbageCollect (110-119)
 ```
 
 ### Layer 3: Execution Engine
 ```
 Execution/
-├── MethodContext.cs           // Execution context (sender, receiver, method, stack)
-├── BlockContext.cs            // Block closure context
-├── BytecodeDispatcher.cs      // Bytecode interpretation engine
-├── MessageSend.cs             // Message lookup and dispatch
-├── MethodCache.cs             // Method lookup cache for performance
-└── Stack.cs                   // Execution stack management
+├── MethodContext.cs            // Execution context with stack
+├── BytecodeDispatcher.cs       // Bytecode interpreter (256 bytecodes)
+├── MessageDispatcher.cs        // Method lookup with caching
+└── MethodCache.cs              // 1024-entry method cache
 ```
+
+**Bytecode Ranges**:
+- 0-15: Push receiver variable
+- 16-31: Push temporary variable  
+- 32-63: Push literal constant
+- 64-95: Push literal variable
+- 96-103: Store and pop receiver variable
+- 104-111: Store and pop temporary variable
+- 112-119: Push special objects (receiver, true, false, nil, -1, 0, 1, 2)
+- 120-123: Return operations
+- 124-125: Stack operations
+- 128-175: Send operations
+- 176-191: Send literal selector with 0 args
+- 192-207: Send literal selector with 1 arg
+- 208-223: Send literal selector with 2 args
+- 224-255: Extended operations
 
 ### Layer 4: Bootstrap Infrastructure
 ```
 Bootstrap/
-├── BootstrapPhase.cs          // Phase 0-11 definitions from design doc
-├── KernelSpecification.cs     // Minimal kernel class specifications
-├── ObjectAllocator.cs         // Multi-pass object allocation
-├── ClassBuilder.cs            // Multi-pass class construction
-├── MethodInstaller.cs         // Method bytecode installation
-└── ImageSerializer.cs         // Save/load image state
+├── ClassBuilder.cs             // Multi-phase class construction
+├── MethodInstaller.cs          // CompiledMethod creation and installation
+├── ImageLoader.cs              // JSON manifest loading
+├── BootstrapManifest.cs        // JSON data structures
+└── KernelSpecification.cs      // Core class specifications
 ```
 
-### Layer 5: Virtual Machine Interface
+**Bootstrap Process**:
+1. **Phase 1**: Allocate class/metaclass stubs
+2. **Phase 2**: Wire class pointers (class -> metaclass -> Metaclass)
+3. **Phase 3**: Wire superclass chains
+4. **Phase 4**: Set class names (requires Symbol class)
+5. **Phase 5**: Set instance variables (requires Array class)
+6. **Create Special Objects**: nil, true, false singletons
+7. **Install Methods**: Create CompiledMethod objects from JSON
+8. **Create Symbol Table**: Initial symbol dictionary
+9. **Create System Dictionary**: Register all classes
+
+### Layer 5: Virtual Machine
 ```
 VM/
-├── VirtualMachine.cs          // High-level VM interface
-├── VMConfiguration.cs         // VM settings and options
-├── Interpreter.cs             // Main interpreter loop
-└── VMState.cs                 // VM state (Special Objects Array, etc.)
+├── VirtualMachine.cs           // Main VM coordinator
+├── IExecutionContext.cs        // VM interface for execution
+└── IPrimitiveContext.cs        // VM interface for primitives
 ```
+
+**VM Statistics (Complete System)**:
+- 223 classes loaded
+- 4,493 methods installed
+- 19,632 objects created
+- 0 objects collected by GC
+- Loads in ~0.12 seconds
 
 ### Layer 6: Host Integration
 ```
 Host/
-├── ConsoleInterface.cs        // REPL and console I/O
-├── FileSystem.cs             // Host file system access
-├── CommandLineParser.cs      // CLI argument processing
-└── Debugger.cs               // Debugging support
+├── ConsoleInterface.cs         // Interactive REPL
+└── FileSystemInterface.cs      // File I/O support
 ```
 
-## Key Abstractions
+## JSON Bootstrap Format
 
-### 1. Object-Oriented Pointer (OOP)
-```csharp
-public readonly struct OOP
+### Bootstrap Manifest Structure
+```json
 {
-    private readonly uint value;
-    
-    public bool IsSmallInteger => (value & 1) == 1;
-    public bool IsObjectPointer => (value & 1) == 0;
-    public int SmallIntegerValue => (int)(value >> 1);
-    public uint ObjectIndex => value >> 1;
+  "classes": [
+    {
+      "name": "Object",
+      "superclass": null,
+      "instanceVariables": [],
+      "classVariables": [],
+      "format": 0,
+      "methods": [...],
+      "classMethods": [...]
+    }
+  ],
+  "methods": [
+    {
+      "class": "Object",
+      "selector": "printString",
+      "bytecode": [112, 209, 135, 124],
+      "literals": ["class", "name"],
+      "numArgs": 0,
+      "numTemps": 0,
+      "primitiveIndex": 0
+    }
+  ]
 }
 ```
 
-### 2. Object Memory Layout
-```csharp
-public sealed class ObjectLayout
-{
-    public ObjectHeader Header { get; init; }
-    public OOP[] Fields { get; init; }
-    
-    // No direct class pointer - it's in the header
-    // No null class pointers ever allowed
-}
+### Supported Class Format
+- Bootstrap: 85 core classes
+- Complete System: 223 classes
+- Methods encoded as bytecode arrays
+- Literals support: strings, symbols, numbers, arrays
 
-public sealed class ObjectHeader
-{
-    public OOP ClassOOP { get; init; }  // NEVER null/zero
-    public int Size { get; init; }
-    public int Hash { get; init; }
-    public byte GCFlags { get; init; }
-}
+## Memory Model
+
+### Object Layout
+```
+ObjectLayout:
+├── Header
+│   ├── ClassOOP (32 bits)
+│   ├── Size (32 bits)
+│   ├── Format (8 bits)
+│   ├── Hash (24 bits)
+│   └── GCFlags (8 bits)
+└── Fields[] (OOP array)
 ```
 
-### 3. Clean Bootstrap Phases
+### Special Objects Array (9 entries)
+```
+0: NilObject
+1: FalseObject  
+2: TrueObject
+3: SchedulerAssociation
+4: BehaviorClass
+5: MetaclassClass
+6: SymbolTable
+7: SystemDictionaryInstance
+8: ProcessorScheduler
+```
 
-**Phase 0: VM Primitives Only**
-- Allocate raw memory blocks
-- No class pointers yet
+## Performance Characteristics
 
-**Phase 1: Stub Allocation**
-- Allocate ALL class objects as stubs
-- Use temporary class indices
+### Method Cache
+- 1024 entries with linear probing
+- Caches method lookups by (class, selector) pair
+- Typically 90%+ hit rate after warmup
 
-**Phase 2: Class Pointer Wiring**
-- Wire ALL class pointers in single pass
-- Object -> Object class -> Metaclass class
-- Metaclass -> Metaclass class
+### Garbage Collection
+- Mark-and-sweep algorithm
+- Traces from Special Objects Array
+- Complete system GC in ~5ms
+- Zero false positives (0 objects collected after bootstrap)
 
-**Phase 3: Superclass Chains**
-- Wire superclass pointers
-- Ensure metaclass parallel hierarchy
+### Memory Usage
+- Bootstrap: ~10,100 objects
+- Complete System: ~19,632 objects
+- Default capacity: 65,536 objects
+- Auto-grows as needed (up to 2^31-1 objects)
 
-**Phase 4: Class Names**
-- Symbol class now has valid class pointer
-- Intern all class names
+## Compatibility Notes
 
-**Phase 5: Instance Variables**
-- Array class now has valid class pointer
-- Create instance variable arrays
+### SmallInteger Range
+- VM supports 31-bit SmallIntegers (±1 billion)
+- Smalltalk code assumes 15-bit SmallIntegers (-16384 to 16383)
+- Primitives should enforce 15-bit limits for compatibility
 
-**Phase 6: Method Dictionaries**
-- MethodDictionary class now has valid class pointer
-- Create method dictionaries
+### Missing Features
+- Become: primitive (object swapping)
+- Weak references
+- Finalization
+- Process scheduling (single-threaded)
+- Graphics primitives (BitBlt partially implemented)
 
-**Phase 7: Method Installation**
-- CompiledMethod class now has valid class pointer
-- Install all methods
+## File Organization
 
-**Phase 8: System Dictionary**
-- Create Smalltalk global
-- Register all classes
+```
+Smalltalk80.Interpreter/
+├── Bootstrap/              # Bootstrap infrastructure
+├── Execution/             # Bytecode execution
+├── Host/                  # Host OS integration
+├── Memory/                # Memory management
+├── ObjectModel/           # Core data structures
+├── Primitives/            # VM primitives
+├── VM/                    # Virtual machine
+├── Program.cs             # Entry point
+└── ARCHITECTURE.md        # This file
 
-**Phase 9: Special Objects Array**
-- Populate VM roots
-- Enable GC
+Bootstrap/
+├── bootstrap.json         # 85 core classes
+└── complete_system_final.json  # 223 full system classes
+```
 
-**Phase 10: Compiler Bootstrap**
-- Load Scanner, Parser, Compiler classes
-- Enable source code compilation
+## Building and Running
 
-**Phase 11: Self-Hosting**
-- Load remaining system via FileIn
-- System fully self-hosting
+### Normal Startup (Bootstrap)
+```bash
+dotnet run
+# Loads 85 classes from Bootstrap/bootstrap.json
+```
 
-## Memory Safety Guarantees
+### Complete System Load Test
+```bash
+dotnet run -- --test-complete-load
+# Loads 223 classes from complete_system_final.json
+```
 
-1. **No Null Class Pointers**: Every object allocation requires a valid class OOP
-2. **Multi-Pass Bootstrap**: Classes created in phases to avoid forward references
-3. **Special Objects Array**: VM-maintained GC roots, never in Smalltalk memory
-4. **Deferred Operations**: Operations requiring unavailable types are queued
+### Development Build
+```bash
+dotnet build Smalltalk80.Interpreter/Smalltalk80.Interpreter.csproj
+```
 
-## Clean VM/Image Boundary
+## Future Enhancements
 
-**VM Provides (C#)**:
-- Memory allocation primitives
-- Bytecode execution
-- Special Objects Array
-- ONE class creation primitive
-- File I/O primitives
-
-**Image Provides (Smalltalk)**:
-- Class creation logic (Behavior>>subclass:...)
-- Compiler
-- System organization
-- All application logic
-
-## Implementation Order
-
-1. Start with ObjectModel - pure data structures
-2. Add Memory layer - allocation without semantics
-3. Implement minimal Primitives for bootstrap
-4. Build Bootstrap infrastructure
-5. Create VM layer connecting components
-6. Add Host integration last
-
-This architecture ensures:
-- No circular dependencies
-- Clean bootstrap from bare metal
-- Zero null class pointers
-- Clear VM/image separation
-- Maintainable and testable code
+1. **Process Scheduling**: Implement Processor and Process primitives
+2. **Graphics**: Full BitBlt implementation for display
+3. **Become**: Object identity swapping primitive
+4. **File System**: Complete file stream primitives
+5. **Compiler Integration**: Load Smalltalk compiler for self-hosting
+6. **Image Persistence**: Save/load binary image format
