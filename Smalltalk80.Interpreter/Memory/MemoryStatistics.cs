@@ -20,6 +20,11 @@ public sealed record MemoryStatistics
     public required uint NextIndex { get; init; }
 
     /// <summary>
+    /// Number of free objects available for allocation.
+    /// </summary>
+    public int FreeObjects => TotalCapacity - TotalObjects;
+
+    /// <summary>
     /// Percentage of capacity used.
     /// </summary>
     public double UsagePercentage => TotalCapacity > 0 ? (double)TotalObjects / TotalCapacity * 100 : 0;

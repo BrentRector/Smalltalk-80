@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Smalltalk80.Interpreter.Bootstrap;
 using Smalltalk80.Interpreter.Execution;
 using Smalltalk80.Interpreter.Memory;
@@ -107,6 +108,67 @@ namespace Smalltalk80.Interpreter.VM
             RunGarbageCollection();
         }
 
+        /// <summary>
+        /// Loads the bootstrap from a JSON file.
+        /// </summary>
+        /// <param name="bootstrapPath">Path to the bootstrap.json file.</param>
+        public void LoadBootstrapFromJson(string bootstrapPath)
+        {
+            Console.WriteLine($"[VM] Loading bootstrap from JSON: {bootstrapPath}");
+            
+            // Create the image loader
+            var imageLoader = new ImageLoader(memory, classBuilder, this);
+            
+            // Load the bootstrap manifest
+            var manifest = imageLoader.LoadBootstrap(bootstrapPath);
+            
+            // Create special objects after classes are loaded
+            CreateSpecialObjects();
+            
+            // Create initial symbol table
+            CreateInitialSymbolTable();
+            
+            // Create system dictionary
+            CreateSystemDictionary();
+            
+            bootstrapComplete = true;
+            Console.WriteLine($"[VM] Bootstrap complete! Loaded {manifest.Classes.Count} classes");
+            
+            // Initialize message dispatcher with common selectors
+            messageDispatcher.Initialize();
+            
+            // Get load statistics
+            var stats = imageLoader.GetStatistics();
+            Console.WriteLine($"[VM] Load statistics: {stats}");
+            
+            // Run garbage collection to verify everything is reachable
+            RunGarbageCollection();
+        }
+
+        /// <summary>
+        /// Loads extended class manifests from a directory.
+        /// </summary>
+        /// <param name="manifestDirectory">Directory containing extended manifest JSON files.</param>
+        public void LoadExtendedManifests(string manifestDirectory)
+        {
+            if (!bootstrapComplete)
+            {
+                throw new InvalidOperationException("Bootstrap must be completed before loading extended manifests");
+            }
+            
+            Console.WriteLine($"[VM] Loading extended manifests from: {manifestDirectory}");
+            
+            // Create the image loader
+            var imageLoader = new ImageLoader(memory, classBuilder, this);
+            
+            // Load all manifests from directory
+            imageLoader.LoadManifestsFromDirectory(manifestDirectory);
+            
+            // Get load statistics
+            var stats = imageLoader.GetStatistics();
+            Console.WriteLine($"[VM] Extended load statistics: {stats}");
+        }
+
         private void CreateSpecialObjects()
         {
             Console.WriteLine("[VM] Creating special objects...");
@@ -182,19 +244,87 @@ namespace Smalltalk80.Interpreter.VM
 
         private void RegisterAllClasses(OOP systemDict)
         {
+            var systemDictObj = memory.GetObject(systemDict);
+            if (systemDictObj == null) return;
+            
+            // Initialize dictionary with appropriate capacity
+            var arrayClass = classBuilder.GetClass("Array");
+            if (arrayClass.IsNil) return;
+            
             var allClasses = classBuilder.GetAllClasses();
+            int capacity = NextPowerOfTwo(allClasses.Count * 3); // Extra space for hash efficiency
+            
+            // Create the dictionary's internal array
+            var dictArray = memory.AllocateWordArray(arrayClass, capacity * 2); // key-value pairs
+            var dictArrayObj = memory.GetObject(dictArray);
+            if (dictArrayObj == null) return;
+            
+            // Initialize all slots to nil
+            for (int i = 0; i < dictArrayObj.Fields.Length; i++)
+            {
+                dictArrayObj.Fields[i] = OOP.Nil;
+            }
+            
+            // Set dictionary fields (tally and array)
+            systemDictObj.Fields[0] = OOP.FromSmallInteger(0); // tally
+            systemDictObj.Fields[1] = dictArray; // array
+            
+            // Register all classes with Symbol keys
+            int registeredCount = 0;
             foreach (var kvp in allClasses)
             {
-                // Register class in system dictionary
-                // This would normally use Dictionary>>at:put: but we're bootstrapping
-                Console.WriteLine($"  Registered class: {kvp.Key}");
+                // Class name must be a Symbol
+                var classNameSymbol = Intern(kvp.Key);
+                var classOop = kvp.Value;
+                
+                // Simple hash table insertion with linear probing
+                var hash = Math.Abs(classNameSymbol.RawValue) % capacity;
+                
+                for (int i = 0; i < capacity; i++)
+                {
+                    var index = (hash + i) % capacity;
+                    var keyIndex = index * 2;
+                    var valueIndex = keyIndex + 1;
+                    
+                    if (dictArrayObj.Fields[keyIndex].IsNil)
+                    {
+                        dictArrayObj.Fields[keyIndex] = classNameSymbol;
+                        dictArrayObj.Fields[valueIndex] = classOop;
+                        registeredCount++;
+                        Console.WriteLine($"  Registered class: {kvp.Key} as Symbol {classNameSymbol}");
+                        break;
+                    }
+                }
             }
+            
+            // Update tally
+            systemDictObj.Fields[0] = OOP.FromSmallInteger(registeredCount);
+        }
+        
+        private static int NextPowerOfTwo(int n)
+        {
+            if (n <= 1) return 2;
+            n--;
+            n |= n >> 1;
+            n |= n >> 2;
+            n |= n >> 4;
+            n |= n >> 8;
+            n |= n >> 16;
+            return n + 1;
         }
 
         private void RegisterPrimitives()
         {
-            ObjectPrimitives.RegisterAll(primitiveTable);
-            // Additional primitive registrations would go here
+            // Register all primitive classes
+            ArithmeticPrimitives.RegisterAll(primitiveTable);
+            ArrayPrimitives.RegisterAll(primitiveTable);
+            ClassPrimitives.RegisterAll(primitiveTable);
+            ControlPrimitives.RegisterAll(primitiveTable);
+            StringPrimitives.RegisterAll(primitiveTable);
+            SystemPrimitives.RegisterAll(primitiveTable);
+            IOPrimitives.RegisterAll(primitiveTable);
+            // Note: ComparisonPrimitives are already registered by ArithmeticPrimitives
+            // Note: Some primitives may be registered by multiple classes, last registration wins
         }
 
         /// <summary>

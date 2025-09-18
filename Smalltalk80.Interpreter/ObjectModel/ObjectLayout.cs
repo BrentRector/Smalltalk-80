@@ -89,6 +89,12 @@ public sealed class ObjectLayout
     /// </summary>
     public bool IsBytes => (Header.Format & 0x40) != 0;
 
+    /// <summary>
+    /// Checks if this object is byte-indexable (both bytes and indexable).
+    /// Used for String, ByteArray, and similar objects.
+    /// </summary>
+    public bool IsByteIndexable => IsBytes && IsIndexable;
+
     public override string ToString()
     {
         var sb = new StringBuilder();

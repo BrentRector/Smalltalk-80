@@ -167,6 +167,64 @@ public sealed class ObjectMemory
     };
 
     /// <summary>
+    /// Swaps two objects in memory (for become: primitive).
+    /// All references to first will point to second and vice versa.
+    /// </summary>
+    /// <param name="first">First object to swap.</param>
+    /// <param name="second">Second object to swap.</param>
+    public void SwapObjects(OOP first, OOP second)
+    {
+        if (first.IsSmallInteger || second.IsSmallInteger)
+            throw new ArgumentException("Cannot swap SmallIntegers");
+        
+        var firstLayout = GetObject(first);
+        var secondLayout = GetObject(second);
+        
+        if (firstLayout == null || secondLayout == null)
+            throw new ArgumentException("Invalid object OOP for swap");
+        
+        // Swap the objects in the table
+        objectTable.StoreObject(first.ObjectIndex, secondLayout);
+        objectTable.StoreObject(second.ObjectIndex, firstLayout);
+    }
+
+    /// <summary>
+    /// Forwards all references from one object to another (for becomeForward:).
+    /// After this, all references to 'from' will point to 'to'.
+    /// </summary>
+    /// <param name="from">Object to forward from.</param>
+    /// <param name="to">Object to forward to.</param>
+    public void ForwardReferences(OOP from, OOP to)
+    {
+        if (from.IsSmallInteger || to.IsSmallInteger)
+            throw new ArgumentException("Cannot forward SmallIntegers");
+        
+        // This would require scanning all objects and updating references
+        // For now, we can swap the object contents
+        var fromLayout = GetObject(from);
+        var toLayout = GetObject(to);
+        
+        if (fromLayout == null || toLayout == null)
+            throw new ArgumentException("Invalid object OOP for forward");
+        
+        // Copy 'to' object into 'from' slot
+        objectTable.StoreObject(from.ObjectIndex, toLayout);
+    }
+
+    /// <summary>
+    /// Gets an enumerator for all allocated object OOPs.
+    /// Used for instance enumeration primitives.
+    /// </summary>
+    /// <returns>Enumerator of all object OOPs.</returns>
+    public IEnumerator<OOP> GetAllObjects()
+    {
+        foreach (var (oop, _) in EnumerateObjects())
+        {
+            yield return oop;
+        }
+    }
+
+    /// <summary>
     /// Compacts the object table after GC.
     /// </summary>
     internal void Compact()

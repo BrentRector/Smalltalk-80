@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-01-18",
+  "description": "Example bootstrap manifest demonstrating JSON loading",
+  "comments": [
+    "This is a minimal example showing how to load classes and methods from JSON",
+    "In production, use the full bootstrap.json from the Bootstrap directory"
+  ],
+  "classes": [
+    {
+      "name": "ExampleClass",
+      "superclass": "Object",
+      "instanceVariables": ["value", "count"],
+      "classVariables": ["DefaultValue"],
+      "format": 0,
+      "category": "Examples",
+      "methods": [
+        {
+          "selector": "initialize",
+          "bytecode": [112, 117, 96, 135, 112, 118, 97, 135, 120],
+          "literals": [],
+          "numArgs": 0,
+          "numTemps": 0,
+          "primitiveIndex": 0,
+          "source": "initialize\n\tvalue := 0.\n\tcount := 0"
+        },
+        {
+          "selector": "value",
+          "bytecode": [0, 124],
+          "literals": [],
+          "numArgs": 0,
+          "numTemps": 0,
+          "primitiveIndex": 0,
+          "source": "value\n\t^value"
+        },
+        {
+          "selector": "value:",
+          "bytecode": [16, 96, 135, 120],
+          "literals": [],
+          "numArgs": 1,
+          "numTemps": 0,
+          "primitiveIndex": 0,
+          "source": "value: anObject\n\tvalue := anObject"
+        }
+      ],
+      "classMethods": [
+        {
+          "selector": "new",
+          "bytecode": [112, 204, 164, 2, 211, 124],
+          "literals": ["#basicNew", "#initialize"],
+          "numArgs": 0,
+          "numTemps": 0,
+          "primitiveIndex": 0,
+          "source": "new\n\t^super new initialize",
+          "isClassMethod": true
+        }
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "ExampleClass",
+      "selector": "increment",
+      "bytecode": [1, 176, 97, 135, 0, 124],
+      "literals": [],
+      "numArgs": 0,
+      "numTemps": 0,
+      "primitiveIndex": 0,
+      "isClassMethod": false
+    }
+  ]
+}
