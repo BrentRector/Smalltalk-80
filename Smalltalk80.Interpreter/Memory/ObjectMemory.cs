@@ -223,6 +223,16 @@ public sealed class ObjectMemory
             yield return oop;
         }
     }
+    
+    /// <summary>
+    /// Removes an object from memory.
+    /// Used by the garbage collector to free unreachable objects.
+    /// </summary>
+    /// <param name="index">The object index to remove.</param>
+    public void RemoveObject(uint index)
+    {
+        objectTable.RemoveObject(index);
+    }
 
     /// <summary>
     /// Compacts the object table after GC.

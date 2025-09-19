@@ -108,15 +108,8 @@ public sealed class BytecodeDispatcher
 
     private bool PushReceiverVariable(MethodContext context, int index)
     {
-        var receiver = executionContext.Memory.GetObject(context.Receiver);
-        if (receiver != null && index < receiver.Fields.Length)
-        {
-            context.Stack.Push(receiver.Fields[index]);
-        }
-        else
-        {
-            context.Stack.Push(OOP.Nil);
-        }
+        var value = executionContext.GetFieldByIndex(context.Receiver, index);
+        context.Stack.Push(value);
         return true;
     }
 
@@ -152,16 +145,9 @@ public sealed class BytecodeDispatcher
         var literals = GetLiterals(context.Method);
         if (index < literals.Length)
         {
-            // For Association objects, push the value
-            var assoc = executionContext.Memory.GetObject(literals[index]);
-            if (assoc != null && assoc.Fields.Length > 1)
-            {
-                context.Stack.Push(assoc.Fields[1]); // value field
-            }
-            else
-            {
-                context.Stack.Push(OOP.Nil);
-            }
+            // For Association objects, push the value field
+            var value = executionContext.GetFieldByName(literals[index], "value");
+            context.Stack.Push(value);
         }
         else
         {
@@ -173,11 +159,7 @@ public sealed class BytecodeDispatcher
     private bool StoreAndPopReceiverVariable(MethodContext context, int index)
     {
         var value = context.Stack.Pop();
-        var receiver = executionContext.Memory.GetObject(context.Receiver);
-        if (receiver != null && index < receiver.Fields.Length)
-        {
-            receiver.Fields[index] = value;
-        }
+        executionContext.SetFieldByIndex(context.Receiver, index, value);
         return true;
     }
 
@@ -376,11 +358,7 @@ public sealed class BytecodeDispatcher
         switch (variableType)
         {
             case 0: // Receiver variable
-                var receiver = executionContext.Memory.GetObject(context.Receiver);
-                if (receiver != null && index < receiver.Fields.Length)
-                {
-                    receiver.Fields[index] = value;
-                }
+                executionContext.SetFieldByIndex(context.Receiver, index, value);
                 break;
                 
             case 1: // Temporary variable
@@ -395,11 +373,8 @@ public sealed class BytecodeDispatcher
                 var literals = GetLiterals(context.Method);
                 if (index < literals.Length)
                 {
-                    var assoc = executionContext.Memory.GetObject(literals[index]);
-                    if (assoc != null && assoc.Fields.Length > 1)
-                    {
-                        assoc.Fields[1] = value; // value field
-                    }
+                    // Set Association's value field
+                    executionContext.SetFieldByName(literals[index], "value", value);
                 }
                 break;
         }
@@ -476,20 +451,12 @@ public sealed class BytecodeDispatcher
                 
             case 5: // Store receiver variable
                 var value = context.Stack.Top;
-                var rcvr = executionContext.Memory.GetObject(context.Receiver);
-                if (rcvr != null && index < rcvr.Fields.Length)
-                {
-                    rcvr.Fields[index] = value;
-                }
+                executionContext.SetFieldByIndex(context.Receiver, index, value);
                 return true;
                 
             case 6: // Store and pop receiver variable
                 value = context.Stack.Pop();
-                rcvr = executionContext.Memory.GetObject(context.Receiver);
-                if (rcvr != null && index < rcvr.Fields.Length)
-                {
-                    rcvr.Fields[index] = value;
-                }
+                executionContext.SetFieldByIndex(context.Receiver, index, value);
                 return true;
                 
             case 7: // Store literal variable
@@ -497,11 +464,8 @@ public sealed class BytecodeDispatcher
                 literals = GetLiterals(context.Method);
                 if (index < literals.Length)
                 {
-                    var assoc = executionContext.Memory.GetObject(literals[index]);
-                    if (assoc != null && assoc.Fields.Length > 1)
-                    {
-                        assoc.Fields[1] = value;
-                    }
+                    // Set Association's value field
+                    executionContext.SetFieldByName(literals[index], "value", value);
                 }
                 return true;
                 
@@ -516,11 +480,11 @@ public sealed class BytecodeDispatcher
 
     private OOP[] GetLiterals(OOP method)
     {
-        var methodObj = executionContext.Memory.GetObject(method);
-        if (methodObj != null && methodObj.Fields.Length > 2)
+        // CompiledMethod has fields: selector, bytecode, literals, header
+        var literalsArrayOop = executionContext.GetFieldByName(method, "literals");
+        if (!literalsArrayOop.IsNil)
         {
-            // Field 2 is literals array
-            var literalsArray = executionContext.Memory.GetObject(methodObj.Fields[2]);
+            var literalsArray = executionContext.Memory.GetObject(literalsArrayOop);
             if (literalsArray != null)
             {
                 return literalsArray.Fields;
@@ -531,11 +495,11 @@ public sealed class BytecodeDispatcher
 
     private byte GetNextByte(MethodContext context)
     {
-        var methodObj = executionContext.Memory.GetObject(context.Method);
-        if (methodObj != null && methodObj.Fields.Length > 1)
+        // CompiledMethod has fields: selector, bytecode, literals, header
+        var bytecodeArrayOop = executionContext.GetFieldByName(context.Method, "bytecode");
+        if (!bytecodeArrayOop.IsNil)
         {
-            // Field 1 is bytecode array
-            var bytecodeArray = executionContext.Memory.GetObject(methodObj.Fields[1]);
+            var bytecodeArray = executionContext.Memory.GetObject(bytecodeArrayOop);
             if (bytecodeArray != null && context.PC < bytecodeArray.Fields.Length)
             {
                 var byteValue = bytecodeArray.Fields[context.PC++];
@@ -595,4 +559,24 @@ public interface IExecutionContext
     /// Interns a symbol string.
     /// </summary>
     OOP InternSymbol(string value);
+    
+    /// <summary>
+    /// Gets a field value from an object by index.
+    /// </summary>
+    OOP GetFieldByIndex(OOP objectOop, int index);
+    
+    /// <summary>
+    /// Sets a field value in an object by index.
+    /// </summary>
+    void SetFieldByIndex(OOP objectOop, int index, OOP value);
+    
+    /// <summary>
+    /// Gets a field value from an object by name.
+    /// </summary>
+    OOP GetFieldByName(OOP objectOop, string fieldName);
+    
+    /// <summary>
+    /// Sets a field value in an object by name.
+    /// </summary>
+    void SetFieldByName(OOP objectOop, string fieldName, OOP value);
 }

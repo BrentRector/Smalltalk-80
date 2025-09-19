@@ -188,6 +188,11 @@ public static class Primitives
         
         // Note: Dictionary operations are not primitives in Smalltalk-80
         // Dictionary at:put: and at: are implemented in Smalltalk bytecode
+        
+        // Transcript primitives for console output
+        [250] = Smalltalk80.Primitives.IO.TranscriptPrimitives.WriteChar,
+        [251] = Smalltalk80.Primitives.IO.TranscriptPrimitives.FlushOutput,
+        [252] = Smalltalk80.Primitives.IO.TranscriptPrimitives.ClearConsole,
     };
 
     static Primitives()

@@ -11,6 +11,7 @@ This is a clean-slate implementation of a Smalltalk-80 virtual machine written i
 3. **Bootstrap-First Design**: System loads from JSON manifests without requiring self-hosting
 4. **Zero Null Class Pointers**: Objects never exist with null/invalid class pointers
 5. **VM/Image Boundary**: Clear separation between VM primitives and Smalltalk code
+6. **Centralized Field Access**: Only VirtualMachine knows object layouts, all field access goes through VM
 
 ## Component Architecture
 
@@ -99,10 +100,17 @@ Bootstrap/
 ├── MethodInstaller.cs          // CompiledMethod creation and installation
 ├── ImageLoader.cs              // JSON manifest loading
 ├── BootstrapManifest.cs        // JSON data structures
-└── KernelSpecification.cs      // Core class specifications
+├── KernelSpecification.cs      // Core class specifications
+└── FieldLookup.cs              // Field name to index mapping
 ```
 
 **Bootstrap Process**:
+0. **Phase -1**: Build field mapping from manifest (NEW)
+   - Parse complete class hierarchy from JSON
+   - Calculate field indices for all instance variables through inheritance
+   - Build mapping: `(className, fieldName) -> index`
+   - Create parallel mapping for metaclass instances
+   - Pass mapping to VirtualMachine for runtime use
 1. **Phase 1**: Allocate class/metaclass stubs
 2. **Phase 2**: Wire class pointers (class -> metaclass -> Metaclass)
 3. **Phase 3**: Wire superclass chains
@@ -172,6 +180,79 @@ Host/
 - Complete System: 223 classes
 - Methods encoded as bytecode arrays
 - Literals support: strings, symbols, numbers, arrays
+
+## Field Access Architecture
+
+### Design Philosophy
+The VirtualMachine is the **sole authority** on object memory layouts. No other component should directly access object fields using hardcoded indices. This centralization provides:
+- **Flexibility**: Field layouts can change without breaking code
+- **Type Safety**: Field names are validated against class definitions
+- **Maintainability**: Single source of truth for object structure
+
+### Field Mapping Strategy
+
+#### Bootstrap Time (Static Mapping)
+During bootstrap, before any objects exist, Phase -1 builds a complete field mapping from the JSON manifest:
+
+```csharp
+// Built from manifest before any objects exist
+FieldMapping: (className, fieldName) -> index
+
+// Instance-side examples:
+("Dictionary", "tally") -> 0           // inherited from Set
+("Association", "key") -> 0            // from LookupKey
+("Association", "value") -> 1          // own field
+
+// Class-side examples (metaclass instances):
+("Dictionary class", "methodDict") -> 1     // from Behavior
+("Dictionary class", "thisClass") -> 5      // from Metaclass
+```
+
+This mapping is:
+- **Complete**: Contains all fields for all classes including inherited ones
+- **Static**: Built entirely from JSON, no runtime lookups needed
+- **Bidirectional**: Supports both instance and metaclass field access
+- **Passed to VM**: Available throughout the VM's lifetime
+
+#### Runtime (Dynamic Lookup)
+After bootstrap, when Smalltalk code creates new classes:
+- The VM dynamically walks the class hierarchy
+- Builds field mappings on-demand
+- Caches results for performance
+
+### Field Access Methods
+
+The VirtualMachine provides multiple field access interfaces:
+
+```csharp
+// For components that know the class name (bootstrap)
+GetFieldBootstrap(oop, "Dictionary", "tally")
+SetFieldBootstrap(oop, "Dictionary", "tally", value)
+
+// For components that don't know the class (runtime)  
+GetFieldByName(oop, "tally")     // VM determines class
+SetFieldByName(oop, "tally", value)
+
+// For performance-critical code (bytecodes)
+GetFieldByIndex(oop, index)      // Direct indexed access
+SetFieldByIndex(oop, index, value)
+```
+
+### Usage Patterns
+
+#### Bootstrap Components
+- **Phase -1**: Builds the field mapping from JSON
+- **ClassBuilder**: Uses field names via mapping (no hardcoded indices)
+- **MethodInstaller**: Uses `GetFieldBootstrap`/`SetFieldBootstrap`
+
+#### Runtime Components  
+- **BytecodeDispatcher**: Uses `GetFieldByName` for method fields, `GetFieldByIndex` for instance variables
+- **MessageDispatcher**: Caches field indices for performance
+- **ProcessScheduler**: Uses field names for Process and Context objects
+
+#### Special Cases
+- **Primitives** (in Smalltalk80 namespace): Work at lower level, may use direct access
+- **Memory Management**: Direct field access before VM initialization
 
 ## Memory Model
 

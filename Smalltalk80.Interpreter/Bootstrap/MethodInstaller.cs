@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
+using Smalltalk80.Interpreter.VM;
 
 namespace Smalltalk80.Interpreter.Bootstrap
 {
@@ -15,6 +16,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         private readonly ObjectMemory memory;
         private readonly ClassBuilder classBuilder;
         private readonly ISymbolTable symbolTable;
+        private readonly VirtualMachine vm;
         private readonly Dictionary<string, OOP> methodCache = new();
         private readonly Func<int, OOP>? getSpecialObject;
         
@@ -24,12 +26,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// <param name="memory">The object memory to use for allocations.</param>
         /// <param name="classBuilder">The class builder for class lookups.</param>
         /// <param name="symbolTable">The symbol table for selector interning.</param>
+        /// <param name="vm">The virtual machine for field access.</param>
         /// <param name="getSpecialObject">Optional function to get special objects (true, false, nil).</param>
-        public MethodInstaller(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable, Func<int, OOP>? getSpecialObject = null)
+        public MethodInstaller(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable, VirtualMachine vm, Func<int, OOP>? getSpecialObject = null)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
             this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
+            this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
             this.getSpecialObject = getSpecialObject;
         }
 
@@ -41,28 +45,49 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             Console.WriteLine("[MethodInstaller] Beginning method installation...");
             
-            // Install inline methods from classes
-            foreach (var classDef in manifest.Classes)
+            // Check if we have inline methods in classes
+            bool hasInlineMethods = manifest.Classes.Any(c => c.Methods != null || c.ClassMethods != null);
+            
+            Console.WriteLine($"[MethodInstaller] hasInlineMethods={hasInlineMethods}, manifest.Methods count={(manifest.Methods?.Count ?? 0)}");
+            
+            if (hasInlineMethods)
             {
-                // Install instance methods
-                if (classDef.Methods != null)
+                // Install inline methods from classes
+                foreach (var classDef in manifest.Classes)
                 {
-                    InstallMethodsToClass(classDef.Name, classDef.Methods, isClassMethod: false);
-                }
-                
-                // Install class methods
-                if (classDef.ClassMethods != null)
-                {
-                    InstallMethodsToClass(classDef.Name, classDef.ClassMethods, isClassMethod: true);
+                    // Install instance methods
+                    if (classDef.Methods != null)
+                    {
+                        InstallMethodsToClass(classDef.Name, classDef.Methods, isClassMethod: false);
+                    }
+                    
+                    // Install class methods
+                    if (classDef.ClassMethods != null)
+                    {
+                        InstallMethodsToClass(classDef.Name, classDef.ClassMethods, isClassMethod: true);
+                    }
                 }
             }
-            
-            // Install flat methods array
-            if (manifest.Methods != null)
+            else if (manifest.Methods != null)
             {
-                foreach (var methodGroup in manifest.Methods.GroupBy(m => new { m.ClassName, m.IsClassMethod }))
+                // Install from flat methods array only if no inline methods exist
+                // Group methods by actual class name and whether they're class methods
+                foreach (var methodGroup in manifest.Methods.GroupBy(m => 
                 {
-                    if (methodGroup.Key.ClassName != null)
+                    // Parse "ClassName class" format for class methods
+                    var className = m.ClassName ?? string.Empty;
+                    var isClassMethod = m.IsClassMethod;
+                    
+                    if (className.EndsWith(" class"))
+                    {
+                        className = className[..^6]; // Remove " class" suffix
+                        isClassMethod = true;
+                    }
+                    
+                    return new { ClassName = className, IsClassMethod = isClassMethod };
+                }))
+                {
+                    if (!string.IsNullOrEmpty(methodGroup.Key.ClassName))
                     {
                         InstallMethodsToClass(
                             methodGroup.Key.ClassName, 
@@ -72,7 +97,45 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
             }
             
-            Console.WriteLine($"[MethodInstaller] Installation complete. {methodCache.Count} methods installed.");
+            // Count actual methods installed to dictionaries
+            int totalInstalled = 0;
+            foreach (var classDef in manifest.Classes)
+            {
+                var classOop = classBuilder.GetClass(classDef.Name);
+                if (!classOop.IsNil)
+                {
+                    var dictOop = vm.GetFieldBootstrap(classOop, "Behavior", "methodDict");
+                    
+                    if (!dictOop.IsNil)
+                    {
+                        var tallyOop = vm.GetFieldBootstrap(dictOop, "MethodDictionary", "tally");
+                            
+                        if (tallyOop.IsSmallInteger)
+                        {
+                            totalInstalled += tallyOop.SmallIntegerValue;
+                        }
+                    }
+                }
+                
+                // Check metaclass methods too
+                var metaclassOop = classBuilder.GetMetaclass(classDef.Name);
+                if (!metaclassOop.IsNil)
+                {
+                    var dictOop2 = vm.GetFieldBootstrap(metaclassOop, "Behavior", "methodDict");
+                        
+                    if (!dictOop2.IsNil)
+                    {
+                        var tallyOop2 = vm.GetFieldBootstrap(dictOop2, "MethodDictionary", "tally");
+                            
+                        if (tallyOop2.IsSmallInteger)
+                        {
+                            totalInstalled += tallyOop2.SmallIntegerValue;
+                        }
+                    }
+                }
+            }
+            
+            Console.WriteLine($"[MethodInstaller] Installation complete. {methodCache.Count} methods cached, {totalInstalled} actually installed in dictionaries.");
         }
 
         /// <summary>
@@ -84,6 +147,22 @@ namespace Smalltalk80.Interpreter.Bootstrap
         public void InstallMethodsToClass(string className, List<MethodDefinition> methods, bool isClassMethod)
         {
             if (methods.Count == 0) return;
+            
+            // Check for duplicate methods - this should be an error
+            var duplicates = methods
+                .GroupBy(m => m.Selector)
+                .Where(g => g.Count() > 1)
+                .Select(g => new { Selector = g.Key, Count = g.Count() })
+                .ToList();
+            
+            if (duplicates.Any())
+            {
+                foreach (var dup in duplicates)
+                {
+                    Console.WriteLine($"[MethodInstaller] ERROR: {className} has {dup.Count} definitions of selector '{dup.Selector}'");
+                }
+                throw new InvalidOperationException($"Duplicate method definitions found in {className}");
+            }
             
             // Get the target class OOP
             OOP targetClass = isClassMethod 
@@ -107,12 +186,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
             
             // Install each method
+            int installedCount = 0;
             foreach (var methodDef in methods)
             {
                 var compiledMethod = CreateCompiledMethod(methodDef);
                 if (!compiledMethod.IsNil)
                 {
                     InstallMethodToDictionary(methodDict, methodDef.Selector, compiledMethod);
+                    installedCount++;
                     
                     // Cache the method for debugging/introspection
                     var cacheKey = $"{className}.{(isClassMethod ? "class." : "")}{methodDef.Selector}";
@@ -153,7 +234,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 return OOP.Nil;
             }
             
-            // Set fields according to Blue Book layout:
+            // Set fields according to our implementation layout:
+            // CompiledMethod has 4 fields but no instanceVariables in the manifest
+            // So we set them directly by index
             // Field 0: selector (Symbol)
             var selectorSymbol = symbolTable.Intern(methodDef.Selector);
             methodObj.Fields[0] = selectorSymbol;
@@ -367,8 +450,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var classObj = memory.GetObject(classOop);
             if (classObj == null) return OOP.Nil;
             
-            // Method dictionary is at field 1 in Behavior
-            var methodDict = classObj.Fields[1];
+            // Get method dictionary from Behavior
+            var methodDict = vm.GetFieldBootstrap(classOop, "Behavior", "methodDict");
             
             if (methodDict.IsNil)
             {
@@ -380,31 +463,62 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     return OOP.Nil;
                 }
                 
-                // MethodDictionary has 2 fields: tally and array (inherits from Set)
-                methodDict = memory.AllocateObject(methodDictClass, 2);
-                var dictObj = memory.GetObject(methodDict);
+                // Calculate capacity - need space for hash table, plus 50% for hash efficiency
+                int capacity = Math.Max(32, (expectedMethodCount * 3) / 2);
+                // Round up to next power of 2 for better hashing
+                capacity = NextPowerOfTwo(capacity);
                 
-                if (dictObj != null)
+                // MethodDictionary inherits from IdentityDictionary which inherits from Set
+                // It has 2 named fields: tally (from Set), valueArray (from IdentityDictionary)
+                // Plus indexed portion for keys
+                methodDict = memory.AllocateObject(methodDictClass, 2 + capacity);
+                
+                if (!methodDict.IsNil)
                 {
-                    // Initialize tally to 0
-                    dictObj.Fields[0] = OOP.FromSmallInteger(0);
-                    
-                    // Calculate capacity - need 2x space for key-value pairs, plus 50% for hash efficiency
-                    int capacity = Math.Max(32, ((expectedMethodCount * 2) * 3) / 2);
-                    // Round up to next power of 2 for better hashing
-                    capacity = NextPowerOfTwo(capacity);
-                    
-                    var arrayClass = classBuilder.GetClass("Array");
-                    if (!arrayClass.IsNil)
+                    var methodDictObj = memory.GetObject(methodDict);
+                    if (methodDictObj != null)
                     {
-                        var array = memory.AllocateWordArray(arrayClass, capacity);
-                        dictObj.Fields[1] = array;
-                        Console.WriteLine($"[MethodInstaller] Created method dictionary with capacity {capacity} for {expectedMethodCount} methods");
+                        // Initialize tally to 0
+                        vm.SetFieldBootstrap(methodDict, "MethodDictionary", "tally", OOP.FromSmallInteger(0));
+                        
+                        // Initialize indexed portion (keys) to nil
+                        for (int i = 2; i < methodDictObj.Fields.Length; i++)
+                        {
+                            methodDictObj.Fields[i] = OOP.Nil;
+                        }
+                        
+                        // Create valueArray to hold the compiled methods
+                        var arrayClass = classBuilder.GetClass("Array");
+                        if (!arrayClass.IsNil)
+                        {
+                            var valueArray = memory.AllocateWordArray(arrayClass, capacity);
+                            // Initialize valueArray slots to nil
+                            var valueArrayObj = memory.GetObject(valueArray);
+                            if (valueArrayObj != null)
+                            {
+                                for (int i = 0; i < valueArrayObj.Fields.Length; i++)
+                                {
+                                    valueArrayObj.Fields[i] = OOP.Nil;
+                                }
+                            }
+                            
+                            // MethodDictionary inherits from IdentityDictionary which has "valueArray"
+                            vm.SetFieldBootstrap(methodDict, "MethodDictionary", "valueArray", valueArray);
+                            Console.WriteLine($"[MethodInstaller] Created method dictionary with capacity {capacity} for {expectedMethodCount} methods");
+                            
+                            // Debug: verify valueArray was set
+                            var checkArray = vm.GetFieldBootstrap(methodDict, "MethodDictionary", "valueArray");
+                            Console.WriteLine($"[DEBUG] MethodDict {methodDict} valueArray set to {valueArray}, verify: {checkArray}");
+                        }
                     }
                 }
                 
                 // Store in class
-                classObj.Fields[1] = methodDict;
+                vm.SetFieldBootstrap(classOop, "Behavior", "methodDict", methodDict);
+                
+                // Debug: Verify it was stored
+                var checkDict = vm.GetFieldBootstrap(classOop, "Behavior", "methodDict");
+                Console.WriteLine($"[DEBUG] Stored methodDict {methodDict} in class {classOop}, verify: {checkDict}");
             }
             
             return methodDict;
@@ -427,49 +541,67 @@ namespace Smalltalk80.Interpreter.Bootstrap
 
         /// <summary>
         /// Installs a method into a method dictionary.
+        /// MethodDictionary/IdentityDictionary structure:
+        /// - Keys are in the indexed portion (Fields[2+])
+        /// - Values are in the valueArray at corresponding indices
         /// </summary>
         private void InstallMethodToDictionary(OOP dictOop, string selector, OOP methodOop)
         {
             var dictObj = memory.GetObject(dictOop);
             if (dictObj == null) return;
             
-            // Get the array from the dictionary
-            var arrayOop = dictObj.Fields[1];
-            var arrayObj = memory.GetObject(arrayOop);
-            if (arrayObj == null) return;
+            // Get the valueArray from the dictionary
+            var valueArrayOop = vm.GetFieldBootstrap(dictOop, "MethodDictionary", "valueArray");
+            var valueArrayObj = memory.GetObject(valueArrayOop);
+            if (valueArrayObj == null || valueArrayObj.Fields.Length == 0)
+            {
+                Console.WriteLine($"[MethodInstaller] ERROR: Dictionary has no valueArray or empty valueArray for selector {selector}");
+                return;
+            }
             
             // Get selector symbol
             var selectorSymbol = symbolTable.Intern(selector);
             
-            // Simple linear probe hash table implementation
-            var size = arrayObj.Fields.Length / 2; // Array stores key-value pairs
-            var hash = Math.Abs(selectorSymbol.RawValue) % size;
+            // The indexed portion of the dictionary starts at field 2
+            // Calculate capacity from the indexed portion size
+            var capacity = dictObj.Fields.Length - 2; // Subtract tally and valueArray fields
+            if (capacity == 0 || capacity != valueArrayObj.Fields.Length)
+            {
+                Console.WriteLine($"[MethodInstaller] ERROR: Dictionary capacity mismatch for selector {selector}");
+                return;
+            }
+            
+            var hash = Math.Abs(selectorSymbol.RawValue) % capacity;
             
             // Find empty slot or matching selector
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < capacity; i++)
             {
-                var index = (hash + i) % size;
-                var keyIndex = index * 2;
-                var valueIndex = keyIndex + 1;
+                var index = (hash + i) % capacity;
+                var keyFieldIndex = 2 + index; // Skip tally and valueArray fields
                 
-                if (keyIndex >= arrayObj.Fields.Length) break;
-                
-                var key = arrayObj.Fields[keyIndex];
+                var key = dictObj.Fields[keyFieldIndex];
                 
                 if (key.IsNil || key.Equals(selectorSymbol))
                 {
-                    // Install method
-                    arrayObj.Fields[keyIndex] = selectorSymbol;
-                    arrayObj.Fields[valueIndex] = methodOop;
+                    // Install selector in indexed portion and method in valueArray
+                    dictObj.Fields[keyFieldIndex] = selectorSymbol;
+                    valueArrayObj.Fields[index] = methodOop;
+                    
+                    // Debug: Log method installation
+                    if (selector == "new" || selector == "initialize" || selector == "at:")
+                    {
+                        Console.WriteLine($"[DEBUG] Installed {selector} -> method {methodOop} at index {index} in valueArray {valueArrayOop}");
+                    }
                     
                     // Update tally if new entry
                     if (key.IsNil)
                     {
-                        var tallyOop = dictObj.Fields[0];
+                        var tallyOop = vm.GetFieldBootstrap(dictOop, "MethodDictionary", "tally");
+                            
                         if (tallyOop.IsSmallInteger)
                         {
                             var tally = tallyOop.SmallIntegerValue;
-                            dictObj.Fields[0] = OOP.FromSmallInteger(tally + 1);
+                            vm.SetFieldBootstrap(dictOop, "MethodDictionary", "tally", OOP.FromSmallInteger(tally + 1));
                         }
                     }
                     
@@ -477,7 +609,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
             }
             
-            Console.WriteLine($"[MethodInstaller] Warning: Method dictionary full for selector {selector}");
+            Console.WriteLine($"[MethodInstaller] ERROR: Method dictionary full for selector {selector} - method NOT installed!");
+            // This is a critical error - the method won't be reachable and will be GC'd
         }
 
         /// <summary>

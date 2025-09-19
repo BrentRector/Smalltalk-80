@@ -1,0 +1,23 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-18 13:57:26",
+  "classes": [
+    {
+      "name": "TestClass",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    }
+  ],
+  "methods": [],
+  "initializationExpressions": [
+    {
+      "receiver": "TestClass",
+      "selector": "initialize",
+      "arguments": [],
+      "source": "TestClass initialize!"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-18 13:53:11",
+  "classes": [
+    {
+      "name": "TestClass",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test"
+    }
+  ],
+  "methods": [
+    {
+      "class": "TestClass class",
+      "selector": "initialize",
+      "bytecode": [
+        67,
+        136,
+        104,
+        208,
+        105,
+        16,
+        34,
+        225,
+        124
+      ],
+      "literals": [
+        "#cr",
+        "#show:",
+        "TestClass initialized",
+        "#Transcript"
+      ],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 2,
+      "isClassMethod": true
+    }
+  ],
+  "initializationExpressions": [
+    {
+      "receiver": "Character",
+      "selector": "initialize",
+      "arguments": [],
+      "source": "Character initialize!"
+    }
+  ]
+}

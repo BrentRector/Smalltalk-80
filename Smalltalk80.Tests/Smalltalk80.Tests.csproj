@@ -9,6 +9,6 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\Smalltalk80\Smalltalk80.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj" />
   </ItemGroup>
 </Project>

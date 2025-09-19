@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Smalltalk80.Interpreter.Bootstrap;
 using Smalltalk80.Interpreter.Execution;
 using Smalltalk80.Interpreter.Memory;
@@ -13,12 +16,13 @@ namespace Smalltalk80.Interpreter.VM
     /// The Smalltalk-80 Virtual Machine.
     /// Coordinates all components and provides the main execution engine.
     /// </summary>
-    public sealed class VirtualMachine : IExecutionContext, IPrimitiveContext, Bootstrap.ISymbolTable
+    public sealed partial class VirtualMachine : IExecutionContext, IPrimitiveContext, Bootstrap.ISymbolTable, IFieldAccessor
     {
         private readonly ObjectMemory memory;
         private readonly PrimitiveTable primitiveTable;
         private readonly GarbageCollector gc;
         private readonly ClassBuilder classBuilder;
+        private readonly FieldLookup fieldLookup;
         private readonly BytecodeDispatcher bytecodeDispatcher;
         private readonly MessageDispatcher messageDispatcher;
         private readonly ProcessScheduler processScheduler;
@@ -41,9 +45,16 @@ namespace Smalltalk80.Interpreter.VM
             memory = new ObjectMemory(initialMemorySize);
             primitiveTable = new PrimitiveTable();
             gc = new GarbageCollector(memory);
-            classBuilder = new ClassBuilder(memory);
+            
+            // Phase -1: Create FieldLookup without dependencies
+            // It will be populated with field mappings before any objects are created
+            fieldLookup = new FieldLookup();
+            
+            // ClassBuilder now receives the FieldLookup for field index queries
+            classBuilder = new ClassBuilder(memory, fieldLookup);
+            
             bytecodeDispatcher = new BytecodeDispatcher(this);
-            messageDispatcher = new MessageDispatcher(memory, primitiveTable, this);
+            messageDispatcher = new MessageDispatcher(memory, primitiveTable, this, this);
             processScheduler = new ProcessScheduler(this, memory);
             specialObjectsArray = new OOP[SpecialObjects.Count];
             symbolTable = new Dictionary<string, OOP>();
@@ -72,6 +83,13 @@ namespace Smalltalk80.Interpreter.VM
         /// Gets the process scheduler.
         /// </summary>
         public ProcessScheduler ProcessScheduler => processScheduler;
+        
+        /// <summary>
+        /// Gets a class by name from the loaded system.
+        /// </summary>
+        /// <param name="className">The name of the class to retrieve.</param>
+        /// <returns>The OOP of the class, or OOP.Nil if not found.</returns>
+        public OOP GetClassByName(string className) => classBuilder.GetClass(className);
         
         /// <summary>
         /// Gets or sets whether process scheduling is enabled.
@@ -144,20 +162,18 @@ namespace Smalltalk80.Interpreter.VM
         {
             Console.WriteLine($"[VM] Loading bootstrap from JSON: {bootstrapPath}");
             
-            // Create the image loader 
-            // We'll pass GetSpecialObject later after special objects are created
-            var imageLoader = new ImageLoader(memory, classBuilder, this);
+            // Load the manifest file first
+            var manifest = LoadManifestFromFile(bootstrapPath);
             
-            // First, just load and create the classes (without installing methods)
-            var manifest = imageLoader.LoadManifestFromFile(bootstrapPath);
-            imageLoader.ProcessClasses(manifest);
+            // Create the classes using ClassBuilder directly
+            ProcessBootstrapClasses(manifest);
             
             // Create special objects now that classes exist
             CreateSpecialObjects();
             
-            // NOW create a new MethodInstaller with access to special objects
+            // NOW create a single MethodInstaller with access to special objects
             // and install the methods
-            var methodInstaller = new MethodInstaller(memory, classBuilder, this, GetSpecialObject);
+            var methodInstaller = new MethodInstaller(memory, classBuilder, this, this, GetSpecialObject);
             methodInstaller.InstallMethods(manifest);
             
             // Create initial symbol table
@@ -172,15 +188,21 @@ namespace Smalltalk80.Interpreter.VM
             // Initialize message dispatcher with common selectors
             messageDispatcher.Initialize();
             
-            // Get load statistics
-            var stats = imageLoader.GetStatistics();
-            Console.WriteLine($"[VM] Load statistics: {stats}");
+            Console.WriteLine($"[VM] Load statistics: Classes: {manifest.Classes.Count}, Methods: {methodInstaller.GetAllCachedMethods().Count}");
             
             // Run garbage collection to verify everything is reachable
             RunGarbageCollection();
             
-            // Start execution with an initial process
-            StartExecution();
+            // Execute initialization expressions if present
+            // This will initialize Transcript and other globals through Smalltalk code
+            // DISABLED: ExecuteInitializationExpressions(manifest);
+            
+            // Start execution with an initial process - but only for complete system
+            // For bootstrap only, we don't create any temporary startup objects
+            if (manifest.Classes.Count > 100)  // Complete system has 223 classes, bootstrap has 85
+            {
+                StartExecution();
+            }
         }
 
         /// <summary>
@@ -195,16 +217,7 @@ namespace Smalltalk80.Interpreter.VM
             }
             
             Console.WriteLine($"[VM] Loading extended manifests from: {manifestDirectory}");
-            
-            // Create the image loader with getSpecialObject function
-            var imageLoader = new ImageLoader(memory, classBuilder, this, GetSpecialObject);
-            
-            // Load all manifests from directory
-            imageLoader.LoadManifestsFromDirectory(manifestDirectory);
-            
-            // Get load statistics
-            var stats = imageLoader.GetStatistics();
-            Console.WriteLine($"[VM] Extended load statistics: {stats}");
+            // TODO: Implement loading of extended manifests
         }
 
         private void CreateSpecialObjects()
@@ -319,7 +332,15 @@ namespace Smalltalk80.Interpreter.VM
             var systemDictClass = classBuilder.GetClass("SystemDictionary");
             if (!systemDictClass.IsNil)
             {
-                var systemDict = memory.AllocateObject(systemDictClass, 2);
+                var allClasses = classBuilder.GetAllClasses();
+                
+                // Calculate capacity: need 2 slots per entry (key, value) plus buffer
+                // We need space for classes AND metaclasses
+                int capacity = allClasses.Count * 8; // 2x entries * 2 (class+metaclass) * 2 for efficiency
+                
+                // Create SystemDictionary with proper size:
+                // 1 field for tally + capacity for indexed/variable portion
+                var systemDict = memory.AllocateObject(systemDictClass, 1 + capacity);
                 specialObjectsArray[SpecialObjects.SystemDictionaryInstance] = systemDict;
                 
                 // Initialize and register all classes
@@ -332,30 +353,23 @@ namespace Smalltalk80.Interpreter.VM
             var systemDictObj = memory.GetObject(systemDict);
             if (systemDictObj == null) return;
             
-            // Initialize dictionary with appropriate capacity
-            var arrayClass = classBuilder.GetClass("Array");
-            if (arrayClass.IsNil) return;
-            
             var allClasses = classBuilder.GetAllClasses();
-            int capacity = NextPowerOfTwo(allClasses.Count * 3); // Extra space for hash efficiency
+            int capacity = systemDictObj.Fields.Length - 1; // -1 for tally field
             
-            // Create the dictionary's internal array
-            var dictArray = memory.AllocateWordArray(arrayClass, capacity * 2); // key-value pairs
-            var dictArrayObj = memory.GetObject(dictArray);
-            if (dictArrayObj == null) return;
-            
-            // Initialize all slots to nil
-            for (int i = 0; i < dictArrayObj.Fields.Length; i++)
+            // Initialize all indexed slots to nil
+            for (int i = 1; i < systemDictObj.Fields.Length; i++)
             {
-                dictArrayObj.Fields[i] = OOP.Nil;
+                systemDictObj.Fields[i] = OOP.Nil;
             }
             
-            // Set dictionary fields (tally and array)
-            systemDictObj.Fields[0] = OOP.FromSmallInteger(0); // tally
-            systemDictObj.Fields[1] = dictArray; // array
+            // Initialize tally to 0
+            systemDictObj.Fields[0] = OOP.FromSmallInteger(0);
             
-            // Register all classes with Symbol keys
+            // Register all classes AND metaclasses with Symbol keys
             int registeredCount = 0;
+            int pairCapacity = capacity / 2; // Each entry uses 2 slots
+            
+            // First register regular classes
             foreach (var kvp in allClasses)
             {
                 // Class name must be a Symbol
@@ -363,21 +377,57 @@ namespace Smalltalk80.Interpreter.VM
                 var classOop = kvp.Value;
                 
                 // Simple hash table insertion with linear probing
-                var hash = Math.Abs(classNameSymbol.RawValue) % capacity;
+                var hash = Math.Abs(classNameSymbol.RawValue) % pairCapacity;
                 
-                for (int i = 0; i < capacity; i++)
+                for (int i = 0; i < pairCapacity; i++)
                 {
-                    var index = (hash + i) % capacity;
-                    var keyIndex = index * 2;
+                    var pairIndex = (hash + i) % pairCapacity;
+                    var keyIndex = 1 + (pairIndex * 2);     // +1 to skip tally field
                     var valueIndex = keyIndex + 1;
                     
-                    if (dictArrayObj.Fields[keyIndex].IsNil)
+                    if (systemDictObj.Fields[keyIndex].IsNil)
                     {
-                        dictArrayObj.Fields[keyIndex] = classNameSymbol;
-                        dictArrayObj.Fields[valueIndex] = classOop;
+                        systemDictObj.Fields[keyIndex] = classNameSymbol;
+                        systemDictObj.Fields[valueIndex] = classOop;
                         registeredCount++;
                         Console.WriteLine($"  Registered class: {kvp.Key} as Symbol {classNameSymbol}");
                         break;
+                    }
+                    // Check if key already exists
+                    else if (systemDictObj.Fields[keyIndex].Equals(classNameSymbol))
+                    {
+                        // Update existing value
+                        systemDictObj.Fields[valueIndex] = classOop;
+                        break;
+                    }
+                }
+                
+                // Also register the metaclass with name "ClassName class"
+                var metaclassOop = classBuilder.GetMetaclass(kvp.Key);
+                if (!metaclassOop.IsNil)
+                {
+                    var metaclassNameSymbol = Intern(kvp.Key + " class");
+                    hash = Math.Abs(metaclassNameSymbol.RawValue) % pairCapacity;
+                    
+                    for (int i = 0; i < pairCapacity; i++)
+                    {
+                        var pairIndex = (hash + i) % pairCapacity;
+                        var keyIndex = 1 + (pairIndex * 2);
+                        var valueIndex = keyIndex + 1;
+                        
+                        if (systemDictObj.Fields[keyIndex].IsNil)
+                        {
+                            systemDictObj.Fields[keyIndex] = metaclassNameSymbol;
+                            systemDictObj.Fields[valueIndex] = metaclassOop;
+                            registeredCount++;
+                            Console.WriteLine($"  Registered metaclass: {kvp.Key} class as Symbol {metaclassNameSymbol}");
+                            break;
+                        }
+                        else if (systemDictObj.Fields[keyIndex].Equals(metaclassNameSymbol))
+                        {
+                            systemDictObj.Fields[valueIndex] = metaclassOop;
+                            break;
+                        }
                     }
                 }
             }
@@ -404,10 +454,12 @@ namespace Smalltalk80.Interpreter.VM
             ArithmeticPrimitives.RegisterAll(primitiveTable);
             ArrayPrimitives.RegisterAll(primitiveTable);
             ClassPrimitives.RegisterAll(primitiveTable);
+            CompilerPrimitives.RegisterAll(primitiveTable);
             ControlPrimitives.RegisterAll(primitiveTable);
             ProcessPrimitives.RegisterAll(primitiveTable);
             StringPrimitives.RegisterAll(primitiveTable);
             SystemPrimitives.RegisterAll(primitiveTable);
+            TranscriptPrimitives.RegisterAll(primitiveTable);
             IOPrimitives.RegisterAll(primitiveTable);
             // Note: ComparisonPrimitives are already registered by ArithmeticPrimitives
             // Note: Some primitives may be registered by multiple classes, last registration wins
@@ -523,13 +575,12 @@ namespace Smalltalk80.Interpreter.VM
                     throw new InvalidOperationException("Cannot determine method class for super send");
                 }
                 
-                var classObj = memory.GetObject(methodClass);
-                if (classObj == null || classObj.Fields.Length == 0)
+                // Get superclass for super send
+                var superclass = GetFieldByName(methodClass, "superclass");
+                if (superclass.IsNil)
                 {
-                    throw new InvalidOperationException("Invalid class object for super send");
+                    throw new InvalidOperationException("Invalid superclass for super send");
                 }
-                
-                var superclass = classObj.Fields[0]; // Field 0 is superclass in Behavior
                 
                 // Look up method starting from superclass
                 var (method, actualMethodClass) = messageDispatcher.Dispatch(receiver, selector, arguments, superclass);
@@ -572,7 +623,205 @@ namespace Smalltalk80.Interpreter.VM
             // Would return the result after execution
             return OOP.Nil;
         }
+        
+        OOP IPrimitiveContext.InternSymbol(string value)
+        {
+            return Intern(value);
+        }
 
+        #endregion
+        
+        #region Field Access Methods
+        
+        /// <summary>
+        /// Gets a field value from an object using the field name.
+        /// </summary>
+        /// <param name="objectOop">The object to read from.</param>
+        /// <param name="className">The class name for field lookup.</param>
+        /// <param name="fieldName">The name of the field to read.</param>
+        /// <returns>The field value or Nil if not found.</returns>
+        public OOP GetField(OOP objectOop, string className, string fieldName)
+        {
+            if (objectOop.IsNil) return OOP.Nil;
+            
+            var obj = memory.GetObject(objectOop);
+            if (obj == null) return OOP.Nil;
+            
+            var index = fieldLookup.GetFieldIndex(className, fieldName);
+            if (index < 0 || index >= obj.Fields.Length)
+                return OOP.Nil;
+                
+            return obj.Fields[index];
+        }
+        
+        /// <summary>
+        /// Sets a field value in an object using the field name.
+        /// </summary>
+        /// <param name="objectOop">The object to write to.</param>
+        /// <param name="className">The class name for field lookup.</param>
+        /// <param name="fieldName">The name of the field to write.</param>
+        /// <param name="value">The value to set.</param>
+        /// <returns>True if successful, false otherwise.</returns>
+        public bool SetField(OOP objectOop, string className, string fieldName, OOP value)
+        {
+            if (objectOop.IsNil) return false;
+            
+            var obj = memory.GetObject(objectOop);
+            if (obj == null) return false;
+            
+            var index = fieldLookup.GetFieldIndex(className, fieldName);
+            if (index < 0 || index >= obj.Fields.Length)
+                return false;
+                
+            obj.Fields[index] = value;
+            return true;
+        }
+        
+        /// <summary>
+        /// Gets a field value by index (for performance-critical code).
+        /// </summary>
+        public OOP GetFieldByIndex(OOP objectOop, int index)
+        {
+            if (objectOop.IsNil) return OOP.Nil;
+            
+            var obj = memory.GetObject(objectOop);
+            if (obj == null || index < 0 || index >= obj.Fields.Length)
+                return OOP.Nil;
+                
+            return obj.Fields[index];
+        }
+        
+        /// <summary>
+        /// Sets a field value by index (for performance-critical code).
+        /// </summary>
+        public bool SetFieldByIndex(OOP objectOop, int index, OOP value)
+        {
+            if (objectOop.IsNil) return false;
+            
+            var obj = memory.GetObject(objectOop);
+            if (obj == null || index < 0 || index >= obj.Fields.Length)
+                return false;
+                
+            obj.Fields[index] = value;
+            return true;
+        }
+        
+        /// <summary>
+        /// Gets the field index for a class and field name.
+        /// Can be cached by callers for performance.
+        /// </summary>
+        public int GetFieldIndex(string className, string fieldName)
+        {
+            return fieldLookup.GetFieldIndex(className, fieldName);
+        }
+        
+        #endregion
+        
+        #region Helper Methods
+        
+        /// <summary>
+        /// Creates a Smalltalk String object from a C# string.
+        /// </summary>
+        /// <param name="value">The C# string value.</param>
+        /// <returns>OOP of the created String object.</returns>
+        public OOP CreateString(string value)
+        {
+            var stringClass = classBuilder.GetClass("String");
+            if (stringClass.IsNil)
+                return OOP.Nil;
+            
+            var stringOop = memory.AllocateByteArray(stringClass, value.Length);
+            var stringObj = memory.GetObject(stringOop);
+            
+            if (stringObj != null)
+            {
+                for (int i = 0; i < value.Length; i++)
+                {
+                    stringObj.Fields[i] = OOP.FromSmallInteger(value[i]);
+                }
+            }
+            
+            return stringOop;
+        }
+        
+        /// <summary>
+        /// Evaluates a Smalltalk expression string and returns the result.
+        /// For now, handles simple arithmetic expressions directly.
+        /// TODO: Integrate with Smalltalk Compiler class when ready.
+        /// </summary>
+        /// <param name="expression">The Smalltalk expression to evaluate.</param>
+        /// <returns>The result of the evaluation, or Nil if evaluation failed.</returns>
+        public OOP EvaluateExpression(string expression)
+        {
+            try
+            {
+                // For now, handle simple integer arithmetic expressions directly
+                // This is a temporary implementation until the Compiler class is fully integrated
+                
+                // Try to parse simple binary expressions like "3 + 4" or single integers like "42"
+                var parts = expression.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                
+                // Handle single integer literal
+                if (parts.Length == 1)
+                {
+                    if (int.TryParse(parts[0], out int value))
+                    {
+                        return OOP.FromSmallInteger(value);
+                    }
+                }
+                // Handle binary expressions
+                else if (parts.Length == 3)
+                {
+                    if (int.TryParse(parts[0], out int left) && int.TryParse(parts[2], out int right))
+                    {
+                        var leftOop = OOP.FromSmallInteger(left);
+                        var rightOop = OOP.FromSmallInteger(right);
+                        
+                        switch (parts[1])
+                        {
+                            case "+":
+                                return OOP.FromSmallInteger(left + right);
+                            case "-":
+                                return OOP.FromSmallInteger(left - right);
+                            case "*":
+                                return OOP.FromSmallInteger(left * right);
+                            case "/":
+                                if (right != 0)
+                                    return OOP.FromSmallInteger(left / right);
+                                break;
+                            case "=":
+                                return left == right ? GetSpecialObject(SpecialObjects.TrueObject) : GetSpecialObject(SpecialObjects.FalseObject);
+                            case "<":
+                                return left < right ? GetSpecialObject(SpecialObjects.TrueObject) : GetSpecialObject(SpecialObjects.FalseObject);
+                            case ">":
+                                return left > right ? GetSpecialObject(SpecialObjects.TrueObject) : GetSpecialObject(SpecialObjects.FalseObject);
+                        }
+                    }
+                }
+                
+                // For more complex expressions, we need the Compiler class
+                // Check if the Compiler class is available
+                var compilerClass = classBuilder.GetClass("Compiler");
+                if (!compilerClass.IsNil)
+                {
+                    Console.WriteLine("[VM] Compiler class found, but full evaluation not yet implemented");
+                    Console.WriteLine("[VM] Currently only simple arithmetic expressions are supported (e.g., '3 + 4')");
+                }
+                else
+                {
+                    Console.WriteLine("[VM] Compiler class not found in loaded system");
+                    Console.WriteLine("[VM] Only simple arithmetic expressions are supported (e.g., '3 + 4')");
+                }
+                
+                return OOP.Nil;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Exception during evaluation: {ex.Message}");
+                return OOP.Nil;
+            }
+        }
+        
         #endregion
 
         #region ISymbolTable Implementation
@@ -629,7 +878,7 @@ namespace Smalltalk80.Interpreter.VM
                 throw new InvalidOperationException("Invalid CompiledMethod structure");
             }
             
-            var headerOop = methodObj.Fields[0];
+            var headerOop = GetFieldByName(method, "header");
             if (!headerOop.IsSmallInteger)
             {
                 throw new InvalidOperationException("Invalid method header");
@@ -700,7 +949,7 @@ namespace Smalltalk80.Interpreter.VM
             if (methodObj == null || methodObj.Fields.Length < 2)
                 return;
             
-            var bytecodeArrayOop = methodObj.Fields[1];
+            var bytecodeArrayOop = GetFieldByName(context.Method, "bytecode");
             var bytecodeArray = memory.GetObject(bytecodeArrayOop);
             if (bytecodeArray == null)
                 return;
@@ -849,7 +1098,7 @@ namespace Smalltalk80.Interpreter.VM
                 var classObj = memory.GetObject(classOop);
                 if (classObj != null && classObj.Fields.Length > 1)
                 {
-                    var methodDict = classObj.Fields[1];
+                    var methodDict = GetFieldByName(classOop, "methodDict");
                     if (ContainsMethod(methodDict, method))
                     {
                         return classOop;
@@ -866,7 +1115,7 @@ namespace Smalltalk80.Interpreter.VM
             if (dictObj == null || dictObj.Fields.Length < 2)
                 return false;
             
-            var arrayOop = dictObj.Fields[1];
+            var arrayOop = GetFieldByName(dictionary, "valueArray");
             var arrayObj = memory.GetObject(arrayOop);
             if (arrayObj == null)
                 return false;
@@ -885,6 +1134,365 @@ namespace Smalltalk80.Interpreter.VM
 
         #region System Startup
 
+        /// <summary>
+        /// Loads and parses a manifest file.
+        /// </summary>
+        private BootstrapManifest LoadManifestFromFile(string filePath)
+        {
+            try
+            {
+                var json = File.ReadAllText(filePath);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true,
+                    NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+                
+                var manifest = JsonSerializer.Deserialize<BootstrapManifest>(json, options);
+                
+                if (manifest == null)
+                {
+                    throw new InvalidOperationException($"Failed to deserialize manifest from {filePath}");
+                }
+                
+                return manifest;
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException($"Invalid JSON in manifest {filePath}: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// Processes bootstrap classes using the ClassBuilder phases.
+        /// </summary>
+        private void ProcessBootstrapClasses(BootstrapManifest manifest)
+        {
+            Console.WriteLine("[VM] Processing bootstrap classes through ClassBuilder phases");
+            
+            // PHASE -1: Build field mappings BEFORE any objects are created
+            Console.WriteLine("[VM] Phase -1: Building field mappings from manifest...");
+            fieldLookup.RegisterManifest(manifest);
+            Console.WriteLine("[VM] Phase -1 complete: Field mappings established for all classes and metaclasses");
+            
+            // Convert manifest classes to KernelClass format
+            var kernelClasses = manifest.Classes.Select(c => new KernelClass(
+                c.Name,
+                c.Superclass,
+                c.InstanceVariables.ToArray()
+            )).ToList();
+            
+            // Execute ClassBuilder phases
+            classBuilder.AllocateStubs(kernelClasses);
+            classBuilder.WireClassPointers();
+            classBuilder.WireSuperclasses(kernelClasses);
+            classBuilder.SetClassNames(this);
+            classBuilder.SetInstanceVariables(kernelClasses, this);
+            
+            // Set additional class attributes (format, class variables, etc.)
+            // This is critical for proper class initialization
+            foreach (var classDef in manifest.Classes)
+            {
+                SetClassAttributes(classDef);
+            }
+        }
+        
+        /// <summary>
+        /// Sets additional attributes on a class.
+        /// </summary>
+        private void SetClassAttributes(ClassDefinition classDef)
+        {
+            var classOop = classBuilder.GetClass(classDef.Name);
+            if (classOop.IsNil) return;
+            
+            var classObj = memory.GetObject(classOop);
+            if (classObj == null) return;
+            
+            // Get field indices using the lookup system for class objects
+            // Class objects are instances of their metaclass, so we use GetMetaclassFieldIndex
+            var formatIndex = fieldLookup.GetMetaclassFieldIndex(classDef.Name, "format");
+            var classPoolIndex = fieldLookup.GetMetaclassFieldIndex(classDef.Name, "classPool");
+            var sharedPoolsIndex = fieldLookup.GetMetaclassFieldIndex(classDef.Name, "sharedPools");
+            
+            // Set format if specified
+            if (classDef.Format != 0 && formatIndex >= 0 && formatIndex < classObj.Fields.Length)
+            {
+                classObj.Fields[formatIndex] = OOP.FromSmallInteger(classDef.Format);
+            }
+            
+            // Check if this class has classPool and sharedPools fields
+            // (only Class objects have these, not Behavior or ClassDescription)
+            if (classPoolIndex < 0 || sharedPoolsIndex < 0 || 
+                classPoolIndex >= classObj.Fields.Length || 
+                sharedPoolsIndex >= classObj.Fields.Length)
+            {
+                // Not a full Class object - might be Behavior or ClassDescription
+                return;
+            }
+            
+            // Set class variables (classPool field)
+            if (classDef.ClassVariables.Count > 0)
+            {
+                // Create a Dictionary to hold class variables
+                var dictClass = classBuilder.GetClass("Dictionary");
+                if (!dictClass.IsNil)
+                {
+                    // Create dictionary with appropriate capacity
+                    var capacity = Math.Max(16, classDef.ClassVariables.Count * 2);
+                    var classPoolDict = CreateDictionary(dictClass, capacity);
+                    
+                    // Add each class variable as an Association in the dictionary
+                    foreach (var varName in classDef.ClassVariables)
+                    {
+                        AddToDictionary(classPoolDict, varName, OOP.Nil);
+                    }
+                    
+                    classObj.Fields[classPoolIndex] = classPoolDict;
+                    Console.WriteLine($"[VM] Set {classDef.ClassVariables.Count} class variables for {classDef.Name}");
+                }
+                else
+                {
+                    // Dictionary class not available yet during early bootstrap
+                    classObj.Fields[classPoolIndex] = OOP.Nil;
+                }
+            }
+            else
+            {
+                classObj.Fields[classPoolIndex] = OOP.Nil; // No class variables
+            }
+            
+            // Set pool dictionaries (sharedPools field)
+            if (classDef.PoolDictionaries.Count > 0)
+            {
+                // Pool dictionaries are references to shared dictionaries
+                // For now, create an Array to hold the pool dictionary names
+                var arrayClass = classBuilder.GetClass("Array");
+                if (!arrayClass.IsNil)
+                {
+                    var poolArray = memory.AllocateWordArray(arrayClass, classDef.PoolDictionaries.Count);
+                    var poolArrayObj = memory.GetObject(poolArray);
+                    
+                    if (poolArrayObj != null)
+                    {
+                        // Store pool dictionary names as Symbols
+                        for (int i = 0; i < classDef.PoolDictionaries.Count; i++)
+                        {
+                            poolArrayObj.Fields[i] = Intern(classDef.PoolDictionaries[i]);
+                        }
+                    }
+                    
+                    classObj.Fields[sharedPoolsIndex] = poolArray;
+                    Console.WriteLine($"[VM] Set {classDef.PoolDictionaries.Count} pool dictionaries for {classDef.Name}");
+                }
+                else
+                {
+                    // Array class not available yet during early bootstrap
+                    classObj.Fields[sharedPoolsIndex] = OOP.Nil;
+                }
+            }
+            else
+            {
+                classObj.Fields[sharedPoolsIndex] = OOP.Nil; // No pool dictionaries
+            }
+        }
+        
+        /// <summary>
+        /// Creates a Dictionary object with the specified capacity.
+        /// </summary>
+        private OOP CreateDictionary(OOP dictClass, int capacity)
+        {
+            // Dictionary has fields: tally, array (inherited from Set)
+            var dict = memory.AllocateObject(dictClass, 2);
+            var dictObj = memory.GetObject(dict);
+            
+            if (dictObj != null)
+            {
+                // Initialize tally to 0
+                dictObj.Fields[0] = OOP.FromSmallInteger(0);
+                
+                // Create backing array with capacity for key-value pairs
+                var arrayClass = classBuilder.GetClass("Array");
+                if (!arrayClass.IsNil)
+                {
+                    var array = memory.AllocateWordArray(arrayClass, capacity);
+                    dictObj.Fields[1] = array;
+                }
+                else
+                {
+                    dictObj.Fields[1] = OOP.Nil;
+                }
+            }
+            
+            return dict;
+        }
+        
+        /// <summary>
+        /// Adds a key-value pair to a Dictionary.
+        /// </summary>
+        private void AddToDictionary(OOP dict, string key, OOP value)
+        {
+            var dictObj = memory.GetObject(dict);
+            if (dictObj == null || dictObj.Fields.Length < 2) return;
+            
+            // Dictionary inherits from Set which has: tally at 0, array at 1
+            // But IdentityDictionary has: tally at 0, valueArray at 1
+            // For now, we'll use direct field access at index 1 for the array
+            var arrayOop = dictObj.Fields[1];
+            if (arrayOop.IsNil) return;
+            
+            var arrayObj = memory.GetObject(arrayOop);
+            if (arrayObj == null || arrayObj.Fields.Length == 0) return;
+            
+            // Create Association for the key-value pair
+            var assocClass = classBuilder.GetClass("Association");
+            if (!assocClass.IsNil)
+            {
+                var assoc = memory.AllocateObject(assocClass, 2);
+                var assocObj = memory.GetObject(assoc);
+                if (assocObj != null)
+                {
+                    assocObj.Fields[0] = Intern(key); // key as Symbol
+                    assocObj.Fields[1] = value;       // value
+                    
+                    // Simple linear probing to find empty slot
+                    var keySymbol = Intern(key);
+                    var size = arrayObj.Fields.Length;
+                    var hash = Math.Abs(keySymbol.RawValue) % size;
+                    
+                    for (int i = 0; i < size; i++)
+                    {
+                        var index = (hash + i) % size;
+                        if (arrayObj.Fields[index].IsNil)
+                        {
+                            arrayObj.Fields[index] = assoc;
+                            
+                            // Update tally
+                            var tallyOop = dictObj.Fields[0];
+                            if (tallyOop.IsSmallInteger)
+                            {
+                                dictObj.Fields[0] = OOP.FromSmallInteger(tallyOop.SmallIntegerValue + 1);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Executes initialization expressions from the loaded system image.
+        /// </summary>
+        private void ExecuteInitializationExpressions(BootstrapManifest manifest)
+        {
+            Console.WriteLine("[VM] Executing initialization expressions...");
+            
+            if (manifest.InitializationExpressions == null || manifest.InitializationExpressions.Count == 0)
+            {
+                Console.WriteLine("[VM] No initialization expressions to execute");
+                return;
+            }
+            
+            Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
+            
+            // For now, execute them in order (we can add sorting later if needed)
+            var expressions = manifest.InitializationExpressions;
+            
+            // Track which classes have been initialized to avoid duplicates
+            var initializedClasses = new HashSet<string>();
+            
+            foreach (var expr in expressions)
+            {
+                try
+                {
+                    Console.WriteLine($"[VM] Executing: {expr.Source ?? $"{expr.Receiver} {expr.Selector}"}");
+                    
+                    // Look up the receiver class
+                    var receiverOop = classBuilder.GetClass(expr.Receiver);
+                    if (receiverOop.IsNil)
+                    {
+                        // Try to find it as a global in Smalltalk dictionary
+                        receiverOop = LookupGlobal(expr.Receiver);
+                        if (receiverOop.IsNil)
+                        {
+                            Console.WriteLine($"[VM] Warning: Cannot find receiver '{expr.Receiver}' for initialization");
+                            continue;
+                        }
+                    }
+                    
+                    // Create selector symbol
+                    var selectorOop = InternSymbol(expr.Selector);
+                    
+                    // Convert arguments to OOPs
+                    var argumentOops = new OOP[expr.Arguments.Count];
+                    for (int i = 0; i < expr.Arguments.Count; i++)
+                    {
+                        // For now, treat arguments as symbol names or literals
+                        argumentOops[i] = InternSymbol(expr.Arguments[i]);
+                    }
+                    
+                    // Send the initialization message
+                    Send(receiverOop, selectorOop, argumentOops);
+                    
+                    // Track that this class has been initialized
+                    initializedClasses.Add(expr.Receiver);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VM] Error executing initialization for {expr.Receiver}: {ex.Message}");
+                    // Continue with other initializations
+                }
+            }
+            
+            Console.WriteLine($"[VM] Completed initialization for {initializedClasses.Count} classes");
+        }
+        
+        /// <summary>
+        /// Looks up a global name in the Smalltalk system dictionary.
+        /// </summary>
+        private OOP LookupGlobal(string name)
+        {
+            var smalltalkDict = GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+            if (smalltalkDict.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            var dictObj = memory.GetObject(smalltalkDict);
+            if (dictObj == null || dictObj.Fields.Length <= 1)
+            {
+                return OOP.Nil;
+            }
+            
+            // Create symbol for the name
+            var nameSymbol = InternSymbol(name);
+            
+            // Find the dictionary's array (usually at field index 1)
+            if (dictObj.Fields[1] is OOP arrayOop && !arrayOop.IsNil)
+            {
+                var arrayObj = memory.GetObject(arrayOop);
+                if (arrayObj != null)
+                {
+                    // Search for the name in the dictionary
+                    int capacity = arrayObj.Fields.Length / 2;
+                    for (int i = 0; i < capacity; i++)
+                    {
+                        int keyIndex = i * 2;
+                        int valueIndex = keyIndex + 1;
+                        
+                        if (arrayObj.Fields[keyIndex] == nameSymbol)
+                        {
+                            return arrayObj.Fields[valueIndex];
+                        }
+                    }
+                }
+            }
+            
+            return OOP.Nil;
+        }
+        
         /// <summary>
         /// Starts system execution by creating an initial process and context.
         /// </summary>
@@ -1022,13 +1630,11 @@ namespace Smalltalk80.Interpreter.VM
                 return OOP.Nil;
             }
             
-            // Create a simple startup method that:
-            // 1. Pushes a greeting string
-            // 2. Sends #print to it
-            // 3. Returns nil
+            // Create a minimal startup method that just returns nil immediately
+            // This allows the system to start without trying to execute complex operations
             
-            // Create the method object with 3 fields: header, bytecode, literals
-            var method = memory.AllocateObject(compiledMethodClass, 3);
+            // Create the method object with 4 fields: selector, bytecode, literals, header
+            var method = memory.AllocateObject(compiledMethodClass, 4);
             var methodObj = memory.GetObject(method);
             
             if (methodObj == null)
@@ -1041,24 +1647,24 @@ namespace Smalltalk80.Interpreter.VM
             int primitiveIndex = 0; // No primitive
             int argCount = 0;       // No arguments
             int tempCount = 0;      // No temporaries
-            int stackSize = 4;      // Small stack needed
+            int stackSize = 2;      // Minimal stack
             
             int header = (primitiveIndex << 1) | (argCount << 9) | (tempCount << 14) | (stackSize << 19);
-            methodObj.Fields[0] = OOP.FromSmallInteger(header);
+            
+            // Field 0: selector (use nil for startup method)
+            methodObj.Fields[0] = OOP.Nil;
+            
+            // Field 3: header (moved to correct position)
+            methodObj.Fields[3] = OOP.FromSmallInteger(header);
             
             // Create bytecode array
             var byteArrayClass = classBuilder.GetClass("ByteArray");
             if (!byteArrayClass.IsNil)
             {
-                // Simple bytecode sequence:
-                // Push literal 0 (the string "Smalltalk system initialized")
-                // Send selector #print (literal 1)
-                // Push nil
-                // Return top
+                // Minimal bytecode sequence:
+                // Push nil and return it
                 byte[] bytecodes = [
-                    32,  // Push literal constant 0
-                    209, // Send literal selector 1 with 0 arguments (192 + 17)
-                    115, // Push nil
+                    115, // Push nil (special constant)
                     124  // Return top
                 ];
                 
@@ -1071,41 +1677,16 @@ namespace Smalltalk80.Interpreter.VM
                         bytecodeObj.Fields[i] = OOP.FromSmallInteger(bytecodes[i]);
                     }
                 }
+                // Field 1: bytecode
                 methodObj.Fields[1] = bytecodeArray;
                 
-                // Create literals array
+                // Create empty literals array (no literals needed)
                 var arrayClass = classBuilder.GetClass("Array");
                 if (!arrayClass.IsNil)
                 {
-                    var literalsArray = memory.AllocateWordArray(arrayClass, 2);
-                    var literalsObj = memory.GetObject(literalsArray);
-                    if (literalsObj != null)
-                    {
-                        // Literal 0: String "Smalltalk system initialized"
-                        var stringClass = classBuilder.GetClass("String");
-                        if (!stringClass.IsNil)
-                        {
-                            var message = "Smalltalk-80 system initialized";
-                            var stringObj = memory.AllocateByteArray(stringClass, message.Length);
-                            var strObj = memory.GetObject(stringObj);
-                            if (strObj != null)
-                            {
-                                for (int i = 0; i < message.Length; i++)
-                                {
-                                    strObj.Fields[i] = OOP.FromSmallInteger(message[i]);
-                                }
-                            }
-                            literalsObj.Fields[0] = stringObj;
-                        }
-                        else
-                        {
-                            literalsObj.Fields[0] = OOP.Nil;
-                        }
-                        
-                        // Literal 1: Symbol #print (or #printString)
-                        literalsObj.Fields[1] = Intern("printString");
-                    }
-                    methodObj.Fields[2] = literalsArray;
+                    var literalsArray = memory.AllocateWordArray(arrayClass, 0);
+                    // Field 2: literals
+                methodObj.Fields[2] = literalsArray;
                 }
                 else
                 {
@@ -1114,11 +1695,12 @@ namespace Smalltalk80.Interpreter.VM
             }
             else
             {
-                // No ByteArray class, create empty bytecode
+                // No ByteArray class, create nil fields
                 methodObj.Fields[1] = OOP.Nil;
                 methodObj.Fields[2] = OOP.Nil;
             }
             
+            Console.WriteLine("[VM] Created minimal startup method (push nil, return)");
             return method;
         }
         

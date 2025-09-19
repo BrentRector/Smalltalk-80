@@ -6,6 +6,12 @@ namespace Smalltalk80.Interpreter.Bootstrap;
 public enum BootstrapPhase
 {
     /// <summary>
+    /// Phase -1: Build field mappings from manifest before any objects are created.
+    /// This eliminates hardcoded field indices from the bootstrap process.
+    /// </summary>
+    FieldMappingSetup = -1,
+    
+    /// <summary>
     /// Phase 0: VM primitives only, no Smalltalk objects yet.
     /// </summary>
     VMPrimitivesOnly = 0,
@@ -87,6 +93,9 @@ public static class BootstrapPhaseInfo
     /// </summary>
     public static string GetDescription(BootstrapPhase phase) => phase switch
     {
+        BootstrapPhase.FieldMappingSetup => 
+            "Build field mappings from manifest - establish all field indices before object creation",
+        
         BootstrapPhase.VMPrimitivesOnly => 
             "VM primitives only - allocate raw memory blocks without class pointers",
         

@@ -137,6 +137,7 @@ public sealed class ProcessScheduler
         if (process.IsNil)
             throw new ArgumentException("Cannot suspend nil process", nameof(process));
         
+        // Validate process object structure
         var processObj = memory.GetObject(process);
         if (processObj == null || processObj.Fields.Length < 4)
             throw new InvalidOperationException("Invalid process object structure");
@@ -146,7 +147,7 @@ public sealed class ProcessScheduler
         {
             // Save the current execution context
             var contextOop = SaveActiveContext();
-            processObj.Fields[1] = contextOop; // suspendedContext
+            vm.SetField(process, "Process", "suspendedContext", contextOop);
             
             // Switch to another process
             SwitchToNextProcess();
@@ -156,7 +157,7 @@ public sealed class ProcessScheduler
         else
         {
             // Remove from priority queue if present
-            var priority = processObj.Fields[2];
+            var priority = vm.GetField(process, "Process", "priority");
             if (priority.IsSmallInteger)
             {
                 var priorityLevel = priority.SmallIntegerValue;
@@ -167,9 +168,9 @@ public sealed class ProcessScheduler
             }
             
             // Clear myList field
-            processObj.Fields[3] = OOP.Nil;
+            vm.SetField(process, "Process", "myList", OOP.Nil);
             
-            return processObj.Fields[1]; // Return existing suspendedContext
+            return vm.GetField(process, "Process", "suspendedContext");
         }
     }
     
@@ -182,15 +183,17 @@ public sealed class ProcessScheduler
         if (process.IsNil)
             throw new ArgumentException("Cannot resume nil process", nameof(process));
         
+        // Validate process object structure
         var processObj = memory.GetObject(process);
         if (processObj == null || processObj.Fields.Length < 4)
             throw new InvalidOperationException("Invalid process object structure");
         
         // Check if already on a list
-        if (!processObj.Fields[3].IsNil)
+        var myList = vm.GetField(process, "Process", "myList");
+        if (!myList.IsNil)
             return; // Already scheduled
         
-        var priority = processObj.Fields[2];
+        var priority = vm.GetField(process, "Process", "priority");
         if (!priority.IsSmallInteger)
             throw new InvalidOperationException("Invalid process priority");
         
@@ -202,7 +205,7 @@ public sealed class ProcessScheduler
         priorityQueues[priorityLevel - 1].Add(process);
         
         // Update myList to indicate it's scheduled
-        processObj.Fields[3] = OOP.FromSmallInteger(priorityLevel);
+        vm.SetField(process, "Process", "myList", OOP.FromSmallInteger(priorityLevel));
         
         // Check for preemption
         CheckForPreemption(priorityLevel);
@@ -223,19 +226,12 @@ public sealed class ProcessScheduler
         // Save current process context if there is one
         if (!activeProcess.IsNil)
         {
-            var oldProcessObj = memory.GetObject(activeProcess);
-            if (oldProcessObj != null && oldProcessObj.Fields.Length > 1)
-            {
-                oldProcessObj.Fields[1] = SaveActiveContext();
-            }
+            var contextOop = SaveActiveContext();
+            vm.SetField(activeProcess, "Process", "suspendedContext", contextOop);
         }
         
         // Load new process context
-        var newProcessObj = memory.GetObject(newProcess);
-        if (newProcessObj == null || newProcessObj.Fields.Length < 4)
-            throw new InvalidOperationException("Invalid process object structure");
-        
-        var suspendedContext = newProcessObj.Fields[1];
+        var suspendedContext = vm.GetField(newProcess, "Process", "suspendedContext");
         if (suspendedContext.IsNil)
             throw new InvalidOperationException("Process has no suspended context");
         
@@ -255,11 +251,7 @@ public sealed class ProcessScheduler
         if (activeProcess.IsNil)
             return;
         
-        var processObj = memory.GetObject(activeProcess);
-        if (processObj == null || processObj.Fields.Length < 3)
-            return;
-        
-        var priority = processObj.Fields[2];
+        var priority = vm.GetField(activeProcess, "Process", "priority");
         if (!priority.IsSmallInteger)
             return;
         
@@ -271,11 +263,12 @@ public sealed class ProcessScheduler
         if (queue.Count > 0)
         {
             // Save current context
-            processObj.Fields[1] = SaveActiveContext();
+            var contextOop = SaveActiveContext();
+            vm.SetField(activeProcess, "Process", "suspendedContext", contextOop);
             
             // Move current process to end of queue
             queue.Add(activeProcess);
-            processObj.Fields[3] = OOP.FromSmallInteger(priorityLevel);
+            vm.SetField(activeProcess, "Process", "myList", OOP.FromSmallInteger(priorityLevel));
             
             // Switch to next process in queue
             SwitchToNextProcess();
@@ -322,11 +315,7 @@ public sealed class ProcessScheduler
             return;
         }
         
-        var activeProcessObj = memory.GetObject(activeProcess);
-        if (activeProcessObj == null || activeProcessObj.Fields.Length < 3)
-            return;
-        
-        var activePriority = activeProcessObj.Fields[2];
+        var activePriority = vm.GetField(activeProcess, "Process", "priority");
         if (!activePriority.IsSmallInteger)
             return;
         
@@ -334,14 +323,15 @@ public sealed class ProcessScheduler
         {
             // Higher priority process should preempt
             // Save current process
-            activeProcessObj.Fields[1] = SaveActiveContext();
+            var contextOop = SaveActiveContext();
+            vm.SetField(activeProcess, "Process", "suspendedContext", contextOop);
             
             // Add current process back to its queue
             var currentPriority = activePriority.SmallIntegerValue;
             if (currentPriority > 0 && currentPriority <= MaxPriority)
             {
                 priorityQueues[currentPriority - 1].Insert(0, activeProcess);
-                activeProcessObj.Fields[3] = OOP.FromSmallInteger(currentPriority);
+                vm.SetField(activeProcess, "Process", "myList", OOP.FromSmallInteger(currentPriority));
             }
             
             // Switch to higher priority process
@@ -364,11 +354,7 @@ public sealed class ProcessScheduler
                 queue.RemoveAt(0);
                 
                 // Clear myList since it's no longer on a queue
-                var processObj = memory.GetObject(nextProcess);
-                if (processObj != null && processObj.Fields.Length > 3)
-                {
-                    processObj.Fields[3] = OOP.Nil;
-                }
+                vm.SetField(nextProcess, "Process", "myList", OOP.Nil);
                 
                 SwitchToProcess(nextProcess);
                 return;
@@ -407,22 +393,25 @@ public sealed class ProcessScheduler
         {
             var blockContext = (BlockContext)context;
             // BlockContext fields: sender, pc, stackp, nargs, startpc, home
-            contextObj.Fields[0] = context.Sender != null ? SaveContextChain(context.Sender) : OOP.Nil;
-            contextObj.Fields[1] = OOP.FromSmallInteger(context.PC);
-            contextObj.Fields[2] = OOP.FromSmallInteger(context.Stack.Count);
-            contextObj.Fields[3] = OOP.FromSmallInteger(blockContext.ArgumentCount);
-            contextObj.Fields[4] = OOP.FromSmallInteger(blockContext.InitialPC);
-            contextObj.Fields[5] = SaveContextChain(blockContext.Home);
+            var senderOop = context.Sender != null ? SaveContextChain(context.Sender) : OOP.Nil;
+            vm.SetField(contextOop, "BlockContext", "sender", senderOop);
+            vm.SetField(contextOop, "BlockContext", "pc", OOP.FromSmallInteger(context.PC));
+            vm.SetField(contextOop, "BlockContext", "stackp", OOP.FromSmallInteger(context.Stack.Count));
+            vm.SetField(contextOop, "BlockContext", "nargs", OOP.FromSmallInteger(blockContext.ArgumentCount));
+            vm.SetField(contextOop, "BlockContext", "startpc", OOP.FromSmallInteger(blockContext.InitialPC));
+            vm.SetField(contextOop, "BlockContext", "home", SaveContextChain(blockContext.Home));
         }
         else
         {
             // MethodContext fields: sender, pc, stackp, method, receiver, (unused)
-            contextObj.Fields[0] = context.Sender != null ? SaveContextChain(context.Sender) : OOP.Nil;
-            contextObj.Fields[1] = OOP.FromSmallInteger(context.PC);
-            contextObj.Fields[2] = OOP.FromSmallInteger(context.Stack.Count);
-            contextObj.Fields[3] = context.Method;
-            contextObj.Fields[4] = context.Receiver;
-            contextObj.Fields[5] = OOP.Nil; // Unused field in standard MethodContext
+            var senderOop = context.Sender != null ? SaveContextChain(context.Sender) : OOP.Nil;
+            vm.SetField(contextOop, "MethodContext", "sender", senderOop);
+            vm.SetField(contextOop, "MethodContext", "pc", OOP.FromSmallInteger(context.PC));
+            vm.SetField(contextOop, "MethodContext", "stackp", OOP.FromSmallInteger(context.Stack.Count));
+            vm.SetField(contextOop, "MethodContext", "method", context.Method);
+            vm.SetField(contextOop, "MethodContext", "receiver", context.Receiver);
+            // Field 5 is unused in standard MethodContext - we'll still need to set it for proper object structure
+            contextObj.Fields[5] = OOP.Nil;
         }
         
         // Save indexed fields (arguments, temporaries, stack)
@@ -475,19 +464,25 @@ public sealed class ProcessScheduler
         // For now, we'll check field patterns to determine type
         // In a full implementation, we'd track the class through the OOP header
         
-        // Check if this is a BlockContext (would need to check class name)
-        // For simplicity, we'll check field patterns
+        // Check if this is a BlockContext by examining field patterns
+        // BlockContext has a non-nil home field (field 5) and integer nargs (field 3)
+        // MethodContext has a method object in field 3
         var isBlockContext = !contextObj.Fields[5].IsNil && contextObj.Fields[3].IsSmallInteger;
         
         if (isBlockContext)
         {
             // Restore BlockContext
-            var senderOop = contextObj.Fields[0];
-            var pc = contextObj.Fields[1].IsSmallInteger ? contextObj.Fields[1].SmallIntegerValue : 0;
-            var stackCount = contextObj.Fields[2].IsSmallInteger ? contextObj.Fields[2].SmallIntegerValue : 0;
-            var nargs = contextObj.Fields[3].IsSmallInteger ? contextObj.Fields[3].SmallIntegerValue : 0;
-            var startpc = contextObj.Fields[4].IsSmallInteger ? contextObj.Fields[4].SmallIntegerValue : 0;
-            var homeOop = contextObj.Fields[5];
+            var senderOop = vm.GetField(contextOop, "BlockContext", "sender");
+            var pc = vm.GetField(contextOop, "BlockContext", "pc");
+            var stackCountOop = vm.GetField(contextOop, "BlockContext", "stackp");
+            var nargsOop = vm.GetField(contextOop, "BlockContext", "nargs");
+            var startpcOop = vm.GetField(contextOop, "BlockContext", "startpc");
+            var homeOop = vm.GetField(contextOop, "BlockContext", "home");
+            
+            var pcValue = pc.IsSmallInteger ? pc.SmallIntegerValue : 0;
+            var stackCount = stackCountOop.IsSmallInteger ? stackCountOop.SmallIntegerValue : 0;
+            var nargs = nargsOop.IsSmallInteger ? nargsOop.SmallIntegerValue : 0;
+            var startpc = startpcOop.IsSmallInteger ? startpcOop.SmallIntegerValue : 0;
             
             // Restore home context first
             var home = RestoreContextChain(homeOop);
@@ -516,7 +511,7 @@ public sealed class ProcessScheduler
             
             // Restore sender
             blockContext.Sender = RestoreContextChain(senderOop);
-            blockContext.PC = pc;
+            blockContext.PC = pcValue;
             
             // Restore temporaries
             int index = 6 + nargs;
@@ -536,18 +531,17 @@ public sealed class ProcessScheduler
         else
         {
             // Restore MethodContext
-            var senderOop = contextObj.Fields[0];
-            var pc = contextObj.Fields[1].IsSmallInteger ? contextObj.Fields[1].SmallIntegerValue : 0;
-            var stackCount = contextObj.Fields[2].IsSmallInteger ? contextObj.Fields[2].SmallIntegerValue : 0;
-            var method = contextObj.Fields[3];
-            var receiver = contextObj.Fields[4];
+            var senderOop = vm.GetField(contextOop, "MethodContext", "sender");
+            var pcOop = vm.GetField(contextOop, "MethodContext", "pc");
+            var stackCountOop = vm.GetField(contextOop, "MethodContext", "stackp");
+            var method = vm.GetField(contextOop, "MethodContext", "method");
+            var receiver = vm.GetField(contextOop, "MethodContext", "receiver");
+            
+            var pc = pcOop.IsSmallInteger ? pcOop.SmallIntegerValue : 0;
+            var stackCount = stackCountOop.IsSmallInteger ? stackCountOop.SmallIntegerValue : 0;
             
             // Get method header to determine counts
-            var methodObj = memory.GetObject(method);
-            if (methodObj == null || methodObj.Fields.Length < 1)
-                return null;
-            
-            var header = methodObj.Fields[0];
+            var header = vm.GetField(method, "CompiledMethod", "header");
             if (!header.IsSmallInteger)
                 return null;
             
@@ -601,11 +595,8 @@ public sealed class ProcessScheduler
         if (processorSchedulerOop.IsNil)
             return;
         
-        var schedulerObj = memory.GetObject(processorSchedulerOop);
-        if (schedulerObj != null && schedulerObj.Fields.Length > 1)
-        {
-            schedulerObj.Fields[1] = activeProcess;
-        }
+        // ProcessorScheduler has fields: quiescentProcessLists, activeProcess
+        vm.SetField(processorSchedulerOop, "ProcessorScheduler", "activeProcess", activeProcess);
     }
     
     /// <summary>
@@ -618,11 +609,7 @@ public sealed class ProcessScheduler
         if (process.IsNil)
             return 0;
         
-        var processObj = memory.GetObject(process);
-        if (processObj == null || processObj.Fields.Length < 3)
-            return 0;
-        
-        var priority = processObj.Fields[2];
+        var priority = vm.GetField(process, "Process", "priority");
         return priority.IsSmallInteger ? priority.SmallIntegerValue : 0;
     }
     

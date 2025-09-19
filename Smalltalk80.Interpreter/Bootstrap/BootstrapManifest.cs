@@ -63,6 +63,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         [JsonPropertyName("operations")]
         public List<OperationDefinition>? Operations { get; init; }
+
+        /// <summary>
+        /// Initialization expressions to execute after loading classes.
+        /// These are file-scope expressions from the original Smalltalk source.
+        /// </summary>
+        [JsonPropertyName("initializationExpressions")]
+        public List<InitializationExpression>? InitializationExpressions { get; init; }
     }
 
     /// <summary>
@@ -327,5 +334,36 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         [JsonPropertyName("comment")]
         public string? Comment { get; init; }
+    }
+
+    /// <summary>
+    /// Represents an initialization expression to execute at startup.
+    /// These are file-scope expressions from Smalltalk source files.
+    /// </summary>
+    public sealed record InitializationExpression
+    {
+        /// <summary>
+        /// The receiver of the initialization message.
+        /// </summary>
+        [JsonPropertyName("receiver")]
+        public required string Receiver { get; init; }
+
+        /// <summary>
+        /// The selector (message name) to send.
+        /// </summary>
+        [JsonPropertyName("selector")]
+        public required string Selector { get; init; }
+
+        /// <summary>
+        /// Arguments for the message (if any).
+        /// </summary>
+        [JsonPropertyName("arguments")]
+        public List<string> Arguments { get; init; } = [];
+
+        /// <summary>
+        /// The original source text of the expression.
+        /// </summary>
+        [JsonPropertyName("source")]
+        public string? Source { get; init; }
     }
 }

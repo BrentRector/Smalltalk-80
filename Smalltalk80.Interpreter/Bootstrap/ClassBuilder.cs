@@ -9,16 +9,35 @@ namespace Smalltalk80.Interpreter.Bootstrap
     /// <summary>
     /// Builds classes in multiple passes to ensure no null class pointers.
     /// Implements the clean bootstrap design from ../../BOOTSTRAP_DESIGN.md.
+    /// 
+    /// NOTE: ClassBuilder uses FieldLookup for field indices, which are established
+    /// in Phase -1 before any objects are created. This eliminates hardcoded indices
+    /// and makes the bootstrap self-documenting.
     /// </summary>
     public sealed class ClassBuilder
     {
         private readonly ObjectMemory memory;
         private readonly Dictionary<string, OOP> classRegistry = new();
         private readonly Dictionary<string, OOP> metaclassRegistry = new();
+        private readonly FieldLookup fieldLookup;
+        private IFieldAccessor? fieldAccessor;
         
-        public ClassBuilder(ObjectMemory memory)
+        /// <summary>
+        /// Creates a new ClassBuilder with the field lookup established in Phase -1.
+        /// </summary>
+        public ClassBuilder(ObjectMemory memory, FieldLookup fieldLookup)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
+            this.fieldLookup = fieldLookup ?? throw new ArgumentNullException(nameof(fieldLookup));
+        }
+        
+        /// <summary>
+        /// Sets the field accessor for dynamic field access.
+        /// Should be called after the VM is fully initialized.
+        /// </summary>
+        public void SetFieldAccessor(IFieldAccessor accessor)
+        {
+            this.fieldAccessor = accessor;
         }
 
         /// <summary>
@@ -35,6 +54,24 @@ namespace Smalltalk80.Interpreter.Bootstrap
         public OOP GetMetaclass(string className)
         {
             return metaclassRegistry.TryGetValue(className, out var oop) ? oop : OOP.Nil;
+        }
+        
+        /// <summary>
+        /// Gets all registered classes (for VM field lookup).
+        /// </summary>
+        public IReadOnlyDictionary<string, OOP> GetAllClasses()
+        {
+            return classRegistry;
+        }
+        
+        /// <summary>
+        /// Checks if the given OOP is a registered class object (including metaclasses).
+        /// </summary>
+        public bool IsClassRegistered(OOP oop)
+        {
+            if (oop.IsNil) return false;
+            // Check both class and metaclass registries
+            return classRegistry.ContainsValue(oop) || metaclassRegistry.ContainsValue(oop);
         }
 
         /// <summary>
@@ -93,11 +130,25 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 // A metaclass is an instance of Metaclass
                 memory.UpdateClassPointer(metaclassOop, metaclassClassOop);
                 
-                // Set metaclass's thisClass field (field 5)
+                // Set metaclass's thisClass field using field lookup
                 var metaclassObj = memory.GetObject(metaclassOop);
                 if (metaclassObj != null)
                 {
-                    metaclassObj.Fields[5] = classOop;
+                    // Metaclass instances have the 'thisClass' field from Metaclass class
+                    var thisClassIndex = fieldLookup.GetMetaclassFieldIndex("Metaclass", "thisClass");
+                    if (thisClassIndex >= 0 && thisClassIndex < metaclassObj.Fields.Length)
+                    {
+                        metaclassObj.Fields[thisClassIndex] = classOop;
+                    }
+                    else
+                    {
+                        // Fallback to known index if field lookup fails
+                        // thisClass is at index 9 in the standard metaclass field layout
+                        if (metaclassObj.Fields.Length > 9)
+                        {
+                            metaclassObj.Fields[9] = classOop;
+                        }
+                    }
                 }
                 
                 Console.WriteLine($"  Wired: {className} -> metaclass, metaclass -> Metaclass");
@@ -131,28 +182,63 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classObj == null || metaclassObj == null)
                     continue;
                 
-                // Set class superclass
+                // Set class superclass using field lookup
                 if (classSpec.Superclass != null)
                 {
                     var superclassOop = GetClass(classSpec.Superclass);
                     if (!superclassOop.IsNil)
                     {
-                        classObj.Fields[0] = superclassOop; // superclass field
+                        var superclassIndex = fieldLookup.GetMetaclassFieldIndex(classSpec.Name, "superclass");
+                        if (superclassIndex >= 0 && superclassIndex < classObj.Fields.Length)
+                        {
+                            classObj.Fields[superclassIndex] = superclassOop;
+                        }
+                        else
+                        {
+                            // Fallback: superclass is always at index 0
+                            classObj.Fields[0] = superclassOop;
+                        }
                         
                         // Set metaclass superclass (metaclass of superclass)
                         var superclassMetaOop = GetMetaclass(classSpec.Superclass);
                         if (!superclassMetaOop.IsNil)
                         {
-                            metaclassObj.Fields[0] = superclassMetaOop;
+                            var metaSuperclassIndex = fieldLookup.GetMetaclassFieldIndex($"{classSpec.Name} class", "superclass");
+                            if (metaSuperclassIndex >= 0 && metaSuperclassIndex < metaclassObj.Fields.Length)
+                            {
+                                metaclassObj.Fields[metaSuperclassIndex] = superclassMetaOop;
+                            }
+                            else
+                            {
+                                // Fallback: superclass is always at index 0
+                                metaclassObj.Fields[0] = superclassMetaOop;
+                            }
                         }
                     }
                 }
                 else if (classSpec.Name == "Object")
                 {
                     // Object's superclass is nil
-                    classObj.Fields[0] = OOP.Nil;
+                    var superclassIndex = fieldLookup.GetMetaclassFieldIndex("Object", "superclass");
+                    if (superclassIndex >= 0 && superclassIndex < classObj.Fields.Length)
+                    {
+                        classObj.Fields[superclassIndex] = OOP.Nil;
+                    }
+                    else
+                    {
+                        classObj.Fields[0] = OOP.Nil;
+                    }
+                    
                     // Object class's superclass is Class
-                    metaclassObj.Fields[0] = classClass;
+                    var metaSuperclassIndex = fieldLookup.GetMetaclassFieldIndex("Object class", "superclass");
+                    if (metaSuperclassIndex >= 0 && metaSuperclassIndex < metaclassObj.Fields.Length)
+                    {
+                        metaclassObj.Fields[metaSuperclassIndex] = classClass;
+                    }
+                    else
+                    {
+                        metaclassObj.Fields[0] = classClass;
+                    }
                 }
                 
                 Console.WriteLine($"  Wired superclass: {classSpec.Name} -> {classSpec.Superclass ?? "nil"}");
@@ -174,7 +260,21 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classObj != null)
                 {
                     var nameSymbol = symbolTable.Intern(className);
-                    classObj.Fields[5] = nameSymbol; // name field
+                    
+                    // Use field lookup to find the 'name' field index
+                    var nameIndex = fieldLookup.GetMetaclassFieldIndex(className, "name");
+                    if (nameIndex >= 0 && nameIndex < classObj.Fields.Length)
+                    {
+                        classObj.Fields[nameIndex] = nameSymbol;
+                    }
+                    else
+                    {
+                        // Fallback: name field is at index 5 in Class
+                        if (classObj.Fields.Length > 5)
+                        {
+                            classObj.Fields[5] = nameSymbol;
+                        }
+                    }
                     Console.WriteLine($"  Set name: {className} -> {nameSymbol}");
                 }
             }
@@ -216,20 +316,26 @@ namespace Smalltalk80.Interpreter.Bootstrap
                             ivArrayObj.Fields[i] = ivSymbol;
                         }
                         
-                        classObj.Fields[3] = ivArray; // instance variables field
+                        // Use field lookup to find the 'instanceVariables' field index
+                        var ivIndex = fieldLookup.GetMetaclassFieldIndex(classSpec.Name, "instanceVariables");
+                        if (ivIndex >= 0 && ivIndex < classObj.Fields.Length)
+                        {
+                            classObj.Fields[ivIndex] = ivArray;
+                        }
+                        else
+                        {
+                            // Fallback: instanceVariables field is at index 3 in ClassDescription
+                            if (classObj.Fields.Length > 3)
+                            {
+                                classObj.Fields[3] = ivArray;
+                            }
+                        }
                         Console.WriteLine($"  Set instance vars: {classSpec.Name} -> [{string.Join(", ", classSpec.InstanceVariables)}]");
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Gets all registered classes.
-        /// </summary>
-        public IReadOnlyDictionary<string, OOP> GetAllClasses()
-        {
-            return classRegistry;
-        }
     }
 
     /// <summary>

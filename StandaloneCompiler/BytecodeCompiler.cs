@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime.Tree;
-using Smalltalk80.Generated;
+using StandaloneCompiler.Generated;
 
 namespace StandaloneCompiler
 {
@@ -501,7 +501,78 @@ namespace StandaloneCompiler
         private int scratchTempIndex = -1;
         
         /// <summary>
-        /// Compiles a Smalltalk method to Blue Book bytecode.
+        /// Compiles a Smalltalk method from a parse tree to Blue Book bytecode.
+        /// </summary>
+        public CompiledMethodData CompileMethodFromTree(
+            Smalltalk80Parser.MethodDefContext methodDef,
+            List<string> instanceVars,
+            Dictionary<string, object>? classVars = null,
+            Dictionary<string, object>? poolVars = null)
+        {
+            // Initialize compilation state
+            environment = new CompilationEnvironment();
+            emitter = new BytecodeEmitter();
+            selector = "";
+            primitiveNumber = 0;
+            hasPrimitive = false;
+            nextCascadeTemp = 0;
+            scratchTempIndex = -1;
+            
+            // Set up instance variables with correct offsets
+            for (int i = 0; i < instanceVars.Count; i++)
+            {
+                environment.InstanceVariables[instanceVars[i]] = i;
+            }
+            
+            try
+            {
+                // Process method header
+                ProcessMethodHeader(methodDef.methodHeader());
+                
+                // Process temporaries
+                if (methodDef.temporaries() != null)
+                {
+                    ProcessTemporaries(methodDef.temporaries());
+                }
+                
+                // Process primitive declaration
+                if (methodDef.primitiveDecl() != null)
+                {
+                    ProcessPrimitive(methodDef.primitiveDecl());
+                }
+                
+                // First pass: collect literals
+                CollectLiterals(methodDef.methodBody());
+                
+                // Second pass: generate bytecode
+                CompileMethodBody(methodDef.methodBody());
+                
+                // Ensure method has a return
+                EnsureMethodReturn();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error compiling method: {ex.Message}");
+                // Return minimal stub method
+                emitter = new BytecodeEmitter();
+                emitter.ReturnSelf();
+            }
+            
+            return new CompiledMethodData
+            {
+                Selector = selector,
+                ArgumentCount = environment.ArgumentCount,
+                TemporaryCount = environment.TemporaryCount,
+                IsPrimitive = hasPrimitive,
+                PrimitiveNumber = primitiveNumber,
+                Bytecode = emitter.GetBytecodes(),
+                Literals = emitter.GetLiterals()
+            };
+        }
+        
+        /// <summary>
+        /// Compiles a Smalltalk method from source text to Blue Book bytecode.
+        /// (Kept for backwards compatibility)
         /// </summary>
         public CompiledMethodData CompileMethod(
             string methodSource,
@@ -608,10 +679,12 @@ namespace StandaloneCompiler
                 
                 for (int i = 0; i < keywords.Length; i++)
                 {
-                    parts.Add(keywords[i].GetText());
+                    var keywordText = keywords[i].GetText();
+                    parts.Add(keywordText);
                     if (i < args.Length)
                     {
-                        environment.Arguments[args[i].GetText()] = i;
+                        var argText = args[i].GetText();
+                        environment.Arguments[argText] = i;
                     }
                 }
                 

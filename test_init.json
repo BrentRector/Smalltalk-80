@@ -1,0 +1,31 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Test initialization expressions",
+  "classes": [
+    {
+      "name": "TestInit",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "classVariables": [],
+      "poolDictionaries": []
+    }
+  ],
+  "methods": [
+    {
+      "class": "TestInit class",
+      "selector": "initialize",
+      "bytecode": [217, 124],
+      "literals": [],
+      "numArgs": 0,
+      "numTemps": 0
+    }
+  ],
+  "initializationExpressions": [
+    {
+      "receiver": "TestInit",
+      "selector": "initialize",
+      "arguments": [],
+      "source": "TestInit initialize"
+    }
+  ]
+}

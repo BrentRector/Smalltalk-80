@@ -17,9 +17,16 @@ public sealed class MessageDispatcher
     private readonly PrimitiveTable primitiveTable;
     private readonly MethodCache methodCache;
     private readonly ISymbolTable symbolTable;
+    private readonly IFieldAccessor fieldAccessor;
     
     // Pre-interned common selectors
     private OOP doesNotUnderstandSelector = OOP.Nil;
+    
+    // Cached field indices for performance
+    private int behaviorSuperclassIndex = -1;
+    private int behaviorMethodDictIndex = -1;
+    private int dictTallyIndex = -1;
+    private int dictArrayIndex = -1;
     
     /// <summary>
     /// Creates a new message dispatcher.
@@ -27,20 +34,29 @@ public sealed class MessageDispatcher
     /// <param name="memory">Object memory for accessing objects.</param>
     /// <param name="primitiveTable">Table of primitive methods.</param>
     /// <param name="symbolTable">Symbol table for selector interning.</param>
-    public MessageDispatcher(ObjectMemory memory, PrimitiveTable primitiveTable, ISymbolTable symbolTable)
+    /// <param name="fieldAccessor">Field accessor for object field access.</param>
+    public MessageDispatcher(ObjectMemory memory, PrimitiveTable primitiveTable, ISymbolTable symbolTable, IFieldAccessor fieldAccessor)
     {
         this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
         this.primitiveTable = primitiveTable ?? throw new ArgumentNullException(nameof(primitiveTable));
         this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
+        this.fieldAccessor = fieldAccessor ?? throw new ArgumentNullException(nameof(fieldAccessor));
         this.methodCache = new MethodCache();
     }
     
     /// <summary>
-    /// Initializes pre-interned selectors after bootstrap.
+    /// Initializes pre-interned selectors and cached field indices after bootstrap.
     /// </summary>
     public void Initialize()
     {
         doesNotUnderstandSelector = symbolTable.Intern("doesNotUnderstand:");
+        
+        // Cache field indices for performance
+        behaviorSuperclassIndex = fieldAccessor.GetFieldIndex("Behavior", "superclass");
+        behaviorMethodDictIndex = fieldAccessor.GetFieldIndex("Behavior", "methodDict");
+        dictTallyIndex = fieldAccessor.GetFieldIndex("Dictionary", "tally");
+        dictArrayIndex = fieldAccessor.GetFieldIndex("Dictionary", "array");
+        
         // Don't pre-intern selectors we're not actually using yet
         // These would be leaked since MessageDispatcher is not traced by GC
         // messageSelector = symbolTable.Intern("message");
@@ -93,22 +109,24 @@ public sealed class MessageDispatcher
             if (classObj == null)
                 break;
             
-            // Get method dictionary (usually field 1 for Behavior)
-            if (classObj.Fields.Length > 1)
+            // Get method dictionary using cached field index
+            var methodDict = behaviorMethodDictIndex >= 0 
+                ? fieldAccessor.GetFieldByIndex(currentClass, behaviorMethodDictIndex)
+                : OOP.Nil;
+                
+            if (!methodDict.IsNil)
             {
-                var methodDict = classObj.Fields[1];
-                if (!methodDict.IsNil)
+                var method = LookupInDictionary(methodDict, selector);
+                if (!method.IsNil)
                 {
-                    var method = LookupInDictionary(methodDict, selector);
-                    if (!method.IsNil)
-                    {
-                        return (method, currentClass);
-                    }
+                    return (method, currentClass);
                 }
             }
             
-            // Move to superclass (usually field 0 for Behavior)
-            currentClass = classObj.Fields.Length > 0 ? classObj.Fields[0] : OOP.Nil;
+            // Move to superclass using cached field index
+            currentClass = behaviorSuperclassIndex >= 0 
+                ? fieldAccessor.GetFieldByIndex(currentClass, behaviorSuperclassIndex)
+                : OOP.Nil;
         }
         
         return (OOP.Nil, OOP.Nil);
@@ -125,28 +143,31 @@ public sealed class MessageDispatcher
         
         // MethodDictionary format: [tally, array]
         // Where array contains alternating keys and values
-        if (dictObj.Fields.Length >= 2)
+        var tallyOop = dictTallyIndex >= 0 
+            ? fieldAccessor.GetFieldByIndex(dictionary, dictTallyIndex)
+            : OOP.Nil;
+            
+        if (!tallyOop.IsSmallInteger)
+            return OOP.Nil;
+        
+        var tally = tallyOop.SmallIntegerValue;
+        if (tally == 0)
+            return OOP.Nil;
+        
+        var arrayOop = dictArrayIndex >= 0 
+            ? fieldAccessor.GetFieldByIndex(dictionary, dictArrayIndex)
+            : OOP.Nil;
+            
+        var arrayObj = memory.GetObject(arrayOop);
+        if (arrayObj == null)
+            return OOP.Nil;
+        
+        // Linear search through dictionary (could optimize with hashing)
+        for (int i = 0; i < arrayObj.Fields.Length - 1; i += 2)
         {
-            var tallyOop = dictObj.Fields[0];
-            if (!tallyOop.IsSmallInteger)
-                return OOP.Nil;
-            
-            var tally = tallyOop.SmallIntegerValue;
-            if (tally == 0)
-                return OOP.Nil;
-            
-            var arrayOop = dictObj.Fields[1];
-            var arrayObj = memory.GetObject(arrayOop);
-            if (arrayObj == null)
-                return OOP.Nil;
-            
-            // Linear search through dictionary (could optimize with hashing)
-            for (int i = 0; i < arrayObj.Fields.Length - 1; i += 2)
+            if (SelectorEquals(arrayObj.Fields[i], selector))
             {
-                if (SelectorEquals(arrayObj.Fields[i], selector))
-                {
-                    return arrayObj.Fields[i + 1];
-                }
+                return arrayObj.Fields[i + 1];
             }
         }
         

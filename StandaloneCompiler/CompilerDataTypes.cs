@@ -123,4 +123,30 @@ namespace StandaloneCompiler
         /// </summary>
         public CompiledMethodData? CompiledData { get; set; }
     }
+    
+    /// <summary>
+    /// Represents an initialization expression that should be executed after loading classes.
+    /// </summary>
+    public class InitializationExpression
+    {
+        /// <summary>
+        /// The receiver of the initialization message (e.g., "Character", "Cursor").
+        /// </summary>
+        public string Receiver { get; set; } = "";
+        
+        /// <summary>
+        /// The selector to send (e.g., "initialize").
+        /// </summary>
+        public string Selector { get; set; } = "";
+        
+        /// <summary>
+        /// Optional arguments if any.
+        /// </summary>
+        public List<string> Arguments { get; set; } = new();
+        
+        /// <summary>
+        /// The source line for debugging purposes.
+        /// </summary>
+        public string Source { get; set; } = "";
+    }
 }

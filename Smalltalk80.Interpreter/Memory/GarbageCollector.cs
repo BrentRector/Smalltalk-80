@@ -101,13 +101,89 @@ public sealed class GarbageCollector(ObjectMemory objectMemory)
     private void SweepUnmarked()
     {
         List<uint> toRemove = [];
+        bool firstReported = false;
         
         // Find all unmarked objects
         foreach (var (oop, layout) in objectMemory.EnumerateObjects())
         {
             if (!layout.Header.IsMarked && !layout.Header.IsPermanent)
             {
-                // Only show debug for unexpected cases
+                // Report details of first object being collected
+                if (!firstReported)
+                {
+                    Console.WriteLine($"\n[GC] FIRST UNREACHABLE OBJECT:");
+                    Console.WriteLine($"  OOP: {oop}");
+                    Console.WriteLine($"  Class OOP: {layout.Header.ClassOOP}");
+                    Console.WriteLine($"  Field Count: {layout.Fields.Length}");
+                    Console.WriteLine($"  HasPointers: {layout.HasPointers}");
+                    Console.WriteLine($"  IsBytes: {layout.IsBytes}");
+                    Console.WriteLine($"  Format: 0x{layout.Header.Format:X2}");
+                    
+                    // Show first few fields if any
+                    if (layout.Fields.Length > 0)
+                    {
+                        Console.WriteLine($"  First fields:");
+                        for (int i = 0; i < Math.Min(4, layout.Fields.Length); i++)
+                        {
+                            Console.WriteLine($"    Field[{i}]: {layout.Fields[i]}");
+                        }
+                    }
+                    
+                    // Try to identify what class this is
+                    var classObj = objectMemory.GetObject(layout.Header.ClassOOP);
+                    if (classObj != null && classObj.Fields.Length > 6)
+                    {
+                        var nameOop = classObj.Fields[6]; // name field is typically at index 6
+                        var nameObj = objectMemory.GetObject(nameOop);
+                        if (nameObj != null && nameObj.IsBytes)
+                        {
+                            var bytes = new System.Collections.Generic.List<byte>();
+                            foreach (var field in nameObj.Fields)
+                            {
+                                if (field.IsSmallInteger)
+                                    bytes.Add((byte)field.SmallIntegerValue);
+                            }
+                            var className = System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+                            Console.WriteLine($"  Class Name: {className}");
+                        }
+                    }
+                    
+                    // If it's a CompiledMethod (has exactly 4 pointer fields: selector, bytecode, literals, header)
+                    if (layout.Fields.Length == 4 && layout.HasPointers && !layout.IsBytes)
+                    {
+                        var selectorOop = layout.Fields[0];
+                        if (!selectorOop.IsNil && !selectorOop.IsSmallInteger)
+                        {
+                            var selectorObj = objectMemory.GetObject(selectorOop);
+                            if (selectorObj != null && selectorObj.IsBytes)
+                            {
+                                var bytes = new System.Collections.Generic.List<byte>();
+                                foreach (var field in selectorObj.Fields)
+                                {
+                                    if (field.IsSmallInteger)
+                                        bytes.Add((byte)field.SmallIntegerValue);
+                                }
+                                var selectorName = System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+                                Console.WriteLine($"  Method Selector: {selectorName}");
+                                
+                                // Also show bytecode size
+                                var bytecodeOop = layout.Fields[1];
+                                if (!bytecodeOop.IsNil)
+                                {
+                                    var bytecodeObj = objectMemory.GetObject(bytecodeOop);
+                                    if (bytecodeObj != null && bytecodeObj.IsBytes)
+                                    {
+                                        Console.WriteLine($"  Bytecode length: {bytecodeObj.Fields.Length} bytes");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Console.WriteLine();
+                    firstReported = true;
+                }
+                
+                // Only show debug for unexpected cases (objects with fields)
                 if (layout.Fields.Length > 0)
                 {
                     Console.WriteLine($"[GC] Collecting unreachable object: OOP={oop}, Class={layout.Header.ClassOOP}, " +
@@ -122,9 +198,7 @@ public sealed class GarbageCollector(ObjectMemory objectMemory)
         lastCollectedCount = toRemove.Count;
         foreach (var index in toRemove)
         {
-            // Note: In a real implementation, we'd need to update the ObjectTable
-            // to support removal. For now, this is a placeholder.
-            // objectMemory.RemoveObject(index);
+            objectMemory.RemoveObject(index);
         }
     }
 

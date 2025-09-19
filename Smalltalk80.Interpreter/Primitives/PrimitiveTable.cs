@@ -114,4 +114,9 @@ public interface IPrimitiveContext
     /// Performs a message send (for primitives that need to invoke methods).
     /// </summary>
     OOP Send(OOP receiver, OOP selector, OOP[] arguments);
+    
+    /// <summary>
+    /// Interns a symbol string and returns its OOP.
+    /// </summary>
+    OOP InternSymbol(string value);
 }
