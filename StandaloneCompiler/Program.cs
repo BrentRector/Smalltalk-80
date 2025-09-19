@@ -269,13 +269,15 @@ namespace StandaloneCompiler
                 var charStop = stop?.StopIndex ?? charStart;
                 var sourceText = charStream.GetText(new Antlr4.Runtime.Misc.Interval(charStart, charStop));
                 
-                // Parse the expression structure to extract receiver, selector, and arguments
+                // Compile the expression to bytecode
+                var compiledData = compiler.bytecodeCompiler.CompileExpressionFromTree(expression);
+                
+                // Also extract receiver and selector for documentation
                 string receiver = "";
                 string selector = "";
                 var arguments = new List<string>();
                 
-                // Navigate the parse tree to extract components
-                // Expression -> AssignmentExpr -> CascadeExpr -> MessageExpr
+                // Navigate the parse tree to extract components for documentation
                 var assignmentExpr = expression.assignmentExpr();
                 if (assignmentExpr != null)
                 {
@@ -293,13 +295,11 @@ namespace StandaloneCompiler
                             }
                             
                             // Extract the selector from messages
-                            // Check for unary message
                             var unaryMessages = messageExpr.unaryMessage();
                             if (unaryMessages != null && unaryMessages.Length > 0)
                             {
                                 selector = unaryMessages[0].unarySelector()?.GetText() ?? "";
                             }
-                            // Check for binary message
                             else 
                             {
                                 var binaryMessages = messageExpr.binaryMessage();
@@ -312,20 +312,21 @@ namespace StandaloneCompiler
                                         arguments.Add(tokenStream.GetText(arg.Start, arg.Stop));
                                     }
                                 }
-                            }
-                            
-                            // Check for keyword message
-                            var keywordMessage = messageExpr.keywordMessage();
-                            if (keywordMessage != null)
-                            {
-                                var keywordParts = keywordMessage.keywordPart();
-                                selector = string.Join("", keywordParts.Select(p => p.IDENTIFIER()?.GetText() + ":"));
-                                foreach (var part in keywordParts)
+                                else
                                 {
-                                    var argExpr = part.nonKeywordExpr();
-                                    if (argExpr != null)
+                                    var keywordMessage = messageExpr.keywordMessage();
+                                    if (keywordMessage != null)
                                     {
-                                        arguments.Add(tokenStream.GetText(argExpr.Start, argExpr.Stop));
+                                        var keywordParts = keywordMessage.keywordPart();
+                                        selector = string.Join("", keywordParts.Select(p => p.IDENTIFIER()?.GetText() + ":"));
+                                        foreach (var part in keywordParts)
+                                        {
+                                            var argExpr = part.nonKeywordExpr();
+                                            if (argExpr != null)
+                                            {
+                                                arguments.Add(tokenStream.GetText(argExpr.Start, argExpr.Stop));
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -335,10 +336,14 @@ namespace StandaloneCompiler
                 
                 var initExpr = new InitializationExpression
                 {
-                    Receiver = receiver,
-                    Selector = selector,
-                    Arguments = arguments,
-                    Source = sourceText
+                    Bytecode = compiledData.Bytecode,
+                    Literals = ConvertLiterals(compiledData.Literals),
+                    NumTemps = compiledData.TemporaryCount,
+                    Source = sourceText,
+                    // These are optional/documentation fields
+                    Receiver = string.IsNullOrEmpty(receiver) ? null : receiver,
+                    Selector = string.IsNullOrEmpty(selector) ? null : selector,
+                    Arguments = arguments.Count > 0 ? arguments : null
                 };
                 
                 compiler.initializationExpressions.Add(initExpr);

@@ -1,31 +1,62 @@
 {
   "$schema": "./bootstrap-schema.json",
-  "description": "Test initialization expressions",
+  "description": "Compiled from source on 2025-09-18 20:29:44",
   "classes": [
     {
       "name": "TestInit",
       "superclass": "Object",
-      "instanceVariables": [],
+      "instanceVariables": [
+        "counter"
+      ],
       "classVariables": [],
-      "poolDictionaries": []
+      "poolDictionaries": [],
+      "category": "Test"
     }
   ],
   "methods": [
     {
       "class": "TestInit class",
       "selector": "initialize",
-      "bytecode": [217, 124],
-      "literals": [],
+      "bytecode": [
+        67,
+        136,
+        104,
+        33,
+        224,
+        105,
+        16,
+        210,
+        105,
+        112,
+        124
+      ],
+      "literals": [
+        "#show:",
+        "TestInit initialized",
+        "#cr",
+        "#Transcript"
+      ],
+      "primitiveIndex": 0,
       "numArgs": 0,
-      "numTemps": 0
+      "numTemps": 2,
+      "isClassMethod": true
     }
   ],
   "initializationExpressions": [
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#TestInit"
+      ],
+      "numTemps": 0,
+      "source": "TestInit initialize",
       "receiver": "TestInit",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "TestInit initialize"
+      "selector": "initialize"
     }
   ]
 }

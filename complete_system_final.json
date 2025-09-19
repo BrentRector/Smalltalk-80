@@ -1,6 +1,6 @@
 {
   "$schema": "./bootstrap-schema.json",
-  "description": "Compiled from source on 2025-09-18 20:17:13",
+  "description": "Compiled from source on 2025-09-18 20:30:18",
   "classes": [
     {
       "name": "ActionMenu",
@@ -211750,274 +211750,679 @@
   ],
   "initializationExpressions": [
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#AltoFile"
+      ],
+      "numTemps": 0,
+      "source": "AltoFile initialize",
       "receiver": "AltoFile",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "AltoFile initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#BinaryChoiceView"
+      ],
+      "numTemps": 0,
+      "source": "BinaryChoiceView initialize",
       "receiver": "BinaryChoiceView",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "BinaryChoiceView initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#BitEditor"
+      ],
+      "numTemps": 0,
+      "source": "BitEditor initialize",
       "receiver": "BitEditor",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "BitEditor initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ChangeListController"
+      ],
+      "numTemps": 0,
+      "source": "ChangeListController initialize",
       "receiver": "ChangeListController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ChangeListController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Character"
+      ],
+      "numTemps": 0,
+      "source": "Character initialize",
       "receiver": "Character",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Character initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ClassOrganizer"
+      ],
+      "numTemps": 0,
+      "source": "ClassOrganizer initialize",
       "receiver": "ClassOrganizer",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ClassOrganizer initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#CompiledMethod"
+      ],
+      "numTemps": 0,
+      "source": "CompiledMethod initialize",
       "receiver": "CompiledMethod",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "CompiledMethod initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Cursor"
+      ],
+      "numTemps": 0,
+      "source": "Cursor initialize",
       "receiver": "Cursor",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Cursor initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Date"
+      ],
+      "numTemps": 0,
+      "source": "Date initialize",
       "receiver": "Date",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Date initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Debugger"
+      ],
+      "numTemps": 0,
+      "source": "Debugger initialize",
       "receiver": "Debugger",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Debugger initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Decompiler"
+      ],
+      "numTemps": 0,
+      "source": "Decompiler initialize",
       "receiver": "Decompiler",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Decompiler initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Delay"
+      ],
+      "numTemps": 0,
+      "source": "Delay initialize",
       "receiver": "Delay",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Delay initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Explainer"
+      ],
+      "numTemps": 0,
+      "source": "Explainer initialize",
       "receiver": "Explainer",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Explainer initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#File"
+      ],
+      "numTemps": 0,
+      "source": "File initialize",
       "receiver": "File",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "File initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#FileDirectory"
+      ],
+      "numTemps": 0,
+      "source": "FileDirectory initialize",
       "receiver": "FileDirectory",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "FileDirectory initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Float"
+      ],
+      "numTemps": 0,
+      "source": "Float initialize",
       "receiver": "Float",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Float initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Form"
+      ],
+      "numTemps": 0,
+      "source": "Form initialize",
       "receiver": "Form",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Form initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#FormEditor"
+      ],
+      "numTemps": 0,
+      "source": "FormEditor initialize",
       "receiver": "FormEditor",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "FormEditor initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#FormMenuView"
+      ],
+      "numTemps": 0,
+      "source": "FormMenuView initialize",
       "receiver": "FormMenuView",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "FormMenuView initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#InputSensor"
+      ],
+      "numTemps": 0,
+      "source": "InputSensor initialize",
       "receiver": "InputSensor",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "InputSensor initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#InputState"
+      ],
+      "numTemps": 0,
+      "source": "InputState initialize",
       "receiver": "InputState",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "InputState initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#InstructionStream"
+      ],
+      "numTemps": 0,
+      "source": "InstructionStream initialize",
       "receiver": "InstructionStream",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "InstructionStream initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#LargeNegativeInteger"
+      ],
+      "numTemps": 0,
+      "source": "LargeNegativeInteger initialize",
       "receiver": "LargeNegativeInteger",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "LargeNegativeInteger initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#LargePositiveInteger"
+      ],
+      "numTemps": 0,
+      "source": "LargePositiveInteger initialize",
       "receiver": "LargePositiveInteger",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "LargePositiveInteger initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#MessageNode"
+      ],
+      "numTemps": 0,
+      "source": "MessageNode initialize",
       "receiver": "MessageNode",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "MessageNode initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#NotifierController"
+      ],
+      "numTemps": 0,
+      "source": "NotifierController initialize",
       "receiver": "NotifierController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "NotifierController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Object"
+      ],
+      "numTemps": 0,
+      "source": "Object initialize",
       "receiver": "Object",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Object initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Paragraph"
+      ],
+      "numTemps": 0,
+      "source": "Paragraph initialize",
       "receiver": "Paragraph",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Paragraph initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ParagraphEditor"
+      ],
+      "numTemps": 0,
+      "source": "ParagraphEditor initialize",
       "receiver": "ParagraphEditor",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ParagraphEditor initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ParseNode"
+      ],
+      "numTemps": 0,
+      "source": "ParseNode initialize",
       "receiver": "ParseNode",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ParseNode initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ProcessorScheduler"
+      ],
+      "numTemps": 0,
+      "source": "ProcessorScheduler initialize",
       "receiver": "ProcessorScheduler",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ProcessorScheduler initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Project"
+      ],
+      "numTemps": 0,
+      "source": "Project initialize",
       "receiver": "Project",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Project initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ProjectController"
+      ],
+      "numTemps": 0,
+      "source": "ProjectController initialize",
       "receiver": "ProjectController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ProjectController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Scanner"
+      ],
+      "numTemps": 0,
+      "source": "Scanner initialize",
       "receiver": "Scanner",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Scanner initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#ScreenController"
+      ],
+      "numTemps": 0,
+      "source": "ScreenController initialize",
       "receiver": "ScreenController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "ScreenController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#SmallInteger"
+      ],
+      "numTemps": 0,
+      "source": "SmallInteger initialize",
       "receiver": "SmallInteger",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "SmallInteger initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#StandardSystemController"
+      ],
+      "numTemps": 0,
+      "source": "StandardSystemController initialize",
       "receiver": "StandardSystemController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "StandardSystemController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#StringHolder"
+      ],
+      "numTemps": 0,
+      "source": "StringHolder initialize",
       "receiver": "StringHolder",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "StringHolder initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#StringHolderController"
+      ],
+      "numTemps": 0,
+      "source": "StringHolderController initialize",
       "receiver": "StringHolderController",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "StringHolderController initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Symbol"
+      ],
+      "numTemps": 0,
+      "source": "Symbol initialize",
       "receiver": "Symbol",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Symbol initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#SystemDictionary"
+      ],
+      "numTemps": 0,
+      "source": "SystemDictionary initialize",
       "receiver": "SystemDictionary",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "SystemDictionary initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#SystemTracer"
+      ],
+      "numTemps": 0,
+      "source": "SystemTracer initialize",
       "receiver": "SystemTracer",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "SystemTracer initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#Text"
+      ],
+      "numTemps": 0,
+      "source": "Text initialize",
       "receiver": "Text",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "Text initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#TextList"
+      ],
+      "numTemps": 0,
+      "source": "TextList initialize",
       "receiver": "TextList",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "TextList initialize"
+      "selector": "initialize"
     },
     {
+      "bytecode": [
+        65,
+        208,
+        124
+      ],
+      "literals": [
+        "#initialize",
+        "#VariableNode"
+      ],
+      "numTemps": 0,
+      "source": "VariableNode initialize",
       "receiver": "VariableNode",
-      "selector": "initialize",
-      "arguments": [],
-      "source": "VariableNode initialize"
+      "selector": "initialize"
     }
   ]
 }

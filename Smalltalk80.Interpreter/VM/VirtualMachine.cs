@@ -35,6 +35,7 @@ namespace Smalltalk80.Interpreter.VM
         private int recursionDepth = 0;
         private const int MaxRecursionDepth = 1000;
         private bool schedulerEnabled = false;
+        private OOP doItProcess = OOP.Nil;
 
         /// <summary>
         /// Creates a new virtual machine instance.
@@ -195,7 +196,7 @@ namespace Smalltalk80.Interpreter.VM
             
             // Execute initialization expressions if present
             // This will initialize Transcript and other globals through Smalltalk code
-            // DISABLED: ExecuteInitializationExpressions(manifest);
+            ExecuteInitializationExpressions(manifest);
             
             // Start execution with an initial process - but only for complete system
             // For bootstrap only, we don't create any temporary startup objects
@@ -1383,6 +1384,16 @@ namespace Smalltalk80.Interpreter.VM
         }
         
         /// <summary>
+        /// Gets the stored DoIt process for REPL/initialization use.
+        /// </summary>
+        private OOP GetDoItProcess() => doItProcess;
+        
+        /// <summary>
+        /// Stores the DoIt process for future REPL use.
+        /// </summary>
+        private void StoreDoItProcess(OOP process) => doItProcess = process;
+        
+        /// <summary>
         /// Executes initialization expressions from the loaded system image.
         /// </summary>
         private void ExecuteInitializationExpressions(BootstrapManifest manifest)
@@ -1397,56 +1408,29 @@ namespace Smalltalk80.Interpreter.VM
             
             Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
             
-            // For now, execute them in order (we can add sorting later if needed)
-            var expressions = manifest.InitializationExpressions;
+            // Create the initialization expression executor
+            var executor = new InitializationExpressionExecutor(
+                memory, 
+                this, 
+                classBuilder, 
+                this, // ISymbolTable
+                classBuilder.GetAllClasses());
             
-            // Track which classes have been initialized to avoid duplicates
-            var initializedClasses = new HashSet<string>();
+            // Check if we have an existing process from REPL setup
+            var existingProcess = GetDoItProcess();
             
-            foreach (var expr in expressions)
+            // Execute the initialization expressions with proper hierarchy ordering
+            var process = executor.ExecuteInitializationExpressions(
+                manifest.InitializationExpressions.ToList(), 
+                existingProcess);
+            
+            // Store the process for potential REPL use
+            if (existingProcess.IsNil && !process.IsNil)
             {
-                try
-                {
-                    Console.WriteLine($"[VM] Executing: {expr.Source ?? $"{expr.Receiver} {expr.Selector}"}");
-                    
-                    // Look up the receiver class
-                    var receiverOop = classBuilder.GetClass(expr.Receiver);
-                    if (receiverOop.IsNil)
-                    {
-                        // Try to find it as a global in Smalltalk dictionary
-                        receiverOop = LookupGlobal(expr.Receiver);
-                        if (receiverOop.IsNil)
-                        {
-                            Console.WriteLine($"[VM] Warning: Cannot find receiver '{expr.Receiver}' for initialization");
-                            continue;
-                        }
-                    }
-                    
-                    // Create selector symbol
-                    var selectorOop = InternSymbol(expr.Selector);
-                    
-                    // Convert arguments to OOPs
-                    var argumentOops = new OOP[expr.Arguments.Count];
-                    for (int i = 0; i < expr.Arguments.Count; i++)
-                    {
-                        // For now, treat arguments as symbol names or literals
-                        argumentOops[i] = InternSymbol(expr.Arguments[i]);
-                    }
-                    
-                    // Send the initialization message
-                    Send(receiverOop, selectorOop, argumentOops);
-                    
-                    // Track that this class has been initialized
-                    initializedClasses.Add(expr.Receiver);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[VM] Error executing initialization for {expr.Receiver}: {ex.Message}");
-                    // Continue with other initializations
-                }
+                StoreDoItProcess(process);
             }
             
-            Console.WriteLine($"[VM] Completed initialization for {initializedClasses.Count} classes");
+            Console.WriteLine("[VM] Initialization expressions completed");
         }
         
         /// <summary>

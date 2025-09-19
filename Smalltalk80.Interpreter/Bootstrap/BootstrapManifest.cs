@@ -343,27 +343,45 @@ namespace Smalltalk80.Interpreter.Bootstrap
     public sealed record InitializationExpression
     {
         /// <summary>
-        /// The receiver of the initialization message.
+        /// The bytecode for the initialization expression.
         /// </summary>
-        [JsonPropertyName("receiver")]
-        public required string Receiver { get; init; }
-
+        [JsonPropertyName("bytecode")]
+        public List<int> Bytecode { get; init; } = [];
+        
         /// <summary>
-        /// The selector (message name) to send.
+        /// The literal objects referenced by the expression.
         /// </summary>
-        [JsonPropertyName("selector")]
-        public required string Selector { get; init; }
-
+        [JsonPropertyName("literals")]
+        public List<object> Literals { get; init; } = [];
+        
         /// <summary>
-        /// Arguments for the message (if any).
+        /// Number of temporary variables needed.
         /// </summary>
-        [JsonPropertyName("arguments")]
-        public List<string> Arguments { get; init; } = [];
-
+        [JsonPropertyName("numTemps")]
+        public int NumTemps { get; init; } = 0;
+        
         /// <summary>
         /// The original source text of the expression.
         /// </summary>
         [JsonPropertyName("source")]
         public string? Source { get; init; }
+        
+        /// <summary>
+        /// Optional: The receiver of the initialization message (for documentation/sorting).
+        /// </summary>
+        [JsonPropertyName("receiver")]
+        public string? Receiver { get; init; }
+        
+        /// <summary>
+        /// Optional: The selector to send (for documentation).
+        /// </summary>
+        [JsonPropertyName("selector")]
+        public string? Selector { get; init; }
+        
+        /// <summary>
+        /// Optional: Arguments if any (for documentation).
+        /// </summary>
+        [JsonPropertyName("arguments")]
+        public List<string>? Arguments { get; init; }
     }
 }

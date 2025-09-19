@@ -501,6 +501,64 @@ namespace StandaloneCompiler
         private int scratchTempIndex = -1;
         
         /// <summary>
+        /// Compiles a file-scope expression to bytecode.
+        /// The expression will be compiled as if it were a method with no arguments.
+        /// </summary>
+        public CompiledMethodData CompileExpressionFromTree(
+            Smalltalk80Parser.ExpressionContext expression)
+        {
+            // Initialize compilation state
+            environment = new CompilationEnvironment();
+            emitter = new BytecodeEmitter();
+            selector = "doIt"; // Standard selector for expressions
+            primitiveNumber = 0;
+            hasPrimitive = false;
+            nextCascadeTemp = 0;
+            scratchTempIndex = -1;
+            
+            try
+            {
+                // No arguments or temporaries for file-scope expressions
+                environment.ArgumentCount = 0;
+                environment.TemporaryCount = 0;
+                
+                // First pass: collect literals
+                var visitor = new LiteralCollector(emitter);
+                visitor.Visit(expression);
+                
+                // Second pass: compile the expression
+                CompileExpression(expression);
+                
+                // Expression should leave its result on the stack
+                // Add return if not already present
+                if (emitter.GetBytecodes().Length == 0 || 
+                    emitter.GetBytecodes()[^1] != 124) // returnTop
+                {
+                    emitter.ReturnTop();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error compiling expression: {ex.Message}");
+                // Return minimal stub
+                emitter = new BytecodeEmitter();
+                emitter.PushNil();
+                emitter.ReturnTop();
+            }
+            
+            return new CompiledMethodData
+            {
+                Selector = selector,
+                ArgumentCount = 0,
+                TemporaryCount = environment.TemporaryCount,
+                IsPrimitive = false,
+                PrimitiveNumber = 0,
+                Bytecode = emitter.GetBytecodes(),
+                Literals = emitter.GetLiterals()
+            };
+        }
+        
+        /// <summary>
         /// Compiles a Smalltalk method from a parse tree to Blue Book bytecode.
         /// </summary>
         public CompiledMethodData CompileMethodFromTree(

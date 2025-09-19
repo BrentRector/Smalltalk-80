@@ -130,23 +130,38 @@ namespace StandaloneCompiler
     public class InitializationExpression
     {
         /// <summary>
-        /// The receiver of the initialization message (e.g., "Character", "Cursor").
+        /// The bytecode for the initialization expression.
         /// </summary>
-        public string Receiver { get; set; } = "";
+        public byte[] Bytecode { get; set; } = Array.Empty<byte>();
         
         /// <summary>
-        /// The selector to send (e.g., "initialize").
+        /// The literal objects referenced by the expression.
         /// </summary>
-        public string Selector { get; set; } = "";
+        public List<object> Literals { get; set; } = new();
         
         /// <summary>
-        /// Optional arguments if any.
+        /// Number of temporary variables needed.
         /// </summary>
-        public List<string> Arguments { get; set; } = new();
+        public int NumTemps { get; set; } = 0;
         
         /// <summary>
         /// The source line for debugging purposes.
         /// </summary>
         public string Source { get; set; } = "";
+        
+        /// <summary>
+        /// Optional: The receiver of the initialization message (for documentation).
+        /// </summary>
+        public string? Receiver { get; set; }
+        
+        /// <summary>
+        /// Optional: The selector to send (for documentation).
+        /// </summary>
+        public string? Selector { get; set; }
+        
+        /// <summary>
+        /// Optional: Arguments if any (for documentation).
+        /// </summary>
+        public List<string>? Arguments { get; set; }
     }
 }
