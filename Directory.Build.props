@@ -11,7 +11,8 @@
     
     <!-- Output paths -->
     <BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</BaseIntermediateOutputPath>
+    <!-- Each project uses its own obj directory to avoid conflicts -->
+    <!-- <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</BaseIntermediateOutputPath> -->
     
     <!-- Package metadata -->
     <Authors>Smalltalk-80 Contributors</Authors>

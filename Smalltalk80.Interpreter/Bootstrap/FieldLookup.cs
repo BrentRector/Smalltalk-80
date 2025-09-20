@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
 
@@ -363,7 +364,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 processed.Add(classDef.Name);
             }
             
-            Console.WriteLine($"[FieldLookup] Phase -1: Registered {processed.Count} classes with field mappings");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine($"[FieldLookup] Phase -1: Registered {processed.Count} classes with field mappings");
+            }
         }
         
         /// <summary>
@@ -399,6 +403,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 "instanceVariables", "organization",                  // from ClassDescription
                 "thisClass"                                            // own field
             };
+            
+            // CRITICAL: Register Association and LookupKey for proper field access
+            // LookupKey has field "key" at index 0
+            classInstanceVariables["LookupKey"] = new List<string> { "key" };
+            
+            // Association inherits "key" from LookupKey and adds "value"
+            classInstanceVariables["Association"] = new List<string> { "key", "value" };
             
             // Register standard metaclass instance variables
             // All metaclasses are instances of Metaclass

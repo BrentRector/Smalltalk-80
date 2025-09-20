@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
 using Smalltalk80.Interpreter.VM;
@@ -54,8 +55,24 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             Console.WriteLine($"[InitExpr] Executing {expressions.Count} initialization expressions...");
             
-            // Sort expressions by class hierarchy
-            var sortedExpressions = SortByClassHierarchy(expressions);
+            // TEMPORARY: Only execute "Object initialize" to debug infinite recursion
+            var objectInitialize = expressions.FirstOrDefault(e => 
+                e.Source != null && e.Source.Trim() == "Object initialize");
+            
+            if (objectInitialize == null)
+            {
+                Console.WriteLine("[InitExpr] WARNING: 'Object initialize' not found in initialization expressions");
+                Console.WriteLine("[InitExpr] Available expressions:");
+                foreach (var e in expressions.Take(10))
+                {
+                    Console.WriteLine($"  - {e.Source}");
+                }
+                return doItProcess.IsNil ? CreateDoItProcess() : doItProcess;
+            }
+            
+            // Execute all initialization expressions, starting with Object initialize
+            var sortedExpressions = new List<InitializationExpression> { objectInitialize };
+            sortedExpressions.AddRange(expressions.Where(e => e != objectInitialize));
             
             // Get or create a process for execution
             if (doItProcess.IsNil)
@@ -70,6 +87,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 try
                 {
                     Console.WriteLine($"[InitExpr] Executing: {expr.Source ?? "Unknown"}");
+            if (expr.Bytecode != null && expr.Bytecode.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Bytecode: [{string.Join(", ", expr.Bytecode)}]");
+            }
+            if (expr.Literals != null && expr.Literals.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Literals: [{string.Join(", ", expr.Literals)}]");
+            }
                     ExecuteExpression(expr, doItProcess);
                     successCount++;
                 }
@@ -150,10 +175,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             // Get necessary classes
             var processClass = classBuilder.GetClass("Process");
-            var blockContextClass = classBuilder.GetClass("BlockContext");
+            var methodContextClass = classBuilder.GetClass("MethodContext");
             var compiledMethodClass = classBuilder.GetClass("CompiledMethod");
             
-            if (processClass.IsNil || blockContextClass.IsNil || compiledMethodClass.IsNil)
+            if (processClass.IsNil || methodContextClass.IsNil || compiledMethodClass.IsNil)
             {
                 throw new InvalidOperationException("Required classes for process creation not found");
             }
@@ -166,28 +191,104 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 doItMethodObj.Fields[0] = symbolTable.Intern("doIt"); // selector
                 doItMethodObj.Fields[1] = CreateByteArray(new byte[] { 0x78 }); // bytecode: returnSelf
                 doItMethodObj.Fields[2] = memory.AllocateWordArray(classBuilder.GetClass("Array"), 0); // empty literals
-                doItMethodObj.Fields[3] = OOP.FromSmallInteger(0); // header
+                
+                // Create proper method header with stack size
+                int primitiveIndex = 0; // No primitive
+                int argCount = 0;       // No arguments
+                int tempCount = 0;      // No temporaries
+                int methodStackSize = 2;      // Minimal stack
+                int header = (primitiveIndex << 1) | (argCount << 9) | (tempCount << 14) | (methodStackSize << 19);
+                doItMethodObj.Fields[3] = OOP.FromSmallInteger(header);
             }
             
-            // Create a context for the process
-            var context = memory.AllocateObject(blockContextClass, 32); // Allocate with space for stack
+            // Create a MethodContext (not BlockContext!) for the process
+            // Blue Book MethodContext fields: sender, pc, stackp, method, receiver, unused, then stack
+            const int stackSize = 20;
+            var context = memory.AllocateObject(methodContextClass, 6 + stackSize);
             var contextObj = memory.GetObject(context);
             if (contextObj != null)
             {
-                // Set up the context
-                vm.SetFieldBootstrap(context, "BlockContext", "method", doItMethod);
-                vm.SetFieldBootstrap(context, "BlockContext", "receiver", OOP.Nil);
-                vm.SetFieldBootstrap(context, "BlockContext", "caller", OOP.Nil);
-                vm.SetFieldBootstrap(context, "BlockContext", "pc", OOP.FromSmallInteger(0));
-                vm.SetFieldBootstrap(context, "BlockContext", "sp", OOP.FromSmallInteger(0));
+                // Set up context fields according to Blue Book specification
+                contextObj.Fields[0] = OOP.Nil;                    // sender
+                contextObj.Fields[1] = OOP.FromSmallInteger(0);    // pc
+                contextObj.Fields[2] = OOP.FromSmallInteger(0);    // stackp
+                contextObj.Fields[3] = doItMethod;                 // method
+                contextObj.Fields[4] = OOP.Nil;                    // receiver (nil for doIt)
+                contextObj.Fields[5] = OOP.Nil;                    // unused
+                // Fields 6+ are for the stack
             }
             
-            // Create the process
-            var process = memory.AllocateObject(processClass, 10); // Standard Process size
-            vm.SetFieldBootstrap(process, "Process", "suspendedContext", context);
-            vm.SetFieldBootstrap(process, "Process", "priority", OOP.FromSmallInteger(4)); // User priority
+            // Create the Process with proper field layout
+            // Blue Book Process fields: nextLink (from Link), suspendedContext, priority, myList
+            var process = memory.AllocateObject(processClass, 4);
+            var processObj = memory.GetObject(process);
+            if (processObj != null)
+            {
+                processObj.Fields[0] = OOP.Nil;                    // nextLink (from Link superclass)
+                processObj.Fields[1] = context;                    // suspendedContext
+                processObj.Fields[2] = OOP.FromSmallInteger(50);   // priority (user level = 50)
+                processObj.Fields[3] = OOP.Nil;                    // myList
+            }
+            
+            // Add the process to the ProcessList for GC tracking
+            AddProcessToProcessList(process);
             
             return process;
+        }
+        
+        /// <summary>
+        /// Adds a process to the global ProcessList for GC tracking.
+        /// </summary>
+        private void AddProcessToProcessList(OOP process)
+        {
+            var processList = vm.GetSpecialObject(SpecialObjects.ProcessList);
+            if (processList.IsNil)
+            {
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine("[DEBUG] ProcessList not found in special objects");
+                }
+                return;
+            }
+            
+            var processListObj = memory.GetObject(processList);
+            if (processListObj == null)
+                return;
+            
+            var processObj = memory.GetObject(process);
+            if (processObj == null)
+                return;
+            
+            // LinkedList fields: firstLink, lastLink
+            var firstLink = processListObj.Fields[0];
+            var lastLink = processListObj.Fields[1];
+            
+            if (firstLink.IsNil)
+            {
+                // First process in the list
+                processListObj.Fields[0] = process; // firstLink
+                processListObj.Fields[1] = process; // lastLink
+                processObj.Fields[0] = OOP.Nil;     // nextLink
+            }
+            else
+            {
+                // Add to end of list
+                var lastProcessObj = memory.GetObject(lastLink);
+                if (lastProcessObj != null)
+                {
+                    lastProcessObj.Fields[0] = process; // Set nextLink of last process
+                }
+                processListObj.Fields[1] = process;     // Update lastLink
+                processObj.Fields[0] = OOP.Nil;         // nextLink of new process
+            }
+            
+            // Set the process's myList to indicate it's in the ProcessList
+            processObj.Fields[3] = processList;
+            
+            if (DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] Added process {process} to ProcessList");
+            }
         }
         
         /// <summary>
@@ -195,10 +296,6 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         private void ExecuteExpression(InitializationExpression expr, OOP process)
         {
-            // For initialization expressions, the compiled bytecode already contains
-            // the receiver lookup and message send. The expressions are compiled as
-            // top-level expressions that will be executed in the context of nil.
-            
             // Check if we have bytecode to execute
             if (expr.Bytecode == null || expr.Bytecode.Count == 0)
             {
@@ -206,42 +303,178 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 return;
             }
             
-            // Since initialization expressions are typically of the form "ClassName initialize",
-            // and we have the bytecode that performs that send, we can execute it using
-            // the documented receiver and selector if available
+            // Create a CompiledMethod from the expression
+            var compiledMethod = CreateCompiledMethodFromExpression(expr);
             
-            if (!string.IsNullOrEmpty(expr.Receiver) && !string.IsNullOrEmpty(expr.Selector))
+            // Get the process's suspended context
+            var processObj = memory.GetObject(process);
+            if (processObj == null)
             {
-                // Look up the receiver (usually a class)
-                var receiver = classBuilder.GetClass(expr.Receiver);
-                if (receiver.IsNil)
-                {
-                    Console.WriteLine($"[InitExpr] Warning: Cannot find receiver '{expr.Receiver}'");
-                    return;
-                }
+                Console.WriteLine($"[InitExpr] Process object not found");
+                return;
+            }
+            
+            var suspendedContext = processObj.Fields[1]; // suspendedContext field
+            var contextObj = memory.GetObject(suspendedContext);
+            if (contextObj == null)
+            {
+                Console.WriteLine($"[InitExpr] Context object not found");
+                return;
+            }
+            
+            // Determine the receiver for this expression
+            OOP receiverOop = OOP.Nil;
+            
+            // For expressions like "Object initialize", the receiver should be the Object class itself
+            // The bytecode 72 (PushLiteralVariable) will push the class Object onto the stack
+            // But we need to set up the context properly for the top-level doIt
+            // The receiver for the doIt context itself is nil (workspace/UndefinedObject)
+            receiverOop = OOP.Nil;
+            
+            // Update the context to execute the new method
+            // Blue Book MethodContext fields: sender, pc, stackp, method, receiver, unused
+            contextObj.Fields[1] = OOP.FromSmallInteger(0);    // Reset pc to 0
+            contextObj.Fields[2] = OOP.FromSmallInteger(0);    // Reset stackp to 0
+            contextObj.Fields[3] = compiledMethod;             // Set the new method
+            contextObj.Fields[4] = receiverOop;                // receiver for the doIt context
+            
+            // Clear the stack portion (fields 6+)
+            for (int i = 6; i < contextObj.Fields.Length; i++)
+            {
+                contextObj.Fields[i] = OOP.Nil;
+            }
+            
+            // Save current active context if any
+            var previousContext = vm.GetActiveContext();
+            
+            // Save and enable method tracing
+            var previousMethodTrace = Config.DebugOptions.EnableMethodTrace;
+            Config.DebugOptions.EnableMethodTrace = true;
+            
+            try
+            {
+                // Create a C# MethodContext wrapper for execution
+                // CRITICAL: For "Object initialize", the receiver of the doIt method is nil
+                // The Object class will be pushed by bytecode 72 (PushLiteralVariable)
+                // and will become the receiver for the 'initialize' message send
+                var context = new Execution.MethodContext(
+                    sender: null, // No sender for top-level initialization
+                    receiver: receiverOop, // nil for top-level doIt context
+                    method: compiledMethod,
+                    arguments: Array.Empty<OOP>(), // No arguments for initialization expressions
+                    tempCount: expr.NumTemps, // Number of temporaries from expression
+                    stackSize: 16 // Standard stack size
+                );
                 
-                // Create the selector symbol
-                var selector = symbolTable.Intern(expr.Selector);
+                // Set the new context as active and execute the bytecode
+                vm.SetActiveContext(context);
                 
-                // Convert arguments if any
-                var args = new OOP[expr.Arguments?.Count ?? 0];
-                for (int i = 0; i < args.Length; i++)
+                // Debug logging to trace execution
+                Console.WriteLine($"[InitExpr] About to execute bytecode for: {expr.Source}");
+                
+                // Pretty-print the MethodContext
+                Console.WriteLine($"[InitExpr] MethodContext:");
+                Console.WriteLine($"  - Receiver: {(context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver))}");
+                Console.WriteLine($"  - Method: CompiledMethod for anonymous doIt");
+                Console.WriteLine($"  - Sender: {(context.Sender == null ? "nil (top-level)" : "previous context")}");
+                Console.WriteLine($"  - PC: {context.PC}");
+                Console.WriteLine($"  - Stack: empty (initial)");
+                Console.WriteLine($"  - Arguments: {context.Arguments.Length}");
+                Console.WriteLine($"  - Temporaries: {context.Temporaries.Length}");
+                
+                // Log the compiled method structure with resolved values
+                var compiledMethodObj = memory.GetObject(compiledMethod);
+                if (compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4)
                 {
-                    // For now, treat arguments as literals or symbols
-                    if (expr.Arguments != null && expr.Arguments[i] != null)
+                    Console.WriteLine($"[InitExpr] CompiledMethod structure:");
+                    
+                    // Selector
+                    var selectorStr = compiledMethodObj.Fields[0].IsNil ? "nil (anonymous doIt)" : OopToString(compiledMethodObj.Fields[0]);
+                    Console.WriteLine($"  - Selector: {selectorStr}");
+                    
+                    // Bytecode array
+                    var bytecodeArrayOop = compiledMethodObj.Fields[1];
+                    var bytecodeArray = memory.GetObject(bytecodeArrayOop);
+                    if (bytecodeArray != null)
                     {
-                        args[i] = symbolTable.Intern(expr.Arguments[i]);
+                        var bytecodes = new List<int>();
+                        for (int i = 0; i < bytecodeArray.Fields.Length; i++)
+                        {
+                            if (bytecodeArray.Fields[i].IsSmallInteger)
+                            {
+                                bytecodes.Add(bytecodeArray.Fields[i].SmallIntegerValue);
+                            }
+                        }
+                        Console.WriteLine($"  - Bytecode: [{string.Join(", ", bytecodes)}]");
+                    }
+                    
+                    // Header
+                    if (compiledMethodObj.Fields[3].IsSmallInteger)
+                    {
+                        int header = compiledMethodObj.Fields[3].SmallIntegerValue;
+                        int primitiveIndex = (header >> 1) & 0xFF;
+                        int argCount = (header >> 9) & 0x1F;
+                        int tempCount = (header >> 14) & 0x1F;
+                        int stackSize = (header >> 19) & 0x3F;
+                        Console.WriteLine($"  - Header: primitive={primitiveIndex}, args={argCount}, temps={tempCount}, stack={stackSize}");
+                    }
+                    
+                    // Literals array with detailed contents
+                    var literalsArrayOop = compiledMethodObj.Fields[2];
+                    var literalsArray = memory.GetObject(literalsArrayOop);
+                    if (literalsArray != null)
+                    {
+                        Console.WriteLine($"  - Literals: {literalsArray.Fields.Length} entries");
+                        for (int i = 0; i < literalsArray.Fields.Length; i++)
+                        {
+                            var literalOop = literalsArray.Fields[i];
+                            var literalObj = memory.GetObject(literalOop);
+                            
+                            if (literalObj != null)
+                            {
+                                var associationClass = classBuilder.GetClass("Association");
+                                if (!associationClass.IsNil && literalObj.Header.ClassOOP.RawValue == associationClass.RawValue)
+                                {
+                                    // It's an Association - show detailed key and value
+                                    var keyStr = OopToString(literalObj.Fields[0]);
+                                    var valueStr = GetClassNameOrValue(literalObj.Fields[1]);
+                                    Console.WriteLine($"    [{i}] Association(#{keyStr} -> {valueStr})");
+                                }
+                                else
+                                {
+                                    // It's something else (Symbol, String, etc)
+                                    var className = GetClassNameForOop(literalOop);
+                                    var value = OopToString(literalOop);
+                                    Console.WriteLine($"    [{i}] {className}: #{value}");
+                                }
+                            }
+                            else if (literalOop.IsSmallInteger)
+                            {
+                                Console.WriteLine($"    [{i}] SmallInteger: {literalOop.SmallIntegerValue}");
+                            }
+                            else if (literalOop.IsNil)
+                            {
+                                Console.WriteLine($"    [{i}] nil");
+                            }
+                        }
                     }
                 }
                 
-                // Send the message
-                vm.Send(receiver, selector, args);
+                vm.ExecuteBytecodes(context);
+                
+                Console.WriteLine($"[InitExpr] Successfully executed: {expr.Source}");
             }
-            else
+            catch (Exception ex)
             {
-                // For expressions without explicit receiver/selector info,
-                // we would need to execute the bytecode directly
-                Console.WriteLine($"[InitExpr] Skipping expression without receiver/selector info: {expr.Source}");
+                Console.WriteLine($"[InitExpr] Error executing '{expr.Source}': {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                // Restore previous context
+                vm.SetActiveContext(previousContext);
+                // Restore method trace setting
+                Config.DebugOptions.EnableMethodTrace = previousMethodTrace;
             }
         }
         
@@ -265,8 +498,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 throw new InvalidOperationException("Failed to allocate CompiledMethod");
             }
             
-            // Field 0: selector
-            methodObj.Fields[0] = symbolTable.Intern("doIt");
+            // Field 0: selector (nil for anonymous top-level doIt)
+            methodObj.Fields[0] = OOP.Nil; // Anonymous doIt has no selector
             
             // Field 1: bytecode
             var bytecodeArray = CreateByteArray(expr.Bytecode.Select(b => (byte)b).ToArray());
@@ -276,10 +509,34 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var literalsArray = CreateLiteralsArray(expr.Literals);
             methodObj.Fields[2] = literalsArray;
             
-            // Field 3: header (method header format)
-            // Format: 0 args, numTemps temporaries, literals count
-            var header = (expr.NumTemps << 6) | Math.Min(expr.Literals.Count, 63);
+            // Field 3: header (Blue Book method header format)
+            // Header format per Blue Book:
+            // Bits 0: primitive flag (1 bit) - 0 for no primitive
+            // Bits 1-8: primitive index (8 bits) - 0 for no primitive
+            // Bits 9-13: number of arguments (5 bits) - 0 for doIt
+            // Bits 14-18: number of temporaries (5 bits) - from expr.NumTemps
+            // Bits 19-24: stack size (6 bits) - use 16 as default
+            // Bits 25-31: unused
+            
+            int primitiveIndex = 0; // No primitive for doIt
+            int argCount = 0; // No arguments for doIt
+            int tempCount = expr.NumTemps;
+            // Use stack depth from expression if available, otherwise use reasonable default
+            int stackSize = expr.StackDepth > 0 ? Math.Max(expr.StackDepth, 2) : 16;
+            
+            // Encode header according to Blue Book format
+            int header = (primitiveIndex << 1) | 
+                        (argCount << 9) | 
+                        (tempCount << 14) | 
+                        (stackSize << 19);
+            
             methodObj.Fields[3] = OOP.FromSmallInteger(header);
+            
+            Console.WriteLine($"[InitExpr] Created CompiledMethod with header: 0x{header:X8}");
+            Console.WriteLine($"  - Primitive: {primitiveIndex}");
+            Console.WriteLine($"  - Args: {argCount}");
+            Console.WriteLine($"  - Temps: {tempCount}");
+            Console.WriteLine($"  - Stack size: {stackSize}");
             
             return methodOop;
         }
@@ -345,7 +602,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 string s when s == "nil" => OOP.Nil,
                 string s when s == "true" => vm.GetSpecialObject(SpecialObjects.TrueObject),
                 string s when s == "false" => vm.GetSpecialObject(SpecialObjects.FalseObject),
-                string s when s.StartsWith("#") => symbolTable.Intern(s[1..]), // Symbol literal
+                string s when s.StartsWith("Association(key:") => ParseAssociation(s), // Parse Association literal
+                string s when s.StartsWith("#") => ConvertSymbolLiteral(s[1..]), // Symbol literal - may need Association
                 string s => CreateString(s),
                 int i => OOP.FromSmallInteger(i),
                 long l => OOP.FromSmallInteger((int)l),
@@ -393,6 +651,242 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
             
             return stringOop;
+        }
+        
+        /// <summary>
+        /// Converts a symbol literal to either a Symbol or an Association for global variables.
+        /// </summary>
+        /// <param name="symbolName">The symbol name without the # prefix.</param>
+        /// <returns>Either a Symbol OOP or an Association OOP for global variables.</returns>
+        private OOP ConvertSymbolLiteral(string symbolName)
+        {
+            // First check if this is a known class name
+            var classOop = classBuilder.GetClass(symbolName);
+            if (!classOop.IsNil)
+            {
+                // This is a global class reference - create an Association
+                return CreateAssociation(symbolName, classOop);
+            }
+            
+            // Check if it's in the classRegistry passed to the constructor
+            if (classRegistry.TryGetValue(symbolName, out var registryClassOop))
+            {
+                // This is a global class reference from registry - create an Association
+                return CreateAssociation(symbolName, registryClassOop);
+            }
+            
+            // Check if this is another global in the system dictionary
+            // For now, we'll check known special globals
+            var globalValue = GetGlobalValue(symbolName);
+            if (!globalValue.IsNil)
+            {
+                // This is a global variable - create an Association
+                return CreateAssociation(symbolName, globalValue);
+            }
+            
+            // Not a global - just return a plain symbol
+            return symbolTable.Intern(symbolName);
+        }
+        
+        /// <summary>
+        /// Creates an Association object with key and value fields.
+        /// </summary>
+        /// <param name="key">The key as a string (will be interned as a symbol).</param>
+        /// <param name="value">The value OOP.</param>
+        /// <returns>An OOP pointing to the created Association.</returns>
+        private OOP CreateAssociation(string key, OOP value)
+        {
+            var associationClass = classBuilder.GetClass("Association");
+            if (associationClass.IsNil)
+            {
+                // Fallback to just returning the symbol if Association class not found
+                return symbolTable.Intern(key);
+            }
+            
+            // Create an Association with 2 instance variables: key and value
+            var associationOop = memory.AllocateObject(associationClass, 2);
+            var associationObj = memory.GetObject(associationOop);
+            
+            if (associationObj != null)
+            {
+                // Field 0: key (as Symbol)
+                associationObj.Fields[0] = symbolTable.Intern(key);
+                // Field 1: value
+                associationObj.Fields[1] = value;
+            }
+            
+            return associationOop;
+        }
+        
+        /// <summary>
+        /// Gets the value of a global variable from the system dictionary.
+        /// </summary>
+        /// <param name="name">The name of the global variable.</param>
+        /// <returns>The value of the global or OOP.Nil if not found.</returns>
+        private OOP GetGlobalValue(string name)
+        {
+            // Check for special known globals
+            switch (name)
+            {
+                case "Smalltalk":
+                    return vm.GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+                case "Processor":
+                    return vm.GetSpecialObject(SpecialObjects.ProcessorScheduler);
+                case "nil":
+                    return OOP.Nil;
+                case "true":
+                    return vm.GetSpecialObject(SpecialObjects.TrueObject);
+                case "false":
+                    return vm.GetSpecialObject(SpecialObjects.FalseObject);
+                default:
+                    // For other globals, we could look them up in the system dictionary
+                    // but for now we'll return Nil if not a known special global
+                    return OOP.Nil;
+            }
+        }
+        
+        /// <summary>
+        /// Gets the class name for an OOP for debugging.
+        /// </summary>
+        private string GetClassNameForOop(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return "SmallInteger";
+            
+            var obj = memory.GetObject(oop);
+            if (obj == null) return "unknown";
+            
+            var classOop = obj.Header.ClassOOP;
+            
+            // Check known classes
+            if (classOop.RawValue == classBuilder.GetClass("Symbol").RawValue) return "Symbol";
+            if (classOop.RawValue == classBuilder.GetClass("String").RawValue) return "String";
+            if (classOop.RawValue == classBuilder.GetClass("Array").RawValue) return "Array";
+            if (classOop.RawValue == classBuilder.GetClass("ByteArray").RawValue) return "ByteArray";
+            if (classOop.RawValue == classBuilder.GetClass("Association").RawValue) return "Association";
+            
+            return $"Class({classOop})";
+        }
+        
+        /// <summary>
+        /// Converts an OOP to a string representation for debugging.
+        /// </summary>
+        private string OopToString(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return oop.SmallIntegerValue.ToString();
+            
+            var obj = memory.GetObject(oop);
+            if (obj == null) return "?";
+            
+            var classOop = obj.Header.ClassOOP;
+            
+            // For Symbol or String, extract the actual text
+            if (classOop.RawValue == classBuilder.GetClass("Symbol").RawValue ||
+                classOop.RawValue == classBuilder.GetClass("String").RawValue)
+            {
+                var chars = new List<char>();
+                for (int i = 0; i < obj.Fields.Length && i < 100; i++) // Limit to 100 chars
+                {
+                    if (obj.Fields[i].IsSmallInteger)
+                    {
+                        chars.Add((char)obj.Fields[i].SmallIntegerValue);
+                    }
+                }
+                return new string(chars.ToArray());
+            }
+            
+            return oop.ToString();
+        }
+        
+        /// <summary>
+        /// Gets a readable name or value for an OOP (used for Association values).
+        /// </summary>
+        private string GetClassNameOrValue(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return $"SmallInt({oop.SmallIntegerValue})";
+            
+            // Check if it's a known class
+            foreach (var kvp in classRegistry)
+            {
+                if (kvp.Value.RawValue == oop.RawValue)
+                {
+                    return $"class {kvp.Key}";
+                }
+            }
+            
+            // Check if it's a metaclass
+            var obj = memory.GetObject(oop);
+            if (obj != null && obj.Header.ClassOOP.RawValue == classBuilder.GetClass("Metaclass").RawValue)
+            {
+                // It's a metaclass - try to find which one
+                foreach (var kvp in classRegistry)
+                {
+                    var metaclassOop = classBuilder.GetMetaclass(kvp.Key);
+                    if (metaclassOop.RawValue == oop.RawValue)
+                    {
+                        return $"metaclass {kvp.Key}";
+                    }
+                }
+            }
+            
+            return GetClassNameForOop(oop) + $"({oop})";
+        }
+        
+        /// <summary>
+        /// Parses an Association literal from the JSON string format.
+        /// Format: "Association(key: #Name, value: null)"
+        /// </summary>
+        private OOP ParseAssociation(string associationStr)
+        {
+            // Parse the association string to extract the key
+            var match = System.Text.RegularExpressions.Regex.Match(
+                associationStr, 
+                @"Association\(key:\s*#(\w+),\s*value:\s*(\w+)\)"
+            );
+            
+            if (match.Success)
+            {
+                var keyName = match.Groups[1].Value;
+                // The value is always null in the JSON, we need to resolve it at runtime
+                
+                // Check if this is a known class
+                var classOop = classBuilder.GetClass(keyName);
+                if (!classOop.IsNil)
+                {
+                    Console.WriteLine($"[InitExpr] Resolved Association for class {keyName}: {classOop}");
+                    return CreateAssociation(keyName, classOop);
+                }
+                
+                // Check if it's in the classRegistry passed to the constructor
+                if (classRegistry.TryGetValue(keyName, out var registryClassOop))
+                {
+                    Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} from registry: {registryClassOop}");
+                    return CreateAssociation(keyName, registryClassOop);
+                }
+                
+                // Check other globals
+                var globalValue = GetGlobalValue(keyName);
+                if (!globalValue.IsNil)
+                {
+                    Console.WriteLine($"[InitExpr] Resolved Association for global {keyName}: {globalValue}");
+                    return CreateAssociation(keyName, globalValue);
+                }
+                
+                // Unknown global - create association with nil value
+                // It might be resolved later
+                Console.WriteLine($"[InitExpr] WARNING: Could not resolve Association for {keyName}, using nil");
+                Console.WriteLine($"[InitExpr] DEBUG: ClassBuilder.GetClass returned {classOop}, classRegistry has {classRegistry.Count} entries");
+                if (classRegistry.Count > 0)
+                {
+                    Console.WriteLine($"[InitExpr] DEBUG: First few classes in registry: {string.Join(", ", classRegistry.Keys.Take(5))}");
+                }
+                return CreateAssociation(keyName, OOP.Nil);
+            }
+            
+            // Couldn't parse - return nil
+            return OOP.Nil;
         }
     }
 }

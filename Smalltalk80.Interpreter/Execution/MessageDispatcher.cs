@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.Bootstrap;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
 using Smalltalk80.Interpreter.Primitives;
+using Smalltalk80.Interpreter.VM;
 
 namespace Smalltalk80.Interpreter.Execution;
 
@@ -54,8 +55,10 @@ public sealed class MessageDispatcher
         // Cache field indices for performance
         behaviorSuperclassIndex = fieldAccessor.GetFieldIndex("Behavior", "superclass");
         behaviorMethodDictIndex = fieldAccessor.GetFieldIndex("Behavior", "methodDict");
-        dictTallyIndex = fieldAccessor.GetFieldIndex("Dictionary", "tally");
-        dictArrayIndex = fieldAccessor.GetFieldIndex("Dictionary", "array");
+        
+        // MethodDictionary fields: tally is at 0 (from Set), valueArray is at 1 (from IdentityDictionary)
+        dictTallyIndex = 0; // tally is the first field (from Set)
+        dictArrayIndex = 1; // valueArray is the second field (from IdentityDictionary)
         
         // Don't pre-intern selectors we're not actually using yet
         // These would be leaked since MessageDispatcher is not traced by GC
@@ -102,31 +105,82 @@ public sealed class MessageDispatcher
     private (OOP method, OOP methodClass) LookupMethod(OOP classOop, OOP selector)
     {
         var currentClass = classOop;
+        int depth = 0;
+        const int MAX_DEPTH = 20; // Prevent infinite loops in class hierarchy
         
-        while (!currentClass.IsNil)
+        // Debug: Show method lookup start
+        if (Config.DebugOptions.EnableMethodTrace)
         {
+            var selectorStr = GetSelectorString(selector);
+            var startClassName = GetClassName(classOop);
+            Console.WriteLine($"[LOOKUP] Looking up selector #{selectorStr} starting from class {startClassName}");
+        }
+        
+        while (!currentClass.IsNil && depth < MAX_DEPTH)
+        {
+            depth++;
             var classObj = memory.GetObject(currentClass);
             if (classObj == null)
                 break;
+            
+            // Debug: Show which class we're checking
+            if (Config.DebugOptions.EnableMethodTrace)
+            {
+                var className = GetClassName(currentClass);
+                Console.WriteLine($"[LOOKUP]   Checking class {className} (hierarchy level {depth})");
+            }
             
             // Get method dictionary using cached field index
             var methodDict = behaviorMethodDictIndex >= 0 
                 ? fieldAccessor.GetFieldByIndex(currentClass, behaviorMethodDictIndex)
                 : OOP.Nil;
                 
+            // Special debug for Object class's initialize
+            if (Config.DebugOptions.EnableMethodTrace)
+            {
+                var className = GetClassName(currentClass);
+                if (className == "Object class" && GetSelectorString(selector) == "initialize")
+                {
+                    Console.WriteLine($"[LOOKUP]   DEBUG: Looking for initialize in Object class, methodDict={methodDict}");
+                }
+            }
+                
             if (!methodDict.IsNil)
             {
                 var method = LookupInDictionary(methodDict, selector);
                 if (!method.IsNil)
                 {
+                    if (Config.DebugOptions.EnableMethodTrace)
+                    {
+                        Console.WriteLine($"[LOOKUP]   Found method {method} in class {currentClass}");
+                    }
                     return (method, currentClass);
                 }
             }
             
             // Move to superclass using cached field index
+            var previousClass = currentClass;
             currentClass = behaviorSuperclassIndex >= 0 
                 ? fieldAccessor.GetFieldByIndex(currentClass, behaviorSuperclassIndex)
                 : OOP.Nil;
+            
+            // Debug: Show superclass navigation
+            if (Config.DebugOptions.EnableMethodTrace)
+            {
+                var prevClassName = GetClassName(previousClass);
+                var nextClassName = currentClass.IsNil ? "nil" : GetClassName(currentClass);
+                Console.WriteLine($"[LOOKUP]   Moving from {prevClassName} to superclass {nextClassName}");
+            }
+        }
+        
+        if (depth >= MAX_DEPTH)
+        {
+            Console.WriteLine($"[LOOKUP] WARNING: Max depth {MAX_DEPTH} reached in method lookup!");
+        }
+        
+        if (Config.DebugOptions.EnableMethodTrace)
+        {
+            Console.WriteLine($"[LOOKUP]   Method not found");
         }
         
         return (OOP.Nil, OOP.Nil);
@@ -141,8 +195,18 @@ public sealed class MessageDispatcher
         if (dictObj == null)
             return OOP.Nil;
         
-        // MethodDictionary format: [tally, array]
-        // Where array contains alternating keys and values
+        // Special debug for initialize selector
+        if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
+        {
+            Console.WriteLine($"[LOOKUP]   DEBUG: Looking up 'initialize' in dictionary {dictionary}");
+            Console.WriteLine($"[LOOKUP]   DEBUG: Dictionary has {dictObj.Fields.Length} fields");
+        }
+        
+        // MethodDictionary format as installed by MethodInstaller:
+        // Fields[0] = tally
+        // Fields[1] = valueArray (array of compiled methods)
+        // Fields[2..n] = keys (selectors) in indexed portion
+        
         var tallyOop = dictTallyIndex >= 0 
             ? fieldAccessor.GetFieldByIndex(dictionary, dictTallyIndex)
             : OOP.Nil;
@@ -154,20 +218,60 @@ public sealed class MessageDispatcher
         if (tally == 0)
             return OOP.Nil;
         
-        var arrayOop = dictArrayIndex >= 0 
+        var valueArrayOop = dictArrayIndex >= 0 
             ? fieldAccessor.GetFieldByIndex(dictionary, dictArrayIndex)
             : OOP.Nil;
             
-        var arrayObj = memory.GetObject(arrayOop);
-        if (arrayObj == null)
+        var valueArrayObj = memory.GetObject(valueArrayOop);
+        if (valueArrayObj == null)
             return OOP.Nil;
         
-        // Linear search through dictionary (could optimize with hashing)
-        for (int i = 0; i < arrayObj.Fields.Length - 1; i += 2)
+        // Search the indexed portion of the dictionary for the selector
+        // Keys are in dictObj.Fields[2..n], values are in valueArrayObj.Fields at corresponding index
+        var capacity = dictObj.Fields.Length - 2; // Subtract tally and valueArray fields
+        
+        // Special debug for initialize  
+        if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
         {
-            if (SelectorEquals(arrayObj.Fields[i], selector))
+            Console.WriteLine($"[LOOKUP]   DEBUG: Searching {capacity} slots in dictionary");
+            Console.WriteLine($"[LOOKUP]   DEBUG: Looking for selector OOP {selector.RawValue}");
+            
+            // Show keys around index 20-22
+            for (int j = 18; j < Math.Min(25, capacity); j++)
             {
-                return arrayObj.Fields[i + 1];
+                var k = dictObj.Fields[2 + j];
+                if (!k.IsNil)
+                {
+                    var keyStr = GetSelectorString(k);
+                    Console.WriteLine($"[LOOKUP]   DEBUG: Key at field index {2+j}, array index {j}: {keyStr} (OOP {k.RawValue})");
+                    if (j < valueArrayObj.Fields.Length && !valueArrayObj.Fields[j].IsNil)
+                    {
+                        Console.WriteLine($"[LOOKUP]   DEBUG:   -> value at index {j}: OOP {valueArrayObj.Fields[j].RawValue}");
+                    }
+                }
+            }
+        }
+        
+        for (int i = 0; i < capacity; i++)
+        {
+            var keyFieldIndex = 2 + i;
+            var key = dictObj.Fields[keyFieldIndex];
+            
+            if (SelectorEquals(key, selector))
+            {
+                // Found the selector, return the corresponding method from valueArray
+                if (i < valueArrayObj.Fields.Length)
+                {
+                    var methodOop = valueArrayObj.Fields[i];
+                    if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
+                    {
+                        Console.WriteLine($"[LOOKUP]   DEBUG: FOUND at index {i}");
+                        Console.WriteLine($"[LOOKUP]   DEBUG: valueArrayOop = {valueArrayOop}");
+                        Console.WriteLine($"[LOOKUP]   DEBUG: valueArrayObj.Fields[{i}] = {methodOop}");
+                        Console.WriteLine($"[LOOKUP]   DEBUG: Returning method OOP {methodOop.RawValue}");
+                    }
+                    return methodOop;
+                }
             }
         }
         
@@ -266,6 +370,32 @@ public sealed class MessageDispatcher
     /// Gets cache statistics for monitoring.
     /// </summary>
     public MethodCacheStatistics GetCacheStatistics() => methodCache.GetStatistics();
+    
+    /// <summary>
+    /// Gets the class name for debug output.
+    /// </summary>
+    private string GetClassName(OOP classOop)
+    {
+        // Try to use the VM's GetClassName method if available
+        if (fieldAccessor is VirtualMachine vm)
+        {
+            return vm.GetClassName(classOop);
+        }
+        return classOop.ToString();
+    }
+    
+    /// <summary>
+    /// Gets the selector string for debug output.
+    /// </summary>
+    private string GetSelectorString(OOP selector)
+    {
+        // Try to use the VM's GetSymbolString method if available
+        if (symbolTable is VirtualMachine vm)
+        {
+            return vm.GetSymbolString(selector);
+        }
+        return selector.ToString();
+    }
 }
 
 /// <summary>

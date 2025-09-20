@@ -1,0 +1,28 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-19 18:29:54",
+  "classes": [],
+  "methods": [],
+  "initializationExpressions": [
+    {
+      "bytecode": [
+        32,
+        33,
+        224,
+        124
+      ],
+      "literals": [
+        "3",
+        "4"
+      ],
+      "numTemps": 0,
+      "stackDepth": 6,
+      "source": "3 \u002B 4",
+      "receiver": "3",
+      "selector": "\u002B",
+      "arguments": [
+        "4"
+      ]
+    }
+  ]
+}

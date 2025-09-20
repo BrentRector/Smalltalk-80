@@ -138,7 +138,9 @@ This prevents issues with executable files being overwritten.
 
 2. **Class Creation**: Bootstrap contains all core classes with their complete method implementations in a single unified step.
 
-3. **Method Installation**: Instance methods go on the class's method dictionary, class methods go on the metaclass's method dictionary.
+3. **Method Installation**: Instance methods go on the class's method dictionary, class methods go on the metaclass's method dictionary. 
+   - See [selector-lookup.md](selector-lookup.md) for detailed explanation of the method lookup algorithm.
+   - See [execution-model.md](execution-model.md) for understanding stack architecture and method contexts.
 
 4. **Bytecode Format**: All bytecode must be arrays of integers, even single-byte bytecode.
 

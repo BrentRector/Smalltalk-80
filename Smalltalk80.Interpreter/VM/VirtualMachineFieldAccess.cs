@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.ObjectModel;
 using Smalltalk80.Interpreter.Execution;
 
@@ -38,8 +39,42 @@ namespace Smalltalk80.Interpreter.VM
             var classOop = obj.Header.ClassOOP;
             if (classOop.IsNil) return OOP.Nil;
             
+            // Special handling for CompiledMethod
+            // CompiledMethod has no instance variables but uses indexed fields:
+            // Field 0: selector, Field 1: bytecode, Field 2: literals, Field 3: header
+            var className = GetClassName(classOop);
+            if (className == "CompiledMethod")
+            {
+                switch (fieldName)
+                {
+                    case "selector": return obj.Fields.Length > 0 ? obj.Fields[0] : OOP.Nil;
+                    case "bytecode": return obj.Fields.Length > 1 ? obj.Fields[1] : OOP.Nil;
+                    case "literals": return obj.Fields.Length > 2 ? obj.Fields[2] : OOP.Nil;
+                    case "header": return obj.Fields.Length > 3 ? obj.Fields[3] : OOP.Nil;
+                    default: return OOP.Nil;
+                }
+            }
+            
+            // Debug output for Association field access
+            if (DebugOptions.EnableBytecodeTrace && className == "Association" && fieldName == "value")
+            {
+                Console.WriteLine($"[DEBUG] GetFieldByName: Association {objectOop}, looking for field 'value'");
+                Console.WriteLine($"[DEBUG] Class: {className} ({classOop}), Fields.Length: {obj.Fields.Length}");
+            }
+            
             // Look up the field index
             var index = GetFieldIndexForClass(classOop, fieldName);
+            
+            // More debug output for Association
+            if (DebugOptions.EnableBytecodeTrace && className == "Association" && fieldName == "value")
+            {
+                Console.WriteLine($"[DEBUG] Field index for 'value': {index}");
+                if (index >= 0 && index < obj.Fields.Length)
+                {
+                    Console.WriteLine($"[DEBUG] Field value at index {index}: {obj.Fields[index]}");
+                }
+            }
+            
             if (index < 0 || index >= obj.Fields.Length)
                 return OOP.Nil;
                 
@@ -64,6 +99,20 @@ namespace Smalltalk80.Interpreter.VM
             var classOop = obj.Header.ClassOOP;
             if (classOop.IsNil) return;
             
+            // Special handling for CompiledMethod
+            var className = GetClassName(classOop);
+            if (className == "CompiledMethod")
+            {
+                switch (fieldName)
+                {
+                    case "selector": if (obj.Fields.Length > 0) obj.Fields[0] = value; return;
+                    case "bytecode": if (obj.Fields.Length > 1) obj.Fields[1] = value; return;
+                    case "literals": if (obj.Fields.Length > 2) obj.Fields[2] = value; return;
+                    case "header": if (obj.Fields.Length > 3) obj.Fields[3] = value; return;
+                    default: return;
+                }
+            }
+            
             // Look up the field index
             var index = GetFieldIndexForClass(classOop, fieldName);
             if (index < 0 || index >= obj.Fields.Length)
@@ -83,8 +132,8 @@ namespace Smalltalk80.Interpreter.VM
             if (fieldIndexCache.TryGetValue(cacheKey, out var cachedIndex))
                 return cachedIndex;
             
-            // If we're still in early bootstrap, use the FieldLookup system
-            if (bootstrapComplete && fieldLookup != null)
+            // Try using the FieldLookup system if available
+            if (fieldLookup != null)
             {
                 // Try to get the class name for the lookup
                 var className = GetClassName(classOop);
@@ -102,10 +151,15 @@ namespace Smalltalk80.Interpreter.VM
             // If bootstrap is complete, we can walk the class hierarchy dynamically
             if (bootstrapComplete)
             {
-                return GetFieldIndexDynamic(classOop, fieldName);
+                var dynamicIndex = GetFieldIndexDynamic(classOop, fieldName);
+                if (dynamicIndex >= 0)
+                {
+                    fieldIndexCache[cacheKey] = dynamicIndex;
+                    return dynamicIndex;
+                }
             }
             
-            // During early bootstrap, we might need to use hard-coded knowledge
+            // Fall back to hard-coded knowledge for core bootstrap classes
             return GetFieldIndexBootstrap(classOop, fieldName);
         }
         
@@ -157,18 +211,43 @@ namespace Smalltalk80.Interpreter.VM
         /// <summary>
         /// Gets the name of a class (for debugging and lookup purposes).
         /// </summary>
-        private string GetClassName(OOP classOop)
+        public string GetClassName(OOP classOop)
         {
-            // During bootstrap, check our registries
+            if (classOop.IsNil) return "nil";
+            
+            // During bootstrap, check our registries for regular classes
             foreach (var kvp in classBuilder.GetAllClasses())
             {
                 if (kvp.Value.Equals(classOop))
                     return kvp.Key;
             }
             
-            // After bootstrap, we could look at the name field (field 6 in Class)
-            // But that requires Symbol to String conversion
-            return "";
+            // Check if it's a metaclass
+            var classObj = memory.GetObject(classOop);
+            if (classObj != null)
+            {
+                var metaclassClass = classBuilder.GetClass("Metaclass");
+                if (!metaclassClass.IsNil && classObj.Header.ClassOOP.Equals(metaclassClass))
+                {
+                    // It's a metaclass - check all metaclasses
+                    foreach (var kvp in classBuilder.GetAllClasses())
+                    {
+                        var metaclassOop = classBuilder.GetMetaclass(kvp.Key);
+                        if (metaclassOop.Equals(classOop))
+                            return kvp.Key + " class";
+                    }
+                }
+            }
+            
+            // Try to get the name field from the class object
+            // Class has a 'name' field which is a Symbol (field 5 in standard Smalltalk-80)
+            var nameOop = GetFieldByIndex(classOop, 5);
+            if (!nameOop.IsNil)
+            {
+                return GetSymbolString(nameOop);
+            }
+            
+            return $"OOP({classOop.RawValue})";
         }
         
         /// <summary>
@@ -190,7 +269,10 @@ namespace Smalltalk80.Interpreter.VM
             // Debug output for critical field accesses
             if (fieldName == "methodDict" || fieldName == "valueArray")
             {
-                Console.WriteLine($"[DEBUG] GetFieldBootstrap: object={objectOop}, className={className}, field={fieldName}, isClass={isClassObject}");
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] GetFieldBootstrap: object={objectOop}, className={className}, field={fieldName}, isClass={isClassObject}");
+                }
             }
             
             if (isClassObject)
@@ -238,7 +320,10 @@ namespace Smalltalk80.Interpreter.VM
             // Debug output for critical field accesses
             if (fieldName == "methodDict" || fieldName == "valueArray")
             {
-                Console.WriteLine($"[DEBUG] GetFieldBootstrap: object={objectOop}, className={className}, field={fieldName}, isClass={isClassObject}");
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] GetFieldBootstrap: object={objectOop}, className={className}, field={fieldName}, isClass={isClassObject}");
+                }
             }
             
             if (isClassObject)

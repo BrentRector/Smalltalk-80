@@ -222,6 +222,12 @@ namespace Smalltalk80.Interpreter.Bootstrap
         public string? Category { get; init; }
 
         /// <summary>
+        /// Maximum stack depth required by the method.
+        /// </summary>
+        [JsonPropertyName("stackDepth")]
+        public int StackDepth { get; init; } = 0;
+
+        /// <summary>
         /// Gets the effective number of temporaries.
         /// </summary>
         [JsonIgnore]
@@ -359,6 +365,12 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         [JsonPropertyName("numTemps")]
         public int NumTemps { get; init; } = 0;
+        
+        /// <summary>
+        /// Maximum stack depth required by the expression.
+        /// </summary>
+        [JsonPropertyName("stackDepth")]
+        public int StackDepth { get; init; } = 0;
         
         /// <summary>
         /// The original source text of the expression.

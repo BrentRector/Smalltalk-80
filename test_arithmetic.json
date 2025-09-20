@@ -1,0 +1,88 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-19 18:33:07",
+  "classes": [],
+  "methods": [],
+  "initializationExpressions": [
+    {
+      "bytecode": [
+        32,
+        33,
+        224,
+        124
+      ],
+      "literals": [
+        "3",
+        "4"
+      ],
+      "numTemps": 0,
+      "stackDepth": 6,
+      "source": "3 \u002B 4",
+      "receiver": "3",
+      "selector": "\u002B",
+      "arguments": [
+        "4"
+      ]
+    },
+    {
+      "bytecode": [
+        32,
+        33,
+        232,
+        124
+      ],
+      "literals": [
+        "5",
+        "6"
+      ],
+      "numTemps": 0,
+      "stackDepth": 6,
+      "source": "5 * 6",
+      "receiver": "5",
+      "selector": "*",
+      "arguments": [
+        "6"
+      ]
+    },
+    {
+      "bytecode": [
+        32,
+        33,
+        225,
+        124
+      ],
+      "literals": [
+        "100",
+        "25"
+      ],
+      "numTemps": 0,
+      "stackDepth": 6,
+      "source": "100 - 25",
+      "receiver": "100",
+      "selector": "-",
+      "arguments": [
+        "25"
+      ]
+    },
+    {
+      "bytecode": [
+        32,
+        33,
+        233,
+        124
+      ],
+      "literals": [
+        "50",
+        "2"
+      ],
+      "numTemps": 0,
+      "stackDepth": 6,
+      "source": "50 / 2",
+      "receiver": "50",
+      "selector": "/",
+      "arguments": [
+        "2"
+      ]
+    }
+  ]
+}

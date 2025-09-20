@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
 
@@ -80,7 +81,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public void AllocateStubs(IEnumerable<KernelClass> classes)
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 1: Allocating class stubs...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[BOOTSTRAP] Phase 1: Allocating class stubs...");
+            }
             
             foreach (var classSpec in classes)
             {
@@ -97,7 +101,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 classRegistry[classSpec.Name] = classOop;
                 metaclassRegistry[classSpec.Name] = metaclassOop;
                 
-                Console.WriteLine($"  Allocated stubs: {classSpec.Name} -> {classOop}, metaclass -> {metaclassOop}");
+                if (DebugOptions.EnableClassRegistrationOutput)
+                {
+                    Console.WriteLine($"  Allocated stubs: {classSpec.Name} -> {classOop}, metaclass -> {metaclassOop}");
+                }
             }
         }
 
@@ -107,7 +114,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public void WireClassPointers()
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 2: Wiring class pointers...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[BOOTSTRAP] Phase 2: Wiring class pointers...");
+            }
             
             // Get the critical classes
             var behaviorOop = GetClass("Behavior");
@@ -150,8 +160,6 @@ namespace Smalltalk80.Interpreter.Bootstrap
                         }
                     }
                 }
-                
-                Console.WriteLine($"  Wired: {className} -> metaclass, metaclass -> Metaclass");
             }
             
             // Special case: Metaclass's metaclass is an instance of Metaclass (itself)
@@ -167,7 +175,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public void WireSuperclasses(IEnumerable<KernelClass> classes)
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 3: Wiring superclass chains...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[BOOTSTRAP] Phase 3: Wiring superclass chains...");
+            }
             
             var classClass = GetClass("Class");
             
@@ -182,8 +193,16 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classObj == null || metaclassObj == null)
                     continue;
                 
+                // Debug Object class handling
+                if (classSpec.Name == "Object")
+                {
+                    Console.WriteLine($"[ClassBuilder] Found Object in WireSuperclasses");
+                    Console.WriteLine($"[ClassBuilder]   Superclass: {classSpec.Superclass ?? "null"}");
+                    Console.WriteLine($"[ClassBuilder]   Will enter else branch at line 230");
+                }
+                
                 // Set class superclass using field lookup
-                if (classSpec.Superclass != null)
+                if (classSpec.Superclass != null && classSpec.Superclass != "nil")
                 {
                     var superclassOop = GetClass(classSpec.Superclass);
                     if (!superclassOop.IsNil)
@@ -218,6 +237,11 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
                 else if (classSpec.Name == "Object")
                 {
+                    // Always show this debug
+                    Console.WriteLine($"[ClassBuilder] Processing Object class special case");
+                    Console.WriteLine($"[ClassBuilder]   classClass = {classClass}");
+                    Console.WriteLine($"[ClassBuilder]   metaclassObj = {GetMetaclass(classSpec.Name)}");
+                    
                     // Object's superclass is nil
                     var superclassIndex = fieldLookup.GetMetaclassFieldIndex("Object", "superclass");
                     if (superclassIndex >= 0 && superclassIndex < classObj.Fields.Length)
@@ -231,17 +255,27 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     
                     // Object class's superclass is Class
                     var metaSuperclassIndex = fieldLookup.GetMetaclassFieldIndex("Object class", "superclass");
-                    if (metaSuperclassIndex >= 0 && metaSuperclassIndex < metaclassObj.Fields.Length)
+                    
+                    // Object class's superclass is Class
+                    if (!classClass.IsNil)
                     {
-                        metaclassObj.Fields[metaSuperclassIndex] = classClass;
+                        metaclassObj.Fields[0] = classClass; // superclass is always at index 0
+                        
+                        if (DebugOptions.EnableClassRegistrationOutput)
+                        {
+                            Console.WriteLine($"  Set Object class superclass to Class ({classClass})");
+                        }
                     }
                     else
                     {
-                        metaclassObj.Fields[0] = classClass;
+                        Console.WriteLine("[WARNING] Class class not found when setting Object metaclass superclass!");
                     }
                 }
                 
-                Console.WriteLine($"  Wired superclass: {classSpec.Name} -> {classSpec.Superclass ?? "nil"}");
+                if (DebugOptions.EnablePhaseDetailOutput)
+                {
+                    Console.WriteLine($"  Wired superclass: {classSpec.Name} -> {classSpec.Superclass ?? "nil"}");
+                }
             }
         }
 
@@ -250,7 +284,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public void SetClassNames(ISymbolTable symbolTable)
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 4: Setting class names...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[BOOTSTRAP] Phase 4: Setting class names...");
+            }
             
             foreach (var className in classRegistry.Keys)
             {
@@ -275,7 +312,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                             classObj.Fields[5] = nameSymbol;
                         }
                     }
-                    Console.WriteLine($"  Set name: {className} -> {nameSymbol}");
+                    if (DebugOptions.EnablePhaseDetailOutput)
+                    {
+                        Console.WriteLine($"  Set name: {className} -> {nameSymbol}");
+                    }
                 }
             }
         }
@@ -285,7 +325,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// </summary>
         public void SetInstanceVariables(IEnumerable<KernelClass> classes, ISymbolTable symbolTable)
         {
-            Console.WriteLine("[BOOTSTRAP] Phase 5: Setting instance variables...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[BOOTSTRAP] Phase 5: Setting instance variables...");
+            }
             
             var arrayClass = GetClass("Array");
             if (arrayClass.IsNil)
@@ -330,7 +373,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                                 classObj.Fields[3] = ivArray;
                             }
                         }
-                        Console.WriteLine($"  Set instance vars: {classSpec.Name} -> [{string.Join(", ", classSpec.InstanceVariables)}]");
+                        if (DebugOptions.EnablePhaseDetailOutput)
+                        {
+                            Console.WriteLine($"  Set instance vars: {classSpec.Name} -> [{string.Join(", ", classSpec.InstanceVariables)}]");
+                        }
                     }
                 }
             }

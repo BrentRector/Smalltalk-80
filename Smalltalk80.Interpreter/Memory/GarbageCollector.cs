@@ -54,6 +54,11 @@ public sealed class GarbageCollector(ObjectMemory objectMemory)
     private void MarkRoots(OOP[] specialObjectsArray)
     {
         // Mark all objects reachable from Special Objects Array
+        // This includes:
+        // - ProcessList (index 7) which contains all processes
+        // - ProcessorScheduler (index 8) with active process and priority queues
+        // Each Process has a suspendedContext that chains to all method contexts
+        // This ensures all live processes and their execution stacks are preserved
         foreach (var root in specialObjectsArray)
         {
             if (!root.IsNil)
@@ -61,6 +66,12 @@ public sealed class GarbageCollector(ObjectMemory objectMemory)
                 MarkReachable(root);
             }
         }
+        
+        // The MarkReachable method will recursively traverse:
+        // 1. ProcessList -> all Process objects
+        // 2. Each Process -> suspendedContext (MethodContext/BlockContext)
+        // 3. Each Context -> sender chain, method, receiver, stack contents
+        // 4. ProcessorScheduler -> activeProcess and all queued processes
     }
 
     private void MarkReachable(OOP oop)

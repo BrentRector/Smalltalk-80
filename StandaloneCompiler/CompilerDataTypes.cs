@@ -73,6 +73,60 @@ namespace StandaloneCompiler
     }
     
     /// <summary>
+    /// Represents a Smalltalk Association (key-value pair) used for global variables.
+    /// According to the Blue Book, global variables are stored as Associations in the literal frame.
+    /// </summary>
+    public class Association
+    {
+        /// <summary>
+        /// The key (variable name as a Symbol).
+        /// </summary>
+        public Symbol Key { get; }
+        
+        /// <summary>
+        /// The value (initially null, resolved at runtime).
+        /// </summary>
+        public object? Value { get; set; }
+        
+        /// <summary>
+        /// Initializes a new instance of the Association class.
+        /// </summary>
+        /// <param name="key">The key (variable name as a Symbol).</param>
+        /// <param name="value">The value (typically null for global variables).</param>
+        public Association(Symbol key, object? value = null)
+        {
+            Key = key;
+            Value = value;
+        }
+        
+        /// <summary>
+        /// Initializes a new instance of the Association class with a string key.
+        /// </summary>
+        /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
+        /// <param name="value">The value (typically null for global variables).</param>
+        public Association(string keyName, object? value = null)
+        {
+            Key = new Symbol(keyName);
+            Value = value;
+        }
+        
+        public override bool Equals(object? obj)
+        {
+            return obj is Association other && Key.Equals(other.Key);
+        }
+        
+        public override int GetHashCode()
+        {
+            return Key.GetHashCode();
+        }
+        
+        public override string ToString()
+        {
+            return $"Association(key: {Key}, value: {Value ?? "null"})";
+        }
+    }
+    
+    /// <summary>
     /// Represents the Smalltalk nil object in the literal frame.
     /// </summary>
     public class NilObject
@@ -143,6 +197,11 @@ namespace StandaloneCompiler
         /// Number of temporary variables needed.
         /// </summary>
         public int NumTemps { get; set; } = 0;
+        
+        /// <summary>
+        /// Maximum stack depth required by this expression.
+        /// </summary>
+        public int StackDepth { get; set; } = 0;
         
         /// <summary>
         /// The source line for debugging purposes.

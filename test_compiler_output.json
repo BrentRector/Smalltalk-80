@@ -1,0 +1,106 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-19 19:08:59",
+  "classes": [],
+  "methods": [],
+  "initializationExpressions": [
+    {
+      "bytecode": [
+        115,
+        124
+      ],
+      "literals": [],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "nil",
+      "receiver": "nil"
+    },
+    {
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "#foo"
+      ],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "#foo",
+      "receiver": "#foo"
+    },
+    {
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [
+        "hello"
+      ],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "\u0027hello\u0027",
+      "receiver": "\u0027hello\u0027"
+    },
+    {
+      "bytecode": [
+        64,
+        124
+      ],
+      "literals": [
+        "Association(key: #Object, value: null)"
+      ],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "Object",
+      "receiver": "Object"
+    },
+    {
+      "bytecode": [
+        64,
+        209,
+        124
+      ],
+      "literals": [
+        "Association(key: #Object, value: null)",
+        "#initialize"
+      ],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "Object initialize",
+      "receiver": "Object",
+      "selector": "initialize"
+    },
+    {
+      "bytecode": [
+        64,
+        204,
+        124
+      ],
+      "literals": [
+        "Association(key: #Array, value: null)"
+      ],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "Array new",
+      "receiver": "Array",
+      "selector": "new"
+    },
+    {
+      "bytecode": [
+        118,
+        119,
+        176,
+        124
+      ],
+      "literals": [],
+      "numTemps": 0,
+      "stackDepth": 2,
+      "source": "1 \u002B 2",
+      "receiver": "1",
+      "selector": "\u002B",
+      "arguments": [
+        "2"
+      ]
+    }
+  ]
+}

@@ -19,4 +19,34 @@
     <None Remove="Backup\**" />
   </ItemGroup>
 
+  <!-- Copy system_image.json to output directory -->
+  <ItemGroup>
+    <None Include="..\system_image.json" CopyToOutputDirectory="PreserveNewest" Link="system_image.json" />
+  </ItemGroup>
+
+  <!-- Optional: Regenerate system_image.json when needed -->
+  <!-- To regenerate, run: dotnet msbuild /t:RegenerateSystemImage -->
+  <Target Name="RegenerateSystemImage">
+    <PropertyGroup>
+      <CompilerPath>$(ProjectDir)..\StandaloneCompiler\bin\$(Configuration)\$(TargetFramework)\StandaloneCompiler.exe</CompilerPath>
+      <SourcePath>$(ProjectDir)..\Smalltalk80\Smalltalk-80 Source\Smalltalk-80.st</SourcePath>
+      <OutputPath>$(ProjectDir)..\system_image.json</OutputPath>
+    </PropertyGroup>
+    
+    <Message Text="Regenerating system_image.json from source..." Importance="high" />
+    
+    <!-- Build the StandaloneCompiler first -->
+    <MSBuild Projects="..\StandaloneCompiler\StandaloneCompiler.csproj" Targets="Build" />
+    
+    <!-- Run the StandaloneCompiler to generate system_image.json -->
+    <Exec Command="&quot;$(CompilerPath)&quot; &quot;$(SourcePath)&quot; &quot;$(OutputPath)&quot;" 
+          ConsoleToMSBuild="true"
+          ContinueOnError="false">
+      <Output TaskParameter="ExitCode" PropertyName="CompilerExitCode" />
+    </Exec>
+    
+    <Message Text="Successfully regenerated system_image.json" Importance="high" Condition="'$(CompilerExitCode)' == '0'" />
+    <Error Text="Failed to regenerate system_image.json" Condition="'$(CompilerExitCode)' != '0'" />
+  </Target>
+
 </Project>

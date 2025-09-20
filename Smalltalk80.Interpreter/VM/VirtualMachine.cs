@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Smalltalk80.Interpreter.Bootstrap;
+using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Execution;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
@@ -33,7 +34,7 @@ namespace Smalltalk80.Interpreter.VM
         private MethodContext? activeContext;
         private bool bootstrapComplete = false;
         private int recursionDepth = 0;
-        private const int MaxRecursionDepth = 1000;
+        private const int MaxRecursionDepth = 5;
         private bool schedulerEnabled = false;
         private OOP doItProcess = OOP.Nil;
 
@@ -161,7 +162,10 @@ namespace Smalltalk80.Interpreter.VM
         /// <param name="bootstrapPath">Path to the bootstrap.json file.</param>
         public void LoadBootstrapFromJson(string bootstrapPath)
         {
-            Console.WriteLine($"[VM] Loading bootstrap from JSON: {bootstrapPath}");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine($"[VM] Loading bootstrap from JSON: {bootstrapPath}");
+            }
             
             // Load the manifest file first
             var manifest = LoadManifestFromFile(bootstrapPath);
@@ -186,6 +190,28 @@ namespace Smalltalk80.Interpreter.VM
             bootstrapComplete = true;
             Console.WriteLine($"[VM] Bootstrap complete! Loaded {manifest.Classes.Count} classes");
             
+            // DEBUG: Check Object metaclass superclass
+            var objectClass = classBuilder.GetClass("Object");
+            if (!objectClass.IsNil)
+            {
+                var objectClassMeta = GetClassOfObject(objectClass);
+                Console.WriteLine($"[DEBUG] Object class = {objectClass}");
+                Console.WriteLine($"[DEBUG] Object metaclass = {objectClassMeta}");
+                
+                if (!objectClassMeta.IsNil)
+                {
+                    var metaObj = memory.GetObject(objectClassMeta);
+                    if (metaObj != null && metaObj.Fields.Length > 0)
+                    {
+                        Console.WriteLine($"[DEBUG] Object metaclass superclass (field 0) = {metaObj.Fields[0]}");
+                        
+                        // Check what Class class is
+                        var classClass = classBuilder.GetClass("Class");
+                        Console.WriteLine($"[DEBUG] Class class = {classClass}");
+                    }
+                }
+            }
+            
             // Initialize message dispatcher with common selectors
             messageDispatcher.Initialize();
             
@@ -194,16 +220,18 @@ namespace Smalltalk80.Interpreter.VM
             // Run garbage collection to verify everything is reachable
             RunGarbageCollection();
             
-            // Execute initialization expressions if present
-            // This will initialize Transcript and other globals through Smalltalk code
-            ExecuteInitializationExpressions(manifest);
-            
             // Start execution with an initial process - but only for complete system
             // For bootstrap only, we don't create any temporary startup objects
+            // This MUST be done before initialization expressions so we have a process context
             if (manifest.Classes.Count > 100)  // Complete system has 223 classes, bootstrap has 85
             {
                 StartExecution();
             }
+            
+            // Execute initialization expressions if present
+            // This will initialize Transcript and other globals through Smalltalk code
+            // MUST be done after StartExecution so there's an active process and context
+            ExecuteInitializationExpressions(manifest);
         }
 
         /// <summary>
@@ -250,6 +278,25 @@ namespace Smalltalk80.Interpreter.VM
             // Metaclass class
             specialObjectsArray[SpecialObjects.MetaclassClass] = classBuilder.GetClass("Metaclass");
             
+            // Create ProcessList to track all processes (for GC roots)
+            var linkedListClass = classBuilder.GetClass("LinkedList");
+            if (!linkedListClass.IsNil)
+            {
+                var processList = memory.AllocateObject(linkedListClass, 2);
+                var processListObj = memory.GetObject(processList);
+                if (processListObj != null)
+                {
+                    processListObj.Fields[0] = OOP.Nil; // firstLink
+                    processListObj.Fields[1] = OOP.Nil; // lastLink
+                }
+                specialObjectsArray[SpecialObjects.ProcessList] = processList;
+                
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] Created ProcessList at index {SpecialObjects.ProcessList}");
+                }
+            }
+            
             // Create ProcessorScheduler if the class exists
             var processorSchedulerClass = classBuilder.GetClass("ProcessorScheduler");
             if (!processorSchedulerClass.IsNil)
@@ -265,9 +312,9 @@ namespace Smalltalk80.Interpreter.VM
                 {
                     // Create array of process lists (one for each priority)
                     var arrayClass = classBuilder.GetClass("Array");
-                    var linkedListClass = classBuilder.GetClass("LinkedList");
+                    var linkedListClass2 = classBuilder.GetClass("LinkedList");
                     
-                    if (!arrayClass.IsNil && !linkedListClass.IsNil)
+                    if (!arrayClass.IsNil && !linkedListClass2.IsNil)
                     {
                         // Create array of 100 priority queues
                         var priorityListsArray = memory.AllocateWordArray(arrayClass, 100);
@@ -278,7 +325,7 @@ namespace Smalltalk80.Interpreter.VM
                             // Initialize each priority queue as a LinkedList
                             for (int i = 0; i < 100; i++)
                             {
-                                var list = memory.AllocateObject(linkedListClass, 2);
+                                var list = memory.AllocateObject(linkedListClass2, 2);
                                 var listObj = memory.GetObject(list);
                                 if (listObj != null)
                                 {
@@ -391,7 +438,10 @@ namespace Smalltalk80.Interpreter.VM
                         systemDictObj.Fields[keyIndex] = classNameSymbol;
                         systemDictObj.Fields[valueIndex] = classOop;
                         registeredCount++;
-                        Console.WriteLine($"  Registered class: {kvp.Key} as Symbol {classNameSymbol}");
+                        if (DebugOptions.EnableClassRegistrationOutput)
+                        {
+                            Console.WriteLine($"  Registered class: {kvp.Key} as Symbol {classNameSymbol}");
+                        }
                         break;
                     }
                     // Check if key already exists
@@ -421,7 +471,10 @@ namespace Smalltalk80.Interpreter.VM
                             systemDictObj.Fields[keyIndex] = metaclassNameSymbol;
                             systemDictObj.Fields[valueIndex] = metaclassOop;
                             registeredCount++;
-                            Console.WriteLine($"  Registered metaclass: {kvp.Key} class as Symbol {metaclassNameSymbol}");
+                            if (DebugOptions.EnableClassRegistrationOutput)
+                            {
+                                Console.WriteLine($"  Registered metaclass: {kvp.Key} class as Symbol {metaclassNameSymbol}");
+                            }
                             break;
                         }
                         else if (systemDictObj.Fields[keyIndex].Equals(metaclassNameSymbol))
@@ -512,6 +565,148 @@ namespace Smalltalk80.Interpreter.VM
                 return memory.AllocateObject(contextClass, 6);
             }
             return OOP.Nil;
+        }
+
+        public OOP CreateBlockContext(MethodContext context, int blockIndex)
+        {
+            // Get the block literal from the method's literals array
+            var methodObj = memory.GetObject(context.Method);
+            if (methodObj == null)
+            {
+                return OOP.Nil;
+            }
+            
+            var literalsOop = GetFieldByName(context.Method, "literals");
+            if (literalsOop.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            var literalsObj = memory.GetObject(literalsOop);
+            if (literalsObj == null || blockIndex >= literalsObj.Fields.Length)
+            {
+                return OOP.Nil;
+            }
+            
+            // Get the block literal at the specified index
+            var blockLiteral = literalsObj.Fields[blockIndex];
+            if (blockLiteral.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            // In Smalltalk-80, a block literal is typically an Array containing:
+            // [0] = argument count (SmallInteger)
+            // [1] = start PC (SmallInteger) - where the block body starts
+            // [2] = end PC (SmallInteger) - where the block body ends (optional)
+            // [3] = number of temporaries (SmallInteger)
+            var blockLiteralObj = memory.GetObject(blockLiteral);
+            if (blockLiteralObj == null || blockLiteralObj.Fields.Length < 2)
+            {
+                return OOP.Nil;
+            }
+            
+            // Extract block information
+            int argCount = 0;
+            int startPC = 0;
+            int tempCount = 0;
+            
+            // Get argument count
+            if (blockLiteralObj.Fields.Length > 0 && blockLiteralObj.Fields[0].IsSmallInteger)
+            {
+                argCount = blockLiteralObj.Fields[0].SmallIntegerValue;
+            }
+            
+            // Get start PC
+            if (blockLiteralObj.Fields.Length > 1 && blockLiteralObj.Fields[1].IsSmallInteger)
+            {
+                startPC = blockLiteralObj.Fields[1].SmallIntegerValue;
+            }
+            
+            // Get temp count if available
+            if (blockLiteralObj.Fields.Length > 3 && blockLiteralObj.Fields[3].IsSmallInteger)
+            {
+                tempCount = blockLiteralObj.Fields[3].SmallIntegerValue;
+            }
+            
+            // Create the BlockContext object
+            var blockContextClass = classBuilder.GetClass("BlockContext");
+            if (blockContextClass.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            // BlockContext inherits from ContextPart and has these fields:
+            // From ContextPart: sender, pc, stackp
+            // From BlockContext: nargs, startpc, home
+            // Total: 6 fields minimum
+            var blockContextOop = memory.AllocateObject(blockContextClass, 6);
+            var blockContextObj = memory.GetObject(blockContextOop);
+            
+            if (blockContextObj == null)
+            {
+                return OOP.Nil;
+            }
+            
+            // Initialize BlockContext fields
+            // Field 0: sender (initially nil, set when block is activated)
+            blockContextObj.Fields[0] = OOP.Nil;
+            
+            // Field 1: pc (program counter - set to startPC when activated)
+            blockContextObj.Fields[1] = OOP.FromSmallInteger(startPC);
+            
+            // Field 2: stackp (stack pointer - initially 0)
+            blockContextObj.Fields[2] = OOP.FromSmallInteger(0);
+            
+            // Field 3: nargs (number of arguments)
+            blockContextObj.Fields[3] = OOP.FromSmallInteger(argCount);
+            
+            // Field 4: startpc (initial PC for the block)
+            blockContextObj.Fields[4] = OOP.FromSmallInteger(startPC);
+            
+            // Field 5: home (the home context - the method context that created this block)
+            // Create a context object for the home context if not already created
+            var homeContextOop = CreateContextObject(context);
+            if (!homeContextOop.IsNil)
+            {
+                // Copy current context state to the home context object
+                var homeContextObj = memory.GetObject(homeContextOop);
+                if (homeContextObj != null && homeContextObj.Fields.Length >= 6)
+                {
+                    // Set basic context fields
+                    homeContextObj.Fields[0] = context.Sender != null ? CreateContextObject(context.Sender) : OOP.Nil; // sender
+                    homeContextObj.Fields[1] = OOP.FromSmallInteger(context.PC); // pc
+                    homeContextObj.Fields[2] = OOP.FromSmallInteger(context.Stack.Count); // stackp
+                    homeContextObj.Fields[3] = context.Method; // method
+                    homeContextObj.Fields[4] = context.Receiver; // receiver
+                    
+                    // Store arguments and temporaries if space available
+                    if (homeContextObj.Fields.Length > 5)
+                    {
+                        int fieldIndex = 5;
+                        
+                        // Store arguments
+                        for (int i = 0; i < context.Arguments.Length && fieldIndex < homeContextObj.Fields.Length; i++)
+                        {
+                            homeContextObj.Fields[fieldIndex++] = context.Arguments[i];
+                        }
+                        
+                        // Store temporaries
+                        for (int i = 0; i < context.Temporaries.Length && fieldIndex < homeContextObj.Fields.Length; i++)
+                        {
+                            homeContextObj.Fields[fieldIndex++] = context.Temporaries[i];
+                        }
+                    }
+                }
+            }
+            blockContextObj.Fields[5] = homeContextOop;
+            
+            if (DebugOptions.EnableMethodTrace)
+            {
+                Console.WriteLine($"[VM] Created BlockContext: argCount={argCount}, startPC={startPC}, tempCount={tempCount}");
+            }
+            
+            return blockContextOop;
         }
 
         public void Send(OOP receiver, OOP selector, OOP[] arguments)
@@ -721,6 +916,74 @@ namespace Smalltalk80.Interpreter.VM
         #region Helper Methods
         
         /// <summary>
+        /// Gets the selector for a CompiledMethod.
+        /// </summary>
+        private OOP GetMethodSelector(OOP method)
+        {
+            // The selector is stored in field 0 of the CompiledMethod
+            var methodObj = memory.GetObject(method);
+            if (methodObj == null) return OOP.Nil;
+            
+            // Field 0 contains the selector
+            if (methodObj.Fields.Length > 0)
+            {
+                return methodObj.Fields[0];
+            }
+            
+            return OOP.Nil;
+        }
+        
+        /// <summary>
+        /// Gets the class of an object.
+        /// </summary>
+        public OOP GetClassOfObject(OOP objectOop)
+        {
+            if (objectOop.IsNil) return OOP.Nil;
+            if (objectOop.IsSmallInteger) 
+            {
+                return classBuilder.GetClass("SmallInteger");
+            }
+            
+            var obj = memory.GetObject(objectOop);
+            if (obj == null) return OOP.Nil;
+            
+            return obj.Header.ClassOOP;
+        }
+        
+        /// <summary>
+        /// Gets a string representation of a Symbol.
+        /// </summary>
+        public string GetSymbolString(OOP symbol)
+        {
+            if (symbol.IsNil) return "<nil>";
+            if (symbol.IsSmallInteger) return symbol.SmallIntegerValue.ToString();
+            
+            var obj = memory.GetObject(symbol);
+            if (obj == null) return "<invalid>";
+            
+            // Symbol is a byte array containing characters stored as SmallIntegers
+            if (obj.IsByteIndexable && obj.Fields.Length > 0)
+            {
+                var chars = new char[obj.Fields.Length];
+                for (int i = 0; i < obj.Fields.Length; i++)
+                {
+                    if (obj.Fields[i].IsSmallInteger)
+                    {
+                        chars[i] = (char)obj.Fields[i].SmallIntegerValue;
+                    }
+                    else
+                    {
+                        chars[i] = '?';
+                    }
+                }
+                return new string(chars);
+            }
+            
+            return "<not-a-symbol>";
+        }
+        
+        
+        /// <summary>
         /// Creates a Smalltalk String object from a C# string.
         /// </summary>
         /// <param name="value">The C# string value.</param>
@@ -863,6 +1126,51 @@ namespace Smalltalk80.Interpreter.VM
 
         private void ExecuteMethod(OOP receiver, OOP method, OOP methodClass, OOP[] arguments)
         {
+            // Method invocation trace
+            if (DebugOptions.EnableMethodTrace)
+            {
+                // Get selector name for the method
+                var selectorOop = GetMethodSelector(method);
+                var selectorName = selectorOop.IsNil ? "<unknown>" : GetSymbolString(selectorOop);
+                
+                // Get class name
+                var className = GetClassName(methodClass);
+                
+                // Get receiver info
+                var receiverClass = GetClassOfObject(receiver);
+                var receiverClassName = receiverClass.IsNil ? "<nil>" : GetClassName(receiverClass);
+                
+                // Create indentation based on recursion depth
+                var indent = new string(' ', recursionDepth * 2);
+                
+                Console.WriteLine($"[METHOD {recursionDepth}] {indent}{receiverClassName} >> {selectorName} (implementing class: {className})");
+                
+                // Special debug for Object initialize
+                if (selectorName == "initialize" && receiverClassName == "Object class")
+                {
+                    var debugMethodObj = memory.GetObject(method);
+                    if (debugMethodObj != null && debugMethodObj.Fields.Length > 1)
+                    {
+                        var bytecodeOop = debugMethodObj.Fields[1];
+                        var bytecodeArray = memory.GetObject(bytecodeOop);
+                        if (bytecodeArray != null)
+                        {
+                            Console.WriteLine($"[DEBUG] Object>>initialize method has {bytecodeArray.Fields.Length} bytecodes");
+                            var bytes = new List<int>();
+                            for (int i = 0; i < Math.Min(14, bytecodeArray.Fields.Length); i++)
+                            {
+                                if (bytecodeArray.Fields[i].IsSmallInteger)
+                                {
+                                    bytes.Add(bytecodeArray.Fields[i].SmallIntegerValue);
+                                }
+                            }
+                            Console.WriteLine($"[DEBUG] First bytes: [{string.Join(", ", bytes)}]");
+                            Console.WriteLine($"[DEBUG] Expected: [112, 33, 224, 137, 0, 6, 112, 211, 104, 112, 212, 125, 226, 124]");
+                        }
+                    }
+                }
+            }
+            
             var methodObj = memory.GetObject(method);
             if (methodObj == null)
             {
@@ -944,7 +1252,30 @@ namespace Smalltalk80.Interpreter.VM
             }
         }
         
-        private void ExecuteBytecodes(MethodContext context)
+        /// <summary>
+        /// Executes the bytecodes of a method in the given context.
+        /// Internal method to allow InitializationExpressionExecutor to execute bytecode directly.
+        /// </summary>
+        internal void ExecuteBytecodes(MethodContext context)
+        {
+            if (DebugOptions.EnableMethodTrace)
+            {
+                Console.WriteLine($"[VM] ExecuteBytecodes called for context with method {context.Method}");
+                var methodObj = memory.GetObject(context.Method);
+                if (methodObj != null && methodObj.Fields.Length > 1)
+                {
+                    var bytecodeOop = GetFieldByName(context.Method, "bytecode");
+                    var bytecodeArray = memory.GetObject(bytecodeOop);
+                    if (bytecodeArray != null)
+                    {
+                        Console.WriteLine($"[VM] Method has {bytecodeArray.Fields.Length} bytecodes, PC={context.PC}");
+                    }
+                }
+            }
+            ExecuteBytecodesPrivate(context);
+        }
+        
+        private void ExecuteBytecodesPrivate(MethodContext context)
         {
             var methodObj = memory.GetObject(context.Method);
             if (methodObj == null || methodObj.Fields.Length < 2)
@@ -954,6 +1285,14 @@ namespace Smalltalk80.Interpreter.VM
             var bytecodeArray = memory.GetObject(bytecodeArrayOop);
             if (bytecodeArray == null)
                 return;
+            
+            if (DebugOptions.EnableBytecodeTrace)
+            {
+                Console.WriteLine($"[VM] ExecuteBytecodesPrivate: Starting bytecode execution");
+                Console.WriteLine($"[VM]   Receiver: {context.Receiver}");
+                Console.WriteLine($"[VM]   Method: {context.Method}");
+                Console.WriteLine($"[VM]   PC: {context.PC}, BytecodeArray length: {bytecodeArray.Fields.Length}");
+            }
             
             // Execute bytecodes until return or end
             while (context.PC < bytecodeArray.Fields.Length)
@@ -973,6 +1312,11 @@ namespace Smalltalk80.Interpreter.VM
                     break;
                 
                 byte bytecode = (byte)byteOop.SmallIntegerValue;
+                
+                if (DebugOptions.EnableMethodTrace || DebugOptions.EnableBytecodeTrace)
+                {
+                    Console.WriteLine($"[VM] Executing bytecode: {bytecode} (0x{bytecode:X2}) at PC {context.PC - 1}");
+                }
                 
                 // Execute bytecode - returns false on return instructions
                 if (!bytecodeDispatcher.ExecuteBytecode(context, bytecode))
@@ -1172,12 +1516,21 @@ namespace Smalltalk80.Interpreter.VM
         /// </summary>
         private void ProcessBootstrapClasses(BootstrapManifest manifest)
         {
-            Console.WriteLine("[VM] Processing bootstrap classes through ClassBuilder phases");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[VM] Processing bootstrap classes through ClassBuilder phases");
+            }
             
             // PHASE -1: Build field mappings BEFORE any objects are created
-            Console.WriteLine("[VM] Phase -1: Building field mappings from manifest...");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[VM] Phase -1: Building field mappings from manifest...");
+            }
             fieldLookup.RegisterManifest(manifest);
-            Console.WriteLine("[VM] Phase -1 complete: Field mappings established for all classes and metaclasses");
+            if (DebugOptions.EnableClassRegistrationOutput)
+            {
+                Console.WriteLine("[VM] Phase -1 complete: Field mappings established for all classes and metaclasses");
+            }
             
             // Convert manifest classes to KernelClass format
             var kernelClasses = manifest.Classes.Select(c => new KernelClass(
@@ -1478,11 +1831,12 @@ namespace Smalltalk80.Interpreter.VM
         }
         
         /// <summary>
-        /// Starts system execution by creating an initial process and context.
+        /// Prepares system for execution by creating an initial process.
+        /// Does NOT execute any bytecode - that will be done by initialization expressions.
         /// </summary>
         private void StartExecution()
         {
-            Console.WriteLine("[VM] Starting system execution...");
+            Console.WriteLine("[VM] Preparing system for execution...");
             
             try
             {
@@ -1494,27 +1848,9 @@ namespace Smalltalk80.Interpreter.VM
                     return;
                 }
                 
-                // Create the startup context that will execute system initialization
-                var startupContext = CreateStartupContext();
-                if (startupContext == null)
-                {
-                    Console.WriteLine("[VM] Warning: Could not create startup context");
-                    return;
-                }
-                
-                // Set the process's suspended context to our startup context
-                var processObj = memory.GetObject(initialProcess);
-                if (processObj != null && processObj.Fields.Length >= 3)
-                {
-                    // Process has fields: suspendedContext, priority, myList (from superclass Link)
-                    // Actually Link has nextLink field, so Process fields are at indices 1, 2, 3
-                    processObj.Fields[1] = CreateContextObject(startupContext); // suspendedContext
-                    processObj.Fields[2] = OOP.FromSmallInteger(50); // priority (normal user priority)
-                    processObj.Fields[3] = OOP.Nil; // myList (not on any list initially)
-                }
-                
                 // Set as the active process
-                activeContext = startupContext;
+                // Note: We don't create a startup context here - the initialization
+                // expressions will create their own contexts as needed
                 processScheduler.SetActiveProcess(initialProcess);
                 
                 // Update the ProcessorScheduler's activeProcess field
@@ -1530,13 +1866,13 @@ namespace Smalltalk80.Interpreter.VM
                 
                 Console.WriteLine("[VM] Initial process created and activated");
                 
-                // Begin executing the startup context
-                Console.WriteLine("[VM] Beginning bytecode execution...");
-                ExecuteStartup(startupContext);
+                // DO NOT execute any startup bytecode here!
+                // The initialization expressions will handle all execution.
+                // This method just sets up the process infrastructure.
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[VM] Error during startup: {ex.Message}");
+                Console.WriteLine($"[VM] Error during startup preparation: {ex.Message}");
                 Console.WriteLine($"[VM] Stack trace: {ex.StackTrace}");
             }
         }
@@ -1565,9 +1901,67 @@ namespace Smalltalk80.Interpreter.VM
                 {
                     processObj.Fields[i] = OOP.Nil;
                 }
+                
+                // Add to ProcessList for GC tracking
+                AddProcessToGlobalList(process);
             }
             
             return process;
+        }
+        
+        /// <summary>
+        /// Adds a process to the global ProcessList for GC tracking.
+        /// </summary>
+        private void AddProcessToGlobalList(OOP process)
+        {
+            var processList = GetSpecialObject(SpecialObjects.ProcessList);
+            if (processList.IsNil)
+            {
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine("[DEBUG] ProcessList not found in special objects");
+                }
+                return;
+            }
+            
+            var processListObj = memory.GetObject(processList);
+            if (processListObj == null)
+                return;
+            
+            var processObj = memory.GetObject(process);
+            if (processObj == null)
+                return;
+            
+            // LinkedList fields: firstLink, lastLink
+            var firstLink = processListObj.Fields[0];
+            var lastLink = processListObj.Fields[1];
+            
+            if (firstLink.IsNil)
+            {
+                // First process in the list
+                processListObj.Fields[0] = process; // firstLink
+                processListObj.Fields[1] = process; // lastLink
+                processObj.Fields[0] = OOP.Nil;     // nextLink
+            }
+            else
+            {
+                // Add to end of list
+                var lastProcessObj = memory.GetObject(lastLink);
+                if (lastProcessObj != null)
+                {
+                    lastProcessObj.Fields[0] = process; // Set nextLink of last process
+                }
+                processListObj.Fields[1] = process;     // Update lastLink
+                processObj.Fields[0] = OOP.Nil;         // nextLink of new process
+            }
+            
+            // Set the process's myList to indicate it's in the ProcessList
+            processObj.Fields[3] = processList;
+            
+            if (DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] Added process {process} to global ProcessList");
+            }
         }
         
         /// <summary>

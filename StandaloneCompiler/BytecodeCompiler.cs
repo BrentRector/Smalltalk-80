@@ -37,6 +37,18 @@ namespace StandaloneCompiler
         public Dictionary<string, int> HiddenTemporaries { get; } = new();
         
         /// <summary>
+        /// Class variables (shared among all instances of a class).
+        /// These are stored as Associations in the literal frame.
+        /// </summary>
+        public Dictionary<string, object> ClassVariables { get; } = new();
+        
+        /// <summary>
+        /// Pool variables (shared dictionaries imported by classes).
+        /// These are stored as Associations in the literal frame.
+        /// </summary>
+        public Dictionary<string, object> PoolVariables { get; } = new();
+        
+        /// <summary>
         /// Total number of arguments.
         /// </summary>
         public int ArgumentCount { get; set; }
@@ -100,6 +112,193 @@ namespace StandaloneCompiler
         public int CurrentIP => bytecodes.Count;
         
         /// <summary>
+        /// Calculates the maximum stack depth required by the bytecode.
+        /// </summary>
+        public int CalculateMaxStackDepth()
+        {
+            return CalculateMaxStackDepth(bytecodes.ToArray());
+        }
+        
+        /// <summary>
+        /// Calculates the maximum stack depth required by the given bytecode array.
+        /// </summary>
+        public static int CalculateMaxStackDepth(byte[] bytes)
+        {
+            int currentDepth = 0;
+            int maxDepth = 0;
+            int pc = 0;
+            
+            while (pc < bytes.Length)
+            {
+                byte bytecode = bytes[pc];
+                
+                // Analyze stack effect of each bytecode according to Blue Book
+                if (bytecode <= 15) // Push Receiver Variable
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode <= 31) // Push Temporary Location
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode <= 63) // Push Literal Constant
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode <= 95) // Push Literal Variable
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode <= 103) // Pop and Store Receiver Variable
+                {
+                    currentDepth--; // Pop value
+                    pc++;
+                }
+                else if (bytecode <= 111) // Pop and Store Temporary Location
+                {
+                    currentDepth--; // Pop value
+                    pc++;
+                }
+                else if (bytecode <= 119) // Push special constants
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode <= 125) // Returns
+                {
+                    // Returns don't affect max calculation
+                    pc++;
+                }
+                else if (bytecode == 128) // Extended Push
+                {
+                    currentDepth++;
+                    pc += 3; // Skip 2 extension bytes
+                }
+                else if (bytecode == 129) // Extended Store (non-popping)
+                {
+                    // Store doesn't change stack
+                    pc += 3;
+                }
+                else if (bytecode == 130) // Extended Pop and Store
+                {
+                    currentDepth--;
+                    pc += 3;
+                }
+                else if (bytecode == 131) // Send Literal Selector
+                {
+                    pc++;
+                    if (pc < bytes.Length)
+                    {
+                        int argCount = (bytes[pc] >> 5) & 0x07;
+                        currentDepth -= (argCount + 1); // Pop receiver + args
+                        currentDepth++; // Push result
+                        pc++;
+                    }
+                }
+                else if (bytecode == 132) // Double Extended Send
+                {
+                    pc++;
+                    if (pc < bytes.Length)
+                    {
+                        int argCount = bytes[pc];
+                        currentDepth -= (argCount + 1); // Pop receiver + args
+                        currentDepth++; // Push result
+                        pc += 2; // Skip selector byte
+                    }
+                }
+                else if (bytecode == 135) // Pop Stack Top
+                {
+                    currentDepth--;
+                    pc++;
+                }
+                else if (bytecode == 136) // Duplicate Stack Top
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode == 137) // Push Active Context
+                {
+                    currentDepth++;
+                    pc++;
+                }
+                else if (bytecode >= 144 && bytecode <= 151) // Jump
+                {
+                    pc += 2; // Jump has 1 extension byte
+                }
+                else if (bytecode >= 152 && bytecode <= 159) // Pop and Jump On False
+                {
+                    currentDepth--; // Pop condition
+                    pc += 2;
+                }
+                else if (bytecode >= 160 && bytecode <= 167) // Long Jump
+                {
+                    pc += 2;
+                }
+                else if (bytecode >= 168 && bytecode <= 175) // Pop and Long Jump
+                {
+                    currentDepth--; // Pop condition
+                    pc += 2;
+                }
+                else if (bytecode >= 176 && bytecode <= 191) // Send Arithmetic Message
+                {
+                    // Arithmetic messages typically have 1 arg
+                    currentDepth -= 2; // Pop receiver + arg
+                    currentDepth++; // Push result
+                    pc++;
+                }
+                else if (bytecode >= 192 && bytecode <= 207) // Send Special Message
+                {
+                    // Special messages vary - conservatively assume 1 arg
+                    currentDepth -= 2; // Pop receiver + arg
+                    currentDepth++; // Push result
+                    pc++;
+                }
+                else if (bytecode >= 208 && bytecode <= 223) // Send Literal Selector With No Arguments
+                {
+                    currentDepth--; // Pop receiver
+                    currentDepth++; // Push result
+                    pc++;
+                }
+                else if (bytecode >= 224 && bytecode <= 239) // Send Literal Selector With 1 Argument
+                {
+                    currentDepth -= 2; // Pop receiver + 1 arg
+                    currentDepth++; // Push result
+                    pc++;
+                }
+                else if (bytecode >= 240 && bytecode <= 255) // Send Literal Selector With 2 Arguments
+                {
+                    currentDepth -= 3; // Pop receiver + 2 args
+                    currentDepth++; // Push result
+                    pc++;
+                }
+                else
+                {
+                    // Unknown bytecode
+                    pc++;
+                }
+                
+                // Track maximum depth
+                if (currentDepth > maxDepth)
+                {
+                    maxDepth = currentDepth;
+                }
+                
+                // Sanity check - stack shouldn't go negative  
+                if (currentDepth < 0)
+                {
+                    currentDepth = 0;
+                }
+            }
+            
+            // Return exact max depth without buffer
+            return maxDepth;
+        }
+        
+        /// <summary>
         /// Adds a literal to the frame and returns its index.
         /// </summary>
         public int AddLiteral(object literal)
@@ -121,6 +320,7 @@ namespace StandaloneCompiler
         {
             if (a == null || b == null) return a == b;
             if (a is Symbol symA && b is Symbol symB) return symA.Value == symB.Value;
+            if (a is Association assocA && b is Association assocB) return assocA.Key.Value == assocB.Key.Value;
             if (a is string strA && b is string strB) return strA == strB;
             if (a is int intA && b is int intB) return intA == intB;
             if (a is bool boolA && b is bool boolB) return boolA == boolB;
@@ -183,31 +383,45 @@ namespace StandaloneCompiler
             }
         }
         
-        public void PushLiteral(object literal)
+        public void PushLiteralConstant(object literal)
         {
             var index = AddLiteral(literal);
             if (index <= 31)
             {
-                Emit((byte)(32 + index)); // 32-63
+                // Bytecodes 32-63: Push Literal Constant #0 to #31
+                Emit((byte)(32 + index));
             }
             else
             {
-                Emit(131); // Single extended
-                Emit((byte)(96 + (index & 0x1F))); // Push literal constant extended
+                // Use extended push for indices > 31
+                Emit(128); // Extended push
+                Emit(32);  // Push literal constant (type = 2)
+                Emit((byte)index);
             }
+        }
+        
+        public void PushLiteral(object literal)
+        {
+            // Backward compatibility - redirects to new method
+            PushLiteralConstant(literal);
         }
         
         public void PushLiteralVariable(string name)
         {
-            var index = AddLiteral(new Symbol(name));
+            // For literal variables, we need an Association in the literals
+            // The Association's value slot contains the actual variable value
+            var index = AddLiteral(new Association(name, null));
             if (index <= 31)
             {
-                Emit((byte)(64 + index)); // 64-95
+                // Bytecodes 64-95: Push Literal Variable #0 to #31
+                Emit((byte)(64 + index));
             }
             else
             {
-                Emit(131); // Single extended
-                Emit((byte)(128 + (index & 0x1F))); // Push literal variable extended
+                // Use extended push for indices > 31
+                Emit(128); // Extended push
+                Emit(64);  // Push literal variable (type = 4)
+                Emit((byte)index);
             }
         }
         
@@ -218,17 +432,37 @@ namespace StandaloneCompiler
         
         public void PushNil()
         {
-            PushLiteral(new NilObject());
+            Emit(115); // Push nil
         }
         
         public void PushTrue()
         {
-            PushLiteral(true);
+            Emit(113); // Push true
         }
         
         public void PushFalse()
         {
-            PushLiteral(false);
+            Emit(114); // Push false
+        }
+        
+        public void PushMinusOne()
+        {
+            Emit(116); // Push -1
+        }
+        
+        public void PushZero()
+        {
+            Emit(117); // Push 0
+        }
+        
+        public void PushOne()
+        {
+            Emit(118); // Push 1
+        }
+        
+        public void PushTwo()
+        {
+            Emit(119); // Push 2
         }
         
         // Store operations
@@ -267,7 +501,7 @@ namespace StandaloneCompiler
         
         public void StoreLiteralVariable(string name)
         {
-            var index = AddLiteral(new Symbol(name));
+            var index = AddLiteral(new Association(name, null));
             Emit(129); // Extended store
             Emit(96);  // Store literal variable
             Emit((byte)index);
@@ -394,86 +628,127 @@ namespace StandaloneCompiler
             bytecodes[blockCopyPosition + 2] = (byte)(blockSize & 0xFF);
         }
         
-        // Send operations
+        // Send operations - Following Blue Book specification
         
-        public void SendMessage(string selector, int argCount)
+        /// <summary>
+        /// Special selectors from Blue Book.
+        /// Arithmetic (176-191), Special (192-207), and others embedded in 208-255.
+        /// </summary>
+        internal static readonly Dictionary<string, (int bytecode, int args)> SpecialSelectors = new()
         {
-            // Check for special arithmetic/common selectors
-            var specialSelectors = new Dictionary<string, int>
-            {
-                ["+"] = 0, ["-"] = 1, ["<"] = 2, [">"] = 3, ["<="] = 4, [">="] = 5,
-                ["="] = 6, ["~="] = 7, ["*"] = 8, ["/"] = 9, ["\\\\"] = 10, ["@"] = 11,
-                ["bitShift:"] = 12, ["//"] = 13, ["bitAnd:"] = 14, ["bitOr:"] = 15
-            };
+            // Arithmetic selectors (176-191) - all binary (1 arg)
+            ["+"] = (176, 1),
+            ["-"] = (177, 1),
+            ["<"] = (178, 1),
+            [">"] = (179, 1),
+            ["<="] = (180, 1),
+            [">="] = (181, 1),
+            ["="] = (182, 1),
+            ["~="] = (183, 1),
+            ["*"] = (184, 1),
+            ["/"] = (185, 1),
+            ["\\\\"] = (186, 1),  // mod
+            ["@"] = (187, 1),
+            ["bitShift:"] = (188, 1),
+            ["//"] = (189, 1),      // div
+            ["bitAnd:"] = (190, 1),
+            ["bitOr:"] = (191, 1),
             
-            var commonSelectors = new Dictionary<string, int>
+            // Special message selectors (192-207)
+            ["at:"] = (192, 1),
+            ["at:put:"] = (193, 2),
+            ["size"] = (194, 0),
+            ["next"] = (195, 0),
+            ["nextPut:"] = (196, 1),
+            ["atEnd"] = (197, 0),
+            ["=="] = (198, 1),
+            ["class"] = (199, 0),
+            ["blockCopy:"] = (200, 1),
+            ["value"] = (201, 0),
+            ["value:"] = (202, 1),
+            ["do:"] = (203, 1),
+            ["new"] = (204, 0),
+            ["new:"] = (205, 1),
+            ["x"] = (206, 0),
+            ["y"] = (207, 0)
+        };
+        
+        /// <summary>
+        /// Emits a send bytecode according to Blue Book specification.
+        /// Bytecodes 176-191: Arithmetic messages
+        /// Bytecodes 192-207: Special messages
+        /// Bytecodes 208-223: Send Literal Selector With No Arguments
+        /// Bytecodes 224-239: Send Literal Selector With 1 Argument
+        /// Bytecodes 240-255: Send Literal Selector With 2 Arguments
+        /// </summary>
+        public void EmitSend(string selector, int argCount)
+        {
+            // Check if this is a special selector
+            if (SpecialSelectors.TryGetValue(selector, out var special))
             {
-                ["at:"] = 0, ["at:put:"] = 1, ["size"] = 2, ["next"] = 3,
-                ["nextPut:"] = 4, ["atEnd"] = 5, ["=="] = 6, ["class"] = 7,
-                ["blockCopy:"] = 8, ["value"] = 9, ["value:"] = 10, ["do:"] = 11,
-                ["new"] = 12, ["new:"] = 13, ["x"] = 14, ["y"] = 15
-            };
-            
-            // Check for arithmetic selector (176-191)
-            if (specialSelectors.TryGetValue(selector, out var arithIndex))
-            {
-                Emit((byte)(176 + arithIndex));
+                // Use the special bytecode directly
+                Emit((byte)special.bytecode);
                 return;
             }
             
-            // Check for common selector (192-207)
-            if (commonSelectors.TryGetValue(selector, out var commonIndex))
+            // Regular send: add selector to literal frame
+            var selectorIndex = AddLiteral(new Symbol(selector));
+            
+            // Check for optimized bytecode ranges for 0, 1, 2 arguments
+            if (argCount == 0 && selectorIndex <= 15)
             {
-                Emit((byte)(192 + commonIndex));
-                return;
+                // Bytecodes 208-223: Send Literal Selector With No Arguments
+                Emit((byte)(208 + selectorIndex));
             }
-            
-            // Regular message send via literal frame
-            var index = AddLiteral(new Symbol(selector));
-            
-            if (index <= 15)
+            else if (argCount == 1 && selectorIndex <= 15)
             {
-                // Literal selector send
-                switch (argCount)
-                {
-                    case 0:
-                        Emit((byte)(208 + index)); // 208-223: 0 args
-                        break;
-                    case 1:
-                        Emit((byte)(224 + index)); // 224-239: 1 arg
-                        break;
-                    case 2:
-                        Emit((byte)(240 + index)); // 240-255: 2 args
-                        break;
-                    default:
-                        // Use extended send for > 2 args
-                        Emit(131); // Single extended send
-                        Emit((byte)((argCount << 5) | index));
-                        break;
-                }
+                // Bytecodes 224-239: Send Literal Selector With 1 Argument
+                Emit((byte)(224 + selectorIndex));
+            }
+            else if (argCount == 2 && selectorIndex <= 15)
+            {
+                // Bytecodes 240-255: Send Literal Selector With 2 Arguments
+                Emit((byte)(240 + selectorIndex));
+            }
+            else if (argCount <= 7 && selectorIndex <= 31)
+            {
+                // Bytecode 128-191: Send #kkkk With jjj Arguments
+                // Binary: 1jjjkkkk where jjj = arg count, kkkk = selector index
+                var bytecode = 128 | (argCount << 5) | selectorIndex;
+                Emit((byte)bytecode);
+            }
+            else if (argCount <= 7 && selectorIndex <= 63)
+            {
+                // Use single extended send (131)
+                Emit(131); // Single extended send
+                Emit((byte)((argCount << 5) | (selectorIndex & 0x1F)));
             }
             else
             {
-                // Extended send for selector index > 15
-                if (argCount <= 3)
-                {
-                    Emit(131); // Single extended send
-                    Emit((byte)((argCount << 5) | (index & 0x1F)));
-                }
-                else
-                {
-                    Emit(132); // Double extended send
-                    Emit((byte)argCount);
-                    Emit((byte)index);
-                }
+                // Use double extended send (132) for large selector indices or arg counts
+                Emit(132); // Double extended send
+                Emit((byte)argCount);
+                Emit((byte)selectorIndex);
             }
         }
         
-        public void SendSuperMessage(string selector, int argCount)
+        /// <summary>
+        /// Backward compatibility wrapper - redirects to EmitSend.
+        /// </summary>
+        public void SendMessage(string selector, int argCount)
+        {
+            EmitSend(selector, argCount);
+        }
+        
+        /// <summary>
+        /// Emits a super send bytecode according to Blue Book specification.
+        /// Uses extended bytecodes 133 (single) and 134 (double).
+        /// </summary>
+        public void EmitSuperSend(string selector, int argCount)
         {
             var index = AddLiteral(new Symbol(selector));
             
-            if (argCount <= 3 && index <= 31)
+            if (argCount <= 7 && index <= 31)
             {
                 Emit(133); // Single extended super send
                 Emit((byte)((argCount << 5) | index));
@@ -484,6 +759,14 @@ namespace StandaloneCompiler
                 Emit((byte)argCount);
                 Emit((byte)index);
             }
+        }
+        
+        /// <summary>
+        /// Backward compatibility wrapper.
+        /// </summary>
+        public void SendSuperMessage(string selector, int argCount)
+        {
+            EmitSuperSend(selector, argCount);
         }
     }
     
@@ -523,7 +806,7 @@ namespace StandaloneCompiler
                 environment.TemporaryCount = 0;
                 
                 // First pass: collect literals
-                var visitor = new LiteralCollector(emitter);
+                var visitor = new LiteralCollector(emitter, environment);
                 visitor.Visit(expression);
                 
                 // Second pass: compile the expression
@@ -580,6 +863,24 @@ namespace StandaloneCompiler
             for (int i = 0; i < instanceVars.Count; i++)
             {
                 environment.InstanceVariables[instanceVars[i]] = i;
+            }
+            
+            // Set up class variables
+            if (classVars != null)
+            {
+                foreach (var kvp in classVars)
+                {
+                    environment.ClassVariables[kvp.Key] = kvp.Value;
+                }
+            }
+            
+            // Set up pool variables
+            if (poolVars != null)
+            {
+                foreach (var kvp in poolVars)
+                {
+                    environment.PoolVariables[kvp.Key] = kvp.Value;
+                }
             }
             
             try
@@ -654,6 +955,24 @@ namespace StandaloneCompiler
             for (int i = 0; i < instanceVars.Count; i++)
             {
                 environment.InstanceVariables[instanceVars[i]] = i;
+            }
+            
+            // Set up class variables
+            if (classVars != null)
+            {
+                foreach (var kvp in classVars)
+                {
+                    environment.ClassVariables[kvp.Key] = kvp.Value;
+                }
+            }
+            
+            // Set up pool variables
+            if (poolVars != null)
+            {
+                foreach (var kvp in poolVars)
+                {
+                    environment.PoolVariables[kvp.Key] = kvp.Value;
+                }
             }
             
             try
@@ -778,7 +1097,7 @@ namespace StandaloneCompiler
             if (body == null) return;
             
             // Walk the tree to collect all literals that will be needed
-            var visitor = new LiteralCollector(emitter);
+            var visitor = new LiteralCollector(emitter, environment);
             visitor.Visit(body);
         }
         
@@ -952,7 +1271,7 @@ namespace StandaloneCompiler
                 foreach (var msg in unaryMessages)
                 {
                     var selector = msg.unarySelector().GetText();
-                    emitter.SendMessage(selector, 0);
+                    emitter.EmitSend(selector, 0);
                 }
             }
             
@@ -964,7 +1283,7 @@ namespace StandaloneCompiler
                 {
                     var selector = msg.binarySelector().GetText();
                     CompileMessageBase(msg.messageBase());
-                    emitter.SendMessage(selector, 1);
+                    emitter.EmitSend(selector, 1);
                 }
             }
             
@@ -1016,7 +1335,7 @@ namespace StandaloneCompiler
             
             // Build selector
             var selector = string.Join("", keywords);
-            emitter.SendMessage(selector, keywordParts.Length);
+            emitter.EmitSend(selector, keywordParts.Length);
         }
         
         private void CompileNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext expr)
@@ -1031,7 +1350,7 @@ namespace StandaloneCompiler
                 foreach (var msg in unaryMessages)
                 {
                     var selector = msg.unarySelector().GetText();
-                    emitter.SendMessage(selector, 0);
+                    emitter.EmitSend(selector, 0);
                 }
             }
             
@@ -1043,7 +1362,7 @@ namespace StandaloneCompiler
                 {
                     var selector = msg.binarySelector().GetText();
                     CompileMessageBase(msg.messageBase());
-                    emitter.SendMessage(selector, 1);
+                    emitter.EmitSend(selector, 1);
                 }
             }
         }
@@ -1112,11 +1431,29 @@ namespace StandaloneCompiler
                 var text = literal.numberLiteral().GetText();
                 if (int.TryParse(text, out int intVal))
                 {
-                    emitter.PushLiteral(intVal);
+                    // Use special bytecodes for small integers
+                    switch (intVal)
+                    {
+                        case -1:
+                            emitter.PushMinusOne();
+                            break;
+                        case 0:
+                            emitter.PushZero();
+                            break;
+                        case 1:
+                            emitter.PushOne();
+                            break;
+                        case 2:
+                            emitter.PushTwo();
+                            break;
+                        default:
+                            emitter.PushLiteralConstant(intVal);
+                            break;
+                    }
                 }
                 else if (double.TryParse(text, out double floatVal))
                 {
-                    emitter.PushLiteral(floatVal);
+                    emitter.PushLiteralConstant(floatVal);
                 }
             }
             // Note: negativeNumber handling removed - grammar may not support it
@@ -1125,32 +1462,32 @@ namespace StandaloneCompiler
             {
                 var text = literal.stringConst().GetText();
                 var str = text.Substring(1, text.Length - 2); // Remove quotes
-                emitter.PushLiteral(str);
+                emitter.PushLiteralConstant(str);
             }
             else if (literal.symbolConst() != null)
             {
                 var text = literal.symbolConst().GetText();
                 var sym = new Symbol(text.Substring(1)); // Remove #
-                emitter.PushLiteral(sym);
+                emitter.PushLiteralConstant(sym);
             }
             else if (literal.characterLiteral() != null)
             {
                 var text = literal.characterLiteral().GetText();
                 var ch = text[1]; // Get character after $
-                emitter.PushLiteral(ch);
+                emitter.PushLiteralConstant(ch);
             }
             else if (literal.arrayLiteral() != null)
             {
                 // Array literals need special handling
                 var array = literal.arrayLiteral();
                 // For now, push as a literal array object
-                emitter.PushLiteral(array.GetText());
+                emitter.PushLiteralConstant(array.GetText());
             }
             else if (literal.byteArrayLiteral() != null)
             {
                 // Byte array literals
                 var byteArray = literal.byteArrayLiteral();
-                emitter.PushLiteral(byteArray.GetText());
+                emitter.PushLiteralConstant(byteArray.GetText());
             }
             else
             {
@@ -1199,11 +1536,34 @@ namespace StandaloneCompiler
                 return;
             }
             
-            // Check local variables
-            var index = environment.GetVariableIndex(name);
-            if (index.HasValue)
+            // Check if it's an argument FIRST (arguments use different bytecode than temporaries)
+            if (environment.Arguments.TryGetValue(name, out var argIndex))
             {
-                emitter.PushTemporary(index.Value);
+                // Arguments use bytecodes 48-63 via PushArgument
+                if (argIndex <= 15)
+                {
+                    emitter.Emit((byte)(48 + argIndex));
+                }
+                else
+                {
+                    // Extended push for arguments > 15
+                    emitter.Emit(128); // Extended push
+                    emitter.Emit((byte)((argIndex << 6) | 0x30)); // Type bits for argument
+                }
+                return;
+            }
+            
+            // Check if it's a temporary
+            if (environment.Temporaries.TryGetValue(name, out var tempIndex))
+            {
+                emitter.PushTemporary(tempIndex);
+                return;
+            }
+            
+            // Check hidden temporaries
+            if (environment.HiddenTemporaries.TryGetValue(name, out var hiddenIndex))
+            {
+                emitter.PushTemporary(hiddenIndex);
                 return;
             }
             
@@ -1214,13 +1574,27 @@ namespace StandaloneCompiler
                 return;
             }
             
-            // Global variable
+            // Check class variables (Blue Book: these use PushLiteralVariable with Association)
+            if (environment.ClassVariables.ContainsKey(name))
+            {
+                emitter.PushLiteralVariable(name);
+                return;
+            }
+            
+            // Check pool variables (Blue Book: these also use PushLiteralVariable with Association)
+            if (environment.PoolVariables.ContainsKey(name))
+            {
+                emitter.PushLiteralVariable(name);
+                return;
+            }
+            
+            // Global variable (also uses PushLiteralVariable with Association)
             emitter.PushLiteralVariable(name);
         }
         
         private void StoreVariable(string name, bool leaveOnStack)
         {
-            // Check local variables
+            // Check local variables (arguments and temporaries)
             var index = environment.GetVariableIndex(name);
             if (index.HasValue)
             {
@@ -1243,7 +1617,29 @@ namespace StandaloneCompiler
                 return;
             }
             
-            // Global variable
+            // Check class variables (Blue Book: these use StoreLiteralVariable with Association)
+            if (environment.ClassVariables.ContainsKey(name))
+            {
+                if (leaveOnStack)
+                {
+                    emitter.Dup();
+                }
+                emitter.StoreLiteralVariable(name);
+                return;
+            }
+            
+            // Check pool variables (Blue Book: these also use StoreLiteralVariable with Association)
+            if (environment.PoolVariables.ContainsKey(name))
+            {
+                if (leaveOnStack)
+                {
+                    emitter.Dup();
+                }
+                emitter.StoreLiteralVariable(name);
+                return;
+            }
+            
+            // Global variable (also uses StoreLiteralVariable with Association)
             if (leaveOnStack)
             {
                 emitter.Dup();
@@ -1284,23 +1680,36 @@ namespace StandaloneCompiler
         private class LiteralCollector : Smalltalk80BaseVisitor<object?>
         {
             private readonly BytecodeEmitter emitter;
+            private readonly CompilationEnvironment? environment;
             
-            public LiteralCollector(BytecodeEmitter emitter)
+            // Reference to the static SpecialSelectors dictionary
+            private static readonly Dictionary<string, (int bytecode, int args)> SpecialSelectors = BytecodeEmitter.SpecialSelectors;
+            
+            public LiteralCollector(BytecodeEmitter emitter, CompilationEnvironment? environment = null)
             {
                 this.emitter = emitter;
+                this.environment = environment;
             }
             
             public override object? VisitUnaryMessage(Smalltalk80Parser.UnaryMessageContext context)
             {
                 var selector = context.unarySelector().GetText();
-                emitter.AddLiteral(new Symbol(selector));
+                // Only add to literals if not a special selector
+                if (!SpecialSelectors.ContainsKey(selector))
+                {
+                    emitter.AddLiteral(new Symbol(selector));
+                }
                 return base.VisitUnaryMessage(context);
             }
             
             public override object? VisitBinaryMessage(Smalltalk80Parser.BinaryMessageContext context)
             {
                 var selector = context.binarySelector().GetText();
-                emitter.AddLiteral(new Symbol(selector));
+                // Only add to literals if not a special selector
+                if (!SpecialSelectors.ContainsKey(selector))
+                {
+                    emitter.AddLiteral(new Symbol(selector));
+                }
                 return base.VisitBinaryMessage(context);
             }
             
@@ -1313,8 +1722,49 @@ namespace StandaloneCompiler
                     keywords.Add(part.IDENTIFIER().GetText() + ":");
                 }
                 var selector = string.Join("", keywords);
-                emitter.AddLiteral(new Symbol(selector));
+                // Only add to literals if not a special selector
+                if (!SpecialSelectors.ContainsKey(selector))
+                {
+                    emitter.AddLiteral(new Symbol(selector));
+                }
                 return base.VisitKeywordMessage(context);
+            }
+            
+            public override object? VisitVariable(Smalltalk80Parser.VariableContext context)
+            {
+                var name = context.GetText();
+                
+                // Skip special variables
+                if (name == "self" || name == "super" || name == "true" || 
+                    name == "false" || name == "nil")
+                {
+                    return base.VisitVariable(context);
+                }
+                
+                // Check if it needs an Association in the literal frame
+                // (i.e., it's a class variable, pool variable, or global variable)
+                bool needsAssociation = true;
+                if (environment != null)
+                {
+                    // Check if it's a local variable (argument, temporary, or instance variable)
+                    // These DON'T need Associations
+                    if (environment.Arguments.ContainsKey(name) ||
+                        environment.Temporaries.ContainsKey(name) ||
+                        environment.HiddenTemporaries.ContainsKey(name) ||
+                        environment.InstanceVariables.ContainsKey(name))
+                    {
+                        needsAssociation = false;
+                    }
+                }
+                
+                // If it's a class variable, pool variable, or global variable,
+                // add an Association to the literals for use with PushLiteralVariable
+                if (needsAssociation)
+                {
+                    emitter.AddLiteral(new Association(name, null));
+                }
+                
+                return base.VisitVariable(context);
             }
             
             public override object? VisitLiteral(Smalltalk80Parser.LiteralContext context)
@@ -1325,7 +1775,11 @@ namespace StandaloneCompiler
                     var text = context.numberLiteral().GetText();
                     if (int.TryParse(text, out int intVal))
                     {
-                        emitter.AddLiteral(intVal);
+                        // Only add to literals if not a special small integer
+                        if (intVal != -1 && intVal != 0 && intVal != 1 && intVal != 2)
+                        {
+                            emitter.AddLiteral(intVal);
+                        }
                     }
                     else if (double.TryParse(text, out double floatVal))
                     {
