@@ -36,6 +36,21 @@ namespace Smalltalk80.Interpreter.Config
         public static bool EnableBytecodeTrace { get; set; } = false;
         
         /// <summary>
+        /// Gets or sets whether VM bytecode execution messages ([VM] Executing bytecode) are enabled.
+        /// </summary>
+        public static bool EnableVMBytecodeMessages { get; set; } = false;
+        
+        /// <summary>
+        /// Gets or sets whether InitExpr MethodContext debug output is enabled.
+        /// </summary>
+        public static bool EnableInitExprMethodContext { get; set; } = false;
+        
+        /// <summary>
+        /// Gets or sets whether InitExpr CompiledMethod structure debug output is enabled.
+        /// </summary>
+        public static bool EnableInitExprCompiledMethod { get; set; } = false;
+        
+        /// <summary>
         /// Enables all debug output categories.
         /// </summary>
         public static void EnableAll()
@@ -46,6 +61,9 @@ namespace Smalltalk80.Interpreter.Config
             EnablePhaseDetailOutput = true;
             EnableMethodTrace = true;
             EnableBytecodeTrace = true;
+            EnableVMBytecodeMessages = true;
+            EnableInitExprMethodContext = true;
+            EnableInitExprCompiledMethod = true;
         }
         
         /// <summary>
@@ -59,6 +77,9 @@ namespace Smalltalk80.Interpreter.Config
             EnablePhaseDetailOutput = false;
             EnableMethodTrace = false;
             EnableBytecodeTrace = false;
+            EnableVMBytecodeMessages = false;
+            EnableInitExprMethodContext = false;
+            EnableInitExprCompiledMethod = false;
         }
     }
 }

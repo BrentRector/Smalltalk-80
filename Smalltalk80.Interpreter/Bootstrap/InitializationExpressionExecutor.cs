@@ -9,6 +9,46 @@ using Smalltalk80.Interpreter.VM;
 namespace Smalltalk80.Interpreter.Bootstrap
 {
     /// <summary>
+    /// Configuration options for initialization expression execution.
+    /// </summary>
+    public sealed class InitializationConfig
+    {
+        /// <summary>
+        /// Gets or sets a value indicating whether to skip UI-related initializations.
+        /// When true, initialization failures due to missing UI classes will be logged but not block execution.
+        /// </summary>
+        public bool SkipUIInitializations { get; set; } = false;
+        
+        /// <summary>
+        /// Gets or sets a value indicating whether to continue on initialization errors.
+        /// When true, all initialization errors are logged but execution continues.
+        /// </summary>
+        public bool ContinueOnError { get; set; } = true;
+        
+        /// <summary>
+        /// Gets or sets the set of known UI class names to check for.
+        /// </summary>
+        public HashSet<string> KnownUIClasses { get; } = new HashSet<string>
+        {
+            "BinaryChoice",
+            "BinaryChoiceView",
+            "FillInTheBlank",
+            "FillInTheBlankView",
+            "ActionMenu",
+            "PopUpMenu",
+            "StandardSystemView",
+            "StandardSystemController",
+            "ListView",
+            "SelectionInListView",
+            "PluggableTextView",
+            "CodeView",
+            "TextCollectorView",
+            "FormView",
+            "DisplayTextView"
+        };
+    }
+    
+    /// <summary>
     /// Executes initialization expressions after bootstrap completes.
     /// These are file-scope expressions that need to run to initialize classes.
     /// </summary>
@@ -19,6 +59,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
         private readonly ClassBuilder classBuilder;
         private readonly ISymbolTable symbolTable;
         private readonly IReadOnlyDictionary<string, OOP> classRegistry;
+        private readonly InitializationConfig config;
+        private readonly HashSet<string> missingUIClasses = new HashSet<string>();
+        private readonly Dictionary<string, List<string>> initializationErrors = new Dictionary<string, List<string>>();
         
         /// <summary>
         /// Initializes a new instance of the InitializationExpressionExecutor class.
@@ -28,13 +71,15 @@ namespace Smalltalk80.Interpreter.Bootstrap
             VirtualMachine vm,
             ClassBuilder classBuilder,
             ISymbolTable symbolTable,
-            IReadOnlyDictionary<string, OOP> classRegistry)
+            IReadOnlyDictionary<string, OOP> classRegistry,
+            InitializationConfig? config = null)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
             this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
             this.classRegistry = classRegistry ?? throw new ArgumentNullException(nameof(classRegistry));
+            this.config = config ?? new InitializationConfig();
         }
         
         /// <summary>
@@ -87,25 +132,57 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 try
                 {
                     Console.WriteLine($"[InitExpr] Executing: {expr.Source ?? "Unknown"}");
-            if (expr.Bytecode != null && expr.Bytecode.Count > 0)
-            {
-                Console.WriteLine($"[InitExpr] Bytecode: [{string.Join(", ", expr.Bytecode)}]");
-            }
-            if (expr.Literals != null && expr.Literals.Count > 0)
-            {
-                Console.WriteLine($"[InitExpr] Literals: [{string.Join(", ", expr.Literals)}]");
-            }
                     ExecuteExpression(expr, doItProcess);
                     successCount++;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[InitExpr] Failed to execute '{expr.Source}': {ex.Message}");
-                    // Continue with other expressions
+                    var errorInfo = AnalyzeInitializationError(expr, ex);
+                    RecordInitializationError(expr.Source ?? "Unknown", errorInfo);
+                    
+                    // Check if this is a UI-related failure that should be skipped
+                    if (config.SkipUIInitializations && IsUIRelatedError(errorInfo))
+                    {
+                        Console.WriteLine($"[InitExpr] Skipping UI-related initialization '{expr.Source}': {errorInfo}");
+                    }
+                    else if (config.ContinueOnError)
+                    {
+                        Console.WriteLine($"[InitExpr] Error in '{expr.Source}' (continuing): {errorInfo}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[InitExpr] Fatal error in '{expr.Source}': {errorInfo}");
+                        throw;
+                    }
                 }
             }
             
             Console.WriteLine($"[InitExpr] Completed {successCount}/{expressions.Count} initialization expressions.");
+            
+            // Report missing UI classes if any were detected
+            if (missingUIClasses.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Missing UI classes detected:");
+                foreach (var className in missingUIClasses)
+                {
+                    Console.WriteLine($"  - {className}");
+                }
+            }
+            
+            // Report initialization errors summary
+            if (initializationErrors.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Initialization errors summary:");
+                foreach (var kvp in initializationErrors)
+                {
+                    Console.WriteLine($"  {kvp.Key}:");
+                    foreach (var error in kvp.Value)
+                    {
+                        Console.WriteLine($"    - {error}");
+                    }
+                }
+            }
+            
             return doItProcess;
         }
         
@@ -292,6 +369,121 @@ namespace Smalltalk80.Interpreter.Bootstrap
         }
         
         /// <summary>
+        /// Analyzes an initialization error to determine its cause.
+        /// </summary>
+        /// <param name="expr">The expression that failed.</param>
+        /// <param name="ex">The exception that was thrown.</param>
+        /// <returns>A descriptive error message with analysis.</returns>
+        private string AnalyzeInitializationError(InitializationExpression expr, Exception ex)
+        {
+            var errorMessage = ex.Message;
+            
+            // Check for missing class references in the error or expression
+            if (errorMessage.Contains("not found") || errorMessage.Contains("nil") || 
+                errorMessage.Contains("does not understand"))
+            {
+                // Check if any UI classes are referenced in the expression
+                foreach (var uiClass in config.KnownUIClasses)
+                {
+                    if (expr.Source != null && expr.Source.Contains(uiClass))
+                    {
+                        // Check if the class exists
+                        var classOop = classBuilder.GetClass(uiClass);
+                        if (classOop.IsNil)
+                        {
+                            missingUIClasses.Add(uiClass);
+                            return $"Missing UI class: {uiClass}. {errorMessage}";
+                        }
+                    }
+                }
+                
+                // Check literals for missing class references
+                if (expr.Literals != null)
+                {
+                    foreach (var literal in expr.Literals)
+                    {
+                        if (literal is string literalStr)
+                        {
+                            // Check for Association literals with UI classes
+                            if (literalStr.StartsWith("Association") || literalStr.StartsWith("#"))
+                            {
+                                foreach (var uiClass in config.KnownUIClasses)
+                                {
+                                    if (literalStr.Contains(uiClass))
+                                    {
+                                        var classOop = classBuilder.GetClass(uiClass);
+                                        if (classOop.IsNil)
+                                        {
+                                            missingUIClasses.Add(uiClass);
+                                            return $"Missing UI class in literal: {uiClass}. {errorMessage}";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for stack overflow or infinite recursion
+            if (ex is StackOverflowException || errorMessage.Contains("recursion") || 
+                errorMessage.Contains("stack overflow"))
+            {
+                return $"Stack overflow or infinite recursion detected. {errorMessage}";
+            }
+            
+            // Check for primitive failures
+            if (errorMessage.Contains("primitive") || errorMessage.Contains("Primitive"))
+            {
+                return $"Primitive operation failed. {errorMessage}";
+            }
+            
+            return errorMessage;
+        }
+        
+        /// <summary>
+        /// Determines if an error is UI-related based on the error message.
+        /// </summary>
+        /// <param name="errorInfo">The analyzed error information.</param>
+        /// <returns>True if the error is UI-related; otherwise, false.</returns>
+        private bool IsUIRelatedError(string errorInfo)
+        {
+            if (string.IsNullOrEmpty(errorInfo))
+                return false;
+                
+            // Check if the error mentions any UI classes
+            foreach (var uiClass in config.KnownUIClasses)
+            {
+                if (errorInfo.Contains(uiClass))
+                    return true;
+            }
+            
+            // Check for common UI-related terms
+            var uiTerms = new[] { "View", "Controller", "Window", "Menu", "Display", "Graphics", "Form" };
+            foreach (var term in uiTerms)
+            {
+                if (errorInfo.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Records an initialization error for reporting.
+        /// </summary>
+        /// <param name="expression">The expression that failed.</param>
+        /// <param name="errorInfo">The error information.</param>
+        private void RecordInitializationError(string expression, string errorInfo)
+        {
+            if (!initializationErrors.ContainsKey(expression))
+            {
+                initializationErrors[expression] = new List<string>();
+            }
+            initializationErrors[expression].Add(errorInfo);
+        }
+        
+        /// <summary>
         /// Executes a single initialization expression.
         /// </summary>
         private void ExecuteExpression(InitializationExpression expr, OOP process)
@@ -369,22 +561,24 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 // Set the new context as active and execute the bytecode
                 vm.SetActiveContext(context);
                 
-                // Debug logging to trace execution
-                Console.WriteLine($"[InitExpr] About to execute bytecode for: {expr.Source}");
+                // Debug logging controlled by flags
                 
                 // Pretty-print the MethodContext
-                Console.WriteLine($"[InitExpr] MethodContext:");
-                Console.WriteLine($"  - Receiver: {(context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver))}");
-                Console.WriteLine($"  - Method: CompiledMethod for anonymous doIt");
-                Console.WriteLine($"  - Sender: {(context.Sender == null ? "nil (top-level)" : "previous context")}");
-                Console.WriteLine($"  - PC: {context.PC}");
-                Console.WriteLine($"  - Stack: empty (initial)");
-                Console.WriteLine($"  - Arguments: {context.Arguments.Length}");
-                Console.WriteLine($"  - Temporaries: {context.Temporaries.Length}");
+                if (Config.DebugOptions.EnableInitExprMethodContext)
+                {
+                    Console.WriteLine($"[InitExpr] MethodContext:");
+                    Console.WriteLine($"  - Receiver: {(context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver))}");
+                    Console.WriteLine($"  - Method: CompiledMethod for anonymous doIt");
+                    Console.WriteLine($"  - Sender: {(context.Sender == null ? "nil (top-level)" : "previous context")}");
+                    Console.WriteLine($"  - PC: {context.PC}");
+                    Console.WriteLine($"  - Stack: empty (initial)");
+                    Console.WriteLine($"  - Arguments: {context.Arguments.Length}");
+                    Console.WriteLine($"  - Temporaries: {context.Temporaries.Length}");
+                }
                 
                 // Log the compiled method structure with resolved values
                 var compiledMethodObj = memory.GetObject(compiledMethod);
-                if (compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4)
+                if (Config.DebugOptions.EnableInitExprCompiledMethod && compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4)
                 {
                     Console.WriteLine($"[InitExpr] CompiledMethod structure:");
                     
@@ -466,7 +660,17 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[InitExpr] Error executing '{expr.Source}': {ex.Message}");
+                // Enhance error message with more context
+                var enhancedMessage = AnalyzeInitializationError(expr, ex);
+                Console.WriteLine($"[InitExpr] Error executing '{expr.Source}': {enhancedMessage}");
+                
+                // Check if we should continue despite the error
+                if (config.SkipUIInitializations && IsUIRelatedError(enhancedMessage))
+                {
+                    Console.WriteLine($"[InitExpr] UI-related error detected, skipping due to configuration.");
+                    return; // Don't throw, just return
+                }
+                
                 throw;
             }
             finally
@@ -532,11 +736,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             methodObj.Fields[3] = OOP.FromSmallInteger(header);
             
-            Console.WriteLine($"[InitExpr] Created CompiledMethod with header: 0x{header:X8}");
-            Console.WriteLine($"  - Primitive: {primitiveIndex}");
-            Console.WriteLine($"  - Args: {argCount}");
-            Console.WriteLine($"  - Temps: {tempCount}");
-            Console.WriteLine($"  - Stack size: {stackSize}");
+            if (Config.DebugOptions.EnableInitExprCompiledMethod)
+            {
+                Console.WriteLine($"[InitExpr] Created CompiledMethod with header: 0x{header:X8}");
+                Console.WriteLine($"  - Primitive: {primitiveIndex}");
+                Console.WriteLine($"  - Args: {argCount}");
+                Console.WriteLine($"  - Temps: {tempCount}");
+                Console.WriteLine($"  - Stack size: {stackSize}");
+            }
             
             return methodOop;
         }
@@ -855,14 +1062,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 var classOop = classBuilder.GetClass(keyName);
                 if (!classOop.IsNil)
                 {
-                    Console.WriteLine($"[InitExpr] Resolved Association for class {keyName}: {classOop}");
+                    // Resolved Association for class
                     return CreateAssociation(keyName, classOop);
                 }
                 
                 // Check if it's in the classRegistry passed to the constructor
                 if (classRegistry.TryGetValue(keyName, out var registryClassOop))
                 {
-                    Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} from registry: {registryClassOop}");
+                    // Resolved Association from registry
                     return CreateAssociation(keyName, registryClassOop);
                 }
                 
@@ -870,7 +1077,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 var globalValue = GetGlobalValue(keyName);
                 if (!globalValue.IsNil)
                 {
-                    Console.WriteLine($"[InitExpr] Resolved Association for global {keyName}: {globalValue}");
+                    // Resolved Association for global
                     return CreateAssociation(keyName, globalValue);
                 }
                 

@@ -124,11 +124,7 @@ public sealed class MessageDispatcher
                 break;
             
             // Debug: Show which class we're checking
-            if (Config.DebugOptions.EnableMethodTrace)
-            {
-                var className = GetClassName(currentClass);
-                Console.WriteLine($"[LOOKUP]   Checking class {className} (hierarchy level {depth})");
-            }
+            // Removed debug output - checking class hierarchy level
             
             // Get method dictionary using cached field index
             var methodDict = behaviorMethodDictIndex >= 0 
@@ -136,24 +132,13 @@ public sealed class MessageDispatcher
                 : OOP.Nil;
                 
             // Special debug for Object class's initialize
-            if (Config.DebugOptions.EnableMethodTrace)
-            {
-                var className = GetClassName(currentClass);
-                if (className == "Object class" && GetSelectorString(selector) == "initialize")
-                {
-                    Console.WriteLine($"[LOOKUP]   DEBUG: Looking for initialize in Object class, methodDict={methodDict}");
-                }
-            }
+            // Removed debug output - special case for Object class initialize
                 
             if (!methodDict.IsNil)
             {
                 var method = LookupInDictionary(methodDict, selector);
                 if (!method.IsNil)
                 {
-                    if (Config.DebugOptions.EnableMethodTrace)
-                    {
-                        Console.WriteLine($"[LOOKUP]   Found method {method} in class {currentClass}");
-                    }
                     return (method, currentClass);
                 }
             }
@@ -195,12 +180,7 @@ public sealed class MessageDispatcher
         if (dictObj == null)
             return OOP.Nil;
         
-        // Special debug for initialize selector
-        if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
-        {
-            Console.WriteLine($"[LOOKUP]   DEBUG: Looking up 'initialize' in dictionary {dictionary}");
-            Console.WriteLine($"[LOOKUP]   DEBUG: Dictionary has {dictObj.Fields.Length} fields");
-        }
+        // Removed special debug for initialize selector
         
         // MethodDictionary format as installed by MethodInstaller:
         // Fields[0] = tally
@@ -230,27 +210,6 @@ public sealed class MessageDispatcher
         // Keys are in dictObj.Fields[2..n], values are in valueArrayObj.Fields at corresponding index
         var capacity = dictObj.Fields.Length - 2; // Subtract tally and valueArray fields
         
-        // Special debug for initialize  
-        if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
-        {
-            Console.WriteLine($"[LOOKUP]   DEBUG: Searching {capacity} slots in dictionary");
-            Console.WriteLine($"[LOOKUP]   DEBUG: Looking for selector OOP {selector.RawValue}");
-            
-            // Show keys around index 20-22
-            for (int j = 18; j < Math.Min(25, capacity); j++)
-            {
-                var k = dictObj.Fields[2 + j];
-                if (!k.IsNil)
-                {
-                    var keyStr = GetSelectorString(k);
-                    Console.WriteLine($"[LOOKUP]   DEBUG: Key at field index {2+j}, array index {j}: {keyStr} (OOP {k.RawValue})");
-                    if (j < valueArrayObj.Fields.Length && !valueArrayObj.Fields[j].IsNil)
-                    {
-                        Console.WriteLine($"[LOOKUP]   DEBUG:   -> value at index {j}: OOP {valueArrayObj.Fields[j].RawValue}");
-                    }
-                }
-            }
-        }
         
         for (int i = 0; i < capacity; i++)
         {
@@ -262,15 +221,7 @@ public sealed class MessageDispatcher
                 // Found the selector, return the corresponding method from valueArray
                 if (i < valueArrayObj.Fields.Length)
                 {
-                    var methodOop = valueArrayObj.Fields[i];
-                    if (Config.DebugOptions.EnableMethodTrace && GetSelectorString(selector) == "initialize")
-                    {
-                        Console.WriteLine($"[LOOKUP]   DEBUG: FOUND at index {i}");
-                        Console.WriteLine($"[LOOKUP]   DEBUG: valueArrayOop = {valueArrayOop}");
-                        Console.WriteLine($"[LOOKUP]   DEBUG: valueArrayObj.Fields[{i}] = {methodOop}");
-                        Console.WriteLine($"[LOOKUP]   DEBUG: Returning method OOP {methodOop.RawValue}");
-                    }
-                    return methodOop;
+                    return valueArrayObj.Fields[i];
                 }
             }
         }

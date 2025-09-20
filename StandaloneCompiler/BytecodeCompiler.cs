@@ -1252,8 +1252,9 @@ namespace StandaloneCompiler
         
         private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, int cacheReceiver = -1)
         {
-            // Compile receiver
+            // Compile receiver and check if it's super
             var messageBase = expr.messageBase();
+            bool receiverIsSuper = IsReceiverSuper(messageBase);
             CompileMessageBase(messageBase);
             
             // Cache receiver if needed (for cascades)
@@ -1270,7 +1271,15 @@ namespace StandaloneCompiler
                 foreach (var msg in unaryMessages)
                 {
                     var selector = msg.unarySelector().GetText();
-                    emitter.EmitSend(selector, 0);
+                    if (receiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 0);
+                        receiverIsSuper = false; // Only the first message is a super send
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 0);
+                    }
                 }
             }
             
@@ -1282,7 +1291,15 @@ namespace StandaloneCompiler
                 {
                     var selector = msg.binarySelector().GetText();
                     CompileMessageBase(msg.messageBase());
-                    emitter.EmitSend(selector, 1);
+                    if (receiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 1);
+                        receiverIsSuper = false; // Only the first message is a super send
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 1);
+                    }
                 }
             }
             
@@ -1290,7 +1307,7 @@ namespace StandaloneCompiler
             var keywordMessage = expr.keywordMessage();
             if (keywordMessage != null)
             {
-                CompileKeywordMessage(keywordMessage);
+                CompileKeywordMessage(keywordMessage, receiverIsSuper);
             }
         }
         
@@ -1320,7 +1337,7 @@ namespace StandaloneCompiler
             }
         }
         
-        private void CompileKeywordMessage(Smalltalk80Parser.KeywordMessageContext msg)
+        private void CompileKeywordMessage(Smalltalk80Parser.KeywordMessageContext msg, bool isSuper = false)
         {
             var keywordParts = msg.keywordPart();
             var keywords = new List<string>();
@@ -1334,12 +1351,20 @@ namespace StandaloneCompiler
             
             // Build selector
             var selector = string.Join("", keywords);
-            emitter.EmitSend(selector, keywordParts.Length);
+            if (isSuper)
+            {
+                emitter.EmitSuperSend(selector, keywordParts.Length);
+            }
+            else
+            {
+                emitter.EmitSend(selector, keywordParts.Length);
+            }
         }
         
         private void CompileNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext expr)
         {
             var messageBase = expr.messageBase();
+            bool receiverIsSuper = IsReceiverSuper(messageBase);
             CompileMessageBase(messageBase);
             
             // Process unary messages
@@ -1349,7 +1374,15 @@ namespace StandaloneCompiler
                 foreach (var msg in unaryMessages)
                 {
                     var selector = msg.unarySelector().GetText();
-                    emitter.EmitSend(selector, 0);
+                    if (receiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 0);
+                        receiverIsSuper = false; // Only the first message is a super send
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 0);
+                    }
                 }
             }
             
@@ -1361,7 +1394,15 @@ namespace StandaloneCompiler
                 {
                     var selector = msg.binarySelector().GetText();
                     CompileMessageBase(msg.messageBase());
-                    emitter.EmitSend(selector, 1);
+                    if (receiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 1);
+                        receiverIsSuper = false; // Only the first message is a super send
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 1);
+                    }
                 }
             }
         }
@@ -1671,6 +1712,17 @@ namespace StandaloneCompiler
         {
             // Blue Book return bytecodes: 120-125
             return bytecode >= 120 && bytecode <= 125;
+        }
+        
+        private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext baseCtx)
+        {
+            // Check if the receiver is the special variable "super"
+            if (baseCtx.variable() != null)
+            {
+                var varName = baseCtx.variable().GetText();
+                return varName == "super";
+            }
+            return false;
         }
         
         /// <summary>

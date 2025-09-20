@@ -12,6 +12,8 @@ namespace Smalltalk80.Interpreter
     /// </summary>
     public class Program
     {
+        private static bool skipUIInitializations = false;
+        
         public static void Main(string[] args)
         {
             try
@@ -22,6 +24,14 @@ namespace Smalltalk80.Interpreter
                 // Create VM with larger memory size for complete system
                 // The complete system has 223 classes and ~4500 methods
                 var vm = new VirtualMachine(initialMemorySize: 262144); // 256K objects
+                
+                // Configure UI initialization skipping if requested
+                if (skipUIInitializations)
+                {
+                    vm.SetSkipUIInitializations(true);
+                    Console.WriteLine("UI-related initializations will be skipped.");
+                    Console.WriteLine();
+                }
                 
                 // Look for the system image JSON file in multiple locations
                 string? systemImagePath = null;
@@ -147,6 +157,21 @@ namespace Smalltalk80.Interpreter
                                     DebugOptions.EnableBytecodeTrace = true;
                                     Console.WriteLine("Bytecode execution trace enabled.");
                                     break;
+                                case "vmbytecode":
+                                case "vm":
+                                    DebugOptions.EnableVMBytecodeMessages = true;
+                                    Console.WriteLine("[VM] bytecode execution messages enabled.");
+                                    break;
+                                case "initcontext":
+                                case "initexprcontext":
+                                    DebugOptions.EnableInitExprMethodContext = true;
+                                    Console.WriteLine("InitExpr MethodContext debug output enabled.");
+                                    break;
+                                case "initmethod":
+                                case "initexprmethod":
+                                    DebugOptions.EnableInitExprCompiledMethod = true;
+                                    Console.WriteLine("InitExpr CompiledMethod structure debug output enabled.");
+                                    break;
                                 default:
                                     Console.WriteLine($"Unknown debug option: {option}");
                                     break;
@@ -159,6 +184,11 @@ namespace Smalltalk80.Interpreter
                         DebugOptions.EnableAll();
                         Console.WriteLine("All debug output enabled.");
                     }
+                }
+                else if (arg == "--no-ui" || arg == "--headless")
+                {
+                    skipUIInitializations = true;
+                    Console.WriteLine("UI initializations will be skipped (headless mode).");
                 }
                 else
                 {
@@ -189,8 +219,15 @@ namespace Smalltalk80.Interpreter
             Console.WriteLine("        detail           - Enable phase detail output (Set name, etc.)");
             Console.WriteLine("        trace            - Enable method invocation trace");
             Console.WriteLine("        bytecode         - Enable bytecode execution trace");
+            Console.WriteLine("        vmbytecode       - Enable [VM] bytecode execution messages");
+            Console.WriteLine("        initcontext      - Enable InitExpr MethodContext debug output");
+            Console.WriteLine("        initmethod       - Enable InitExpr CompiledMethod structure output");
             Console.WriteLine("      Multiple options can be comma-separated: --debug debug,method");
             Console.WriteLine("      If no options specified, enables all debug output");
+            Console.WriteLine();
+            Console.WriteLine("  --no-ui, --headless   Skip UI-related initializations");
+            Console.WriteLine("                        Use for headless/server environments");
+            Console.WriteLine("                        Continues even if UI classes are missing");
             Console.WriteLine();
             Console.WriteLine("  --help, -h            Show this help message");
             Console.WriteLine("  --version, -v         Show version information");
@@ -199,6 +236,7 @@ namespace Smalltalk80.Interpreter
             Console.WriteLine("  Smalltalk80.Interpreter --debug all");
             Console.WriteLine("  Smalltalk80.Interpreter -d debug,method");
             Console.WriteLine("  Smalltalk80.Interpreter --debug class");
+            Console.WriteLine("  Smalltalk80.Interpreter --no-ui         # Run without UI support");
         }
     }
 }

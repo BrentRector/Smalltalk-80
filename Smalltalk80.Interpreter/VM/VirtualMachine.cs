@@ -34,9 +34,10 @@ namespace Smalltalk80.Interpreter.VM
         private MethodContext? activeContext;
         private bool bootstrapComplete = false;
         private int recursionDepth = 0;
-        private const int MaxRecursionDepth = 5;
+        private const int MaxRecursionDepth = 100;
         private bool schedulerEnabled = false;
         private OOP doItProcess = OOP.Nil;
+        private InitializationConfig initializationConfig;
 
         /// <summary>
         /// Creates a new virtual machine instance.
@@ -68,6 +69,13 @@ namespace Smalltalk80.Interpreter.VM
                 specialObjectsArray[i] = OOP.Nil;
             }
             
+            // Create default initialization configuration
+            initializationConfig = new InitializationConfig
+            {
+                SkipUIInitializations = false,  // Can be changed via property
+                ContinueOnError = true          // Continue on errors by default
+            };
+            
             RegisterPrimitives();
         }
 
@@ -92,6 +100,30 @@ namespace Smalltalk80.Interpreter.VM
         /// <param name="className">The name of the class to retrieve.</param>
         /// <returns>The OOP of the class, or OOP.Nil if not found.</returns>
         public OOP GetClassByName(string className) => classBuilder.GetClass(className);
+        
+        /// <summary>
+        /// Gets or sets the initialization configuration.
+        /// Configure this before calling Bootstrap to control initialization behavior.
+        /// </summary>
+        public InitializationConfig InitializationConfig 
+        { 
+            get => initializationConfig;
+            set => initializationConfig = value ?? new InitializationConfig();
+        }
+        
+        /// <summary>
+        /// Configures the VM to skip UI-related initializations.
+        /// Call this before Bootstrap() if running in a headless environment.
+        /// </summary>
+        /// <param name="skip">True to skip UI initializations; false to include them.</param>
+        public void SetSkipUIInitializations(bool skip = true)
+        {
+            initializationConfig.SkipUIInitializations = skip;
+            if (skip)
+            {
+                Console.WriteLine("[VM] Configured to skip UI-related initializations");
+            }
+        }
         
         /// <summary>
         /// Gets or sets whether process scheduling is enabled.
@@ -1313,7 +1345,7 @@ namespace Smalltalk80.Interpreter.VM
                 
                 byte bytecode = (byte)byteOop.SmallIntegerValue;
                 
-                if (DebugOptions.EnableMethodTrace || DebugOptions.EnableBytecodeTrace)
+                if (DebugOptions.EnableVMBytecodeMessages)
                 {
                     Console.WriteLine($"[VM] Executing bytecode: {bytecode} (0x{bytecode:X2}) at PC {context.PC - 1}");
                 }
@@ -1761,13 +1793,14 @@ namespace Smalltalk80.Interpreter.VM
             
             Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
             
-            // Create the initialization expression executor
+            // Create the initialization expression executor with configuration
             var executor = new InitializationExpressionExecutor(
                 memory, 
                 this, 
                 classBuilder, 
                 this, // ISymbolTable
-                classBuilder.GetAllClasses());
+                classBuilder.GetAllClasses(),
+                initializationConfig);
             
             // Check if we have an existing process from REPL setup
             var existingProcess = GetDoItProcess();
