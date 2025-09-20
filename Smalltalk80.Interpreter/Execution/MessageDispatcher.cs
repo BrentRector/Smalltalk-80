@@ -295,12 +295,17 @@ public sealed class MessageDispatcher
     
     /// <summary>
     /// Gets a class by name from the system dictionary.
-    /// This is a placeholder - should be provided by the VM.
     /// </summary>
     private OOP GetClassByName(string name)
     {
-        // This would normally look up in the system dictionary
-        // For now, return nil
+        // Use the VM's class lookup if available
+        if (fieldAccessor is VirtualMachine vm)
+        {
+            return vm.GetClass(name);
+        }
+        
+        // Fallback: should not happen
+        Console.WriteLine($"[WARNING] GetClassByName called without VM access for class: {name}");
         return OOP.Nil;
     }
     
