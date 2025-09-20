@@ -26,8 +26,8 @@ public sealed class SimpleCompilerTests
     public void Compiler_GeneratedClasses_Exist()
     {
         // Arrange & Act
-        var lexerType = typeof(Generated.Smalltalk80Lexer);
-        var parserType = typeof(Generated.Smalltalk80Parser);
+        var lexerType = typeof(Smalltalk80Lexer);
+        var parserType = typeof(Smalltalk80Parser);
         
         // Assert
         lexerType.Should().NotBeNull();

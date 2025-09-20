@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/StandaloneCompiler/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -19,7 +19,7 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace StandaloneCompiler.Generated {
+namespace StandaloneCompiler {
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using IToken = Antlr4.Runtime.IToken;
@@ -666,4 +666,4 @@ public partial class Smalltalk80BaseVisitor<Result> : AbstractParseTreeVisitor<R
 	/// <return>The visitor result.</return>
 	public virtual Result VisitClassName([NotNull] Smalltalk80Parser.ClassNameContext context) { return VisitChildren(context); }
 }
-} // namespace StandaloneCompiler.Generated
+} // namespace StandaloneCompiler

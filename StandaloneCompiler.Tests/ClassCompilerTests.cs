@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Antlr4.Runtime;
-using StandaloneCompiler.Generated;
 
 namespace StandaloneCompiler.Tests;
 

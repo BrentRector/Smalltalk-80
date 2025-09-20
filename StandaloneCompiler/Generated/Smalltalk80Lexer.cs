@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80/scripts/../Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/StandaloneCompiler/Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -19,7 +19,7 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace StandaloneCompiler.Generated {
+namespace StandaloneCompiler {
 using System;
 using System.IO;
 using System.Text;
@@ -230,4 +230,4 @@ public partial class Smalltalk80Lexer : Lexer {
 
 
 }
-} // namespace StandaloneCompiler.Generated
+} // namespace StandaloneCompiler

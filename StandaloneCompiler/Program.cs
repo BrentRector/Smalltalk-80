@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using StandaloneCompiler.Generated;
 
 namespace StandaloneCompiler
 {
