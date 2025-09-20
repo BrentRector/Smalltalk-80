@@ -501,10 +501,9 @@ namespace StandaloneCompiler
         public void StoreLiteralVariable(string name)
         {
             var index = AddLiteral(new Association(name, null));
-            Emit(129); // Extended store
-            Emit(96);  // Store literal variable
-            Emit((byte)index);
-            Pop();     // Explicit pop
+            Emit(130); // Extended pop and store (bytecode 130 pops the value after storing)
+            Emit((byte)(0xC0 | index));  // Store literal variable: 11xxxxxx (top 2 bits = 11 for literal var, bottom 6 bits = index)
+            // NO Pop() here - bytecode 130 already pops the stack!
         }
         
         // Stack operations
@@ -814,9 +813,11 @@ namespace StandaloneCompiler
                 // Expression should leave its result on the stack
                 // Add return if not already present
                 if (emitter.GetBytecodes().Length == 0 || 
-                    emitter.GetBytecodes()[^1] != 124) // returnTop
+                    emitter.GetBytecodes()[^1] != 120) // returnSelf
                 {
-                    emitter.ReturnTop();
+                    // For expressions that don't leave a value on the stack,
+                    // return self (Smalltalk-80 semantics)
+                    emitter.ReturnSelf();
                 }
             }
             catch (Exception ex)
@@ -1149,13 +1150,8 @@ namespace StandaloneCompiler
             var exprStmt = stmt.expressionStatement();
             if (exprStmt != null)
             {
-                CompileExpression(exprStmt.expression());
-                
-                // Pop intermediate results except for last statement
-                if (!isLast)
-                {
-                    SpillResult();
-                }
+                // Only leave value on stack if it's the last statement
+                CompileExpression(exprStmt.expression(), leaveOnStack: isLast);
             }
         }
         
@@ -1181,25 +1177,26 @@ namespace StandaloneCompiler
             }
         }
         
-        private void CompileExpression(Smalltalk80Parser.ExpressionContext expr)
+        private void CompileExpression(Smalltalk80Parser.ExpressionContext expr, bool leaveOnStack = true)
         {
             var assignExpr = expr.assignmentExpr();
             if (assignExpr != null)
             {
-                CompileAssignmentExpr(assignExpr);
+                CompileAssignmentExpr(assignExpr, leaveOnStack);
             }
         }
         
-        private void CompileAssignmentExpr(Smalltalk80Parser.AssignmentExprContext expr)
+        private void CompileAssignmentExpr(Smalltalk80Parser.AssignmentExprContext expr, bool leaveOnStack = true)
         {
             var variable = expr.variable();
             if (variable != null && expr.ASSIGN() != null)
             {
                 // Assignment: compile RHS first
-                CompileAssignmentExpr(expr.assignmentExpr());
+                // IMPORTANT: RHS must ALWAYS leave value on stack for the store operation
+                CompileAssignmentExpr(expr.assignmentExpr(), leaveOnStack: true);
                 
-                // Store leaves value on stack
-                StoreVariable(variable.GetText(), leaveOnStack: true);
+                // Store, leaving value on stack only if needed
+                StoreVariable(variable.GetText(), leaveOnStack: leaveOnStack);
             }
             else
             {
@@ -1417,6 +1414,44 @@ namespace StandaloneCompiler
             {
                 var varName = baseCtx.variable().GetText();
                 PushVariable(varName);
+            }
+            else if (baseCtx.negativeNumber() != null)
+            {
+                // Handle negative numbers (e.g., -1, -42)
+                var negNum = baseCtx.negativeNumber();
+                var innerBase = negNum.messageBase();
+                
+                // Check if the inner base is a literal number
+                if (innerBase.literal() != null && innerBase.literal().numberLiteral() != null)
+                {
+                    var numText = innerBase.literal().numberLiteral().GetText();
+                    if (int.TryParse(numText, out int positiveVal))
+                    {
+                        int negativeVal = -positiveVal;
+                        
+                        // Use special bytecode for -1
+                        if (negativeVal == -1)
+                        {
+                            emitter.PushMinusOne();
+                        }
+                        else
+                        {
+                            // For other negative integers, push as literal constant
+                            emitter.PushLiteralConstant(negativeVal);
+                        }
+                    }
+                    else if (double.TryParse(numText, out double floatVal))
+                    {
+                        // For negative floats, push as literal constant
+                        emitter.PushLiteralConstant(-floatVal);
+                    }
+                }
+                else
+                {
+                    // For complex expressions like -(x + 1), compile and send negated
+                    CompileMessageBase(innerBase);
+                    emitter.EmitSend("negated", 0);
+                }
             }
             else if (baseCtx.parenthesizedExpr() != null)
             {
@@ -1704,7 +1739,9 @@ namespace StandaloneCompiler
             var bytecodes = emitter.GetBytecodes();
             if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
             {
-                emitter.ReturnTop();
+                // Smalltalk-80 semantics: methods without explicit returns should return self
+                // Use ReturnSelf (bytecode 120) which doesn't require anything on the stack
+                emitter.ReturnSelf();
             }
         }
         

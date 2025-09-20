@@ -258,11 +258,11 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             // Debug output for methods with interesting fields
             if (DebugOptions.EnableMethodInstallerOutput && 
-                (methodDef.Selector == "initialize" || methodDef.EffectivePrimitive > 0 || methodDef.StackDepth > 10))
+                (methodDef.Selector == "initialize" || methodDef.PrimitiveIndex > 0 || methodDef.StackDepth > 10))
             {
                 Console.WriteLine($"[MethodInstaller] Creating method {methodDef.Selector}:");
                 Console.WriteLine($"[MethodInstaller]   Bytecode count: {methodDef.Bytecode.Count}");
-                Console.WriteLine($"[MethodInstaller]   Primitive: {methodDef.EffectivePrimitive}");
+                Console.WriteLine($"[MethodInstaller]   Primitive: {methodDef.PrimitiveIndex}");
                 Console.WriteLine($"[MethodInstaller]   NumArgs: {methodDef.NumArgs}");
                 Console.WriteLine($"[MethodInstaller]   NumTemps: {methodDef.EffectiveTemporaries}");
                 Console.WriteLine($"[MethodInstaller]   StackDepth: {methodDef.StackDepth}");
@@ -277,10 +277,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 methodDef.NumArgs,
                 methodDef.EffectiveTemporaries,
                 methodDef.StackDepth,
-                methodDef.EffectivePrimitive);
+                methodDef.PrimitiveIndex);
             
             if (DebugOptions.EnableMethodInstallerOutput && 
-                (methodDef.Selector == "initialize" || methodDef.EffectivePrimitive > 0 || methodDef.StackDepth > 10))
+                (methodDef.Selector == "initialize" || methodDef.PrimitiveIndex > 0 || methodDef.StackDepth > 10))
             {
                 Console.WriteLine($"[MethodInstaller]   Calculated header: 0x{header:X8}");
             }
@@ -570,16 +570,24 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     // Field 1: value (initially the global object or nil)
                     if (valueName == "null" || valueName == "nil")
                     {
-                        // Try to resolve the global variable
+                        // Try to resolve the global variable as a class
                         var globalOop = classBuilder.GetClass(keyName); // Try as class name
                         if (!globalOop.IsNil)
                         {
                             assocObj.Fields[1] = globalOop;
+                            if (DebugOptions.EnableDebugOutput)
+                            {
+                                Console.WriteLine($"[DEBUG] Resolved Association key #{keyName} to class {globalOop}");
+                            }
                         }
                         else
                         {
                             // Could be another global - initially nil
                             assocObj.Fields[1] = OOP.Nil;
+                            if (DebugOptions.EnableDebugOutput)
+                            {
+                                Console.WriteLine($"[DEBUG] Association key #{keyName} not resolved (not a class), value = nil");
+                            }
                         }
                     }
                     else

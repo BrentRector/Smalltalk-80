@@ -261,6 +261,13 @@ public sealed class BytecodeDispatcher
             }
             
             var value = executionContext.GetFieldByName(association, "value");
+            
+            // Debug: Check if value is valid
+            if (value.IsNil && DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] WARNING: PushLiteralVariable #{index} has nil value!");
+            }
+            
             context.Stack.Push(value);
             
             if (DebugOptions.EnableBytecodeTrace)
@@ -325,6 +332,11 @@ public sealed class BytecodeDispatcher
     /// </summary>
     private bool PopStackTop(MethodContext context)
     {
+        if (context.Stack.Count == 0)
+        {
+            throw new InvalidOperationException($"PopStackTop (bytecode 135): Stack is empty at PC {context.PC-1}");
+        }
+        
         context.Stack.Pop();
         
         if (DebugOptions.EnableBytecodeTrace)
@@ -506,6 +518,11 @@ public sealed class BytecodeDispatcher
         var nextByte = GetNextByte(context);
         var variableType = (nextByte >> 6) & 0x03; // Extract jj (bits 6-7)
         var variableIndex = nextByte & 0x3F; // Extract kkkkkk (bits 0-5)
+        
+        if (context.Stack.Count == 0)
+        {
+            throw new InvalidOperationException($"ExtendedStore: Stack is empty at PC {context.PC-2}");
+        }
         
         var value = context.Stack.Top; // Store doesn't pop
         

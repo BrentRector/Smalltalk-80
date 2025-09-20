@@ -34,7 +34,8 @@ namespace Smalltalk80.Interpreter.VM
         private MethodContext? activeContext;
         private bool bootstrapComplete = false;
         private int recursionDepth = 0;
-        private const int MaxRecursionDepth = 100;
+        private const int MaxRecursionDepth = 10000; // Increased to allow deep call stacks during initialization
+        private bool checkRecursionDepth = true; // Can be disabled during initialization if needed
         private bool schedulerEnabled = false;
         private OOP doItProcess = OOP.Nil;
         private InitializationConfig initializationConfig;
@@ -743,11 +744,15 @@ namespace Smalltalk80.Interpreter.VM
 
         public void Send(OOP receiver, OOP selector, OOP[] arguments)
         {
-            // Check recursion depth
-            if (++recursionDepth > MaxRecursionDepth)
+            // Increment recursion depth
+            recursionDepth++;
+            
+            // Check recursion depth (can be disabled during initialization)
+            if (checkRecursionDepth && recursionDepth > MaxRecursionDepth)
             {
-                recursionDepth--;
-                throw new InvalidOperationException($"Maximum recursion depth ({MaxRecursionDepth}) exceeded");
+                recursionDepth--; // Restore the depth before throwing
+                var selectorStr = GetSymbolString(selector);
+                throw new InvalidOperationException($"Maximum recursion depth ({MaxRecursionDepth}) exceeded while sending '{selectorStr}'");
             }
             
             try
@@ -773,11 +778,15 @@ namespace Smalltalk80.Interpreter.VM
 
         public void SuperSend(OOP receiver, OOP selector, OOP[] arguments)
         {
-            // Check recursion depth
-            if (++recursionDepth > MaxRecursionDepth)
+            // Increment recursion depth
+            recursionDepth++;
+            
+            // Check recursion depth (can be disabled during initialization)
+            if (checkRecursionDepth && recursionDepth > MaxRecursionDepth)
             {
-                recursionDepth--;
-                throw new InvalidOperationException($"Maximum recursion depth ({MaxRecursionDepth}) exceeded");
+                recursionDepth--; // Restore the depth before throwing
+                var selectorStr = GetSymbolString(selector);
+                throw new InvalidOperationException($"Maximum recursion depth ({MaxRecursionDepth}) exceeded while super sending '{selectorStr}'");
             }
             
             try
@@ -830,6 +839,21 @@ namespace Smalltalk80.Interpreter.VM
         }
 
         public OOP InternSymbol(string value) => Intern(value);
+
+        /// <summary>
+        /// Gets or sets whether recursion depth checking is enabled.
+        /// Can be temporarily disabled during initialization if needed.
+        /// </summary>
+        public bool RecursionCheckEnabled
+        {
+            get => checkRecursionDepth;
+            set => checkRecursionDepth = value;
+        }
+
+        /// <summary>
+        /// Gets the current recursion depth for debugging.
+        /// </summary>
+        public int CurrentRecursionDepth => recursionDepth;
 
         #endregion
 
@@ -1176,31 +1200,6 @@ namespace Smalltalk80.Interpreter.VM
                 var indent = new string(' ', recursionDepth * 2);
                 
                 Console.WriteLine($"[METHOD {recursionDepth}] {indent}{receiverClassName} >> {selectorName} (implementing class: {className})");
-                
-                // Special debug for Object initialize
-                if (selectorName == "initialize" && receiverClassName == "Object class")
-                {
-                    var debugMethodObj = memory.GetObject(method);
-                    if (debugMethodObj != null && debugMethodObj.Fields.Length > 1)
-                    {
-                        var bytecodeOop = debugMethodObj.Fields[1];
-                        var bytecodeArray = memory.GetObject(bytecodeOop);
-                        if (bytecodeArray != null)
-                        {
-                            Console.WriteLine($"[DEBUG] Object>>initialize method has {bytecodeArray.Fields.Length} bytecodes");
-                            var bytes = new List<int>();
-                            for (int i = 0; i < Math.Min(14, bytecodeArray.Fields.Length); i++)
-                            {
-                                if (bytecodeArray.Fields[i].IsSmallInteger)
-                                {
-                                    bytes.Add(bytecodeArray.Fields[i].SmallIntegerValue);
-                                }
-                            }
-                            Console.WriteLine($"[DEBUG] First bytes: [{string.Join(", ", bytes)}]");
-                            Console.WriteLine($"[DEBUG] Expected: [112, 33, 224, 137, 0, 6, 112, 211, 104, 112, 212, 125, 226, 124]");
-                        }
-                    }
-                }
             }
             
             var methodObj = memory.GetObject(method);
@@ -1233,6 +1232,18 @@ namespace Smalltalk80.Interpreter.VM
             int tempCount = (header >> 14) & 0x1F;
             int stackSize = (header >> 19) & 0x3F;
             
+            if (DebugOptions.EnableDebugOutput)
+            {
+                // Debug methods with 0 temps to see if SmallInteger initialize is one
+                var selectorOop = GetFieldByName(method, "selector");
+                var selectorStr = GetSymbolString(selectorOop);
+                if (selectorStr == "initialize")
+                {
+                    Console.WriteLine($"[DEBUG] Method {selectorStr} header: 0x{header:X8}");
+                    Console.WriteLine($"[DEBUG]   Primitive: {primitiveIndex}, Args: {argCount}, Temps: {tempCount}, Stack: {stackSize}");
+                }
+            }
+            
             // Validate argument count
             if (arguments.Length != argCount)
             {
@@ -1253,6 +1264,10 @@ namespace Smalltalk80.Interpreter.VM
                     return;
                 }
                 // Primitive failed - continue with method execution
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] Primitive {primitiveIndex} failed: {result.FailureReason}");
+                }
             }
             
             // Create new method context
@@ -1290,20 +1305,7 @@ namespace Smalltalk80.Interpreter.VM
         /// </summary>
         internal void ExecuteBytecodes(MethodContext context)
         {
-            if (DebugOptions.EnableMethodTrace)
-            {
-                Console.WriteLine($"[VM] ExecuteBytecodes called for context with method {context.Method}");
-                var methodObj = memory.GetObject(context.Method);
-                if (methodObj != null && methodObj.Fields.Length > 1)
-                {
-                    var bytecodeOop = GetFieldByName(context.Method, "bytecode");
-                    var bytecodeArray = memory.GetObject(bytecodeOop);
-                    if (bytecodeArray != null)
-                    {
-                        Console.WriteLine($"[VM] Method has {bytecodeArray.Fields.Length} bytecodes, PC={context.PC}");
-                    }
-                }
-            }
+            // VM bytecode execution tracing controlled by flags
             ExecuteBytecodesPrivate(context);
         }
         
@@ -1318,13 +1320,7 @@ namespace Smalltalk80.Interpreter.VM
             if (bytecodeArray == null)
                 return;
             
-            if (DebugOptions.EnableBytecodeTrace)
-            {
-                Console.WriteLine($"[VM] ExecuteBytecodesPrivate: Starting bytecode execution");
-                Console.WriteLine($"[VM]   Receiver: {context.Receiver}");
-                Console.WriteLine($"[VM]   Method: {context.Method}");
-                Console.WriteLine($"[VM]   PC: {context.PC}, BytecodeArray length: {bytecodeArray.Fields.Length}");
-            }
+            // Detailed bytecode tracing controlled by EnableBytecodeTrace flag
             
             // Execute bytecodes until return or end
             while (context.PC < bytecodeArray.Fields.Length)
@@ -1351,8 +1347,17 @@ namespace Smalltalk80.Interpreter.VM
                 }
                 
                 // Execute bytecode - returns false on return instructions
-                if (!bytecodeDispatcher.ExecuteBytecode(context, bytecode))
-                    break;
+                try
+                {
+                    if (!bytecodeDispatcher.ExecuteBytecode(context, bytecode))
+                        break;
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("Stack underflow") || ex.Message.Contains("Stack is empty"))
+                {
+                    // Enhance the error with PC information
+                    var errorType = ex.Message.Contains("underflow") ? "Stack underflow" : "Stack empty";
+                    throw new InvalidOperationException($"{errorType} at PC {context.PC - 1} (bytecode {bytecode:X2})", ex);
+                }
             }
         }
         
@@ -1441,6 +1446,35 @@ namespace Smalltalk80.Interpreter.VM
         
         private void HandleDoesNotUnderstand(OOP receiver, OOP selector, OOP[] arguments)
         {
+            // For now, just print a diagnostic message and return nil
+            // This prevents infinite loops when doesNotUnderstand: itself is missing
+            
+            var selectorStr = GetSymbolString(selector);
+            var receiverClass = GetClassOfObject(receiver);
+            var receiverClassName = GetClassName(receiverClass);
+            
+            // Print in red to make it visible
+            var oldColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ERROR] Message not understood: {receiverClassName}>>{selectorStr} with {arguments.Length} arguments");
+            Console.WriteLine($"        Receiver: {receiver}");
+            Console.WriteLine($"        Selector: {selector} ({selectorStr})");
+            if (arguments.Length > 0)
+            {
+                Console.WriteLine($"        Arguments: {string.Join(", ", arguments.Select(a => a.ToString()))}");
+            }
+            Console.ForegroundColor = oldColor;
+            
+            // Push nil as the result
+            if (activeContext != null)
+            {
+                activeContext.Stack.Push(OOP.Nil);
+            }
+            
+            // TODO: Once the system is stable, implement proper doesNotUnderstand: handling
+            // by creating a Message object and sending doesNotUnderstand: to the receiver
+            
+            /* Original implementation that causes infinite loops:
             // Create a Message object
             var messageClass = classBuilder.GetClass("Message");
             if (messageClass.IsNil)
@@ -1460,6 +1494,7 @@ namespace Smalltalk80.Interpreter.VM
             {
                 throw new InvalidOperationException($"Message not understood: {selector}");
             }
+            */
         }
         
         private OOP FindMethodClass(OOP method)

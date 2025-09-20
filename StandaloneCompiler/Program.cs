@@ -455,8 +455,19 @@ namespace StandaloneCompiler
                     {
                         result.Add(b ? "true" : "false");
                     }
+                    else if (literal is int || literal is long || literal is short || literal is byte)
+                    {
+                        // Preserve numeric literals as numbers
+                        result.Add(literal);
+                    }
+                    else if (literal is float || literal is double || literal is decimal)
+                    {
+                        // Preserve floating point literals as numbers
+                        result.Add(literal);
+                    }
                     else
                     {
+                        // For strings and other types, keep as is or convert to string
                         result.Add(literal.ToString() ?? "");
                     }
                 }

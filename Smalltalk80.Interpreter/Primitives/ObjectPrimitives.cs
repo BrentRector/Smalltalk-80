@@ -18,44 +18,6 @@ namespace Smalltalk80.Interpreter.Primitives
         }
 
         /// <summary>
-        /// Primitive 1: SmallInteger addition.
-        /// </summary>
-        public static PrimitiveResult PrimitiveSmallIntegerAdd(OOP receiver, OOP[] arguments, IPrimitiveContext context)
-        {
-            if (arguments.Length != 1)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongNumberOfArguments);
-            
-            if (!receiver.IsSmallInteger || !arguments[0].IsSmallInteger)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
-            
-            // Check for overflow
-            long result = (long)receiver.SmallIntegerValue + arguments[0].SmallIntegerValue;
-            if (result < int.MinValue || result > int.MaxValue)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
-            
-            return OOP.FromSmallInteger((int)result);
-        }
-
-        /// <summary>
-        /// Primitive 2: SmallInteger subtraction.
-        /// </summary>
-        public static PrimitiveResult PrimitiveSmallIntegerSubtract(OOP receiver, OOP[] arguments, IPrimitiveContext context)
-        {
-            if (arguments.Length != 1)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongNumberOfArguments);
-            
-            if (!receiver.IsSmallInteger || !arguments[0].IsSmallInteger)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
-            
-            // Check for overflow
-            long result = (long)receiver.SmallIntegerValue - arguments[0].SmallIntegerValue;
-            if (result < int.MinValue || result > int.MaxValue)
-                return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
-            
-            return OOP.FromSmallInteger((int)result);
-        }
-
-        /// <summary>
         /// Primitive 60: Object at: (indexed access).
         /// </summary>
         public static PrimitiveResult PrimitiveAt(OOP receiver, OOP[] arguments, IPrimitiveContext context)
@@ -225,8 +187,6 @@ namespace Smalltalk80.Interpreter.Primitives
         public static void RegisterAll(PrimitiveTable table)
         {
             table.Register(0, "primitiveFail", PrimitiveFail);
-            table.Register(1, "primitiveAdd", PrimitiveSmallIntegerAdd);
-            table.Register(2, "primitiveSubtract", PrimitiveSmallIntegerSubtract);
             table.Register(60, "primitiveAt", PrimitiveAt);
             table.Register(61, "primitiveAtPut", PrimitiveAtPut);
             table.Register(62, "primitiveSize", PrimitiveSize);

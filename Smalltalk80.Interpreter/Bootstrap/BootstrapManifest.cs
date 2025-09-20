@@ -197,11 +197,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         [JsonPropertyName("primitiveIndex")]
         public int PrimitiveIndex { get; init; } = 0;
 
-        /// <summary>
-        /// Primitive index (alternate name).
-        /// </summary>
-        [JsonPropertyName("primitive")]
-        public int? Primitive { get; init; }
+        // Removed duplicate 'primitive' property - standardizing on 'primitiveIndex'
 
         /// <summary>
         /// Whether this is a class method (true) or instance method (false).
@@ -233,11 +229,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         [JsonIgnore]
         public int EffectiveTemporaries => Temporaries ?? NumTemps;
 
-        /// <summary>
-        /// Gets the effective primitive index.
-        /// </summary>
-        [JsonIgnore]
-        public int EffectivePrimitive => Primitive ?? PrimitiveIndex;
+        // Removed EffectivePrimitive - using PrimitiveIndex directly
     }
 
     /// <summary>

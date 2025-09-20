@@ -1,0 +1,119 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-19 22:06:27",
+  "classes": [],
+  "methods": [],
+  "initializationExpressions": [
+    {
+      "bytecode": [
+        64,
+        66,
+        225,
+        67,
+        225,
+        124
+      ],
+      "literals": [
+        "Association(key: #initialize, value: null)",
+        "#|",
+        "Association(key: #n, value: null)",
+        "Association(key: #Digitbuffer, value: null)"
+      ],
+      "numTemps": 0,
+      "stackDepth": 2,
+      "source": "initialize\r\n\t\u0022Initialize class variables\u0022\r\n\t| n |\r\n\tDigitbuffer",
+      "receiver": "initialize",
+      "selector": "|",
+      "arguments": [
+        "n"
+      ]
+    },
+    {
+      "bytecode": [
+        64,
+        33,
+        205,
+        124
+      ],
+      "literals": [
+        "Association(key: #Array, value: null)",
+        32
+      ],
+      "numTemps": 0,
+      "stackDepth": 2,
+      "source": "Array new: 32",
+      "receiver": "Array",
+      "selector": "new:",
+      "arguments": [
+        "32"
+      ]
+    },
+    {
+      "bytecode": [
+        117,
+        124
+      ],
+      "literals": [],
+      "numTemps": 0,
+      "stackDepth": 1,
+      "source": "0",
+      "receiver": "0"
+    },
+    {
+      "bytecode": [
+        118,
+        33,
+        137,
+        0,
+        15,
+        66,
+        67,
+        68,
+        40,
+        213,
+        70,
+        176,
+        202,
+        193,
+        70,
+        70,
+        182,
+        118,
+        176,
+        125,
+        39,
+        182,
+        137,
+        0,
+        2,
+        70,
+        125,
+        117,
+        182,
+        224,
+        124
+      ],
+      "literals": [
+        "#to:do:ifTrue:",
+        32,
+        "Association(key: #Digitbuffer, value: null)",
+        "Association(key: #i, value: null)",
+        "Association(key: #Character, value: null)",
+        "#asciiValue",
+        "Association(key: #n, value: null)",
+        10,
+        "0"
+      ],
+      "numTemps": 0,
+      "stackDepth": 13,
+      "source": "1 to: 32 do:\r\n\t\t[:i | Digitbuffer at: i put: (Character value: $0 asciiValue \u002B n).\r\n\t\t(n := n \u002B 1) = 10 ifTrue: [n := 0",
+      "receiver": "1",
+      "selector": "to:do:ifTrue:",
+      "arguments": [
+        "32",
+        "[:i|Digitbufferat:iput:(Charactervalue:$0asciiValue\u002Bn).(n:=n\u002B1)=10",
+        "[n:=0"
+      ]
+    }
+  ]
+}

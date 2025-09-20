@@ -10,6 +10,12 @@ namespace Smalltalk80.Interpreter.Primitives;
 public static class ArithmeticPrimitives
 {
     /// <summary>
+    /// SmallInteger range limits (30-bit signed integer due to tag bit).
+    /// </summary>
+    private const int SmallIntegerMinValue = -(1 << 30); // -1,073,741,824
+    private const int SmallIntegerMaxValue = (1 << 30) - 1; // 1,073,741,823
+
+    /// <summary>
     /// Primitive 1: SmallInteger + (addition).
     /// </summary>
     /// <param name="receiver">The SmallInteger receiver.</param>
@@ -27,8 +33,8 @@ public static class ArithmeticPrimitives
         // Use long to detect overflow
         long result = (long)receiver.SmallIntegerValue + arguments[0].SmallIntegerValue;
         
-        // Check for SmallInteger range overflow
-        if (result is < int.MinValue or > int.MaxValue)
+        // Check for SmallInteger range overflow (30-bit signed range)
+        if (result < SmallIntegerMinValue || result > SmallIntegerMaxValue)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
         
         return OOP.FromSmallInteger((int)result);
@@ -49,11 +55,11 @@ public static class ArithmeticPrimitives
         if (!receiver.IsSmallInteger || !arguments[0].IsSmallInteger)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
         
-        // Use long to detect overflow
+        // Use long to detect overflow/underflow
         long result = (long)receiver.SmallIntegerValue - arguments[0].SmallIntegerValue;
         
-        // Check for SmallInteger range overflow
-        if (result is < int.MinValue or > int.MaxValue)
+        // Check for SmallInteger range overflow/underflow (30-bit signed range)
+        if (result < SmallIntegerMinValue || result > SmallIntegerMaxValue)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
         
         return OOP.FromSmallInteger((int)result);
@@ -191,8 +197,8 @@ public static class ArithmeticPrimitives
         // Use long to detect overflow
         long result = (long)receiver.SmallIntegerValue * arguments[0].SmallIntegerValue;
         
-        // Check for SmallInteger range overflow
-        if (result is < int.MinValue or > int.MaxValue)
+        // Check for SmallInteger range overflow (30-bit signed range)
+        if (result < SmallIntegerMinValue || result > SmallIntegerMaxValue)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
         
         return OOP.FromSmallInteger((int)result);
@@ -408,12 +414,13 @@ public static class ArithmeticPrimitives
         return OOP.FromSmallInteger(result);
         
         // Local function for left shift with overflow detection
-        static int LeftShiftWithOverflowCheck(int value, int shift)
+        int LeftShiftWithOverflowCheck(int value, int shift)
         {
-            // Check if left shift would overflow
-            if (shift >= 31 || (value != 0 && (value > (int.MaxValue >> shift) || value < (int.MinValue >> shift))))
+            // Check if left shift would overflow SmallInteger range
+            long result = (long)value << shift;
+            if (result < SmallIntegerMinValue || result > SmallIntegerMaxValue)
                 return int.MinValue; // Signal overflow
-            return value << shift;
+            return (int)result;
         }
     }
 

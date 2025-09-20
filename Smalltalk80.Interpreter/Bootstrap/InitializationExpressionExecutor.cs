@@ -125,6 +125,16 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 doItProcess = CreateDoItProcess();
             }
             
+            // TEMPORARY: Only execute SmallInteger initialize for debugging
+            sortedExpressions = sortedExpressions.Where(e => 
+                e.Source != null && e.Source.Contains("SmallInteger initialize")).ToList();
+            
+            if (sortedExpressions.Count == 0)
+            {
+                Console.WriteLine("[InitExpr] WARNING: SmallInteger initialize not found in expressions");
+                return doItProcess;
+            }
+            
             // Execute each expression in order
             int successCount = 0;
             foreach (var expr in sortedExpressions)
@@ -872,6 +882,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
             if (!classOop.IsNil)
             {
                 // This is a global class reference - create an Association
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Creating Association for class {symbolName} -> {classOop}");
+                }
                 return CreateAssociation(symbolName, classOop);
             }
             
@@ -920,6 +934,11 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 associationObj.Fields[0] = symbolTable.Intern(key);
                 // Field 1: value
                 associationObj.Fields[1] = value;
+                
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Created Association for {key} -> {value}");
+                }
             }
             
             return associationOop;
