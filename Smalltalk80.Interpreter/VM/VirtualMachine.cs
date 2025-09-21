@@ -38,7 +38,10 @@ namespace Smalltalk80.Interpreter.VM
         private bool checkRecursionDepth = true; // Can be disabled during initialization if needed
         private bool schedulerEnabled = false;
         private OOP doItProcess = OOP.Nil;
+        private BootstrapManifest? lastLoadedManifest = null;
+        private BootstrapManifest? savedManifest = null; // Store manifest for post-bootstrap initialization
         private InitializationConfig initializationConfig;
+        private bool executingInitialization = false; // Track if we're in initialization phase
 
         /// <summary>
         /// Creates a new virtual machine instance.
@@ -110,6 +113,16 @@ namespace Smalltalk80.Interpreter.VM
         { 
             get => initializationConfig;
             set => initializationConfig = value ?? new InitializationConfig();
+        }
+        
+        /// <summary>
+        /// Gets or sets whether we're currently executing initialization expressions.
+        /// When true, Message Not Understood errors will throw exceptions instead of returning nil.
+        /// </summary>
+        public bool ExecutingInitialization
+        {
+            get => executingInitialization;
+            set => executingInitialization = value;
         }
         
         /// <summary>
@@ -203,47 +216,29 @@ namespace Smalltalk80.Interpreter.VM
             // Load the manifest file first
             var manifest = LoadManifestFromFile(bootstrapPath);
             
+            // Store the manifest for later use (e.g., post-bootstrap initialization)
+            lastLoadedManifest = manifest;
+            
             // Create the classes using ClassBuilder directly
             ProcessBootstrapClasses(manifest);
             
             // Create special objects now that classes exist
             CreateSpecialObjects();
             
+            // Create initial symbol table (needed for SystemDictionary)
+            CreateInitialSymbolTable();
+            
+            // Create system dictionary AND pool dictionaries BEFORE installing methods
+            // This ensures that Associations in methods can find pool dictionaries
+            CreateSystemDictionary();
+            
             // NOW create a single MethodInstaller with access to special objects
-            // and install the methods
+            // and install the methods (pool dictionaries now exist)
             var methodInstaller = new MethodInstaller(memory, classBuilder, this, this, GetSpecialObject);
             methodInstaller.InstallMethods(manifest);
             
-            // Create initial symbol table
-            CreateInitialSymbolTable();
-            
-            // Create system dictionary
-            CreateSystemDictionary();
-            
             bootstrapComplete = true;
             Console.WriteLine($"[VM] Bootstrap complete! Loaded {manifest.Classes.Count} classes");
-            
-            // DEBUG: Check Object metaclass superclass
-            var objectClass = classBuilder.GetClass("Object");
-            if (!objectClass.IsNil)
-            {
-                var objectClassMeta = GetClassOfObject(objectClass);
-                Console.WriteLine($"[DEBUG] Object class = {objectClass}");
-                Console.WriteLine($"[DEBUG] Object metaclass = {objectClassMeta}");
-                
-                if (!objectClassMeta.IsNil)
-                {
-                    var metaObj = memory.GetObject(objectClassMeta);
-                    if (metaObj != null && metaObj.Fields.Length > 0)
-                    {
-                        Console.WriteLine($"[DEBUG] Object metaclass superclass (field 0) = {metaObj.Fields[0]}");
-                        
-                        // Check what Class class is
-                        var classClass = classBuilder.GetClass("Class");
-                        Console.WriteLine($"[DEBUG] Class class = {classClass}");
-                    }
-                }
-            }
             
             // Initialize message dispatcher with common selectors
             messageDispatcher.Initialize();
@@ -261,10 +256,25 @@ namespace Smalltalk80.Interpreter.VM
                 StartExecution();
             }
             
-            // Execute initialization expressions if present
-            // This will initialize Transcript and other globals through Smalltalk code
-            // MUST be done after StartExecution so there's an active process and context
-            ExecuteInitializationExpressions(manifest);
+            // Store the manifest for post-bootstrap initialization
+            savedManifest = manifest;
+
+            // Skip SystemDictionary>>install during bootstrap - it's for snapshot resume, not initial load
+            // The install method tries to initialize classes that need working arithmetic,
+            // but arithmetic needs those initializations - circular dependency
+            // Console.WriteLine("[VM] Calling SystemDictionary>>install to set up core system...");
+            // CallSystemInstall();
+
+            // Then execute initialization expressions with retry logic
+            if (manifest.InitializationExpressions != null && manifest.InitializationExpressions.Count > 0)
+            {
+                Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
+                ExecuteInitializationsWithRetry(manifest.InitializationExpressions);
+            }
+            else
+            {
+                Console.WriteLine("[VM] No initialization expressions found");
+            }
         }
 
         /// <summary>
@@ -416,8 +426,9 @@ namespace Smalltalk80.Interpreter.VM
                 var allClasses = classBuilder.GetAllClasses();
                 
                 // Calculate capacity: need 2 slots per entry (key, value) plus buffer
-                // We need space for classes AND metaclasses
-                int capacity = allClasses.Count * 8; // 2x entries * 2 (class+metaclass) * 2 for efficiency
+                // We need space for classes AND metaclasses, plus pool dictionaries
+                // Add extra space for pool dictionaries and other globals
+                int capacity = (allClasses.Count * 8) + 100; // Extra space for pools and globals
                 
                 // Create SystemDictionary with proper size:
                 // 1 field for tally + capacity for indexed/variable portion
@@ -426,9 +437,91 @@ namespace Smalltalk80.Interpreter.VM
                 
                 // Initialize and register all classes
                 RegisterAllClasses(systemDict);
+                
+                // Create pool dictionaries AFTER registering classes
+                CreatePoolDictionaries(systemDict);
             }
         }
 
+        private void CreatePoolDictionaries(OOP systemDict)
+        {
+            Console.WriteLine("[VM] Creating pool dictionaries...");
+            
+            var dictClass = classBuilder.GetClass("Dictionary");
+            if (dictClass.IsNil)
+            {
+                Console.WriteLine("[VM] Warning: Dictionary class not found - cannot create pool dictionaries");
+                return;
+            }
+            
+            // List of pool dictionaries needed in the Smalltalk-80 system
+            // AltoFilePool removed - no longer needed with Windows file implementation
+            var poolNames = new[] { "FilePool", "TextConstants" };
+            
+            foreach (var poolName in poolNames)
+            {
+                // Create a new Dictionary instance for the pool
+                // Dictionary has tally field + variable indexed part
+                // Start with a reasonable size (32 slots = 16 key-value pairs)
+                var poolDict = memory.AllocateObject(dictClass, 1 + 32);
+                var poolObj = memory.GetObject(poolDict);
+                
+                if (poolObj != null)
+                {
+                    // Initialize tally to 0
+                    poolObj.Fields[0] = OOP.FromSmallInteger(0);
+                    
+                    // Initialize all indexed slots to nil
+                    for (int i = 1; i < poolObj.Fields.Length; i++)
+                    {
+                        poolObj.Fields[i] = OOP.Nil;
+                    }
+                    
+                    // Register the pool dictionary in the system dictionary
+                    var poolSymbol = Intern(poolName);
+                    AddToSystemDictionary(systemDict, poolSymbol, poolDict);
+                    
+                    Console.WriteLine($"[VM] Created pool dictionary: {poolName}");
+                }
+            }
+        }
+        
+        private void AddToSystemDictionary(OOP systemDict, OOP key, OOP value)
+        {
+            var systemDictObj = memory.GetObject(systemDict);
+            if (systemDictObj == null) return;
+            
+            int capacity = systemDictObj.Fields.Length - 1; // -1 for tally field
+            int pairCapacity = capacity / 2; // Each entry uses 2 slots
+            
+            // Simple hash table insertion with linear probing
+            var hash = Math.Abs(key.RawValue) % pairCapacity;
+            
+            for (int i = 0; i < pairCapacity; i++)
+            {
+                var pairIndex = (hash + i) % pairCapacity;
+                var keyIndex = 1 + (pairIndex * 2);     // +1 to skip tally field
+                var valueIndex = keyIndex + 1;
+                
+                if (systemDictObj.Fields[keyIndex].IsNil)
+                {
+                    systemDictObj.Fields[keyIndex] = key;
+                    systemDictObj.Fields[valueIndex] = value;
+                    
+                    // Update tally
+                    var tally = systemDictObj.Fields[0].SmallIntegerValue;
+                    systemDictObj.Fields[0] = OOP.FromSmallInteger(tally + 1);
+                    break;
+                }
+                else if (systemDictObj.Fields[keyIndex].Equals(key))
+                {
+                    // Update existing value
+                    systemDictObj.Fields[valueIndex] = value;
+                    break;
+                }
+            }
+        }
+        
         private void RegisterAllClasses(OOP systemDict)
         {
             var systemDictObj = memory.GetObject(systemDict);
@@ -742,7 +835,21 @@ namespace Smalltalk80.Interpreter.VM
             return blockContextOop;
         }
 
+        /// <summary>
+        /// Tracks the last result from a Send operation for retrieval by SendWithResult.
+        /// </summary>
+        private OOP lastSendResult = OOP.Nil;
+        
         public void Send(OOP receiver, OOP selector, OOP[] arguments)
+        {
+            // Delegate to SendWithResult but discard the result for backward compatibility
+            SendWithResult(receiver, selector, arguments);
+        }
+        
+        /// <summary>
+        /// Sends a message and returns the result.
+        /// </summary>
+        public OOP SendWithResult(OOP receiver, OOP selector, OOP[] arguments)
         {
             // Increment recursion depth
             recursionDepth++;
@@ -764,11 +871,13 @@ namespace Smalltalk80.Interpreter.VM
                 {
                     // Method not found - send doesNotUnderstand:
                     HandleDoesNotUnderstand(receiver, selector, arguments);
-                    return;
+                    return OOP.Nil;
                 }
                 
-                // Execute the method
-                ExecuteMethod(receiver, method, methodClass, arguments);
+                // Execute the method and get result
+                var result = ExecuteMethodWithResult(receiver, method, methodClass, arguments);
+                lastSendResult = result;
+                return result;
             }
             finally
             {
@@ -871,9 +980,8 @@ namespace Smalltalk80.Interpreter.VM
 
         OOP IPrimitiveContext.Send(OOP receiver, OOP selector, OOP[] arguments)
         {
-            Send(receiver, selector, arguments);
-            // Would return the result after execution
-            return OOP.Nil;
+            // Use SendWithResult to properly return the result
+            return SendWithResult(receiver, selector, arguments);
         }
         
         OOP IPrimitiveContext.InternSymbol(string value)
@@ -939,6 +1047,15 @@ namespace Smalltalk80.Interpreter.VM
             var obj = memory.GetObject(objectOop);
             if (obj == null || index < 0 || index >= obj.Fields.Length)
                 return OOP.Nil;
+            
+            // DEBUG: Track Point field access
+            var classOop = obj.Header.ClassOOP;
+            if (classOop.RawValue == 349) // Point class
+            {
+                Console.WriteLine($"[DEBUG POINT GET] Getting Point {objectOop} field {index}");
+                Console.WriteLine($"  - Fields[{index}] = {obj.Fields[index]}");
+                Console.WriteLine($"  - All fields: x={obj.Fields[0]}, y={(obj.Fields.Length > 1 ? obj.Fields[1] : OOP.Nil)}");
+            }
                 
             return obj.Fields[index];
         }
@@ -954,7 +1071,22 @@ namespace Smalltalk80.Interpreter.VM
             if (obj == null || index < 0 || index >= obj.Fields.Length)
                 return false;
                 
+            // DEBUG: Track Point field assignments
+            var classOop = obj.Header.ClassOOP;
+            if (classOop.RawValue == 349) // Point class
+            {
+                Console.WriteLine($"[DEBUG POINT SET] Setting Point {objectOop} field {index} to {value}");
+                Console.WriteLine($"  - Before: Fields[{index}] = {obj.Fields[index]}");
+            }
+            
             obj.Fields[index] = value;
+            
+            if (classOop.RawValue == 349) // Point class
+            {
+                Console.WriteLine($"  - After: Fields[{index}] = {obj.Fields[index]}");
+                Console.WriteLine($"  - All fields: x={obj.Fields[0]}, y={(obj.Fields.Length > 1 ? obj.Fields[1] : OOP.Nil)}");
+            }
+            
             return true;
         }
         
@@ -1182,8 +1314,17 @@ namespace Smalltalk80.Interpreter.VM
 
         private void ExecuteMethod(OOP receiver, OOP method, OOP methodClass, OOP[] arguments)
         {
+            // Delegate to ExecuteMethodWithResult but discard the result for backward compatibility
+            ExecuteMethodWithResult(receiver, method, methodClass, arguments);
+        }
+        
+        /// <summary>
+        /// Executes a method and returns the result.
+        /// </summary>
+        private OOP ExecuteMethodWithResult(OOP receiver, OOP method, OOP methodClass, OOP[] arguments)
+        {
             // Method invocation trace
-            if (DebugOptions.EnableMethodTrace)
+            if (DebugOptions.EnableMethodTrace || DebugOptions.EnableDebugOutput)
             {
                 // Get selector name for the method
                 var selectorOop = GetMethodSelector(method);
@@ -1199,7 +1340,60 @@ namespace Smalltalk80.Interpreter.VM
                 // Create indentation based on recursion depth
                 var indent = new string(' ', recursionDepth * 2);
                 
-                Console.WriteLine($"[METHOD {recursionDepth}] {indent}{receiverClassName} >> {selectorName} (implementing class: {className})");
+                if (DebugOptions.EnableMethodTrace)
+                {
+                    Console.WriteLine($"[METHOD {recursionDepth}] {indent}{receiverClassName} >> {selectorName} (implementing class: {className})");
+                }
+                
+                // ENHANCED DEBUG: Show arguments being passed
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] Method Activation: {receiverClassName}>>{selectorName}");
+                    Console.WriteLine($"  - Method OOP: {method}");
+                    Console.WriteLine($"  - Receiver: {receiver}");
+                    Console.WriteLine($"  - Receiver class: {receiverClassName}");
+                    Console.WriteLine($"  - Argument count: {arguments.Length}");
+                    
+                    // Special tracking for Cursor class>>extent:fromArray:offset:
+                    if (className == "Cursor class" && selectorName == "extent:fromArray:offset:")
+                    {
+                        Console.WriteLine($"[DEBUG] *** SPECIAL TRACKING: Cursor class>>extent:fromArray:offset: ***");
+                    }
+                    
+                    for (int i = 0; i < arguments.Length; i++)
+                    {
+                        var arg = arguments[i];
+                        Console.WriteLine($"  - Argument[{i}]: {arg}");
+                        Console.WriteLine($"    Is nil? {arg.IsNil}");
+                        Console.WriteLine($"    Is SmallInteger? {arg.IsSmallInteger}");
+                        
+                        if (!arg.IsNil && !arg.IsSmallInteger)
+                        {
+                            var argClass = GetClassOfObject(arg);
+                            var argClassName = GetClassName(argClass);
+                            Console.WriteLine($"    Class: {argClassName}");
+                            
+                            // Special handling for Point arguments
+                            if (argClassName == "Point")
+                            {
+                                Console.WriteLine($"    *** POINT ARGUMENT DETECTED ***");
+                                var xField = GetFieldByIndex(arg, 0);
+                                var yField = GetFieldByIndex(arg, 1);
+                                Console.WriteLine($"    Point.x = {xField}");
+                                Console.WriteLine($"    Point.y = {yField}");
+                                
+                                if (xField.IsSmallInteger && yField.IsSmallInteger)
+                                {
+                                    Console.WriteLine($"    Point value: {xField.SmallIntegerValue}@{yField.SmallIntegerValue}");
+                                }
+                            }
+                        }
+                        else if (arg.IsSmallInteger)
+                        {
+                            Console.WriteLine($"    SmallInteger value: {arg.SmallIntegerValue}");
+                        }
+                    }
+                }
             }
             
             var methodObj = memory.GetObject(method);
@@ -1256,12 +1450,12 @@ namespace Smalltalk80.Interpreter.VM
                 var result = primitiveTable.Execute(primitiveIndex, receiver, arguments, this);
                 if (result.Success)
                 {
-                    // Primitive succeeded - push result and return
+                    // Primitive succeeded - push result to activeContext if there is one and return the result
                     if (activeContext != null)
                     {
                         activeContext.Stack.Push(result.Value);
                     }
-                    return;
+                    return result.Value; // Return the primitive result directly
                 }
                 // Primitive failed - continue with method execution
                 if (DebugOptions.EnableDebugOutput)
@@ -1285,10 +1479,17 @@ namespace Smalltalk80.Interpreter.VM
             var previousContext = activeContext;
             activeContext = newContext;
             
+            OOP methodResult = OOP.Nil;
             try
             {
                 // Execute bytecodes
                 ExecuteBytecodes(newContext);
+                
+                // Get the result from the stack (the last value)
+                if (newContext.Stack.Count > 0)
+                {
+                    methodResult = newContext.Stack.Top;
+                }
             }
             finally
             {
@@ -1297,6 +1498,8 @@ namespace Smalltalk80.Interpreter.VM
                     executionStack.Pop();
                 activeContext = previousContext;
             }
+            
+            return methodResult;
         }
         
         /// <summary>
@@ -1464,6 +1667,12 @@ namespace Smalltalk80.Interpreter.VM
                 Console.WriteLine($"        Arguments: {string.Join(", ", arguments.Select(a => a.ToString()))}");
             }
             Console.ForegroundColor = oldColor;
+            
+            // If we're executing initialization expressions, throw an exception to stop execution
+            if (executingInitialization)
+            {
+                throw new InvalidOperationException($"Message not understood during initialization: {receiverClassName}>>{selectorStr}");
+            }
             
             // Push nil as the result
             if (activeContext != null)
@@ -1814,19 +2023,60 @@ namespace Smalltalk80.Interpreter.VM
         private void StoreDoItProcess(OOP process) => doItProcess = process;
         
         /// <summary>
+        /// Runs initialization expressions selectively after bootstrap completes.
+        /// This should only be called after the system is fully functional.
+        /// </summary>
+        /// <param name="classNames">Optional list of class names to initialize. If null, runs all.</param>
+        public void RunPostBootstrapInitializations(HashSet<string>? classNames = null)
+        {
+            if (!bootstrapComplete)
+            {
+                throw new InvalidOperationException("Cannot run initializations before bootstrap is complete");
+            }
+
+            var manifest = lastLoadedManifest;
+            if (manifest == null)
+            {
+                Console.WriteLine("[VM] No manifest available for initialization");
+                return;
+            }
+
+            // Filter initialization expressions if class names provided
+            var expressions = manifest.InitializationExpressions;
+            if (expressions == null || expressions.Count == 0)
+            {
+                Console.WriteLine("[VM] No initialization expressions available");
+                return;
+            }
+
+            if (classNames != null && classNames.Count > 0)
+            {
+                expressions = expressions
+                    .Where(e => e.Receiver != null && classNames.Contains(e.Receiver))
+                    .ToList();
+                Console.WriteLine($"[VM] Running initialization for: {string.Join(", ", classNames)}");
+            }
+
+            ExecuteInitializationExpressions(manifest, expressions);
+        }
+
+        /// <summary>
         /// Executes initialization expressions from the loaded system image.
         /// </summary>
-        private void ExecuteInitializationExpressions(BootstrapManifest manifest)
+        private void ExecuteInitializationExpressions(BootstrapManifest manifest, List<InitializationExpression>? expressions = null)
         {
             Console.WriteLine("[VM] Executing initialization expressions...");
             
-            if (manifest.InitializationExpressions == null || manifest.InitializationExpressions.Count == 0)
+            // Use provided expressions or fall back to all expressions in manifest
+            var toExecute = expressions ?? manifest.InitializationExpressions;
+            
+            if (toExecute == null || toExecute.Count == 0)
             {
                 Console.WriteLine("[VM] No initialization expressions to execute");
                 return;
             }
             
-            Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
+            Console.WriteLine($"[VM] Found {toExecute.Count} initialization expressions");
             
             // Create the initialization expression executor with configuration
             var executor = new InitializationExpressionExecutor(
@@ -1842,7 +2092,7 @@ namespace Smalltalk80.Interpreter.VM
             
             // Execute the initialization expressions with proper hierarchy ordering
             var process = executor.ExecuteInitializationExpressions(
-                manifest.InitializationExpressions.ToList(), 
+                toExecute.ToList(), 
                 existingProcess);
             
             // Store the process for potential REPL use
@@ -2168,6 +2418,241 @@ namespace Smalltalk80.Interpreter.VM
                 Console.WriteLine($"[VM] Error during startup execution: {ex.Message}");
                 // Don't rethrow - allow the system to continue even if startup fails
             }
+        }
+        
+        /// <summary>
+        /// Calls SystemDictionary>>install to set up core system state.
+        /// This establishes critical system infrastructure like SmallInteger ranges.
+        /// </summary>
+        private void CallSystemInstall()
+        {
+            try
+            {
+                // Get the SystemDictionary INSTANCE (not the class!)
+                // The global Smalltalk dictionary is stored as a special object
+                var smalltalkDict = GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+                if (smalltalkDict.IsNil)
+                {
+                    Console.WriteLine("[VM] Warning: Smalltalk global dictionary not found - skipping install");
+                    return;
+                }
+                
+                // Get the install selector
+                var installSelector = Intern("install");
+                if (installSelector.IsNil)
+                {
+                    Console.WriteLine("[VM] Warning: Could not create 'install' selector");
+                    return;
+                }
+                
+                // Send the install message to the SystemDictionary INSTANCE (not the class!)
+                Console.WriteLine("[VM] Sending install message to SystemDictionary instance (Smalltalk global)...");
+                
+                // Temporarily set executingInitialization to false to avoid throwing on MNU
+                var wasExecutingInit = executingInitialization;
+                executingInitialization = false;
+                
+                try
+                {
+                    Send(smalltalkDict, installSelector, []);
+                    Console.WriteLine("[VM] SystemDictionary>>install completed successfully");
+                }
+                catch (Exception ex)
+                {
+                    // Handle errors gracefully - UI might not be available yet
+                    Console.WriteLine($"[VM] Warning: SystemDictionary>>install failed: {ex.Message}");
+                    Console.WriteLine("[VM] This is expected if UI-related code is not available");
+                }
+                finally
+                {
+                    executingInitialization = wasExecutingInit;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VM] Error calling SystemDictionary>>install: {ex.Message}");
+                // Continue - the system may still work without this initialization
+            }
+        }
+        
+        /// <summary>
+        /// Executes initialization expressions with retry logic for failed initializations.
+        /// </summary>
+        /// <param name="expressions">The initialization expressions to execute.</param>
+        private void ExecuteInitializationsWithRetry(List<InitializationExpression> expressions)
+        {
+            if (expressions == null || expressions.Count == 0)
+            {
+                return;
+            }
+            
+            // DEBUGGING: Re-enable retry but keep debug output
+            bool enableRetry = true; // SET TO FALSE TO DISABLE RETRY LOGIC
+            
+            Console.WriteLine($"[VM] Executing {expressions.Count} initialization expressions (retry {(enableRetry ? "enabled" : "DISABLED")})...");
+            
+            // Track successful and failed initializations
+            var successful = new List<string>();
+            var failed = new Dictionary<string, string>(); // class -> error message
+            var retryList = new List<InitializationExpression>();
+            
+            // First pass - try all initializations
+            foreach (var expr in expressions)
+            {
+                var className = expr.Receiver ?? "<unknown>";
+                try
+                {
+                    // Set the flag to indicate we're executing initialization
+                    executingInitialization = true;
+                    
+                    // Enable method tracing for debugging initialization
+                    var oldMethodTrace = DebugOptions.EnableMethodTrace;
+                    DebugOptions.EnableMethodTrace = true;
+                    
+                    Console.WriteLine($"[VM] Starting: {className}>>{expr.Selector}");
+                    
+                    // Execute the initialization expression
+                    ExecuteSingleInitialization(expr);
+                    
+                    // Restore method trace setting
+                    DebugOptions.EnableMethodTrace = oldMethodTrace;
+                    
+                    successful.Add($"{className}>>{expr.Selector}");
+                }
+                catch (Exception ex)
+                {
+                    failed[className] = ex.Message;
+                    retryList.Add(expr);
+                    Console.WriteLine($"[VM] Failed: {className}>>{expr.Selector} - {ex.Message}");
+                    
+                    // If retry is disabled, throw immediately on first error to see full stack trace
+                    if (!enableRetry)
+                    {
+                        Console.WriteLine($"[VM] STOPPING: Retry disabled, throwing exception for debugging");
+                        throw new InvalidOperationException($"Initialization failed for {className}>>{expr.Selector}: {ex.Message}", ex);
+                    }
+                }
+                finally
+                {
+                    executingInitialization = false;
+                }
+            }
+            
+            // Retry failed initializations once (some may succeed after others have run)
+            if (enableRetry && retryList.Count > 0)
+            {
+                Console.WriteLine($"[VM] Retrying {retryList.Count} failed initializations...");
+                var stillFailed = new List<InitializationExpression>();
+                
+                foreach (var expr in retryList)
+                {
+                    var className = expr.Receiver ?? "<unknown>";
+                    try
+                    {
+                        executingInitialization = true;
+                        
+                        // Enable method tracing for debugging initialization
+                        var oldMethodTrace = DebugOptions.EnableMethodTrace;
+                        DebugOptions.EnableMethodTrace = true;
+                        
+                        Console.WriteLine($"[VM] Retrying: {className}>>{expr.Selector}");
+                        
+                        ExecuteSingleInitialization(expr);
+                        
+                        // Restore method trace setting
+                        DebugOptions.EnableMethodTrace = oldMethodTrace;
+                        
+                        // Remove from failed list and add to successful
+                        failed.Remove(className);
+                        successful.Add($"{className}>>{expr.Selector} (retry)");
+                    }
+                    catch (Exception ex)
+                    {
+                        stillFailed.Add(expr);
+                        failed[className] = ex.Message;
+                    }
+                    finally
+                    {
+                        executingInitialization = false;
+                    }
+                }
+                
+                if (stillFailed.Count > 0)
+                {
+                    Console.WriteLine($"[VM] {stillFailed.Count} initializations still failed after retry");
+                }
+            }
+            
+            // Report results
+            Console.WriteLine($"[VM] Initialization complete: {successful.Count} succeeded, {failed.Count} failed");
+            
+            if (successful.Count > 0)
+            {
+                Console.WriteLine("[VM] Successful initializations:");
+                foreach (var s in successful.Take(10)) // Show first 10
+                {
+                    Console.WriteLine($"  ✓ {s}");
+                }
+                if (successful.Count > 10)
+                {
+                    Console.WriteLine($"  ... and {successful.Count - 10} more");
+                }
+            }
+            
+            if (failed.Count > 0)
+            {
+                Console.WriteLine("[VM] Failed initializations:");
+                foreach (var kvp in failed.Take(10)) // Show first 10
+                {
+                    Console.WriteLine($"  ✗ {kvp.Key}: {kvp.Value}");
+                }
+                if (failed.Count > 10)
+                {
+                    Console.WriteLine($"  ... and {failed.Count - 10} more");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Executes a single initialization expression.
+        /// </summary>
+        /// <param name="expr">The initialization expression to execute.</param>
+        private void ExecuteSingleInitialization(InitializationExpression expr)
+        {
+            if (expr.Receiver == null || expr.Selector == null)
+            {
+                throw new ArgumentException("Invalid initialization expression: missing receiver or selector");
+            }
+            
+            // Look up the receiver (should be a class)
+            var receiverClass = classBuilder.GetClass(expr.Receiver);
+            if (receiverClass.IsNil)
+            {
+                throw new InvalidOperationException($"Class not found: {expr.Receiver}");
+            }
+            
+            // Create the selector symbol
+            var selector = Intern(expr.Selector);
+            if (selector.IsNil)
+            {
+                throw new InvalidOperationException($"Could not create selector: {expr.Selector}");
+            }
+            
+            // Prepare arguments if any
+            var arguments = new OOP[0];
+            if (expr.Arguments != null && expr.Arguments.Count > 0)
+            {
+                arguments = new OOP[expr.Arguments.Count];
+                for (int i = 0; i < expr.Arguments.Count; i++)
+                {
+                    // For now, only handle nil arguments
+                    // TODO: Handle other argument types as needed
+                    arguments[i] = OOP.Nil;
+                }
+            }
+            
+            // Send the initialization message and get result (though we typically don't use it)
+            var result = SendWithResult(receiverClass, selector, arguments);
         }
 
         #endregion

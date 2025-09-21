@@ -75,6 +75,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitChunk([NotNull] Smalltalk80Parser.ChunkContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.simpleMethodChunk"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitSimpleMethodChunk([NotNull] Smalltalk80Parser.SimpleMethodChunkContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.expressionChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.OldInterpreter", "Smalltalk80.OldInterpreter\Smalltalk80.OldInterpreter.csproj", "{B2345678-C90F-5FE1-0537-897FE40776FE}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Interpreter", "Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj", "{A1234567-B89C-0DEF-1234-567890ABCDEF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StandaloneCompiler", "StandaloneCompiler\StandaloneCompiler.csproj", "{F2353002-6EBC-48AF-B11D-EDEB5CB80E4A}"

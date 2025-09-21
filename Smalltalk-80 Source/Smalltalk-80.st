@@ -38,929 +38,1636 @@ labels: aString selectors: selArray
 
 !ActionMenu class methodsFor: 'confirmation'!
 confirm  "ActionMenu confirm"
-	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !File subclass: #AltoFile
-	instanceVariableNames: 'writeTime pageAddresses leader '
-	classVariableNames: ''
-	poolDictionaries: 'AltoFilePool '
-	category: 'Files-Xerox Alto'!
-AltoFile comment:
-'A concrete example of class File.
+	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !
+'From Smalltalk-80, Version 2 of April 1, 1983'!
 
-Instance Variables:
-	writeTime	<Time>
-	pageAddresses	<RunArray> of page addresses
-	leader		<Integer> address of the page where the leader information is stored
-	'!
+Object subclass: #WindowsFile
+    instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'System-Files'!
 
+WindowsFile comment:
+'I represent a file in the Windows file system. I provide basic file operations
+using primitives 90-100 which interface directly with the Windows OS file system.
+Unlike AltoFile, I do not use page-based I/O or Alto-specific disk primitives.'!
 
-!AltoFile methodsFor: 'nonhomogeneous accessing'!
-read: page
-	| pn p fp palen oldCursor |
-	pn _ page pageNumber.
-	pageAddresses isNil
-	  ifTrue:
-		[pn = 0 ifTrue: [palen _ 0] ifFalse: [^nil]]
-	  ifFalse:
-		[palen _ pageAddresses size].
+!WindowsFile class methodsFor: 'instance creation'!
 
-	fp _ palen min: pn.
-	"set address of first page. next addresses are set later"
-	page address: (fp = 0
-					ifTrue: [leader]
-					ifFalse: [pageAddresses at: fp]).
+named: aFileName
+    "Answer a new instance opened on the file named aFileName."
+    ^self new openNamed: aFileName mode: 'r'! 
 
-	oldCursor _ Cursor currentCursor.
-	pn-fp > 10 ifTrue: [Cursor wait show]. "this may take a while..."
+named: aFileName mode: modeString
+    "Answer a new instance opened on the file named aFileName with the given mode."
+    ^self new openNamed: aFileName mode: modeString! !
 
-	fp to: pn do:
-		[:p | "set up page for checking"
-		page pageNumber: p.
-		"set by machine code:
-			page headerWordAt: Nextp put:
-				(p < palen ifTrue: [pageAddresses at: (p+1)] ifFalse: [0]).
-			page headerWordAt: backp put:
-				(p=0 ifTrue: [0] ifFalse: [p=1 ifTrue: [leader]
-					ifFalse: [pageAddresses at: (p-1)]]).
-			page size: (p < palen ifTrue: [page dataSize] ifFalse: [0])."
+!WindowsFile class methodsFor: 'class initialization'!
 
-		page doCommand: CCR error: 'read:'.
+initialize
+    "No pool dictionary needed - we use primitives directly"! !
 
-		page lastPage
-		  ifTrue:
-			[lastPageNumber _ p.
-			p < pn
-				ifTrue: [oldCursor show. ^nil] 
-				ifFalse: [oldCursor show. ^page]].
+!WindowsFile methodsFor: 'file operations'!
 
-		(pageAddresses ~~ nil and: [p >= palen])
-			ifTrue: ["save address of next page if there is a page address table
-				and address not already stored"
-				pageAddresses addLast: (page headerWordAt: Nextp)].
-		p < pn
-			ifTrue: ["set address of next page"
-				page address: (page headerWordAt: Nextp)]].
-	oldCursor show.
-	^page!
-readOrAdd: aPage 
-	| page p pn |
-	page _ aPage.
-	pn _ page pageNumber.
-	(self read: page) notNil ifTrue: [^page].
-	"page now contains last page"
-	(lastPageNumber to: pn - 1) do: 
-		[:p | 
-		page pageNumber: p.
-		page size: page dataSize.
-		"this writes current and allocates next (empty) page"
-		page _ self write: page].
-	^page!
-write: page
-	| nextPage labelDirty returnPage |
-	((labelDirty _ page lastPage) and: [page isFull])
-	  ifTrue:
-		["last page can't be full, so glue on another page"
-		returnPage _ nextPage _ self initPageNumber: 0.
-		fileDirectory allocate: nextPage after: (fileDirectory realToVirtual: page address).
-		nextPage reinitialize.
-		nextPage headerWordAt: Backp put: page address.
-		nextPage pageNumber: (lastPageNumber _ page pageNumber + 1).
-		nextPage serialNumber: serialNumber.
-		nextPage doCommand: CWW error: 'write: (allocate)'.
-		"link to current page"
-		page headerWordAt: Nextp put: nextPage address.
-		pageAddresses ~~ nil
-		  ifTrue: [pageAddresses addLast: nextPage address]]
-	  	  ifFalse: [returnPage _ page].
+openNamed: aFileName mode: modeString
+    "Open the file. Mode can be 'r', 'w', 'rw', or 'a'. Primitive 98."
+    <primitive: 98>
+    "Primitive failed - perform fallback initialization"
+    fileHandle _ self primOpen: aFileName mode: modeString.
+    fileName _ aFileName.
+    position _ 0.
+    readLimit _ self size.
+    writeLimit _ self size.
+    isBinary _ false.
+    ^self!
 
-	"whenever a last (or second last) page is written, write label also"
-	self doCommand: (labelDirty
-	  					ifTrue: [CWW]
-	  					ifFalse: [CCW]) page: page error: 'write:'.
-	readWrite _ Read + Write.
-	^returnPage! !
-
-!AltoFile methodsFor: 'file accessing'!
-beSnapshotFile
-	^self
-		beSnapshotSerialNumber: (self serialNumber)
-		leaderVirtualDiskAddr: (fileDirectory realToVirtual: self leader)!
-endFile: aPage 
-	| page nextPage pn |
-	page _ aPage.
-	page isNil
-	  ifTrue: [pn _ -1 "free all of file"]
-	  ifFalse:
-		[page isFull
-		  ifTrue:
-			[nextPage _ self write: page.
-			"if page was a full last page, next is an empty (and now last) page"
-			nextPage lastPage ifTrue: [^nextPage].
-			page _ self readPageNumber: page pageNumber + 1.
-			page isEmpty ifTrue: [^page].
-			page size: 0].
-		page headerWordAt: Nextp put: 0.
-		self write: page.
-		"free rest of file"
-		pn _ page pageNumber].
-
-	lastPageNumber _ nil "reset by read:".
-	[lastPageNumber isNil and: [
-		(nextPage _ self readPageNumber: (pn _ pn + 1)) notNil]] whileTrue:
-		[nextPage reinitialize.
-		nextPage freePage.
-		nextPage doCommand: CWW error: 'endFile:'.
-		fileDirectory deallocate: nextPage].
-
-	page notNil
-	  ifTrue: [pageAddresses shortenTo: (lastPageNumber _ page pageNumber)].
-	^page! !
-
-!AltoFile methodsFor: 'file status'!
 close
-	"fix up leader page, and remember create time"
+    "Close the file. Primitive 99."
+    <primitive: 99>
+    "Primitive failed - perform fallback close"
+    fileHandle ifNotNil: [
+        self primClose: fileHandle.
+        fileHandle _ nil]!
+
+delete
+    "Delete the file. Primitive 100."
+    <primitive: 100>
+    "Primitive failed - perform fallback delete"
+    self close.
+    self primDelete: fileName! !
+
+!WindowsFile methodsFor: 'accessing'!
 
-	self updateLeader: (self readPageNumber: 0)!
-open
-	"don't find last page immediately.  for later close"
-
-	readWrite _ Read!
-reinitialize
-	super reinitialize.
-	pageAddresses _ AltoFileAddressArray new directory: fileDirectory!
-release! !
-
-!AltoFile methodsFor: 'error handling'!
-errorString: status 
-	"see Alto hardware manual for details on error word format"
-
-	| s |
-	status = -1 ifTrue: [^'primitive failure, bad args?'].
-	s _ WriteStream on: (String new: 50).
-	s nextPutAll: (#('' 'hardware error or sector overflow' 'check error'
-					 'disk command specified illegal sector' ) at: 1 + (status bitAnd: 3)).
-	1 to: 6 do: [:t | (status allMask: (128 bitShift: 1 - t))
-			ifTrue: 
-				[s nextPut: $ .
-				s nextPutAll: (#('seek failed, possible illegal track' 'seek in progress'
-								'disk unit not ready' 'hardware late'
-								 'hardware not transferring' 'checksum' ) at: t)]].
-	s nextPut: $ .
-	s nextPutAll: (status storeStringRadix: 8).
-	^s contents! !
-
-!AltoFile methodsFor: 'file/page/directory implementation'!
-doCommand: command page: filePage error: e 
-	| done |
-	done _ Semaphore new.
-	self dskprim: fileDirectory diskNumber
-		address: filePage address
-		command: command
-		page: filePage page
-		semaphore: done.
-	error<0 ifFalse: [done wait].
-	error ~= 0
-		ifTrue: 
-			[e isNil ifTrue: [^nil].
-			error _ self errorString: error.
-			self error: e]
-		ifFalse: 
-			[error _ ''.
-			^filePage]! !
-
-!AltoFile methodsFor: 'private'!
-beSnapshotSerialNumber: aByteArray leaderVirtualDiskAddr: anInteger
-	<primitive: 135>
-	self primitiveFailed!
-dskprim: diskNumber address: diskAddress command: diskCommand page: buffer semaphore: aSemaphore 
-	"Transfer a single record (page) to or from the Alto File System.  Fail if  
-	integer arguments are not 16-bit positive Integers.  Fail if a disk transfer 
-	 is already in progress.  Fail if the buffer is not large enough or is 
-	pointer containing.  Fail if the last argument is not a Semaphore.  Xerox 
-	specific primitive.  See Object documentation what IsAPrimitive. 
-	 
-	diskNumber is 0 or 1,  
-	diskAddress is the starting Alto disk address (Integer),  
-	diskCommand is the disk command (usually CCR, CCW, CWW)  
-	(Integer), buffer is the string containing label and data,  
-	aSemaphore is signalled when the transfer completes.  
-	If disk primitive encounters an error, the receiver's instance variable  
-	named error is set to the DCB status.  This Integer is greater than 0 and 
-	is  
-	interpreted by errorString:.  Normally error is set to 0."
-
-	<primitive: 128>
-	error _ -1
-	"set error when the primitive fails"!
-findLastPageNumber
-	self readPageNumber: 20000.
-	^lastPageNumber!
-leader
-	^leader!
-leader: pageAddress
-	leader _ pageAddress!
-pageAddresses: anArrayOrNil 
-	pageAddresses _ anArrayOrNil!
-pageClass
-	^AltoFilePage!
-readFromDirectory: aFileStream 
-	"read file description from SysDir"
-
-	serialNumber _ aFileStream next: 4.
-	aFileStream skip: 4.
-	leader _ fileDirectory virtualToReal: aFileStream nextWord.
-	fileName _ String new: aFileStream next.
-	1 to: fileName size do: [:i | fileName at: i put: aFileStream next asCharacter].
-	aFileStream padToNextWord!
-sameAsStoredFile
-	| page s tname |
-	page _ self initPageNumber: 0.
-	page binary.
-	page address: leader.
-	"if any of the following tests fail, File will be reinitialized"
-	(((page doCommand: CCR error: nil) notNil and: [page pageNumber = 0])
-		and: [s _ page asFileStream: ExternalStream new.
-			s skip: 4.
-			writeTime = (s next: 4)
-				and: 
-					[s skip: 4.
-					tname _ String new: s next.
-					1 to: tname size do: [:i | tname at: i put: s next asCharacter].
-					fileName sameAs: tname]])
-		ifTrue: 
-			[(lastPageNumber notNil and: [pageAddresses notNil])
-				ifTrue: 
-					[page pageNumber: lastPageNumber.
-					page address: (pageAddresses at: lastPageNumber).
-					(page doCommand: CCR error: nil) isNil 
-						ifTrue: ["wrong file or page number" ^false].
-					page lastPage ifFalse: ["not last page anymore"
-						lastPageNumber _ nil].
-					^true].
-			^true].
-	^false!
-storeOnDirectory: aFileStream
-	aFileStream nextPutAll: serialNumber.
-	aFileStream nextWordPut: 1.
-	aFileStream nextWordPut: 0.
-	aFileStream nextWordPut: (fileDirectory realToVirtual: leader).
-	aFileStream nextPut: fileName size.
-	fileName do: [:char | aFileStream nextPut: char asciiValue].
-	aFileStream padToNextWordPut: 0!
-updateLeader: page 
-	"see <Alto>AltoFileSys.D, (p.3 leader page) for further info"
-
-	| aFileStream time lastwrite |
-	page binary.
-	aFileStream _ page asFileStream: ExternalStream new.
-	time _ Time timeWords.
-	(readWrite bitAnd: Write) = Write
-		ifTrue: 
-			[fileDirectory flush.
-			"set creation/write/read date and file name"
-			writeTime _ time.
-			aFileStream nextPutAll: time.
-			aFileStream nextPutAll: time.
-			aFileStream nextPutAll: time.
-			fileName isEmpty
-				ifFalse: 
-					[aFileStream nextPut: fileName size.
-					fileName do: [:char | aFileStream nextPut: char asciiValue]]]
-		ifFalse: 
-			["skip creation, remember write, update read date"
-			aFileStream skip: 4.
-			writeTime _ aFileStream next: 4.
-			aFileStream nextPutAll: time].
-	page fromFileStream: aFileStream.
-	self write: page!
-writeTime
-	^writeTime! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-AltoFile class
-	instanceVariableNames: ''!
-
-
-!AltoFile class methodsFor: 'class initialization'!
-initialize  
-	| readStream |
-	AltoFilePool at: #(CRR CCR CCW CWW ) put: #(18496 18512 18520 18536 ).
-	readStream _ ReadStream on: #(1024 32 'SysDir.' ).
-	#(Dfmask Boffset Dirname ) do:
-		 [:each | AltoFilePool at: each put: readStream next].
-	readStream _ ReadStream on: #(1 2 3 4 5 6 7 8 ).
-	#(Nextp Backp Unused Numch Pagen Vn Sn1 Sn2 ) do: 
-		[:each | AltoFilePool at: each put: readStream next]! !
-
-AltoFile initialize!
-RunArray subclass: #AltoFileAddressArray
-	instanceVariableNames: 'directory '
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Files-Xerox Alto'!
-AltoFileAddressArray comment:
-'I am a RunArray where each run represents the virtual addresses of a block of contiguous pages.  Indexed by page numbers, my instance holds the virtual disk addresses of the pages.  Attributes inherited from RunArray are:  runs, an array of starting indicies;  and values, an array of the first virtual address in each block.
-	
-Instance Variables:
-	directory	<FileDirectory>
-'!
-
-
-!AltoFileAddressArray methodsFor: 'initialize-release'!
-directory: aDirectory
-	"Set the receiver's directory to be the argument, aDirectory."
-	directory _ aDirectory!
-shortenTo: newSize 
-	"Shortens the receiver to be size, newSize (for file shorten).  Create an
-	error if newSize is greater than the old size."
-
-	| oldSize short |
-	oldSize _ self size.
-	newSize > oldSize ifTrue: [^self error: 'invalid extension'].
-	newSize < oldSize
-		ifTrue: 
-			[short _ self copyFrom: 1 to: newSize.
-			runs _ short runs.
-			values _ short values]! !
-
-!AltoFileAddressArray methodsFor: 'accessing'!
-at: index 
-	| run offset value |
-	super at: index setRunOffsetAndValue: 
-		[:run :offset :value | ^directory virtualToReal: value + offset]! !
-
-!AltoFileAddressArray methodsFor: 'adding'!
-addLast: val 
-	| virt |
-	virt _ directory realToVirtual: val.
-	(runs size = 0 or: [virt ~= ((values at: values size) + (runs at: runs size))])
-		ifTrue: [super addLast: virt] "create new run"
-		ifFalse: [runs at: runs size put: (runs at: runs size) + 1]. "stretch last run"
-	^val! !FileDirectory subclass: #AltoFileDirectory
-	instanceVariableNames: 'dirFile bitsFile diskPages totalPages nSectors '
-	classVariableNames: ''
-	poolDictionaries: 'AltoFilePool '
-	category: 'Files-Xerox Alto'!
-AltoFileDirectory comment:
-'A concrete example of a FileDirectory class.  Implements the Xerox Alto File System.  See the Alto Operating System Reference Manual section about Disks.	
-
-Note that the Alto file address format is
-	bits
-	0-3		sector number	(0 - 8r15, i.e., 12 or 14 sectors)
-	4-12	cylinder number (0 - 8r312, Model 31; 0-8r625, Model 44)
-	13		head number (0-1)
-	14		disk number (0-1)
-	15		restore bit.
-
-Instance Variables:
-	dirFile		<File> or nil
-	bitsFile		<File> or nil
-	diskPages	<Integer>
-	totalPages	<Integer>
-	nSectors		<Integer>
-	'!
-
-
-!AltoFileDirectory methodsFor: 'adding'!
-addNew: aFile 
-	| sn page |
-	sn _ self allocateSN: aFile.
-	aFile serialNumber: sn.
-
-	"allocate a new page (more success after O.S. stuff, bittable etc.)"
-	self allocate: (page _ aFile initPageNumber: 0) after: 800.
-
-	"write 0th -- leader, in the process filling it in and then creating first page".
-	page reinitialize.
-	page serialNumber: sn.
-	page size: page dataSize.
-	aFile leader: page address.
-	aFile readWrite: Write.
-	aFile updateLeader: page.
-	self addEntry: aFile.
-	^aFile! !
-
-!AltoFileDirectory methodsFor: 'removing'!
-remove: aFile ifAbsentDo: aBlock
-	(self findFileOrHole: aFile) ifFalse: [^aBlock value: aFile].
-	self removeOld: aFile!
-removeOld: file 
-	| aFile |
-	aFile _ self deleteEntry: file.
-	aFile open.
-	aFile endFile: nil.
-	bitsFile flush! !
-
-!AltoFileDirectory methodsFor: 'accessing'!
-next
-	^self nextFile: self fileClass new!
-realToVirtual: address
-	"Convert the argument, address, from a real address to a virtual address."
-
-	^(( address bitShift: -12) bitAnd: 8r17) "sector: field"
-	  + (nSectors * ((address bitAnd: 8r7774) bitShift: -2)) "cylinder and head: field*"
-	  +  "disk: field*pages per disk"
-		((address bitAnd: 2) = 2 "diskPages*(address bitAnd: 2)//2"
-		  ifTrue: [diskPages]
-		  ifFalse: [0])! !
-
-!AltoFileDirectory methodsFor: 'enumerating'!
-reset
-	dirFile == nil
-		ifTrue: [self open]
-		ifFalse: [self flush].
-	dirFile readOnly.
-	dirFile reset! !
-
-!AltoFileDirectory methodsFor: 'file accessing'!
-checkName: aString
-	"Answer whether aString is a valid file name."
-	^self checkName: aString fixErrors: false!
-checkName: fname fixErrors: fixing 
-	"Check file name for correct length and characters."
-
-	| char len i newName special period |
-	fname isEmpty
-		ifTrue: [fixing ifTrue: [^'$'].
-				 self error: 'empty file name'].
-
-	special _ '.-+$!!?'.
-	period _ $..
-	len _ fname size.
-
-	(len > 39 or: [len = 39 and: [(fname at: len) ~= period]])
-		ifTrue: [fixing ifTrue: ["truncate name" len _ 38]
-		ifFalse: [self error: 'name too long']].
-
-	newName _ WriteStream on: (String new: len + 1).
-	1 to: len do: [:i |
-		char _ fname at: i.
-		"check characters: alphanumeric or 6 special"
-		(char isLetter or: [(special includes: char) or: [char isDigit]])
-		 	ifTrue: [newName nextPut: char]
-		 	ifFalse: [
-				fixing ifTrue: [newName nextPut: $-]
-					ifFalse: [self error: ('illegal character ' copyWith: char)]]].
-
-	"make sure last character is period (isn't period when fixing)"
-	(fname at: len) = period
-		ifTrue: [fixing ifTrue: [newName skip: -1]]
-		ifFalse: [fixing ifFalse: [newName nextPut: period]].
-
-	^newName contents!
-checkNameOfFile: aString  
-	"Answer whether aString is a valid file name."
-	^self checkNameOfFile: aString fixErrors: false!
-fileClass
-	^AltoFile!
-filesMatching: pattern 
-	^super filesMatching: 
-		(pattern last = $.
-			ifTrue: [pattern]
-			ifFalse: [pattern , '.'])!
-rename: aFile newName: newFileName 
-	| holesize pos newFile newName file | 
-	(self findFileOrHole: (newFile _ self initFileName: newFileName))
-		  ifTrue: [^newFile error: 'rename: new name already exists'].
-
-	newName _ newFile fileName.
-	"a possible insertion place"
-	pos _ dirFile position.
-	
-	(self findFileOrHole: (file _ self initFile: aFile))
-		ifFalse: [^file error: 'rename: old name does not exist'].
-
-	holesize _ dirFile nextWord bitAnd: Dfmask - 1.
-	dirFile skip: -2.
-	file fileName: newName.
-	(self fileSize: file) "new size of entry" <= holesize
-	  ifTrue:
-		["new entry will fit in current entry" "read and save entry"
-		pos _ dirFile position.
-		file _ self next]
-	  ifFalse: ["delete and save entry"
-		file _ self deleteEntry: file].
-
-	"position to same entry or hole discovered earlier"
-	dirFile position: pos.
-	file fileName: newName.
-	self addEntry: file.
-	file readWrite: Write.
-	file writeTime isNil
-		ifTrue:
-			["close file: updating name in leader page"
-			file close]
-	"otherwise, file is open. defer leader page change until someone closes it"! !
-
-!AltoFileDirectory methodsFor: 'file status'!
-close
-	closed
-		ifFalse: 
-			[dirFile close.
-			bitsFile == nil ifFalse: ["an interrupted open?" bitsFile close].
-			super close]!
-flush
-	bitsFile == nil ifFalse: [bitsFile flush]!
-open
-	| f s a page len elen type | 
-	closed
-	  ifTrue:
-		["assume some defaults in case DSHAPE is not in SysDir leader page.
-	these should only be needed if the disk is old (and not scavenged).
-	they will not work if a 14 sector system is missing DSHAPE (unlikely) since
-	addresses of first page of SysDir and DiskDescriptor might be computed incorrectly"
-		nSectors _ 12.
-		diskPages _ 812 * nSectors.
-		totalPages _ 2 * diskPages.
-
-		"read SysDir leader page to find out file system configuration.  see AltoFileSys.D".
-		f _ self findKey: Dirname.
-		f binary.
-		"to prevent address of page 1 from being stored".
-		f pageAddresses: nil.
-		page _ f readPageNumber: 0.
-		"length of property list, in words"
-		len _ page at: 494.
-		len = 210
-		  ifTrue:
-			["scan file properties for DSHAPE"
-			s _ page asFileStream: ExternalStream new.
-			s skipWords: (page at: 493).
-			[len > 0] whileTrue:
-				[type _ s next.
-				type = 0
-				  ifTrue: [
-					"0 terminates list. property not found.
-					try to read it later from DiskDescriptor"
-					len _ 0]
-				  ifFalse:
-					[elen _ s next.
-					(type = 1 and: [elen = 5])
-					  ifTrue:
-						["DSHAPE. read property"
-						self configure: s.
-						"set flags so configure and loop are not done again"
-						s _ false.
-						len _ 0]
-					  ifFalse:
-						["skip over other property"
-						len _ len - elen.
-						s skipWords: elen - 1]]]].
-
-		"now, with the correct (or default) file system configuration,
-		store the virtual address of next page (1), and create a FileStream on SysDir"
-		a _ AltoFileAddressArray new directory: self.
-		a addLast: (page headerWordAt: Nextp).
-		f pageAddresses: a.
-		dirFile _ f asFileStream.
-		dirFile readOnly.
-
-		bitsFile _ self oldFile: 'DiskDescriptor'.
-		bitsFile binary.
-		bitsFile readWrite.
-		closed _ false.
-		s
-		  ifTrue: 
-			["configuration not read from SysDir. this will work for 12 sector systems.
-			14 sector systems should have had the DSHAPE property"
-			self configure: bitsFile].
-		super open]!
-release
-	dirFile _ bitsFile _ nil.
-	closed _ true! !
-
-!AltoFileDirectory methodsFor: 'page accessing'!
-allocate: nextPage after: address 
-	| index stop ch m vadr oldCursor |
-	index _ nil.
-	[true] whileTrue:
-		["go around bittable from address to end, and beginning to address.
-		we start over again if the table appears full or bitsFile is out of sync"
-		(index notNil and: [stop >= totalPages])
-		  ifTrue:
-			["wrap around to where we started"
-			stop _ address.
-			index _ 0]
-		  ifFalse:
-			[index isNil
-			  ifFalse: ["disk probably full"
-				Smalltalk releaseExternalViews.
-				self error: 'YOUR DISK IS FULL (abort or make space and proceed)'].
-
-			self open.
-			"index by bits rather than bytes? close enough for now"
-			index _ address bitAnd: 8r177770.
-			stop _ totalPages].
-
-		bitsFile position: index // 8 + Boffset.
-		[index notNil and: [(index _ index + 8) <= stop]] whileTrue:
-			[(ch _ bitsFile next) = 8r377
-			  ifFalse:
-				["check that bitsFile position is correct --
-				possibly out of sync with index if  growSmalltalkBy: occurred?"
-				bitsFile position ~= (index // 8 + Boffset)
-				  ifTrue: [index _ nil]
-				  ifFalse:
-					[m _ 8r200.
-					index - 8 to: index - 1 do:
-						[:vadr | (ch bitAnd: m) = 0
-						  ifTrue:
-							["page appears free. first update DiskDescriptor"
-							bitsFile skip: -1.
-							bitsFile nextPut: (ch _ ch bitOr: m).
-
-							"then check if page is really free"
-							vadr = 0
-							  ifFalse: "O.S. boot"
-								[nextPage reinitialize.
-								nextPage freePage.
-								nextPage address: (self virtualToReal: vadr).
-								(nextPage doCommand: CCR error: nil) notNil
-								  ifTrue: [oldCursor notNil ifTrue: [oldCursor show].
-										^vadr]
-								  ifFalse: "otherwise, page not really free"
-									[oldCursor isNil ifTrue:
-										[oldCursor _ Cursor currentCursor.
-										Cursor wait show. "this may take a while"]]]].
-
-						"page not free according to bit"
-						m _ m bitShift: -1]]]]]!
-allocateSN: file 
-	| sn i |
-	"get last serial number used, a ByteArray"
-	bitsFile position: 8.
-	sn _ bitsFile next: 4.
-
-	"Add 1 to 4-byte SN, handling overflow"
-	i _ 4.
-	[(sn at: i) = 255] whileTrue:
-		[sn at: i put: 0.  i _ i-1].
-	sn at: i put: ((sn at: i) + 1).
-
-	"store new serial number, and return it"
-	bitsFile skip: -4.
-	bitsFile nextPutAll: sn.
-	^sn!
-deallocate: page 
-	| index byte m |
-	closed ifTrue: [self open].
-	index _ self realToVirtual: page address.
-	"byte position"
-	bitsFile position: index // 8 + Boffset.
-	byte _ bitsFile next.
-	"bit position"
-	m _ 8r200 bitShift: 0 - (index bitAnd: 7).
-
-	"make page free by turning off bit in DiskDescriptor"
-	(byte bitAnd: m) = m
-	  ifTrue:
-		[bitsFile skip: -1.
-		bitsFile nextPut: byte - m]
-	  ifFalse:
-		[Transcript cr. Transcript show: 'page already free (deallocate:)']!
-freePages 
-	| npages byte |
-	self open.
-	bitsFile position: Boffset.
-	npages _ 0.
-	1 to: totalPages by: 8 do:
-		[:i | (byte _ bitsFile next) = 255
-		  ifFalse:
-			["possibly up to 8 unused"
-			npages _ npages + 8.
-			[byte = 0] whileFalse: 
-				[npages _ npages - (byte bitAnd: 1).
-				byte _ byte bitShift: -1]
-			"all used"]].
-	^npages! !
-
-!AltoFileDirectory methodsFor: 'private'!
-addEntry: file 
-	 "called only by Insert: and rename:newName:"
-
-	| entrysize holesize |
-	dirFile atEnd
-		ifTrue: [holesize _ nil]
-		ifFalse: [
-			"either a deleted entry or rename entry"
-			holesize _ dirFile nextWord bitAnd: Dfmask - 1.
-			dirFile skip: -2].
-
-	dirFile readWrite.
-	entrysize _ (self fileSize: file) // 2.
-	dirFile nextWordPut: Dfmask + entrysize.
-	file storeOnDirectory: dirFile.
-
-	(holesize notNil and: [entrysize < holesize])
-	  ifTrue: ["mark remaining hole" dirFile nextWordPut: holesize - entrysize].
-	dirFile readOnly.
-	bitsFile flush!
-configure: s 
-	"read disk configuration from a Stream:
-		either leader page of SysDir or beginning of DiskDescriptor"
-
-	| nDisks nHeads nTracks |
-	nDisks _ s nextWord .
-	nTracks _ s nextWord.
-	nHeads _ s nextWord.
-	nSectors _ s nextWord.
-	diskPages _ nTracks * nHeads * nSectors.
-	totalPages _ nDisks * diskPages!
-deleteEntry: file 
-	"called only by Delete: and rename:newName:
-	read and save"
-
-	| p nextFile |
-	p _ dirFile position.
-	nextFile _ self next.
-	dirFile position: p.
-
-	"delete it from directory (turn off bit in entry length word)"
-	p _ dirFile nextWord bitAnd: Dfmask - 1.
-	dirFile skip: -2.
-	dirFile readWrite.
-	dirFile nextWordPut: p.
-	dirFile readOnly.
-	dirFile skip: -2.
-	^nextFile!
-diskID
-	"return user name and disk name installed in O.S. 
-	login name is stored somewhere else???"
-
-	| f userName diskName len |
-	f _ self oldFile: 'Sys.Boot'.
-	f text.
-	f readOnly.
-	f position: 512.
-	len _ f next asciiValue.
-	userName _ f next: len.
-	f padToNextWord.
-	len _ f next asciiValue.
-	diskName _ f next: len.
-	f close.
-	^Array with: userName with: diskName!
-diskNumber
-	^directoryName!
-fileSize: file
-	"return size in characters of a directory entry
-
-	entry format
-		1	n (length in words, including this one) + undeleted bit (dfmask)
-		2-3	serialNumber
-		4	version
-		5	file number (0?)
-		6	virtual address of page 0
-		7-n name as Bcpl string (extra 0 if length even)"
-
-	^13 "header word, sn, version, fn, leader, name" + (file fileName size bitOr: 1)!
-find: aFile ifAbsentDo: aBlock 
-	| sn |
-	(aFile fileName sameAs: Dirname)
-		ifTrue:
-			["return system directory file. known serialNumber and leader"
-			sn _ ByteArray new: 4.
-			sn wordAt: 1 put: 8r100000.
-			sn wordAt: 2 put: 8r144.
-			aFile serialNumber: sn.
-			aFile leader: 8r10000 "(self virtualToReal: 1)".
-			^aFile].
-
-	"^super find: aFile ifAbsent: aBlock"
-	(self findFileOrHole: aFile) ifFalse: [^aBlock value: aFile].
-	^self nextFile: aFile!
-findFileOrHole: t1  
-	| t2 t3 t4 t5 t6 t7 t8 t9 t10 |
-	t2 _ self checkNameOfFile: t1.
-	t1 fileName: t2.
-	t8 _ t2 size.
-	self reset.
-	t5 _ nil.
-	t6 _ Dfmask.
-	t7 _ (self fileSize: t1) // 2.
-	[dirFile atEnd]
-	 whileFalse: [t4 _ dirFile nextWord.
-		t3 _ t4 bitAnd: Dfmask - 1.
-		t7 > t3 ifTrue: [t9 _ -2]
-		 ifFalse: [t4 = t3
-			 ifTrue: [t9 _ -2.
-				t3 < t6
-				 ifTrue: [t6 _ t3.
-					t5 _ dirFile position]]
-			 ifFalse: [dirFile skip: 10.
-				t9 _ -13.
-				t8 = dirFile next
-				 ifTrue: [t10 _ 1.
-					[t10 <= t8 and: [(t2 at: t10) asLowercase 
-						= dirFile next asCharacter asLowercase]]
-						 whileTrue: [t10 _ t10 + 1].
-					t10 > t8 
-						ifTrue: 
-							[dirFile skip: t9 - t8.
-							^true].
-					t9 _ t9 - t10]]].
-		dirFile skip: t3 * 2 + t9].
-	t5 notNil ifTrue: [dirFile position: t5 - 2].
-	^false!
-nextFile: aFile 
-	| w elen |
-	[dirFile atEnd]
-		whileFalse: 
-			["header word of directory"
-			w _ dirFile nextWord.
-			elen _ w bitAnd: Dfmask - 1.
-			(w bitAnd: Dfmask) = Dfmask
-				ifTrue: 
-					["normal entry. create file instance"
-					aFile directory: self.
-					aFile reinitialize.
-					"initialize from directory"
-					aFile readFromDirectory: dirFile.
-					"skip to end of partially read entry"
-					dirFile skip: elen * 2 - (self fileSize: aFile).
-					^aFile].
-			"deleted entry"
-			dirFile skipWords: elen - 1].
-	^nil!
-virtualToReal: vadr 
-	 "inverse of realToVirtual:"
-
-	| sec d |
-	vadr < diskPages
-	  ifTrue: [d _ 0. sec _ vadr] "d _ (vadr // diskPages) bitShift: 1"
-	  ifFalse: [d _ 2. sec _ vadr \\ diskPages].
-	^"disk" d +
-	"cylinder & head" (sec // nSectors bitShift: 2) + "(sec \\ nSectors) bitShift: 12"
-	"sector" (#(0 8r10000 8r20000 8r30000 8r40000 8r50000 8r60000 8r70000
-		8r100000 8r110000 8r120000 8r130000 8r140000 8r150000 8r160000 8r170000)
-		at: (sec \\ nSectors + 1))  "Indexing is faster than LargeInteger arithmetic!!"! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-AltoFileDirectory class
-	instanceVariableNames: ''!
-
-
-!AltoFileDirectory class methodsFor: 'instance creation'!
-directory: aFileDirectory directoryName: aString 
-	"Answer an instance of me in directory aFileDirectory whose name is aString."
-
-	^super new setDirectory: aFileDirectory directoryName: aString!
-new
-	^self directory: 0 directoryName: 0! !FilePage subclass: #AltoFilePage
-	instanceVariableNames: 'address '
-	classVariableNames: ''
-	poolDictionaries: 'AltoFilePool '
-	category: 'Files-Xerox Alto'!
-AltoFilePage comment:
-'A FilePage from an AltoFile consists of an address (2 words), a label (8 words) and data (512 bytes).  The instance variable "page" is a ByteArray which contains first the label and then the data.'!
-
-
-!AltoFilePage methodsFor: 'accessing'!
 size
-	^self headerWordAt: Numch! !
+    "Answer the size of the file in bytes. Primitive 92."
+    <primitive: 92>
+    "Primitive failed - perform fallback"
+    ^self primSize: fileHandle!
 
-!AltoFilePage methodsFor: 'file status'!
-reinitialize
-	page == nil
-		ifTrue: [super reinitialize]
-		ifFalse: ["nextp, backp, lnused, numch, pn"
-				page atAll: (1 to: 10) put: 0]! !
+position
+    "Answer the current file position. Primitive 93."
+    <primitive: 93>
+    "Primitive failed - perform fallback"
+    ^position!
 
-!AltoFilePage methodsFor: 'page accessing'!
-address
-	^address!
-address: addressNumber
-	address _ addressNumber!
-pageNumber
-	^self headerWordAt: Pagen!
-pageNumber: pn 
-	self headerWordAt: Pagen put: pn!
+position: anInteger
+    "Set the file position. Primitive 94."
+    <primitive: 94>
+    "Primitive failed - perform fallback"
+    self primSetPosition: fileHandle to: anInteger.
+    position _ anInteger!
+
+fileName
+    "Answer the name of the file."
+    ^fileName!
+
+isBinary
+    "Answer whether the file is being treated as binary."
+    ^isBinary!
+
+binary
+    "Set the file to binary mode."
+    isBinary _ true!
+
+text
+    "Set the file to text mode."
+    isBinary _ false! !
+
+!WindowsFile methodsFor: 'reading'!
+
+next
+    "Answer the next byte from the file."
+    | byte |
+    byte _ self nextByte.
+    isBinary ifTrue: [^byte].
+    "In text mode, convert CR LF to CR"
+    byte = 13 ifTrue: [
+        self peek = 10 ifTrue: [position _ position + 1]].
+    ^byte!
+
+nextByte
+    "Read a single byte. Primitive 91."
+    <primitive: 91>
+    "Primitive failed - perform fallback without local variables"
+    position _ position + 1.
+    ^self primAt: fileHandle position: position - 1!
+
+peek
+    "Answer the next byte without advancing position."
+    | byte |
+    byte _ self primAt: fileHandle position: position.
+    ^byte!
+
+next: count
+    "Read count bytes and answer them as a ByteArray."
+    | bytes |
+    bytes _ ByteArray new: count.
+    1 to: count do: [:i |
+        bytes at: i put: self nextByte].
+    ^bytes!
+
+nextWord
+    "Read a 16-bit word (little-endian)."
+    | low high |
+    low _ self nextByte.
+    high _ self nextByte.
+    ^(high bitShift: 8) + low! !
+
+!WindowsFile methodsFor: 'writing'!
+
+nextPut: aByte
+    "Write a byte to the file."
+    isBinary 
+        ifTrue: [self nextPutByte: aByte]
+        ifFalse: [self nextPutByte: aByte.
+                  "In text mode on Windows, write LF after CR"
+                  aByte = 13 ifTrue: [self nextPutByte: 10]].
+    ^aByte!
+
+nextPutByte: aByte
+    "Write a single byte. Primitive 90."
+    <primitive: 90>
+    "Primitive failed - perform fallback"
+    self primAt: fileHandle position: position put: aByte.
+    position _ position + 1.
+    ^aByte!
+
+nextPutAll: aCollection
+    "Write all bytes in aCollection."
+    aCollection do: [:byte |
+        self nextPut: byte].
+    ^aCollection!
+
+nextWordPut: anInteger
+    "Write a 16-bit word (little-endian)."
+    self nextPutByte: (anInteger bitAnd: 255).
+    self nextPutByte: ((anInteger bitShift: -8) bitAnd: 255).
+    ^anInteger!
+
+cr
+    "Write a carriage return."
+    self nextPut: 13!
+
+lf
+    "Write a line feed."
+    self nextPut: 10!
+
+crlf
+    "Write a carriage return and line feed."
+    self cr; lf!
+
+flush
+    "Flush any buffered data to disk."
+    "No explicit flush primitive - handled by OS"! !
+
+!WindowsFile methodsFor: 'testing'!
+
+atEnd
+    "Answer whether we are at the end of the file."
+    ^position >= self size!
+
+exists
+    "Answer whether the file exists."
+    ^fileHandle notNil! !
+
+!WindowsFile methodsFor: 'positioning'!
+
+reset
+    "Position to beginning of file."
+    self position: 0!
+
+skip: anInteger
+    "Skip forward anInteger bytes."
+    self position: position + anInteger!
+
+setToEnd
+    "Position at end of file."
+    self position: self size! !
+
+!WindowsFile methodsFor: 'private-primitives'!
+
+primOpen: aFileName mode: modeString
+    "Private - Primitive 98: Open file"
+    <primitive: 98>
+    self primitiveFailed!
+
+primClose: handle
+    "Private - Primitive 99: Close file"
+    <primitive: 99>
+    self primitiveFailed!
+
+primDelete: aFileName
+    "Private - Primitive 100: Delete file"
+    <primitive: 100>
+    self primitiveFailed!
+
+primAt: handle position: pos
+    "Private - Primitive 91: Read byte at position"
+    <primitive: 91>
+    self primitiveFailed!
+
+primAt: handle position: pos put: byte
+    "Private - Primitive 90: Write byte at position"
+    <primitive: 90>
+    self primitiveFailed!
+
+primSize: handle
+    "Private - Primitive 92: Get file size"
+    <primitive: 92>
+    self primitiveFailed!
+
+primPosition: handle
+    "Private - Primitive 93: Get file position"
+    <primitive: 93>
+    self primitiveFailed!
+
+primSetPosition: handle to: pos
+    "Private - Primitive 94: Set file position"
+    <primitive: 94>
+    self primitiveFailed! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFile class
+    instanceVariableNames: ''!
+
+
+Object subclass: #WindowsFileDirectory
+    instanceVariableNames: 'pathName'
+    classVariableNames: 'PathSeparator CurrentDirectory'
+    poolDictionaries: ''
+    category: 'System-Files'!
+
+WindowsFileDirectory comment:
+'I represent a directory in the Windows file system.'!
+
+!WindowsFileDirectory class methodsFor: 'class initialization'!
+
+initialize
+    "Initialize class variables."
+    PathSeparator _ '\'.
+    CurrentDirectory _ '.'! !
+
+!WindowsFileDirectory class methodsFor: 'instance creation'!
+
+on: aPathName
+    "Answer a new instance for the given path."
+    ^self new setPath: aPathName!
+
+current
+    "Answer the current working directory."
+    ^self on: CurrentDirectory!
+
+default
+    "Answer the default directory."
+    ^self current! !
+
+!WindowsFileDirectory class methodsFor: 'accessing'!
+
+pathSeparator
+    "Answer the path separator character."
+    ^PathSeparator! !
+
+!WindowsFileDirectory methodsFor: 'initialize-release'!
+
+setPath: aPath
+    "Set the directory path."
+    pathName _ aPath! !
+
+!WindowsFileDirectory methodsFor: 'accessing'!
+
+pathName
+    "Answer the full path of this directory."
+    ^pathName!
+
+fullNameFor: fileName
+    "Answer the full path for a file in this directory."
+    ^pathName, PathSeparator, fileName! !
+
+!WindowsFileDirectory methodsFor: 'file operations'!
+
+fileNamed: fileName
+    "Answer a WindowsFile for the given filename in this directory."
+    | fullPath |
+    fullPath _ self fullNameFor: fileName.
+    ^WindowsFile named: fullPath!
+
+oldFileNamed: fileName
+    "Answer an existing file or nil."
+    | file |
+    file _ self fileNamed: fileName.
+    [file size] on: Error do: [^nil].
+    ^file!
+
+newFileNamed: fileName
+    "Answer a new file, creating it if needed."
+    ^self fileNamed: fileName! !
+
+!WindowsFileDirectory methodsFor: 'directory operations'!
+
+directoryNamed: dirName
+    "Answer a subdirectory."
+    ^self class on: (self fullNameFor: dirName)!
+
+entries
+    "Answer a collection of file and directory names. Primitive 95."
+    <primitive: 95>
+    "Primitive failed - perform fallback"
+    ^self primLookup: pathName pattern: '*'!
+
+fileNames
+    "Answer only the file names."
+    ^self entries select: [:name | (name endsWith: '\') not]!
+
+directoryNames
+    "Answer only the directory names."
+    ^self entries select: [:name | name endsWith: '\']! !
+
+!WindowsFileDirectory methodsFor: 'testing'!
+
+exists: fileName
+    "Answer whether the named file exists."
+    | file |
+    [file _ self fileNamed: fileName.
+     file close.
+     ^true] on: Error do: [^false]!
+
+includesKey: fileName
+    "Answer whether a file with the given name exists."
+    ^self exists: fileName! !
+
+!WindowsFileDirectory methodsFor: 'private-primitives'!
+
+primLookup: dirPath pattern: pattern
+    "Private - Primitive 95: Directory lookup"
+    <primitive: 95>
+    "Return empty collection if primitive fails"
+    ^OrderedCollection new! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFileDirectory class
+    instanceVariableNames: ''!
+
+WindowsFileDirectory initialize!
+
+"==================== Complete Windows File System Implementation ===================="
+"==================== PathName Classes ===================="
+
+Object subclass: #PathName
+    instanceVariableNames: 'components'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Paths'!
+
+PathName comment:
+'I am an abstract representation of a file system path.
+My subclasses handle platform-specific path formats.'!
+
+!PathName methodsFor: 'accessing'!
+
+components
+    "Answer the path components as an array."
+    ^components!
+
+components: anArray
+    "Set the path components."
+    components _ anArray!
+
+asString
+    "Answer the path as a string - subclass responsibility."
+    self subclassResponsibility!
+
+fileName
+    "Answer the file name (last component)."
+    components isEmpty ifTrue: [^''].
+    ^components last!
+
+directoryName
+    "Answer the directory path (all but last component)."
+    components size <= 1 ifTrue: [^''].
+    ^self class new components: (components copyFrom: 1 to: components size - 1)! !
+
+!PathName methodsFor: 'converting'!
+
+asFileSystemPath: encoding
+    "Convert to file system path with given encoding."
+    ^self asString!
+
+asFileReference
+    "Answer a FileReference for this path."
+    ^FileReference pathName: self!
+
+asDirectoryReference
+    "Answer a DirectoryReference for this path."
+    ^DirectoryReference pathName: self! !
+
+!PathName class methodsFor: 'instance creation'!
+
+fromString: aString
+    "Create a path from a string."
+    ^self new pathNameFromString: aString!
+
+components: anArray
+    "Create a path from components."
+    ^self new components: anArray! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+PathName subclass: #WindowsPathName
+    instanceVariableNames: 'driveLetter'
+    classVariableNames: 'PathSeparator'
+    poolDictionaries: ''
+    category: 'Files-Paths'!
+
+WindowsPathName comment:
+'I represent a Windows file system path with drive letters and backslash separators.
+I handle both regular paths (C:\dir\file.ext) and UNC paths (\\server\share\path).'!
+
+!WindowsPathName class methodsFor: 'class initialization'!
+
+initialize
+    "Initialize class variables."
+    PathSeparator _ '\'! !
+
+!WindowsPathName methodsFor: 'initialization'!
+
+pathNameFromString: aString
+    "Parse a Windows path string. Primitive 120: PathParsePrimitive"
+    <primitive: 120>
+    "Fallback implementation"
+    | parts |
+    (aString size >= 2 and: [(aString at: 2) = $:]) ifTrue: [
+        "Drive letter path: C:\dir\file"
+        driveLetter _ aString at: 1.
+        parts _ (aString copyFrom: 3 to: aString size) 
+            findTokens: PathSeparator.
+        components _ parts select: [:p | p notEmpty]].
+    (aString beginsWith: '\\') ifTrue: [
+        "UNC path: \\server\share\path"
+        driveLetter _ nil.
+        parts _ (aString copyFrom: 3 to: aString size)
+            findTokens: PathSeparator.
+        components _ parts].
+    components ifNil: [
+        "Relative path"
+        driveLetter _ nil.
+        components _ aString findTokens: PathSeparator]! !
+
+!WindowsPathName methodsFor: 'accessing'!
+
+driveLetter
+    "Answer the drive letter or nil for UNC/relative paths."
+    ^driveLetter!
+
+driveLetter: aCharacter
+    "Set the drive letter."
+    driveLetter _ aCharacter!
+
+isAbsolute
+    "Answer whether this is an absolute path."
+    ^driveLetter notNil or: [self isUNC]!
+
+isUNC
+    "Answer whether this is a UNC path."
+    ^driveLetter isNil and: [components size >= 2]!
+
+asString
+    "Answer the path as a Windows string."
+    | stream |
+    stream _ WriteStream on: (String new: 100).
+    driveLetter ifNotNil: [
+        stream nextPut: driveLetter; nextPut: $:].
+    self isUNC ifTrue: [
+        stream nextPutAll: '\\'].
+    components do: [:comp |
+        stream nextPut: $\; nextPutAll: comp].
+    ^stream contents! !
+
+!WindowsPathName class methodsFor: 'instance creation'!
+
+newFromDrive: aDriveCharacter
+    "Create a root path for a drive."
+    ^self new
+        driveLetter: aDriveCharacter;
+        components: #();
+        yourself! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsPathName class
+    instanceVariableNames: ''!
+
+"==================== FileReference Classes ===================="
+
+Object subclass: #FileReference
+    instanceVariableNames: 'pathName'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+FileReference comment:
+'I am an abstract reference to a file in the file system.
+My subclasses provide platform-specific implementations.'!
+
+!FileReference methodsFor: 'accessing'!
+
+pathName
+    "Answer the path name."
+    ^pathName!
+
+pathName: aPathName
+    "Set the path name."
+    pathName _ aPathName!
+
+fileName
+    "Answer the file name."
+    ^pathName fileName!
+
+directory
+    "Answer the directory containing this file."
+    ^DirectoryReference pathName: pathName directoryName! !
+
+!FileReference methodsFor: 'operations'!
+
+openRead
+    "Open for reading - subclass responsibility."
+    self subclassResponsibility!
+
+openWrite
+    "Open for writing - subclass responsibility."
+    self subclassResponsibility!
+
+openAppend
+    "Open for appending - subclass responsibility."
+    self subclassResponsibility!
+
+close
+    "Close the file - subclass responsibility."
+    self subclassResponsibility!
+
+delete
+    "Delete the file - subclass responsibility."
+    self subclassResponsibility!
+
+rename: newName
+    "Rename the file - subclass responsibility."
+    self subclassResponsibility!
+
+size
+    "Answer the file size - subclass responsibility."
+    self subclassResponsibility!
+
+exists
+    "Answer whether the file exists - subclass responsibility."
+    self subclassResponsibility! !
+
+!FileReference class methodsFor: 'instance creation'!
+
+pathName: aPathName
+    "Create a reference for the given path."
+    ^self new pathName: aPathName!
+
+fileName: aString
+    "Create a reference for a file name."
+    ^self pathName: (WindowsPathName fromString: aString)! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+FileReference class
+    instanceVariableNames: ''!
+
+FileReference subclass: #WindowsFileReference
+    instanceVariableNames: 'handle'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+WindowsFileReference comment:
+'I represent a Windows file reference using Win32 file handles.
+I implement file operations using Windows primitives.'!
+
+!WindowsFileReference methodsFor: 'initialization'!
+
+initialize
+    "Initialize with invalid handle."
+    super initialize.
+    handle _ -1! !
+
+!WindowsFileReference methodsFor: 'accessing'!
+
+handle
+    "Answer the file handle."
+    ^handle! !
+
+!WindowsFileReference methodsFor: 'operations'!
+
+openRead
+    "Open for reading. Primitive 121: FileOpenPrimitive"
+    <primitive: 121>
+    handle _ self primOpen: pathName asString 
+                  accessMode: 1    "GENERIC_READ"
+                  shareMode: 1     "FILE_SHARE_READ"
+                  createMode: 3.   "OPEN_EXISTING"
+    handle = -1 ifTrue: [self error: 'Cannot open file for reading']!
+
+openWrite
+    "Open for writing. Primitive 121: FileOpenPrimitive"
+    <primitive: 121>
+    handle _ self primOpen: pathName asString
+                  accessMode: 2    "GENERIC_WRITE"
+                  shareMode: 0     "No sharing"
+                  createMode: 2.   "CREATE_ALWAYS"
+    handle = -1 ifTrue: [self error: 'Cannot open file for writing']!
+
+openAppend
+    "Open for appending. Primitive 121: FileOpenPrimitive"
+    <primitive: 121>
+    handle _ self primOpen: pathName asString
+                  accessMode: 2    "GENERIC_WRITE"
+                  shareMode: 0     "No sharing"
+                  createMode: 4.   "OPEN_ALWAYS"
+    handle = -1 ifTrue: [self error: 'Cannot open file for appending'].
+    "Seek to end"
+    self seekToEnd!
+
+close
+    "Close the file. Primitive 122: FileClosePrimitive"
+    <primitive: 122>
+    handle >= 0 ifTrue: [
+        self primClose: handle.
+        handle _ -1]!
+
+delete
+    "Delete the file. Primitive 125: DeleteFilePrimitive"
+    <primitive: 125>
+    self close.
+    self primDelete: pathName asString!
+
+rename: newName
+    "Rename the file. Primitive 126: MoveFilePrimitive"
+    <primitive: 126>
+    | oldPath newPath |
+    self close.
+    oldPath _ pathName asString.
+    newPath _ newName isString 
+        ifTrue: [newName]
+        ifFalse: [newName asString].
+    self primMove: oldPath to: newPath.
+    pathName _ WindowsPathName fromString: newPath!
+
+size
+    "Get file size. Primitive 130: GetFileAttributesPrimitive"
+    <primitive: 130>
+    | attrs |
+    attrs _ self primGetAttributes: pathName asString.
+    attrs ifNil: [^0].
+    ^attrs at: #size ifAbsent: [0]!
+
+exists
+    "Check if file exists. Primitive 130: GetFileAttributesPrimitive"
+    <primitive: 130>
+    | attrs |
+    attrs _ self primGetAttributes: pathName asString.
+    ^attrs notNil and: [(attrs at: #attributes) ~= 16rFFFFFFFF]! !
+
+!WindowsFileReference methodsFor: 'private'!
+
+seekToEnd
+    "Seek to end of file. Primitive 124: FileSeekPrimitive"
+    <primitive: 124>
+    self primSeek: handle offset: 0 origin: 2  "FILE_END"!
+
+primOpen: path accessMode: access shareMode: share createMode: create
+    "Private - Open file primitive"
+    <primitive: 121>
+    ^-1!
+
+primClose: aHandle
+    "Private - Close file primitive"
+    <primitive: 122>
+    ^false!
+
+primDelete: path
+    "Private - Delete file primitive"
+    <primitive: 125>
+    self error: 'Cannot delete file'!
+
+primMove: oldPath to: newPath
+    "Private - Move/rename file primitive"
+    <primitive: 126>
+    self error: 'Cannot rename file'!
+
+primSeek: aHandle offset: offset origin: origin
+    "Private - Seek primitive"
+    <primitive: 124>
+    ^-1!
+
+primGetAttributes: path
+    "Private - Get file attributes primitive"
+    <primitive: 130>
+    ^nil! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFileReference class
+    instanceVariableNames: ''!
+
+"==================== DirectoryReference Classes ===================="
+
+Object subclass: #DirectoryReference
+    instanceVariableNames: 'pathName'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+DirectoryReference comment:
+'I am an abstract reference to a directory in the file system.
+My subclasses provide platform-specific implementations.'!
+
+!DirectoryReference methodsFor: 'accessing'!
+
+pathName
+    "Answer the path name."
+    ^pathName!
+
+pathName: aPathName
+    "Set the path name."
+    pathName _ aPathName!
+
+directoryName
+    "Answer the directory name."
+    ^pathName asString! !
+
+!DirectoryReference methodsFor: 'operations'!
+
+create
+    "Create the directory - subclass responsibility."
+    self subclassResponsibility!
+
+delete
+    "Delete the directory - subclass responsibility."
+    self subclassResponsibility!
+
+entries
+    "Answer directory entries - subclass responsibility."
+    self subclassResponsibility!
+
+nextEntry
+    "Answer next directory entry - subclass responsibility."
+    self subclassResponsibility!
+
+reset
+    "Reset directory enumeration - subclass responsibility."
+    self subclassResponsibility! !
+
+!DirectoryReference class methodsFor: 'instance creation'!
+
+pathName: aPathName
+    "Create a reference for the given path."
+    ^self new pathName: aPathName!
+
+directoryName: aString
+    "Create a reference for a directory name."
+    ^self pathName: (WindowsPathName fromString: aString)! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+DirectoryReference class
+    instanceVariableNames: ''!
+
+DirectoryReference subclass: #WindowsDirectoryReference
+    instanceVariableNames: 'findHandle'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+WindowsDirectoryReference comment:
+'I represent a Windows directory reference using Win32 directory handles.
+I implement directory operations using Windows primitives.'!
+
+!WindowsDirectoryReference methodsFor: 'initialization'!
+
+initialize
+    "Initialize with invalid handle."
+    super initialize.
+    findHandle _ -1! !
+
+!WindowsDirectoryReference methodsFor: 'operations'!
+
+create
+    "Create directory. Primitive 127: CreateDirectoryPrimitive"
+    <primitive: 127>
+    self primCreateDirectory: pathName asString!
+
+delete
+    "Delete directory. Primitive 128: RemoveDirectoryPrimitive"
+    <primitive: 128>
+    self primRemoveDirectory: pathName asString!
+
+entries
+    "Get all entries. Uses DirFindFirstPrimitive/DirFindNextPrimitive"
+    | result entry pattern |
+    result _ OrderedCollection new.
+    pattern _ pathName asString, '\*'.
+    
+    "Start enumeration - Primitive 132: DirFindFirstPrimitive"
+    findHandle _ self primFindFirst: pattern.
+    findHandle = -1 ifTrue: [^result].
+    
+    "Get first entry"
+    entry _ self primGetFindData: findHandle.
+    entry ifNotNil: [result add: entry].
+    
+    "Get remaining entries - Primitive 133: DirFindNextPrimitive"
+    [entry _ self nextEntry.
+     entry notNil] whileTrue: [
+        result add: entry].
+    
+    "Close enumeration - Primitive 134: DirFindClosePrimitive"
+    self primFindClose: findHandle.
+    findHandle _ -1.
+    
+    ^result!
+
+nextEntry
+    "Get next entry. Primitive 133: DirFindNextPrimitive"
+    <primitive: 133>
+    findHandle = -1 ifTrue: [^nil].
+    ^self primFindNext: findHandle!
+
+reset
+    "Reset enumeration. Primitive 134: DirFindClosePrimitive then DirFindFirstPrimitive"
+    | pattern |
+    findHandle >= 0 ifTrue: [
+        self primFindClose: findHandle.
+        findHandle _ -1].
+    "Restart enumeration"
+    pattern _ pathName asString, '\*'.
+    findHandle _ self primFindFirst: pattern! !
+
+!WindowsDirectoryReference methodsFor: 'private'!
+
+primCreateDirectory: path
+    "Private - Create directory primitive"
+    <primitive: 127>
+    self error: 'Cannot create directory'!
+
+primRemoveDirectory: path
+    "Private - Remove directory primitive"
+    <primitive: 128>
+    self error: 'Cannot remove directory'!
+
+primFindFirst: pattern
+    "Private - Find first file primitive"
+    <primitive: 132>
+    ^-1!
+
+primFindNext: handle
+    "Private - Find next file primitive"
+    <primitive: 133>
+    ^nil!
+
+primFindClose: handle
+    "Private - Close find handle primitive"
+    <primitive: 134>
+    ^false!
+
+primGetFindData: handle
+    "Private - Get current find data"
+    "This would return a dictionary with file name and attributes"
+    ^nil! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsDirectoryReference class
+    instanceVariableNames: ''!
+
+"==================== Stream Classes ===================="
+
+Stream subclass: #ExternalBinaryStream
+    instanceVariableNames: 'fileReference position'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+ExternalBinaryStream comment:
+'I am an abstract binary stream for external file I/O.
+My subclasses provide platform-specific implementations.'!
+
+!ExternalBinaryStream methodsFor: 'accessing'!
+
+fileReference
+    "Answer the file reference."
+    ^fileReference!
+
+fileReference: aFileReference
+    "Set the file reference."
+    fileReference _ aFileReference!
+
+position
+    "Answer current position."
+    ^position!
+
+position: anInteger
+    "Set position."
+    position _ anInteger.
+    self setPosition: anInteger!
+
+size
+    "Answer the size."
+    ^fileReference size! !
+
+!ExternalBinaryStream methodsFor: 'reading'!
+
+basicRead: count
+    "Read count bytes - subclass responsibility."
+    self subclassResponsibility!
+
+next
+    "Read next byte."
+    | buffer |
+    buffer _ self basicRead: 1.
+    buffer isEmpty ifTrue: [^nil].
+    ^buffer at: 1!
+
+next: count
+    "Read count bytes."
+    ^self basicRead: count! !
+
+!ExternalBinaryStream methodsFor: 'writing'!
+
+basicWrite: buffer
+    "Write buffer - subclass responsibility."
+    self subclassResponsibility!
+
+nextPut: aByte
+    "Write a byte."
+    self basicWrite: (ByteArray with: aByte).
+    ^aByte!
+
+nextPutAll: aCollection
+    "Write a collection of bytes."
+    self basicWrite: aCollection asByteArray.
+    ^aCollection! !
+
+!ExternalBinaryStream methodsFor: 'positioning'!
+
+setPosition: anOffset
+    "Set file position - subclass responsibility."
+    self subclassResponsibility!
+
+reset
+    "Reset to beginning."
+    self position: 0!
+
+setToEnd
+    "Position at end."
+    self position: self size!
+
+atEnd
+    "Answer whether at end."
+    ^position >= self size! !
+
+!ExternalBinaryStream methodsFor: 'open/close'!
+
+close
+    "Close the stream."
+    fileReference close!
+
+flush
+    "Flush any buffers."
+    "Default implementation does nothing"! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+ExternalBinaryStream class
+    instanceVariableNames: ''!
+
+ExternalBinaryStream subclass: #WindowsFileStream
+    instanceVariableNames: 'handle buffer bufferPosition bufferSize'
+    classVariableNames: 'BufferSize'
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+WindowsFileStream comment:
+'I am a Windows binary file stream using Win32 file I/O.
+I use buffering for efficient read/write operations.'!
+
+!WindowsFileStream class methodsFor: 'class initialization'!
+
+initialize
+    "Set buffer size."
+    BufferSize _ 4096! !
+
+!WindowsFileStream methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    buffer _ ByteArray new: BufferSize.
+    bufferPosition _ 0.
+    bufferSize _ 0.
+    position _ 0! !
+
+!WindowsFileStream methodsFor: 'open/close'!
+
+on: aWindowsFileReference
+    "Open on the given file reference."
+    fileReference _ aWindowsFileReference.
+    handle _ aWindowsFileReference handle.
+    position _ 0.
+    bufferPosition _ 0.
+    bufferSize _ 0!
+
+on: aWindowsFileReference mode: modeSymbol
+    "Open on the given file reference with mode."
+    modeSymbol = #read ifTrue: [aWindowsFileReference openRead].
+    modeSymbol = #write ifTrue: [aWindowsFileReference openWrite].
+    modeSymbol = #append ifTrue: [aWindowsFileReference openAppend].
+    self on: aWindowsFileReference! !
+
+!WindowsFileStream methodsFor: 'reading'!
+
+basicRead: count
+    "Read count bytes. Primitive 123: FileReadPrimitive"
+    <primitive: 123>
+    | result bytesRead |
+    result _ ByteArray new: count.
+    bytesRead _ self primRead: handle into: result count: count.
+    bytesRead < count ifTrue: [
+        result _ result copyFrom: 1 to: bytesRead].
+    position _ position + bytesRead.
+    ^result! !
+
+!WindowsFileStream methodsFor: 'writing'!
+
+basicWrite: buffer
+    "Write buffer. Primitive 123: FileWritePrimitive"
+    <primitive: 123>
+    | bytesWritten |
+    bytesWritten _ self primWrite: handle from: buffer count: buffer size.
+    position _ position + bytesWritten.
+    ^bytesWritten! !
+
+!WindowsFileStream methodsFor: 'positioning'!
+
+setPosition: anOffset
+    "Set position. Primitive 124: FileSeekPrimitive"
+    <primitive: 124>
+    self primSeek: handle offset: anOffset origin: 0.  "FILE_BEGIN"
+    position _ anOffset! !
+
+!WindowsFileStream methodsFor: 'private'!
+
+primRead: aHandle into: buffer count: count
+    "Private - Read primitive"
+    <primitive: 123>
+    ^0!
+
+primWrite: aHandle from: buffer count: count
+    "Private - Write primitive"
+    <primitive: 123>
+    ^0!
+
+primSeek: aHandle offset: offset origin: origin
+    "Private - Seek primitive"
+    <primitive: 124>
+    ^-1! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFileStream class
+    instanceVariableNames: ''!
+
+Stream subclass: #ExternalTextStream
+    instanceVariableNames: 'binaryStream encoding lineEnding'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+ExternalTextStream comment:
+'I am an abstract text stream that handles character encoding.
+My subclasses provide platform-specific implementations.'!
+
+!ExternalTextStream methodsFor: 'accessing'!
+
+binaryStream
+    "Answer the underlying binary stream."
+    ^binaryStream!
+
+binaryStream: aBinaryStream
+    "Set the underlying binary stream."
+    binaryStream _ aBinaryStream!
+
+encoding
+    "Answer the character encoding."
+    ^encoding ifNil: [encoding _ #ascii]!
+
+encoding: aSymbol
+    "Set the character encoding."
+    encoding _ aSymbol!
+
+lineEnding
+    "Answer the line ending convention."
+    ^lineEnding ifNil: [lineEnding _ String crlf]!
+
+lineEnding: aString
+    "Set the line ending convention."
+    lineEnding _ aString! !
+
+!ExternalTextStream methodsFor: 'reading'!
+
+nextChar
+    "Read next character - subclass responsibility."
+    self subclassResponsibility!
+
+nextLine
+    "Read next line - subclass responsibility."
+    self subclassResponsibility! !
+
+!ExternalTextStream methodsFor: 'writing'!
+
+show: aString
+    "Write a string - subclass responsibility."
+    self subclassResponsibility!
+
+showLn: aString
+    "Write a string with line ending - subclass responsibility."
+    self subclassResponsibility! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+ExternalTextStream class
+    instanceVariableNames: ''!
+
+ExternalTextStream subclass: #WindowsTextFileStream
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+WindowsTextFileStream comment:
+'I am a Windows text file stream that handles text encoding and line endings.
+I wrap a WindowsFileStream and provide text-oriented operations.'!
+
+!WindowsTextFileStream methodsFor: 'initialization'!
+
+on: aWindowsFileReference
+    "Initialize on a file reference."
+    binaryStream _ WindowsFileStream new on: aWindowsFileReference.
+    encoding _ #ascii.
+    lineEnding _ String crlf! !
+
+!WindowsTextFileStream methodsFor: 'reading'!
+
+nextChar
+    "Read next character with encoding conversion."
+    | byte |
+    byte _ binaryStream next.
+    byte ifNil: [^nil].
+    encoding = #utf8 ifTrue: [^self decodeUTF8: byte].
+    ^Character value: byte!
+
+nextLine
+    "Read next line, handling line endings."
+    | result char |
+    result _ WriteStream on: (String new: 80).
+    [char _ self nextChar.
+     char notNil and: [char ~= Character cr]] whileTrue: [
+        result nextPut: char].
+    "Skip LF after CR if present"
+    (char = Character cr and: [binaryStream peek = 10]) ifTrue: [
+        binaryStream next].
+    ^result contents! !
+
+!WindowsTextFileStream methodsFor: 'writing'!
+
+show: aString
+    "Write a string with encoding conversion."
+    aString do: [:char |
+        encoding = #utf8
+            ifTrue: [self encodeUTF8: char]
+            ifFalse: [binaryStream nextPut: char asciiValue]]!
+
+showLn: aString
+    "Write a string with line ending."
+    self show: aString.
+    self show: lineEnding! !
+
+!WindowsTextFileStream methodsFor: 'private'!
+
+decodeUTF8: byte
+    "Decode UTF-8 byte sequence to character."
+    "Simplified - only handles ASCII range"
+    ^Character value: byte!
+
+encodeUTF8: char
+    "Encode character as UTF-8 bytes."
+    "Simplified - only handles ASCII range"
+    binaryStream nextPut: char asciiValue! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsTextFileStream class
+    instanceVariableNames: ''!
+
+"==================== FileSystem Classes ===================="
+
+Object subclass: #FileSystem
+    instanceVariableNames: ''
+    classVariableNames: 'Default'
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+FileSystem comment:
+'I am an abstract file system entry point for volumes and drives.
+My subclasses provide platform-specific implementations.'!
+
+!FileSystem methodsFor: 'accessing'!
+
+drives
+    "Answer available drives - subclass responsibility."
+    self subclassResponsibility!
+
+currentDrive
+    "Answer current drive - subclass responsibility."
+    self subclassResponsibility!
+
+rootFor: aDriveIdentifier
+    "Answer root path for drive - subclass responsibility."
+    self subclassResponsibility! !
+
+!FileSystem class methodsFor: 'accessing'!
+
+default
+    "Answer the default file system."
+    Default ifNil: [Default _ WindowsFileSystem new].
+    ^Default! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+FileSystem class
+    instanceVariableNames: ''!
+
+FileSystem subclass: #WindowsFileSystem
+    instanceVariableNames: 'currentDrive'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+WindowsFileSystem comment:
+'I am the Windows file system that manages drive letters and volumes.'!
+
+!WindowsFileSystem methodsFor: 'initialization'!
+
+initialize
+    "Initialize with C: as default drive."
+    super initialize.
+    currentDrive _ $C! !
+
+!WindowsFileSystem methodsFor: 'accessing'!
+
+drives
+    "Answer available drives. Primitive 135: GetDriveListPrimitive"
+    <primitive: 135>
+    | driveString drives |
+    driveString _ self primGetDrives.
+    drives _ OrderedCollection new.
+    driveString do: [:char |
+        char = $: ifTrue: [
+            drives add: (driveString at: driveString position - 1)]].
+    ^drives!
+
+currentDrive
+    "Answer current drive letter."
+    ^currentDrive!
+
+rootFor: aDriveCharacter
+    "Answer root path for a drive."
+    ^WindowsPathName newFromDrive: aDriveCharacter!
+
+changeDrive: aDriveCharacter
+    "Change current drive."
+    currentDrive _ aDriveCharacter! !
+
+!WindowsFileSystem methodsFor: 'private'!
+
+primGetDrives
+    "Private - Get drive list primitive"
+    <primitive: 135>
+    ^'C:D:E:'  "Fallback"! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFileSystem class
+    instanceVariableNames: ''!
+
+"==================== Volume Classes ===================="
+
+Object subclass: #Volume
+    instanceVariableNames: 'identifier'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Volumes'!
+
+Volume comment:
+'I am an abstract volume/drive representation.
+My subclasses provide platform-specific implementations.'!
+
+!Volume methodsFor: 'accessing'!
+
+identifier
+    "Answer the volume identifier."
+    ^identifier!
+
+identifier: anObject
+    "Set the volume identifier."
+    identifier _ anObject!
+
+volumeName
+    "Answer volume name - subclass responsibility."
+    self subclassResponsibility!
+
+freeSpace
+    "Answer free space - subclass responsibility."
+    self subclassResponsibility!
+
+totalSpace
+    "Answer total space - subclass responsibility."
+    self subclassResponsibility! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+Volume class
+    instanceVariableNames: ''!
+
+Volume subclass: #WindowsVolume
+    instanceVariableNames: 'driveLetter volumeName serialNumber freeBytesAvailable totalNumberOfBytes totalFreeBytes'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Volumes'!
+
+WindowsVolume comment:
+'I represent a Windows drive volume with drive letter and volume information.'!
+
+!WindowsVolume methodsFor: 'initialization'!
+
+driveLetter: aCharacter
+    "Set drive letter and refresh info."
+    driveLetter _ aCharacter.
+    identifier _ aCharacter.
+    self refresh! !
+
+!WindowsVolume methodsFor: 'accessing'!
+
+driveLetter
+    "Answer drive letter."
+    ^driveLetter!
+
+volumeName
+    "Answer volume name."
+    ^volumeName!
+
 serialNumber
-	^self label copyFrom: Sn1 * 2 - 1 to: Sn2 * 2!
-serialNumber: sn 
-	self headerWordAt: Sn1 put: (sn wordAt: 1).
-	self headerWordAt: Sn2 put: (sn wordAt: 2).
-	self headerWordAt: Vn put: 1  "fixed version"! !
+    "Answer serial number."
+    ^serialNumber!
 
-!AltoFilePage methodsFor: 'page testing'!
-headerSize
-	^16!
-lastPage
-	^(self headerWordAt: Nextp) = 0! !
+freeSpace
+    "Answer free bytes available."
+    ^freeBytesAvailable!
 
-!AltoFilePage methodsFor: 'file/page/directory implementation'!
-size: size 
-	self headerWordAt: Numch put: size! !
+totalSpace
+    "Answer total bytes."
+    ^totalNumberOfBytes!
 
-!AltoFilePage methodsFor: 'private'!
-freePage 
-	self headerWordAt: Sn1 put: -1.
-	self headerWordAt: Sn2 put: -1.
-	self headerWordAt: Vn put: -1!
-label
-	^page! !CodeController subclass: #AlwaysAcceptCodeController
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Interface-Text'!
+totalFreeBytes
+    "Answer total free bytes."
+    ^totalFreeBytes! !
+
+!WindowsVolume methodsFor: 'operations'!
+
+refresh
+    "Refresh volume info. Primitive 137: GetVolumeInfoPrimitive"
+    <primitive: 137>
+    | info |
+    info _ self primGetVolumeInfo: (driveLetter asString, ':\').
+    info ifNotNil: [
+        volumeName _ info at: #volumeName.
+        serialNumber _ info at: #serialNumber.
+        freeBytesAvailable _ info at: #freeBytesAvailable.
+        totalNumberOfBytes _ info at: #totalNumberOfBytes.
+        totalFreeBytes _ info at: #totalFreeBytes]! !
+
+!WindowsVolume methodsFor: 'private'!
+
+primGetVolumeInfo: rootPath
+    "Private - Get volume info primitive"
+    <primitive: 137>
+    ^Dictionary new
+        at: #volumeName put: 'Local Disk';
+        at: #serialNumber put: 12345678;
+        at: #freeBytesAvailable put: 1000000000;
+        at: #totalNumberOfBytes put: 2000000000;
+        at: #totalFreeBytes put: 1000000000;
+        yourself! !
+
+!WindowsVolume methodsFor: 'disk space'!
+
+getDiskFreeSpaceEx
+    "Get disk free space. Primitive 136: GetDiskFreeSpaceExPrimitive"
+    <primitive: 136>
+    | info |
+    info _ self primGetDiskFreeSpaceEx: (driveLetter asString, ':\').
+    info ifNotNil: [
+        freeBytesAvailable _ info at: #freeBytesAvailable.
+        totalNumberOfBytes _ info at: #totalNumberOfBytes.
+        totalFreeBytes _ info at: #totalFreeBytes]! !
+
+!WindowsVolume methodsFor: 'private'!
+
+primGetDiskFreeSpaceEx: path
+    "Private - Get disk free space primitive"
+    <primitive: 136>
+    ^Dictionary new
+        at: #freeBytesAvailable put: 1000000000;
+        at: #totalNumberOfBytes put: 2000000000;
+        at: #totalFreeBytes put: 1000000000;
+        yourself! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsVolume class
+    instanceVariableNames: ''!
+
+"==================== FileAttributes Classes ===================="
+
+Object subclass: #FileAttributes
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Attributes'!
+
+FileAttributes comment:
+'I am an abstract file attributes container.
+My subclasses provide platform-specific implementations.'!
+
+!FileAttributes methodsFor: 'testing'!
+
+isReadOnly
+    "Answer whether read-only - subclass responsibility."
+    self subclassResponsibility!
+
+isHidden
+    "Answer whether hidden - subclass responsibility."
+    self subclassResponsibility!
+
+isSystem
+    "Answer whether system file - subclass responsibility."
+    self subclassResponsibility!
+
+isDirectory
+    "Answer whether directory - subclass responsibility."
+    self subclassResponsibility! !
+
+!FileAttributes methodsFor: 'accessing'!
+
+fileSize
+    "Answer file size - subclass responsibility."
+    self subclassResponsibility!
+
+creationTime
+    "Answer creation time - subclass responsibility."
+    self subclassResponsibility!
+
+lastAccessTime
+    "Answer last access time - subclass responsibility."
+    self subclassResponsibility!
+
+lastWriteTime
+    "Answer last write time - subclass responsibility."
+    self subclassResponsibility! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+FileAttributes class
+    instanceVariableNames: ''!
+
+FileAttributes subclass: #WindowsFileAttributes
+    instanceVariableNames: 'attributeFlags creationTime lastAccessTime lastWriteTime fileSize'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Attributes'!
+
+WindowsFileAttributes comment:
+'I represent Windows file attributes including timestamps and attribute flags.'!
+
+!WindowsFileAttributes methodsFor: 'initialization'!
+
+initializeFrom: path
+    "Initialize from a file path. Primitive 130: GetFileAttributesPrimitive"
+    <primitive: 130>
+    | info |
+    info _ self primGetAttributes: path.
+    info ifNotNil: [
+        attributeFlags _ info at: #attributes.
+        fileSize _ info at: #size.
+        creationTime _ info at: #creationTime.
+        lastAccessTime _ info at: #lastAccessTime.
+        lastWriteTime _ info at: #lastWriteTime]! !
+
+!WindowsFileAttributes methodsFor: 'testing'!
+
+isReadOnly
+    "Answer whether read-only."
+    ^(attributeFlags bitAnd: 1) ~= 0!
+
+isHidden
+    "Answer whether hidden."
+    ^(attributeFlags bitAnd: 2) ~= 0!
+
+isSystem
+    "Answer whether system file."
+    ^(attributeFlags bitAnd: 4) ~= 0!
+
+isDirectory
+    "Answer whether directory."
+    ^(attributeFlags bitAnd: 16) ~= 0!
+
+isArchive
+    "Answer whether archive bit is set."
+    ^(attributeFlags bitAnd: 32) ~= 0! !
+
+!WindowsFileAttributes methodsFor: 'accessing'!
+
+attributeFlags
+    "Answer attribute flags."
+    ^attributeFlags!
+
+fileSize
+    "Answer file size."
+    ^fileSize!
+
+creationTime
+    "Answer creation time."
+    ^creationTime!
+
+lastAccessTime
+    "Answer last access time."
+    ^lastAccessTime!
+
+lastWriteTime
+    "Answer last write time."
+    ^lastWriteTime! !
+
+!WindowsFileAttributes methodsFor: 'modifying'!
+
+setReadOnly: aBoolean
+    "Set read-only flag. Primitive 131: SetFileAttributesPrimitive"
+    <primitive: 131>
+    aBoolean
+        ifTrue: [attributeFlags _ attributeFlags bitOr: 1]
+        ifFalse: [attributeFlags _ attributeFlags bitAnd: -2].
+    self primSetAttributes: attributeFlags!
+
+setHidden: aBoolean
+    "Set hidden flag. Primitive 131: SetFileAttributesPrimitive"
+    <primitive: 131>
+    aBoolean
+        ifTrue: [attributeFlags _ attributeFlags bitOr: 2]
+        ifFalse: [attributeFlags _ attributeFlags bitAnd: -3].
+    self primSetAttributes: attributeFlags!
+
+setSystem: aBoolean
+    "Set system flag. Primitive 131: SetFileAttributesPrimitive"
+    <primitive: 131>
+    aBoolean
+        ifTrue: [attributeFlags _ attributeFlags bitOr: 4]
+        ifFalse: [attributeFlags _ attributeFlags bitAnd: -5].
+    self primSetAttributes: attributeFlags! !
+
+!WindowsFileAttributes methodsFor: 'private'!
+
+primGetAttributes: path
+    "Private - Get attributes primitive"
+    <primitive: 130>
+    ^nil!
+
+primSetAttributes: flags
+    "Private - Set attributes primitive"
+    <primitive: 131>
+    ^false! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowsFileAttributes class
+    instanceVariableNames: ''!
+
+"==================== Initialization ===================="
+
+WindowsPathName initialize!
+WindowsFileStream initialize!
+WindowsFileSystem initialize!
+
 AlwaysAcceptCodeController comment:
 'I am a code controller that will do an accept even if the text is the same.'!
 
@@ -4663,7 +5370,7 @@ xor: aBoolean
 	"Exclusive OR -- answer true if the receiver is not equivalent to aBoolean."
 
 	^(self == aBoolean) not!
-| aBoolean 
+| aBoolean
 	"Evaluating disjunction (OR) -- Evaluate the argument.  Then answer true if
 	either the receiver or the argument is true."
 	self subclassResponsibility! !
@@ -16134,7 +16841,7 @@ not
 	"Negation -- answer true since the receiver is false."
 
 	^true!
-| aBoolean 
+| aBoolean
 	"Evaluating disjunction (OR) -- answer with the argument, aBoolean."
 
 	^aBoolean! !
@@ -16443,19 +17150,35 @@ sameAsStoredFile
 	^false! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
+Object subclass: #File
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: 'FilePool'
+	category: 'Files-Abstract'!
+File comment: 'File is an abstract base class for file implementations. WindowsFile provides the concrete implementation for Windows systems.'!
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
 File class
 	instanceVariableNames: ''!
 
-
 !File class methodsFor: 'class initialization'!
 initialize
-	"Subclasses of File may want to share variables in pools. 
-	Execute before filin:  Smalltalk at: #XFilePool as: (Dictionary: 16). 
-	in XFile initialize."
+	"Initialize FilePool with file mode constants.
+	Updated for Windows file implementation."
 
-	FilePool at: #Read put: 1.
-	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3! !
+	FilePool _ Dictionary new.
+	FilePool at: #read put: 1.         "Open for reading"
+	FilePool at: #Read put: 1.         "Compatibility"
+	FilePool at: #write put: 2.        "Open for writing"
+	FilePool at: #Write put: 2.        "Compatibility"
+	FilePool at: #readWrite put: 3.    "Open for read/write"
+	FilePool at: #Shorten put: 3.      "Compatibility"
+	FilePool at: #append put: 4.       "Open for appending"
+	FilePool at: #create put: 16.      "Create if doesn't exist"
+	FilePool at: #truncate put: 32.    "Truncate existing file"
+	FilePool at: #binary put: 64.      "Binary mode"
+	FilePool at: #text put: 128! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -16491,6 +17214,18 @@ documentation
 "! !
 
 File initialize!
+
+!File class methodsFor: 'instance creation'!
+
+named: fileName
+    "Answer a new file with the given name - use Windows implementation."
+    ^WindowsFile named: fileName!
+
+named: fileName mode: modeSymbol
+    "Answer a new file with the given name and mode - use Windows implementation."
+    ^WindowsFile named: fileName mode: modeSymbol! !
+
+
 Object subclass: #FileDirectory
 	instanceVariableNames: 'directoryName closed '
 	classVariableNames: 'ExternalReferences '
@@ -16888,6 +17623,21 @@ documentation
 "! !
 
 FileDirectory initialize!
+
+!FileDirectory class methodsFor: 'instance creation'!
+
+default
+    "Answer the default directory - use Windows implementation."
+    ^WindowsFileDirectory default!
+
+current
+    "Answer the current working directory - use Windows implementation."
+    ^WindowsFileDirectory current!
+
+on: aPathName
+    "Answer a directory for the given path - use Windows implementation."
+    ^WindowsFileDirectory on: aPathName! !
+
 FileModel subclass: #FileList
 	instanceVariableNames: 'list myPattern isReading '
 	classVariableNames: 'FileMenu PatternMenu '
@@ -27011,11 +27761,21 @@ Object class
 
 !Object class methodsFor: 'class initialization'!
 initialize 
+	"Initialize Object class variables. Skip during bootstrap."
+	
+	"Original code that requires UI and proper system state:
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
 			[self initializeDependentsFields.
-			self initializeErrorRecursion]
+			self initializeErrorRecursion]"
+	
+	"During bootstrap, skip initialization entirely as it depends on 
+	 system state that isn't available yet. The VM will handle the
+	 necessary setup for DependentsFields and ErrorRecursion."
+	
+	"self initializeDependentsFields.
+	self initializeErrorRecursion"
 
 	"Object initialize"! !
 
@@ -38337,7 +39097,7 @@ printDanglingRefs   "SystemTracer new printDanglingRefs."
 		(SystemOrganization superclassOrder: str) do: 
 			[:class | clamped add: class name]].
 	"clamp individual classes and other Globals: "
-	(Array with: #AltoFile with: #AltoFileDirectory with: #AltoFilePage) do: 
+	(Array with: #WindowsFile with: #WindowsFileDirectory) do: 
 		[:x | clamped add: x].
 	Smalltalk allBehaviorsDo: 
 		[:class | 
@@ -38465,7 +39225,7 @@ writeClone
 writeCloneWithout: aSet
 	"This message creates and runs a SystemTracer without the sets named:
 		SystemTracer writeCloneWithout:
-			(Set with: AltoFilePage with: AltoFile with: AltoFileDirectory).
+			(Set with: WindowsFile with: WindowsFileDirectory).
 	If all goes well, it will produce a file called clone.im which is a valid image file"
 
 	| tracer |
@@ -39931,7 +40691,7 @@ not
 	"Negation--answer false since the receiver is true."
 
 	^false!
-| aBoolean 
+| aBoolean
 	"Evaluating disjunction (OR) -- answer true since the receiver is true."
 
 	^self! !

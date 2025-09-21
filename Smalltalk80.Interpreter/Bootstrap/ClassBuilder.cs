@@ -193,13 +193,6 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classObj == null || metaclassObj == null)
                     continue;
                 
-                // Debug Object class handling
-                if (classSpec.Name == "Object")
-                {
-                    Console.WriteLine($"[ClassBuilder] Found Object in WireSuperclasses");
-                    Console.WriteLine($"[ClassBuilder]   Superclass: {classSpec.Superclass ?? "null"}");
-                    Console.WriteLine($"[ClassBuilder]   Will enter else branch at line 230");
-                }
                 
                 // Set class superclass using field lookup
                 if (classSpec.Superclass != null && classSpec.Superclass != "nil")
@@ -237,10 +230,6 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
                 else if (classSpec.Name == "Object")
                 {
-                    // Always show this debug
-                    Console.WriteLine($"[ClassBuilder] Processing Object class special case");
-                    Console.WriteLine($"[ClassBuilder]   classClass = {classClass}");
-                    Console.WriteLine($"[ClassBuilder]   metaclassObj = {GetMetaclass(classSpec.Name)}");
                     
                     // Object's superclass is nil
                     var superclassIndex = fieldLookup.GetMetaclassFieldIndex("Object", "superclass");

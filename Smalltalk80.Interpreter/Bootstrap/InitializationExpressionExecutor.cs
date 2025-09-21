@@ -100,39 +100,23 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             Console.WriteLine($"[InitExpr] Executing {expressions.Count} initialization expressions...");
             
-            // TEMPORARY: Only execute "Object initialize" to debug infinite recursion
-            var objectInitialize = expressions.FirstOrDefault(e => 
-                e.Source != null && e.Source.Trim() == "Object initialize");
+            // Sort initialization expressions by class hierarchy (superclasses first)
+            var sortedExpressions = SortByClassHierarchy(expressions);
             
-            if (objectInitialize == null)
+            Console.WriteLine("[InitExpr] Sorted initialization expressions by class hierarchy:");
+            foreach (var expr in sortedExpressions.Take(10))
             {
-                Console.WriteLine("[InitExpr] WARNING: 'Object initialize' not found in initialization expressions");
-                Console.WriteLine("[InitExpr] Available expressions:");
-                foreach (var e in expressions.Take(10))
-                {
-                    Console.WriteLine($"  - {e.Source}");
-                }
-                return doItProcess.IsNil ? CreateDoItProcess() : doItProcess;
+                Console.WriteLine($"  - {expr.Source}");
             }
-            
-            // Execute all initialization expressions, starting with Object initialize
-            var sortedExpressions = new List<InitializationExpression> { objectInitialize };
-            sortedExpressions.AddRange(expressions.Where(e => e != objectInitialize));
+            if (sortedExpressions.Count > 10)
+            {
+                Console.WriteLine($"  ... and {sortedExpressions.Count - 10} more");
+            }
             
             // Get or create a process for execution
             if (doItProcess.IsNil)
             {
                 doItProcess = CreateDoItProcess();
-            }
-            
-            // TEMPORARY: Only execute SmallInteger initialize for debugging
-            sortedExpressions = sortedExpressions.Where(e => 
-                e.Source != null && e.Source.Contains("SmallInteger initialize")).ToList();
-            
-            if (sortedExpressions.Count == 0)
-            {
-                Console.WriteLine("[InitExpr] WARNING: SmallInteger initialize not found in expressions");
-                return doItProcess;
             }
             
             // Execute each expression in order
@@ -141,7 +125,6 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 try
                 {
-                    Console.WriteLine($"[InitExpr] Executing: {expr.Source ?? "Unknown"}");
                     ExecuteExpression(expr, doItProcess);
                     successCount++;
                 }
@@ -209,7 +192,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 if (!string.IsNullOrEmpty(expr.Receiver) && !classDepths.ContainsKey(expr.Receiver))
                 {
-                    classDepths[expr.Receiver] = GetClassDepth(expr.Receiver);
+                    // Skip expressions that aren't class initializations
+                    // (e.g., string literals like 'From Smalltalk-80, Version 2 of April 1, 1983')
+                    if (expr.Receiver.StartsWith("'") || expr.Receiver.StartsWith("\""))
+                        continue;
+                        
+                    var depth = GetClassDepth(expr.Receiver);
+                    classDepths[expr.Receiver] = depth;
                 }
             }
             
@@ -225,11 +214,41 @@ namespace Smalltalk80.Interpreter.Bootstrap
         }
         
         /// <summary>
+        /// Helper method to extract a string from an OOP.
+        /// </summary>
+        private string? GetStringFromOOP(OOP oop)
+        {
+            if (oop.IsNil)
+                return null;
+                
+            var obj = memory.GetObject(oop);
+            if (obj == null)
+                return null;
+                
+            // For String/Symbol, the bytes are typically stored as the object's indexed fields
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < obj.Fields.Length; i++)
+            {
+                var field = obj.GetField(i);
+                if (field.IsSmallInteger)
+                {
+                    sb.Append((char)field.SmallIntegerValue);
+                }
+            }
+            
+            return sb.ToString();
+        }
+        
+        /// <summary>
         /// Gets the depth of a class in the inheritance hierarchy.
         /// Object has depth 0, its direct subclasses have depth 1, etc.
         /// </summary>
         private int GetClassDepth(string className)
         {
+            // Special case for Object - always depth 0
+            if (className == "Object")
+                return 0;
+            
             var classOop = classBuilder.GetClass(className);
             if (classOop.IsNil)
             {
@@ -240,14 +259,30 @@ namespace Smalltalk80.Interpreter.Bootstrap
             int depth = 0;
             var current = classOop;
             
+            // Navigate up the superclass chain
             while (!current.IsNil)
             {
                 // Get superclass
                 var superclassOop = vm.GetFieldBootstrap(current, "Behavior", "superclass");
                 
                 if (superclassOop.IsNil)
-                    break; // Reached Object
-                    
+                {
+                    // Reached Object (nil superclass)
+                    break;
+                }
+                
+                // Check if the superclass is Object
+                var classNameObj = vm.GetFieldBootstrap(superclassOop, "Class", "name");
+                if (!classNameObj.IsNil)
+                {
+                    var nameStr = GetStringFromOOP(classNameObj);
+                    if (nameStr == "Object")
+                    {
+                        // Direct subclass of Object
+                        return depth + 1;
+                    }
+                }
+                
                 current = superclassOop;
                 depth++;
             }
@@ -664,12 +699,29 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     }
                 }
                 
-                vm.ExecuteBytecodes(context);
+                // Enable MNU exception throwing during initialization
+                var originalExecutingInit = vm.ExecutingInitialization;
+                vm.ExecutingInitialization = true;
                 
-                Console.WriteLine($"[InitExpr] Successfully executed: {expr.Source}");
+                try
+                {
+                    vm.ExecuteBytecodes(context);
+                    Console.WriteLine($"[InitExpr] Completed: {expr.Source}");
+                }
+                finally
+                {
+                    // Restore the original state
+                    vm.ExecutingInitialization = originalExecutingInit;
+                }
+                
+                Console.WriteLine(); // Blank line to separate from next expression
             }
             catch (Exception ex)
             {
+                // Log completion with error status
+                Console.WriteLine($"[InitExpr] Completed with error: {expr.Source}");
+                Console.WriteLine(); // Blank line to separate from next expression
+                
                 // Enhance error message with more context
                 var enhancedMessage = AnalyzeInitializationError(expr, ex);
                 Console.WriteLine($"[InitExpr] Error executing '{expr.Source}': {enhancedMessage}");
@@ -801,7 +853,26 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 for (int i = 0; i < literals.Count; i++)
                 {
-                    literalsObj.Fields[i] = ConvertLiteralToOop(literals[i]);
+                    var literalOop = ConvertLiteralToOop(literals[i]);
+                    literalsObj.Fields[i] = literalOop;
+                    
+                    // Debug trace for Associations
+                    if (Config.DebugOptions.EnableDebugOutput && !literalOop.IsNil)
+                    {
+                        var literalObj = memory.GetObject(literalOop);
+                        if (literalObj != null)
+                        {
+                            var associationClass = classBuilder.GetClass("Association");
+                            if (!associationClass.IsNil && literalObj.Header.ClassOOP.RawValue == associationClass.RawValue)
+                            {
+                                var keyStr = OopToString(literalObj.Fields[0]);
+                                if (keyStr == "Cursor" || keyStr == "BinaryChoiceView")
+                                {
+                                    Console.WriteLine($"[InitExpr] TRACE: Storing Association {literalOop} at literals[{i}] with key={literalObj.Fields[0]}, value={literalObj.Fields[1]}");
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
@@ -937,7 +1008,11 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 
                 if (Config.DebugOptions.EnableDebugOutput)
                 {
-                    Console.WriteLine($"[InitExpr] Created Association for {key} -> {value}");
+                    Console.WriteLine($"[InitExpr] Created Association {associationOop} for {key} -> {value}");
+                    if (key == "Cursor" || key == "BinaryChoiceView")
+                    {
+                        Console.WriteLine($"[InitExpr] TRACE: Association {associationOop} has key={associationObj.Fields[0]}, value={associationObj.Fields[1]}");
+                    }
                 }
             }
             
@@ -1082,6 +1157,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (!classOop.IsNil)
                 {
                     // Resolved Association for class
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via ClassBuilder -> {classOop}");
+                    }
                     return CreateAssociation(keyName, classOop);
                 }
                 
@@ -1089,6 +1168,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classRegistry.TryGetValue(keyName, out var registryClassOop))
                 {
                     // Resolved Association from registry
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via classRegistry -> {registryClassOop}");
+                    }
                     return CreateAssociation(keyName, registryClassOop);
                 }
                 
@@ -1102,11 +1185,30 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 
                 // Unknown global - create association with nil value
                 // It might be resolved later
-                Console.WriteLine($"[InitExpr] WARNING: Could not resolve Association for {keyName}, using nil");
+                Console.WriteLine($"[InitExpr] WARNING: Could not resolve Association for '{keyName}', using nil");
                 Console.WriteLine($"[InitExpr] DEBUG: ClassBuilder.GetClass returned {classOop}, classRegistry has {classRegistry.Count} entries");
+                
+                // Special debug for Cursor class
+                if (keyName == "Cursor")
+                {
+                    Console.WriteLine($"[InitExpr] CRITICAL: Cursor class not found!");
+                    Console.WriteLine($"[InitExpr] Checking if 'Cursor' exists in classRegistry with different casing...");
+                    var cursorVariants = classRegistry.Keys.Where(k => k.Equals("cursor", StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (cursorVariants.Count > 0)
+                    {
+                        Console.WriteLine($"[InitExpr] Found similar: {string.Join(", ", cursorVariants)}");
+                    }
+                }
+                
                 if (classRegistry.Count > 0)
                 {
-                    Console.WriteLine($"[InitExpr] DEBUG: First few classes in registry: {string.Join(", ", classRegistry.Keys.Take(5))}");
+                    Console.WriteLine($"[InitExpr] DEBUG: Sample classes in registry: {string.Join(", ", classRegistry.Keys.Take(10))}");
+                    
+                    // Check if Cursor is actually there
+                    if (classRegistry.ContainsKey("Cursor"))
+                    {
+                        Console.WriteLine($"[InitExpr] STRANGE: 'Cursor' IS in classRegistry! Value: {classRegistry["Cursor"]}");
+                    }
                 }
                 return CreateAssociation(keyName, OOP.Nil);
             }

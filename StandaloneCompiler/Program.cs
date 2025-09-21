@@ -17,11 +17,21 @@ namespace StandaloneCompiler
     {
         public static void Main(string[] args)
         {
+            // Check for test mode
+            if (args.Length > 0 && args[0] == "--test-cascade")
+            {
+                Console.WriteLine("Running cascade compilation tests...\n");
+                TestCascadeCompilation.RunTests();
+                return;
+            }
+            
             if (args.Length == 0)
             {
                 Console.WriteLine("Usage: StandaloneCompiler <input.st> [output.json]");
+                Console.WriteLine("       StandaloneCompiler --test-cascade");
                 Console.WriteLine();
                 Console.WriteLine("Compiles a Smalltalk source file to JSON with bytecode.");
+                Console.WriteLine("Use --test-cascade to run cascade compilation tests.");
                 return;
             }
             
@@ -107,6 +117,7 @@ namespace StandaloneCompiler
             
             // Visit the parse tree to extract classes, methods, and file-scope expressions
             var visitor = new SmalltalkVisitor(this, result, tokenStream);
+            // Console.WriteLine($"Parse tree has {fileInContext.chunk()?.Length ?? 0} chunks");
             visitor.Visit(fileInContext);
             
             // Copy collected data to result
@@ -192,9 +203,61 @@ namespace StandaloneCompiler
                 return base.VisitClassDefChunk(context);
             }
             
+            public override object? VisitSimpleMethodChunk(Smalltalk80Parser.SimpleMethodChunkContext context)
+            {
+                // Get the class name from the simple method chunk  
+                var className = context.className()?.GetText() ?? "";
+                
+                // Check if it's a class method (the optional "class" keyword after the class name)
+                bool isClassMethodDef = context.IDENTIFIER()?.GetText() == "class";
+                
+                // If we don't have this class yet, create a stub for it
+                if (!compiler.classMap.TryGetValue(className, out var classDef))
+                {
+                        // Creating stub class definition
+                    classDef = new ClassDefinition
+                    {
+                        Name = className,
+                        Superclass = "Object", // Default superclass
+                        InstanceVariables = new List<string>(),
+                        ClassVariables = new List<string>(),
+                        PoolDictionaries = new List<string>(),
+                        Category = ""
+                    };
+                    compiler.classMap[className] = classDef;
+                }
+                
+                currentClass = classDef;
+                isClassMethod = isClassMethodDef;
+                
+                // Compile the single method
+                CompileMethod(context.methodDef());
+                
+                return base.VisitSimpleMethodChunk(context);
+            }
+            
             public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
             {
-                if (currentClass == null) return null;
+                // Get the class name from the method category chunk
+                var className = context.className()?.GetText() ?? "";
+                
+                // If we don't have this class yet, create a stub for it
+                if (!compiler.classMap.TryGetValue(className, out var classDef))
+                {
+                        // Creating stub class definition
+                    classDef = new ClassDefinition
+                    {
+                        Name = className,
+                        Superclass = "Object", // Default superclass
+                        InstanceVariables = new List<string>(),
+                        ClassVariables = new List<string>(),
+                        PoolDictionaries = new List<string>(),
+                        Category = ""
+                    };
+                    compiler.classMap[className] = classDef;
+                }
+                
+                currentClass = classDef;
                 
                 // Check if this is a class method by looking for the "class" identifier in the parse tree
                 // The grammar: className (cls = IDENTIFIER)? methodsFor: '...'
@@ -464,6 +527,18 @@ namespace StandaloneCompiler
                     {
                         // Preserve floating point literals as numbers
                         result.Add(literal);
+                    }
+                    else if (literal is object[] array)
+                    {
+                        // Handle array literals recursively
+                        var arrayElements = new List<object>();
+                        foreach (var element in array)
+                        {
+                            // Recursively convert each element
+                            var converted = ConvertLiterals(new[] { element });
+                            arrayElements.Add(converted[0]);
+                        }
+                        result.Add(arrayElements);
                     }
                     else
                     {

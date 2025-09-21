@@ -58,9 +58,12 @@ chunk:
 	| classCommentChunk
 	| classDefChunk
 	| separatorChunk
+	| simpleMethodChunk
 	| expressionChunk
 	| methodCategoryChunk
 	| BANG;
+
+simpleMethodChunk: className (cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })? BIT_SHIFT_RIGHT methodDef;
 
 expressionChunk: expression BANG;
 
@@ -121,7 +124,7 @@ metaclassCommentChunk:
 // ───────────────────────────────────────────────────────────────
 
 methodDef:
-	methodHeader stringConst? NEW_LINE? temporaries? primitiveDecl? methodBody;
+	methodHeader stringConst? NEW_LINE? (temporaries primitiveDecl? | primitiveDecl? temporaries?) methodBody;
 
 methodBody:
 	statements PERIOD* BANG // standard method

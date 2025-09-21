@@ -158,7 +158,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             if (methods.Count == 0) return;
             
-            // Check for duplicate methods - this should be an error
+            // Check for duplicate methods
             var duplicates = methods
                 .GroupBy(m => m.Selector)
                 .Where(g => g.Count() > 1)
@@ -422,6 +422,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 string s when s == "true" => GetTrueObject(),
                 string s when s == "false" => GetFalseObject(),
                 string s when s.StartsWith("Association(key:") => ParseAssociation(s), // Parse Association literal
+                string s when s.StartsWith("#(") && s.EndsWith(")") => ParseArrayLiteral(s), // Array literal
                 string s when s.StartsWith("#") => symbolTable.Intern(s[1..]), // Symbol literal
                 string s => CreateString(s),
                 int i => OOP.FromSmallInteger(i),
@@ -531,6 +532,244 @@ namespace Smalltalk80.Interpreter.Bootstrap
         }
 
         /// <summary>
+        /// Looks up a key in a Dictionary object.
+        /// </summary>
+        private OOP LookupInDictionary(OOP dictOop, OOP keyOop)
+        {
+            var dictObj = memory.GetObject(dictOop);
+            if (dictObj == null) return OOP.Nil;
+            
+            // Dictionary has tally at index 0, then key-value pairs
+            int capacity = dictObj.Fields.Length - 1;
+            int pairCapacity = capacity / 2;
+            
+            // Simple linear search for the key
+            for (int i = 0; i < pairCapacity; i++)
+            {
+                var keyIndex = 1 + (i * 2);
+                var valueIndex = keyIndex + 1;
+                
+                if (keyIndex < dictObj.Fields.Length && valueIndex < dictObj.Fields.Length)
+                {
+                    if (dictObj.Fields[keyIndex].Equals(keyOop))
+                    {
+                        return dictObj.Fields[valueIndex];
+                    }
+                }
+            }
+            
+            return OOP.Nil;
+        }
+        
+        /// <summary>
+        /// Parses an array literal from Smalltalk syntax.
+        /// Format: "#(element1 element2 ...)"
+        /// Supports numbers, symbols, strings, nil, true, false, and nested arrays.
+        /// </summary>
+        private OOP ParseArrayLiteral(string arrayStr)
+        {
+            // Get Array class
+            var arrayClass = classBuilder.GetClass("Array");
+            if (arrayClass.IsNil)
+            {
+                if (DebugOptions.EnableMethodInstallerOutput)
+                {
+                    Console.WriteLine($"[MethodInstaller] Error: Array class not found for array literal: {arrayStr}");
+                }
+                // Return nil instead of falling back to Symbol to avoid confusion
+                return OOP.Nil;
+            }
+            
+            // Validate format
+            if (!arrayStr.StartsWith("#(") || !arrayStr.EndsWith(")"))
+            {
+                if (DebugOptions.EnableMethodInstallerOutput)
+                {
+                    Console.WriteLine($"[MethodInstaller] Warning: Invalid array literal format: {arrayStr}");
+                }
+                return OOP.Nil;
+            }
+            
+            // Remove #( and ) to get the content
+            if (arrayStr.Length <= 3) // Empty array #() or invalid
+            {
+                return memory.AllocateWordArray(arrayClass, 0);
+            }
+            
+            var content = arrayStr[2..^1].Trim(); // Using C# 13 range syntax
+            if (string.IsNullOrEmpty(content))
+            {
+                // Empty array
+                return memory.AllocateWordArray(arrayClass, 0);
+            }
+            
+            // Parse elements using a more robust tokenizer
+            var elements = ParseArrayElements(content);
+            
+            // Create array
+            var arrayOop = memory.AllocateWordArray(arrayClass, elements.Count);
+            var arrayObj = memory.GetObject(arrayOop);
+            
+            if (arrayObj != null)
+            {
+                for (int i = 0; i < elements.Count; i++)
+                {
+                    arrayObj.Fields[i] = ParseArrayElement(elements[i]);
+                }
+            }
+            
+            if (DebugOptions.EnableMethodInstallerOutput && elements.Count > 0)
+            {
+                Console.WriteLine($"[MethodInstaller] Created array literal with {elements.Count} elements from: {arrayStr}");
+            }
+            
+            return arrayOop;
+        }
+        
+        /// <summary>
+        /// Parses the elements of an array literal into individual tokens.
+        /// Handles nested arrays, quoted strings, and proper tokenization.
+        /// </summary>
+        private List<string> ParseArrayElements(string content)
+        {
+            var elements = new List<string>();
+            var currentElement = new System.Text.StringBuilder();
+            var depth = 0;
+            var inString = false;
+            var escapeNext = false;
+            
+            for (int i = 0; i < content.Length; i++)
+            {
+                var ch = content[i];
+                
+                if (escapeNext)
+                {
+                    currentElement.Append(ch);
+                    escapeNext = false;
+                    continue;
+                }
+                
+                if (ch == '\\' && inString)
+                {
+                    escapeNext = true;
+                    currentElement.Append(ch);
+                    continue;
+                }
+                
+                if (ch == '\'' && !inString)
+                {
+                    // Start of string literal
+                    inString = true;
+                    currentElement.Append(ch);
+                }
+                else if (ch == '\'' && inString && i + 1 < content.Length && content[i + 1] == '\'')
+                {
+                    // Escaped quote in string
+                    currentElement.Append("''");
+                    i++; // Skip next quote
+                }
+                else if (ch == '\'' && inString)
+                {
+                    // End of string literal
+                    inString = false;
+                    currentElement.Append(ch);
+                }
+                else if (!inString)
+                {
+                    if (ch == '(')
+                    {
+                        depth++;
+                        currentElement.Append(ch);
+                    }
+                    else if (ch == ')')
+                    {
+                        depth--;
+                        currentElement.Append(ch);
+                    }
+                    else if (depth == 0 && char.IsWhiteSpace(ch))
+                    {
+                        // Element separator at top level
+                        if (currentElement.Length > 0)
+                        {
+                            elements.Add(currentElement.ToString());
+                            currentElement.Clear();
+                        }
+                    }
+                    else
+                    {
+                        currentElement.Append(ch);
+                    }
+                }
+                else
+                {
+                    currentElement.Append(ch);
+                }
+            }
+            
+            // Add last element if any
+            if (currentElement.Length > 0)
+            {
+                elements.Add(currentElement.ToString());
+            }
+            
+            return elements;
+        }
+        
+        /// <summary>
+        /// Parses a single element from an array literal.
+        /// </summary>
+        private OOP ParseArrayElement(string element)
+        {
+            // Handle nested array
+            if (element.StartsWith("#(") && element.EndsWith(")"))
+            {
+                return ParseArrayLiteral(element);
+            }
+            
+            // Handle string literal (enclosed in single quotes)
+            if (element.StartsWith("'") && element.EndsWith("'") && element.Length >= 2)
+            {
+                // Remove quotes and handle escaped quotes
+                var stringContent = element[1..^1].Replace("''", "'");
+                return CreateString(stringContent);
+            }
+            
+            // Handle integer
+            if (int.TryParse(element, out var intValue))
+            {
+                return OOP.FromSmallInteger(intValue);
+            }
+            
+            // Handle negative integer
+            if (element.StartsWith("-") && int.TryParse(element[1..], out var negValue))
+            {
+                return OOP.FromSmallInteger(-negValue);
+            }
+            
+            // Handle float
+            if (double.TryParse(element, System.Globalization.NumberStyles.Float, 
+                System.Globalization.CultureInfo.InvariantCulture, out var floatValue))
+            {
+                return CreateFloat(floatValue);
+            }
+            
+            // Handle symbol (starts with #)
+            if (element.StartsWith("#"))
+            {
+                return symbolTable.Intern(element[1..]);
+            }
+            
+            // Handle special literals
+            return element switch
+            {
+                "nil" => OOP.Nil,
+                "true" => GetTrueObject(),
+                "false" => GetFalseObject(),
+                _ => CreateString(element) // Default to string for unrecognized elements
+            };
+        }
+        
+        /// <summary>
         /// Parses an Association literal from the JSON string format.
         /// Format: "Association(key: #Name, value: null)"
         /// </summary>
@@ -570,23 +809,97 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     // Field 1: value (initially the global object or nil)
                     if (valueName == "null" || valueName == "nil")
                     {
+                        // Enhanced debug output for global variable resolution
+                        if (DebugOptions.EnableDebugOutput)
+                        {
+                            Console.WriteLine($"[DEBUG] Attempting to resolve global variable: '{keyName}'");
+                        }
+
                         // Try to resolve the global variable as a class
                         var globalOop = classBuilder.GetClass(keyName); // Try as class name
+                        
+                        // Special debug for Cursor class
+                        if (keyName == "Cursor" && DebugOptions.EnableDebugOutput)
+                        {
+                            Console.WriteLine($"[DEBUG] Looking up 'Cursor' class:");
+                            Console.WriteLine($"  - GetClass('Cursor') returned: {globalOop}");
+                            Console.WriteLine($"  - IsNil: {globalOop.IsNil}");
+                            
+                            // Check if Cursor exists in the class registry
+                            var allClasses = classBuilder.GetAllClasses();
+                            Console.WriteLine($"  - Total classes registered: {allClasses.Count}");
+                            
+                            // Look for Cursor and similar names
+                            var cursorRelated = allClasses.Where(kvp => 
+                                kvp.Key.Contains("Cursor", StringComparison.OrdinalIgnoreCase))
+                                .ToList();
+                                
+                            if (cursorRelated.Any())
+                            {
+                                Console.WriteLine($"  - Found Cursor-related classes:");
+                                foreach (var kvp in cursorRelated)
+                                {
+                                    Console.WriteLine($"    * '{kvp.Key}' -> {kvp.Value}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"  - No classes containing 'Cursor' found in registry");
+                                // Show first 10 classes to verify registry content
+                                Console.WriteLine($"  - First 10 registered classes:");
+                                foreach (var kvp in allClasses.Take(10))
+                                {
+                                    Console.WriteLine($"    * '{kvp.Key}' -> {kvp.Value}");
+                                }
+                            }
+                        }
+                        
                         if (!globalOop.IsNil)
                         {
                             assocObj.Fields[1] = globalOop;
                             if (DebugOptions.EnableDebugOutput)
                             {
-                                Console.WriteLine($"[DEBUG] Resolved Association key #{keyName} to class {globalOop}");
+                                Console.WriteLine($"[DEBUG] Successfully resolved Association key '{keyName}' to class {globalOop}");
                             }
                         }
                         else
                         {
-                            // Could be another global - initially nil
-                            assocObj.Fields[1] = OOP.Nil;
                             if (DebugOptions.EnableDebugOutput)
                             {
-                                Console.WriteLine($"[DEBUG] Association key #{keyName} not resolved (not a class), value = nil");
+                                Console.WriteLine($"[DEBUG] Failed to resolve '{keyName}' as a class, trying SystemDictionary...");
+                            }
+                            // Try to look it up in SystemDictionary (for pool dictionaries and other globals)
+                            var systemDictOop = vm.GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+                            if (!systemDictOop.IsNil)
+                            {
+                                var symbolOop = symbolTable.Intern(keyName);
+                                var valueOop = LookupInDictionary(systemDictOop, symbolOop);
+                                if (!valueOop.IsNil)
+                                {
+                                    assocObj.Fields[1] = valueOop;
+                                    if (DebugOptions.EnableDebugOutput)
+                                    {
+                                        Console.WriteLine($"[DEBUG] Resolved Association key #{keyName} to global {valueOop} from SystemDictionary");
+                                    }
+                                }
+                                else
+                                {
+                                    // Not found - leave as nil
+                                    assocObj.Fields[1] = OOP.Nil;
+                                    if (DebugOptions.EnableDebugOutput)
+                                    {
+                                        Console.WriteLine($"[DEBUG] Association key #{keyName} not found in SystemDictionary, value = nil");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // SystemDictionary not available yet - leave as nil
+                                assocObj.Fields[1] = OOP.Nil;
+                                if (DebugOptions.EnableDebugOutput)
+                                {
+                                    Console.WriteLine($"[DEBUG] Association key #{keyName} not resolved (SystemDictionary not available), value = nil");
+                                }
                             }
                         }
                     }

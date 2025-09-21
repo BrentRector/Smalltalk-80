@@ -710,23 +710,18 @@ namespace StandaloneCompiler
             }
             else if (argCount <= 7 && selectorIndex <= 31)
             {
-                // Bytecode 128-191: Send #kkkk With jjj Arguments
-                // Binary: 1jjjkkkk where jjj = arg count, kkkk = selector index
-                var bytecode = 128 | (argCount << 5) | selectorIndex;
-                Emit((byte)bytecode);
-            }
-            else if (argCount <= 7 && selectorIndex <= 63)
-            {
                 // Use single extended send (131)
-                Emit(131); // Single extended send
-                Emit((byte)((argCount << 5) | (selectorIndex & 0x1F)));
+                // Format: jjjkkkkk where jjj = arg count, kkkkk = selector index
+                Emit(131); // Single extended send  
+                Emit((byte)((argCount << 5) | selectorIndex));
             }
             else
             {
                 // Use double extended send (132) for large selector indices or arg counts
+                // Format: First byte = selector index, Second byte = arg count
                 Emit(132); // Double extended send
-                Emit((byte)argCount);
-                Emit((byte)selectorIndex);
+                Emit((byte)selectorIndex);  // Selector first
+                Emit((byte)argCount);        // Then arg count
             }
         }
         
@@ -753,9 +748,11 @@ namespace StandaloneCompiler
             }
             else
             {
+                // Double extended super send
+                // Format: First byte = selector index, Second byte = arg count
                 Emit(134); // Double extended super send
-                Emit((byte)argCount);
-                Emit((byte)index);
+                Emit((byte)index);      // Selector index first
+                Emit((byte)argCount);   // Then arg count
             }
         }
         
@@ -778,7 +775,7 @@ namespace StandaloneCompiler
         private string selector = "";
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
-        private int nextCascadeTemp = 0;
+        // Note: scratchTempIndex kept for potential future use, though not currently used
         private int scratchTempIndex = -1;
         
         /// <summary>
@@ -794,7 +791,6 @@ namespace StandaloneCompiler
             selector = "doIt"; // Standard selector for expressions
             primitiveNumber = 0;
             hasPrimitive = false;
-            nextCascadeTemp = 0;
             scratchTempIndex = -1;
             
             try
@@ -804,7 +800,7 @@ namespace StandaloneCompiler
                 environment.TemporaryCount = 0;
                 
                 // First pass: collect literals
-                var visitor = new LiteralCollector(emitter, environment);
+                var visitor = new LiteralCollector(this, emitter, environment);
                 visitor.Visit(expression);
                 
                 // Second pass: compile the expression
@@ -812,12 +808,12 @@ namespace StandaloneCompiler
                 
                 // Expression should leave its result on the stack
                 // Add return if not already present
-                if (emitter.GetBytecodes().Length == 0 || 
-                    emitter.GetBytecodes()[^1] != 120) // returnSelf
+                var bytecodes = emitter.GetBytecodes();
+                if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
                 {
-                    // For expressions that don't leave a value on the stack,
-                    // return self (Smalltalk-80 semantics)
-                    emitter.ReturnSelf();
+                    // For standalone expressions, return the top of stack
+                    // (The expression result should be on the stack)
+                    emitter.ReturnTop();
                 }
             }
             catch (Exception ex)
@@ -856,7 +852,6 @@ namespace StandaloneCompiler
             selector = "";
             primitiveNumber = 0;
             hasPrimitive = false;
-            nextCascadeTemp = 0;
             scratchTempIndex = -1;
             
             // Set up instance variables with correct offsets
@@ -945,7 +940,6 @@ namespace StandaloneCompiler
             selector = "";
             primitiveNumber = 0;
             hasPrimitive = false;
-            nextCascadeTemp = 0;
             scratchTempIndex = -1;
             
             // Set up instance variables with correct offsets
@@ -1097,7 +1091,7 @@ namespace StandaloneCompiler
             if (body == null) return;
             
             // Walk the tree to collect all literals that will be needed
-            var visitor = new LiteralCollector(emitter, environment);
+            var visitor = new LiteralCollector(this, emitter, environment);
             visitor.Visit(body);
         }
         
@@ -1195,8 +1189,10 @@ namespace StandaloneCompiler
                 // IMPORTANT: RHS must ALWAYS leave value on stack for the store operation
                 CompileAssignmentExpr(expr.assignmentExpr(), leaveOnStack: true);
                 
-                // Store, leaving value on stack only if needed
-                StoreVariable(variable.GetText(), leaveOnStack: leaveOnStack);
+                // Store the value
+                // Assignment statements in method bodies should NOT leave values on stack
+                // The leaveOnStack parameter should only apply to the final non-assignment expression
+                StoreVariable(variable.GetText(), leaveOnStack: false);
             }
             else
             {
@@ -1216,49 +1212,101 @@ namespace StandaloneCompiler
             
             if (messageParts != null && messageParts.Length > 0)
             {
-                // Cascade: need to cache receiver
-                var cascadeTemp = environment.AllocateHiddenTemp($"cascade{nextCascadeTemp++}");
+                // Cascade implementation following Smalltalk-80 Blue Book specification:
+                // 1. Push receiver once
+                // 2. For each message except the last:
+                //    - Dup the receiver (bytecode 136)
+                //    - Send the message
+                //    - Pop the result (bytecode 135)
+                // 3. For the last message:
+                //    - Send the message
+                //    - Leave result on stack
                 
-                // Compile the base message expression
-                CompileMessageExpr(messageExpr, cacheReceiver: cascadeTemp);
+                // Check if the messageExpr actually sends a message or is just a receiver
+                bool firstIsJustReceiver = IsJustReceiver(messageExpr);
                 
-                // Process cascaded messages
-                for (int i = 0; i < messageParts.Length; i++)
+                if (firstIsJustReceiver)
                 {
-                    bool isLast = (i == messageParts.Length - 1);
+                    // The first part is just a receiver (like "anObject"), not a message send
+                    // Push the receiver once
+                    CompileMessageExpr(messageExpr, isCascadeBase: false, totalCascadeMessages: 0);
                     
-                    // Pop previous result unless it's the first (already handled)
-                    if (i > 0 || messageExpr != null)
+                    // Process all cascaded messages
+                    for (int i = 0; i < messageParts.Length; i++)
                     {
-                        SpillResult();
+                        bool isLast = (i == messageParts.Length - 1);
+                        
+                        // Dup receiver for this message (except for the last)
+                        if (!isLast)
+                        {
+                            emitter.Dup(); // bytecode 136 - duplicate receiver for next message
+                        }
+                        
+                        // Compile the message part
+                        CompileMessagePart(messageParts[i]);
+                        
+                        // Pop result (except for the last)
+                        if (!isLast)
+                        {
+                            emitter.Pop(); // bytecode 135 - pop the result
+                        }
                     }
+                }
+                else
+                {
+                    // The first part is a full message expression
+                    // Compile it with cascade support
+                    CompileMessageExpr(messageExpr, isCascadeBase: true, totalCascadeMessages: messageParts.Length + 1);
                     
-                    // Push cached receiver
-                    emitter.PushTemporary(cascadeTemp);
-                    
-                    // Compile the message part
-                    CompileMessagePart(messageParts[i]);
+                    // Process cascaded messages
+                    for (int i = 0; i < messageParts.Length; i++)
+                    {
+                        bool isLast = (i == messageParts.Length - 1);
+                        
+                        // Pop previous message result
+                        emitter.Pop(); // bytecode 135 - pop the result of the previous message
+                        
+                        // Dup receiver for next message (except for the last)
+                        if (!isLast)
+                        {
+                            emitter.Dup(); // bytecode 136 - duplicate receiver for next message
+                        }
+                        
+                        // Compile the message part
+                        CompileMessagePart(messageParts[i]);
+                    }
                 }
             }
             else
             {
                 // No cascade, just compile the message
-                CompileMessageExpr(messageExpr, cacheReceiver: -1);
+                CompileMessageExpr(messageExpr, isCascadeBase: false, totalCascadeMessages: 0);
             }
         }
         
-        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, int cacheReceiver = -1)
+        private bool IsJustReceiver(Smalltalk80Parser.MessageExprContext expr)
+        {
+            // Check if this message expression is just a receiver without any messages
+            if (expr == null) return false;
+            
+            // A messageExpr is just a receiver if it has no unary, binary, or keyword messages
+            return expr.unaryMessage() == null &&
+                   expr.binaryMessage() == null &&
+                   expr.keywordMessage() == null;
+        }
+        
+        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, bool isCascadeBase = false, int totalCascadeMessages = 0)
         {
             // Compile receiver and check if it's super
             var messageBase = expr.messageBase();
             bool receiverIsSuper = IsReceiverSuper(messageBase);
             CompileMessageBase(messageBase);
             
-            // Cache receiver if needed (for cascades)
-            if (cacheReceiver >= 0)
+            // For cascades with more than one message, dup the receiver after pushing it
+            // (we need a copy for each message except the last)
+            if (isCascadeBase && totalCascadeMessages > 1)
             {
-                emitter.Dup();
-                emitter.StoreTemporary(cacheReceiver);
+                emitter.Dup(); // bytecode 136 - duplicate receiver for first cascade message
             }
             
             // Process unary messages
@@ -1342,7 +1390,8 @@ namespace StandaloneCompiler
             // Compile arguments
             foreach (var part in keywordParts)
             {
-                keywords.Add(part.IDENTIFIER().GetText() + ":");
+                var keyword = part.IDENTIFIER().GetText() + ":";
+                keywords.Add(keyword);
                 CompileNonKeywordExpr(part.nonKeywordExpr());
             }
             
@@ -1555,8 +1604,16 @@ namespace StandaloneCompiler
             {
                 // Array literals need special handling
                 var array = literal.arrayLiteral();
-                // For now, push as a literal array object
-                emitter.PushLiteralConstant(array.GetText());
+                var elements = new List<object>();
+                
+                // Process each array element
+                foreach (var element in array.arrayElement())
+                {
+                    elements.Add(ProcessArrayElement(element));
+                }
+                
+                // Push the array as a literal constant
+                emitter.PushLiteralConstant(elements.ToArray());
             }
             else if (literal.byteArrayLiteral() != null)
             {
@@ -1580,6 +1637,73 @@ namespace StandaloneCompiler
                     emitter.PushNil();
                 }
             }
+        }
+        
+        private object ProcessArrayElement(Smalltalk80Parser.ArrayElementContext element)
+        {
+            // Handle literals
+            if (element.literal() != null)
+            {
+                var lit = element.literal();
+                if (lit.numberLiteral() != null)
+                {
+                    var text = lit.numberLiteral().GetText();
+                    if (text.Contains('.'))
+                        return double.Parse(text);
+                    else if (long.TryParse(text, out var longVal))
+                        return longVal;
+                    else
+                        return text; // Keep as string if too large
+                }
+                else if (lit.stringConst() != null)
+                {
+                    var str = lit.stringConst().GetText();
+                    // Remove quotes
+                    return str.Substring(1, str.Length - 2).Replace("''", "'");
+                }
+                else if (lit.symbolConst() != null)
+                {
+                    return lit.symbolConst().GetText();
+                }
+                else if (lit.characterLiteral() != null)
+                {
+                    var text = lit.characterLiteral().GetText();
+                    return text[1]; // Get character after $
+                }
+                else if (lit.arrayLiteral() != null)
+                {
+                    // Nested array
+                    var nestedArray = lit.arrayLiteral();
+                    var nestedElements = new List<object>();
+                    foreach (var nestedElement in nestedArray.arrayElement())
+                    {
+                        nestedElements.Add(ProcessArrayElement(nestedElement));
+                    }
+                    return nestedElements.ToArray();
+                }
+                else if (lit.byteArrayLiteral() != null)
+                {
+                    return lit.byteArrayLiteral().GetText();
+                }
+            }
+            // Handle symbol names (identifiers in arrays become symbols)
+            else if (element.symbolName() != null)
+            {
+                return "#" + element.symbolName().GetText();
+            }
+            // Handle nested parenthesized arrays
+            else if (element.LEFT_PAREN() != null)
+            {
+                var nestedElements = new List<object>();
+                foreach (var nestedElement in element.arrayElement())
+                {
+                    nestedElements.Add(ProcessArrayElement(nestedElement));
+                }
+                return nestedElements.ToArray();
+            }
+            
+            // Default: return the text
+            return element.GetText();
         }
         
         private void PushVariable(string name)
@@ -1611,20 +1735,13 @@ namespace StandaloneCompiler
                 return;
             }
             
-            // Check if it's an argument FIRST (arguments use different bytecode than temporaries)
+            // Check if it's an argument FIRST
+            // Arguments are stored in temporary locations starting at index 0
             if (environment.Arguments.TryGetValue(name, out var argIndex))
             {
-                // Arguments use bytecodes 48-63 via PushArgument
-                if (argIndex <= 15)
-                {
-                    emitter.Emit((byte)(48 + argIndex));
-                }
-                else
-                {
-                    // Extended push for arguments > 15
-                    emitter.Emit(128); // Extended push
-                    emitter.Emit((byte)((argIndex << 6) | 0x30)); // Type bits for argument
-                }
+                // Arguments use temporary location bytecodes (16-31 for indices 0-15)
+                // NOT literal constant bytecodes (32-63)
+                emitter.PushTemporary(argIndex);
                 return;
             }
             
@@ -1769,14 +1886,61 @@ namespace StandaloneCompiler
         {
             private readonly BytecodeEmitter emitter;
             private readonly CompilationEnvironment? environment;
+            private readonly BytecodeCompiler compiler;
             
             // Reference to the static SpecialSelectors dictionary
             private static readonly Dictionary<string, (int bytecode, int args)> SpecialSelectors = BytecodeEmitter.SpecialSelectors;
             
-            public LiteralCollector(BytecodeEmitter emitter, CompilationEnvironment? environment = null)
+            public LiteralCollector(BytecodeCompiler compiler, BytecodeEmitter emitter, CompilationEnvironment? environment = null)
             {
+                this.compiler = compiler;
                 this.emitter = emitter;
                 this.environment = environment;
+            }
+            
+            public override object? VisitAssignmentExpr(Smalltalk80Parser.AssignmentExprContext context)
+            {
+                // Check if this is an actual assignment
+                if (context.variable() != null && context.ASSIGN() != null)
+                {
+                    // This is an assignment: variable _ expression
+                    var varName = context.variable().GetText();
+                    
+                    // For assignments to global/class variables, we need an Association in the literals
+                    // BUT we should not visit the variable node itself (to avoid pushing it)
+                    bool needsAssociation = true;
+                    if (environment != null)
+                    {
+                        // Check if it's a local variable (these don't need Associations)
+                        if (environment.Arguments.ContainsKey(varName) ||
+                            environment.Temporaries.ContainsKey(varName) ||
+                            environment.HiddenTemporaries.ContainsKey(varName) ||
+                            environment.InstanceVariables.ContainsKey(varName))
+                        {
+                            needsAssociation = false;
+                        }
+                    }
+                    
+                    // Add Association for the store operation (but don't visit the variable node)
+                    if (needsAssociation)
+                    {
+                        emitter.AddLiteral(new Association(varName, null));
+                    }
+                    
+                    // Now visit only the RHS of the assignment
+                    if (context.assignmentExpr() != null)
+                    {
+                        Visit(context.assignmentExpr());
+                    }
+                    
+                    // Return without visiting the variable node to prevent it from being pushed
+                    return null;
+                }
+                else
+                {
+                    // Not an assignment, continue normal visiting
+                    return base.VisitAssignmentExpr(context);
+                }
             }
             
             public override object? VisitUnaryMessage(Smalltalk80Parser.UnaryMessageContext context)
@@ -1885,6 +2049,21 @@ namespace StandaloneCompiler
                     var text = context.symbolConst().GetText();
                     var sym = new Symbol(text.Substring(1));
                     emitter.AddLiteral(sym);
+                }
+                else if (context.arrayLiteral() != null)
+                {
+                    // Array literals need special handling
+                    var array = context.arrayLiteral();
+                    var elements = new List<object>();
+                    
+                    // Process each array element
+                    foreach (var element in array.arrayElement())
+                    {
+                        elements.Add(compiler.ProcessArrayElement(element));
+                    }
+                    
+                    // Add the array as a literal constant
+                    emitter.AddLiteral(elements.ToArray());
                 }
                 
                 return base.VisitLiteral(context);

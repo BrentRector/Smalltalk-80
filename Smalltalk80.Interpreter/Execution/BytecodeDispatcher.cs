@@ -174,7 +174,80 @@ public sealed class BytecodeDispatcher
     /// </summary>
     private bool PushTemporaryVariable(MethodContext context, int index)
     {
+        // ENHANCED DEBUG OUTPUT FOR ARGUMENT TRACKING
+        if (DebugOptions.EnableDebugOutput || DebugOptions.EnableBytecodeTrace)
+        {
+            Console.WriteLine($"[DEBUG] PushTemporaryVariable: index={index}");
+            Console.WriteLine($"  - Temporaries array length: {context.Temporaries.Length}");
+            Console.WriteLine($"  - Arguments array length: {context.Arguments.Length}");
+            
+            // Check if this is accessing an argument (arguments are first temporaries)
+            if (index < context.Arguments.Length)
+            {
+                Console.WriteLine($"  - This is ARGUMENT #{index}");
+                var argValue = context.Arguments[index];
+                Console.WriteLine($"  - Argument value from Arguments array: {argValue}");
+                Console.WriteLine($"  - Is nil? {argValue.IsNil}");
+                
+                // Also check what's in temporaries at this index
+                if (index < context.Temporaries.Length)
+                {
+                    var tempValue = context.Temporaries[index];
+                    Console.WriteLine($"  - Value in Temporaries[{index}]: {tempValue}");
+                    Console.WriteLine($"  - Is nil? {tempValue.IsNil}");
+                    
+                    if (!argValue.Equals(tempValue))
+                    {
+                        Console.WriteLine($"  - WARNING: Mismatch between Arguments[{index}] and Temporaries[{index}]!");
+                    }
+                    
+                    // If the value is not nil, show its class
+                    if (!tempValue.IsNil)
+                    {
+                        var classOop = executionContext.GetClassOfObject(tempValue);
+                        var className = executionContext.GetClassName(classOop);
+                        Console.WriteLine($"  - Object class: {className}");
+                        
+                        // Special handling for Point objects
+                        if (className == "Point")
+                        {
+                            Console.WriteLine($"  - POINT OBJECT DETECTED!");
+                            // Try to get x and y fields
+                            var xField = executionContext.GetFieldByIndex(tempValue, 0);
+                            var yField = executionContext.GetFieldByIndex(tempValue, 1);
+                            Console.WriteLine($"    x field (index 0): {xField}");
+                            Console.WriteLine($"    y field (index 1): {yField}");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"  - This is TEMPORARY VARIABLE #{index - context.Arguments.Length}");
+            }
+            
+            // Show method info for context
+            var methodSelector = executionContext.GetFieldByName(context.Method, "selector");
+            var selectorStr = executionContext.GetSymbolString(methodSelector);
+            Console.WriteLine($"  - Method: {selectorStr}");
+            Console.WriteLine($"  - Receiver: {context.Receiver}");
+            var receiverClass = executionContext.GetClassOfObject(context.Receiver);
+            var receiverClassName = executionContext.GetClassName(receiverClass);
+            Console.WriteLine($"  - Receiver class: {receiverClassName}");
+        }
+        
         var value = index < context.Temporaries.Length ? context.Temporaries[index] : OOP.Nil;
+        
+        // Additional check for nil values being pushed
+        if ((DebugOptions.EnableDebugOutput || DebugOptions.EnableBytecodeTrace) && value.IsNil)
+        {
+            Console.WriteLine($"[WARNING] PushTemporaryVariable pushing NIL for index {index}!");
+            if (index >= context.Temporaries.Length)
+            {
+                Console.WriteLine($"  - Index {index} is OUT OF BOUNDS (Temporaries length = {context.Temporaries.Length})");
+            }
+        }
+        
         context.Stack.Push(value);
         
         if (DebugOptions.EnableBytecodeTrace)
@@ -244,35 +317,159 @@ public sealed class BytecodeDispatcher
             var association = literals[index];
             
             // Enhanced debug output to diagnose the Association issue
-            if (DebugOptions.EnableBytecodeTrace)
+            if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
             {
+                Console.WriteLine($"[DEBUG] PushLiteralVariable: Association OOP = {association}");
+                
                 var assocObj = executionContext.Memory.GetObject(association);
                 if (assocObj != null && assocObj.Fields.Length >= 2)
                 {
                     var keyField = assocObj.Fields[0];
                     var valueField = assocObj.Fields[1];
                     var keyStr = executionContext.GetSymbolString(keyField);
-                    Console.WriteLine($"  -> PushLiteralVariable #{index}: Association key='{keyStr}', value={valueField}");
+                    
+                    // Comprehensive debug output
+                    Console.WriteLine($"[DEBUG] Association Details:");
+                    Console.WriteLine($"  - OOP: {association}");
+                    Console.WriteLine($"  - Key field (index 0): {keyField}");
+                    Console.WriteLine($"  - Key string: '{keyStr}'");
+                    Console.WriteLine($"  - Value field (index 1): {valueField}");
+                    Console.WriteLine($"  - Object class: {assocObj.Header.ClassOOP}");
+                    Console.WriteLine($"  - Field count: {assocObj.Fields.Length}");
+                    
+                    // Special detailed trace for problem globals
+                    if (keyStr == "Cursor" || keyStr == "ThumbsUp" || keyStr == "ThumbsDown" || 
+                        keyStr == "BinaryChoiceView" || keyStr == "Normal" || keyStr == "Origin")
+                    {
+                        Console.WriteLine($"[DEBUG] *** PROBLEM GLOBAL DETECTED: {keyStr} ***");
+                        Console.WriteLine($"[DEBUG] Association memory address: {association.RawValue}");
+                        Console.WriteLine($"[DEBUG] Expected value should be a class OOP, got: {valueField}");
+                        
+                        if (valueField.IsNil)
+                        {
+                            Console.WriteLine($"[DEBUG] ERROR: Association for {keyStr} has NIL value!");
+                            Console.WriteLine($"[DEBUG] This Association was likely created during method installation");
+                            Console.WriteLine($"[DEBUG] Something has cleared or failed to set the value field");
+                            
+                            // Try to dump all fields for extra debugging
+                            Console.WriteLine($"[DEBUG] All Association fields:");
+                            for (int i = 0; i < assocObj.Fields.Length; i++)
+                            {
+                                Console.WriteLine($"[DEBUG]   Field[{i}] = {assocObj.Fields[i]}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[DEBUG] Value field is NOT nil: {valueField}");
+                            // Check if it's a valid class OOP
+                            var valueObj = executionContext.Memory.GetObject(valueField);
+                            if (valueObj != null)
+                            {
+                                Console.WriteLine($"[DEBUG] Value object class: {valueObj.Header.ClassOOP}");
+                            }
+                        }
+                    }
+                    
+                    if (DebugOptions.EnableBytecodeTrace)
+                    {
+                        Console.WriteLine($"  -> PushLiteralVariable #{index}: Association key='{keyStr}', value={valueField}");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine($"  -> PushLiteralVariable #{index}: Association={association} (invalid or nil)");
+                    Console.WriteLine($"[DEBUG] WARNING: Association object is invalid!");
+                    Console.WriteLine($"[DEBUG]   Association OOP: {association}");
+                    if (assocObj == null)
+                    {
+                        Console.WriteLine($"[DEBUG]   Object is NULL in memory!");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[DEBUG]   Object has {assocObj.Fields.Length} fields (expected >= 2)");
+                    }
                 }
             }
             
             var value = executionContext.GetFieldByName(association, "value");
             
-            // Debug: Check if value is valid
-            if (value.IsNil && DebugOptions.EnableDebugOutput)
+            // Debug: Check if value is valid after retrieval
+            if (DebugOptions.EnableDebugOutput)
             {
-                Console.WriteLine($"[DEBUG] WARNING: PushLiteralVariable #{index} has nil value!");
+                var assocObj = executionContext.Memory.GetObject(association);
+                if (assocObj != null && assocObj.Fields.Length >= 2)
+                {
+                    var keyField = assocObj.Fields[0];
+                    var keyStr = executionContext.GetSymbolString(keyField);
+                    
+                    // Check problem globals
+                    if (keyStr == "Cursor" || keyStr == "ThumbsUp" || keyStr == "ThumbsDown" || 
+                        keyStr == "BinaryChoiceView" || keyStr == "Normal" || keyStr == "Origin")
+                    {
+                        Console.WriteLine($"[DEBUG] After GetFieldByName for {keyStr}:");
+                        Console.WriteLine($"[DEBUG]   Retrieved value: {value}");
+                        Console.WriteLine($"[DEBUG]   Direct field access: {assocObj.Fields[1]}");
+                        
+                        if (value.IsNil)
+                        {
+                            Console.WriteLine($"[DEBUG] CRITICAL ERROR: {keyStr} Association has nil value!");
+                            Console.WriteLine($"[DEBUG]   Association OOP: {association}");
+                            Console.WriteLine($"[DEBUG]   This is the same Association? Let's verify:");
+                            
+                            // Double-check by direct field access
+                            var directValue = assocObj.Fields[1];
+                            Console.WriteLine($"[DEBUG]   Direct field[1] access gives: {directValue}");
+                            
+                            if (!directValue.IsNil)
+                            {
+                                Console.WriteLine($"[DEBUG] INCONSISTENCY: GetFieldByName returned nil but direct access shows {directValue}!");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[DEBUG] Both GetFieldByName and direct access show nil value");
+                                Console.WriteLine($"[DEBUG] The Association was created with value but it's been cleared!");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[DEBUG] SUCCESS: {keyStr} has non-nil value: {value}");
+                        }
+                    }
+                }
+                
+                // General nil value warning
+                if (value.IsNil)
+                {
+                    Console.WriteLine($"[DEBUG] WARNING: PushLiteralVariable #{index} pushing nil value!");
+                }
             }
             
             context.Stack.Push(value);
             
-            if (DebugOptions.EnableBytecodeTrace)
+            if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
             {
-                Console.WriteLine($"  -> Pushed value: {value}");
+                if (DebugOptions.EnableBytecodeTrace)
+                {
+                    Console.WriteLine($"  -> Pushed value: {value}");
+                }
+                
+                // Final verification for problem globals
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    var assocObj = executionContext.Memory.GetObject(association);
+                    if (assocObj != null && assocObj.Fields.Length >= 2)
+                    {
+                        var keyStr = executionContext.GetSymbolString(assocObj.Fields[0]);
+                        if (keyStr == "Cursor" || keyStr == "ThumbsUp" || keyStr == "ThumbsDown" || 
+                            keyStr == "BinaryChoiceView" || keyStr == "Normal" || keyStr == "Origin")
+                        {
+                            Console.WriteLine($"[DEBUG] FINAL: Pushed {keyStr} value: {value} to stack");
+                            if (value.IsNil)
+                            {
+                                Console.WriteLine($"[DEBUG] ERROR: Pushed NIL for {keyStr} - this will cause a MNU error!");
+                            }
+                        }
+                    }
+                }
             }
         }
         else
