@@ -29,7 +29,8 @@ Each element in the `classes` array has:
 | `poolDictionaries` | string[] | No | Pool dictionary names |
 | `category` | string | No | System category (e.g., "Collections-Abstract") |
 | `comment` | string/null | No | Class documentation |
-| `methods` | string[] | No | Method selectors defined in this class |
+| `methods` | MethodDefinition[] | No | Instance method definitions (full method objects) |
+| `classMethods` | MethodDefinition[] | No | Class method definitions (full method objects) |
 
 ### Method Definition Structure
 

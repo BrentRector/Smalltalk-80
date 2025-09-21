@@ -172,8 +172,36 @@ public sealed class SystemCompiler : IAstProcessor, IAstVisitor<object?>
                 classVariables = c.ClassVariables,
                 poolDictionaries = c.PoolDictionaries,
                 category = c.Category,
-                comment = c.Comment,
-                methods = c.MethodReferences
+                // Get full method definitions for instance methods
+                methods = _compilationContext.Methods
+                    .Where(m => m.ClassName == c.Name && !m.IsClassMethod)
+                    .Select(m => new
+                    {
+                        @class = m.ClassName,
+                        selector = m.Selector,
+                        bytecode = m.Bytecode.Select(b => (int)b).ToArray(),
+                        literals = m.Literals.Select(ConvertLiteralForJson).ToArray(),
+                        primitiveIndex = m.PrimitiveIndex,
+                        numArgs = m.NumArgs,
+                        numTemps = m.NumTemps,
+                        stackDepth = m.StackDepth,
+                        isClassMethod = m.IsClassMethod
+                    }).ToArray(),
+                // Get full method definitions for class methods
+                classMethods = _compilationContext.Methods
+                    .Where(m => m.ClassName == $"{c.Name} class" && m.IsClassMethod)
+                    .Select(m => new
+                    {
+                        @class = m.ClassName,
+                        selector = m.Selector,
+                        bytecode = m.Bytecode.Select(b => (int)b).ToArray(),
+                        literals = m.Literals.Select(ConvertLiteralForJson).ToArray(),
+                        primitiveIndex = m.PrimitiveIndex,
+                        numArgs = m.NumArgs,
+                        numTemps = m.NumTemps,
+                        stackDepth = m.StackDepth,
+                        isClassMethod = m.IsClassMethod
+                    }).ToArray()
             }).ToArray(),
             ["methods"] = _compilationContext.Methods.Select(m => new
             {

@@ -4,6 +4,124 @@
   "description": "Schema for compiled Smalltalk-80 system images",
   "type": "object",
   "required": ["classes", "methods", "initializationExpressions"],
+  "definitions": {
+    "methodDefinition": {
+      "type": "object",
+      "required": ["class", "selector", "bytecode", "literals"],
+      "properties": {
+        "class": {
+          "type": "string",
+          "description": "The class this method belongs to (includes ' class' suffix for class methods)"
+        },
+        "selector": {
+          "type": "string",
+          "description": "The method selector"
+        },
+        "bytecode": {
+          "type": "array",
+          "description": "The compiled bytecode as an array of integers",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "literals": {
+          "type": "array",
+          "description": "The literal frame for this method",
+          "items": {
+            "$ref": "#/definitions/literal"
+          }
+        },
+        "primitiveIndex": {
+          "type": "integer",
+          "description": "The primitive number if this is a primitive method, 0 otherwise",
+          "minimum": 0
+        },
+        "numArgs": {
+          "type": "integer",
+          "description": "Number of arguments this method accepts",
+          "minimum": 0
+        },
+        "numTemps": {
+          "type": "integer",
+          "description": "Number of temporary variables",
+          "minimum": 0
+        },
+        "stackDepth": {
+          "type": "integer",
+          "description": "Maximum stack depth needed during execution",
+          "minimum": 0
+        },
+        "isClassMethod": {
+          "type": "boolean",
+          "description": "True if this is a class method, false for instance methods"
+        },
+        "protocol": {
+          "type": "string",
+          "description": "The method category/protocol"
+        },
+        "sourceCode": {
+          "type": "string",
+          "description": "The original source code of the method"
+        },
+        "argumentNames": {
+          "type": "array",
+          "description": "Names of the method arguments",
+          "items": {
+            "type": "string"
+          }
+        },
+        "temporaryNames": {
+          "type": "array",
+          "description": "Names of temporary variables",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "literal": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "String literal or symbol (prefixed with #)"
+        },
+        {
+          "type": "number",
+          "description": "Numeric literal"
+        },
+        {
+          "type": "boolean",
+          "description": "Boolean literal"
+        },
+        {
+          "type": "array",
+          "description": "Array literal",
+          "items": {
+            "$ref": "#/definitions/literal"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Association or other complex literal",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["Association"]
+            },
+            "key": {
+              "type": "string",
+              "description": "Association key (usually a symbol)"
+            },
+            "value": {
+              "description": "Association value"
+            }
+          }
+        }
+      ]
+    }
+  },
   "properties": {
     "$schema": {
       "type": "string",
@@ -59,9 +177,16 @@
           },
           "methods": {
             "type": "array",
-            "description": "Method selectors defined in this class",
+            "description": "Instance method definitions for this class",
             "items": {
-              "type": "string"
+              "$ref": "#/definitions/methodDefinition"
+            }
+          },
+          "classMethods": {
+            "type": "array",
+            "description": "Class method definitions for this class",
+            "items": {
+              "$ref": "#/definitions/methodDefinition"
             }
           }
         }
@@ -69,116 +194,9 @@
     },
     "methods": {
       "type": "array",
-      "description": "All compiled methods in the system",
+      "description": "All compiled methods in the system (flat list)",
       "items": {
-        "type": "object",
-        "required": ["class", "selector", "bytecode", "literals"],
-        "properties": {
-          "class": {
-            "type": "string",
-            "description": "The class this method belongs to (includes ' class' suffix for class methods)"
-          },
-          "selector": {
-            "type": "string",
-            "description": "The method selector"
-          },
-          "bytecode": {
-            "type": "array",
-            "description": "The compiled bytecode as an array of integers",
-            "items": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 255
-            }
-          },
-          "literals": {
-            "type": "array",
-            "description": "The literal frame for this method",
-            "items": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "description": "String literal or symbol (prefixed with #)"
-                },
-                {
-                  "type": "number",
-                  "description": "Numeric literal"
-                },
-                {
-                  "type": "boolean",
-                  "description": "Boolean literal"
-                },
-                {
-                  "type": "array",
-                  "description": "Array literal"
-                },
-                {
-                  "type": "object",
-                  "description": "Association or other complex literal",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": ["Association"]
-                    },
-                    "key": {
-                      "type": "string",
-                      "description": "Association key (usually a symbol)"
-                    },
-                    "value": {
-                      "description": "Association value"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "primitiveIndex": {
-            "type": "integer",
-            "description": "The primitive number if this is a primitive method, 0 otherwise",
-            "minimum": 0
-          },
-          "numArgs": {
-            "type": "integer",
-            "description": "Number of arguments this method accepts",
-            "minimum": 0
-          },
-          "numTemps": {
-            "type": "integer",
-            "description": "Number of temporary variables",
-            "minimum": 0
-          },
-          "stackDepth": {
-            "type": "integer",
-            "description": "Maximum stack depth needed during execution",
-            "minimum": 0
-          },
-          "isClassMethod": {
-            "type": "boolean",
-            "description": "True if this is a class method, false for instance methods"
-          },
-          "protocol": {
-            "type": "string",
-            "description": "The method category/protocol"
-          },
-          "sourceCode": {
-            "type": "string",
-            "description": "The original source code of the method"
-          },
-          "argumentNames": {
-            "type": "array",
-            "description": "Names of the method arguments",
-            "items": {
-              "type": "string"
-            }
-          },
-          "temporaryNames": {
-            "type": "array",
-            "description": "Names of temporary variables",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
+        "$ref": "#/definitions/methodDefinition"
       }
     },
     "initializationExpressions": {
@@ -201,33 +219,7 @@
             "type": "array",
             "description": "The literal frame for this expression",
             "items": {
-              "oneOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "array"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": ["Association"]
-                    },
-                    "key": {
-                      "type": "string"
-                    },
-                    "value": {}
-                  }
-                }
-              ]
+              "$ref": "#/definitions/literal"
             }
           },
           "numTemps": {

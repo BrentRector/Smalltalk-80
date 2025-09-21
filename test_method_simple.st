@@ -1,2 +1,0 @@
-testMethod
-    ^42
