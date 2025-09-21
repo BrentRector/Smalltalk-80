@@ -1,0 +1,30 @@
+﻿{
+  "bytecode": [
+    112,
+    204,
+    136,
+    16,
+    225,
+    135,
+    136,
+    17,
+    227,
+    135,
+    213,
+    135,
+    124
+  ],
+  "literals": [
+    "#new",
+    "#x:",
+    "Association(key: #xValue, value: null)",
+    "#y:",
+    "Association(key: #yValue, value: null)",
+    "#yourself"
+  ],
+  "numArgs": 2,
+  "numTemps": 2,
+  "stackDepth": 3,
+  "primitive": 0,
+  "source": "!Object subclass: #Point\r\n    instanceVariableNames: \u0027x y\u0027\r\n    classVariableNames: \u0027\u0027\r\n    poolDictionaries: \u0027\u0027\r\n    category: \u0027Graphics-Primitives\u0027!\r\n\r\n!Point methodsFor: \u0027accessing\u0027!\r\n\r\nx\r\n    ^x!\r\n\r\ny  \r\n    ^y!\r\n\r\nx: aNumber\r\n    x _ aNumber!\r\n\r\ny: aNumber\r\n    y _ aNumber! !\r\n\r\n!Point methodsFor: \u0027arithmetic\u0027!\r\n\r\n\u002B aPoint\r\n    ^(x \u002B aPoint x) @ (y \u002B aPoint y)!\r\n\r\n- aPoint\r\n    ^(x - aPoint x) @ (y - aPoint y)!\r\n\r\n* scale\r\n    ^(x * scale) @ (y * scale)! !\r\n\r\n!Point class methodsFor: \u0027instance creation\u0027!\r\n\r\nx: xValue y: yValue\r\n    ^self new x: xValue; y: yValue; yourself! !"
+}

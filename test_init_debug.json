@@ -1,0 +1,38 @@
+﻿{
+  "schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 11:03:30",
+  "classes": [
+    {
+      "name": "Object",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "",
+      "methods": [
+        "test"
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "Object",
+      "selector": "test",
+      "bytecode": [
+        32,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "test",
+      "sourceCode": "test\r\n    ^42!",
+      "argumentNames": [],
+      "temporaryNames": []
+    }
+  ],
+  "initializationExpressions": []
+}

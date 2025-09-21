@@ -1,0 +1,21 @@
+{
+  "$schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 10:27:37",
+  "classes": [
+    {
+      "name": "Point",
+      "superclass": "Object",
+      "instanceVariables": [
+        "x",
+        "y"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Graphics-Primitives",
+      "methods": [],
+      "classMethods": []
+    }
+  ],
+  "methods": [],
+  "initializationExpressions": []
+}

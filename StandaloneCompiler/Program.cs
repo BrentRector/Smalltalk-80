@@ -18,12 +18,12 @@ namespace StandaloneCompiler
         public static void Main(string[] args)
         {
             // Check for test mode
-            if (args.Length > 0 && args[0] == "--test-cascade")
-            {
-                Console.WriteLine("Running cascade compilation tests...\n");
-                TestCascadeCompilation.RunTests();
-                return;
-            }
+            // if (args.Length > 0 && args[0] == "--test-cascade")
+            // {
+            //     Console.WriteLine("Running cascade compilation tests...\n");
+            //     TestCascadeCompilation.RunTests();
+            //     return;
+            // }
             
             if (args.Length == 0)
             {
@@ -52,8 +52,24 @@ namespace StandaloneCompiler
                     return;
                 }
                 
-                var compiler = new SmalltalkCompiler();
-                var result = compiler.CompileFile(inputFile);
+                var sourceCode = File.ReadAllText(inputFile);
+                
+                // Determine which compiler to use based on content
+                CompilationResult result;
+                if (sourceCode.Contains('!'))
+                {
+                    // Use existing SmalltalkCompiler for file-in format
+                    Console.WriteLine("Detected file-in format (contains '!' delimiters)");
+                    var compiler = new SmalltalkCompiler();
+                    result = compiler.CompileFile(inputFile);
+                }
+                else
+                {
+                    // For single methods/expressions, use simplified compilation
+                    Console.WriteLine("Detected single method/expression format");
+                    var compiler = new SmalltalkCompiler();
+                    result = compiler.CompileSource(sourceCode);
+                }
                 
                 // Write JSON output
                 var options = new JsonSerializerOptions

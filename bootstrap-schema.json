@@ -1,0 +1,266 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Smalltalk-80 Bootstrap Schema",
+  "description": "Schema for compiled Smalltalk-80 system images",
+  "type": "object",
+  "required": ["classes", "methods", "initializationExpressions"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema file"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of when and how this file was generated"
+    },
+    "classes": {
+      "type": "array",
+      "description": "All class definitions in the system",
+      "items": {
+        "type": "object",
+        "required": ["name", "superclass"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the class"
+          },
+          "superclass": {
+            "type": "string",
+            "description": "The name of the superclass"
+          },
+          "instanceVariables": {
+            "type": "array",
+            "description": "Instance variable names",
+            "items": {
+              "type": "string"
+            }
+          },
+          "classVariables": {
+            "type": "array",
+            "description": "Class variable names",
+            "items": {
+              "type": "string"
+            }
+          },
+          "poolDictionaries": {
+            "type": "array",
+            "description": "Pool dictionary names",
+            "items": {
+              "type": "string"
+            }
+          },
+          "category": {
+            "type": "string",
+            "description": "The system category this class belongs to"
+          },
+          "comment": {
+            "type": ["string", "null"],
+            "description": "Class documentation comment"
+          },
+          "methods": {
+            "type": "array",
+            "description": "Method selectors defined in this class",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "methods": {
+      "type": "array",
+      "description": "All compiled methods in the system",
+      "items": {
+        "type": "object",
+        "required": ["class", "selector", "bytecode", "literals"],
+        "properties": {
+          "class": {
+            "type": "string",
+            "description": "The class this method belongs to (includes ' class' suffix for class methods)"
+          },
+          "selector": {
+            "type": "string",
+            "description": "The method selector"
+          },
+          "bytecode": {
+            "type": "array",
+            "description": "The compiled bytecode as an array of integers",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          },
+          "literals": {
+            "type": "array",
+            "description": "The literal frame for this method",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "String literal or symbol (prefixed with #)"
+                },
+                {
+                  "type": "number",
+                  "description": "Numeric literal"
+                },
+                {
+                  "type": "boolean",
+                  "description": "Boolean literal"
+                },
+                {
+                  "type": "array",
+                  "description": "Array literal"
+                },
+                {
+                  "type": "object",
+                  "description": "Association or other complex literal",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["Association"]
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "Association key (usually a symbol)"
+                    },
+                    "value": {
+                      "description": "Association value"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "primitiveIndex": {
+            "type": "integer",
+            "description": "The primitive number if this is a primitive method, 0 otherwise",
+            "minimum": 0
+          },
+          "numArgs": {
+            "type": "integer",
+            "description": "Number of arguments this method accepts",
+            "minimum": 0
+          },
+          "numTemps": {
+            "type": "integer",
+            "description": "Number of temporary variables",
+            "minimum": 0
+          },
+          "stackDepth": {
+            "type": "integer",
+            "description": "Maximum stack depth needed during execution",
+            "minimum": 0
+          },
+          "isClassMethod": {
+            "type": "boolean",
+            "description": "True if this is a class method, false for instance methods"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "The method category/protocol"
+          },
+          "sourceCode": {
+            "type": "string",
+            "description": "The original source code of the method"
+          },
+          "argumentNames": {
+            "type": "array",
+            "description": "Names of the method arguments",
+            "items": {
+              "type": "string"
+            }
+          },
+          "temporaryNames": {
+            "type": "array",
+            "description": "Names of temporary variables",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "initializationExpressions": {
+      "type": "array",
+      "description": "Top-level expressions to be executed during system initialization",
+      "items": {
+        "type": "object",
+        "required": ["bytecode", "literals"],
+        "properties": {
+          "bytecode": {
+            "type": "array",
+            "description": "The compiled bytecode for the expression",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          },
+          "literals": {
+            "type": "array",
+            "description": "The literal frame for this expression",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "array"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["Association"]
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {}
+                  }
+                }
+              ]
+            }
+          },
+          "numTemps": {
+            "type": "integer",
+            "description": "Number of temporary variables",
+            "minimum": 0
+          },
+          "stackDepth": {
+            "type": "integer",
+            "description": "Maximum stack depth needed",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string",
+            "description": "The original source code of the expression"
+          },
+          "receiver": {
+            "type": "string",
+            "description": "The receiver of the message send (if applicable)"
+          },
+          "selector": {
+            "type": "string",
+            "description": "The message selector (if applicable)"
+          },
+          "arguments": {
+            "type": "array",
+            "description": "The arguments to the message send (if applicable)",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

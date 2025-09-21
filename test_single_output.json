@@ -1,0 +1,13 @@
+﻿{
+  "bytecode": [
+    32
+  ],
+  "literals": [
+    42
+  ],
+  "numArgs": 0,
+  "numTemps": 0,
+  "stackDepth": 1,
+  "primitive": 0,
+  "source": "42"
+}

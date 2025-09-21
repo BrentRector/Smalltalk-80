@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>Smalltalk80.Compiler</AssemblyName>
+    <RootNamespace>Smalltalk80.Compiler</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>13</LangVersion>
+    <!-- Suppress CS3021 warnings from ANTLR-generated files -->
+    <NoWarn>$(NoWarn);CS3021</NoWarn>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+  </ItemGroup>
+  
+  <!-- Grammar file included for reference -->
+  <ItemGroup>
+    <None Include="Smalltalk80.g4" />
+    <None Include="ANTLR4\antlr-4.13.2-complete.jar" />
+  </ItemGroup>
+  
+  <!-- Exclude Generated folder from default compilation -->
+  <ItemGroup>
+    <Compile Remove="Generated\**" />
+  </ItemGroup>
+  
+  <!-- Ensure Generated folder exists and regenerate parser if needed -->
+  <Target Name="EnsureGeneratedFiles" BeforeTargets="CoreCompile">
+    <!-- Create Generated folder if it doesn't exist -->
+    <MakeDir Directories="$(MSBuildProjectDirectory)\Generated" Condition="!Exists('$(MSBuildProjectDirectory)\Generated')" />
+    
+    <!-- Run parser generation -->
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\GenerateIfNewer.ps1&quot;" 
+          WorkingDirectory="$(MSBuildProjectDirectory)" 
+          ContinueOnError="true" />
+    
+    <!-- Dynamically include generated files for compilation -->
+    <ItemGroup>
+      <Compile Include="Generated\*.cs" />
+    </ItemGroup>
+  </Target>
+  
+  <!-- Clean target to remove generated files -->
+  <Target Name="CleanGenerated" AfterTargets="Clean">
+    <ItemGroup>
+      <GeneratedFiles Include="$(MSBuildProjectDirectory)\Generated\*.*" />
+    </ItemGroup>
+    <Delete Files="@(GeneratedFiles)" TreatErrorsAsWarnings="true" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\Generated" ContinueOnError="true" />
+  </Target>
+</Project>

@@ -1,0 +1,91 @@
+﻿{
+  "schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 11:19:56",
+  "classes": [
+    {
+      "name": "TestClass",
+      "superclass": "Object",
+      "instanceVariables": [
+        "value"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Test",
+      "methods": [
+        "value",
+        "value:"
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "TestClass",
+      "selector": "value",
+      "bytecode": [
+        0,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "value\r\n    ^value!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "TestClass",
+      "selector": "value:",
+      "bytecode": [
+        16,
+        136,
+        96,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "value: anObject\r\n    value _ anObject!",
+      "argumentNames": [
+        "anObject"
+      ],
+      "temporaryNames": []
+    }
+  ],
+  "initializationExpressions": [
+    {
+      "bytecode": [
+        64,
+        33,
+        34,
+        193,
+        124
+      ],
+      "literals": [
+        {
+          "type": "Association",
+          "key": "#Smalltalk"
+        },
+        "#TestGlobal",
+        42,
+        "#at:put:"
+      ],
+      "numTemps": 0,
+      "stackDepth": 3,
+      "source": "Smalltalk at: #TestGlobal put: 42",
+      "receiver": "Smalltalk",
+      "selector": "at:put:",
+      "arguments": [
+        "#TestGlobal",
+        "42"
+      ]
+    }
+  ]
+}

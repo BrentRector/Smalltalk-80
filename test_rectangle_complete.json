@@ -1,0 +1,471 @@
+﻿{
+  "schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 10:47:45",
+  "classes": [
+    {
+      "name": "Rectangle",
+      "superclass": "Object",
+      "instanceVariables": [
+        "origin",
+        "corner"
+      ],
+      "classVariables": [
+        "DefaultExtent"
+      ],
+      "poolDictionaries": [],
+      "category": "Graphics-Primitives",
+      "methods": [
+        "origin",
+        "corner",
+        "origin:",
+        "corner:",
+        "containsPoint:",
+        "isEmpty",
+        "translateBy:",
+        "scaleBy:",
+        "printOn:",
+        "origin:corner:",
+        "origin:extent:",
+        "fromUser",
+        "example1",
+        "example2",
+        "defaultExtent",
+        "defaultExtent:"
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "Rectangle",
+      "selector": "origin",
+      "bytecode": [
+        0,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "origin\r\n    \"Answer the origin point\"\r\n    ^origin!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "corner",
+      "bytecode": [
+        1,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "corner\r\n    \"Answer the corner point\"\r\n    ^corner!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "origin:",
+      "bytecode": [
+        16,
+        136,
+        96,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "origin: aPoint\r\n    \"Set the origin point\"\r\n    origin _ aPoint!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "corner:",
+      "bytecode": [
+        16,
+        136,
+        97,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "corner: aPoint\r\n    \"Set the corner point\"\r\n    corner _ aPoint!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "containsPoint:",
+      "bytecode": [
+        16,
+        206,
+        206,
+        0,
+        181,
+        16,
+        207,
+        207,
+        0,
+        181,
+        209,
+        16,
+        206,
+        206,
+        1,
+        180,
+        209,
+        16,
+        207,
+        207,
+        1,
+        180,
+        209,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "testing",
+      "sourceCode": "containsPoint: aPoint\r\n    \"Answer whether aPoint is within this rectangle\"\r\n    ^(aPoint x >= origin x) &\r\n     (aPoint y >= origin y) &\r\n     (aPoint x <= corner x) &\r\n     (aPoint y <= corner y)!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "isEmpty",
+      "bytecode": [
+        0,
+        1,
+        182,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "testing",
+      "sourceCode": "isEmpty\r\n    \"Answer whether this rectangle has zero area\"\r\n    ^origin = corner!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "translateBy:",
+      "bytecode": [
+        112,
+        199,
+        0,
+        16,
+        176,
+        1,
+        16,
+        176,
+        131,
+        2,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": false,
+      "protocol": "transforming",
+      "sourceCode": "translateBy: delta\r\n    \"Answer a new rectangle translated by delta\"\r\n    ^self class\r\n        origin: origin + delta\r\n        corner: corner + delta!",
+      "argumentNames": [
+        "delta"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "scaleBy:",
+      "bytecode": [
+        112,
+        199,
+        0,
+        16,
+        184,
+        1,
+        16,
+        184,
+        131,
+        2,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": false,
+      "protocol": "transforming",
+      "sourceCode": "scaleBy: scale\r\n    \"Answer a new rectangle scaled by scale\"\r\n    ^self class\r\n        origin: origin * scale\r\n        corner: corner * scale!",
+      "argumentNames": [
+        "scale"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle",
+      "selector": "printOn:",
+      "bytecode": [
+        0,
+        16,
+        209,
+        135,
+        16,
+        33,
+        213,
+        135,
+        1,
+        16,
+        209,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "printing",
+      "sourceCode": "printOn: aStream\r\n    \"Print a representation of this rectangle\"\r\n    origin printOn: aStream.\r\n    aStream nextPutAll: ' corner: '.\r\n    corner printOn: aStream!",
+      "argumentNames": [
+        "aStream"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "origin:corner:",
+      "bytecode": [
+        112,
+        204,
+        136,
+        16,
+        209,
+        135,
+        136,
+        17,
+        211,
+        135,
+        212,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": true,
+      "protocol": "instance creation",
+      "sourceCode": "origin: originPoint corner: cornerPoint\r\n    \"Create a new rectangle with the given origin and corner\"\r\n    ^self new\r\n        origin: originPoint;\r\n        corner: cornerPoint;\r\n        yourself!",
+      "argumentNames": [
+        "originPoint",
+        "cornerPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "origin:extent:",
+      "bytecode": [
+        112,
+        204,
+        136,
+        16,
+        209,
+        135,
+        136,
+        16,
+        17,
+        176,
+        211,
+        135,
+        212,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": true,
+      "protocol": "instance creation",
+      "sourceCode": "origin: originPoint extent: extentPoint\r\n    \"Create a new rectangle with the given origin and extent\"\r\n    ^self new\r\n        origin: originPoint;\r\n        corner: originPoint + extentPoint;\r\n        yourself!",
+      "argumentNames": [
+        "originPoint",
+        "extentPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "fromUser",
+      "bytecode": [
+        32,
+        201,
+        210,
+        136,
+        104,
+        135,
+        32,
+        201,
+        212,
+        136,
+        105,
+        135,
+        112,
+        16,
+        17,
+        131,
+        26,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 2,
+      "stackDepth": 3,
+      "isClassMethod": true,
+      "protocol": "instance creation",
+      "sourceCode": "fromUser\r\n    \"Let the user define a rectangle on the screen\"\r\n    | origin corner |\r\n    origin _ Sensor waitButton.\r\n    corner _ Sensor waitNoButton.\r\n    ^self origin: origin corner: corner!",
+      "argumentNames": [],
+      "temporaryNames": [
+        "origin",
+        "corner"
+      ]
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "example1",
+      "bytecode": [
+        112,
+        32,
+        32,
+        187,
+        33,
+        33,
+        187,
+        131,
+        18,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": true,
+      "protocol": "examples",
+      "sourceCode": "example1\r\n    \"Rectangle example1\"\r\n    ^self origin: 10@10 corner: 100@100!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "example2",
+      "bytecode": [
+        112,
+        117,
+        117,
+        187,
+        32,
+        33,
+        187,
+        131,
+        18,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": true,
+      "protocol": "examples",
+      "sourceCode": "example2\r\n    \"Rectangle example2\"\r\n    ^self origin: 0@0 extent: 50@75!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "defaultExtent",
+      "bytecode": [
+        32,
+        201,
+        143,
+        0,
+        148,
+        33,
+        33,
+        187,
+        125,
+        213,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 5,
+      "isClassMethod": true,
+      "protocol": "defaults",
+      "sourceCode": "defaultExtent\r\n    \"Answer the default extent for new rectangles\"\r\n    ^DefaultExtent ifNil: [100@100]!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Rectangle class",
+      "selector": "defaultExtent:",
+      "bytecode": [
+        16,
+        136,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": true,
+      "protocol": "defaults",
+      "sourceCode": "defaultExtent: aPoint\r\n    \"Set the default extent for new rectangles\"\r\n    DefaultExtent _ aPoint!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    }
+  ],
+  "initializationExpressions": []
+}

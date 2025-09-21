@@ -1,0 +1,242 @@
+﻿{
+  "schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 10:29:22",
+  "classes": [
+    {
+      "name": "Point",
+      "superclass": "Object",
+      "instanceVariables": [
+        "x",
+        "y"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Graphics-Primitives",
+      "methods": []
+    },
+    {
+      "name": "AnonymousClass",
+      "superclass": "Object",
+      "instanceVariables": [],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "",
+      "methods": [
+        "x",
+        "y",
+        "x:",
+        "y:",
+        "+",
+        "-",
+        "*",
+        "x:y:"
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "AnonymousClass",
+      "selector": "x",
+      "bytecode": [
+        32,
+        201,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "y",
+      "bytecode": [
+        32,
+        201,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "x:",
+      "bytecode": [
+        16,
+        136,
+        32,
+        202,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "aNumber"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "y:",
+      "bytecode": [
+        16,
+        136,
+        32,
+        202,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "aNumber"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "+",
+      "bytecode": [
+        32,
+        201,
+        206,
+        16,
+        176,
+        33,
+        201,
+        207,
+        16,
+        176,
+        187,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "-",
+      "bytecode": [
+        32,
+        201,
+        206,
+        16,
+        177,
+        33,
+        201,
+        207,
+        16,
+        177,
+        187,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "*",
+      "bytecode": [
+        32,
+        201,
+        16,
+        184,
+        33,
+        201,
+        16,
+        184,
+        187,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "scale"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "AnonymousClass",
+      "selector": "x:y:",
+      "bytecode": [
+        112,
+        204,
+        136,
+        16,
+        209,
+        135,
+        136,
+        17,
+        211,
+        135,
+        212,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "stackDepth": 3,
+      "isClassMethod": false,
+      "protocol": "unclassified",
+      "sourceCode": "",
+      "argumentNames": [
+        "xValue",
+        "yValue"
+      ],
+      "temporaryNames": []
+    }
+  ],
+  "initializationExpressions": []
+}

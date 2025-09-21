@@ -1,0 +1,240 @@
+﻿{
+  "schema": "./bootstrap-schema.json",
+  "description": "Compiled from source on 2025-09-21 11:08:27",
+  "classes": [
+    {
+      "name": "Point",
+      "superclass": "Object",
+      "instanceVariables": [
+        "x",
+        "y"
+      ],
+      "classVariables": [],
+      "poolDictionaries": [],
+      "category": "Graphics-Primitives",
+      "methods": [
+        "x",
+        "y",
+        "x:",
+        "y:",
+        "+",
+        "-",
+        "*",
+        "x:y:"
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "class": "Point",
+      "selector": "x",
+      "bytecode": [
+        0,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "x\r\n    ^x!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "y",
+      "bytecode": [
+        1,
+        124
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 0,
+      "numTemps": 0,
+      "stackDepth": 1,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "y\r\n    ^y!",
+      "argumentNames": [],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "x:",
+      "bytecode": [
+        16,
+        136,
+        96,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "x: aNumber\r\n    x _ aNumber!",
+      "argumentNames": [
+        "aNumber"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "y:",
+      "bytecode": [
+        16,
+        136,
+        97,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "accessing",
+      "sourceCode": "y: aNumber\r\n    y _ aNumber!",
+      "argumentNames": [
+        "aNumber"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "+",
+      "bytecode": [
+        32,
+        201,
+        204,
+        0,
+        206,
+        16,
+        176,
+        1,
+        207,
+        16,
+        176,
+        131,
+        10,
+        124
+      ],
+      "literals": [
+        "#Point",
+        "#x:y:"
+      ],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": false,
+      "protocol": "arithmetic",
+      "sourceCode": "+ aPoint\r\n    ^Point new x: x + aPoint x y: y + aPoint y!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "-",
+      "bytecode": [
+        32,
+        201,
+        204,
+        0,
+        206,
+        16,
+        177,
+        1,
+        207,
+        16,
+        177,
+        131,
+        10,
+        124
+      ],
+      "literals": [
+        "#Point",
+        "#x:y:"
+      ],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": false,
+      "protocol": "arithmetic",
+      "sourceCode": "- aPoint\r\n    ^Point new x: x - aPoint x y: y - aPoint y!",
+      "argumentNames": [
+        "aPoint"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "*",
+      "bytecode": [
+        32,
+        201,
+        204,
+        0,
+        16,
+        184,
+        1,
+        16,
+        184,
+        131,
+        10,
+        124
+      ],
+      "literals": [
+        "#Point",
+        "#x:y:"
+      ],
+      "primitiveIndex": 0,
+      "numArgs": 1,
+      "numTemps": 0,
+      "stackDepth": 4,
+      "isClassMethod": false,
+      "protocol": "arithmetic",
+      "sourceCode": "* scale\r\n    ^Point new x: x * scale y: y * scale!",
+      "argumentNames": [
+        "scale"
+      ],
+      "temporaryNames": []
+    },
+    {
+      "class": "Point",
+      "selector": "x:y:",
+      "bytecode": [
+        16,
+        136,
+        96,
+        135,
+        17,
+        136,
+        97,
+        120
+      ],
+      "literals": [],
+      "primitiveIndex": 0,
+      "numArgs": 2,
+      "numTemps": 0,
+      "stackDepth": 2,
+      "isClassMethod": false,
+      "protocol": "initialization",
+      "sourceCode": "x: xValue y: yValue\r\n    x _ xValue.\r\n    y _ yValue!",
+      "argumentNames": [
+        "xValue",
+        "yValue"
+      ],
+      "temporaryNames": []
+    }
+  ],
+  "initializationExpressions": []
+}
