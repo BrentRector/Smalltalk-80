@@ -36,6 +36,8 @@ public static class Program
 
         try
         {
+            Console.WriteLine("[DEBUG] Starting compiler...");
+            
             // Read source file
             if (!File.Exists(inputFile))
             {
@@ -44,6 +46,7 @@ public static class Program
             }
 
             string sourceCode = File.ReadAllText(inputFile, Encoding.UTF8);
+            Console.WriteLine($"[DEBUG] Read source code: {sourceCode.Length} characters");
             
             if (verbose)
             {
@@ -89,11 +92,11 @@ public static class Program
             }
             else
             {
-                // Use BytecodeCompiler for individual methods/expressions
-                compiler = new BytecodeCompiler();
+                // Use BytecodeGenerator for individual methods/expressions
+                compiler = new BytecodeGenerator();
                 if (verbose)
                 {
-                    Console.WriteLine("Using BytecodeCompiler for single method/expression");
+                    Console.WriteLine("Using BytecodeGenerator for single method/expression");
                 }
             }
             

@@ -235,9 +235,15 @@ public sealed record CompilationScope
             return (VariableType.Argument, argIndex);
         
         // Then temporaries
+        // IMPORTANT: In Smalltalk-80 bytecode, temporaries and arguments share the same index space.
+        // Arguments occupy indices 0..n-1, temporaries start at index n.
         var tempIndex = Temporaries.ToList().IndexOf(name);
         if (tempIndex >= 0)
-            return (VariableType.Temporary, tempIndex);
+        {
+            // Adjust index to account for arguments
+            var adjustedIndex = Arguments.Count + tempIndex;
+            return (VariableType.Temporary, adjustedIndex);
+        }
         
         // Then instance variables (only for method scopes)
         if (Type == ScopeType.Method)
@@ -265,14 +271,79 @@ public sealed record CompilationScope
     {
         ArgumentNullException.ThrowIfNull(literal);
         
-        // Check if literal already exists
-        var existingIndex = Literals.IndexOf(literal);
-        if (existingIndex >= 0)
-            return existingIndex;
+        // Check if literal already exists using semantic equality
+        for (int i = 0; i < Literals.Count; i++)
+        {
+            if (LiteralsEqual(Literals[i], literal))
+                return i;
+        }
         
         // Add new literal
         Literals.Add(literal);
         return Literals.Count - 1;
+    }
+    
+    /// <summary>
+    /// Compares two literals for semantic equality.
+    /// </summary>
+    /// <param name="a">First literal to compare.</param>
+    /// <param name="b">Second literal to compare.</param>
+    /// <returns>True if the literals are semantically equal, false otherwise.</returns>
+    private static bool LiteralsEqual(object? a, object? b)
+    {
+        if (a == null || b == null) return a == b;
+        
+        // Handle Symbol types from both BytecodeEmitter and Models namespaces
+        if (a.GetType().Name == "Symbol" && b.GetType().Name == "Symbol")
+        {
+            // Use reflection to compare by Name/Value property
+            var aProp = a.GetType().GetProperty("Name") ?? a.GetType().GetProperty("Value");
+            var bProp = b.GetType().GetProperty("Name") ?? b.GetType().GetProperty("Value");
+            if (aProp != null && bProp != null)
+            {
+                var aValue = aProp.GetValue(a) as string;
+                var bValue = bProp.GetValue(b) as string;
+                return aValue == bValue;
+            }
+        }
+        
+        // Handle Association types
+        if (a.GetType().Name == "Association" && b.GetType().Name == "Association")
+        {
+            // Compare by Key property
+            var aKeyProp = a.GetType().GetProperty("Key");
+            var bKeyProp = b.GetType().GetProperty("Key");
+            if (aKeyProp != null && bKeyProp != null)
+            {
+                var aKey = aKeyProp.GetValue(a);
+                var bKey = bKeyProp.GetValue(b);
+                
+                // Keys might be strings or Symbols
+                if (aKey is string aKeyStr && bKey is string bKeyStr)
+                {
+                    return aKeyStr == bKeyStr;
+                }
+                else if (aKey?.GetType().Name == "Symbol" && bKey?.GetType().Name == "Symbol")
+                {
+                    var aValueProp = aKey.GetType().GetProperty("Value") ?? aKey.GetType().GetProperty("Name");
+                    var bValueProp = bKey.GetType().GetProperty("Value") ?? bKey.GetType().GetProperty("Name");
+                    if (aValueProp != null && bValueProp != null)
+                    {
+                        var aValue = aValueProp.GetValue(aKey) as string;
+                        var bValue = bValueProp.GetValue(bKey) as string;
+                        return aValue == bValue;
+                    }
+                }
+            }
+        }
+        
+        // For primitive types, use standard equality
+        if (a is string strA && b is string strB) return strA == strB;
+        if (a is int intA && b is int intB) return intA == intB;
+        if (a is bool boolA && b is bool boolB) return boolA == boolB;
+        
+        // Default to standard equality
+        return a.Equals(b);
     }
 }
 

@@ -21,10 +21,9 @@ The compiler uses a multi-phase architecture with clear separation of concerns:
 - **Multiple Passes**: Supports multiple processing passes over the AST
 
 ### 4. Code Generation Phase
-- **Bytecode Compiler**: First processor implementation generates Smalltalk-80 bytecode
-- **Two-Pass Compilation**: 
-  - Pass 1: Literal collection
-  - Pass 2: Bytecode generation
+- **Bytecode Generator**: Unified bytecode generation and compilation
+- **Single-Pass Compilation**: Efficient bytecode generation with inline literal collection
+- **Dual Interface**: Works both as IAstVisitor for direct use and IAstProcessor for JSON output
 - **JSON Output**: Generates bytecode in JSON format for interpreter consumption
 
 ## Project Structure
@@ -45,10 +44,10 @@ Smalltalk80.Compiler/
 │   └── Processors/          # AST processors
 │       └── IAstProcessor.cs     # Processor interface
 ├── Compilation/             # Bytecode compilation
-│   ├── BytecodeCompiler.cs      # Main compiler
-│   ├── BytecodeEmitter.cs       # Bytecode emission
-│   ├── CompilationEnvironment.cs # Variable tracking
-│   └── LiteralCollectorVisitor.cs # Literal collection
+│   ├── BytecodeGenerator.cs     # Bytecode generator & compiler
+│   ├── CompilationContext.cs    # Compilation context
+│   ├── CompilationScope.cs      # Variable & literal tracking
+│   └── Models/                   # Compilation data models
 ├── ANTLR4/                  # ANTLR tools
 │   └── antlr-4.13.2-complete.jar
 ├── Generated/               # ANTLR-generated code

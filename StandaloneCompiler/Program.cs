@@ -128,12 +128,148 @@ namespace StandaloneCompiler
             var tokenStream = new CommonTokenStream(lexer);
             var parser = new Smalltalk80Parser(tokenStream);
             
+            // Check if this looks like a single expression/statement (no method header)
+            // Single expressions typically start with ^ or are just expressions
+            bool isSingleExpression = false;
+            bool hasMethodHeader = false;
+            
+            if (!source.Contains('!'))
+            {
+                Console.WriteLine($"Source doesn't contain '!', checking parse modes...");
+                
+                // Try as methodEntry (full method with header) FIRST
+                parser.Reset();
+                parser.RemoveErrorListeners();
+                var methodContext = parser.methodEntry();
+                int methodErrors = parser.NumberOfSyntaxErrors;
+                Console.WriteLine($"methodEntry parse errors: {methodErrors}");
+                
+                if (methodErrors == 0)
+                {
+                    hasMethodHeader = true;
+                    Console.WriteLine("Detected as full method with header");
+                }
+                else
+                {
+                    // Try parsing as statements/expression
+                    parser.Reset();
+                    parser.RemoveErrorListeners(); // Suppress error output for trial parse
+                    
+                    // Try as statementsEntry (handles both return statements and plain expressions)
+                    var statementsContext = parser.statementsEntry();
+                    int statementsErrors = parser.NumberOfSyntaxErrors;
+                    Console.WriteLine($"statementsEntry parse errors: {statementsErrors}");
+                    
+                    if (statementsErrors == 0)
+                    {
+                        isSingleExpression = true;
+                        Console.WriteLine("Detected as single expression/statement");
+                    }
+                    else
+                    {
+                        // Neither worked perfectly, but if source starts with ^ it's likely an expression
+                        if (source.TrimStart().StartsWith("^"))
+                        {
+                            isSingleExpression = true;
+                            Console.WriteLine("Starts with ^, treating as expression needing wrapper");
+                        }
+                        else
+                        {
+                            // Default to trying as method
+                            hasMethodHeader = true;
+                            Console.WriteLine("Defaulting to method parsing");
+                        }
+                    }
+                }
+            }
+            
+            // Handle single expression/statement compilation
+            if (isSingleExpression)
+            {
+                Console.WriteLine("Parsing as single expression/statement...");
+                
+                // For expressions that start with ^, we compile them directly as expressions
+                // The BytecodeCompiler has a CompileExpression method that can handle this
+                var compiler = new BytecodeCompiler();
+                
+                // Remove leading ^ if present for expression compilation
+                string expressionSource = source.TrimStart();
+                if (expressionSource.StartsWith("^"))
+                {
+                    expressionSource = expressionSource.Substring(1).TrimStart();
+                }
+                
+                Console.WriteLine($"Compiling expression: {expressionSource}");
+                
+                // Use CompileExpression to compile just the expression part
+                var compiledData = compiler.CompileExpressionSource(expressionSource);
+                
+                // Wrap in method bytecode with return
+                var bytecodes = new List<byte>(compiledData.Bytecode);
+                if (bytecodes.Count == 0 || bytecodes[bytecodes.Count - 1] != 124) // 124 is returnTop
+                {
+                    bytecodes.Add(124); // Add returnTop if not present
+                }
+                
+                // Create a method definition
+                var methodDef = new MethodDefinition
+                {
+                    Selector = "doIt",
+                    NumArgs = 0,
+                    NumTemps = compiledData.TemporaryCount,
+                    PrimitiveIndex = 0,
+                    Class = "Object",
+                    IsClassMethod = false,
+                    Bytecode = bytecodes.ToArray(),
+                    Literals = new List<object>(compiledData.Literals),
+                    StackDepth = 10 // Default stack depth
+                };
+                
+                result.Methods.Add(methodDef);
+                
+                // For the test output, also add to the bytecode field at root level
+                result.Bytecode = methodDef.Bytecode;
+                
+                return result;
+            }
+            
+            // Handle method with header
+            if (hasMethodHeader)
+            {
+                Console.WriteLine("Parsing as single method with header...");
+                
+                // Compile the method using BytecodeCompiler
+                var compiler = new BytecodeCompiler();
+                var compiledMethod = compiler.CompileMethod(source, new List<string>());
+                
+                // Create a method definition
+                var methodDef = new MethodDefinition
+                {
+                    Selector = compiledMethod.Selector,
+                    NumArgs = compiledMethod.ArgumentCount,
+                    NumTemps = compiledMethod.TemporaryCount,
+                    PrimitiveIndex = compiledMethod.PrimitiveNumber,
+                    Class = "Object",
+                    IsClassMethod = false,
+                    Bytecode = compiledMethod.Bytecode,
+                    Literals = new List<object>(compiledMethod.Literals),
+                    StackDepth = 10 // Default stack depth
+                };
+                
+                result.Methods.Add(methodDef);
+                
+                // For the test output, also add to the bytecode field at root level
+                result.Bytecode = methodDef.Bytecode;
+                
+                return result;
+            }
+            
             // Parse as file-in format (chunks separated by !)
+            parser.Reset();
             var fileInContext = parser.fileIn();
             
             // Visit the parse tree to extract classes, methods, and file-scope expressions
             var visitor = new SmalltalkVisitor(this, result, tokenStream);
-            // Console.WriteLine($"Parse tree has {fileInContext.chunk()?.Length ?? 0} chunks");
             visitor.Visit(fileInContext);
             
             // Copy collected data to result
@@ -576,6 +712,7 @@ namespace StandaloneCompiler
         public List<ClassDefinition>? Classes { get; set; }
         public List<MethodDefinition>? Methods { get; set; }
         public List<InitializationExpression>? InitializationExpressions { get; set; }
+        public byte[]? Bytecode { get; set; } // For single method compilation
     }
     
     public class ClassDefinition

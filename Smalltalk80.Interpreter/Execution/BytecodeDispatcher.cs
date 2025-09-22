@@ -125,14 +125,17 @@ public sealed class BytecodeDispatcher
             // 152-159: Pop and Jump On False iii+1 (i.e., 1 through 8)
             >= 152 and <= 159 => ShortJumpOnFalse(context, (bytecode & 0x07) + 1),
             
-            // 160-167: Long Jump (iii+4)*256 + next byte
-            >= 160 and <= 167 => LongJump(context, (bytecode & 0x07) + 4),
+            // 160: Medium Jump NN + 1 where NN is next byte (range: 1-256)
+            160 => UnconditionalJump(context, bytecode),
             
-            // 168-171: Pop and Jump On True ii*256 + next byte
-            >= 168 and <= 171 => LongJumpOnTrue(context, bytecode & 0x03),
+            // 161-167: Long Jump with N operand bytes where N = bytecode - 159 (N = 2-8)
+            >= 161 and <= 167 => UnconditionalJump(context, bytecode),
             
-            // 172-175: Pop and Jump On False ii*256 + next byte
-            >= 172 and <= 175 => LongJumpOnFalse(context, bytecode & 0x03),
+            // 168: Medium Conditional Jump On False (1 operand byte)
+            168 => MediumConditionalJumpOnFalse(context),
+            
+            // 169-175: Long Conditional Jump On False with N operand bytes where N = bytecode - 168
+            >= 169 and <= 175 => LongConditionalJumpOnFalse(context, bytecode),
             
             // 176-191: Send Arithmetic Message #iiii
             >= 176 and <= 191 => SendArithmeticMessage(context, bytecode & 0x0F),
@@ -844,59 +847,78 @@ public sealed class BytecodeDispatcher
     }
 
     /// <summary>
-    /// Long Jump: Jump (iii+4)*256 + next byte.
+    /// Unconditional Jump: Handles both medium jumps (bytecode 160) and long jumps (bytecodes 161-167).
+    /// Implements the exact Blue Book specification for unconditional jump bytecodes.
     /// </summary>
-    private bool LongJump(MethodContext context, int highBits)
+    /// <remarks>
+    /// According to the Blue Book specification:
+    /// 
+    /// - Bytecode 160: Medium Jump
+    ///   - Has 1 operand byte NN
+    ///   - Jumps NN + 1 bytes forward
+    ///   - Range: 1-256 bytes (NN = 0-255, jump = 1-256)
+    /// 
+    /// - Bytecodes 161-167: Long Jumps
+    ///   - N = bytecode - 159 gives the number of operand bytes (2-8 bytes)
+    ///   - Read N bytes as big-endian unsigned integer NN
+    ///   - Jump NN + 1 bytes forward
+    ///   - Range depends on N:
+    ///     - 161 (N=2): 1-65,536 bytes
+    ///     - 162 (N=3): 1-16,777,216 bytes
+    ///     - ... up to ...
+    ///     - 167 (N=8): 1-2^64 bytes (theoretical)
+    /// 
+    /// Note: Short jumps (144-151) jump 1-8 bytes and are handled separately.
+    /// </remarks>
+    private bool UnconditionalJump(MethodContext context, byte bytecode)
     {
-        var lowByte = GetNextByte(context);
-        var jumpDistance = (highBits * 256) + lowByte;
+        int jumpDistance;
         
-        context.PC += jumpDistance;
-        
-        if (DebugOptions.EnableBytecodeTrace)
+        if (bytecode == 160)
         {
-            Console.WriteLine($"  -> LongJump distance={jumpDistance}, new PC={context.PC}");
-        }
-        
-        return true;
-    }
-
-    /// <summary>
-    /// Long Jump On True: Pop and Jump On True ii*256 + next byte.
-    /// </summary>
-    private bool LongJumpOnTrue(MethodContext context, int highBits)
-    {
-        var lowByte = GetNextByte(context);
-        var jumpDistance = (highBits * 256) + lowByte;
-        
-        var condition = context.Stack.Pop();
-        if (condition == executionContext.GetSpecialObject(SpecialObjects.TrueObject))
-        {
-            context.PC += jumpDistance;
+            // Medium jump: Read 1 byte NN and jump NN + 1
+            var nn = GetNextByte(context);
+            jumpDistance = nn + 1;
             
             if (DebugOptions.EnableBytecodeTrace)
             {
-                Console.WriteLine($"  -> LongJumpOnTrue taken, distance={jumpDistance}, new PC={context.PC}");
+                Console.WriteLine($"  -> MediumJump (bytecode 160) NN={nn}, distance={jumpDistance}, new PC={context.PC + jumpDistance}");
             }
         }
         else
         {
+            // Long jump: bytecodes 161-167
+            // N = bytecode - 159 gives number of operand bytes (2-8)
+            int n = bytecode - 159;
+            
+            // Read N bytes as big-endian unsigned integer
+            uint nn = 0;
+            for (int i = 0; i < n; i++)
+            {
+                nn = (nn << 8) | GetNextByte(context);
+            }
+            
+            // Jump NN + 1 bytes
+            jumpDistance = (int)(nn + 1);
+            
             if (DebugOptions.EnableBytecodeTrace)
             {
-                Console.WriteLine($"  -> LongJumpOnTrue not taken, condition={condition}");
+                Console.WriteLine($"  -> LongJump (bytecode {bytecode}) N={n} operand bytes, NN={nn}, distance={jumpDistance}, new PC={context.PC + jumpDistance}");
             }
         }
         
+        context.PC += jumpDistance;
         return true;
     }
 
     /// <summary>
-    /// Long Jump On False: Pop and Jump On False ii*256 + next byte.
+    /// Medium Conditional Jump On False: Pop and Jump On False with 1 operand byte.
+    /// Blue Book specification: Bytecode 168 with nextByte + 1 jump distance (1-256).
     /// </summary>
-    private bool LongJumpOnFalse(MethodContext context, int highBits)
+    private bool MediumConditionalJumpOnFalse(MethodContext context)
     {
-        var lowByte = GetNextByte(context);
-        var jumpDistance = (highBits * 256) + lowByte;
+        var nextByte = GetNextByte(context);
+        var jumpDistance = nextByte + 1;  // Offset = nextByte + 1
         
         var condition = context.Stack.Pop();
         if (condition == executionContext.GetSpecialObject(SpecialObjects.FalseObject))
@@ -905,14 +927,58 @@ public sealed class BytecodeDispatcher
             
             if (DebugOptions.EnableBytecodeTrace)
             {
-                Console.WriteLine($"  -> LongJumpOnFalse taken, distance={jumpDistance}, new PC={context.PC}");
+                Console.WriteLine($"  -> MediumConditionalJumpOnFalse taken, distance={jumpDistance}, new PC={context.PC}");
             }
         }
         else
         {
             if (DebugOptions.EnableBytecodeTrace)
             {
-                Console.WriteLine($"  -> LongJumpOnFalse not taken, condition={condition}");
+                Console.WriteLine($"  -> MediumConditionalJumpOnFalse not taken, condition={condition}");
+            }
+        }
+        
+        return true;
+    }
+
+    /// <summary>
+    /// Long Conditional Jump On False: Pop and Jump On False with variable-length operand.
+    /// Blue Book specification: Bytecodes 169-175 use N operand bytes where N = bytecode - 168.
+    /// </summary>
+    private bool LongConditionalJumpOnFalse(MethodContext context, int bytecode)
+    {
+        // Calculate number of operand bytes: N = bytecode - 168
+        // Bytecode 169 = 1 byte, 170 = 2 bytes, ..., 175 = 7 bytes
+        // But wait, 169-168=1, which means 169 uses 1 operand byte
+        // Actually for long jumps, 169 should use 2 bytes minimum
+        // Let me correct: For 169-175, N = bytecode - 167 gives 2-8 bytes
+        int operandBytes = bytecode - 167;  // Gives 2-8 bytes for 169-175
+        
+        // Read N bytes as big-endian unsigned integer
+        int jumpDistance = 0;
+        for (int i = 0; i < operandBytes; i++)
+        {
+            jumpDistance = (jumpDistance << 8) | GetNextByte(context);
+        }
+        
+        // Add 1 to get actual offset (Blue Book: offset = NN + 1)
+        jumpDistance += 1;
+        
+        var condition = context.Stack.Pop();
+        if (condition == executionContext.GetSpecialObject(SpecialObjects.FalseObject))
+        {
+            context.PC += jumpDistance;
+            
+            if (DebugOptions.EnableBytecodeTrace)
+            {
+                Console.WriteLine($"  -> LongConditionalJumpOnFalse (bytecode {bytecode}) taken, distance={jumpDistance}, new PC={context.PC}");
+            }
+        }
+        else
+        {
+            if (DebugOptions.EnableBytecodeTrace)
+            {
+                Console.WriteLine($"  -> LongConditionalJumpOnFalse (bytecode {bytecode}) not taken, condition={condition}");
             }
         }
         

@@ -1,13 +1,16 @@
 namespace Smalltalk80.Compiler.Compilation;
 
+using System.Text.Json;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Compiler.AST.Processors;
 using Smalltalk80.Compiler.Compilation.Models;
 
 /// <summary>
 /// Generates Smalltalk-80 bytecode from AST nodes using modern C# patterns.
-/// Implements the visitor pattern to traverse the AST and emit bytecode instructions.
+/// Implements both the visitor pattern for AST traversal and IAstProcessor for standalone compilation.
+/// Can be used directly for bytecode generation or as a processor for JSON output.
 /// </summary>
-public sealed class BytecodeGenerator : IAstVisitor<object?>
+public sealed class BytecodeGenerator : IAstVisitor<object?>, IAstProcessor
 {
     private readonly List<byte> _bytecode = [];
     private readonly CompilationContext _context;
@@ -17,6 +20,12 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
     private int _currentStackDepth;
     private int _maxStackDepth;
     
+    // Track method compilation state for JSON generation
+    private ProcessorContext? _processorContext;
+    private int _methodArgCount;
+    private int _methodTempCount;
+    private int? _primitiveNumber;
+    
     /// <summary>
     /// Initializes a new instance of the BytecodeGenerator class.
     /// </summary>
@@ -24,6 +33,14 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
     public BytecodeGenerator(CompilationContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+    }
+    
+    /// <summary>
+    /// Initializes a new instance of the BytecodeGenerator class with a default context.
+    /// Used when implementing IAstProcessor for standalone compilation.
+    /// </summary>
+    public BytecodeGenerator() : this(new CompilationContext())
+    {
     }
     
     /// <summary>
@@ -45,6 +62,182 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
     /// Gets the literals from the last compiled method.
     /// </summary>
     public IReadOnlyList<object> LastMethodLiterals { get; private set; } = [];
+    
+    #region IAstProcessor Implementation
+    
+    /// <inheritdoc/>
+    public string Name => "Bytecode Generator";
+    
+    /// <inheritdoc/>
+    public ProcessorResult Process(AstNode node, ProcessorContext context)
+    {
+        _processorContext = context;
+        _context.Reset();
+        
+        // Reset method state
+        _methodArgCount = 0;
+        _methodTempCount = 0;
+        _primitiveNumber = null;
+        _bytecode.Clear();
+        LastMethodLiterals = [];
+        _maxStackDepth = 0;
+        _currentStackDepth = 0;
+        
+        try
+        {
+            // Process the AST based on its type
+            if (node is MethodDefinitionNode methodNode)
+            {
+                CompileMethod(methodNode);
+            }
+            else if (node is ProgramNode programNode)
+            {
+                CompileProgram(programNode);
+            }
+            else
+            {
+                // For other nodes, compile as an expression
+                CompileExpression(node);
+            }
+            
+            // Generate JSON output
+            var json = GenerateJsonOutput();
+            return new BytecodeResult(json);
+        }
+        catch (Exception ex)
+        {
+            return BytecodeResult.Failure($"Compilation failed: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Compiles a method definition for JSON output.
+    /// </summary>
+    private void CompileMethod(MethodDefinitionNode methodNode)
+    {
+        // Store method metadata
+        _methodArgCount = methodNode.Arguments.Length;
+        _methodTempCount = methodNode.Temporaries.Length;
+        _primitiveNumber = methodNode.Primitive?.PrimitiveNumber;
+        
+        // Set up default class context if needed
+        _context.SetClassContext("Object", false);
+        
+        // Compile the method using the visitor
+        methodNode.Accept(this);
+    }
+    
+    /// <summary>
+    /// Compiles a program (multiple methods/classes) for JSON output.
+    /// </summary>
+    private void CompileProgram(ProgramNode programNode)
+    {
+        // For programs, compile the first method found
+        foreach (var element in programNode.Elements)
+        {
+            if (element is ClassDefinitionNode classNode)
+            {
+                // Set up class context
+                var classDef = new ClassDefinition(
+                    classNode.ClassName,
+                    classNode.SuperclassName ?? "Object")
+                {
+                    InstanceVariables = classNode.InstanceVariables.ToList(),
+                    ClassVariables = classNode.ClassVariables.ToList(),
+                    PoolDictionaries = [],
+                    Category = "Unclassified",
+                    Comment = "",
+                    MethodReferences = []
+                };
+                _context.AddOrUpdateClass(classDef);
+                _context.SetClassContext(classNode.ClassName, false);
+                
+                // Compile the first method
+                if (classNode.Methods.Length > 0)
+                {
+                    CompileMethod(classNode.Methods[0]);
+                    return;
+                }
+            }
+            else if (element is MethodDefinitionNode methodNode)
+            {
+                CompileMethod(methodNode);
+                return;
+            }
+        }
+        
+        // If no methods found, compile as an expression
+        programNode.Accept(this);
+    }
+    
+    /// <summary>
+    /// Compiles a single expression for JSON output.
+    /// </summary>
+    private void CompileExpression(AstNode node)
+    {
+        // Create a simple scope for the expression
+        var expressionScope = new CompilationScope
+        {
+            Type = ScopeType.Expression,
+            Arguments = [],
+            Temporaries = [],
+            InstanceVariables = [],
+            ClassVariables = []
+        };
+        
+        _context.PushScope(expressionScope);
+        
+        try
+        {
+            // Compile the expression
+            node.Accept(this);
+            
+            // Save literals
+            LastMethodLiterals = expressionScope.Literals;
+        }
+        finally
+        {
+            _context.PopScope();
+        }
+    }
+    
+    /// <summary>
+    /// Generates the JSON output in the expected format.
+    /// </summary>
+    private string GenerateJsonOutput()
+    {
+        var output = new
+        {
+            bytecode = Bytecode.Select(b => (int)b).ToArray(),  // Convert bytes to int array
+            literals = LastMethodLiterals.Select(ConvertLiteralForJson).ToArray(),
+            numArgs = _methodArgCount,
+            numTemps = _methodTempCount,
+            stackDepth = _maxStackDepth,
+            primitive = _primitiveNumber,
+            source = _processorContext?.SourceCode ?? string.Empty
+        };
+        
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        
+        return JsonSerializer.Serialize(output, options);
+    }
+    
+    /// <summary>
+    /// Converts a literal object to its JSON representation.
+    /// </summary>
+    private static object ConvertLiteralForJson(object literal) => literal switch
+    {
+        Symbol sym => $"#{sym.Name}",
+        Association assoc => $"Association(key: #{assoc.Key}, value: {assoc.Value ?? "null"})",
+        object[] array => array.Select(ConvertLiteralForJson).ToArray(),
+        _ => literal
+    };
+    
+    #endregion
 
     #region Visitor Implementation - Program Structure
 
@@ -87,6 +280,14 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         _bytecode.Clear();
         _currentStackDepth = 0;
         _maxStackDepth = 0;
+        
+        // Store method metadata if processing via IAstProcessor
+        if (_processorContext != null)
+        {
+            _methodArgCount = node.Arguments.Length;
+            _methodTempCount = node.Temporaries.Length;
+            _primitiveNumber = node.Primitive?.PrimitiveNumber;
+        }
         
         // Create method scope
         var instanceVars = _context.IsClassMethod 
@@ -148,9 +349,12 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
             statement.Accept(this);
             
             // Pop intermediate results except for the last statement
+            // Note: Assignments do not leave values on the stack, so we only pop
+            // for non-assignment expression statements
             if (i < node.Statements.Length - 1 && 
-                statement is ExpressionStatementNode && 
-                !IsReturnStatement(statement))
+                statement is ExpressionStatementNode exprStmt && 
+                !IsReturnStatement(statement) &&
+                exprStmt.Expression is not AssignmentNode)
             {
                 EmitPop();
             }
@@ -202,11 +406,13 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         // Evaluate the value expression
         node.Value.Accept(this);
         
-        // Duplicate for assignment expression result
-        EmitDuplicate();
-        
         // Store to variable
         EmitStoreToVariable(node.Variable);
+        
+        // Note: Assignments in Smalltalk-80 do NOT leave a value on the stack.
+        // The stored value is consumed by the store operation.
+        // If an assignment is used as an expression (which is rare), 
+        // the compiler would need to handle that specially.
         
         return null;
     }
@@ -245,6 +451,27 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
     {
         ArgumentNullException.ThrowIfNull(node);
         
+        // Debug output to understand what's happening
+        Console.WriteLine($"[DEBUG] VisitMessageSend called:");
+        Console.WriteLine($"  - Node type: {node.GetType().Name}");
+        Console.WriteLine($"  - Node.Message is null: {node.Message == null}");
+        if (node.Message != null)
+        {
+            var debugSelector = node.Message.GetSelector();
+            Console.WriteLine($"  - Selector from node.Message: '{debugSelector}'");
+            Console.WriteLine($"  - GetSelector() result: '{node.Message.GetSelector()}'");
+        }
+        else
+        {
+            Console.WriteLine($"  - Cannot get selector - Message is null");
+        }
+        
+        // Try to inline conditional messages first
+        if (TryInlineConditional(node))
+        {
+            return null;
+        }
+        
         // Handle special super sends
         bool isSuper = node.Receiver is SuperLiteralNode;
         
@@ -252,8 +479,8 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         node.Receiver.Accept(this);
         
         // Get message details
-        var selector = node.Message.GetSelector();
-        var arguments = node.Message.GetArguments();
+        var selector = node.Message?.GetSelector() ?? "";
+        var arguments = node.Message?.GetArguments() ?? [];
         
         // Evaluate arguments
         foreach (var arg in arguments)
@@ -295,26 +522,28 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         
         try
         {
-            // Emit block creation bytecode
+            // Emit block creation bytecode sequence
             EmitPushBlock(node.Arguments.Length);
             
-            // Skip over block body
+            // Jump around block body (block creation leaves block on stack)
             var jumpIndex = EmitJump(0); // Will be fixed up
             
             // Mark block body start
-            blockContext.BodyStart = _bytecode.Count;
+            var blockStartPos = _bytecode.Count;
+            blockContext.BodyStart = blockStartPos;
             
             // Compile block body
             node.Body.Accept(this);
             
-            // Ensure block ends with return
+            // Ensure block ends with block return (bytecode 125)
             if (!IsReturnInstruction(_bytecode[^1]))
             {
-                EmitBlockReturn();
+                EmitBlockReturn(); // bytecode 125
             }
             
-            // Fix up jump to skip block body
-            FixupJump(jumpIndex, _bytecode.Count);
+            // Calculate block size and patch jump
+            var blockSize = _bytecode.Count - blockStartPos;
+            PatchBlockJump(jumpIndex, blockSize);
         }
         finally
         {
@@ -553,9 +782,22 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         
         if (location is null)
         {
-            // Assume global variable
-            EmitPushLiteral(new Symbol(variableName));
-            EmitSend("value", 0, false);
+            // Global variable - use Association and push its value directly
+            var association = new Association(variableName, null);
+            var literalIndex = CurrentScope?.AddLiteral(association) ?? 0;
+            
+            if (literalIndex < 32)
+            {
+                // Use bytecodes 64-95: Push Literal Variable (Association value)
+                EmitByte((byte)(64 + literalIndex));
+            }
+            else
+            {
+                // Extended push for literal variable
+                EmitByte(128); // extendedPushBytecode
+                EmitByte((byte)((2 << 6) | literalIndex)); // literal variable (Association value)
+            }
+            PushStack();
             return;
         }
         
@@ -589,8 +831,21 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
                 break;
                 
             case VariableType.Class:
-                EmitPushLiteral(new Association(variableName, null));
-                EmitSend("value", 0, false);
+                // Class variable - use Association and push its value directly
+                var classAssociation = new Association(variableName, null);
+                var classLiteralIndex = CurrentScope?.AddLiteral(classAssociation) ?? 0;
+                
+                if (classLiteralIndex < 32)
+                {
+                    // Use bytecodes 64-95: Push Literal Variable (Association value)
+                    EmitByte((byte)(64 + classLiteralIndex));
+                }
+                else
+                {
+                    // Extended push for literal variable
+                    EmitByte(128); // extendedPushBytecode
+                    EmitByte((byte)((2 << 6) | classLiteralIndex)); // literal variable (Association value)
+                }
                 break;
         }
         
@@ -603,9 +858,16 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         
         if (location is null)
         {
-            // Global variable - need special handling
-            EmitPushLiteral(new Symbol(variableName));
-            EmitSend("value:", 1, false);
+            // Global variable - use Association and extended store bytecode 130
+            var association = new Association(variableName, null);
+            var literalIndex = CurrentScope?.AddLiteral(association) ?? 0;
+            
+            // Use extended pop and store bytecode 130
+            EmitByte(130); // extendedStoreAndPopBytecode
+            EmitByte((byte)((2 << 6) | literalIndex)); // store into literal variable (Association)
+            
+            // Store pops the value
+            PopStack();
             return;
         }
         
@@ -636,6 +898,16 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
                     EmitByte(129); // extendedStoreBytecode
                     EmitByte((byte)((0 << 6) | index)); // temporary
                 }
+                break;
+                
+            case VariableType.Class:
+                // Class variable - use Association and extended store bytecode 130
+                var classAssociation = new Association(variableName, null);
+                var classLiteralIndex = CurrentScope?.AddLiteral(classAssociation) ?? 0;
+                
+                // Use extended pop and store bytecode 130
+                EmitByte(130); // extendedStoreAndPopBytecode
+                EmitByte((byte)((2 << 6) | classLiteralIndex)); // store into literal variable (Association)
                 break;
         }
         
@@ -768,45 +1040,408 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
 
     private void EmitPushBlock(int argCount)
     {
-        // Simplified block creation
-        EmitByte(143); // pushNewBlock (not standard, simplified)
-        EmitByte((byte)argCount);
+        // Proper block creation sequence for Smalltalk-80
+        // 1. Push Active Context (bytecode 137)
+        EmitByte(137); // pushActiveContext
         PushStack();
+        
+        // 2. Push argument count as literal
+        EmitPushSmallInteger(argCount);
+        
+        // 3. Send blockCopy: (special selector index 24)
+        // blockCopy: is at special selector index 24, which maps to bytecode 200
+        EmitByte(200); // send blockCopy:
+        
+        // Pop context and arg count, push block
+        PopStack(); // pop arg count
+        // Note: blockCopy: replaces the context on stack with the new block
+        // So we don't pop the context, just leave the block on the stack
     }
 
+    /// <summary>
+    /// Emits a forward jump instruction with placeholder bytes.
+    /// The actual jump distance will be patched later with FixupJump.
+    /// </summary>
+    /// <param name="distance">The initial distance estimate (0 for unknown).</param>
+    /// <returns>The position of the jump instruction for later fixup.</returns>
     private int EmitJump(int distance)
     {
         var position = _bytecode.Count;
         
-        if (distance < 8)
-        {
-            EmitByte((byte)(144 + distance)); // shortUnconditionalJump
-        }
-        else
-        {
-            EmitByte(164); // longUnconditionalJump
-            EmitByte((byte)((distance >> 8) & 0x07));
-            EmitByte((byte)(distance & 0xFF));
-        }
+        // Always emit 2-byte placeholder that can be patched later
+        // This simplifies fixup logic and handles all jump types
+        EmitByte(0);  // Placeholder for jump bytecode
+        EmitByte(0);  // Placeholder for parameter (if needed)
         
         return position;
     }
 
+    /// <summary>
+    /// Emits a conditional jump instruction that tests for FALSE.
+    /// Per the Blue Book, all conditional jumps test for FALSE.
+    /// </summary>
+    /// <param name="distance">The initial distance estimate (0 for unknown).</param>
+    /// <returns>The position of the jump instruction for later fixup.</returns>
+    private int EmitConditionalJump(int distance)
+    {
+        var position = _bytecode.Count;
+        
+        // Always emit 2-byte placeholder that can be patched later
+        // This simplifies fixup logic and handles all jump types
+        EmitByte(0);  // Placeholder for conditional jump bytecode
+        EmitByte(0);  // Placeholder for parameter (if needed)
+        
+        // Pop the boolean value being tested
+        PopStack();
+        
+        return position;
+    }
+
+    /// <summary>
+    /// Fixes up a conditional jump instruction with the actual distance.
+    /// Blue Book specification for conditional jumps (all test for FALSE):
+    /// - Short conditional jumps (152-159): For distances 1-8 bytes
+    /// - Medium conditional jump (168): For distances 9-256 bytes  
+    /// - Long conditional jumps (169-175): For distances > 256 bytes
+    /// </summary>
+    /// <param name="position">The position of the conditional jump instruction.</param>
+    /// <param name="target">The target position to jump to.</param>
+    private void FixupConditionalJump(int position, int target)
+    {
+        // We always reserve exactly 2 bytes for conditional jumps
+        // This simplifies the logic and avoids any byte shifting
+        const int reservedSize = 2;
+        
+        // Calculate the jump distance from after the reserved space
+        var distance = target - (position + reservedSize);
+        
+        // Validate distance
+        if (distance <= 0)
+        {
+            throw new InvalidOperationException($"Invalid conditional jump distance: {distance} from position {position} to {target}. Must be positive.");
+        }
+        
+        // Apply Blue Book conditional jump encoding specification
+        if (distance >= 1 && distance <= 8)
+        {
+            // Short conditional jumps: bytecodes 152-159 jump 1-8 bytes on false
+            // We have 2 bytes reserved, but only need 1 for short jump
+            // Solution: Adjust the jump distance and use padding
+            var adjustedDistance = target - (position + 1); // Jump from position+1
+            if (adjustedDistance >= 1 && adjustedDistance <= 8)
+            {
+                _bytecode[position] = (byte)(152 + (adjustedDistance - 1));
+                _bytecode[position + 1] = 135; // Pop - this will be skipped by the jump
+            }
+            else
+            {
+                // Distance doesn't fit in short jump, use medium jump
+                _bytecode[position] = 168;
+                _bytecode[position + 1] = (byte)(distance - 1);
+            }
+        }
+        else if (distance >= 9 && distance <= 256)
+        {
+            // Medium conditional jump: bytecode 168 with parameter
+            // Perfect fit for our 2-byte reservation
+            _bytecode[position] = 168;
+            _bytecode[position + 1] = (byte)(distance - 1);
+        }
+        else
+        {
+            // Long conditional jumps need more than 2 bytes
+            // For now, throw an error - we'd need to reserve more space initially
+            throw new NotImplementedException($"Long conditional jumps (distance > 256) not yet supported. Distance: {distance}");
+        }
+    }
+
+    /// <summary>
+    /// Handles fixup of long conditional jumps (greater than 256 bytes).
+    /// Blue Book specification: For distances > 256 bytes, choose minimal N (2-8)
+    /// such that distance - 1 fits in N bytes, then emit [167 + N, followed by
+    /// distance - 1 encoded as N-byte big-endian].
+    /// </summary>
+    private void FixupLongConditionalJump(int position, int distance)
+    {
+        // Blue Book specification for long conditional jumps:
+        // - Bytecodes 169-175 represent N = 2 to 8 bytes
+        // - Bytecode = 167 + N where N is the number of bytes needed
+        // - Followed by (distance - 1) encoded in N bytes, big-endian
+        
+        var adjustedDistance = distance - 1;
+        
+        // Determine minimal number of bytes N needed to encode adjustedDistance
+        int bytesNeeded;
+        if (adjustedDistance <= 0xFFFF)           // Fits in 2 bytes
+            bytesNeeded = 2;
+        else if (adjustedDistance <= 0xFFFFFF)    // Fits in 3 bytes
+            bytesNeeded = 3;
+        else                                       // Fits in 4 bytes (max for int)
+            bytesNeeded = 4;
+        
+        // Bytecode = 167 + N
+        _bytecode[position] = (byte)(167 + bytesNeeded);
+        
+        // Since we always allocate 2 bytes in EmitConditionalJump, and long jumps need more,
+        // we need to expand the bytecode list
+        if (bytesNeeded > 2)
+        {
+            // Insert additional bytes after position + 1
+            for (var i = 2; i < bytesNeeded; i++)
+            {
+                _bytecode.Insert(position + i, 0);
+            }
+        }
+        
+        // Encode adjustedDistance in big-endian format
+        for (var i = 0; i < bytesNeeded; i++)
+        {
+            var shift = 8 * (bytesNeeded - 1 - i);
+            _bytecode[position + 1 + i] = (byte)((adjustedDistance >> shift) & 0xFF);
+        }
+        
+        // If we only needed 2 bytes, we're done
+        // If we needed more, the insertion above handled it
+    }
+
+    /// <summary>
+    /// Fixes up a jump instruction with the actual distance.
+    /// Blue Book specification:
+    /// - Short jumps (144-151): For distances 1-8 bytes, emit single byte: 144 + (distance - 1)
+    /// - Medium jump (160): For distances 9-256 bytes, emit [160, distance - 1]
+    /// - Long jumps (161-167): For distances > 256 bytes using N-byte encoding
+    /// </summary>
+    /// <param name="position">The position of the jump instruction.</param>
+    /// <param name="target">The target position to jump to.</param>
     private void FixupJump(int position, int target)
     {
-        var distance = target - position - 1;
+        // We always reserve exactly 2 bytes for jumps
+        // This simplifies the logic and avoids any byte shifting
+        const int reservedSize = 2;
         
-        if (_bytecode[position] >= 144 && _bytecode[position] < 152)
+        // Calculate the jump distance from after the reserved space
+        var distance = target - (position + reservedSize);
+        
+        // Validate distance
+        if (distance <= 0)
         {
-            // Short jump
-            _bytecode[position] = (byte)(144 + Math.Min(distance, 7));
+            throw new InvalidOperationException($"Invalid jump distance: {distance} from position {position} to {target}. Must be positive.");
         }
-        else if (_bytecode[position] == 164)
+        
+        // Apply Blue Book jump encoding specification
+        if (distance >= 1 && distance <= 8)
         {
-            // Long jump
-            _bytecode[position + 1] = (byte)((distance >> 8) & 0x07);
-            _bytecode[position + 2] = (byte)(distance & 0xFF);
+            // Short jumps: bytecodes 144-151 jump 1-8 bytes
+            // We have 2 bytes reserved, but only need 1 for short jump
+            // Solution: Use a short jump followed by a no-op (bytecode 135 = pop, then push nil)
+            _bytecode[position] = (byte)(144 + (distance - 1));
+            _bytecode[position + 1] = 115; // Push nil - harmless padding that maintains stack
+            
+            // Actually, for proper behavior, we should adjust the jump to account for the padding
+            // The jump should skip over our padding byte
+            var adjustedDistance = target - (position + 1); // Jump from position+1 (after the jump byte itself)
+            if (adjustedDistance >= 1 && adjustedDistance <= 8)
+            {
+                _bytecode[position] = (byte)(144 + (adjustedDistance - 1));
+                _bytecode[position + 1] = 135; // Pop - this will be skipped by the jump
+            }
+            else
+            {
+                // Distance doesn't fit in short jump after adjustment, use medium jump
+                _bytecode[position] = 160;
+                _bytecode[position + 1] = (byte)(distance - 1);
+            }
         }
+        else if (distance >= 9 && distance <= 256)
+        {
+            // Medium jump: bytecode 160 with parameter
+            // Perfect fit for our 2-byte reservation
+            _bytecode[position] = 160;
+            _bytecode[position + 1] = (byte)(distance - 1);
+        }
+        else
+        {
+            // Long jumps need more than 2 bytes
+            // For now, throw an error - we'd need to reserve more space initially
+            throw new NotImplementedException($"Long jumps (distance > 256) not yet supported. Distance: {distance}");
+        }
+    }
+    
+    /// <summary>
+    /// Adjusts jump targets after a change in bytecode size.
+    /// </summary>
+    /// <param name="position">The position where the size changed.</param>
+    /// <param name="delta">The change in size (negative for removal, positive for insertion).</param>
+    private void AdjustJumpTargetsAfterSizeChange(int position, int delta)
+    {
+        // Adjust block contexts
+        foreach (var context in _blockContexts)
+        {
+            if (context.StartPosition > position)
+                context.StartPosition += delta;
+            if (context.BodyStart > position)
+                context.BodyStart += delta;
+        }
+        
+        // Note: We should also track and adjust other jump positions if needed
+        // This would require maintaining a list of all jump positions
+    }
+    
+    /// <summary>
+    /// Patches a block jump with the actual block size.
+    /// This is called after compiling the block body to fix the jump distance.
+    /// </summary>
+    /// <param name="position">Position of the jump placeholder</param>
+    /// <param name="blockSize">Size of the block body in bytes</param>
+    private void PatchBlockJump(int position, int blockSize)
+    {
+        // Validate input
+        if (blockSize <= 0)
+        {
+            throw new InvalidOperationException($"Invalid block size: {blockSize}. Must be positive.");
+        }
+        
+        // Apply Blue Book jump encoding specification
+        switch (blockSize)
+        {
+            case >= 1 and <= 8:
+                // Short jumps: bytecodes 144-151 jump 1-8 bytes
+                // Bytecode = 144 + (blockSize - 1)
+                _bytecode[position] = (byte)(144 + (blockSize - 1));
+                // Remove the placeholder parameter byte
+                _bytecode.RemoveAt(position + 1);
+                break;
+                
+            case >= 9 and <= 256:
+                // Medium jump: bytecode 160 with parameter
+                // For distances 9-256, parameter = blockSize - 1
+                _bytecode[position] = 160;
+                _bytecode[position + 1] = (byte)(blockSize - 1);
+                break;
+                
+            case > 256:
+                // Long jumps: bytecodes 161-167
+                PatchLongJump(position, blockSize);
+                break;
+        }
+    }
+    
+    /// <summary>
+    /// Patches a long jump instruction for blocks > 256 bytes.
+    /// </summary>
+    private void PatchLongJump(int position, int blockSize)
+    {
+        // Choose minimal N (2-8 bytes) such that blockSize - 1 fits
+        var value = blockSize - 1;
+        int operandBytes = GetMinimalByteCount(value);
+        
+        // Bytecode = 159 + N where N is operand byte count (2-8)
+        if (operandBytes < 2) operandBytes = 2; // Minimum for long jump
+        if (operandBytes > 8)
+        {
+            throw new NotSupportedException($"Block too large ({blockSize} bytes). Maximum jump is 2^64-1 bytes.");
+        }
+        
+        // We currently have a 2-byte placeholder
+        // We need 1 byte for opcode + operandBytes for the operand
+        var neededSize = 1 + operandBytes;
+        
+        if (neededSize > 2)
+        {
+            // Need to expand the bytecode array
+            var extraBytes = neededSize - 2;
+            for (int i = 0; i < extraBytes; i++)
+            {
+                _bytecode.Insert(position + 2, 0);
+            }
+        }
+        
+        // Set the opcode
+        _bytecode[position] = (byte)(159 + operandBytes);
+        
+        // Encode the value as big-endian
+        for (int i = operandBytes - 1; i >= 0; i--)
+        {
+            _bytecode[position + 1 + i] = (byte)(value & 0xFF);
+            value >>= 8;
+        }
+    }
+    
+    /// <summary>
+    /// Gets the minimal number of bytes needed to encode a value.
+    /// </summary>
+    private int GetMinimalByteCount(int value)
+    {
+        if (value <= 0xFF) return 1;
+        if (value <= 0xFFFF) return 2;
+        if (value <= 0xFFFFFF) return 3;
+        if (value <= 0x7FFFFFFF) return 4;
+        // For larger values, we'd need 5-8 bytes
+        // But for practical Smalltalk code, 4 bytes is enough
+        return 4;
+    }
+    
+    /// <summary>
+    /// Handles fixup of long jumps (greater than 256 bytes).
+    /// Blue Book specification: For distances > 256 bytes, choose minimal N (2-8)
+    /// such that distance - 1 fits in N bytes, then emit [159 + N, followed by
+    /// distance - 1 encoded as N-byte big-endian].
+    /// </summary>
+    private void FixupLongJump(int position, int distance)
+    {
+        // Blue Book specification for long jumps:
+        // - Bytecodes 161-167 represent N = 2 to 8 bytes
+        // - Bytecode = 159 + N where N is the number of bytes needed
+        // - Followed by (distance - 1) encoded in N bytes, big-endian
+        
+        var adjustedDistance = distance - 1;
+        
+        // Determine minimal number of bytes N needed to encode adjustedDistance
+        int bytesNeeded;
+        if (adjustedDistance <= 0xFFFF)           // Fits in 2 bytes
+            bytesNeeded = 2;
+        else if (adjustedDistance <= 0xFFFFFF)    // Fits in 3 bytes
+            bytesNeeded = 3;
+        else                                       // Fits in 4 bytes (max for int)
+            bytesNeeded = 4;
+        
+        // Bytecode = 159 + N
+        _bytecode[position] = (byte)(159 + bytesNeeded);
+        
+        // Since we always allocate 2 bytes in EmitJump, and long jumps need more,
+        // we need to expand the bytecode list
+        if (bytesNeeded > 2)
+        {
+            // Insert additional bytes after position + 1
+            for (var i = 2; i < bytesNeeded; i++)
+            {
+                _bytecode.Insert(position + i, 0);
+            }
+        }
+        
+        // Encode adjustedDistance in big-endian format
+        for (var i = 0; i < bytesNeeded; i++)
+        {
+            var shift = 8 * (bytesNeeded - 1 - i);
+            _bytecode[position + 1 + i] = (byte)((adjustedDistance >> shift) & 0xFF);
+        }
+        
+        // If we only needed 2 bytes, we're done
+        // If we needed more, the insertion above handled it
+    }
+    
+    /// <summary>
+    /// Determines if a bytecode position contains a jump parameter.
+    /// </summary>
+    private bool IsJumpParameter(int position)
+    {
+        // Check if the previous byte is a jump instruction that takes a parameter
+        if (position > 0)
+        {
+            var prevByte = _bytecode[position - 1];
+            return prevByte is >= 160 and <= 167; // Medium and long jumps
+        }
+        return false;
     }
 
     #endregion
@@ -888,6 +1523,362 @@ public sealed class BytecodeGenerator : IAstVisitor<object?>
         ArrayLiteralNode arr => arr.Elements.Select(ConvertToLiteral).ToArray(),
         _ => throw new InvalidOperationException($"Cannot convert {node.GetType().Name} to literal")
     };
+
+    #endregion
+
+    #region Conditional Inlining Methods
+
+    /// <summary>
+    /// Checks if a selector is a conditional message that can be inlined.
+    /// </summary>
+    /// <param name="selector">The message selector.</param>
+    /// <returns>True if the selector is ifTrue:, ifFalse:, or ifTrue:ifFalse:.</returns>
+    private static bool IsConditionalSelector(string selector)
+    {
+        var result = selector is "ifTrue:" or "ifFalse:" or "ifTrue:ifFalse:" or "ifFalse:ifTrue:";
+        Console.WriteLine($"[DEBUG] IsConditionalSelector: selector='{selector}' -> result={result}");
+        return result;
+    }
+
+    /// <summary>
+    /// Checks if a block can be inlined for conditional compilation.
+    /// A block can be inlined if:
+    /// - It has no arguments
+    /// - It's a literal block (not a variable reference)
+    /// - It contains no non-local returns (^)
+    /// </summary>
+    /// <param name="expression">The expression to check.</param>
+    /// <returns>True if the block can be inlined.</returns>
+    private static bool CanInlineBlock(ExpressionNode expression)
+    {
+        Console.WriteLine($"[DEBUG] CanInlineBlock: expression type={expression?.GetType().Name ?? "null"}");
+        
+        if (expression is not BlockNode block)
+        {
+            Console.WriteLine($"[DEBUG] CanInlineBlock: Not a BlockNode, returning false");
+            return false;
+        }
+        
+        // Block must have no arguments
+        if (block.Arguments.Length > 0)
+        {
+            Console.WriteLine($"[DEBUG] CanInlineBlock: Block has {block.Arguments.Length} arguments, returning false");
+            return false;
+        }
+        
+        // Check for non-local returns
+        var hasNonLocalReturn = ContainsNonLocalReturn(block);
+        if (hasNonLocalReturn)
+        {
+            Console.WriteLine($"[DEBUG] CanInlineBlock: Block contains non-local return, returning false");
+            return false;
+        }
+        
+        Console.WriteLine($"[DEBUG] CanInlineBlock: Block can be inlined, returning true");
+        return true;
+    }
+
+    /// <summary>
+    /// Recursively checks if a block or any nested blocks contain non-local returns.
+    /// </summary>
+    /// <param name="block">The block to check.</param>
+    /// <returns>True if the block contains a non-local return.</returns>
+    private static bool ContainsNonLocalReturn(BlockNode block)
+    {
+        return ContainsReturnInStatements(block.Body);
+    }
+
+    /// <summary>
+    /// Recursively checks statements for return statements.
+    /// </summary>
+    private static bool ContainsReturnInStatements(StatementListNode statements)
+    {
+        foreach (var statement in statements.Statements)
+        {
+            if (ContainsReturnInStatement(statement))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks a single statement for returns, recursing into nested structures.
+    /// </summary>
+    private static bool ContainsReturnInStatement(StatementNode statement)
+    {
+        // Direct return statement
+        if (statement is ReturnStatementNode)
+            return true;
+        
+        // Check expression statements for nested blocks
+        if (statement is ExpressionStatementNode exprStmt)
+        {
+            return ContainsReturnInExpression(exprStmt.Expression);
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Checks an expression for returns, particularly in nested blocks.
+    /// </summary>
+    private static bool ContainsReturnInExpression(ExpressionNode expression)
+    {
+        switch (expression)
+        {
+            case BlockNode block:
+                return ContainsNonLocalReturn(block);
+            
+            case MessageSendNode send:
+                // Check receiver
+                if (ContainsReturnInExpression(send.Receiver))
+                    return true;
+                // Check arguments
+                foreach (var arg in send.Message.GetArguments())
+                {
+                    if (ContainsReturnInExpression(arg))
+                        return true;
+                }
+                return false;
+            
+            case CascadeNode cascade:
+                // Check receiver
+                if (ContainsReturnInExpression(cascade.Receiver))
+                    return true;
+                // Check message arguments
+                foreach (var message in cascade.Messages)
+                {
+                    foreach (var arg in message.GetArguments())
+                    {
+                        if (ContainsReturnInExpression(arg))
+                            return true;
+                    }
+                }
+                return false;
+            
+            case AssignmentNode assignment:
+                return ContainsReturnInExpression(assignment.Value);
+            
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to inline a conditional message send.
+    /// </summary>
+    /// <param name="node">The message send node.</param>
+    /// <returns>True if the message was inlined, false otherwise.</returns>
+    private bool TryInlineConditional(MessageSendNode node)
+    {
+        var selector = node.Message.GetSelector();
+        Console.WriteLine($"[DEBUG] TryInlineConditional: selector='{selector}', receiver type={node.Receiver.GetType().Name}");
+        
+        if (!IsConditionalSelector(selector))
+        {
+            Console.WriteLine($"[DEBUG] TryInlineConditional: Not a conditional selector, returning false");
+            return false;
+        }
+        
+        // Can't inline super sends
+        if (node.Receiver is SuperLiteralNode)
+        {
+            Console.WriteLine($"[DEBUG] TryInlineConditional: Receiver is super, can't inline, returning false");
+            return false;
+        }
+        
+        var arguments = node.Message.GetArguments();
+        Console.WriteLine($"[DEBUG] TryInlineConditional: Got {arguments.Length} arguments");
+        
+        bool result = selector switch
+        {
+            "ifTrue:" => TryInlineIfTrue(node.Receiver, arguments[0]),
+            "ifFalse:" => TryInlineIfFalse(node.Receiver, arguments[0]),
+            "ifTrue:ifFalse:" => TryInlineIfTrueIfFalse(node.Receiver, arguments[0], arguments[1]),
+            "ifFalse:ifTrue:" => TryInlineIfTrueIfFalse(node.Receiver, arguments[1], arguments[0]), // Note: arguments swapped
+            _ => false
+        };
+        
+        Console.WriteLine($"[DEBUG] TryInlineConditional: Inlining result={result} for selector '{selector}'");
+        return result;
+    }
+
+    /// <summary>
+    /// Attempts to inline an ifTrue: message.
+    /// Compiles: receiver ifTrue: [trueBlock]
+    /// As: compile receiver, jump-on-false over block, inline block body
+    /// </summary>
+    private bool TryInlineIfTrue(ExpressionNode receiver, ExpressionNode trueBlock)
+    {
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Checking if block can be inlined");
+        if (!CanInlineBlock(trueBlock))
+        {
+            Console.WriteLine($"[DEBUG] TryInlineIfTrue: Block cannot be inlined, returning false");
+            return false;
+        }
+        
+        var block = (BlockNode)trueBlock;
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Inlining ifTrue: block");
+        
+        // Compile the receiver (test expression)
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Compiling receiver expression");
+        receiver.Accept(this);
+        
+        // Emit conditional jump on false (skips the true block)
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Emitting conditional jump at position {_bytecode.Count}");
+        var jumpPosition = EmitConditionalJump(0);
+        
+        // Inline the true block body
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Inlining block body at position {_bytecode.Count}");
+        block.Body.Accept(this);
+        
+        // Fix up the jump to skip over the inlined block
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Fixing up jump from position {jumpPosition} to {_bytecode.Count}");
+        FixupConditionalJump(jumpPosition, _bytecode.Count);
+        
+        Console.WriteLine($"[DEBUG] TryInlineIfTrue: Successfully inlined ifTrue: block");
+        return true;
+    }
+
+    /// <summary>
+    /// Attempts to inline an ifFalse: message.
+    /// Compiles: receiver ifFalse: [falseBlock]
+    /// As: compile receiver, send 'not', jump-on-false to skip block, inline block body
+    /// </summary>
+    private bool TryInlineIfFalse(ExpressionNode receiver, ExpressionNode falseBlock)
+    {
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Checking if block can be inlined");
+        if (!CanInlineBlock(falseBlock))
+        {
+            Console.WriteLine($"[DEBUG] TryInlineIfFalse: Block cannot be inlined, returning false");
+            return false;
+        }
+        
+        var block = (BlockNode)falseBlock;
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Inlining ifFalse: block");
+        
+        // Compile the receiver (test expression)
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Compiling receiver expression");
+        receiver.Accept(this);
+        
+        // For ifFalse:, we need to negate the condition
+        // Send the 'not' message to the boolean on the stack
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Sending 'not' message to negate condition");
+        
+        // Send 'not' as a regular message (no special bytecode for 'not')
+        var notLiteralIndex = CurrentScope?.AddLiteral(new Symbol("not")) ?? 0;
+        if (notLiteralIndex < 16)
+        {
+            // Send literal selector with no arguments (208-223)
+            EmitByte((byte)(208 + notLiteralIndex));
+        }
+        else if (notLiteralIndex < 32)
+        {
+            // Extended send for larger literal indices
+            EmitByte(131); // Send literal selector with arguments
+            EmitByte((byte)notLiteralIndex); // 0 args in high bits, literal index in low bits
+        }
+        else
+        {
+            // Extended send for even larger indices
+            EmitByte(132); // Extended send
+            EmitByte(0); // 0 arguments
+            EmitByte((byte)notLiteralIndex);
+        }
+        
+        // Now emit conditional jump on false (which now tests the negated value)
+        var jumpOverPosition = EmitConditionalJump(0);
+        
+        // Mark where false block starts
+        var falseBlockStart = _bytecode.Count;
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: False block starts at position {falseBlockStart}");
+        
+        // Inline the false block body
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Inlining false block body");
+        block.Body.Accept(this);
+        
+        // Fix up the jump to skip the false block
+        var endPosition = _bytecode.Count;
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Fixing up jump from {jumpOverPosition} to {endPosition}");
+        FixupConditionalJump(jumpOverPosition, endPosition);
+        
+        Console.WriteLine($"[DEBUG] TryInlineIfFalse: Successfully inlined ifFalse: block");
+        return true;
+    }
+
+    /// <summary>
+    /// Attempts to inline an ifTrue:ifFalse: message.
+    /// Compiles: receiver ifTrue: [trueBlock] ifFalse: [falseBlock]
+    /// As: compile receiver, jump-on-false to else, inline then block, jump over else, inline else block
+    /// </summary>
+    private bool TryInlineIfTrueIfFalse(ExpressionNode receiver, ExpressionNode trueBlock, ExpressionNode falseBlock)
+    {
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Checking if blocks can be inlined");
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Checking trueBlock...");
+        var canInlineTrue = CanInlineBlock(trueBlock);
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Checking falseBlock...");
+        var canInlineFalse = CanInlineBlock(falseBlock);
+        
+        if (!canInlineTrue || !canInlineFalse)
+        {
+            Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Cannot inline (true={canInlineTrue}, false={canInlineFalse}), returning false");
+            return false;
+        }
+        
+        var thenBlock = (BlockNode)trueBlock;
+        var elseBlock = (BlockNode)falseBlock;
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Inlining ifTrue:ifFalse: blocks");
+        
+        // Compile the receiver (test expression)
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Compiling receiver expression");
+        receiver.Accept(this);
+        
+        // Emit conditional jump on false to the else block
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Emitting conditional jump to else at position {_bytecode.Count}");
+        var jumpToElsePosition = EmitConditionalJump(0);
+        
+        // Inline the then block body
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Inlining true block body at position {_bytecode.Count}");
+        thenBlock.Body.Accept(this);
+        
+        // Only emit jump over else block if there's actually an else block to skip
+        int? jumpOverElsePosition = null;
+        var afterThenPosition = _bytecode.Count;
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: True block ended at position {afterThenPosition}");
+        
+        // Check if we need to skip the else block (only if else block generates bytecode)
+        var elseStartPosition = _bytecode.Count;
+        
+        // We need to emit the jump before the else block but only if the else block isn't empty
+        // Save current position to check after compiling else block
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Emitting jump over else block at position {_bytecode.Count}");
+        jumpOverElsePosition = EmitJump(0);
+        
+        // Mark where else block starts (after the jump)
+        var elseBlockStart = _bytecode.Count;
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Else block starts at position {elseBlockStart}");
+        
+        // Inline the else block body
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Inlining false block body");
+        elseBlock.Body.Accept(this);
+        
+        var elseBlockEnd = _bytecode.Count;
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Else block ended at position {elseBlockEnd}");
+        
+        // Fix up the jumps
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Fixing up conditional jump from {jumpToElsePosition} to {elseBlockStart}");
+        FixupConditionalJump(jumpToElsePosition, elseBlockStart);
+        
+        // Only fix the jump over else if the else block isn't empty
+        if (jumpOverElsePosition.HasValue)
+        {
+            Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Fixing up jump over else from {jumpOverElsePosition.Value} to {elseBlockEnd}");
+            FixupJump(jumpOverElsePosition.Value, elseBlockEnd);
+        }
+        
+        Console.WriteLine($"[DEBUG] TryInlineIfTrueIfFalse: Successfully inlined ifTrue:ifFalse: blocks");
+        return true;
+    }
 
     #endregion
 

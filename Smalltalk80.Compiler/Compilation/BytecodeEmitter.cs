@@ -9,7 +9,6 @@ public sealed class BytecodeEmitter
 {
     private readonly List<byte> _bytecode = new();
     private readonly List<object> _literals = new();
-    private readonly Dictionary<object, int> _literalMap = new();
     private readonly Stack<int> _stackDepth = new();
     private int _currentStackDepth;
     private int _maxStackDepth;
@@ -48,7 +47,6 @@ public sealed class BytecodeEmitter
     {
         _bytecode.Clear();
         _literals.Clear();
-        _literalMap.Clear();
         _stackDepth.Clear();
         _currentStackDepth = 0;
         _maxStackDepth = 0;
@@ -69,25 +67,54 @@ public sealed class BytecodeEmitter
     /// </summary>
     public int AddLiteral(object literal)
     {
-        var key = GetLiteralKey(literal);
-        if (_literalMap.TryGetValue(key, out int index))
-            return index;
+        // Check for existing literal using semantic equality
+        for (int i = 0; i < _literals.Count; i++)
+        {
+            if (LiteralsEqual(_literals[i], literal))
+                return i;
+        }
 
-        index = _literals.Count;
+        // Add new literal
+        var index = _literals.Count;
         _literals.Add(literal);
-        _literalMap[key] = index;
         return index;
     }
 
-    private object GetLiteralKey(object literal)
+    /// <summary>
+    /// Compares two literals for semantic equality.
+    /// </summary>
+    private static bool LiteralsEqual(object? a, object? b)
     {
-        if (literal is Symbol sym)
-            return $"symbol:{sym.Name}";
-        if (literal is Association assoc)
-            return $"assoc:{assoc.Key}";
-        if (literal is object[] array)
-            return $"array:{array.GetHashCode()}";
-        return literal;
+        if (a == null || b == null) return a == b;
+        
+        // Compare Symbols by their Name
+        if (a is Symbol symA && b is Symbol symB)
+            return symA.Name == symB.Name;
+        
+        // Compare Associations by their Key
+        if (a is Association assocA && b is Association assocB)
+            return assocA.Key == assocB.Key;
+        
+        // Compare arrays element by element
+        if (a is object[] arrayA && b is object[] arrayB)
+        {
+            if (arrayA.Length != arrayB.Length)
+                return false;
+            for (int i = 0; i < arrayA.Length; i++)
+            {
+                if (!LiteralsEqual(arrayA[i], arrayB[i]))
+                    return false;
+            }
+            return true;
+        }
+        
+        // For primitive types, use standard equality
+        if (a is string strA && b is string strB) return strA == strB;
+        if (a is int intA && b is int intB) return intA == intB;
+        if (a is bool boolA && b is bool boolB) return boolA == boolB;
+        
+        // Default to standard equality
+        return a.Equals(b);
     }
 
     // Stack management
