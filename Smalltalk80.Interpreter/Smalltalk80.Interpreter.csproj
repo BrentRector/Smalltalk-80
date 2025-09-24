@@ -1,52 +1,26 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Smalltalk80.Interpreter</RootNamespace>
-    <AssemblyName>Smalltalk80.Interpreter</AssemblyName>
+    <!-- Suppress CS0618 for obsolete DebugOptions usage until VirtualMachine migration is complete -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta5.25277.114" />
   </ItemGroup>
-
+  
   <ItemGroup>
-    <Compile Remove="Backup\**" />
-    <EmbeddedResource Remove="Backup\**" />
-    <None Remove="Backup\**" />
+    <ProjectReference Include="..\Core\Core.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj" />
   </ItemGroup>
-
-  <!-- Copy system_image.json to output directory -->
-  <ItemGroup>
-    <None Include="..\system_image.json" CopyToOutputDirectory="PreserveNewest" Link="system_image.json" />
-  </ItemGroup>
-
-  <!-- Optional: Regenerate system_image.json when needed -->
-  <!-- To regenerate, run: dotnet msbuild /t:RegenerateSystemImage -->
-  <Target Name="RegenerateSystemImage">
-    <PropertyGroup>
-      <CompilerPath>$(ProjectDir)..\StandaloneCompiler\bin\$(Configuration)\$(TargetFramework)\StandaloneCompiler.exe</CompilerPath>
-      <SourcePath>$(ProjectDir)..\Smalltalk80\Smalltalk-80 Source\Smalltalk-80.st</SourcePath>
-      <OutputPath>$(ProjectDir)..\system_image.json</OutputPath>
-    </PropertyGroup>
-    
-    <Message Text="Regenerating system_image.json from source..." Importance="high" />
-    
-    <!-- Build the StandaloneCompiler first -->
-    <MSBuild Projects="..\StandaloneCompiler\StandaloneCompiler.csproj" Targets="Build" />
-    
-    <!-- Run the StandaloneCompiler to generate system_image.json -->
-    <Exec Command="&quot;$(CompilerPath)&quot; &quot;$(SourcePath)&quot; &quot;$(OutputPath)&quot;" 
-          ConsoleToMSBuild="true"
-          ContinueOnError="false">
-      <Output TaskParameter="ExitCode" PropertyName="CompilerExitCode" />
-    </Exec>
-    
-    <Message Text="Successfully regenerated system_image.json" Importance="high" Condition="'$(CompilerExitCode)' == '0'" />
-    <Error Text="Failed to regenerate system_image.json" Condition="'$(CompilerExitCode)' != '0'" />
-  </Target>
 
 </Project>

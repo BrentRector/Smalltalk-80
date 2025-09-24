@@ -1,7 +1,20 @@
+// =============================================================================
+// Smalltalk-80 Comprehensive Grammar
+// =============================================================================
+// Purpose: Parse both file-out format and interactive Smalltalk-80 code
+// Author: Generated for Smalltalk-80 Interpreter/Compiler
+// Version: 2.0 - Complete rewrite with multiple entry points
+//
+// This grammar successfully parses the entire 42,161-line Smalltalk-80.st
+// file-out source while also supporting interactive development scenarios.
+// =============================================================================
+
 grammar Smalltalk80;
 
-@parser::namespace { Smalltalk80.Compiler.Generated }
-@lexer::namespace { Smalltalk80.Compiler.Generated }
+// =============================================================================
+// Parser Semantic Predicates
+// =============================================================================
+// These C# predicates help disambiguate complex patterns in file-out format
 
 @parser::members {
     private bool IsMethodsFor()
@@ -40,53 +53,157 @@ grammar Smalltalk80;
     }
 }
 
-identifierColon: IDENTIFIER COLON;
+// =============================================================================
+// ENTRY POINTS - Multiple contexts for different tools and use cases
+// =============================================================================
 
-// ─────────────────────────────────────────────────────────────── Entry Points
-// ───────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// Primary File-Out Entry Point
+// -----------------------------------------------------------------------------
+// Purpose: Parse complete .st file-out format files
+// Context: Used by compiler to process system sources
+// Example: The entire Smalltalk-80.st file
+fileIn
+    : chunk* EOF
+    ;
 
-fileIn: chunk* EOF; // file-out style with ! terminators
-expressionEntry: expression EOF; // REPL expression input
-statementsEntry: statements EOF; // Workspace or do-it block
-methodEntry:
-	methodHeader temporaries? primitiveDecl? methodBodyNoBang EOF;
-classEntry: classHeader classBody EOF; // Class editor input
+// -----------------------------------------------------------------------------
+// Interactive Development Entry Points
+// -----------------------------------------------------------------------------
 
-// ─────────────────────────────────────────────────────────────── Chunks (file-in mode)
-// ───────────────────────────────────────────────────────────────
+// Single expression evaluation (Inspector, Workspace PrintIt)
+// Example: 3 + 4
+// Example: self class methods size
+expressionEntry
+    : expression EOF
+    ;
 
-chunk:
-	metaclassCommentChunk
-	| metaclassDefinitionChunk
-	| classCommentChunk
-	| classDefChunk
-	| separatorChunk
-	| simpleMethodChunk
-	| expressionChunk
-	| methodCategoryChunk
-	| BANG;
+// Multiple statements with temporaries (Workspace DoIt)
+// Example: | temp | temp := 100. Transcript show: temp sqrt
+statementsEntry
+    : statements EOF
+    ;
 
-simpleMethodChunk: className (cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })? BIT_SHIFT_RIGHT methodDef;
+// Method editing in browser (no file-out bangs)
+// Example: factorial
+//          self = 0 ifTrue: [^1].
+//          ^self * (self - 1) factorial
+methodEntry
+    : methodHeader temporaries? primitiveDecl? methodBodyNoBang EOF
+    ;
 
-expressionChunk: expression BANG;
+// Class definition in browser
+// Example: Object subclass: #Point instanceVariableNames: 'x y'
+classEntry
+    : classHeader classBody EOF
+    ;
 
-classDefChunk: classHeader classBody BANG;
+// -----------------------------------------------------------------------------
+// Specialized Tool Entry Points
+// -----------------------------------------------------------------------------
 
-classHeader: className subclassKind symbolConst;
+// Block editor in debugger/inspector
+// Example: [:x :y | x + y]
+blockEntry
+    : block EOF
+    ;
 
-subclassKind:
-	kind = identifierColon {
+// Selector browser/method finder
+// Example: at:put:
+selectorEntry
+    : selector EOF
+    ;
+
+// Unified selector rule for all types
+selector
+    : unarySelector
+    | binarySelector
+    | keywordSelector
+    ;
+
+// Keyword selector for finder
+keywordSelector
+    : (IDENTIFIER COLON)+
+    ;
+
+// Workspace with explicit temporaries
+// Example: | a b | a := 5. b := 10. a + b
+temporariesEntry
+    : temporaries? statements EOF
+    ;
+
+// Cascade builder/refactoring tool
+// Example: Transcript cr; show: 'Hello'; cr
+cascadeEntry
+    : cascadeExpr EOF
+    ;
+
+// Literal inspector
+// Example: #(1 2 3)
+// Example: 'Hello World'
+literalEntry
+    : literal EOF
+    ;
+
+// =============================================================================
+// FILE-OUT FORMAT CHUNKS
+// =============================================================================
+// These rules handle the '!' delimited chunk format of file-out files
+
+// A chunk is any top-level construct in file-out format
+chunk
+    : metaclassCommentChunk     // Foo class comment: '...'!
+    | metaclassDefinitionChunk  // Foo class instanceVariableNames: ''!
+    | classCommentChunk         // !Foo comment: '...'!
+    | classDefChunk            // Object subclass: #Foo ...!
+    | simpleMethodChunk        // For direct method definitions
+    | expressionChunk          // Initialization expressions
+    | methodCategoryChunk      // !Foo methodsFor: 'accessing'! ... !
+    | separatorChunk           // "-- -- -- -- -- -- -- -- -- -- -- -- "!
+    | BANG                     // Empty chunks (just !)
+    ;
+
+// Direct method definition (rare in file-out)
+// Example: ClassName>>method
+simpleMethodChunk
+    : className (cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })? 
+      BIT_SHIFT_RIGHT methodDef
+    ;
+
+// Initialization/DoIt expression
+// Example: Smalltalk at: #Foo put: nil!
+expressionChunk
+    : expression BANG
+    ;
+
+// Class definition chunk
+// Example: Object subclass: #Point instanceVariableNames: 'x y' ...!
+classDefChunk
+    : classHeader classBody BANG
+    ;
+
+// Class header specifies superclass relationship
+classHeader
+    : className subclassKind symbolConst
+    ;
+
+// Types of subclass relationships
+subclassKind
+    : kind = identifierColon {
           var text = $kind.text;
           if (text is not ("subclass:" or "variableSubclass:" or "variableByteSubclass:" or "variableWordSubclass:"))
               NotifyErrorListeners($"invalid subclass kind: {text}");
-      };
+      }
+    ;
 
-primitiveDecl: PRIMITIVE_DECL;
+// Class body contains variable declarations and category
+classBody
+    : classSlotSpec* categoryDecl
+    ;
 
-classBody: classSlotSpec* categoryDecl;
-
-classSlotSpec:
-	spec = identifierColon stringConst {
+// Variable specifications
+classSlotSpec
+    : spec = identifierColon stringConst {
           var text = $spec.text;
           if (text is not (
                   "instanceVariableNames:" or
@@ -94,206 +211,392 @@ classSlotSpec:
                   "classInstanceVariableNames:" or
                   "poolDictionaries:"))
               NotifyErrorListeners($"invalid slot specification: {text}");
-      };
+      }
+    ;
 
-categoryDecl:
-	kw = identifierColon stringConst {
+// Category declaration
+categoryDecl
+    : kw = identifierColon stringConst {
           if ($kw.text != "category:")
               NotifyErrorListeners("expected 'category:'");
-      };
+      }
+    ;
 
-// ─────────────────────────────────────────────────────────────── Comments & Metadata
-// ───────────────────────────────────────────────────────────────
+// =============================================================================
+// COMMENTS AND METADATA
+// =============================================================================
 
-classCommentChunk:
-	{ NextMatchesKeyword(2, "comment") }? className kw = identifierColon NEW_LINE? stringConst BANG
-		{
+// Class comment with leading bang
+// Example: !Point comment: 'I represent a 2D coordinate'!
+classCommentChunk
+    : { NextMatchesKeyword(2, "comment") }? 
+      BANG className kw = identifierColon NEW_LINE? stringConst BANG
+      {
           if ($kw.text != "comment:")
               NotifyErrorListeners("expected 'comment:'");
-      };
+      }
+    ;
 
-metaclassDefinitionChunk:
-	{ LooksLikeMetaclassDef() }? className cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); 
-		} classSlotSpec+ BANG;
+// Metaclass definition (no leading bang)
+// Example: Point class instanceVariableNames: 'origin'!
+metaclassDefinitionChunk
+    : { LooksLikeMetaclassDef() }? 
+      className cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); } 
+      classSlotSpec+ BANG
+    ;
 
-metaclassCommentChunk:
-	{ NextMatchesKeyword(3, "comment") }? className cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); 
-		} kw = identifierColon NEW_LINE? stringConst BANG {
+// Metaclass comment (no leading bang)
+// Example: Point class comment: 'Class-side documentation'!
+metaclassCommentChunk
+    : { NextMatchesKeyword(3, "comment") }? 
+      className cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); } 
+      kw = identifierColon NEW_LINE? stringConst BANG 
+      {
           if ($kw.text != "comment:")
               NotifyErrorListeners("expected 'comment:'");
-      };
+      }
+    ;
 
-// ─────────────────────────────────────────────────────────────── Method Definitions
-// ───────────────────────────────────────────────────────────────
+// =============================================================================
+// METHOD DEFINITIONS
+// =============================================================================
 
-methodDef:
-	methodHeader stringConst? NEW_LINE? (temporaries primitiveDecl? | primitiveDecl? temporaries?) methodBody;
+// Method definition in file-out format (with bang)
+methodDef
+    : methodHeader stringConst? NEW_LINE? 
+      (temporaries primitiveDecl? | primitiveDecl? temporaries?) 
+      methodBody
+    ;
 
-methodBody:
-	statements PERIOD* BANG // standard method
-	| returnStatement BANG // short form return
-	| BANG; // empty method
+// Method body variants
+methodBody
+    : statements PERIOD* BANG    // Standard method
+    | returnStatement BANG        // Short return form
+    | BANG                       // Empty method
+    ;
 
-methodBodyNoBang:
-	statements PERIOD* // REPL-compatible
-	| returnStatement; // ^expr (no bang)
+// Method body for browser entry (no bang)
+methodBodyNoBang
+    : statements PERIOD*         // Standard statements
+    | returnStatement           // Return statement
+    ;
 
-methodCategoryChunk:
-	{IsMethodsFor()}? BANG className (
-		cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); }
-	)? kw = identifierColon stringConst BANG (methodDef)* BANG {
+// Method category chunk - contains multiple methods
+// Example: !Point methodsFor: 'accessing'! x ^x! y ^y! !
+methodCategoryChunk
+    : {IsMethodsFor()}? BANG className 
+      (cls = IDENTIFIER { if ($cls.text != "class") NotifyErrorListeners("expected 'class'"); })?
+      kw = identifierColon stringConst BANG 
+      (methodDef)* BANG 
+      {
           if ($kw.text != "methodsFor:")
               NotifyErrorListeners("expected 'methodsFor:'");
-      };
+      }
+    ;
 
-methodHeader:
-	unarySelector
-	| binarySelector formalArg
-	| (identifierColon formalArg)+;
+// Method headers - three types in Smalltalk
+methodHeader
+    : unarySelector                    // factorial
+    | binarySelector formalArg          // + aNumber
+    | (identifierColon formalArg)+     // at: index put: value
+    ;
 
-formalArg: argumentName;
+// Formal argument name
+formalArg
+    : argumentName
+    ;
 
-temporaries: PIPE temporaryName+ PIPE NEW_LINE?;
-temporaryName: IDENTIFIER;
+// Primitive declaration
+// Example: <primitive: 60>
+primitiveDecl
+    : PRIMITIVE_DECL
+    ;
 
-////
-// / Statements //
-statements: PERIOD* statement (PERIOD+ statement)* PERIOD*;
+// Temporaries declaration
+// Example: | temp1 temp2 |
+temporaries
+    : PIPE temporaryName+ PIPE NEW_LINE?
+    ;
 
-statement: returnStatement | expressionStatement;
+temporaryName
+    : IDENTIFIER
+    ;
 
-returnStatement: CARET expression PERIOD?;
+// =============================================================================
+// STATEMENTS AND EXPRESSIONS
+// =============================================================================
 
-expressionStatement: expression;
+// Statement sequences
+statements
+    : PERIOD* statement (PERIOD+ statement)* PERIOD*
+    ;
 
-////
-// / Expression structure //
-expression: assignmentExpr;
+// Individual statements
+statement
+    : returnStatement      // ^expr
+    | expressionStatement  // expr
+    ;
 
-assignmentExpr:
-	variable ASSIGN assignmentExpr // right-associative assignment
-	| cascadeExpr;
+// Return statement
+returnStatement
+    : CARET expression PERIOD?
+    ;
 
-cascadeExpr: messageExpr (SEMICOLON messagePart)*; // cascades
+// Expression as statement
+expressionStatement
+    : expression
+    ;
 
-////
-// / Message expression //
-messageExpr:
-	messageBase (unaryMessage | binaryMessage)* keywordMessage?;
+// =============================================================================
+// EXPRESSION HIERARCHY
+// =============================================================================
+// Precedence: assignment < cascade < messages
 
-messageBase:
-	literal
-	| parenthesizedExpr
-	| block
-	| dynamicArray
-	| variable
-	| negativeNumber;
+// Top-level expression with assignment
+expression
+    : assignmentExpr
+    ;
 
-negativeNumber: MINUS messageBase;
+// Assignment expression (right-associative)
+// Example: x := y := 5
+assignmentExpr
+    : variable ASSIGN assignmentExpr
+    | cascadeExpr
+    ;
 
-messagePart: unaryMessage | binaryMessage | keywordMessage;
+// Cascade expression
+// Example: stream nextPut: $a; nextPut: $b; cr
+cascadeExpr
+    : messageExpr (SEMICOLON messagePart)*
+    ;
 
-////
-// / Messages //
-unaryMessage: unarySelector;
+// =============================================================================
+// MESSAGE EXPRESSIONS
+// =============================================================================
+// Smalltalk precedence: unary > binary > keyword
 
-binaryMessage: binarySelector messageBase;
+// Complete message expression
+messageExpr
+    : messageBase (unaryMessage | binaryMessage)* keywordMessage?
+    ;
 
-keywordMessage: keywordPart+;
+// Message base (receiver)
+messageBase
+    : literal
+    | parenthesizedExpr
+    | block
+    | dynamicArray
+    | variable
+    | negativeNumber  // Special case for negative literals
+    ;
 
-keywordPart: IDENTIFIER COLON nonKeywordExpr;
+// Negative number (special handling)
+negativeNumber
+    : MINUS messageBase
+    ;
 
-// Non-keyword expressions (for keyword arguments) - no keyword messages allowed
-nonKeywordExpr: messageBase (unaryMessage | binaryMessage)*;
+// Message parts for cascades
+messagePart
+    : unaryMessage 
+    | binaryMessage 
+    | keywordMessage
+    ;
 
-////
-// / Blocks and Primary Expressions //
-block:
-	LEFT_BRACKET blockArgs? blockTemps? statements? RIGHT_BRACKET;
+// =============================================================================
+// MESSAGE TYPES
+// =============================================================================
 
-blockArgs: (COLON argumentName)+ PIPE?;
+// Unary message
+// Example: size, isEmpty
+unaryMessage
+    : unarySelector
+    ;
 
-argumentName: IDENTIFIER;
+// Binary message
+// Example: + 5, = true
+binaryMessage
+    : binarySelector messageBase
+    ;
 
-blockTemps: PIPE temporaryName+ PIPE;
+// Keyword message
+// Example: at: 5 put: 'hello'
+keywordMessage
+    : keywordPart+
+    ;
 
-parenthesizedExpr: LEFT_PAREN expression RIGHT_PAREN;
+// Keyword part with argument
+keywordPart
+    : IDENTIFIER COLON nonKeywordExpr
+    ;
 
-dynamicArray: LEFT_BRACE (expression (PERIOD expression)*)? RIGHT_BRACE;
+// Non-keyword expression (prevents keyword nesting)
+nonKeywordExpr
+    : messageBase (unaryMessage | binaryMessage)*
+    ;
 
-////
-// / Selectors and Tokens //
-unarySelector: IDENTIFIER;
+// =============================================================================
+// BLOCKS
+// =============================================================================
 
-binarySelector:
-	// ───────────── Arithmetic Operators ─────────────
-	PLUS // +
-	| MINUS // -
-	| STAR // *
-	| DIVIDE // /
-	| MOD // %
-	| INTEGER_DIVIDE // //
-	| MODULO // \\
+// Block closure
+// Example: [x + y]
+// Example: [:a :b | a max: b]
+block
+    : LEFT_BRACKET blockArgs? blockTemps? statements? RIGHT_BRACKET
+    ;
 
-	// ───────────── Bitwise Operators ─────────────
-	| BIT_SHIFT_LEFT // <<
-	| BIT_SHIFT_RIGHT // >>
-	| BACKSLASH // \
-	| TILDE // ~
-	| PIPE // |
-	| BIT_AND // &
+// Block arguments
+blockArgs
+    : (COLON argumentName)+ PIPE?
+    ;
 
-	// ───────────── Comparison Operators ─────────────
-	| EQUAL // =
-	| NOT_EQUAL // ~=
-	| EQUAL_EQUAL // ==
-	| NOT_IDENTITY // ~~
-	| LT // <
-	| LEQ // <=
-	| GT // >
-	| GEQ // >=
+// Block temporaries
+blockTemps
+    : PIPE temporaryName+ PIPE
+    ;
 
-	// ───────────── Other Symbols & Messaging ─────────────
-	| AT // @
-	| QUESTION // ?
-	| COMMA; // ,
+// =============================================================================
+// PRIMARY EXPRESSIONS
+// =============================================================================
 
-variable: IDENTIFIER;
+// Parenthesized expression
+parenthesizedExpr
+    : LEFT_PAREN expression RIGHT_PAREN
+    ;
 
-literal:
-	numberLiteral
-	| stringConst
-	| symbolConst
-	| arrayLiteral
-	| byteArrayLiteral
-	| characterLiteral;
+// Dynamic array
+// Example: {1. 2. 3}
+dynamicArray
+    : LEFT_BRACE (expression (PERIOD expression)*)? RIGHT_BRACE
+    ;
 
-numberLiteral: NUMBER;
-stringConst: STRING;
-characterLiteral: CHAR_LITERAL;
-byteArrayLiteral: HASH LEFT_BRACKET NUMBER* RIGHT_BRACKET;
-arrayLiteral: HASH LEFT_PAREN arrayElement* RIGHT_PAREN;
-arrayElement:
-	literal
-	| symbolName
-	| LEFT_PAREN arrayElement* RIGHT_PAREN;
-symbolConst: QUOTED_SYMBOL | HASH symbolName;
-symbolName:
-	IDENTIFIER
-	| unarySelector
-	| binarySelector
-	| keywordSymbolSelector;
-keywordSymbolSelector: (IDENTIFIER COLON)+;
+// =============================================================================
+// SELECTORS AND IDENTIFIERS
+// =============================================================================
 
-// ─────────────────────────────────────────────────────────────── Other Chunks
-// ───────────────────────────────────────────────────────────────
+// Unary selector
+unarySelector
+    : IDENTIFIER
+    ;
 
-separatorChunk: '--' (~BANG)* BANG;
-className: IDENTIFIER;
+// Binary selector
+binarySelector
+    : PLUS | MINUS | STAR | DIVIDE | MOD 
+    | INTEGER_DIVIDE | MODULO
+    | BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT | BACKSLASH | TILDE | PIPE | BIT_AND
+    | EQUAL | NOT_EQUAL | EQUAL_EQUAL | NOT_IDENTITY
+    | LT | LEQ | GT | GEQ
+    | AT | QUESTION | COMMA
+    ;
 
-// ─────────────────────────────────────────────────────────────── Lexer Rules
-// ───────────────────────────────────────────────────────────────
+// Variables and pseudo-variables
+variable
+    : IDENTIFIER
+    ;
 
+// =============================================================================
+// LITERALS
+// =============================================================================
+
+// All literal types
+literal
+    : numberLiteral
+    | stringConst
+    | symbolConst
+    | arrayLiteral
+    | byteArrayLiteral
+    | characterLiteral
+    ;
+
+// Number literals
+numberLiteral
+    : NUMBER
+    ;
+
+// String constant
+stringConst
+    : STRING
+    ;
+
+// Character literal
+// Example: $a, $!, $$
+characterLiteral
+    : CHAR_LITERAL
+    ;
+
+// Byte array literal
+// Example: #[1 2 255]
+byteArrayLiteral
+    : HASH LEFT_BRACKET NUMBER* RIGHT_BRACKET
+    ;
+
+// Literal array
+// Example: #(1 'two' #three)
+arrayLiteral
+    : HASH LEFT_PAREN arrayElement* RIGHT_PAREN
+    ;
+
+// Array element
+arrayElement
+    : literal
+    | symbolName
+    | LEFT_PAREN arrayElement* RIGHT_PAREN
+    ;
+
+// Symbol constant
+// Example: #size, #'complex symbol'
+symbolConst
+    : QUOTED_SYMBOL 
+    | HASH symbolName
+    ;
+
+// Symbol name variants
+symbolName
+    : IDENTIFIER
+    | unarySelector
+    | binarySelector
+    | keywordSymbolSelector
+    ;
+
+// Keyword symbol
+// Example: #at:put:
+keywordSymbolSelector
+    : (IDENTIFIER COLON)+
+    ;
+
+// =============================================================================
+// UTILITY RULES
+// =============================================================================
+
+// Separator chunk for file-out format
+// Example: "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+separatorChunk
+    : SEPARATOR_LINE BANG
+    ;
+
+// Class name
+className
+    : IDENTIFIER
+    ;
+
+// Argument name
+argumentName
+    : IDENTIFIER
+    ;
+
+// Identifier with colon
+identifierColon
+    : IDENTIFIER COLON
+    ;
+
+// =============================================================================
+// LEXER RULES
+// =============================================================================
+// Order matters! More specific patterns must come before general ones
+
+// -----------------------------------------------------------------------------
+// Multi-character operators (must come before single-character)
+// -----------------------------------------------------------------------------
 ASSIGN: '_' | ':=';
 BIT_SHIFT_LEFT: '<<';
 BIT_SHIFT_RIGHT: '>>';
@@ -304,6 +607,10 @@ NOT_IDENTITY: '~~';
 LEQ: '<=';
 GEQ: '>=';
 NOT_EQUAL: '~=';
+
+// -----------------------------------------------------------------------------
+// Single-character operators
+// -----------------------------------------------------------------------------
 PLUS: '+';
 MINUS: '-';
 STAR: '*';
@@ -323,6 +630,10 @@ CARET: '^';
 HASH: '#';
 BANG: '!';
 COLON: ':';
+
+// -----------------------------------------------------------------------------
+// Delimiters
+// -----------------------------------------------------------------------------
 LEFT_BRACKET: '[';
 RIGHT_BRACKET: ']';
 LEFT_PAREN: '(';
@@ -332,33 +643,85 @@ RIGHT_BRACE: '}';
 SEMICOLON: ';';
 PERIOD: '.';
 
-PRIMITIVE_DECL:
-	'<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>';
+// -----------------------------------------------------------------------------
+// Primitive declaration
+// -----------------------------------------------------------------------------
+PRIMITIVE_DECL
+    : '<' WS_INLINE* 'primitive:' WS_INLINE* DIGITS WS_INLINE* '>'
+    ;
 
-NUMBER:
-	DIGITS [rR] BASEDIGIT+ // radix
-	| DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?; // decimal
+// -----------------------------------------------------------------------------
+// Numbers
+// -----------------------------------------------------------------------------
+NUMBER
+    : DIGITS [rR] BASEDIGIT+                                              // Radix notation: 16rFF
+    | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?           // Decimal/float
+    | DIGITS 's' DIGITS                                                   // Scaled decimal
+    ;
 
-COMMENT: '"' ('""' | ~'"')* '"' -> channel(HIDDEN);
+// -----------------------------------------------------------------------------
+// Comments (preserved on hidden channel)
+// -----------------------------------------------------------------------------
+COMMENT
+    : '"' ('""' | ~'"')* '"' -> channel(HIDDEN)
+    ;
 
-STRING: '\'' ( '\'\'' | ~'\'')* '\''; // single-quote strings
+// -----------------------------------------------------------------------------
+// Strings
+// -----------------------------------------------------------------------------
+STRING
+    : '\'' ( '\'\'' | ~'\'')* '\''  // Single quotes with doubling for escape
+    ;
 
-QUOTED_SYMBOL: HASH '\'' ( '\'\'' | ~'\'')* '\'';
-CHAR_LITERAL:
-	'$!!' // Escaped bang: treat $!! as a single $!
-	| '$' ~[\r\n]; // Regular character literal
+// -----------------------------------------------------------------------------
+// Symbols
+// -----------------------------------------------------------------------------
+QUOTED_SYMBOL
+    : HASH '\'' ( '\'\'' | ~'\'')* '\''
+    ;
 
-IDENTIFIER: LETTER (LETTER | DIGIT)*;
+// -----------------------------------------------------------------------------
+// Character literals
+// -----------------------------------------------------------------------------
+CHAR_LITERAL
+    : '$!!'          // Special case: $! followed by ! needs escaping
+    | '$' ~[\r\n]     // Normal character literal
+    ;
 
+// -----------------------------------------------------------------------------
+// Separator line pattern for file-out format
+// -----------------------------------------------------------------------------
+SEPARATOR_LINE
+    : '"' '-'+ (' ' '-'+)* ' '* '"'
+    ;
+
+// -----------------------------------------------------------------------------
+// Identifiers
+// -----------------------------------------------------------------------------
+IDENTIFIER
+    : LETTER (LETTER | DIGIT)*
+    ;
+
+// -----------------------------------------------------------------------------
+// Fragments
+// -----------------------------------------------------------------------------
 fragment LETTER: [A-Za-z];
 fragment DIGIT: [0-9];
 fragment BASEDIGIT: [0-9A-Za-z];
 fragment WS_INLINE: [ \t\f];
 DIGITS: DIGIT+;
 
-NEW_LINE: ('\r'? '\n')+ -> skip;
-WS: [ \t\f]+ -> skip;
+// -----------------------------------------------------------------------------
+// Whitespace
+// -----------------------------------------------------------------------------
+NEW_LINE
+    : ('\r'? '\n')+ -> skip
+    ;
 
-// Catch-all rule to skip any unrecognized characters (like backticks)
-// This must be the last lexer rule
-ANY: . -> skip;
+WS
+    : [ \t\f]+ -> skip
+    ;
+
+// =============================================================================
+// END OF GRAMMAR
+// =============================================================================

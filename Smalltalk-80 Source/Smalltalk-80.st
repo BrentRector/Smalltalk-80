@@ -1,3 +1,5 @@
+"subclass #Always'From Smalltalk-80, version 2, of April 1, 1983 on 31 May 1983 at 9:10:35 am"
+
 PopUpMenu subclass: #ActionMenu
 	instanceVariableNames: 'selectors '
 	classVariableNames: ''
@@ -39,8 +41,7 @@ labels: aString selectors: selArray
 !ActionMenu class methodsFor: 'confirmation'!
 confirm  "ActionMenu confirm"
 	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !
-'From Smalltalk-80, Version 2 of April 1, 1983'!
-
+	
 Object subclass: #WindowsFile
     instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary'
     classVariableNames: ''
@@ -1668,6 +1669,11 @@ WindowsPathName initialize!
 WindowsFileStream initialize!
 WindowsFileSystem initialize!
 
+CodeController subclass: #AlwaysAcceptCodeController
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Interface-Text'!
 AlwaysAcceptCodeController comment:
 'I am a code controller that will do an accept even if the text is the same.'!
 
@@ -5370,7 +5376,7 @@ xor: aBoolean
 	"Exclusive OR -- answer true if the receiver is not equivalent to aBoolean."
 
 	^(self == aBoolean) not!
-| aBoolean
+| aBoolean 
 	"Evaluating disjunction (OR) -- Evaluate the argument.  Then answer true if
 	either the receiver or the argument is true."
 	self subclassResponsibility! !
@@ -16841,7 +16847,7 @@ not
 	"Negation -- answer true since the receiver is false."
 
 	^true!
-| aBoolean
+| aBoolean 
 	"Evaluating disjunction (OR) -- answer with the argument, aBoolean."
 
 	^aBoolean! !
@@ -17150,35 +17156,19 @@ sameAsStoredFile
 	^false! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
-Object subclass: #File
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: 'FilePool'
-	category: 'Files-Abstract'!
-File comment: 'File is an abstract base class for file implementations. WindowsFile provides the concrete implementation for Windows systems.'!
-
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
 File class
 	instanceVariableNames: ''!
 
+
 !File class methodsFor: 'class initialization'!
 initialize
-	"Initialize FilePool with file mode constants.
-	Updated for Windows file implementation."
+	"Subclasses of File may want to share variables in pools. 
+	Execute before filin:  Smalltalk at: #XFilePool as: (Dictionary: 16). 
+	in XFile initialize."
 
-	FilePool _ Dictionary new.
-	FilePool at: #read put: 1.         "Open for reading"
-	FilePool at: #Read put: 1.         "Compatibility"
-	FilePool at: #write put: 2.        "Open for writing"
-	FilePool at: #Write put: 2.        "Compatibility"
-	FilePool at: #readWrite put: 3.    "Open for read/write"
-	FilePool at: #Shorten put: 3.      "Compatibility"
-	FilePool at: #append put: 4.       "Open for appending"
-	FilePool at: #create put: 16.      "Create if doesn't exist"
-	FilePool at: #truncate put: 32.    "Truncate existing file"
-	FilePool at: #binary put: 64.      "Binary mode"
-	FilePool at: #text put: 128! !
+	FilePool at: #Read put: 1.
+	FilePool at: #Write put: 2.
+	FilePool at: #Shorten put: 3! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -17214,18 +17204,6 @@ documentation
 "! !
 
 File initialize!
-
-!File class methodsFor: 'instance creation'!
-
-named: fileName
-    "Answer a new file with the given name - use Windows implementation."
-    ^WindowsFile named: fileName!
-
-named: fileName mode: modeSymbol
-    "Answer a new file with the given name and mode - use Windows implementation."
-    ^WindowsFile named: fileName mode: modeSymbol! !
-
-
 Object subclass: #FileDirectory
 	instanceVariableNames: 'directoryName closed '
 	classVariableNames: 'ExternalReferences '
@@ -17623,21 +17601,6 @@ documentation
 "! !
 
 FileDirectory initialize!
-
-!FileDirectory class methodsFor: 'instance creation'!
-
-default
-    "Answer the default directory - use Windows implementation."
-    ^WindowsFileDirectory default!
-
-current
-    "Answer the current working directory - use Windows implementation."
-    ^WindowsFileDirectory current!
-
-on: aPathName
-    "Answer a directory for the given path - use Windows implementation."
-    ^WindowsFileDirectory on: aPathName! !
-
 FileModel subclass: #FileList
 	instanceVariableNames: 'list myPattern isReading '
 	classVariableNames: 'FileMenu PatternMenu '
@@ -27059,9 +27022,7 @@ readFrom: aStream
 		ifTrue: 
 			["<integer>e<exponent>"
 			^value * (radix raisedTo: (Integer readFrom: aStream))].
-	^value! !
-	
-nil subclass: #Object
+	^value! !nil subclass: #Object
 	instanceVariableNames: ''
 	classVariableNames: 'DependentsFields ErrorRecursion '
 	poolDictionaries: ''
@@ -27761,21 +27722,11 @@ Object class
 
 !Object class methodsFor: 'class initialization'!
 initialize 
-	"Initialize Object class variables. Skip during bootstrap."
-	
-	"Original code that requires UI and proper system state:
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
 			[self initializeDependentsFields.
-			self initializeErrorRecursion]"
-	
-	"During bootstrap, skip initialization entirely as it depends on 
-	 system state that isn't available yet. The VM will handle the
-	 necessary setup for DependentsFields and ErrorRecursion."
-	
-	"self initializeDependentsFields.
-	self initializeErrorRecursion"
+			self initializeErrorRecursion]
 
 	"Object initialize"! !
 
@@ -39097,7 +39048,7 @@ printDanglingRefs   "SystemTracer new printDanglingRefs."
 		(SystemOrganization superclassOrder: str) do: 
 			[:class | clamped add: class name]].
 	"clamp individual classes and other Globals: "
-	(Array with: #WindowsFile with: #WindowsFileDirectory) do: 
+	(Array with: #AltoFile with: #AltoFileDirectory with: #AltoFilePage) do: 
 		[:x | clamped add: x].
 	Smalltalk allBehaviorsDo: 
 		[:class | 
@@ -39225,7 +39176,7 @@ writeClone
 writeCloneWithout: aSet
 	"This message creates and runs a SystemTracer without the sets named:
 		SystemTracer writeCloneWithout:
-			(Set with: WindowsFile with: WindowsFileDirectory).
+			(Set with: AltoFilePage with: AltoFile with: AltoFileDirectory).
 	If all goes well, it will produce a file called clone.im which is a valid image file"
 
 	| tracer |
@@ -40691,7 +40642,7 @@ not
 	"Negation--answer false since the receiver is true."
 
 	^false!
-| aBoolean
+| aBoolean 
 	"Evaluating disjunction (OR) -- answer true since the receiver is true."
 
 	^self! !
@@ -42158,4 +42109,4 @@ with: aCollection from: firstIndex to: lastIndex
 	at index firstIndex and ending at lastIndex.  Assume that the
 	resulting collection is already full so the position and the limits are set to the end."
 
-	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !

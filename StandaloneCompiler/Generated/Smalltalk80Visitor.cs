@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/StandaloneCompiler/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from Smalltalk80.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -19,7 +19,6 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace StandaloneCompiler {
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using IToken = Antlr4.Runtime.IToken;
@@ -105,12 +104,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitSubclassKind([NotNull] Smalltalk80Parser.SubclassKindContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primitiveDecl"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classBody"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -129,23 +122,17 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitCategoryDecl([NotNull] Smalltalk80Parser.CategoryDeclContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.classCommentChunk"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitClassCommentChunk([NotNull] Smalltalk80Parser.ClassCommentChunkContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassDefinitionChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitMetaclassDefinitionChunk([NotNull] Smalltalk80Parser.MetaclassDefinitionChunkContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.metaclassCommentChunk"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodCategoryChunk"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitMetaclassCommentChunk([NotNull] Smalltalk80Parser.MetaclassCommentChunkContext context);
+	Result VisitMethodCategoryChunk([NotNull] Smalltalk80Parser.MethodCategoryChunkContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodDef"/>.
 	/// </summary>
@@ -164,12 +151,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitMethodBodyNoBang([NotNull] Smalltalk80Parser.MethodBodyNoBangContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodCategoryChunk"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitMethodCategoryChunk([NotNull] Smalltalk80Parser.MethodCategoryChunkContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.methodHeader"/>.
 	/// </summary>
@@ -194,6 +175,18 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitTemporaryName([NotNull] Smalltalk80Parser.TemporaryNameContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.argumentName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArgumentName([NotNull] Smalltalk80Parser.ArgumentNameContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.primitiveDecl"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrimitiveDecl([NotNull] Smalltalk80Parser.PrimitiveDeclContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.statements"/>.
 	/// </summary>
@@ -303,12 +296,6 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitBlockArgs([NotNull] Smalltalk80Parser.BlockArgsContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.argumentName"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitArgumentName([NotNull] Smalltalk80Parser.ArgumentNameContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.blockTemps"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -417,4 +404,3 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassName([NotNull] Smalltalk80Parser.ClassNameContext context);
 }
-} // namespace StandaloneCompiler

@@ -453,6 +453,11 @@ public sealed class BytecodeDispatcher
                 if (DebugOptions.EnableBytecodeTrace)
                 {
                     Console.WriteLine($"  -> Pushed value: {value}");
+                    // Extra check for PC 12-15 range
+                    if (context.PC >= 13 && context.PC <= 16)
+                    {
+                        Console.WriteLine($"[STACK] After push at PC={context.PC - 1}: Stack top = {context.Stack.Top}, depth = {context.Stack.Count}");
+                    }
                 }
                 
                 // Final verification for problem globals
@@ -1009,7 +1014,15 @@ public sealed class BytecodeDispatcher
             Console.WriteLine($"  -> SendArithmeticMessage #{selectorIndex} ({selectorString}) with {argCount} args");
         }
         
-        executionContext.Send(receiver, selector, args);
+        // Use SendWithResult to get the return value and push it onto the stack
+        var result = executionContext.SendWithResult(receiver, selector, args);
+        context.Stack.Push(result);
+        
+        if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+        {
+            Console.WriteLine($"[DEBUG] Pushed send result: {result}");
+        }
+        
         return true;
     }
 
@@ -1024,8 +1037,28 @@ public sealed class BytecodeDispatcher
         var selector = GetSpecialSelector(selectorIndex);
         var argCount = GetSpecialSelectorArgCount(selectorIndex);
         
+        // Enhanced debugging for new: special message
+        if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+        {
+            if (selectorIndex == 13) // new:
+            {
+                Console.WriteLine($"[DEBUG] About to send new: - Stack contents (depth={context.Stack.Count}):");
+                // We can't iterate the stack directly, but we know what should be there
+                Console.WriteLine($"  - Will pop {argCount} arguments, then receiver");
+            }
+        }
+        
         var args = context.Stack.PopN(argCount);
         var receiver = context.Stack.Pop();
+        
+        // Debug what we popped for new:
+        if ((DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput) && selectorIndex == 13)
+        {
+            Console.WriteLine($"[DEBUG] Popped for new: send:");
+            Console.WriteLine($"  - Receiver: {receiver}");
+            if (args.Length > 0)
+                Console.WriteLine($"  - Arg[0]: {args[0]}");
+        }
         
         if (DebugOptions.EnableBytecodeTrace)
         {
@@ -1033,7 +1066,15 @@ public sealed class BytecodeDispatcher
             Console.WriteLine($"  -> SendSpecialMessage #{selectorIndex} ({selectorString}) with {argCount} args");
         }
         
-        executionContext.Send(receiver, selector, args);
+        // Use SendWithResult to get the return value and push it onto the stack
+        var result = executionContext.SendWithResult(receiver, selector, args);
+        context.Stack.Push(result);
+        
+        if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+        {
+            Console.WriteLine($"[DEBUG] Pushed send result: {result}");
+        }
+        
         return true;
     }
 
@@ -1174,6 +1215,15 @@ public sealed class BytecodeDispatcher
         if (selectorIndex < literals.Length)
         {
             var selector = literals[selectorIndex];
+            
+            // Enhanced debugging for stack state
+            if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] SendLiteralSelector: Stack count before pop = {context.Stack.Count}, need {argCount + 1} items");
+                Console.WriteLine($"  - Selector index: {selectorIndex}");
+                Console.WriteLine($"  - Arg count: {argCount}");
+            }
+            
             var args = context.Stack.PopN(argCount);
             var receiver = context.Stack.Pop();
             
@@ -1190,7 +1240,30 @@ public sealed class BytecodeDispatcher
                 Console.WriteLine($"  -> SendLiteralSelector[{selectorIndex}]={selector} with {argCount} args");
             }
             
-            executionContext.Send(receiver, selector, args);
+            // Send the message
+            // The return mechanism in the called method will push the result to our stack
+            // But we need to track the depth to ensure it happened
+            var depthBefore = context.Stack.Count;
+            var result = executionContext.SendWithResult(receiver, selector, args);
+            
+            // Check if the return pushed to our stack
+            if (context.Stack.Count == depthBefore)
+            {
+                // No push happened (e.g., primitive or method without proper return)
+                // Push the result ourselves
+                context.Stack.Push(result);
+                if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] Pushed send result (no auto-push): {result}, stack depth = {context.Stack.Count}");
+                }
+            }
+            else
+            {
+                if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[DEBUG] Return already pushed result: {result}, stack depth = {context.Stack.Count}");
+                }
+            }
         }
         else
         {
@@ -1228,7 +1301,14 @@ public sealed class BytecodeDispatcher
                 Console.WriteLine($"  -> SuperSendLiteralSelector[{selectorIndex}]={selector} with {argCount} args");
             }
             
-            executionContext.SuperSend(receiver, selector, args);
+            // Use SuperSendWithResult to get the return value and push it onto the stack
+            var result = executionContext.SuperSendWithResult(receiver, selector, args);
+            context.Stack.Push(result);
+            
+            if (DebugOptions.EnableBytecodeTrace || DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] Pushed super send result: {result}");
+            }
         }
         
         return true;
@@ -1374,12 +1454,30 @@ public interface IExecutionContext
     void Send(OOP receiver, OOP selector, OOP[] arguments);
     
     /// <summary>
+    /// Performs a message send and returns the result.
+    /// </summary>
+    /// <param name="receiver">The message receiver.</param>
+    /// <param name="selector">The message selector.</param>
+    /// <param name="arguments">The message arguments.</param>
+    /// <returns>The result of the message send.</returns>
+    OOP SendWithResult(OOP receiver, OOP selector, OOP[] arguments);
+    
+    /// <summary>
     /// Performs a super send.
     /// </summary>
     /// <param name="receiver">The message receiver.</param>
     /// <param name="selector">The message selector.</param>
     /// <param name="arguments">The message arguments.</param>
     void SuperSend(OOP receiver, OOP selector, OOP[] arguments);
+    
+    /// <summary>
+    /// Performs a super send and returns the result.
+    /// </summary>
+    /// <param name="receiver">The message receiver.</param>
+    /// <param name="selector">The message selector.</param>
+    /// <param name="arguments">The message arguments.</param>
+    /// <returns>The result of the super send.</returns>
+    OOP SuperSendWithResult(OOP receiver, OOP selector, OOP[] arguments);
     
     /// <summary>
     /// Interns a symbol string.

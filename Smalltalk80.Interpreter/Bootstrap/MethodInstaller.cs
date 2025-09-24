@@ -778,7 +778,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             // Parse the association string to extract the key
             var match = System.Text.RegularExpressions.Regex.Match(
                 associationStr, 
-                @"Association\(key:\s*#(\w+),\s*value:\s*(\w+)\)"
+                @"Association\(key:\s*#?(\w+),\s*value:\s*(\w+)\)"  // Make # optional with ?
             );
             
             if (match.Success)

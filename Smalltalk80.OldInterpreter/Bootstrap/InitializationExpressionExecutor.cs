@@ -1,0 +1,1324 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Smalltalk80.Interpreter.Config;
+using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.ObjectModel;
+using Smalltalk80.Interpreter.VM;
+
+namespace Smalltalk80.Interpreter.Bootstrap
+{
+    /// <summary>
+    /// Configuration options for initialization expression execution.
+    /// </summary>
+    public sealed class InitializationConfig
+    {
+        /// <summary>
+        /// Gets or sets a value indicating whether to skip UI-related initializations.
+        /// When true, initialization failures due to missing UI classes will be logged but not block execution.
+        /// </summary>
+        public bool SkipUIInitializations { get; set; } = false;
+        
+        /// <summary>
+        /// Gets or sets a value indicating whether to continue on initialization errors.
+        /// When true, all initialization errors are logged but execution continues.
+        /// </summary>
+        public bool ContinueOnError { get; set; } = true;
+        
+        /// <summary>
+        /// Gets or sets the set of known UI class names to check for.
+        /// </summary>
+        public HashSet<string> KnownUIClasses { get; } = new HashSet<string>
+        {
+            "BinaryChoice",
+            "BinaryChoiceView",
+            "FillInTheBlank",
+            "FillInTheBlankView",
+            "ActionMenu",
+            "PopUpMenu",
+            "StandardSystemView",
+            "StandardSystemController",
+            "ListView",
+            "SelectionInListView",
+            "PluggableTextView",
+            "CodeView",
+            "TextCollectorView",
+            "FormView",
+            "DisplayTextView"
+        };
+    }
+    
+    /// <summary>
+    /// Executes initialization expressions after bootstrap completes.
+    /// These are file-scope expressions that need to run to initialize classes.
+    /// </summary>
+    public sealed class InitializationExpressionExecutor
+    {
+        private readonly ObjectMemory memory;
+        private readonly VirtualMachine vm;
+        private readonly ClassBuilder classBuilder;
+        private readonly ISymbolTable symbolTable;
+        private readonly IReadOnlyDictionary<string, OOP> classRegistry;
+        private readonly InitializationConfig config;
+        private readonly HashSet<string> missingUIClasses = new HashSet<string>();
+        private readonly Dictionary<string, List<string>> initializationErrors = new Dictionary<string, List<string>>();
+        
+        /// <summary>
+        /// Initializes a new instance of the InitializationExpressionExecutor class.
+        /// </summary>
+        public InitializationExpressionExecutor(
+            ObjectMemory memory,
+            VirtualMachine vm,
+            ClassBuilder classBuilder,
+            ISymbolTable symbolTable,
+            IReadOnlyDictionary<string, OOP> classRegistry,
+            InitializationConfig? config = null)
+        {
+            this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
+            this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
+            this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
+            this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
+            this.classRegistry = classRegistry ?? throw new ArgumentNullException(nameof(classRegistry));
+            this.config = config ?? new InitializationConfig();
+        }
+        
+        /// <summary>
+        /// Executes all initialization expressions in dependency order.
+        /// </summary>
+        /// <param name="expressions">The initialization expressions to execute.</param>
+        /// <param name="doItProcess">Optional existing process to reuse for execution.</param>
+        /// <returns>The process used for execution (can be reused for REPL).</returns>
+        public OOP ExecuteInitializationExpressions(
+            List<InitializationExpression> expressions, 
+            OOP doItProcess = default)
+        {
+            if (expressions == null || expressions.Count == 0)
+            {
+                Console.WriteLine("[InitExpr] No initialization expressions to execute.");
+                return doItProcess.IsNil ? CreateDoItProcess() : doItProcess;
+            }
+            
+            Console.WriteLine($"[InitExpr] Executing {expressions.Count} initialization expressions...");
+            
+            // Sort initialization expressions by class hierarchy (superclasses first)
+            var sortedExpressions = SortByClassHierarchy(expressions);
+            
+            Console.WriteLine("[InitExpr] Sorted initialization expressions by class hierarchy:");
+            foreach (var expr in sortedExpressions.Take(10))
+            {
+                Console.WriteLine($"  - {expr.Source}");
+            }
+            if (sortedExpressions.Count > 10)
+            {
+                Console.WriteLine($"  ... and {sortedExpressions.Count - 10} more");
+            }
+            
+            // Get or create a process for execution
+            if (doItProcess.IsNil)
+            {
+                doItProcess = CreateDoItProcess();
+            }
+            
+            // Execute each expression in order
+            int successCount = 0;
+            foreach (var expr in sortedExpressions)
+            {
+                try
+                {
+                    ExecuteExpression(expr, doItProcess);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    var errorInfo = AnalyzeInitializationError(expr, ex);
+                    RecordInitializationError(expr.Source ?? "Unknown", errorInfo);
+                    
+                    // Always stop after first error - initialization expressions should complete successfully
+                    Console.WriteLine($"[InitExpr] Fatal error in '{expr.Source}': {errorInfo}");
+                    Console.WriteLine($"[InitExpr] Stopping initialization after {successCount} successful expressions.");
+                    throw new InvalidOperationException($"Initialization failed at '{expr.Source}': {errorInfo}", ex);
+                }
+            }
+            
+            Console.WriteLine($"[InitExpr] Completed {successCount}/{expressions.Count} initialization expressions.");
+            
+            // Report missing UI classes if any were detected
+            if (missingUIClasses.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Missing UI classes detected:");
+                foreach (var className in missingUIClasses)
+                {
+                    Console.WriteLine($"  - {className}");
+                }
+            }
+            
+            // Report initialization errors summary
+            if (initializationErrors.Count > 0)
+            {
+                Console.WriteLine($"[InitExpr] Initialization errors summary:");
+                foreach (var kvp in initializationErrors)
+                {
+                    Console.WriteLine($"  {kvp.Key}:");
+                    foreach (var error in kvp.Value)
+                    {
+                        Console.WriteLine($"    - {error}");
+                    }
+                }
+            }
+            
+            return doItProcess;
+        }
+        
+        /// <summary>
+        /// Sorts initialization expressions by class hierarchy.
+        /// Superclass initializations run before subclass initializations.
+        /// </summary>
+        private List<InitializationExpression> SortByClassHierarchy(List<InitializationExpression> expressions)
+        {
+            // Build a map of class names to their depth in the hierarchy
+            var classDepths = new Dictionary<string, int>();
+            
+            foreach (var expr in expressions)
+            {
+                if (!string.IsNullOrEmpty(expr.Receiver) && !classDepths.ContainsKey(expr.Receiver))
+                {
+                    // Skip expressions that aren't class initializations
+                    // (e.g., string literals like 'From Smalltalk-80, Version 2 of April 1, 1983')
+                    if (expr.Receiver.StartsWith("'") || expr.Receiver.StartsWith("\""))
+                        continue;
+                        
+                    var depth = GetClassDepth(expr.Receiver);
+                    classDepths[expr.Receiver] = depth;
+                }
+            }
+            
+            // Sort by depth (lower depth = closer to Object = run first)
+            // Within same depth, maintain original order
+            return expressions.OrderBy(e =>
+            {
+                if (string.IsNullOrEmpty(e.Receiver))
+                    return int.MaxValue; // Unknown receivers go last
+                    
+                return classDepths.TryGetValue(e.Receiver, out var depth) ? depth : int.MaxValue;
+            }).ToList();
+        }
+        
+        /// <summary>
+        /// Helper method to extract a string from an OOP.
+        /// </summary>
+        private string? GetStringFromOOP(OOP oop)
+        {
+            if (oop.IsNil)
+                return null;
+                
+            var obj = memory.GetObject(oop);
+            if (obj == null)
+                return null;
+                
+            // For String/Symbol, the bytes are typically stored as the object's indexed fields
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < obj.Fields.Length; i++)
+            {
+                var field = obj.GetField(i);
+                if (field.IsSmallInteger)
+                {
+                    sb.Append((char)field.SmallIntegerValue);
+                }
+            }
+            
+            return sb.ToString();
+        }
+        
+        /// <summary>
+        /// Gets the depth of a class in the inheritance hierarchy.
+        /// Object has depth 0, its direct subclasses have depth 1, etc.
+        /// </summary>
+        private int GetClassDepth(string className)
+        {
+            // Special case for Object - always depth 0
+            if (className == "Object")
+                return 0;
+            
+            var classOop = classBuilder.GetClass(className);
+            if (classOop.IsNil)
+            {
+                // Unknown class, put it at the end
+                return int.MaxValue;
+            }
+            
+            int depth = 0;
+            var current = classOop;
+            
+            // Navigate up the superclass chain
+            while (!current.IsNil)
+            {
+                // Get superclass
+                var superclassOop = vm.GetFieldBootstrap(current, "Behavior", "superclass");
+                
+                if (superclassOop.IsNil)
+                {
+                    // Reached Object (nil superclass)
+                    break;
+                }
+                
+                // Check if the superclass is Object
+                var classNameObj = vm.GetFieldBootstrap(superclassOop, "Class", "name");
+                if (!classNameObj.IsNil)
+                {
+                    var nameStr = GetStringFromOOP(classNameObj);
+                    if (nameStr == "Object")
+                    {
+                        // Direct subclass of Object
+                        return depth + 1;
+                    }
+                }
+                
+                current = superclassOop;
+                depth++;
+            }
+            
+            return depth;
+        }
+        
+        /// <summary>
+        /// Creates a process suitable for executing initialization expressions.
+        /// </summary>
+        private OOP CreateDoItProcess()
+        {
+            // Get necessary classes
+            var processClass = classBuilder.GetClass("Process");
+            var methodContextClass = classBuilder.GetClass("MethodContext");
+            var compiledMethodClass = classBuilder.GetClass("CompiledMethod");
+            
+            if (processClass.IsNil || methodContextClass.IsNil || compiledMethodClass.IsNil)
+            {
+                throw new InvalidOperationException("Required classes for process creation not found");
+            }
+            
+            // Create a minimal compiled method for doIt
+            var doItMethod = memory.AllocateObject(compiledMethodClass, 4);
+            var doItMethodObj = memory.GetObject(doItMethod);
+            if (doItMethodObj != null)
+            {
+                doItMethodObj.Fields[0] = symbolTable.Intern("doIt"); // selector
+                doItMethodObj.Fields[1] = CreateByteArray(new byte[] { 0x78 }); // bytecode: returnSelf
+                doItMethodObj.Fields[2] = memory.AllocateWordArray(classBuilder.GetClass("Array"), 0); // empty literals
+                
+                // Create proper method header with stack size
+                int primitiveIndex = 0; // No primitive
+                int argCount = 0;       // No arguments
+                int tempCount = 0;      // No temporaries
+                int methodStackSize = 2;      // Minimal stack
+                int header = (primitiveIndex << 1) | (argCount << 9) | (tempCount << 14) | (methodStackSize << 19);
+                doItMethodObj.Fields[3] = OOP.FromSmallInteger(header);
+            }
+            
+            // Create a MethodContext (not BlockContext!) for the process
+            // Blue Book MethodContext fields: sender, pc, stackp, method, receiver, unused, then stack
+            const int stackSize = 20;
+            var context = memory.AllocateObject(methodContextClass, 6 + stackSize);
+            var contextObj = memory.GetObject(context);
+            if (contextObj != null)
+            {
+                // Set up context fields according to Blue Book specification
+                contextObj.Fields[0] = OOP.Nil;                    // sender
+                contextObj.Fields[1] = OOP.FromSmallInteger(0);    // pc
+                contextObj.Fields[2] = OOP.FromSmallInteger(0);    // stackp
+                contextObj.Fields[3] = doItMethod;                 // method
+                contextObj.Fields[4] = OOP.Nil;                    // receiver (nil for doIt)
+                contextObj.Fields[5] = OOP.Nil;                    // unused
+                // Fields 6+ are for the stack
+            }
+            
+            // Create the Process with proper field layout
+            // Blue Book Process fields: nextLink (from Link), suspendedContext, priority, myList
+            var process = memory.AllocateObject(processClass, 4);
+            var processObj = memory.GetObject(process);
+            if (processObj != null)
+            {
+                processObj.Fields[0] = OOP.Nil;                    // nextLink (from Link superclass)
+                processObj.Fields[1] = context;                    // suspendedContext
+                processObj.Fields[2] = OOP.FromSmallInteger(50);   // priority (user level = 50)
+                processObj.Fields[3] = OOP.Nil;                    // myList
+            }
+            
+            // Add the process to the ProcessList for GC tracking
+            AddProcessToProcessList(process);
+            
+            return process;
+        }
+        
+        /// <summary>
+        /// Adds a process to the global ProcessList for GC tracking.
+        /// </summary>
+        private void AddProcessToProcessList(OOP process)
+        {
+            var processList = vm.GetSpecialObject(SpecialObjects.ProcessList);
+            if (processList.IsNil)
+            {
+                if (DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine("[DEBUG] ProcessList not found in special objects");
+                }
+                return;
+            }
+            
+            var processListObj = memory.GetObject(processList);
+            if (processListObj == null)
+                return;
+            
+            var processObj = memory.GetObject(process);
+            if (processObj == null)
+                return;
+            
+            // LinkedList fields: firstLink, lastLink
+            var firstLink = processListObj.Fields[0];
+            var lastLink = processListObj.Fields[1];
+            
+            if (firstLink.IsNil)
+            {
+                // First process in the list
+                processListObj.Fields[0] = process; // firstLink
+                processListObj.Fields[1] = process; // lastLink
+                processObj.Fields[0] = OOP.Nil;     // nextLink
+            }
+            else
+            {
+                // Add to end of list
+                var lastProcessObj = memory.GetObject(lastLink);
+                if (lastProcessObj != null)
+                {
+                    lastProcessObj.Fields[0] = process; // Set nextLink of last process
+                }
+                processListObj.Fields[1] = process;     // Update lastLink
+                processObj.Fields[0] = OOP.Nil;         // nextLink of new process
+            }
+            
+            // Set the process's myList to indicate it's in the ProcessList
+            processObj.Fields[3] = processList;
+            
+            if (DebugOptions.EnableDebugOutput)
+            {
+                Console.WriteLine($"[DEBUG] Added process {process} to ProcessList");
+            }
+        }
+        
+        /// <summary>
+        /// Analyzes an initialization error to determine its cause.
+        /// </summary>
+        /// <param name="expr">The expression that failed.</param>
+        /// <param name="ex">The exception that was thrown.</param>
+        /// <returns>A descriptive error message with analysis.</returns>
+        private string AnalyzeInitializationError(InitializationExpression expr, Exception ex)
+        {
+            var errorMessage = ex.Message;
+            
+            // Check for missing class references in the error or expression
+            if (errorMessage.Contains("not found") || errorMessage.Contains("nil") || 
+                errorMessage.Contains("does not understand"))
+            {
+                // Check if any UI classes are referenced in the expression
+                foreach (var uiClass in config.KnownUIClasses)
+                {
+                    if (expr.Source != null && expr.Source.Contains(uiClass))
+                    {
+                        // Check if the class exists
+                        var classOop = classBuilder.GetClass(uiClass);
+                        if (classOop.IsNil)
+                        {
+                            missingUIClasses.Add(uiClass);
+                            return $"Missing UI class: {uiClass}. {errorMessage}";
+                        }
+                    }
+                }
+                
+                // Check literals for missing class references
+                if (expr.Literals != null)
+                {
+                    foreach (var literal in expr.Literals)
+                    {
+                        if (literal is string literalStr)
+                        {
+                            // Check for Association literals with UI classes
+                            if (literalStr.StartsWith("Association") || literalStr.StartsWith("#"))
+                            {
+                                foreach (var uiClass in config.KnownUIClasses)
+                                {
+                                    if (literalStr.Contains(uiClass))
+                                    {
+                                        var classOop = classBuilder.GetClass(uiClass);
+                                        if (classOop.IsNil)
+                                        {
+                                            missingUIClasses.Add(uiClass);
+                                            return $"Missing UI class in literal: {uiClass}. {errorMessage}";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for stack overflow or infinite recursion
+            if (ex is StackOverflowException || errorMessage.Contains("recursion") || 
+                errorMessage.Contains("stack overflow"))
+            {
+                return $"Stack overflow or infinite recursion detected. {errorMessage}";
+            }
+            
+            // Check for primitive failures
+            if (errorMessage.Contains("primitive") || errorMessage.Contains("Primitive"))
+            {
+                return $"Primitive operation failed. {errorMessage}";
+            }
+            
+            return errorMessage;
+        }
+        
+        /// <summary>
+        /// Determines if an error is UI-related based on the error message.
+        /// </summary>
+        /// <param name="errorInfo">The analyzed error information.</param>
+        /// <returns>True if the error is UI-related; otherwise, false.</returns>
+        private bool IsUIRelatedError(string errorInfo)
+        {
+            if (string.IsNullOrEmpty(errorInfo))
+                return false;
+                
+            // Check if the error mentions any UI classes
+            foreach (var uiClass in config.KnownUIClasses)
+            {
+                if (errorInfo.Contains(uiClass))
+                    return true;
+            }
+            
+            // Check for common UI-related terms
+            var uiTerms = new[] { "View", "Controller", "Window", "Menu", "Display", "Graphics", "Form" };
+            foreach (var term in uiTerms)
+            {
+                if (errorInfo.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Records an initialization error for reporting.
+        /// </summary>
+        /// <param name="expression">The expression that failed.</param>
+        /// <param name="errorInfo">The error information.</param>
+        private void RecordInitializationError(string expression, string errorInfo)
+        {
+            if (!initializationErrors.ContainsKey(expression))
+            {
+                initializationErrors[expression] = new List<string>();
+            }
+            initializationErrors[expression].Add(errorInfo);
+        }
+        
+        /// <summary>
+        /// Executes a single initialization expression.
+        /// </summary>
+        private void ExecuteExpression(InitializationExpression expr, OOP process)
+        {
+            // Check if we have bytecode to execute
+            if (expr.Bytecode == null || expr.Bytecode.Count == 0)
+            {
+                Console.WriteLine($"[InitExpr] No bytecode for expression: {expr.Source}");
+                return;
+            }
+            
+            // Create a CompiledMethod from the expression
+            var compiledMethod = CreateCompiledMethodFromExpression(expr);
+            
+            // Get the process's suspended context
+            var processObj = memory.GetObject(process);
+            if (processObj == null)
+            {
+                Console.WriteLine($"[InitExpr] Process object not found");
+                return;
+            }
+            
+            var suspendedContext = processObj.Fields[1]; // suspendedContext field
+            var contextObj = memory.GetObject(suspendedContext);
+            if (contextObj == null)
+            {
+                Console.WriteLine($"[InitExpr] Context object not found");
+                return;
+            }
+            
+            // Determine the receiver for this expression
+            OOP receiverOop = OOP.Nil;
+            
+            // For expressions like "Object initialize", the receiver should be the Object class itself
+            // The bytecode 72 (PushLiteralVariable) will push the class Object onto the stack
+            // But we need to set up the context properly for the top-level doIt
+            // The receiver for the doIt context itself is nil (workspace/UndefinedObject)
+            receiverOop = OOP.Nil;
+            
+            // Update the context to execute the new method
+            // Blue Book MethodContext fields: sender, pc, stackp, method, receiver, unused
+            contextObj.Fields[1] = OOP.FromSmallInteger(0);    // Reset pc to 0
+            contextObj.Fields[2] = OOP.FromSmallInteger(0);    // Reset stackp to 0
+            contextObj.Fields[3] = compiledMethod;             // Set the new method
+            contextObj.Fields[4] = receiverOop;                // receiver for the doIt context
+            
+            // Clear the stack portion (fields 6+)
+            for (int i = 6; i < contextObj.Fields.Length; i++)
+            {
+                contextObj.Fields[i] = OOP.Nil;
+            }
+            
+            // Save current active context if any
+            var previousContext = vm.GetActiveContext();
+            
+            // Save and enable method tracing
+            var previousMethodTrace = Config.DebugOptions.EnableMethodTrace;
+            Config.DebugOptions.EnableMethodTrace = true;
+            
+            try
+            {
+                // Create a C# MethodContext wrapper for execution
+                // CRITICAL: For "Object initialize", the receiver of the doIt method is nil
+                // The Object class will be pushed by bytecode 72 (PushLiteralVariable)
+                // and will become the receiver for the 'initialize' message send
+                var context = new Execution.MethodContext(
+                    sender: null, // No sender for top-level initialization
+                    receiver: receiverOop, // nil for top-level doIt context
+                    method: compiledMethod,
+                    arguments: Array.Empty<OOP>(), // No arguments for initialization expressions
+                    tempCount: expr.NumTemps, // Number of temporaries from expression
+                    stackSize: 16 // Standard stack size
+                );
+                
+                // Set the new context as active and execute the bytecode
+                vm.SetActiveContext(context);
+                
+                // Debug logging controlled by flags
+                
+                // Pretty-print the MethodContext
+                if (Config.DebugOptions.EnableInitExprMethodContext)
+                {
+                    Console.WriteLine($"[InitExpr] MethodContext:");
+                    Console.WriteLine($"  - Receiver: {(context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver))}");
+                    Console.WriteLine($"  - Method: CompiledMethod for anonymous doIt");
+                    Console.WriteLine($"  - Sender: {(context.Sender == null ? "nil (top-level)" : "previous context")}");
+                    Console.WriteLine($"  - PC: {context.PC}");
+                    Console.WriteLine($"  - Stack: empty (initial)");
+                    Console.WriteLine($"  - Arguments: {context.Arguments.Length}");
+                    Console.WriteLine($"  - Temporaries: {context.Temporaries.Length}");
+                }
+                
+                // Log the compiled method structure with resolved values
+                var compiledMethodObj = memory.GetObject(compiledMethod);
+                if (Config.DebugOptions.EnableInitExprCompiledMethod && compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4)
+                {
+                    Console.WriteLine($"[InitExpr] CompiledMethod structure:");
+                    
+                    // Selector
+                    var selectorStr = compiledMethodObj.Fields[0].IsNil ? "nil (anonymous doIt)" : OopToString(compiledMethodObj.Fields[0]);
+                    Console.WriteLine($"  - Selector: {selectorStr}");
+                    
+                    // Bytecode array
+                    var bytecodeArrayOop = compiledMethodObj.Fields[1];
+                    var bytecodeArray = memory.GetObject(bytecodeArrayOop);
+                    if (bytecodeArray != null)
+                    {
+                        var bytecodes = new List<int>();
+                        for (int i = 0; i < bytecodeArray.Fields.Length; i++)
+                        {
+                            if (bytecodeArray.Fields[i].IsSmallInteger)
+                            {
+                                bytecodes.Add(bytecodeArray.Fields[i].SmallIntegerValue);
+                            }
+                        }
+                        Console.WriteLine($"  - Bytecode: [{string.Join(", ", bytecodes)}]");
+                    }
+                    
+                    // Header
+                    if (compiledMethodObj.Fields[3].IsSmallInteger)
+                    {
+                        int header = compiledMethodObj.Fields[3].SmallIntegerValue;
+                        int primitiveIndex = (header >> 1) & 0xFF;
+                        int argCount = (header >> 9) & 0x1F;
+                        int tempCount = (header >> 14) & 0x1F;
+                        int stackSize = (header >> 19) & 0x3F;
+                        Console.WriteLine($"  - Header: primitive={primitiveIndex}, args={argCount}, temps={tempCount}, stack={stackSize}");
+                    }
+                    
+                    // Literals array with detailed contents
+                    var literalsArrayOop = compiledMethodObj.Fields[2];
+                    var literalsArray = memory.GetObject(literalsArrayOop);
+                    if (literalsArray != null)
+                    {
+                        Console.WriteLine($"  - Literals: {literalsArray.Fields.Length} entries");
+                        for (int i = 0; i < literalsArray.Fields.Length; i++)
+                        {
+                            var literalOop = literalsArray.Fields[i];
+                            var literalObj = memory.GetObject(literalOop);
+                            
+                            if (literalObj != null)
+                            {
+                                var associationClass = classBuilder.GetClass("Association");
+                                if (!associationClass.IsNil && literalObj.Header.ClassOOP.RawValue == associationClass.RawValue)
+                                {
+                                    // It's an Association - show detailed key and value
+                                    var keyStr = OopToString(literalObj.Fields[0]);
+                                    var valueStr = GetClassNameOrValue(literalObj.Fields[1]);
+                                    Console.WriteLine($"    [{i}] Association(#{keyStr} -> {valueStr})");
+                                }
+                                else
+                                {
+                                    // It's something else (Symbol, String, etc)
+                                    var className = GetClassNameForOop(literalOop);
+                                    var value = OopToString(literalOop);
+                                    Console.WriteLine($"    [{i}] {className}: #{value}");
+                                }
+                            }
+                            else if (literalOop.IsSmallInteger)
+                            {
+                                Console.WriteLine($"    [{i}] SmallInteger: {literalOop.SmallIntegerValue}");
+                            }
+                            else if (literalOop.IsNil)
+                            {
+                                Console.WriteLine($"    [{i}] nil");
+                            }
+                        }
+                    }
+                }
+                
+                // Enable MNU exception throwing during initialization
+                var originalExecutingInit = vm.ExecutingInitialization;
+                vm.ExecutingInitialization = true;
+                
+                try
+                {
+                    vm.ExecuteBytecodes(context);
+                    // Simplify display for comment: selectors
+                    string displaySource = expr.Source ?? "";
+                    if (displaySource.Contains(" comment:"))
+                    {
+                        // Extract just the class name and "comment:" part
+                        int commentIndex = displaySource.IndexOf(" comment:");
+                        if (commentIndex > 0)
+                        {
+                            displaySource = displaySource.Substring(0, commentIndex + 9); // Include " comment:"
+                        }
+                    }
+                    Console.WriteLine($"[InitExpr] Completed: {displaySource}");
+                }
+                finally
+                {
+                    // Restore the original state
+                    vm.ExecutingInitialization = originalExecutingInit;
+                }
+                
+                Console.WriteLine(); // Blank line to separate from next expression
+            }
+            catch (Exception ex)
+            {
+                // Log completion with error status
+                Console.WriteLine($"[InitExpr] Failed: {expr.Source}");
+                Console.WriteLine(); // Blank line to separate from next expression
+                
+                // Enhance error message with more context
+                var enhancedMessage = AnalyzeInitializationError(expr, ex);
+                
+                // Check if we should continue despite the error
+                if (config.SkipUIInitializations && IsUIRelatedError(enhancedMessage))
+                {
+                    // UI-related error, just return without throwing
+                    return;
+                }
+                
+                // Re-throw with enhanced message for the outer catch block
+                throw new InvalidOperationException($"Initialization failed: {enhancedMessage}", ex);
+            }
+            finally
+            {
+                // Restore previous context
+                vm.SetActiveContext(previousContext);
+                // Restore method trace setting
+                Config.DebugOptions.EnableMethodTrace = previousMethodTrace;
+            }
+        }
+        
+        /// <summary>
+        /// Creates a CompiledMethod from an initialization expression.
+        /// </summary>
+        private OOP CreateCompiledMethodFromExpression(InitializationExpression expr)
+        {
+            var compiledMethodClass = classBuilder.GetClass("CompiledMethod");
+            if (compiledMethodClass.IsNil)
+            {
+                throw new InvalidOperationException("CompiledMethod class not found");
+            }
+            
+            // Allocate CompiledMethod object (4 fields)
+            var methodOop = memory.AllocateObject(compiledMethodClass, 4);
+            var methodObj = memory.GetObject(methodOop);
+            
+            if (methodObj == null)
+            {
+                throw new InvalidOperationException("Failed to allocate CompiledMethod");
+            }
+            
+            // Field 0: selector (nil for anonymous top-level doIt)
+            methodObj.Fields[0] = OOP.Nil; // Anonymous doIt has no selector
+            
+            // Field 1: bytecode
+            var bytecodeArray = CreateByteArray(expr.Bytecode.Select(b => (byte)b).ToArray());
+            methodObj.Fields[1] = bytecodeArray;
+            
+            // Field 2: literals
+            // Pass bytecode to CreateLiteralsArray so it can analyze which literals need to be Associations
+            var literalsArray = CreateLiteralsArray(expr.Literals, expr.Bytecode);
+            methodObj.Fields[2] = literalsArray;
+            
+            // Field 3: header (Blue Book method header format)
+            // Header format per Blue Book:
+            // Bits 0: primitive flag (1 bit) - 0 for no primitive
+            // Bits 1-8: primitive index (8 bits) - 0 for no primitive
+            // Bits 9-13: number of arguments (5 bits) - 0 for doIt
+            // Bits 14-18: number of temporaries (5 bits) - from expr.NumTemps
+            // Bits 19-24: stack size (6 bits) - use 16 as default
+            // Bits 25-31: unused
+            
+            int primitiveIndex = 0; // No primitive for doIt
+            int argCount = 0; // No arguments for doIt
+            int tempCount = expr.NumTemps;
+            // Use stack depth from expression if available, otherwise use reasonable default
+            int stackSize = expr.StackDepth > 0 ? Math.Max(expr.StackDepth, 2) : 16;
+            
+            // Encode header according to Blue Book format
+            int header = (primitiveIndex << 1) | 
+                        (argCount << 9) | 
+                        (tempCount << 14) | 
+                        (stackSize << 19);
+            
+            methodObj.Fields[3] = OOP.FromSmallInteger(header);
+            
+            if (Config.DebugOptions.EnableInitExprCompiledMethod)
+            {
+                Console.WriteLine($"[InitExpr] Created CompiledMethod with header: 0x{header:X8}");
+                Console.WriteLine($"  - Primitive: {primitiveIndex}");
+                Console.WriteLine($"  - Args: {argCount}");
+                Console.WriteLine($"  - Temps: {tempCount}");
+                Console.WriteLine($"  - Stack size: {stackSize}");
+            }
+            
+            return methodOop;
+        }
+        
+        /// <summary>
+        /// Creates a ByteArray from bytes.
+        /// </summary>
+        private OOP CreateByteArray(byte[] bytes)
+        {
+            var byteArrayClass = classBuilder.GetClass("ByteArray");
+            if (byteArrayClass.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            var byteArrayOop = memory.AllocateByteArray(byteArrayClass, bytes.Length);
+            var byteArrayObj = memory.GetObject(byteArrayOop);
+            
+            if (byteArrayObj != null)
+            {
+                for (int i = 0; i < bytes.Length && i < byteArrayObj.Fields.Length; i++)
+                {
+                    byteArrayObj.Fields[i] = OOP.FromSmallInteger(bytes[i]);
+                }
+            }
+            
+            return byteArrayOop;
+        }
+        
+        /// <summary>
+        /// Creates an Array of literal objects from a list of literal values.
+        /// Analyzes bytecode to determine which literals need to be Associations for pushLiteralVariable.
+        /// </summary>
+        /// <param name="literals">The list of literal values from the JSON.</param>
+        /// <param name="bytecode">The bytecode to analyze for pushLiteralVariable instructions.</param>
+        private OOP CreateLiteralsArray(List<object> literals, List<int> bytecode)
+        {
+            var arrayClass = classBuilder.GetClass("Array");
+            if (arrayClass.IsNil)
+            {
+                return OOP.Nil;
+            }
+            
+            // First, analyze the bytecode to find which literal indices are used with pushLiteralVariable
+            var literalVariableIndices = new HashSet<int>();
+            for (int i = 0; i < bytecode.Count; i++)
+            {
+                int bc = bytecode[i];
+                
+                // Check for pushLiteralVariable bytecodes (64-95)
+                if (bc >= 64 && bc <= 95)
+                {
+                    // The literal index is (bytecode - 64)
+                    int literalIndex = bc - 64;
+                    literalVariableIndices.Add(literalIndex);
+                    
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Bytecode {bc} at position {i} accesses literal[{literalIndex}] as a variable");
+                    }
+                }
+            }
+            
+            var literalsOop = memory.AllocateWordArray(arrayClass, literals.Count);
+            var literalsObj = memory.GetObject(literalsOop);
+            
+            if (literalsObj != null)
+            {
+                for (int i = 0; i < literals.Count; i++)
+                {
+                    OOP literalOop;
+                    
+                    // Check if this literal index is used with pushLiteralVariable
+                    if (literalVariableIndices.Contains(i))
+                    {
+                        // This literal will be used with pushLiteralVariable
+                        // It needs to be an Association, not just a plain string
+                        var literal = literals[i];
+                        
+                        // Handle plain string literals that should be global variable references
+                        if (literal is string str && !str.StartsWith("#") && !str.StartsWith("Association("))
+                        {
+                            // This is a plain string like "ActionMenu" that needs to be an Association
+                            if (Config.DebugOptions.EnableDebugOutput)
+                            {
+                                Console.WriteLine($"[InitExpr] Converting literal[{i}] '{str}' to Association for pushLiteralVariable");
+                            }
+                            
+                            // Look up the global value (class or other global)
+                            var globalValue = GetGlobalValueForVariable(str);
+                            literalOop = CreateAssociation(str, globalValue);
+                        }
+                        else
+                        {
+                            // Process normally (might already be an Association or Symbol that needs conversion)
+                            literalOop = ConvertLiteralToOop(literal);
+                        }
+                    }
+                    else
+                    {
+                        // Normal literal processing
+                        literalOop = ConvertLiteralToOop(literals[i]);
+                    }
+                    
+                    literalsObj.Fields[i] = literalOop;
+                    
+                    // Debug trace for Associations
+                    if (Config.DebugOptions.EnableDebugOutput && !literalOop.IsNil)
+                    {
+                        var literalObj = memory.GetObject(literalOop);
+                        if (literalObj != null)
+                        {
+                            var associationClass = classBuilder.GetClass("Association");
+                            if (!associationClass.IsNil && literalObj.Header.ClassOOP.RawValue == associationClass.RawValue)
+                            {
+                                var keyStr = OopToString(literalObj.Fields[0]);
+                                if (keyStr == "Cursor" || keyStr == "BinaryChoiceView")
+                                {
+                                    Console.WriteLine($"[InitExpr] TRACE: Storing Association {literalOop} at literals[{i}] with key={literalObj.Fields[0]}, value={literalObj.Fields[1]}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return literalsOop;
+        }
+        
+        /// <summary>
+        /// Converts a JSON literal value to an OOP.
+        /// </summary>
+        private OOP ConvertLiteralToOop(object literal)
+        {
+            return literal switch
+            {
+                null => OOP.Nil,
+                string s when s == "nil" => OOP.Nil,
+                string s when s == "true" => vm.GetSpecialObject(SpecialObjects.TrueObject),
+                string s when s == "false" => vm.GetSpecialObject(SpecialObjects.FalseObject),
+                string s when s.StartsWith("Association(key:") => ParseAssociation(s), // Parse Association literal
+                string s when s.StartsWith("#") => ConvertSymbolLiteral(s[1..]), // Symbol literal - may need Association
+                string s => CreateString(s),
+                int i => OOP.FromSmallInteger(i),
+                long l => OOP.FromSmallInteger((int)l),
+                System.Text.Json.JsonElement je => ConvertJsonElement(je),
+                _ => OOP.Nil
+            };
+        }
+        
+        /// <summary>
+        /// Converts a JsonElement to an OOP.
+        /// </summary>
+        private OOP ConvertJsonElement(System.Text.Json.JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Null => OOP.Nil,
+                System.Text.Json.JsonValueKind.True => vm.GetSpecialObject(SpecialObjects.TrueObject),
+                System.Text.Json.JsonValueKind.False => vm.GetSpecialObject(SpecialObjects.FalseObject),
+                System.Text.Json.JsonValueKind.Number => element.TryGetInt32(out var i)
+                    ? OOP.FromSmallInteger(i)
+                    : OOP.Nil,
+                System.Text.Json.JsonValueKind.String => ConvertLiteralToOop(element.GetString() ?? string.Empty),
+                _ => OOP.Nil
+            };
+        }
+        
+        /// <summary>
+        /// Creates a String object from a C# string.
+        /// </summary>
+        private OOP CreateString(string value)
+        {
+            var stringClass = classBuilder.GetClass("String");
+            if (stringClass.IsNil) return OOP.Nil;
+            
+            var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+            var stringOop = memory.AllocateByteArray(stringClass, bytes.Length);
+            var stringObj = memory.GetObject(stringOop);
+            
+            if (stringObj != null)
+            {
+                for (int i = 0; i < bytes.Length && i < stringObj.Fields.Length; i++)
+                {
+                    stringObj.Fields[i] = OOP.FromSmallInteger(bytes[i]);
+                }
+            }
+            
+            return stringOop;
+        }
+        
+        /// <summary>
+        /// Converts a symbol literal to either a Symbol or an Association for global variables.
+        /// </summary>
+        /// <param name="symbolName">The symbol name without the # prefix.</param>
+        /// <returns>Either a Symbol OOP or an Association OOP for global variables.</returns>
+        private OOP ConvertSymbolLiteral(string symbolName)
+        {
+            // First check if this is a known class name
+            var classOop = classBuilder.GetClass(symbolName);
+            if (!classOop.IsNil)
+            {
+                // This is a global class reference - create an Association
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Creating Association for class {symbolName} -> {classOop}");
+                }
+                return CreateAssociation(symbolName, classOop);
+            }
+            
+            // Check if it's in the classRegistry passed to the constructor
+            if (classRegistry.TryGetValue(symbolName, out var registryClassOop))
+            {
+                // This is a global class reference from registry - create an Association
+                return CreateAssociation(symbolName, registryClassOop);
+            }
+            
+            // Check if this is another global in the system dictionary
+            // For now, we'll check known special globals
+            var globalValue = GetGlobalValue(symbolName);
+            if (!globalValue.IsNil)
+            {
+                // This is a global variable - create an Association
+                return CreateAssociation(symbolName, globalValue);
+            }
+            
+            // Not a global - just return a plain symbol
+            return symbolTable.Intern(symbolName);
+        }
+        
+        /// <summary>
+        /// Creates an Association object with key and value fields.
+        /// </summary>
+        /// <param name="key">The key as a string (will be interned as a symbol).</param>
+        /// <param name="value">The value OOP.</param>
+        /// <returns>An OOP pointing to the created Association.</returns>
+        private OOP CreateAssociation(string key, OOP value)
+        {
+            var associationClass = classBuilder.GetClass("Association");
+            if (associationClass.IsNil)
+            {
+                // Fallback to just returning the symbol if Association class not found
+                return symbolTable.Intern(key);
+            }
+            
+            // Create an Association with 2 instance variables: key and value
+            var associationOop = memory.AllocateObject(associationClass, 2);
+            var associationObj = memory.GetObject(associationOop);
+            
+            if (associationObj != null)
+            {
+                // Field 0: key (as Symbol)
+                associationObj.Fields[0] = symbolTable.Intern(key);
+                // Field 1: value
+                associationObj.Fields[1] = value;
+                
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Created Association {associationOop} for {key} -> {value}");
+                    if (key == "Cursor" || key == "BinaryChoiceView")
+                    {
+                        Console.WriteLine($"[InitExpr] TRACE: Association {associationOop} has key={associationObj.Fields[0]}, value={associationObj.Fields[1]}");
+                    }
+                }
+            }
+            
+            return associationOop;
+        }
+        
+        /// <summary>
+        /// Gets the value of a global variable for use in Associations.
+        /// This is specifically for variables accessed with pushLiteralVariable bytecode.
+        /// </summary>
+        /// <param name="name">The name of the global variable.</param>
+        /// <returns>The value of the global or OOP.Nil if not found.</returns>
+        private OOP GetGlobalValueForVariable(string name)
+        {
+            // First check if this is a known class
+            var classOop = classBuilder.GetClass(name);
+            if (!classOop.IsNil)
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found class '{name}' for Association value: {classOop}");
+                }
+                return classOop;
+            }
+            
+            // Check if it's in the classRegistry
+            if (classRegistry.TryGetValue(name, out var registryClassOop))
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found class '{name}' in registry for Association value: {registryClassOop}");
+                }
+                return registryClassOop;
+            }
+            
+            // Check for special known globals
+            var globalValue = GetGlobalValue(name);
+            if (!globalValue.IsNil)
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found global '{name}' for Association value: {globalValue}");
+                }
+                return globalValue;
+            }
+            
+            // Not found - log warning and return nil
+            Console.WriteLine($"[InitExpr] WARNING: Global variable '{name}' not found for pushLiteralVariable Association");
+            return OOP.Nil;
+        }
+        
+        /// <summary>
+        /// Gets the value of a global variable from the system dictionary.
+        /// </summary>
+        /// <param name="name">The name of the global variable.</param>
+        /// <returns>The value of the global or OOP.Nil if not found.</returns>
+        private OOP GetGlobalValue(string name)
+        {
+            // Check for special known globals
+            switch (name)
+            {
+                case "Smalltalk":
+                    return vm.GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
+                case "Processor":
+                    return vm.GetSpecialObject(SpecialObjects.ProcessorScheduler);
+                case "nil":
+                    return OOP.Nil;
+                case "true":
+                    return vm.GetSpecialObject(SpecialObjects.TrueObject);
+                case "false":
+                    return vm.GetSpecialObject(SpecialObjects.FalseObject);
+                default:
+                    // For other globals, we could look them up in the system dictionary
+                    // but for now we'll return Nil if not a known special global
+                    return OOP.Nil;
+            }
+        }
+        
+        /// <summary>
+        /// Gets the class name for an OOP for debugging.
+        /// </summary>
+        private string GetClassNameForOop(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return "SmallInteger";
+            
+            var obj = memory.GetObject(oop);
+            if (obj == null) return "unknown";
+            
+            var classOop = obj.Header.ClassOOP;
+            
+            // Check known classes
+            if (classOop.RawValue == classBuilder.GetClass("Symbol").RawValue) return "Symbol";
+            if (classOop.RawValue == classBuilder.GetClass("String").RawValue) return "String";
+            if (classOop.RawValue == classBuilder.GetClass("Array").RawValue) return "Array";
+            if (classOop.RawValue == classBuilder.GetClass("ByteArray").RawValue) return "ByteArray";
+            if (classOop.RawValue == classBuilder.GetClass("Association").RawValue) return "Association";
+            
+            return $"Class({classOop})";
+        }
+        
+        /// <summary>
+        /// Converts an OOP to a string representation for debugging.
+        /// </summary>
+        private string OopToString(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return oop.SmallIntegerValue.ToString();
+            
+            var obj = memory.GetObject(oop);
+            if (obj == null) return "?";
+            
+            var classOop = obj.Header.ClassOOP;
+            
+            // For Symbol or String, extract the actual text
+            if (classOop.RawValue == classBuilder.GetClass("Symbol").RawValue ||
+                classOop.RawValue == classBuilder.GetClass("String").RawValue)
+            {
+                var chars = new List<char>();
+                for (int i = 0; i < obj.Fields.Length && i < 100; i++) // Limit to 100 chars
+                {
+                    if (obj.Fields[i].IsSmallInteger)
+                    {
+                        chars.Add((char)obj.Fields[i].SmallIntegerValue);
+                    }
+                }
+                return new string(chars.ToArray());
+            }
+            
+            return oop.ToString();
+        }
+        
+        /// <summary>
+        /// Gets a readable name or value for an OOP (used for Association values).
+        /// </summary>
+        private string GetClassNameOrValue(OOP oop)
+        {
+            if (oop.IsNil) return "nil";
+            if (oop.IsSmallInteger) return $"SmallInt({oop.SmallIntegerValue})";
+            
+            // Check if it's a known class
+            foreach (var kvp in classRegistry)
+            {
+                if (kvp.Value.RawValue == oop.RawValue)
+                {
+                    return $"class {kvp.Key}";
+                }
+            }
+            
+            // Check if it's a metaclass
+            var obj = memory.GetObject(oop);
+            if (obj != null && obj.Header.ClassOOP.RawValue == classBuilder.GetClass("Metaclass").RawValue)
+            {
+                // It's a metaclass - try to find which one
+                foreach (var kvp in classRegistry)
+                {
+                    var metaclassOop = classBuilder.GetMetaclass(kvp.Key);
+                    if (metaclassOop.RawValue == oop.RawValue)
+                    {
+                        return $"metaclass {kvp.Key}";
+                    }
+                }
+            }
+            
+            return GetClassNameForOop(oop) + $"({oop})";
+        }
+        
+        /// <summary>
+        /// Parses an Association literal from the JSON string format.
+        /// Format: "Association(key: #Name, value: null)"
+        /// </summary>
+        private OOP ParseAssociation(string associationStr)
+        {
+            // Parse the association string to extract the key
+            // Format can be either "Association(key:Name,value:nil)" or "Association(key:#Name,value:nil)"
+            var match = System.Text.RegularExpressions.Regex.Match(
+                associationStr, 
+                @"Association\(key:\s*#?(\w+),\s*value:\s*(\w+)\)"
+            );
+            
+            if (match.Success)
+            {
+                var keyName = match.Groups[1].Value;
+                // The value is always null in the JSON, we need to resolve it at runtime
+                
+                // Check if this is a known class
+                var classOop = classBuilder.GetClass(keyName);
+                if (!classOop.IsNil)
+                {
+                    // Resolved Association for class
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via ClassBuilder -> {classOop}");
+                    }
+                    return CreateAssociation(keyName, classOop);
+                }
+                
+                // Check if it's in the classRegistry passed to the constructor
+                if (classRegistry.TryGetValue(keyName, out var registryClassOop))
+                {
+                    // Resolved Association from registry
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via classRegistry -> {registryClassOop}");
+                    }
+                    return CreateAssociation(keyName, registryClassOop);
+                }
+                
+                // Check other globals
+                var globalValue = GetGlobalValue(keyName);
+                if (!globalValue.IsNil)
+                {
+                    // Resolved Association for global
+                    return CreateAssociation(keyName, globalValue);
+                }
+                
+                // Unknown global - create association with nil value
+                // It might be resolved later
+                Console.WriteLine($"[InitExpr] WARNING: Could not resolve Association for '{keyName}', using nil");
+                Console.WriteLine($"[InitExpr] DEBUG: ClassBuilder.GetClass returned {classOop}, classRegistry has {classRegistry.Count} entries");
+                
+                // Special debug for Cursor class
+                if (keyName == "Cursor")
+                {
+                    Console.WriteLine($"[InitExpr] CRITICAL: Cursor class not found!");
+                    Console.WriteLine($"[InitExpr] Checking if 'Cursor' exists in classRegistry with different casing...");
+                    var cursorVariants = classRegistry.Keys.Where(k => k.Equals("cursor", StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (cursorVariants.Count > 0)
+                    {
+                        Console.WriteLine($"[InitExpr] Found similar: {string.Join(", ", cursorVariants)}");
+                    }
+                }
+                
+                if (classRegistry.Count > 0)
+                {
+                    Console.WriteLine($"[InitExpr] DEBUG: Sample classes in registry: {string.Join(", ", classRegistry.Keys.Take(10))}");
+                    
+                    // Check if Cursor is actually there
+                    if (classRegistry.ContainsKey("Cursor"))
+                    {
+                        Console.WriteLine($"[InitExpr] STRANGE: 'Cursor' IS in classRegistry! Value: {classRegistry["Cursor"]}");
+                    }
+                }
+                return CreateAssociation(keyName, OOP.Nil);
+            }
+            
+            // Couldn't parse - return nil
+            return OOP.Nil;
+        }
+    }
+}

@@ -196,6 +196,11 @@ namespace StandaloneCompiler
         /// <summary>
         /// Number of temporary variables needed.
         /// </summary>
+        public int TemporaryCount { get; set; } = 0;
+        
+        /// <summary>
+        /// Number of temporary variables needed.
+        /// </summary>
         public int NumTemps { get; set; } = 0;
         
         /// <summary>

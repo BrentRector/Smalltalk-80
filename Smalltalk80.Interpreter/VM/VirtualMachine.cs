@@ -269,7 +269,7 @@ namespace Smalltalk80.Interpreter.VM
             if (manifest.InitializationExpressions != null && manifest.InitializationExpressions.Count > 0)
             {
                 Console.WriteLine($"[VM] Found {manifest.InitializationExpressions.Count} initialization expressions");
-                ExecuteInitializationsWithRetry(manifest.InitializationExpressions);
+                ExecuteInitializationExpressions(manifest, manifest.InitializationExpressions);
             }
             else
             {
@@ -887,6 +887,15 @@ namespace Smalltalk80.Interpreter.VM
 
         public void SuperSend(OOP receiver, OOP selector, OOP[] arguments)
         {
+            // Delegate to SuperSendWithResult but discard the result for backward compatibility
+            SuperSendWithResult(receiver, selector, arguments);
+        }
+        
+        /// <summary>
+        /// Performs a super send and returns the result.
+        /// </summary>
+        public OOP SuperSendWithResult(OOP receiver, OOP selector, OOP[] arguments)
+        {
             // Increment recursion depth
             recursionDepth++;
             
@@ -935,11 +944,13 @@ namespace Smalltalk80.Interpreter.VM
                 {
                     // Method not found - send doesNotUnderstand:
                     HandleDoesNotUnderstand(receiver, selector, arguments);
-                    return;
+                    return OOP.Nil;
                 }
                 
-                // Execute the method
-                ExecuteMethod(receiver, method, actualMethodClass, arguments);
+                // Execute the method and return result
+                var result = ExecuteMethodWithResult(receiver, method, actualMethodClass, arguments);
+                lastSendResult = result;
+                return result;
             }
             finally
             {
@@ -1450,12 +1461,9 @@ namespace Smalltalk80.Interpreter.VM
                 var result = primitiveTable.Execute(primitiveIndex, receiver, arguments, this);
                 if (result.Success)
                 {
-                    // Primitive succeeded - push result to activeContext if there is one and return the result
-                    if (activeContext != null)
-                    {
-                        activeContext.Stack.Push(result.Value);
-                    }
-                    return result.Value; // Return the primitive result directly
+                    // Primitive succeeded - just return the result
+                    // The caller (bytecode dispatcher) will handle pushing to the stack
+                    return result.Value;
                 }
                 // Primitive failed - continue with method execution
                 if (DebugOptions.EnableDebugOutput)
@@ -2475,185 +2483,9 @@ namespace Smalltalk80.Interpreter.VM
             }
         }
         
-        /// <summary>
-        /// Executes initialization expressions with retry logic for failed initializations.
-        /// </summary>
-        /// <param name="expressions">The initialization expressions to execute.</param>
-        private void ExecuteInitializationsWithRetry(List<InitializationExpression> expressions)
-        {
-            if (expressions == null || expressions.Count == 0)
-            {
-                return;
-            }
-            
-            // DEBUGGING: Re-enable retry but keep debug output
-            bool enableRetry = true; // SET TO FALSE TO DISABLE RETRY LOGIC
-            
-            Console.WriteLine($"[VM] Executing {expressions.Count} initialization expressions (retry {(enableRetry ? "enabled" : "DISABLED")})...");
-            
-            // Track successful and failed initializations
-            var successful = new List<string>();
-            var failed = new Dictionary<string, string>(); // class -> error message
-            var retryList = new List<InitializationExpression>();
-            
-            // First pass - try all initializations
-            foreach (var expr in expressions)
-            {
-                var className = expr.Receiver ?? "<unknown>";
-                try
-                {
-                    // Set the flag to indicate we're executing initialization
-                    executingInitialization = true;
-                    
-                    // Enable method tracing for debugging initialization
-                    var oldMethodTrace = DebugOptions.EnableMethodTrace;
-                    DebugOptions.EnableMethodTrace = true;
-                    
-                    Console.WriteLine($"[VM] Starting: {className}>>{expr.Selector}");
-                    
-                    // Execute the initialization expression
-                    ExecuteSingleInitialization(expr);
-                    
-                    // Restore method trace setting
-                    DebugOptions.EnableMethodTrace = oldMethodTrace;
-                    
-                    successful.Add($"{className}>>{expr.Selector}");
-                }
-                catch (Exception ex)
-                {
-                    failed[className] = ex.Message;
-                    retryList.Add(expr);
-                    Console.WriteLine($"[VM] Failed: {className}>>{expr.Selector} - {ex.Message}");
-                    
-                    // If retry is disabled, throw immediately on first error to see full stack trace
-                    if (!enableRetry)
-                    {
-                        Console.WriteLine($"[VM] STOPPING: Retry disabled, throwing exception for debugging");
-                        throw new InvalidOperationException($"Initialization failed for {className}>>{expr.Selector}: {ex.Message}", ex);
-                    }
-                }
-                finally
-                {
-                    executingInitialization = false;
-                }
-            }
-            
-            // Retry failed initializations once (some may succeed after others have run)
-            if (enableRetry && retryList.Count > 0)
-            {
-                Console.WriteLine($"[VM] Retrying {retryList.Count} failed initializations...");
-                var stillFailed = new List<InitializationExpression>();
-                
-                foreach (var expr in retryList)
-                {
-                    var className = expr.Receiver ?? "<unknown>";
-                    try
-                    {
-                        executingInitialization = true;
-                        
-                        // Enable method tracing for debugging initialization
-                        var oldMethodTrace = DebugOptions.EnableMethodTrace;
-                        DebugOptions.EnableMethodTrace = true;
-                        
-                        Console.WriteLine($"[VM] Retrying: {className}>>{expr.Selector}");
-                        
-                        ExecuteSingleInitialization(expr);
-                        
-                        // Restore method trace setting
-                        DebugOptions.EnableMethodTrace = oldMethodTrace;
-                        
-                        // Remove from failed list and add to successful
-                        failed.Remove(className);
-                        successful.Add($"{className}>>{expr.Selector} (retry)");
-                    }
-                    catch (Exception ex)
-                    {
-                        stillFailed.Add(expr);
-                        failed[className] = ex.Message;
-                    }
-                    finally
-                    {
-                        executingInitialization = false;
-                    }
-                }
-                
-                if (stillFailed.Count > 0)
-                {
-                    Console.WriteLine($"[VM] {stillFailed.Count} initializations still failed after retry");
-                }
-            }
-            
-            // Report results
-            Console.WriteLine($"[VM] Initialization complete: {successful.Count} succeeded, {failed.Count} failed");
-            
-            if (successful.Count > 0)
-            {
-                Console.WriteLine("[VM] Successful initializations:");
-                foreach (var s in successful.Take(10)) // Show first 10
-                {
-                    Console.WriteLine($"  ✓ {s}");
-                }
-                if (successful.Count > 10)
-                {
-                    Console.WriteLine($"  ... and {successful.Count - 10} more");
-                }
-            }
-            
-            if (failed.Count > 0)
-            {
-                Console.WriteLine("[VM] Failed initializations:");
-                foreach (var kvp in failed.Take(10)) // Show first 10
-                {
-                    Console.WriteLine($"  ✗ {kvp.Key}: {kvp.Value}");
-                }
-                if (failed.Count > 10)
-                {
-                    Console.WriteLine($"  ... and {failed.Count - 10} more");
-                }
-            }
-        }
-        
-        /// <summary>
-        /// Executes a single initialization expression.
-        /// </summary>
-        /// <param name="expr">The initialization expression to execute.</param>
-        private void ExecuteSingleInitialization(InitializationExpression expr)
-        {
-            if (expr.Receiver == null || expr.Selector == null)
-            {
-                throw new ArgumentException("Invalid initialization expression: missing receiver or selector");
-            }
-            
-            // Look up the receiver (should be a class)
-            var receiverClass = classBuilder.GetClass(expr.Receiver);
-            if (receiverClass.IsNil)
-            {
-                throw new InvalidOperationException($"Class not found: {expr.Receiver}");
-            }
-            
-            // Create the selector symbol
-            var selector = Intern(expr.Selector);
-            if (selector.IsNil)
-            {
-                throw new InvalidOperationException($"Could not create selector: {expr.Selector}");
-            }
-            
-            // Prepare arguments if any
-            var arguments = new OOP[0];
-            if (expr.Arguments != null && expr.Arguments.Count > 0)
-            {
-                arguments = new OOP[expr.Arguments.Count];
-                for (int i = 0; i < expr.Arguments.Count; i++)
-                {
-                    // For now, only handle nil arguments
-                    // TODO: Handle other argument types as needed
-                    arguments[i] = OOP.Nil;
-                }
-            }
-            
-            // Send the initialization message and get result (though we typically don't use it)
-            var result = SendWithResult(receiverClass, selector, arguments);
-        }
+        // Removed ExecuteInitializationsWithRetry and ExecuteSingleInitialization
+        // All initialization expressions should be executed via InitializationExpressionExecutor
+        // which properly handles bytecode execution
 
         #endregion
     }

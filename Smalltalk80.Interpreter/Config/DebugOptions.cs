@@ -2,7 +2,11 @@ namespace Smalltalk80.Interpreter.Config
 {
     /// <summary>
     /// Global debug options for the Smalltalk-80 interpreter.
+    /// NOTE: This class is OBSOLETE and should be replaced with ILogger-based logging.
+    /// Use LoggingConfiguration and ILogger for new code.
+    /// This is only kept for compatibility with the old VirtualMachine implementation.
     /// </summary>
+    [Obsolete("Use ILogger<T> and LoggingConfiguration instead. This will be removed when VirtualMachine is fully migrated.")]
     public static class DebugOptions
     {
         /// <summary>

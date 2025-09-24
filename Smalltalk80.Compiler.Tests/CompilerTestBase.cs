@@ -4,7 +4,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using Smalltalk80.Compiler.AST;
-using Smalltalk80.Compiler.AST.Processors;
 
 namespace Smalltalk80.Compiler.Tests;
 

@@ -133,20 +133,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     var errorInfo = AnalyzeInitializationError(expr, ex);
                     RecordInitializationError(expr.Source ?? "Unknown", errorInfo);
                     
-                    // Check if this is a UI-related failure that should be skipped
-                    if (config.SkipUIInitializations && IsUIRelatedError(errorInfo))
-                    {
-                        Console.WriteLine($"[InitExpr] Skipping UI-related initialization '{expr.Source}': {errorInfo}");
-                    }
-                    else if (config.ContinueOnError)
-                    {
-                        Console.WriteLine($"[InitExpr] Error in '{expr.Source}' (continuing): {errorInfo}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[InitExpr] Fatal error in '{expr.Source}': {errorInfo}");
-                        throw;
-                    }
+                    // Always stop after first error - initialization expressions should complete successfully
+                    Console.WriteLine($"[InitExpr] Fatal error in '{expr.Source}': {errorInfo}");
+                    Console.WriteLine($"[InitExpr] Stopping initialization after {successCount} successful expressions.");
+                    throw new InvalidOperationException($"Initialization failed at '{expr.Source}': {errorInfo}", ex);
                 }
             }
             
@@ -706,7 +696,18 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 try
                 {
                     vm.ExecuteBytecodes(context);
-                    Console.WriteLine($"[InitExpr] Completed: {expr.Source}");
+                    // Simplify display for comment: selectors
+                    string displaySource = expr.Source ?? "";
+                    if (displaySource.Contains(" comment:"))
+                    {
+                        // Extract just the class name and "comment:" part
+                        int commentIndex = displaySource.IndexOf(" comment:");
+                        if (commentIndex > 0)
+                        {
+                            displaySource = displaySource.Substring(0, commentIndex + 9); // Include " comment:"
+                        }
+                    }
+                    Console.WriteLine($"[InitExpr] Completed: {displaySource}");
                 }
                 finally
                 {
@@ -719,21 +720,21 @@ namespace Smalltalk80.Interpreter.Bootstrap
             catch (Exception ex)
             {
                 // Log completion with error status
-                Console.WriteLine($"[InitExpr] Completed with error: {expr.Source}");
+                Console.WriteLine($"[InitExpr] Failed: {expr.Source}");
                 Console.WriteLine(); // Blank line to separate from next expression
                 
                 // Enhance error message with more context
                 var enhancedMessage = AnalyzeInitializationError(expr, ex);
-                Console.WriteLine($"[InitExpr] Error executing '{expr.Source}': {enhancedMessage}");
                 
                 // Check if we should continue despite the error
                 if (config.SkipUIInitializations && IsUIRelatedError(enhancedMessage))
                 {
-                    Console.WriteLine($"[InitExpr] UI-related error detected, skipping due to configuration.");
-                    return; // Don't throw, just return
+                    // UI-related error, just return without throwing
+                    return;
                 }
                 
-                throw;
+                // Re-throw with enhanced message for the outer catch block
+                throw new InvalidOperationException($"Initialization failed: {enhancedMessage}", ex);
             }
             finally
             {
@@ -772,7 +773,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
             methodObj.Fields[1] = bytecodeArray;
             
             // Field 2: literals
-            var literalsArray = CreateLiteralsArray(expr.Literals);
+            // Pass bytecode to CreateLiteralsArray so it can analyze which literals need to be Associations
+            var literalsArray = CreateLiteralsArray(expr.Literals, expr.Bytecode);
             methodObj.Fields[2] = literalsArray;
             
             // Field 3: header (Blue Book method header format)
@@ -837,13 +839,36 @@ namespace Smalltalk80.Interpreter.Bootstrap
         
         /// <summary>
         /// Creates an Array of literal objects from a list of literal values.
+        /// Analyzes bytecode to determine which literals need to be Associations for pushLiteralVariable.
         /// </summary>
-        private OOP CreateLiteralsArray(List<object> literals)
+        /// <param name="literals">The list of literal values from the JSON.</param>
+        /// <param name="bytecode">The bytecode to analyze for pushLiteralVariable instructions.</param>
+        private OOP CreateLiteralsArray(List<object> literals, List<int> bytecode)
         {
             var arrayClass = classBuilder.GetClass("Array");
             if (arrayClass.IsNil)
             {
                 return OOP.Nil;
+            }
+            
+            // First, analyze the bytecode to find which literal indices are used with pushLiteralVariable
+            var literalVariableIndices = new HashSet<int>();
+            for (int i = 0; i < bytecode.Count; i++)
+            {
+                int bc = bytecode[i];
+                
+                // Check for pushLiteralVariable bytecodes (64-95)
+                if (bc >= 64 && bc <= 95)
+                {
+                    // The literal index is (bytecode - 64)
+                    int literalIndex = bc - 64;
+                    literalVariableIndices.Add(literalIndex);
+                    
+                    if (Config.DebugOptions.EnableDebugOutput)
+                    {
+                        Console.WriteLine($"[InitExpr] Bytecode {bc} at position {i} accesses literal[{literalIndex}] as a variable");
+                    }
+                }
             }
             
             var literalsOop = memory.AllocateWordArray(arrayClass, literals.Count);
@@ -853,7 +878,40 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 for (int i = 0; i < literals.Count; i++)
                 {
-                    var literalOop = ConvertLiteralToOop(literals[i]);
+                    OOP literalOop;
+                    
+                    // Check if this literal index is used with pushLiteralVariable
+                    if (literalVariableIndices.Contains(i))
+                    {
+                        // This literal will be used with pushLiteralVariable
+                        // It needs to be an Association, not just a plain string
+                        var literal = literals[i];
+                        
+                        // Handle plain string literals that should be global variable references
+                        if (literal is string str && !str.StartsWith("#") && !str.StartsWith("Association("))
+                        {
+                            // This is a plain string like "ActionMenu" that needs to be an Association
+                            if (Config.DebugOptions.EnableDebugOutput)
+                            {
+                                Console.WriteLine($"[InitExpr] Converting literal[{i}] '{str}' to Association for pushLiteralVariable");
+                            }
+                            
+                            // Look up the global value (class or other global)
+                            var globalValue = GetGlobalValueForVariable(str);
+                            literalOop = CreateAssociation(str, globalValue);
+                        }
+                        else
+                        {
+                            // Process normally (might already be an Association or Symbol that needs conversion)
+                            literalOop = ConvertLiteralToOop(literal);
+                        }
+                    }
+                    else
+                    {
+                        // Normal literal processing
+                        literalOop = ConvertLiteralToOop(literals[i]);
+                    }
+                    
                     literalsObj.Fields[i] = literalOop;
                     
                     // Debug trace for Associations
@@ -1020,6 +1078,51 @@ namespace Smalltalk80.Interpreter.Bootstrap
         }
         
         /// <summary>
+        /// Gets the value of a global variable for use in Associations.
+        /// This is specifically for variables accessed with pushLiteralVariable bytecode.
+        /// </summary>
+        /// <param name="name">The name of the global variable.</param>
+        /// <returns>The value of the global or OOP.Nil if not found.</returns>
+        private OOP GetGlobalValueForVariable(string name)
+        {
+            // First check if this is a known class
+            var classOop = classBuilder.GetClass(name);
+            if (!classOop.IsNil)
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found class '{name}' for Association value: {classOop}");
+                }
+                return classOop;
+            }
+            
+            // Check if it's in the classRegistry
+            if (classRegistry.TryGetValue(name, out var registryClassOop))
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found class '{name}' in registry for Association value: {registryClassOop}");
+                }
+                return registryClassOop;
+            }
+            
+            // Check for special known globals
+            var globalValue = GetGlobalValue(name);
+            if (!globalValue.IsNil)
+            {
+                if (Config.DebugOptions.EnableDebugOutput)
+                {
+                    Console.WriteLine($"[InitExpr] Found global '{name}' for Association value: {globalValue}");
+                }
+                return globalValue;
+            }
+            
+            // Not found - log warning and return nil
+            Console.WriteLine($"[InitExpr] WARNING: Global variable '{name}' not found for pushLiteralVariable Association");
+            return OOP.Nil;
+        }
+        
+        /// <summary>
         /// Gets the value of a global variable from the system dictionary.
         /// </summary>
         /// <param name="name">The name of the global variable.</param>
@@ -1142,9 +1245,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
         private OOP ParseAssociation(string associationStr)
         {
             // Parse the association string to extract the key
+            // Format can be either "Association(key:Name,value:nil)" or "Association(key:#Name,value:nil)"
             var match = System.Text.RegularExpressions.Regex.Match(
                 associationStr, 
-                @"Association\(key:\s*#(\w+),\s*value:\s*(\w+)\)"
+                @"Association\(key:\s*#?(\w+),\s*value:\s*(\w+)\)"
             );
             
             if (match.Success)
