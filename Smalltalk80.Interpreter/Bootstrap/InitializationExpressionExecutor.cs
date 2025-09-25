@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
@@ -54,6 +55,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
     /// </summary>
     public sealed class InitializationExpressionExecutor
     {
+        private readonly ILogger<InitializationExpressionExecutor> logger;
         private readonly ObjectMemory memory;
         private readonly VirtualMachine vm;
         private readonly ClassBuilder classBuilder;
@@ -67,6 +69,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// Initializes a new instance of the InitializationExpressionExecutor class.
         /// </summary>
         public InitializationExpressionExecutor(
+            ILogger<InitializationExpressionExecutor> logger,
             ObjectMemory memory,
             VirtualMachine vm,
             ClassBuilder classBuilder,
@@ -74,6 +77,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             IReadOnlyDictionary<string, OOP> classRegistry,
             InitializationConfig? config = null)
         {
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
@@ -94,23 +98,26 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             if (expressions == null || expressions.Count == 0)
             {
-                Console.WriteLine("[InitExpr] No initialization expressions to execute.");
+                logger.LogInformation("No initialization expressions to execute");
                 return doItProcess.IsNil ? CreateDoItProcess() : doItProcess;
             }
             
-            Console.WriteLine($"[InitExpr] Executing {expressions.Count} initialization expressions...");
+            logger.LogInformation("Executing {Count} initialization expressions", expressions.Count);
             
             // Sort initialization expressions by class hierarchy (superclasses first)
             var sortedExpressions = SortByClassHierarchy(expressions);
             
-            Console.WriteLine("[InitExpr] Sorted initialization expressions by class hierarchy:");
-            foreach (var expr in sortedExpressions.Take(10))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                Console.WriteLine($"  - {expr.Source}");
-            }
-            if (sortedExpressions.Count > 10)
-            {
-                Console.WriteLine($"  ... and {sortedExpressions.Count - 10} more");
+                logger.LogDebug("Sorted initialization expressions by class hierarchy:");
+                foreach (var expr in sortedExpressions.Take(10))
+                {
+                    logger.LogDebug("  Expression: {Source}", expr.Source);
+                }
+                if (sortedExpressions.Count > 10)
+                {
+                    logger.LogDebug("  ... and {Count} more", sortedExpressions.Count - 10);
+                }
             }
             
             // Get or create a process for execution
@@ -134,35 +141,27 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     RecordInitializationError(expr.Source ?? "Unknown", errorInfo);
                     
                     // Always stop after first error - initialization expressions should complete successfully
-                    Console.WriteLine($"[InitExpr] Fatal error in '{expr.Source}': {errorInfo}");
-                    Console.WriteLine($"[InitExpr] Stopping initialization after {successCount} successful expressions.");
+                    logger.LogError(ex, "Fatal error in expression '{Source}': {ErrorInfo}", expr.Source, errorInfo);
+                    logger.LogError("Stopping initialization after {SuccessCount} successful expressions", successCount);
                     throw new InvalidOperationException($"Initialization failed at '{expr.Source}': {errorInfo}", ex);
                 }
             }
             
-            Console.WriteLine($"[InitExpr] Completed {successCount}/{expressions.Count} initialization expressions.");
+            logger.LogInformation("Completed {SuccessCount}/{TotalCount} initialization expressions", successCount, expressions.Count);
             
             // Report missing UI classes if any were detected
             if (missingUIClasses.Count > 0)
             {
-                Console.WriteLine($"[InitExpr] Missing UI classes detected:");
-                foreach (var className in missingUIClasses)
-                {
-                    Console.WriteLine($"  - {className}");
-                }
+                logger.LogWarning("Missing UI classes detected: {Classes}", string.Join(", ", missingUIClasses));
             }
             
             // Report initialization errors summary
             if (initializationErrors.Count > 0)
             {
-                Console.WriteLine($"[InitExpr] Initialization errors summary:");
                 foreach (var kvp in initializationErrors)
                 {
-                    Console.WriteLine($"  {kvp.Key}:");
-                    foreach (var error in kvp.Value)
-                    {
-                        Console.WriteLine($"    - {error}");
-                    }
+                    logger.LogError("Initialization errors for {Expression}: {Errors}", 
+                        kvp.Key, string.Join("; ", kvp.Value));
                 }
             }
             
@@ -358,7 +357,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 if (DebugOptions.EnableDebugOutput)
                 {
-                    Console.WriteLine("[DEBUG] ProcessList not found in special objects");
+                    logger.LogDebug("ProcessList not found in special objects");
                 }
                 return;
             }
@@ -399,7 +398,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             if (DebugOptions.EnableDebugOutput)
             {
-                Console.WriteLine($"[DEBUG] Added process {process} to ProcessList");
+                logger.LogDebug("Added process {Process} to ProcessList", process);
             }
         }
         
@@ -526,7 +525,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             // Check if we have bytecode to execute
             if (expr.Bytecode == null || expr.Bytecode.Count == 0)
             {
-                Console.WriteLine($"[InitExpr] No bytecode for expression: {expr.Source}");
+                logger.LogWarning("No bytecode for expression: {Source}", expr.Source);
                 return;
             }
             
@@ -537,7 +536,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var processObj = memory.GetObject(process);
             if (processObj == null)
             {
-                Console.WriteLine($"[InitExpr] Process object not found");
+                logger.LogError("Process object not found");
                 return;
             }
             
@@ -545,7 +544,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var contextObj = memory.GetObject(suspendedContext);
             if (contextObj == null)
             {
-                Console.WriteLine($"[InitExpr] Context object not found");
+                logger.LogError("Context object not found");
                 return;
             }
             
@@ -599,34 +598,29 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 // Debug logging controlled by flags
                 
                 // Pretty-print the MethodContext
-                if (Config.DebugOptions.EnableInitExprMethodContext)
+                if (Config.DebugOptions.EnableInitExprMethodContext && logger.IsEnabled(LogLevel.Debug))
                 {
-                    Console.WriteLine($"[InitExpr] MethodContext:");
-                    Console.WriteLine($"  - Receiver: {(context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver))}");
-                    Console.WriteLine($"  - Method: CompiledMethod for anonymous doIt");
-                    Console.WriteLine($"  - Sender: {(context.Sender == null ? "nil (top-level)" : "previous context")}");
-                    Console.WriteLine($"  - PC: {context.PC}");
-                    Console.WriteLine($"  - Stack: empty (initial)");
-                    Console.WriteLine($"  - Arguments: {context.Arguments.Length}");
-                    Console.WriteLine($"  - Temporaries: {context.Temporaries.Length}");
+                    logger.LogDebug("MethodContext - Receiver: {Receiver}, Method: CompiledMethod for anonymous doIt, Sender: {Sender}, PC: {PC}, Arguments: {ArgCount}, Temporaries: {TempCount}",
+                        context.Receiver.IsNil ? "nil (workspace/doIt context)" : GetClassNameOrValue(context.Receiver),
+                        context.Sender == null ? "nil (top-level)" : "previous context",
+                        context.PC,
+                        context.Arguments.Length,
+                        context.Temporaries.Length);
                 }
                 
                 // Log the compiled method structure with resolved values
                 var compiledMethodObj = memory.GetObject(compiledMethod);
-                if (Config.DebugOptions.EnableInitExprCompiledMethod && compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4)
+                if (Config.DebugOptions.EnableInitExprCompiledMethod && compiledMethodObj != null && compiledMethodObj.Fields.Length >= 4 && logger.IsEnabled(LogLevel.Debug))
                 {
-                    Console.WriteLine($"[InitExpr] CompiledMethod structure:");
-                    
                     // Selector
                     var selectorStr = compiledMethodObj.Fields[0].IsNil ? "nil (anonymous doIt)" : OopToString(compiledMethodObj.Fields[0]);
-                    Console.WriteLine($"  - Selector: {selectorStr}");
                     
                     // Bytecode array
                     var bytecodeArrayOop = compiledMethodObj.Fields[1];
                     var bytecodeArray = memory.GetObject(bytecodeArrayOop);
+                    var bytecodes = new List<int>();
                     if (bytecodeArray != null)
                     {
-                        var bytecodes = new List<int>();
                         for (int i = 0; i < bytecodeArray.Fields.Length; i++)
                         {
                             if (bytecodeArray.Fields[i].IsSmallInteger)
@@ -634,26 +628,33 @@ namespace Smalltalk80.Interpreter.Bootstrap
                                 bytecodes.Add(bytecodeArray.Fields[i].SmallIntegerValue);
                             }
                         }
-                        Console.WriteLine($"  - Bytecode: [{string.Join(", ", bytecodes)}]");
                     }
                     
                     // Header
+                    int primitiveIndex = 0, argCount = 0, tempCount = 0, stackSize = 0;
                     if (compiledMethodObj.Fields[3].IsSmallInteger)
                     {
                         int header = compiledMethodObj.Fields[3].SmallIntegerValue;
-                        int primitiveIndex = (header >> 1) & 0xFF;
-                        int argCount = (header >> 9) & 0x1F;
-                        int tempCount = (header >> 14) & 0x1F;
-                        int stackSize = (header >> 19) & 0x3F;
-                        Console.WriteLine($"  - Header: primitive={primitiveIndex}, args={argCount}, temps={tempCount}, stack={stackSize}");
+                        primitiveIndex = (header >> 1) & 0xFF;
+                        argCount = (header >> 9) & 0x1F;
+                        tempCount = (header >> 14) & 0x1F;
+                        stackSize = (header >> 19) & 0x3F;
                     }
+                    
+                    logger.LogDebug("CompiledMethod - Selector: {Selector}, Bytecode: [{Bytecode}], Header: primitive={Primitive}, args={Args}, temps={Temps}, stack={Stack}",
+                        selectorStr,
+                        string.Join(", ", bytecodes),
+                        primitiveIndex,
+                        argCount,
+                        tempCount,
+                        stackSize);
                     
                     // Literals array with detailed contents
                     var literalsArrayOop = compiledMethodObj.Fields[2];
                     var literalsArray = memory.GetObject(literalsArrayOop);
-                    if (literalsArray != null)
+                    if (literalsArray != null && logger.IsEnabled(LogLevel.Trace))
                     {
-                        Console.WriteLine($"  - Literals: {literalsArray.Fields.Length} entries");
+                        logger.LogTrace("Literals: {Count} entries", literalsArray.Fields.Length);
                         for (int i = 0; i < literalsArray.Fields.Length; i++)
                         {
                             var literalOop = literalsArray.Fields[i];
@@ -667,23 +668,23 @@ namespace Smalltalk80.Interpreter.Bootstrap
                                     // It's an Association - show detailed key and value
                                     var keyStr = OopToString(literalObj.Fields[0]);
                                     var valueStr = GetClassNameOrValue(literalObj.Fields[1]);
-                                    Console.WriteLine($"    [{i}] Association(#{keyStr} -> {valueStr})");
+                                    logger.LogTrace("  [{Index}] Association(#{Key} -> {Value})", i, keyStr, valueStr);
                                 }
                                 else
                                 {
                                     // It's something else (Symbol, String, etc)
                                     var className = GetClassNameForOop(literalOop);
                                     var value = OopToString(literalOop);
-                                    Console.WriteLine($"    [{i}] {className}: #{value}");
+                                    logger.LogTrace("  [{Index}] {ClassName}: #{Value}", i, className, value);
                                 }
                             }
                             else if (literalOop.IsSmallInteger)
                             {
-                                Console.WriteLine($"    [{i}] SmallInteger: {literalOop.SmallIntegerValue}");
+                                logger.LogTrace("  [{Index}] SmallInteger: {Value}", i, literalOop.SmallIntegerValue);
                             }
                             else if (literalOop.IsNil)
                             {
-                                Console.WriteLine($"    [{i}] nil");
+                                logger.LogTrace("  [{Index}] nil", i);
                             }
                         }
                     }
@@ -707,7 +708,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                             displaySource = displaySource.Substring(0, commentIndex + 9); // Include " comment:"
                         }
                     }
-                    Console.WriteLine($"[InitExpr] Completed: {displaySource}");
+                    logger.LogDebug("Completed expression: {Source}", displaySource);
                 }
                 finally
                 {
@@ -715,13 +716,11 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     vm.ExecutingInitialization = originalExecutingInit;
                 }
                 
-                Console.WriteLine(); // Blank line to separate from next expression
             }
             catch (Exception ex)
             {
                 // Log completion with error status
-                Console.WriteLine($"[InitExpr] Failed: {expr.Source}");
-                Console.WriteLine(); // Blank line to separate from next expression
+                logger.LogError(ex, "Failed expression: {Source}", expr.Source);
                 
                 // Enhance error message with more context
                 var enhancedMessage = AnalyzeInitializationError(expr, ex);
@@ -800,13 +799,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             methodObj.Fields[3] = OOP.FromSmallInteger(header);
             
-            if (Config.DebugOptions.EnableInitExprCompiledMethod)
+            if (Config.DebugOptions.EnableInitExprCompiledMethod && logger.IsEnabled(LogLevel.Debug))
             {
-                Console.WriteLine($"[InitExpr] Created CompiledMethod with header: 0x{header:X8}");
-                Console.WriteLine($"  - Primitive: {primitiveIndex}");
-                Console.WriteLine($"  - Args: {argCount}");
-                Console.WriteLine($"  - Temps: {tempCount}");
-                Console.WriteLine($"  - Stack size: {stackSize}");
+                logger.LogDebug("Created CompiledMethod with header: 0x{Header:X8} - Primitive: {Primitive}, Args: {Args}, Temps: {Temps}, Stack size: {StackSize}",
+                    header, primitiveIndex, argCount, tempCount, stackSize);
             }
             
             return methodOop;
@@ -864,9 +860,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     int literalIndex = bc - 64;
                     literalVariableIndices.Add(literalIndex);
                     
-                    if (Config.DebugOptions.EnableDebugOutput)
+                    if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                     {
-                        Console.WriteLine($"[InitExpr] Bytecode {bc} at position {i} accesses literal[{literalIndex}] as a variable");
+                        logger.LogTrace("Bytecode {Bytecode} at position {Position} accesses literal[{Index}] as a variable",
+                            bc, i, literalIndex);
                     }
                 }
             }
@@ -891,9 +888,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                         if (literal is string str && !str.StartsWith("#") && !str.StartsWith("Association("))
                         {
                             // This is a plain string like "ActionMenu" that needs to be an Association
-                            if (Config.DebugOptions.EnableDebugOutput)
+                            if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                             {
-                                Console.WriteLine($"[InitExpr] Converting literal[{i}] '{str}' to Association for pushLiteralVariable");
+                                logger.LogTrace("Converting literal[{Index}] '{Value}' to Association for pushLiteralVariable",
+                                    i, str);
                             }
                             
                             // Look up the global value (class or other global)
@@ -915,7 +913,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     literalsObj.Fields[i] = literalOop;
                     
                     // Debug trace for Associations
-                    if (Config.DebugOptions.EnableDebugOutput && !literalOop.IsNil)
+                    if (Config.DebugOptions.EnableDebugOutput && !literalOop.IsNil && logger.IsEnabled(LogLevel.Trace))
                     {
                         var literalObj = memory.GetObject(literalOop);
                         if (literalObj != null)
@@ -926,7 +924,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
                                 var keyStr = OopToString(literalObj.Fields[0]);
                                 if (keyStr == "Cursor" || keyStr == "BinaryChoiceView")
                                 {
-                                    Console.WriteLine($"[InitExpr] TRACE: Storing Association {literalOop} at literals[{i}] with key={literalObj.Fields[0]}, value={literalObj.Fields[1]}");
+                                    logger.LogTrace("Storing Association {Association} at literals[{Index}] with key={Key}, value={Value}",
+                                        literalOop, i, literalObj.Fields[0], literalObj.Fields[1]);
                                 }
                             }
                         }
@@ -1011,9 +1010,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
             if (!classOop.IsNil)
             {
                 // This is a global class reference - create an Association
-                if (Config.DebugOptions.EnableDebugOutput)
+                if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                 {
-                    Console.WriteLine($"[InitExpr] Creating Association for class {symbolName} -> {classOop}");
+                    logger.LogTrace("Creating Association for class {ClassName} -> {ClassOop}", symbolName, classOop);
                 }
                 return CreateAssociation(symbolName, classOop);
             }
@@ -1064,12 +1063,13 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 // Field 1: value
                 associationObj.Fields[1] = value;
                 
-                if (Config.DebugOptions.EnableDebugOutput)
+                if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                 {
-                    Console.WriteLine($"[InitExpr] Created Association {associationOop} for {key} -> {value}");
+                    logger.LogTrace("Created Association {Association} for {Key} -> {Value}", associationOop, key, value);
                     if (key == "Cursor" || key == "BinaryChoiceView")
                     {
-                        Console.WriteLine($"[InitExpr] TRACE: Association {associationOop} has key={associationObj.Fields[0]}, value={associationObj.Fields[1]}");
+                        logger.LogTrace("Association {Association} has key={Key}, value={Value}",
+                            associationOop, associationObj.Fields[0], associationObj.Fields[1]);
                     }
                 }
             }
@@ -1089,9 +1089,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var classOop = classBuilder.GetClass(name);
             if (!classOop.IsNil)
             {
-                if (Config.DebugOptions.EnableDebugOutput)
+                if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                 {
-                    Console.WriteLine($"[InitExpr] Found class '{name}' for Association value: {classOop}");
+                    logger.LogTrace("Found class '{ClassName}' for Association value: {ClassOop}", name, classOop);
                 }
                 return classOop;
             }
@@ -1099,9 +1099,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
             // Check if it's in the classRegistry
             if (classRegistry.TryGetValue(name, out var registryClassOop))
             {
-                if (Config.DebugOptions.EnableDebugOutput)
+                if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                 {
-                    Console.WriteLine($"[InitExpr] Found class '{name}' in registry for Association value: {registryClassOop}");
+                    logger.LogTrace("Found class '{ClassName}' in registry for Association value: {ClassOop}", name, registryClassOop);
                 }
                 return registryClassOop;
             }
@@ -1110,15 +1110,15 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var globalValue = GetGlobalValue(name);
             if (!globalValue.IsNil)
             {
-                if (Config.DebugOptions.EnableDebugOutput)
+                if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                 {
-                    Console.WriteLine($"[InitExpr] Found global '{name}' for Association value: {globalValue}");
+                    logger.LogTrace("Found global '{GlobalName}' for Association value: {Value}", name, globalValue);
                 }
                 return globalValue;
             }
             
             // Not found - log warning and return nil
-            Console.WriteLine($"[InitExpr] WARNING: Global variable '{name}' not found for pushLiteralVariable Association");
+            logger.LogWarning("Global variable '{GlobalName}' not found for pushLiteralVariable Association", name);
             return OOP.Nil;
         }
         
@@ -1261,9 +1261,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (!classOop.IsNil)
                 {
                     // Resolved Association for class
-                    if (Config.DebugOptions.EnableDebugOutput)
+                    if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                     {
-                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via ClassBuilder -> {classOop}");
+                        logger.LogTrace("Resolved Association for class {ClassName} via ClassBuilder -> {ClassOop}", keyName, classOop);
                     }
                     return CreateAssociation(keyName, classOop);
                 }
@@ -1272,9 +1272,9 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 if (classRegistry.TryGetValue(keyName, out var registryClassOop))
                 {
                     // Resolved Association from registry
-                    if (Config.DebugOptions.EnableDebugOutput)
+                    if (Config.DebugOptions.EnableDebugOutput && logger.IsEnabled(LogLevel.Trace))
                     {
-                        Console.WriteLine($"[InitExpr] Resolved Association for class {keyName} via classRegistry -> {registryClassOop}");
+                        logger.LogTrace("Resolved Association for class {ClassName} via classRegistry -> {ClassOop}", keyName, registryClassOop);
                     }
                     return CreateAssociation(keyName, registryClassOop);
                 }
@@ -1289,29 +1289,28 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 
                 // Unknown global - create association with nil value
                 // It might be resolved later
-                Console.WriteLine($"[InitExpr] WARNING: Could not resolve Association for '{keyName}', using nil");
-                Console.WriteLine($"[InitExpr] DEBUG: ClassBuilder.GetClass returned {classOop}, classRegistry has {classRegistry.Count} entries");
+                logger.LogWarning("Could not resolve Association for '{KeyName}', using nil. ClassBuilder.GetClass returned {ClassOop}, classRegistry has {Count} entries",
+                    keyName, classOop, classRegistry.Count);
                 
                 // Special debug for Cursor class
-                if (keyName == "Cursor")
+                if (keyName == "Cursor" && logger.IsEnabled(LogLevel.Debug))
                 {
-                    Console.WriteLine($"[InitExpr] CRITICAL: Cursor class not found!");
-                    Console.WriteLine($"[InitExpr] Checking if 'Cursor' exists in classRegistry with different casing...");
+                    logger.LogDebug("CRITICAL: Cursor class not found! Checking if 'Cursor' exists in classRegistry with different casing...");
                     var cursorVariants = classRegistry.Keys.Where(k => k.Equals("cursor", StringComparison.OrdinalIgnoreCase)).ToList();
                     if (cursorVariants.Count > 0)
                     {
-                        Console.WriteLine($"[InitExpr] Found similar: {string.Join(", ", cursorVariants)}");
+                        logger.LogDebug("Found similar: {Variants}", string.Join(", ", cursorVariants));
                     }
-                }
-                
-                if (classRegistry.Count > 0)
-                {
-                    Console.WriteLine($"[InitExpr] DEBUG: Sample classes in registry: {string.Join(", ", classRegistry.Keys.Take(10))}");
                     
-                    // Check if Cursor is actually there
-                    if (classRegistry.ContainsKey("Cursor"))
+                    if (classRegistry.Count > 0)
                     {
-                        Console.WriteLine($"[InitExpr] STRANGE: 'Cursor' IS in classRegistry! Value: {classRegistry["Cursor"]}");
+                        logger.LogDebug("Sample classes in registry: {Classes}", string.Join(", ", classRegistry.Keys.Take(10)));
+                        
+                        // Check if Cursor is actually there
+                        if (classRegistry.ContainsKey("Cursor"))
+                        {
+                            logger.LogDebug("STRANGE: 'Cursor' IS in classRegistry! Value: {Value}", classRegistry["Cursor"]);
+                        }
                     }
                 }
                 return CreateAssociation(keyName, OOP.Nil);

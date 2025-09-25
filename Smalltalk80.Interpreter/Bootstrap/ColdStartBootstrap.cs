@@ -111,7 +111,6 @@ public sealed class ColdStartBootstrap
         if (_specialObjectsArray.Value != 0) // Check if it's been set
         {
             _memory.SetSpecialObjectsArray(_specialObjectsArray);
-            _logger.LogInformation("[GC] Set Special Objects Array as the sole GC root");
         }
         
         // Run garbage collection (will display detailed statistics)
@@ -368,13 +367,13 @@ public sealed class ColdStartBootstrap
         
         // Initialize method - no primitive, just returns self
         InstallCustomPrimitiveMethod(_objectClass, "initialize", 0, 0,
-            new byte[] { 0x70, 0x7C }, // pushReceiver (112), returnTop (124)
-            Array.Empty<OOP>());
+            [0x70, 0x7C], // pushReceiver (112), returnTop (124)
+            []);
         
         // basicSize - special case: returns 0 if primitive fails
         InstallCustomPrimitiveMethod(_objectClass, "basicSize", 62, 0, 
-            new byte[] { 0x75, 0x7C }, // pushZero (117), returnTop (124)
-            Array.Empty<OOP>());
+            [0x75, 0x7C], // pushZero (117), returnTop (124)
+            []);
         
         // Behavior primitives for object creation  
         InstallPrimitiveMethod(_behaviorClass, "new", 70, 0);            // Allocate
@@ -425,7 +424,7 @@ public sealed class ColdStartBootstrap
         var smalltalkSymbol = GetOrCreateSymbol("Smalltalk");
         var smalltalkAssoc = CreateAssociation(smalltalkSymbol, GetOrCreateGlobal("Smalltalk"));
         
-        var subclassLiterals = new OOP[]
+        var subclassLiterals = new[]
         {
             GetOrCreateSymbol("isVariable"),
             GetOrCreateSymbol("ifTrue:"),
@@ -448,7 +447,7 @@ public sealed class ColdStartBootstrap
         InstallMethod(_classClass, "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:", subclassMethod);
         
         // Install Behavior>>compile:classified:
-        var compileLiterals = new OOP[]
+        var compileLiterals = new[]
         {
             GetOrCreateSymbol("compile:classified:notifying:")
         };
@@ -464,13 +463,13 @@ public sealed class ColdStartBootstrap
         
         // Also install some helper methods that are needed
         // isNil: ^false
-        InstallNonPrimitiveMethod(_objectClass, "isNil", new byte[] { 0x72, 0x7C }); // pushFalse (114), returnTop (124)
+        InstallNonPrimitiveMethod(_objectClass, "isNil", [0x72, 0x7C]); // pushFalse (114), returnTop (124)
         
         // notNil: ^true
-        InstallNonPrimitiveMethod(_objectClass, "notNil", new byte[] { 0x71, 0x7C }); // pushTrue (113), returnTop (124)
+        InstallNonPrimitiveMethod(_objectClass, "notNil", [0x71, 0x7C]); // pushTrue (113), returnTop (124)
         
         // yourself: ^self
-        InstallNonPrimitiveMethod(_objectClass, "yourself", new byte[] { 0x78 }); // returnReceiver (120)
+        InstallNonPrimitiveMethod(_objectClass, "yourself", [0x78]); // returnReceiver (120)
         
         _logger.LogInformation("[COLD START] Installed subclass creation and method compilation methods");
     }
@@ -614,7 +613,7 @@ public sealed class ColdStartBootstrap
 
     private void InstallNonPrimitiveMethod(OOP classOop, string selector, byte[] bytecode)
     {
-        var method = CreateCompiledMethod(bytecode, Array.Empty<OOP>(), 0, 0, 2);
+        var method = CreateCompiledMethod(bytecode, [], 0, 0, 2);
         InstallMethod(classOop, selector, method);
     }
 
@@ -625,7 +624,7 @@ public sealed class ColdStartBootstrap
         var bytecodes = new byte[] { 0x70, 0xD0, 0x7C }; // pushReceiver, sendLiteralSelector0Args0, returnTop
         
         // Need #primitiveFailed as literal
-        var literals = new OOP[] { GetOrCreateSymbol("primitiveFailed") };
+        var literals = new[] { GetOrCreateSymbol("primitiveFailed") };
         
         return CreateCompiledMethod(bytecodes, literals, numArgs, 0, 2, primitiveIndex);
     }

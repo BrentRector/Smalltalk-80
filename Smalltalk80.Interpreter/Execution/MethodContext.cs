@@ -17,28 +17,28 @@ public class MethodContext
     /// <summary>
     /// The receiver of the message.
     /// </summary>
-    public OOP Receiver { get; }
+    public OOP Receiver { get; protected set; }
 
     /// <summary>
     /// The compiled method being executed.
     /// </summary>
-    public OOP Method { get; }
+    public OOP Method { get; protected set; }
 
     /// <summary>
     /// Method arguments.
     /// </summary>
-    public OOP[] Arguments { get; }
+    public OOP[] Arguments { get; protected set; }
 
     /// <summary>
     /// Temporary variables (includes arguments at indices 0..argCount-1).
     /// In Smalltalk-80, arguments are the first temporary variables.
     /// </summary>
-    public OOP[] Temporaries { get; }
+    public OOP[] Temporaries { get; protected set; }
 
     /// <summary>
     /// Execution stack for this context.
     /// </summary>
-    public Stack Stack { get; }
+    public Stack Stack { get; protected set; }
 
     /// <summary>
     /// Program counter (index into bytecode).
@@ -161,6 +161,11 @@ public sealed class Stack(int capacity)
         ? new OOP[capacity]
         : throw new ArgumentException("Stack capacity must be positive", nameof(capacity));
     private int sp = -1; // Stack pointer, -1 means empty
+    
+    /// <summary>
+    /// Gets the capacity of the stack.
+    /// </summary>
+    public int Capacity => items.Length;
 
     /// <summary>
     /// Pushes a value onto the stack.

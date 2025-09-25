@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.ObjectModel;
@@ -20,6 +21,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         private readonly VirtualMachine vm;
         private readonly Dictionary<string, OOP> methodCache = new();
         private readonly Func<int, OOP>? getSpecialObject;
+        private readonly ILogger<MethodInstaller> logger;
         
         /// <summary>
         /// Initializes a new instance of the MethodInstaller class.
@@ -28,13 +30,21 @@ namespace Smalltalk80.Interpreter.Bootstrap
         /// <param name="classBuilder">The class builder for class lookups.</param>
         /// <param name="symbolTable">The symbol table for selector interning.</param>
         /// <param name="vm">The virtual machine for field access.</param>
+        /// <param name="logger">The logger for diagnostic output.</param>
         /// <param name="getSpecialObject">Optional function to get special objects (true, false, nil).</param>
-        public MethodInstaller(ObjectMemory memory, ClassBuilder classBuilder, ISymbolTable symbolTable, VirtualMachine vm, Func<int, OOP>? getSpecialObject = null)
+        public MethodInstaller(
+            ObjectMemory memory,
+            ClassBuilder classBuilder,
+            ISymbolTable symbolTable,
+            VirtualMachine vm,
+            ILogger<MethodInstaller> logger,
+            Func<int, OOP>? getSpecialObject = null)
         {
             this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
             this.classBuilder = classBuilder ?? throw new ArgumentNullException(nameof(classBuilder));
             this.symbolTable = symbolTable ?? throw new ArgumentNullException(nameof(symbolTable));
             this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.getSpecialObject = getSpecialObject;
         }
 
@@ -46,7 +56,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             if (DebugOptions.EnableMethodInstallerOutput)
             {
-                Console.WriteLine("[MethodInstaller] Beginning method installation...");
+                logger.LogDebug("Beginning method installation");
             }
             
             // Check if we have inline methods in classes
@@ -54,7 +64,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             if (DebugOptions.EnableMethodInstallerOutput)
             {
-                Console.WriteLine($"[MethodInstaller] hasInlineMethods={hasInlineMethods}, manifest.Methods count={(manifest.Methods?.Count ?? 0)}");
+                logger.LogDebug("Method installation configuration: HasInlineMethods={HasInlineMethods}, MethodCount={MethodCount}",
+                    hasInlineMethods, manifest.Methods?.Count ?? 0);
             }
             
             if (hasInlineMethods)
@@ -142,10 +153,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
             }
             
-            if (DebugOptions.EnableMethodInstallerOutput)
-            {
-                Console.WriteLine($"[MethodInstaller] Installation complete. {methodCache.Count} methods cached, {totalInstalled} actually installed in dictionaries.");
-            }
+            logger.LogInformation("Method installation complete. CachedMethods={CachedCount}, InstalledMethods={InstalledCount}",
+                methodCache.Count, totalInstalled);
         }
 
         /// <summary>
@@ -169,10 +178,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
             {
                 foreach (var dup in duplicates)
                 {
-                    if (DebugOptions.EnableMethodInstallerOutput)
-                    {
-                        Console.WriteLine($"[MethodInstaller] ERROR: {className} has {dup.Count} definitions of selector '{dup.Selector}'");
-                    }
+                    logger.LogError("Duplicate method definition in class {ClassName}: Selector '{Selector}' defined {Count} times",
+                        className, dup.Selector, dup.Count);
                 }
                 throw new InvalidOperationException($"Duplicate method definitions found in {className}");
             }
@@ -184,27 +191,26 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             if (targetClass.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] Warning: Class {className} not found, skipping {methods.Count} methods");
-                }
+                logger.LogWarning("Class {ClassName} not found, skipping {MethodCount} methods",
+                    className, methods.Count);
 
                 return;
             }
             
             if (DebugOptions.EnableMethodInstallerOutput)
             {
-                Console.WriteLine($"[MethodInstaller] Installing {methods.Count} {(isClassMethod ? "class" : "instance")} methods to {className}");
+                logger.LogDebug("Installing {MethodCount} {MethodType} methods to {ClassName}",
+                    methods.Count, isClassMethod ? "class" : "instance", className);
                 
                 // Special debug for Object class methods
                 if (className == "Object" && isClassMethod)
                 {
-                    Console.WriteLine($"[MethodInstaller] DEBUG: Installing to Object metaclass (OOP {targetClass})");
+                    logger.LogDebug("Installing to Object metaclass (OOP {TargetClass})", targetClass);
                     foreach (var method in methods)
                     {
                         if (method.Selector == "initialize")
                         {
-                            Console.WriteLine($"[MethodInstaller] DEBUG: Found Object class>>initialize method");
+                            logger.LogDebug("Found Object class>>initialize method");
                         }
                     }
                 }
@@ -214,10 +220,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var methodDict = GetOrCreateMethodDictionary(targetClass, methods.Count);
             if (methodDict.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] Warning: Could not get method dictionary for {className}");
-                }
+                logger.LogWarning("Could not get method dictionary for {ClassName}", className);
                 return;
             }
             
@@ -249,10 +252,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var compiledMethodClass = classBuilder.GetClass("CompiledMethod");
             if (compiledMethodClass.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine("[MethodInstaller] Error: CompiledMethod class not found!");
-                }
+                logger.LogError("CompiledMethod class not found");
                 return OOP.Nil;
             }
             
@@ -260,15 +260,14 @@ namespace Smalltalk80.Interpreter.Bootstrap
             if (DebugOptions.EnableMethodInstallerOutput && 
                 (methodDef.Selector == "initialize" || methodDef.PrimitiveIndex > 0 || methodDef.StackDepth > 10))
             {
-                Console.WriteLine($"[MethodInstaller] Creating method {methodDef.Selector}:");
-                Console.WriteLine($"[MethodInstaller]   Bytecode count: {methodDef.Bytecode.Count}");
-                Console.WriteLine($"[MethodInstaller]   Primitive: {methodDef.PrimitiveIndex}");
-                Console.WriteLine($"[MethodInstaller]   NumArgs: {methodDef.NumArgs}");
-                Console.WriteLine($"[MethodInstaller]   NumTemps: {methodDef.EffectiveTemporaries}");
-                Console.WriteLine($"[MethodInstaller]   StackDepth: {methodDef.StackDepth}");
+                logger.LogDebug("Creating method {Selector}: BytecodeCount={BytecodeCount}, Primitive={Primitive}, NumArgs={NumArgs}, NumTemps={NumTemps}, StackDepth={StackDepth}",
+                    methodDef.Selector, methodDef.Bytecode.Count, methodDef.PrimitiveIndex,
+                    methodDef.NumArgs, methodDef.EffectiveTemporaries, methodDef.StackDepth);
+                
                 if (methodDef.Bytecode.Count > 0)
                 {
-                    Console.WriteLine($"[MethodInstaller]   Bytecode from JSON: [{string.Join(", ", methodDef.Bytecode)}]");
+                    logger.LogTrace("Method {Selector} bytecode: [{Bytecode}]",
+                        methodDef.Selector, string.Join(", ", methodDef.Bytecode));
                 }
             }
             
@@ -282,7 +281,8 @@ namespace Smalltalk80.Interpreter.Bootstrap
             if (DebugOptions.EnableMethodInstallerOutput && 
                 (methodDef.Selector == "initialize" || methodDef.PrimitiveIndex > 0 || methodDef.StackDepth > 10))
             {
-                Console.WriteLine($"[MethodInstaller]   Calculated header: 0x{header:X8}");
+                logger.LogTrace("Method {Selector} calculated header: 0x{Header:X8}",
+                    methodDef.Selector, header);
             }
             
             // Allocate CompiledMethod object (4 fixed fields per Blue Book)
@@ -291,10 +291,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             
             if (methodObj == null)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine("[MethodInstaller] Error: Failed to allocate CompiledMethod");
-                }
+                logger.LogError("Failed to allocate CompiledMethod");
                 return OOP.Nil;
             }
             
@@ -356,10 +353,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var byteArrayClass = classBuilder.GetClass("ByteArray");
             if (byteArrayClass.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine("[MethodInstaller] Warning: ByteArray class not found");
-                }
+                logger.LogWarning("ByteArray class not found");
                 return OOP.Nil;
             }
             
@@ -387,10 +381,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var arrayClass = classBuilder.GetClass("Array");
             if (arrayClass.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine("[MethodInstaller] Warning: Array class not found");
-                }
+                logger.LogWarning("Array class not found");
                 return OOP.Nil;
             }
             
@@ -482,10 +473,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
         {
             // For now, return nil as Float class may not exist during bootstrap
             // This can be enhanced when Float class is available
-            if (DebugOptions.EnableMethodInstallerOutput)
-            {
-                Console.WriteLine($"[MethodInstaller] Warning: Float literal {value} converted to nil (Float class not implemented)");
-            }
+            logger.LogTrace("Float literal {Value} converted to nil (Float class not implemented)", value);
             return OOP.Nil;
         }
 
@@ -503,10 +491,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
             
             // Fallback: should not happen after bootstrap is complete
-            if (DebugOptions.EnableMethodInstallerOutput)
-            {
-                Console.WriteLine("[MethodInstaller] Warning: true object not found in Special Objects Array");
-            }
+            logger.LogWarning("True object not found in Special Objects Array");
             return OOP.Nil;
         }
 
@@ -524,10 +509,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             }
             
             // Fallback: should not happen after bootstrap is complete
-            if (DebugOptions.EnableMethodInstallerOutput)
-            {
-                Console.WriteLine("[MethodInstaller] Warning: false object not found in Special Objects Array");
-            }
+            logger.LogWarning("False object not found in Special Objects Array");
             return OOP.Nil;
         }
 
@@ -572,10 +554,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var arrayClass = classBuilder.GetClass("Array");
             if (arrayClass.IsNil)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] Error: Array class not found for array literal: {arrayStr}");
-                }
+                logger.LogError("Array class not found for array literal: {ArrayStr}", arrayStr);
                 // Return nil instead of falling back to Symbol to avoid confusion
                 return OOP.Nil;
             }
@@ -583,10 +562,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             // Validate format
             if (!arrayStr.StartsWith("#(") || !arrayStr.EndsWith(")"))
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] Warning: Invalid array literal format: {arrayStr}");
-                }
+                logger.LogWarning("Invalid array literal format: {ArrayStr}", arrayStr);
                 return OOP.Nil;
             }
             
@@ -618,9 +594,10 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
             }
             
-            if (DebugOptions.EnableMethodInstallerOutput && elements.Count > 0)
+            if (elements.Count > 0)
             {
-                Console.WriteLine($"[MethodInstaller] Created array literal with {elements.Count} elements from: {arrayStr}");
+                logger.LogTrace("Created array literal with {ElementCount} elements from: {ArrayStr}",
+                    elements.Count, arrayStr);
             }
             
             return arrayOop;
@@ -790,10 +767,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 var associationClass = classBuilder.GetClass("Association");
                 if (associationClass.IsNil)
                 {
-                    if (DebugOptions.EnableDebugOutput)
-                    {
-                        Console.WriteLine($"[DEBUG] Association class not found for {keyName}");
-                    }
+                    logger.LogWarning("Association class not found for {KeyName}", keyName);
                     return OOP.Nil;
                 }
                 
@@ -809,65 +783,19 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     // Field 1: value (initially the global object or nil)
                     if (valueName == "null" || valueName == "nil")
                     {
-                        // Enhanced debug output for global variable resolution
-                        if (DebugOptions.EnableDebugOutput)
-                        {
-                            Console.WriteLine($"[DEBUG] Attempting to resolve global variable: '{keyName}'");
-                        }
-
                         // Try to resolve the global variable as a class
+                        logger.LogTrace("Attempting to resolve global variable: {KeyName}", keyName);
                         var globalOop = classBuilder.GetClass(keyName); // Try as class name
-                        
-                        // Special debug for Cursor class
-                        if (keyName == "Cursor" && DebugOptions.EnableDebugOutput)
-                        {
-                            Console.WriteLine($"[DEBUG] Looking up 'Cursor' class:");
-                            Console.WriteLine($"  - GetClass('Cursor') returned: {globalOop}");
-                            Console.WriteLine($"  - IsNil: {globalOop.IsNil}");
-                            
-                            // Check if Cursor exists in the class registry
-                            var allClasses = classBuilder.GetAllClasses();
-                            Console.WriteLine($"  - Total classes registered: {allClasses.Count}");
-                            
-                            // Look for Cursor and similar names
-                            var cursorRelated = allClasses.Where(kvp => 
-                                kvp.Key.Contains("Cursor", StringComparison.OrdinalIgnoreCase))
-                                .ToList();
-                                
-                            if (cursorRelated.Any())
-                            {
-                                Console.WriteLine($"  - Found Cursor-related classes:");
-                                foreach (var kvp in cursorRelated)
-                                {
-                                    Console.WriteLine($"    * '{kvp.Key}' -> {kvp.Value}");
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"  - No classes containing 'Cursor' found in registry");
-                                // Show first 10 classes to verify registry content
-                                Console.WriteLine($"  - First 10 registered classes:");
-                                foreach (var kvp in allClasses.Take(10))
-                                {
-                                    Console.WriteLine($"    * '{kvp.Key}' -> {kvp.Value}");
-                                }
-                            }
-                        }
                         
                         if (!globalOop.IsNil)
                         {
                             assocObj.Fields[1] = globalOop;
-                            if (DebugOptions.EnableDebugOutput)
-                            {
-                                Console.WriteLine($"[DEBUG] Successfully resolved Association key '{keyName}' to class {globalOop}");
-                            }
+                            logger.LogTrace("Successfully resolved Association key {KeyName} to class {GlobalOop}",
+                                keyName, globalOop);
                         }
                         else
                         {
-                            if (DebugOptions.EnableDebugOutput)
-                            {
-                                Console.WriteLine($"[DEBUG] Failed to resolve '{keyName}' as a class, trying SystemDictionary...");
-                            }
+                            logger.LogTrace("Failed to resolve {KeyName} as a class, trying SystemDictionary", keyName);
                             // Try to look it up in SystemDictionary (for pool dictionaries and other globals)
                             var systemDictOop = vm.GetSpecialObject(SpecialObjects.SystemDictionaryInstance);
                             if (!systemDictOop.IsNil)
@@ -877,29 +805,22 @@ namespace Smalltalk80.Interpreter.Bootstrap
                                 if (!valueOop.IsNil)
                                 {
                                     assocObj.Fields[1] = valueOop;
-                                    if (DebugOptions.EnableDebugOutput)
-                                    {
-                                        Console.WriteLine($"[DEBUG] Resolved Association key #{keyName} to global {valueOop} from SystemDictionary");
-                                    }
+                                    logger.LogTrace("Resolved Association key {KeyName} to global {ValueOop} from SystemDictionary",
+                                        keyName, valueOop);
                                 }
                                 else
                                 {
                                     // Not found - leave as nil
                                     assocObj.Fields[1] = OOP.Nil;
-                                    if (DebugOptions.EnableDebugOutput)
-                                    {
-                                        Console.WriteLine($"[DEBUG] Association key #{keyName} not found in SystemDictionary, value = nil");
-                                    }
+                                    logger.LogTrace("Association key {KeyName} not found in SystemDictionary, value = nil", keyName);
                                 }
                             }
                             else
                             {
                                 // SystemDictionary not available yet - leave as nil
                                 assocObj.Fields[1] = OOP.Nil;
-                                if (DebugOptions.EnableDebugOutput)
-                                {
-                                    Console.WriteLine($"[DEBUG] Association key #{keyName} not resolved (SystemDictionary not available), value = nil");
-                                }
+                                logger.LogTrace("Association key {KeyName} not resolved (SystemDictionary not available), value = nil",
+                                    keyName);
                             }
                         }
                     }
@@ -909,20 +830,15 @@ namespace Smalltalk80.Interpreter.Bootstrap
                         assocObj.Fields[1] = OOP.Nil; // For now, handle as nil
                     }
                     
-                    if (DebugOptions.EnableDebugOutput)
-                    {
-                        Console.WriteLine($"[DEBUG] Created Association for {keyName} -> {assocObj.Fields[1]}");
-                    }
+                    logger.LogTrace("Created Association for {KeyName} -> {Value}",
+                        keyName, assocObj.Fields[1]);
                 }
                 
                 return assocOop;
             }
             else
             {
-                if (DebugOptions.EnableDebugOutput)
-                {
-                    Console.WriteLine($"[DEBUG] Failed to parse Association: {associationStr}");
-                }
+                logger.LogWarning("Failed to parse Association: {AssociationStr}", associationStr);
                 return OOP.Nil;
             }
         }
@@ -946,10 +862,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 var methodDictClass = classBuilder.GetClass("MethodDictionary");
                 if (methodDictClass.IsNil)
                 {
-                    if (DebugOptions.EnableMethodInstallerOutput)
-                    {
-                        Console.WriteLine("[MethodInstaller] Warning: MethodDictionary class not found");
-                    }
+                    logger.LogWarning("MethodDictionary class not found");
                     return OOP.Nil;
                 }
                 
@@ -994,16 +907,15 @@ namespace Smalltalk80.Interpreter.Bootstrap
                             
                             // MethodDictionary inherits from IdentityDictionary which has "valueArray"
                             vm.SetFieldBootstrap(methodDict, "MethodDictionary", "valueArray", valueArray);
-                            if (DebugOptions.EnableMethodInstallerOutput)
-                            {
-                                Console.WriteLine($"[MethodInstaller] Created method dictionary with capacity {capacity} for {expectedMethodCount} methods");
-                            }
+                            logger.LogDebug("Created method dictionary with capacity {Capacity} for {ExpectedMethodCount} methods",
+                                capacity, expectedMethodCount);
                             
-                            // Debug: verify valueArray was set
-                            var checkArray = vm.GetFieldBootstrap(methodDict, "MethodDictionary", "valueArray");
+                            // Verify valueArray was set
                             if (DebugOptions.EnableDebugOutput)
                             {
-                                Console.WriteLine($"[DEBUG] MethodDict {methodDict} valueArray set to {valueArray}, verify: {checkArray}");
+                                var checkArray = vm.GetFieldBootstrap(methodDict, "MethodDictionary", "valueArray");
+                                logger.LogTrace("MethodDict {MethodDict} valueArray set to {ValueArray}, verify: {CheckArray}",
+                                    methodDict, valueArray, checkArray);
                             }
                         }
                     }
@@ -1012,11 +924,12 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 // Store in class
                 vm.SetFieldBootstrap(classOop, "Behavior", "methodDict", methodDict);
                 
-                // Debug: Verify it was stored
-                var checkDict = vm.GetFieldBootstrap(classOop, "Behavior", "methodDict");
+                // Verify it was stored
                 if (DebugOptions.EnableDebugOutput)
                 {
-                    Console.WriteLine($"[DEBUG] Stored methodDict {methodDict} in class {classOop}, verify: {checkDict}");
+                    var checkDict = vm.GetFieldBootstrap(classOop, "Behavior", "methodDict");
+                    logger.LogTrace("Stored methodDict {MethodDict} in class {ClassOop}, verify: {CheckDict}",
+                        methodDict, classOop, checkDict);
                 }
             }
             
@@ -1054,10 +967,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var valueArrayObj = memory.GetObject(valueArrayOop);
             if (valueArrayObj == null || valueArrayObj.Fields.Length == 0)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] ERROR: Dictionary has no valueArray or empty valueArray for selector {selector}");
-                }
+                logger.LogError("Dictionary has no valueArray or empty valueArray for selector {Selector}", selector);
                 return;
             }
             
@@ -1069,10 +979,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
             var capacity = dictObj.Fields.Length - 2; // Subtract tally and valueArray fields
             if (capacity == 0 || capacity != valueArrayObj.Fields.Length)
             {
-                if (DebugOptions.EnableMethodInstallerOutput)
-                {
-                    Console.WriteLine($"[MethodInstaller] ERROR: Dictionary capacity mismatch for selector {selector}");
-                }
+                logger.LogError("Dictionary capacity mismatch for selector {Selector}", selector);
                 return;
             }
             
@@ -1092,25 +999,19 @@ namespace Smalltalk80.Interpreter.Bootstrap
                     dictObj.Fields[keyFieldIndex] = selectorSymbol;
                     valueArrayObj.Fields[index] = methodOop;
                     
-                    // Debug: Log method installation for Object class
-                    if (DebugOptions.EnableMethodInstallerOutput)
+                    // Log method installation for special selectors
+                    if (DebugOptions.EnableMethodInstallerOutput && 
+                        (selector == "initialize" || selector == "new" || selector == "at:"))
                     {
-                        if (dictOop.ObjectIndex == 18678 || selector == "initialize")
+                        logger.LogTrace("Installing method {Selector} to dictionary {DictOop} at key index {KeyIndex}, value index {ValueIndex}",
+                            selector, dictOop, keyFieldIndex, index);
+                        
+                        // Check for overwrites
+                        if (!key.IsNil && !key.Equals(selectorSymbol))
                         {
-                            Console.WriteLine($"[MethodInstaller] DEBUG: Installing {selector} to Object class dict {dictOop}:");
-                            Console.WriteLine($"[MethodInstaller]   Key at field[{keyFieldIndex}] = selector {selectorSymbol}");
-                            Console.WriteLine($"[MethodInstaller]   Value at valueArray[{index}] = method {methodOop}");
-                            
-                            // Check what's already at that index
-                            if (!key.IsNil && !key.Equals(selectorSymbol))
-                            {
-                                var existingSelector = vm.GetSymbolString(key);
-                                Console.WriteLine($"[MethodInstaller]   WARNING: Overwriting existing key '{existingSelector}' at index {index}!");
-                            }
-                        }
-                        else if (selector == "new" || selector == "at:")
-                        {
-                            Console.WriteLine($"[MethodInstaller] DEBUG: Installing method {selector} to dictionary {dictOop} at key index {keyFieldIndex}, value index {index}");
+                            var existingSelector = vm.GetSymbolString(key);
+                            logger.LogWarning("Overwriting existing selector {ExistingSelector} with {NewSelector} at index {Index}",
+                                existingSelector, selector, index);
                         }
                     }
                     
@@ -1130,10 +1031,7 @@ namespace Smalltalk80.Interpreter.Bootstrap
                 }
             }
             
-            if (DebugOptions.EnableMethodInstallerOutput)
-            {
-                Console.WriteLine($"[MethodInstaller] ERROR: Method dictionary full for selector {selector} - method NOT installed!");
-            }
+            logger.LogError("Method dictionary full for selector {Selector} - method NOT installed!", selector);
             // This is a critical error - the method won't be reachable and will be GC'd
         }
 

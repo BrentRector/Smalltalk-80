@@ -31,6 +31,11 @@ public sealed class ProcessScheduler
     private readonly ObjectMemory memory;
     
     /// <summary>
+    /// The method context pool for efficient context allocation.
+    /// </summary>
+    private readonly MethodContextPool contextPool;
+    
+    /// <summary>
     /// Priority-based queues of ready processes.
     /// Index 0 is priority 1, index 99 is priority 100.
     /// </summary>
@@ -80,6 +85,7 @@ public sealed class ProcessScheduler
     {
         this.vm = vm ?? throw new ArgumentNullException(nameof(vm));
         this.memory = memory ?? throw new ArgumentNullException(nameof(memory));
+        contextPool = MethodContextPool.Instance;
         
         // Initialize priority queues
         priorityQueues = new List<OOP>[MaxPriority];
@@ -557,7 +563,7 @@ public sealed class ProcessScheduler
                 arguments[i] = contextObj.Fields[6 + i];
             }
             
-            var methodContext = new MethodContext(
+            var methodContext = contextPool.Rent(
                 sender: null,
                 receiver: receiver,
                 method: method,
