@@ -1,17 +1,21 @@
 using System.Collections.Concurrent;
 using Core.Abstractions.Memory;
+using System.Linq;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Core.Memory;
 
 /// <summary>
-/// Implements the Smalltalk-80 object memory with allocation, field access, and garbage collection.
-/// Follows the Blue Book specification for object memory management.
+/// Implements the Smalltalk-80 object memory with allocation, field access, and mark-and-sweep garbage collection.
+/// Uses a pure mark-and-sweep algorithm without reference counting.
 /// </summary>
 public sealed class ObjectMemory : IObjectMemory
 {
-    private readonly List<ObjectEntry> _objectTable = [];
+    private readonly ILogger<ObjectMemory> _logger;
+    private readonly List<ObjectEntry?> _objectTable = [];
     private readonly Stack<uint> _freeList = new();
-    private readonly ConcurrentDictionary<OOP, WeakReference> _weakReferences = new();
     
     // Memory segments
     private uint[] _heap;
@@ -19,20 +23,20 @@ public sealed class ObjectMemory : IObjectMemory
     private const uint InitialHeapSize = 65536; // 64K words initially
     private const uint MaxHeapSize = 16777216;  // 16M words maximum
 
-    // Special object indices
-    private const uint NilIndex = 0;
-    private const uint TrueIndex = 1;
-    private const uint FalseIndex = 2;
+    // No special indices - all objects are treated equally
     
     /// <summary>
     /// Initializes a new instance of the ObjectMemory class.
     /// </summary>
-    public ObjectMemory()
+    public ObjectMemory() : this(NullLogger<ObjectMemory>.Instance)
     {
+    }
+    
+    public ObjectMemory(ILogger<ObjectMemory> logger)
+    {
+        _logger = logger;
         _heap = new uint[InitialHeapSize];
         _heapPointer = 0;
-        
-        InitializeSpecialObjects();
     }
 
     /// <inheritdoc/>
@@ -56,15 +60,14 @@ public sealed class ObjectMemory : IObjectMemory
         // Initialize fields to nil
         for (var i = 1; i <= size; i++)
         {
-            _heap[heapIndex + i] = OOP.Nil.Value;
+            _heap[heapIndex + i] = _nilOop.Value;
         }
         
         // Update object table entry
         _objectTable[(int)objectIndex] = new ObjectEntry
         {
             Location = heapIndex,
-            Size = (uint)(size + 1),
-            ReferenceCount = 1
+            Size = (uint)(size + 1)
         };
         
         return OOP.FromPointer(objectIndex);
@@ -102,7 +105,6 @@ public sealed class ObjectMemory : IObjectMemory
         {
             Location = heapIndex,
             Size = (uint)(wordSize + 1),
-            ReferenceCount = 1,
             ByteSize = (uint)byteSize
         };
         
@@ -117,7 +119,7 @@ public sealed class ObjectMemory : IObjectMemory
             throw new InvalidOperationException("Cannot fetch pointer from SmallInteger");
         }
         
-        if (oop.IsNil)
+        if (IsNil(oop))
         {
             throw new InvalidOperationException("Cannot fetch pointer from nil");
         }
@@ -146,7 +148,7 @@ public sealed class ObjectMemory : IObjectMemory
             throw new InvalidOperationException("Cannot store pointer in SmallInteger");
         }
         
-        if (oop.IsNil)
+        if (IsNil(oop))
         {
             throw new InvalidOperationException("Cannot store pointer in nil");
         }
@@ -239,7 +241,7 @@ public sealed class ObjectMemory : IObjectMemory
             return SmallIntegerClass;
         }
         
-        if (oop.IsNil)
+        if (IsNil(oop))
         {
             // Return UndefinedObject class
             return UndefinedObjectClass;
@@ -251,6 +253,31 @@ public sealed class ObjectMemory : IObjectMemory
     }
 
     /// <inheritdoc/>
+    public void SetClassOf(OOP oop, OOP classOop)
+    {
+        if (oop.IsSmallInteger)
+        {
+            throw new InvalidOperationException("Cannot set class of SmallInteger");
+        }
+        
+        // No special handling for nil - it's a regular object
+        
+        var entry = GetObjectEntry(oop);
+        var currentHeader = new ObjectHeader { HeaderWord = _heap[entry.Location] };
+        
+        // Create new header with updated class but preserving size and flags
+        var newHeader = new ObjectHeader(
+            classOop, 
+            currentHeader.Size,
+            currentHeader.HasPointers,
+            currentHeader.HasWords,
+            currentHeader.IsFree
+        );
+        
+        _heap[entry.Location] = newHeader.HeaderWord;
+    }
+
+    /// <inheritdoc/>
     public int FetchWordLengthOf(OOP oop)
     {
         if (oop.IsSmallInteger)
@@ -258,7 +285,7 @@ public sealed class ObjectMemory : IObjectMemory
             return 0; // SmallIntegers have no indexed fields
         }
         
-        if (oop.IsNil)
+        if (IsNil(oop))
         {
             return 0;
         }
@@ -283,54 +310,221 @@ public sealed class ObjectMemory : IObjectMemory
     /// <inheritdoc/>
     public void CollectGarbage()
     {
-        // Simplified mark-and-sweep garbage collection
-        MarkPhase();
-        SweepPhase();
-    }
-
-    /// <inheritdoc/>
-    public void IncrementReference(OOP oop)
-    {
-        if (oop.IsSmallInteger || oop.IsNil)
+        var stopwatch = Stopwatch.StartNew();
+        
+        // Statistics tracking
+        int objectsVisited = 0;
+        int objectsMarked = 0;
+        int objectsCollected = 0;
+        long bytesFreed = 0;
+        int totalObjectsBefore = _objectTable.Count(entry => entry.HasValue);
+        long totalBytesBefore = CalculateTotalMemoryUsed();
+        
+        _logger.LogInformation("[GC] ============ Starting Garbage Collection ============");
+        _logger.LogInformation("[GC] Total objects before GC: {Count:N0}", totalObjectsBefore);
+        _logger.LogInformation("[GC] Memory used: {Bytes:N0} bytes", totalBytesBefore);
+        _logger.LogInformation("[GC] Heap usage: {Used:N0} bytes of {Total:N0} bytes", _heapPointer * 4, _heap.Length * 4);
+        
+        // MARK PHASE - Mark all reachable objects starting from roots
+        var markStartTime = stopwatch.ElapsedMilliseconds;
+        
+        // Mark phase: Start from the Special Objects Array (the ONLY root)
+        var visitedIndices = new HashSet<uint>();
+        var workStack = new Stack<OOP>();
+        
+        // Add the Special Objects Array as the sole root
+        if (!_specialObjectsArray.IsSmallInteger && _specialObjectsArray.Value != 0)
         {
-            return; // No reference counting for immediates
+            workStack.Push(_specialObjectsArray);
+        }
+        else
+        {
+            _logger.LogWarning("[GC] No Special Objects Array registered - nothing to mark!");
         }
         
-        var index = oop.ToPointer();
-        if (index < _objectTable.Count)
+        // Perform depth-first marking
+        while (workStack.Count > 0)
         {
-            var entry = _objectTable[(int)index];
-            entry.ReferenceCount++;
-            _objectTable[(int)index] = entry;
-        }
-    }
-
-    /// <inheritdoc/>
-    public void DecrementReference(OOP oop)
-    {
-        if (oop.IsSmallInteger || oop.IsNil)
-        {
-            return; // No reference counting for immediates
-        }
-        
-        var index = oop.ToPointer();
-        if (index < _objectTable.Count)
-        {
-            var entry = _objectTable[(int)index];
-            if (entry.ReferenceCount > 0)
+            var oop = workStack.Pop();
+            
+            // Skip immediates (SmallIntegers only - nil is a real object that needs marking!)
+            if (oop.IsSmallInteger)
+                continue;
+                
+            var index = oop.ToPointer();
+            
+            // Skip if already visited (this prevents counting the same object multiple times)
+            if (visitedIndices.Contains(index))
+                continue;
+                
+            visitedIndices.Add(index);
+            objectsVisited++;  // Count only when we actually visit a new object
+            
+            // Get the object entry
+            if (index >= _objectTable.Count || !_objectTable[(int)index].HasValue)
             {
-                entry.ReferenceCount--;
-                _objectTable[(int)index] = entry;
+                continue;
+            }
+                
+            var entry = _objectTable[(int)index]!.Value;
+            
+            // No special handling for any objects - all are treated equally
+            
+            // Mark the object by setting the mark bit in its header
+            var header = new ObjectHeader { HeaderWord = _heap[entry.Location] };
+            
+            // Objects should not already be marked if we're visiting them for the first time
+            if (header.IsMarked)
+            {
+                _logger.LogWarning("[GC] Object at index {Index} already marked but not in visited set!", index);
+                continue;
+            }
+            
+            _heap[entry.Location] = header.WithMark().HeaderWord;
+            objectsMarked++;
+            
+            // Also mark the object's class
+            if (!header.ClassOop.IsSmallInteger)
+            {
+                var classIndex = header.ClassOop.ToPointer();
+                if (!visitedIndices.Contains(classIndex))  // Only add if not already visited
+                {
+                    workStack.Push(header.ClassOop);
+                }
+            }
+            
+            // If the object contains pointers, add all referenced objects to work stack
+            if (header.HasPointers)
+            {
+                for (var i = 0; i < header.Size; i++)
+                {
+                    var fieldOop = new OOP(_heap[entry.Location + 1 + (uint)i]);
+                    
+                    if (!fieldOop.IsSmallInteger)
+                    {
+                        var fieldIndex = fieldOop.ToPointer();
+                        if (!visitedIndices.Contains(fieldIndex))  // Only add if not already visited
+                        {
+                            workStack.Push(fieldOop);
+                        }
+                    }
+                }
             }
         }
+        
+        var markEndTime = stopwatch.ElapsedMilliseconds;
+        var markTime = markEndTime - markStartTime;
+        
+        // SWEEP PHASE - Free all unmarked objects and clear marks on surviving objects
+        var sweepStartTime = stopwatch.ElapsedMilliseconds;
+        
+        for (var i = 0; i < _objectTable.Count; i++)
+        {
+            if (!_objectTable[i].HasValue)
+                continue;
+                
+            var entry = _objectTable[i]!.Value;
+            
+            // No special handling - all objects treated equally
+            
+            var header = new ObjectHeader { HeaderWord = _heap[entry.Location] };
+            
+            if (!header.IsMarked)
+            {
+                // This object is unreachable - free it
+                bytesFreed += entry.Size * 4; // Size is in words, convert to bytes
+                
+                // Clear the heap memory (optional, helps with debugging)
+                for (uint j = 0; j < entry.Size; j++)
+                {
+                    _heap[entry.Location + j] = 0xDEADBEEF; // Dead object marker
+                }
+                
+                // Return the object table entry to the free list
+                _objectTable[i] = null;
+                _freeList.Push((uint)i);
+                objectsCollected++;
+            }
+            else
+            {
+                // Object survives - clear the mark bit for the next GC
+                _heap[entry.Location] = header.WithoutMark().HeaderWord;
+            }
+        }
+        
+        var sweepEndTime = stopwatch.ElapsedMilliseconds;
+        var sweepTime = sweepEndTime - sweepStartTime;
+        
+        stopwatch.Stop();
+        
+        // Update statistics
+        _lastObjectsCollected = objectsCollected;
+        _lastBytesFreed = (int)bytesFreed;
+        var totalObjectsAfter = _objectTable.Count(entry => entry.HasValue);
+        long totalBytesAfter = CalculateTotalMemoryUsed();
+        
+        // Display comprehensive statistics with sanity checks
+        _logger.LogInformation("[GC] ============ Garbage Collection Complete ============");
+        _logger.LogInformation("[GC] BEFORE: {ObjBefore} objects, {BytesBefore:N0} bytes", totalObjectsBefore, totalBytesBefore);
+        _logger.LogInformation("[GC] MARKED: {Marked} objects (visited {Visited} unique objects)", objectsMarked, objectsVisited);
+        _logger.LogInformation("[GC] COLLECTED: {Collected} objects, {Freed:N0} bytes freed", objectsCollected, bytesFreed);
+        _logger.LogInformation("[GC] AFTER: {ObjAfter} objects, {BytesAfter:N0} bytes", totalObjectsAfter, totalBytesAfter);
+        _logger.LogInformation("[GC] ROOT: Special Objects Array = {SOA}", _specialObjectsArray);
+        _logger.LogInformation("[GC] TIME: {TotalMs}ms (mark: {MarkMs}ms, sweep: {SweepMs}ms)", stopwatch.ElapsedMilliseconds, markTime, sweepTime);
+        
+        // Sanity checks to detect bugs
+        if (objectsVisited != objectsMarked)
+        {
+            _logger.LogWarning("[GC] Visited {Visited} but marked {Marked} - this indicates a bug!", objectsVisited, objectsMarked);
+        }
+        
+        var unaccounted = totalObjectsBefore - (objectsMarked + objectsCollected);
+        if (unaccounted != 0)
+        {
+            _logger.LogWarning("[GC] {Unaccounted} objects unaccounted for!", unaccounted);
+            _logger.LogWarning("[GC] {Marked} marked + {Collected} collected != {Total} total", objectsMarked, objectsCollected, totalObjectsBefore);
+            
+            // Let's find which objects weren't marked
+            _logger.LogDebug("[GC] Examining first 10 objects:");
+            for (var i = 0; i < Math.Min(_objectTable.Count, 10); i++)
+            {
+                if (_objectTable[i].HasValue)
+                {
+                    var entry = _objectTable[i]!.Value;
+                    
+                    // No special handling for display
+                        
+                    var header = new ObjectHeader { HeaderWord = _heap[entry.Location] };
+                    var oop = OOP.FromPointer((uint)i);
+                    _logger.LogDebug("[GC]   Index {Index} (OOP {Oop}): Class={Class}, Size={Size}, Marked={Marked}", 
+                        i, oop, header.ClassOop, header.Size, header.IsMarked);
+                }
+            }
+        }
+        _logger.LogInformation("[GC] ======================================================");
+    }
+
+    /// <summary>
+    /// Calculates the total memory used by all allocated objects.
+    /// </summary>
+    /// <returns>Total memory in bytes.</returns>
+    private long CalculateTotalMemoryUsed()
+    {
+        long totalBytes = 0;
+        for (var i = 0; i < _objectTable.Count; i++)
+        {
+            if (_objectTable[i].HasValue)
+            {
+                var entry = _objectTable[i]!.Value;
+                totalBytes += entry.Size * 4; // Size is in words, convert to bytes
+            }
+        }
+        return totalBytes;
     }
 
     private void InitializeSpecialObjects()
     {
-        // Pre-allocate special object entries
-        _objectTable.Add(new ObjectEntry { Location = 0, Size = 0 }); // nil
-        _objectTable.Add(new ObjectEntry { Location = 0, Size = 0 }); // true
-        _objectTable.Add(new ObjectEntry { Location = 0, Size = 0 }); // false
+        // No special initialization needed - all objects are created normally
     }
 
     private uint AllocateObjectTableEntry()
@@ -377,77 +571,34 @@ public sealed class ObjectMemory : IObjectMemory
             throw new InvalidOperationException($"Invalid OOP: {oop}");
         }
         
-        return _objectTable[(int)index];
+        var entry = _objectTable[(int)index];
+        if (!entry.HasValue)
+        {
+            throw new InvalidOperationException($"Object at index {index} has been deallocated");
+        }
+        
+        return entry.Value;
     }
 
-    private void MarkPhase()
+    /// <summary>
+    /// Forces a garbage collection cycle.
+    /// Can be called when memory pressure is detected.
+    /// </summary>
+    public void ForceGarbageCollection()
     {
-        // Mark all reachable objects starting from roots
-        // This is simplified - in full implementation would trace from all contexts
-        for (var i = 0; i < _objectTable.Count; i++)
-        {
-            if (_objectTable[i].ReferenceCount > 0)
-            {
-                MarkObject(OOP.FromPointer((uint)i));
-            }
-        }
+        _logger.LogInformation("[GC] Forced garbage collection requested");
+        CollectGarbage();
     }
-
-    private void MarkObject(OOP oop)
+    
+    /// <summary>
+    /// Sets the Special Objects Array as the sole GC root.
+    /// This should be called during system initialization.
+    /// </summary>
+    /// <param name="specialObjectsArray">The OOP of the special objects array.</param>
+    public void SetSpecialObjectsArray(OOP specialObjectsArray)
     {
-        if (oop.IsSmallInteger || oop.IsNil)
-        {
-            return;
-        }
-        
-        var entry = GetObjectEntry(oop);
-        var headerAddr = entry.Location;
-        var header = new ObjectHeader { HeaderWord = _heap[headerAddr] };
-        
-        if (header.IsMarked)
-        {
-            return; // Already marked
-        }
-        
-        // Mark the object
-        _heap[headerAddr] = header.WithMark().HeaderWord;
-        
-        // Recursively mark referenced objects
-        if (header.HasPointers)
-        {
-            for (var i = 0; i < header.Size; i++)
-            {
-                var fieldOop = new OOP(_heap[entry.Location + 1 + (uint)i]);
-                MarkObject(fieldOop);
-            }
-        }
-    }
-
-    private void SweepPhase()
-    {
-        // Sweep unmarked objects and add to free list
-        for (var i = 3; i < _objectTable.Count; i++) // Skip special objects
-        {
-            var entry = _objectTable[i];
-            if (entry.Location == 0)
-            {
-                continue; // Already free
-            }
-            
-            var header = new ObjectHeader { HeaderWord = _heap[entry.Location] };
-            
-            if (!header.IsMarked)
-            {
-                // Free this object
-                _objectTable[i] = new ObjectEntry();
-                _freeList.Push((uint)i);
-            }
-            else
-            {
-                // Clear mark for next GC
-                _heap[entry.Location] = header.WithoutMark().HeaderWord;
-            }
-        }
+        _specialObjectsArray = specialObjectsArray;
+        _logger.LogInformation("[GC] Set Special Objects Array as sole GC root: {SpecialObjectsArray}", specialObjectsArray);
     }
 
     /// <inheritdoc/>
@@ -471,12 +622,59 @@ public sealed class ObjectMemory : IObjectMemory
     // Well-known classes (would be set during system initialization)
     private OOP SmallIntegerClass { get; set; } = new(6);
     private OOP UndefinedObjectClass { get; set; } = new(8);
+    
+    // Track the nil object OOP (set during bootstrap)
+    private OOP _nilOop = new(0); // Will be set properly during initialization
+    
+    // Garbage collection tracking
+    private OOP _specialObjectsArray = new(0); // The ONLY GC root - set during bootstrap
+    private int _lastObjectsCollected;
+    private int _lastBytesFreed;
 
+    /// <summary>
+    /// Represents an entry in the object table.
+    /// Contains location and size information for an allocated object.
+    /// Note: No reference counting - we use pure mark-and-sweep GC.
+    /// </summary>
     private struct ObjectEntry
     {
+        /// <summary>
+        /// Location of the object in the heap (index into _heap array).
+        /// </summary>
         public uint Location;
+        
+        /// <summary>
+        /// Size of the object in words (including header).
+        /// </summary>
         public uint Size;
-        public uint ReferenceCount;
-        public uint ByteSize; // For byte objects
+        
+        /// <summary>
+        /// For byte objects, the actual byte size (word Size may be larger due to alignment).
+        /// </summary>
+        public uint ByteSize;
+    }
+    
+    
+    /// <inheritdoc/>
+    public (int objectsCollected, int bytesFreed) GetLastGCStats()
+    {
+        return (_lastObjectsCollected, _lastBytesFreed);
+    }
+    
+    /// <summary>
+    /// Sets the OOP value that represents nil.
+    /// This should be called during bootstrap after nil object is created.
+    /// </summary>
+    public void SetNilOop(OOP nilOop)
+    {
+        _nilOop = nilOop;
+    }
+    
+    /// <summary>
+    /// Checks if the given OOP is nil.
+    /// </summary>
+    private bool IsNil(OOP oop)
+    {
+        return oop.Value == _nilOop.Value;
     }
 }

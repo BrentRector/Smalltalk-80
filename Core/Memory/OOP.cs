@@ -6,20 +6,16 @@ namespace Core.Memory;
 /// </summary>
 public readonly record struct OOP(uint Value)
 {
-    /// <summary>
-    /// The nil object reference.
-    /// </summary>
-    public static readonly OOP Nil = new(0);
+    // These values should be set during bootstrap from the Special Objects Array
+    // Default to 0, 2, 4 for backwards compatibility but will be updated at runtime
+    public static OOP Nil { get; set; } = new(0);
+    public static OOP True { get; set; } = new(2); 
+    public static OOP False { get; set; } = new(4);
     
     /// <summary>
-    /// The true object reference.
+    /// Checks if this OOP is nil.
     /// </summary>
-    public static readonly OOP True = new(2);
-    
-    /// <summary>
-    /// The false object reference.
-    /// </summary>
-    public static readonly OOP False = new(4);
+    public bool IsNil => Value == Nil.Value;
 
     /// <summary>
     /// Checks if this OOP represents a SmallInteger.
@@ -33,10 +29,6 @@ public readonly record struct OOP(uint Value)
     /// </summary>
     public bool IsPointer => (Value & 1) == 0;
 
-    /// <summary>
-    /// Checks if this OOP is nil.
-    /// </summary>
-    public bool IsNil => Value == 0;
 
     /// <summary>
     /// Gets the SmallInteger value (for compatibility).
@@ -125,7 +117,7 @@ public readonly record struct OOP(uint Value)
     /// </summary>
     public override string ToString() => IsSmallInteger 
         ? $"SmallInt({ToSmallInteger()})" 
-        : IsNil 
-            ? "nil" 
+        : IsNil
+            ? "nil"
             : $"OOP(0x{Value:X8})";
 }

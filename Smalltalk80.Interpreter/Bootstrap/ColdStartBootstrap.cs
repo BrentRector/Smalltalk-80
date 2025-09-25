@@ -16,6 +16,7 @@ public sealed class ColdStartBootstrap
     private readonly ILogger<ColdStartBootstrap> _logger;
     private readonly Dictionary<string, OOP> _classes = new();
     private readonly Dictionary<string, OOP> _symbols = new();
+    private readonly Dictionary<string, OOP> _globals = new(); // Global variables
     private readonly List<Chunk> _pendingChunks = new();
     
     // Core class OOPs - will be allocated during bootstrap
@@ -39,36 +40,35 @@ public sealed class ColdStartBootstrap
     private OOP _trueClass;
     private OOP _falseClass;
     private OOP _undefinedObjectClass;
+    
+    // Singleton objects
+    private OOP _nilObject;
+    private OOP _trueObject;
+    private OOP _falseObject;
+    private OOP _specialObjectsArray;
 
     /// <summary>
-    /// Hardcoded bytecode for Class>>subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
-    /// This is the minimal bytecode needed to create new classes.
+    /// Bytecode for Class>>subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+    /// Compiled from actual Smalltalk-80.st source using Smalltalk80.Compiler
     /// </summary>
     private static readonly byte[] SubclassCreationBytecode = 
     [
-        // Simplified bytecode - actual implementation would be more complex
-        0x70, // pushReceiver (self - the superclass)
-        0x10, // pushTemp: 0 (className)
-        0x11, // pushTemp: 1 (instanceVars) 
-        0x12, // pushTemp: 2 (classVars)
-        0x13, // pushTemp: 3 (poolDicts)
-        0x14, // pushTemp: 4 (category)
-        0xE0, // send: primitiveCreateClass with 5 args (would be a primitive)
-        0x7C  // returnTop
+        112, 208, 137, 117, 200, 160, 47, 112, 210, 137, 117, 200, 160, 9,
+        112, 16, 17, 18, 19, 20, 131, 163, 125, 125, 225, 135,
+        112, 212, 137, 117, 200, 160, 9,
+        112, 16, 17, 18, 19, 20, 131, 165, 125, 125, 225, 135,
+        112, 16, 17, 18, 19, 20, 131, 166, 125, 125, 225, 135,
+        112, 199, 16, 72, 112, 17, 114, 113, 113, 18, 19, 20, 115, 114,
+        132, 7, 12, 124
     ];
     
     /// <summary>
-    /// Hardcoded bytecode for Behavior>>compile:classified:
-    /// This is the minimal bytecode needed to compile methods.
+    /// Bytecode for Behavior>>compile:classified:
+    /// Compiled from actual Smalltalk-80.st source using Smalltalk80.Compiler
     /// </summary>
     private static readonly byte[] CompileMethodBytecode = 
     [
-        // Simplified bytecode for method compilation
-        0x70, // pushReceiver (self - the class)
-        0x10, // pushTemp: 0 (sourceCode)
-        0x11, // pushTemp: 1 (category)
-        0xE1, // send: primitiveCompileMethod with 2 args (would be a primitive)
-        0x7C  // returnTop
+        112, 16, 17, 115, 131, 96, 124
     ];
 
     public ColdStartBootstrap(IObjectMemory memory, ILogger<ColdStartBootstrap> logger)
@@ -76,6 +76,11 @@ public sealed class ColdStartBootstrap
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+    
+    /// <summary>
+    /// Gets all registered classes after bootstrap.
+    /// </summary>
+    public IReadOnlyDictionary<string, OOP> Classes => _classes;
 
     /// <summary>
     /// Performs the cold start bootstrap.
@@ -96,6 +101,34 @@ public sealed class ColdStartBootstrap
         // Phase 4: Read and execute Smalltalk source chunks
         await ProcessSmalltalkSourceAsync(smalltalkSourcePath);
         
+        // Phase 5: Register Special Objects Array as GC root and test GC
+        // RegisterGCRootsAndTestGC(); // Temporarily commented due to strange scoping issue
+        
+        // Inline the GC test for now
+        _logger.LogInformation("[COLD START] Phase 5: Testing garbage collection...");
+        
+        // Set the Special Objects Array as the sole GC root
+        if (_specialObjectsArray.Value != 0) // Check if it's been set
+        {
+            _memory.SetSpecialObjectsArray(_specialObjectsArray);
+            _logger.LogInformation("[GC] Set Special Objects Array as the sole GC root");
+        }
+        
+        // Run garbage collection (will display detailed statistics)
+        _logger.LogInformation("[GC] Running garbage collection after cold start bootstrap...");
+        _memory.CollectGarbage();
+        
+        // Check results
+        var (objectsCollected, bytesFreed) = _memory.GetLastGCStats();
+        if (objectsCollected == 0)
+        {
+            _logger.LogInformation("[GC] ✓ SUCCESS: All bootstrap objects are properly rooted!");
+        }
+        else
+        {
+            _logger.LogWarning("[GC] ⚠ WARNING: {Count} objects were collected - some bootstrap objects may not be properly rooted!", objectsCollected);
+        }
+        
         _logger.LogInformation("[COLD START] Bootstrap complete!");
     }
 
@@ -107,9 +140,27 @@ public sealed class ColdStartBootstrap
     {
         _logger.LogInformation("[COLD START] Phase 1: Creating minimal class hierarchy...");
         
-        // Step 1: Allocate all class objects first (with temporary class pointers)
-        // We use a temporary class OOP that will be fixed up later
+        // Create nil, true, false singleton objects first
+        // They need temporary class pointers that will be fixed later
         var tempClassOop = OOP.FromSmallInteger(999999); // Temporary marker
+        
+        // Create the singleton objects with temporary classes
+        _nilObject = _memory.AllocateObject(tempClassOop, 0);   // nil object
+        _trueObject = _memory.AllocateObject(tempClassOop, 0);  // true object  
+        _falseObject = _memory.AllocateObject(tempClassOop, 0); // false object
+        
+        // Update the static OOP values to match the actual allocated objects
+        OOP.Nil = _nilObject;
+        OOP.True = _trueObject;
+        OOP.False = _falseObject;
+        
+        // Also tell the memory system which OOP is nil
+        _memory.SetNilOop(_nilObject);
+        
+        _logger.LogInformation("[COLD START] Created singleton placeholders: nil={0}, true={1}, false={2}", 
+            _nilObject, _trueObject, _falseObject);
+        
+        // Step 1: Now allocate all class objects (they'll start at index 3)
         
         // Core object model classes (5 classes per Blue Book)
         _objectClass = _memory.AllocateObject(tempClassOop, 8); // 8 fields per Blue Book
@@ -150,6 +201,12 @@ public sealed class ColdStartBootstrap
         var classMetaclass = _memory.AllocateObject(_metaclassClass, 6);
         
         // Step 3: Wire up the class pointers
+        // First fix the singleton objects
+        SetClass(_nilObject, _undefinedObjectClass);
+        SetClass(_trueObject, _trueClass);
+        SetClass(_falseObject, _falseClass);
+        
+        // Then fix the class objects
         SetClass(_objectClass, objectMetaclass);
         SetClass(_behaviorClass, behaviorMetaclass);
         SetClass(_classDescriptionClass, classDescriptionMetaclass);
@@ -158,7 +215,7 @@ public sealed class ColdStartBootstrap
         
         // Step 4: Set up the inheritance chain
         // Object has no superclass (nil)
-        SetSuperclass(_objectClass, OOP.Nil);
+        SetSuperclass(_objectClass, _nilObject); // Object has no superclass
         
         // Behavior inherits from Object
         SetSuperclass(_behaviorClass, _objectClass);
@@ -195,7 +252,10 @@ public sealed class ColdStartBootstrap
         SetClass(_associationClass, _memory.AllocateObject(_metaclassClass, 6));
         SetSuperclass(_associationClass, _objectClass);
         
-        // Step 6: Register classes for lookup
+        // Step 6: Initialize method dictionaries for all classes
+        InitializeMethodDictionaries();
+        
+        // Step 7: Register classes for lookup
         RegisterClass("Object", _objectClass);
         RegisterClass("Behavior", _behaviorClass);
         RegisterClass("ClassDescription", _classDescriptionClass);
@@ -217,7 +277,78 @@ public sealed class ColdStartBootstrap
         RegisterClass("False", _falseClass);
         RegisterClass("UndefinedObject", _undefinedObjectClass);
         
+        // Step 7.5: Singleton objects were already created in Phase 1
+        // They're at indices 0, 1, 2 as required
+        
+        // Step 8: Create the Smalltalk global dictionary
+        CreateSmalltalkGlobal();
+        
+        // Step 9: Create the Special Objects Array
+        CreateSpecialObjectsArray();
+        
         _logger.LogInformation("[COLD START] Created {Count} core classes", _classes.Count);
+    }
+
+    /// <summary>
+    /// Initializes method dictionaries for all classes that were created.
+    /// Each class needs a properly structured method dictionary even if empty.
+    /// </summary>
+    private void InitializeMethodDictionaries()
+    {
+        _logger.LogInformation("[COLD START] Initializing method dictionaries for all classes...");
+        
+        // Initialize method dictionaries for all classes
+        InitializeClassMethodDictionary(_objectClass);
+        InitializeClassMethodDictionary(_behaviorClass);
+        InitializeClassMethodDictionary(_classDescriptionClass);
+        InitializeClassMethodDictionary(_metaclassClass);
+        InitializeClassMethodDictionary(_classClass);
+        InitializeClassMethodDictionary(_compiledMethodClass);
+        InitializeClassMethodDictionary(_methodDictionaryClass);
+        InitializeClassMethodDictionary(_methodContextClass);
+        InitializeClassMethodDictionary(_blockContextClass);
+        InitializeClassMethodDictionary(_stringClass);
+        InitializeClassMethodDictionary(_symbolClass);
+        InitializeClassMethodDictionary(_arrayClass);
+        InitializeClassMethodDictionary(_byteArrayClass);
+        InitializeClassMethodDictionary(_associationClass);
+        InitializeClassMethodDictionary(_dictionaryClass);
+        InitializeClassMethodDictionary(_smallIntegerClass);
+        InitializeClassMethodDictionary(_characterClass);
+        InitializeClassMethodDictionary(_trueClass);
+        InitializeClassMethodDictionary(_falseClass);
+        InitializeClassMethodDictionary(_undefinedObjectClass);
+        
+        // Also initialize method dictionaries for metaclasses
+        var classes = new[] { _objectClass, _behaviorClass, _classDescriptionClass, 
+            _metaclassClass, _classClass, _compiledMethodClass, _methodDictionaryClass,
+            _methodContextClass, _blockContextClass, _stringClass, _symbolClass,
+            _arrayClass, _byteArrayClass, _associationClass, _dictionaryClass,
+            _smallIntegerClass, _characterClass, _trueClass, _falseClass, _undefinedObjectClass };
+            
+        foreach (var classOop in classes)
+        {
+            var metaclassOop = _memory.FetchClassOf(classOop);
+            if (!metaclassOop.IsNil && !metaclassOop.IsSmallInteger)
+            {
+                InitializeClassMethodDictionary(metaclassOop);
+            }
+        }
+        
+        _logger.LogInformation("[COLD START] Method dictionaries initialized");
+    }
+    
+    private void InitializeClassMethodDictionary(OOP classOop)
+    {
+        // Check if class already has a method dictionary
+        var existingDict = _memory.FetchPointer(classOop, 1); // Field 1 in Behavior
+        
+        if (existingDict.IsNil || existingDict.IsSmallInteger)
+        {
+            // Create and install a new method dictionary
+            var methodDict = CreateMethodDictionary();
+            _memory.StorePointer(classOop, 1, methodDict);
+        }
     }
 
     /// <summary>
@@ -231,11 +362,21 @@ public sealed class ColdStartBootstrap
         // Object primitives
         InstallPrimitiveMethod(_objectClass, "class", 111, 0);           // Get class
         InstallPrimitiveMethod(_objectClass, "==", 110, 1);              // Identity
+        InstallPrimitiveMethod(_objectClass, "=", 110, 1);               // Equality (defaults to identity for Object)
         InstallPrimitiveMethod(_objectClass, "basicAt:", 60, 1);         // Field access
-        InstallPrimitiveMethod(_objectClass, "basicAt:put:", 61, 2);     // Field store  
-        InstallPrimitiveMethod(_objectClass, "basicSize", 62, 0);        // Size
+        InstallPrimitiveMethod(_objectClass, "basicAt:put:", 61, 2);     // Field store
         
-        // Behavior primitives for object creation
+        // Initialize method - no primitive, just returns self
+        InstallCustomPrimitiveMethod(_objectClass, "initialize", 0, 0,
+            new byte[] { 0x70, 0x7C }, // pushReceiver (112), returnTop (124)
+            Array.Empty<OOP>());
+        
+        // basicSize - special case: returns 0 if primitive fails
+        InstallCustomPrimitiveMethod(_objectClass, "basicSize", 62, 0, 
+            new byte[] { 0x75, 0x7C }, // pushZero (117), returnTop (124)
+            Array.Empty<OOP>());
+        
+        // Behavior primitives for object creation  
         InstallPrimitiveMethod(_behaviorClass, "new", 70, 0);            // Allocate
         InstallPrimitiveMethod(_behaviorClass, "new:", 71, 1);           // Allocate with size
         InstallPrimitiveMethod(_behaviorClass, "basicNew", 70, 0);       // Allocate
@@ -279,29 +420,57 @@ public sealed class ColdStartBootstrap
         _logger.LogInformation("[COLD START] Phase 3: Installing bootstrap methods...");
         
         // Install Class>>subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:
+        // Literals from the compiled Smalltalk-80.st:
+        // Note: We need to create the Association for Smalltalk and resolve it later
+        var smalltalkSymbol = GetOrCreateSymbol("Smalltalk");
+        var smalltalkAssoc = CreateAssociation(smalltalkSymbol, GetOrCreateGlobal("Smalltalk"));
+        
+        var subclassLiterals = new OOP[]
+        {
+            GetOrCreateSymbol("isVariable"),
+            GetOrCreateSymbol("ifTrue:"),
+            GetOrCreateSymbol("isPointers"),
+            GetOrCreateSymbol("variableSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:"),
+            GetOrCreateSymbol("isBytes"),
+            GetOrCreateSymbol("variableByteSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:"),
+            GetOrCreateSymbol("variableWordSubclass:instanceVariableNames:classVariableNames:poolDictionaries:category:"),
+            GetOrCreateSymbol("name:inEnvironment:subclassOf:instanceVariableNames:variable:words:pointers:classVariableNames:poolDictionaries:category:comment:changed:"),
+            smalltalkAssoc
+        };
+        
         var subclassMethod = CreateCompiledMethod(
             SubclassCreationBytecode,
-            Array.Empty<OOP>(), // No literals needed for primitive
+            subclassLiterals,
             5, // 5 arguments
             0, // No temporaries
-            10 // Stack size
+            15 // Stack depth from compiler
         );
         InstallMethod(_classClass, "subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:", subclassMethod);
         
         // Install Behavior>>compile:classified:
+        var compileLiterals = new OOP[]
+        {
+            GetOrCreateSymbol("compile:classified:notifying:")
+        };
+        
         var compileMethod = CreateCompiledMethod(
             CompileMethodBytecode,
-            Array.Empty<OOP>(), // No literals needed for primitive
+            compileLiterals,
             2, // 2 arguments
             0, // No temporaries
-            8  // Stack size
+            4  // Stack depth from compiler
         );
         InstallMethod(_behaviorClass, "compile:classified:", compileMethod);
         
         // Also install some helper methods that are needed
-        InstallNonPrimitiveMethod(_objectClass, "isNil", new byte[] { 0x79, 0x7C }); // pushFalse, returnTop
-        InstallNonPrimitiveMethod(_objectClass, "notNil", new byte[] { 0x78, 0x7C }); // pushTrue, returnTop
-        InstallNonPrimitiveMethod(_objectClass, "yourself", new byte[] { 0x70, 0x7C }); // pushReceiver, returnTop
+        // isNil: ^false
+        InstallNonPrimitiveMethod(_objectClass, "isNil", new byte[] { 0x72, 0x7C }); // pushFalse (114), returnTop (124)
+        
+        // notNil: ^true
+        InstallNonPrimitiveMethod(_objectClass, "notNil", new byte[] { 0x71, 0x7C }); // pushTrue (113), returnTop (124)
+        
+        // yourself: ^self
+        InstallNonPrimitiveMethod(_objectClass, "yourself", new byte[] { 0x78 }); // returnReceiver (120)
         
         _logger.LogInformation("[COLD START] Installed subclass creation and method compilation methods");
     }
@@ -408,19 +577,17 @@ public sealed class ColdStartBootstrap
 
     private void SetClass(OOP objectOop, OOP classOop)
     {
-        // In the object header, set the class pointer
-        // This depends on the ObjectMemory implementation
-        // For now, we'll store it as the first field (field 0)
-        var obj = GetObject(objectOop);
-        if (obj != null && obj.Length > 0)
-        {
-            obj[0] = classOop;
-        }
+        // The class of an object is stored in the object's header in the ObjectTable
+        // This is managed by ObjectMemory, not as a field in the object itself
+        _memory.SetClassOf(objectOop, classOop);
     }
 
     private void SetSuperclass(OOP classOop, OOP superclassOop)
     {
         // Superclass is field 0 in Behavior per Blue Book
+        // Field 0: superclass
+        // Field 1: methodDict
+        // Field 2: format
         _memory.StorePointer(classOop, 0, superclassOop);
     }
 
@@ -436,6 +603,14 @@ public sealed class ColdStartBootstrap
         var method = CreatePrimitiveMethod(primitiveIndex, numArgs);
         InstallMethod(classOop, selector, method);
     }
+    
+    private void InstallCustomPrimitiveMethod(OOP classOop, string selector, int primitiveIndex, int numArgs, 
+        byte[] fallbackBytecode, OOP[] literals)
+    {
+        // Create a primitive method with custom fallback bytecode
+        var method = CreateCompiledMethod(fallbackBytecode, literals, numArgs, 0, 3, primitiveIndex);
+        InstallMethod(classOop, selector, method);
+    }
 
     private void InstallNonPrimitiveMethod(OOP classOop, string selector, byte[] bytecode)
     {
@@ -445,9 +620,14 @@ public sealed class ColdStartBootstrap
 
     private OOP CreatePrimitiveMethod(int primitiveIndex, int numArgs)
     {
-        // Minimal bytecode: just return self if primitive fails
-        var bytecodes = new byte[] { 0x70, 0x7C }; // pushReceiver, returnTop
-        return CreateCompiledMethod(bytecodes, Array.Empty<OOP>(), numArgs, 0, 1, primitiveIndex);
+        // Default fallback: self primitiveFailed
+        // Bytecode: pushReceiver (112), send literal 0 with 0 args (208), returnTop (124)
+        var bytecodes = new byte[] { 0x70, 0xD0, 0x7C }; // pushReceiver, sendLiteralSelector0Args0, returnTop
+        
+        // Need #primitiveFailed as literal
+        var literals = new OOP[] { GetOrCreateSymbol("primitiveFailed") };
+        
+        return CreateCompiledMethod(bytecodes, literals, numArgs, 0, 2, primitiveIndex);
     }
 
     private OOP CreateCompiledMethod(byte[] bytecodes, OOP[] literals, int numArgs, int numTemps, int stackSize, int primitiveIndex = 0)
@@ -495,47 +675,78 @@ public sealed class ColdStartBootstrap
     private void InstallMethod(OOP classOop, string selector, OOP methodOop)
     {
         // Get or create method dictionary
-        var methodDict = _memory.FetchPointer(classOop, 2); // Field 2 in Behavior is methodDict
+        var methodDict = _memory.FetchPointer(classOop, 1); // Field 1 in Behavior is methodDict
         
-        if (methodDict.IsNil)
+        if (methodDict.IsNil || methodDict.IsSmallInteger)
         {
             // Create new method dictionary
             methodDict = CreateMethodDictionary();
-            _memory.StorePointer(classOop, 2, methodDict);
+            _memory.StorePointer(classOop, 1, methodDict);
+            _logger.LogTrace("[COLD START] Created method dictionary for class {Class}", classOop);
         }
         
         // Add selector->method to dictionary
         var selectorSymbol = GetOrCreateSymbol(selector);
         AddToMethodDictionary(methodDict, selectorSymbol, methodOop);
+        _logger.LogTrace("[COLD START] Installed method {Selector} in class {Class}", selector, classOop);
     }
 
     private OOP CreateMethodDictionary()
     {
-        // Create a simple dictionary with initial capacity
-        // For now, use an array-based implementation
-        var dict = _memory.AllocateObject(_methodDictionaryClass, 64); // 32 key-value pairs
+        // MethodDictionary structure per Blue Book:
+        // Field 0: tally (number of elements)
+        // Field 1: array (contains alternating keys and values)
+        var dict = _memory.AllocateObject(_methodDictionaryClass, 2);
+        
+        // Initialize tally to 0
+        _memory.StorePointer(dict, 0, OOP.FromSmallInteger(0));
+        
+        // Create array for key-value pairs (capacity for 32 entries = 64 slots)
+        var array = _memory.AllocateObject(_arrayClass, 64);
+        
+        // Initialize all slots to nil
+        for (int i = 0; i < 64; i++)
+        {
+            _memory.StorePointer(array, i, _nilObject);
+        }
+        
+        _memory.StorePointer(dict, 1, array);
+        
         return dict;
     }
 
     private void AddToMethodDictionary(OOP dictOop, OOP selectorOop, OOP methodOop)
     {
-        // Simple linear search for now
-        // In a real implementation, this would use hashing
+        // Get tally and array from method dictionary
+        var tallyOop = _memory.FetchPointer(dictOop, 0);
+        var arrayOop = _memory.FetchPointer(dictOop, 1);
         
+        if (arrayOop.IsNil || arrayOop.IsSmallInteger)
+        {
+            _logger.LogError("[COLD START] Method dictionary has invalid array!");
+            return;
+        }
+        
+        var tally = tallyOop.IsSmallInteger ? tallyOop.SmallIntegerValue : 0;
+        
+        // Simple linear search in the array
         for (int i = 0; i < 32; i++)
         {
-            var key = _memory.FetchPointer(dictOop, i * 2);
+            var key = _memory.FetchPointer(arrayOop, i * 2);
             if (key.IsNil)
             {
                 // Found empty slot
-                _memory.StorePointer(dictOop, i * 2, selectorOop);
-                _memory.StorePointer(dictOop, i * 2 + 1, methodOop);
+                _memory.StorePointer(arrayOop, i * 2, selectorOop);
+                _memory.StorePointer(arrayOop, i * 2 + 1, methodOop);
+                
+                // Update tally
+                _memory.StorePointer(dictOop, 0, OOP.FromSmallInteger(tally + 1));
                 return;
             }
             else if (key.Value == selectorOop.Value)
             {
                 // Replace existing method
-                _memory.StorePointer(dictOop, i * 2 + 1, methodOop);
+                _memory.StorePointer(arrayOop, i * 2 + 1, methodOop);
                 return;
             }
         }
@@ -550,17 +761,205 @@ public sealed class ColdStartBootstrap
             return symbol;
         }
         
-        // Create new symbol
-        var bytes = Encoding.UTF8.GetBytes(str);
+        // Create a proper Symbol object
+        // Symbols are ByteArrays (subclass of ByteArray via String)
+        // We need to allocate the bytes for the string content
+        var bytes = System.Text.Encoding.UTF8.GetBytes(str);
+        
+        // AllocateByteObject takes the byte size, not word size
         symbol = _memory.AllocateByteObject(_symbolClass, bytes.Length);
         
+        // Store the bytes into the Symbol
         for (int i = 0; i < bytes.Length; i++)
         {
             _memory.StoreByte(symbol, i, bytes[i]);
         }
         
+        _logger.LogTrace("[COLD START] Created symbol #{String} -> {OOP}", str, symbol);
+        
         _symbols[str] = symbol;
+        
         return symbol;
+    }
+    
+    private OOP CreateAssociation(OOP key, OOP value)
+    {
+        // Create an Association object with key and value
+        var assoc = _memory.AllocateObject(_associationClass, 2);
+        _memory.StorePointer(assoc, 0, key);  // Field 0: key
+        _memory.StorePointer(assoc, 1, value); // Field 1: value
+        return assoc;
+    }
+    
+    private void CreateSingletonObjects()
+    {
+        // Create nil as a proper object (singleton instance of UndefinedObject)
+        _nilObject = _memory.AllocateObject(_undefinedObjectClass, 0); // nil has no instance variables
+        
+        // Create the singleton true object
+        _trueObject = _memory.AllocateObject(_trueClass, 0); // True has no instance variables
+        
+        // Create the singleton false object  
+        _falseObject = _memory.AllocateObject(_falseClass, 0); // False has no instance variables
+        
+        _logger.LogInformation("[COLD START] Created singleton objects (nil={0}, true={1}, false={2})", 
+            _nilObject, _trueObject, _falseObject);
+    }
+    
+    private void CreateSmalltalkGlobal()
+    {
+        // Create the Smalltalk global dictionary
+        // This holds all global variables including class names
+        var smalltalkDict = CreateDictionary();
+        
+        // Add all classes to the Smalltalk dictionary
+        foreach (var kvp in _classes)
+        {
+            var nameSymbol = GetOrCreateSymbol(kvp.Key);
+            AddToDictionary(smalltalkDict, nameSymbol, kvp.Value);
+        }
+        
+        // Add the Smalltalk dictionary itself as a global
+        var smalltalkSymbol = GetOrCreateSymbol("Smalltalk");
+        AddToDictionary(smalltalkDict, smalltalkSymbol, smalltalkDict);
+        
+        // Store in globals
+        _globals["Smalltalk"] = smalltalkDict;
+        
+        _logger.LogInformation("[COLD START] Created Smalltalk global dictionary with {Count} entries", _classes.Count + 1);
+    }
+    
+    private void CreateSpecialObjectsArray()
+    {
+        // Create the Special Objects Array
+        // This array contains well-known objects that the VM needs quick access to
+        // Following the old interpreter's specification (exactly 9 slots):
+        // 0: nil object
+        // 1: false object
+        // 2: true object
+        // 3: Behavior class
+        // 4: Metaclass class
+        // 5: Smalltalk global dictionary (SystemDictionary instance)
+        // 6: Symbol table (to be added)
+        // 7: Process list (to be added)
+        // 8: ProcessorScheduler (to be added)
+        
+        const int specialObjectsSize = 9; // Only 9 slots needed per old interpreter
+        var specialObjects = _memory.AllocateObject(_arrayClass, specialObjectsSize);
+        
+        // Initialize all slots to the nil object first
+        for (int i = 0; i < specialObjectsSize; i++)
+        {
+            _memory.StorePointer(specialObjects, i, _nilObject);
+        }
+        
+        // Populate the essential objects following the old interpreter's SpecialObjects indices
+        // CRITICAL: Indices 3-5 MUST contain Behavior, Metaclass, and Smalltalk for proper GC!
+        _memory.StorePointer(specialObjects, 0, _nilObject);           // nil (the actual object)
+        _memory.StorePointer(specialObjects, 1, _falseObject);         // false
+        _memory.StorePointer(specialObjects, 2, _trueObject);          // true
+        _memory.StorePointer(specialObjects, 3, _behaviorClass);       // Behavior class (CRITICAL GC ROOT!)
+        _memory.StorePointer(specialObjects, 4, _metaclassClass);      // Metaclass class (CRITICAL GC ROOT!)
+        
+        // Store the Smalltalk global dictionary at index 5 - it contains all classes
+        if (_globals.TryGetValue("Smalltalk", out var smalltalkDict))
+        {
+            _memory.StorePointer(specialObjects, 5, smalltalkDict);    // Smalltalk global (CRITICAL GC ROOT!)
+        }
+        else
+        {
+            _logger.LogError("[ERROR] Smalltalk dictionary not found in globals!");
+        }
+        
+        // 6: Create and store the Symbol table
+        // This is critical for selector interning and symbol uniqueness
+        var symbolTable = CreateDictionary(); // Create a Dictionary to hold all symbols
+        _memory.StorePointer(specialObjects, 6, symbolTable);
+        
+        // Store all existing symbols in the Symbol table
+        foreach (var kvp in _symbols)
+        {
+            AddToDictionary(symbolTable, kvp.Value, kvp.Value); // Symbol maps to itself
+        }
+        _globals["SymbolTable"] = symbolTable; // Also make it accessible as a global
+        
+        // 7: Process list - not created yet (will be needed for scheduling)
+        // 8: ProcessorScheduler - not created yet (will be needed for process management)
+        
+        // Note: Other classes like SmallInteger, String, Array etc. are accessible
+        // through the Smalltalk global dictionary and don't need to be in Special Objects
+        
+        // Store the special objects array in globals for VM access
+        _globals["SpecialObjectsArray"] = specialObjects;
+        _specialObjectsArray = specialObjects;
+        
+        _logger.LogInformation("[COLD START] Created Special Objects Array with {Count} slots", specialObjectsSize);
+    }
+    
+    private OOP CreateDictionary()
+    {
+        // Create a basic Dictionary
+        // Dictionary has more complex structure than MethodDictionary
+        // For simplicity, using same structure as MethodDictionary for now
+        var dict = _memory.AllocateObject(_dictionaryClass, 2);
+        _memory.StorePointer(dict, 0, OOP.FromSmallInteger(0)); // tally
+        
+        var array = _memory.AllocateObject(_arrayClass, 128); // Larger capacity for globals
+        for (int i = 0; i < 128; i++)
+        {
+            _memory.StorePointer(array, i, _nilObject);
+        }
+        _memory.StorePointer(dict, 1, array);
+        
+        return dict;
+    }
+    
+    private void AddToDictionary(OOP dictOop, OOP key, OOP value)
+    {
+        // Similar to AddToMethodDictionary but for regular Dictionary
+        var tallyOop = _memory.FetchPointer(dictOop, 0);
+        var arrayOop = _memory.FetchPointer(dictOop, 1);
+        
+        if (arrayOop.IsNil || arrayOop.IsSmallInteger)
+        {
+            _logger.LogError("[COLD START] Dictionary has invalid array!");
+            return;
+        }
+        
+        var tally = tallyOop.IsSmallInteger ? tallyOop.SmallIntegerValue : 0;
+        
+        // Simple linear search in the array
+        for (int i = 0; i < 64; i++) // Using half the array capacity for key-value pairs
+        {
+            var existingKey = _memory.FetchPointer(arrayOop, i * 2);
+            if (existingKey.IsNil)
+            {
+                // Found empty slot
+                _memory.StorePointer(arrayOop, i * 2, key);
+                _memory.StorePointer(arrayOop, i * 2 + 1, value);
+                
+                // Update tally
+                _memory.StorePointer(dictOop, 0, OOP.FromSmallInteger(tally + 1));
+                return;
+            }
+            else if (existingKey.Value == key.Value)
+            {
+                // Replace existing value
+                _memory.StorePointer(arrayOop, i * 2 + 1, value);
+                return;
+            }
+        }
+        
+        _logger.LogWarning("[COLD START] Dictionary full!");
+    }
+    
+    private OOP GetOrCreateGlobal(string name)
+    {
+        if (_globals.TryGetValue(name, out var global))
+        {
+            return global;
+        }
+        return _nilObject;
     }
 
     private OOP[]? GetObject(OOP oop)
@@ -650,6 +1049,7 @@ public sealed class ChunkReader
             
         return ChunkType.DoIt;
     }
+    
 }
 
 public enum ChunkType

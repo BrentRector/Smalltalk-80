@@ -62,15 +62,16 @@ public static class Program
         Console.WriteLine("  repl [-i image]                          Start interactive REPL");
         Console.WriteLine("  compile <file> [-o output]               Compile Smalltalk source to bytecode");
         Console.WriteLine("  inspect <file>                           Inspect a system image or compiled method");
-        Console.WriteLine("  cold-start [-s source]                   Bootstrap from minimal kernel");
+        Console.WriteLine("  cold-start [-s source] [--print-classes] Bootstrap from minimal kernel");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -h, --help      Show this help message");
-        Console.WriteLine("  -v, --verbose   Enable verbose output");
-        Console.WriteLine("  -i, --image     Path to system image file");
-        Console.WriteLine("  -e, --expr      Smalltalk expression to evaluate");
-        Console.WriteLine("  -o, --output    Output file path");
-        Console.WriteLine("  -s, --source    Path to Smalltalk-80.st source file");
+        Console.WriteLine("  -h, --help          Show this help message");
+        Console.WriteLine("  -v, --verbose       Enable verbose output");
+        Console.WriteLine("  -i, --image         Path to system image file");
+        Console.WriteLine("  -e, --expr          Smalltalk expression to evaluate");
+        Console.WriteLine("  -o, --output        Output file path");
+        Console.WriteLine("  -s, --source        Path to Smalltalk-80.st source file");
+        Console.WriteLine("  --print-classes     Pretty print all classes and methods after cold start");
         return 0;
     }
 
@@ -335,6 +336,7 @@ public static class Program
     {
         string? sourcePath = null;
         bool verbose = false;
+        bool printClasses = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -348,6 +350,9 @@ public static class Program
                 case "-v":
                 case "--verbose":
                     verbose = true;
+                    break;
+                case "--print-classes":
+                    printClasses = true;
                     break;
                 default:
                     if (!args[i].StartsWith("-"))
@@ -405,6 +410,15 @@ public static class Program
         {
             await bootstrap.BootstrapAsync(sourcePath);
             Console.WriteLine("[COLD START] Bootstrap completed successfully!");
+            
+            // Print all classes if requested
+            if (printClasses)
+            {
+                var classPrinterLogger = serviceProvider.GetRequiredService<ILogger<Diagnostics.ClassPrinter>>();
+                var classPrinter = new Diagnostics.ClassPrinter(memory, classPrinterLogger);
+                classPrinter.PrintAllClasses(bootstrap.Classes);
+            }
+            
             return 0;
         }
         catch (Exception ex)

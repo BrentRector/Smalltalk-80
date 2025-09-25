@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 namespace Smalltalk80.Interpreter.Config
 {
@@ -14,11 +15,18 @@ namespace Smalltalk80.Interpreter.Config
         public static void ConfigureLogging(ILoggingBuilder builder, bool verbose = false)
         {
             builder.ClearProviders();
-            builder.AddSimpleConsole(options =>
+            builder.AddConsole(options =>
             {
-                options.ColorBehavior = Microsoft.Extensions.Logging.Console.LoggerColorBehavior.Enabled;
+                options.FormatterName = "custom";
+                options.LogToStandardErrorThreshold = LogLevel.Error;
+            });
+            
+            // Add a custom formatter that uses short category names
+            builder.AddConsoleFormatter<CustomConsoleFormatter, CustomConsoleFormatterOptions>(options =>
+            {
                 options.TimestampFormat = "[HH:mm:ss] ";
-                options.SingleLine = true;
+                // Set to true to completely hide category names, false to show short names
+                options.HideCategoryName = true;
             });
 
             if (verbose)

@@ -23,6 +23,11 @@ public interface IObjectMemory
     OOP FetchClassOf(OOP oop);
 
     /// <summary>
+    /// Sets the class of an object.
+    /// </summary>
+    void SetClassOf(OOP oop, OOP classOop);
+
+    /// <summary>
     /// Fetches a field value from an object.
     /// </summary>
     OOP FetchPointer(OOP oop, int fieldIndex);
@@ -41,6 +46,16 @@ public interface IObjectMemory
     /// Performs garbage collection.
     /// </summary>
     void CollectGarbage();
+    
+    /// <summary>
+    /// Sets the Special Objects Array as the sole GC root.
+    /// </summary>
+    void SetSpecialObjectsArray(OOP specialObjectsArray);
+    
+    /// <summary>
+    /// Gets statistics about the last garbage collection.
+    /// </summary>
+    (int objectsCollected, int bytesFreed) GetLastGCStats();
 
     /// <summary>
     /// Checks if an OOP is a SmallInteger.
@@ -66,4 +81,10 @@ public interface IObjectMemory
     /// Stores a byte value in an object.
     /// </summary>
     void StoreByte(OOP oop, int index, byte value);
+    
+    /// <summary>
+    /// Sets the OOP value that represents nil.
+    /// This should be called during bootstrap after nil object is created.
+    /// </summary>
+    void SetNilOop(OOP nilOop);
 }

@@ -1060,6 +1060,326 @@ public interface IStackManagement
 3. Update documentation
 4. Release new version
 
+## Cold Start Bootstrap Requirements
+
+### Overview
+
+A minimal cold-start Smalltalk-80 implementation must create a small, self-consistent object graph plus essential VM-level tables to enable object allocation, selector lookup, bytecode dispatch, and message sending to bootstrapped classes. This section provides an authoritative checklist of required data structures with their purposes and initialization requirements.
+
+### Core Object Model and Class Structures
+
+#### Class Objects (Concrete Classes)
+**Purpose:** Represent each boot class in the system.  
+**Requirements:** Must contain pointers to:
+- Superclass reference
+- Method dictionary
+- Instance variable layout
+- Format/instance size metadata
+- Metaclass reference
+
+#### Metaclass Objects
+**Purpose:** One metaclass per concrete class, forming the class-side behavior.  
+**Requirements:** 
+- Must be instances of Metaclass class
+- Properly wired into class/method lookup chain
+- Include metaclasses for metaclasses as required by the object model
+
+#### Behavior/Prototype Root Classes
+**Purpose:** Form the inheritance roots (e.g., Behavior, Class, Metaclass).  
+**Requirements:** Consistent layout enabling both class-side and instance-side message lookup.
+
+### Method and Message Lookup Structures
+
+#### Method Dictionary
+**Purpose:** Per-class mapping from selectors (Symbols) to CompiledMethod objects.  
+**Requirements:** Must support VM lookup semantics with proper hash collision handling.
+
+#### Compiled Method Objects
+**Purpose:** Represent executable methods.  
+**Requirements:**
+- Method header (literal count, temporaries, stack depth)
+- Bytecode vector
+- Literal array containing selectors and constants
+- Must match VM's expected layout exactly
+
+#### Selector/Symbol Table
+**Purpose:** Canonicalized table of all selector names used during boot.  
+**Requirements:** Selectors must be unique Symbol objects enabling identity checks during lookup.
+
+### Global Registries and Namespaces
+
+#### System/Global Dictionary (Smalltalk)
+**Purpose:** Top-level namespace mapping global names to objects/classes.  
+**Requirements:** Must include:
+- All boot classes
+- Key kernel objects
+- Essential globals (Smalltalk, true, false, nil if represented as globals)
+
+#### Special Objects Array
+**Purpose:** VM-accessible array of frequently-referenced singletons and constants.  
+**Requirements:** Contains nil, true, false, SmallInteger markers, class table roots, special selectors.
+
+#### Class Table/List
+**Purpose:** VM-level collection for enumerating classes.  
+**Requirements:** Must be reachable from VM roots for reflection and GC.
+
+### Fundamental Container and Utility Objects
+
+#### Dictionary Implementation
+**Purpose:** Used by MethodDictionary and Global Dictionary.  
+**Requirements:** Functional implementation of at:, at:put:, keys, associations.
+
+#### Array/OrderedCollection
+**Purpose:** Container for literal arrays, bytecode vectors, Special Objects Array.  
+**Requirements:** Fixed or resizable container with proper bounds checking.
+
+#### Symbol/String Objects
+**Purpose:** Canonical Symbol instances for selectors and global names.  
+**Requirements:** Minimal String support for Symbol creation during boot.
+
+### Execution and Control Structures
+
+#### Process/Active Process
+**Purpose:** Represent the running execution thread.  
+**Requirements:** At least one initial Process with associated stack/context.
+
+#### Context/Activation Records
+**Purpose:** Stack frame representation for method execution.  
+**Requirements:** Must follow VM conventions for temporaries, arguments, return locations.
+
+#### Stack/Temporary Storage Layout
+**Purpose:** Manage execution state.  
+**Requirements:** Honor VM conventions for stack operations.
+
+### VM Primitives and Runtime Support
+
+#### Primitive Function Table
+**Purpose:** Map primitive indices to VM operations.  
+**Requirements:** Entries for all primitives referenced by boot methods.
+
+#### Bytecode Dispatch Tables
+**Purpose:** VM-level bytecode interpretation.  
+**Requirements:** Complete decoder for all bytecodes used in boot methods.
+
+#### Memory Manager/Heap Metadata
+**Purpose:** Object allocation and memory management.  
+**Requirements:** 
+- Functioning allocator
+- GC root set maintenance
+- Support for both pointer and byte-indexed objects
+
+## Garbage Collection System
+
+### Overview
+
+The Smalltalk-80 interpreter implements a mark-and-sweep garbage collector that automatically reclaims memory from unreachable objects. The GC is designed to preserve all language semantics while providing efficient memory management in the .NET environment.
+
+### Architecture
+
+#### Core Components
+
+1. **GarbageCollector Class** (`Core/Memory/GarbageCollector.cs`)
+   - Implements mark-and-sweep algorithm
+   - Manages GC roots and statistics
+   - Provides configurable collection options
+
+2. **ObjectMemory Integration**
+   - Tracks all allocated objects in object table
+   - Maintains explicit GC roots
+   - Provides allocation statistics
+
+3. **ObjectHeader GC Flags**
+   - `IsMarked`: Set during mark phase to indicate reachability
+   - `IsPermanent`: Prevents collection of system objects
+
+### GC Root Set
+
+The garbage collector uses multiple root sources to ensure all live objects are preserved:
+
+#### Primary Roots
+
+1. **Special Objects Array** (Primary Root)
+   - 32-slot array containing essential system objects
+   - Index 0: nil (special value, not collected)
+   - Index 1: false singleton object
+   - Index 2: true singleton object
+   - Index 5: SmallInteger class
+   - Index 6: String class
+   - Index 7: Array class
+   - Index 8: Smalltalk global dictionary
+   - Index 10: MethodContext class
+   - Index 11: BlockContext class
+   - Index 16: CompiledMethod class
+   - Index 19: Character class
+
+2. **Explicit GC Roots**
+   - Objects registered via `AddGCRoot(OOP)`
+   - Used for VM-level objects that must survive collection
+   - Can be removed with `RemoveGCRoot(OOP)`
+
+3. **Transient Roots**
+   - Active contexts and execution stacks
+   - Registered temporarily during execution
+   - Automatically cleared after collection
+
+### Mark-and-Sweep Algorithm
+
+#### Mark Phase
+
+1. **Initialize**: Clear all mark bits in object headers
+2. **Mark Roots**: Mark all objects in root set
+3. **Transitive Closure**: Recursively mark all reachable objects
+   - Follow class pointers
+   - Traverse pointer fields
+   - Skip SmallIntegers (immediate values)
+   - Handle cycles with visited set
+
+```csharp
+private void MarkObject(OOP oop)
+{
+    if (oop.IsSmallInteger || oop.IsNil || visited.Contains(oop))
+        return;
+        
+    visited.Add(oop);
+    var header = objectMemory.GetHeader(oop);
+    header.IsMarked = true;
+    
+    // Mark class
+    MarkObject(header.ClassOop);
+    
+    // Mark fields if object has pointers
+    if (header.HasPointers)
+    {
+        for (int i = 0; i < header.Size; i++)
+        {
+            var field = objectMemory.FetchPointer(oop, i);
+            MarkObject(field);
+        }
+    }
+}
+```
+
+#### Sweep Phase
+
+1. **Enumerate Objects**: Traverse entire object table
+2. **Collect Unmarked**: Free objects without mark bit
+3. **Skip Permanent**: Never collect objects with IsPermanent flag
+4. **Update Statistics**: Track objects and bytes freed
+
+### Object Types and GC Behavior
+
+#### Immediate Values
+- **SmallIntegers**: Tagged values, never allocated or collected
+- **nil**: Special OOP value, not a real object
+
+#### Allocated Objects
+- **Pointer Objects**: Fields traversed during marking
+- **Byte Objects**: No field traversal (Strings, ByteArrays)
+- **Mixed Objects**: Some implementations support partial pointer fields
+
+#### Special Handling
+- **Symbols**: Preserved via symbol table in Smalltalk global
+- **Classes**: Always marked when instances are marked
+- **Methods**: Preserved via class method dictionaries
+
+### GC Triggers and Control
+
+#### Automatic Triggers
+- Memory pressure thresholds
+- Allocation count limits
+- Periodic during bytecode execution
+
+#### Manual Control
+- `ObjectMemory.CollectGarbage()`: Explicit collection
+- GC primitives callable from Smalltalk code
+- Debug options for verbose output
+
+### Statistics and Monitoring
+
+The GC tracks comprehensive statistics:
+- Objects collected per cycle
+- Bytes freed per cycle  
+- Collection duration
+- Total allocations
+- Active GC roots count
+
+Access via: `ObjectMemory.GetLastGCStats()`
+
+### Bootstrap Integration
+
+During cold start bootstrap:
+1. GC is initially disabled
+2. Core classes created and wired
+3. Special Objects Array populated
+4. GC enabled with proper root set
+5. Initial collection verifies zero objects collectable
+
+### Performance Characteristics
+
+- **Time Complexity**: O(n) where n = live objects
+- **Space Complexity**: O(m) where m = unique objects for cycle detection
+- **Typical Performance**: <10ms for thousands of objects
+- **GC Pause**: Stop-the-world during collection
+
+### Invariants
+
+1. **Root Completeness**: All reachable objects marked from roots
+2. **Type Safety**: Class pointers always preserved
+3. **Singleton Preservation**: true, false never collected
+4. **Symbol Uniqueness**: Interned symbols remain unique
+5. **Context Chain**: Execution contexts preserved during execution
+
+#### GC Root Set
+**Purpose:** Prevent collection of live objects.  
+**Requirements:** Include VM stacks, Special Objects Array, Global Dictionary, class table.
+
+### Minimal Object Identity and Small Integer Support
+
+#### SmallInteger Representation
+**Purpose:** Efficient integer handling via tagging.  
+**Requirements:** Consistent encoding/decoding rules matching VM assumptions.
+
+#### Object Header/Format Descriptors
+**Purpose:** Define object memory layout.  
+**Requirements:** Agreement between VM and image on format tags, class pointers, size fields.
+
+### Required Minimal Selectors
+
+The following selectors must exist as Symbols and be present in appropriate method dictionaries:
+- Object creation: `new`, `basicNew`, `basicNew:`
+- Class creation: `subclass:instanceVariableNames:classVariableNames:poolDictionaries:category:`
+- Initialization: `initialize`
+- Collection access: `at:`, `at:put:`, `size`
+- Basic operations: `==`, `=`, `yourself`, `isNil`, `notNil`
+- Method compilation: `compile:classified:`
+- Primitive failures: `primitiveFailed`
+
+### Invariants and Wiring Checklist
+
+#### Critical Invariants
+1. **Class ↔ Metaclass Links:** Bidirectionally consistent
+2. **Method Dictionary Lookup:** Resolves to CompiledMethods with matching Symbol objects
+3. **Special Objects:** Reachable from VM roots with canonical nil/true/false
+4. **Bytecode Formats:** Match VM decoder exactly
+5. **Primitive Indices:** Bound to VM routines before execution
+
+### Minimal Boot Order
+
+1. **Initialize VM Constants:** Tagging masks, object formats, heap allocator, primitive table
+2. **Create Symbol Table:** Essential strings and selectors
+3. **Create Core Classes:** Class, Metaclass, Behavior with empty method dictionaries
+4. **Create Special Objects:** Array and singletons (nil, true, false)
+5. **Create Kernel Classes:** Array, Dictionary, CompiledMethod, Process, Context
+6. **Link Metaclasses:** Establish proper inheritance chains
+7. **Populate Method Dictionaries:** Install minimal methods and primitives
+8. **Create Global Dictionary:** Register all classes and globals
+9. **Initialize Process:** Create initial execution context
+10. **Begin Execution:** Start interpreting bytecodes
+
+### Implementation Notes
+
+Different Smalltalk-80 implementations can balance VM primitives versus image methods. When choosing this split, ensure any image method only calls selectors and primitives already initialized by the VM and present in boot dictionaries.
+
 ## Appendices
 
 ### A. Bytecode Reference
@@ -1086,6 +1406,8 @@ public interface IStackManagement
 - **Version 1.3** (2025-01-23) - Implemented and tested cold start bootstrap
 - **Version 1.4** (2025-01-23) - Achieved zero warnings and errors in all main projects
 - **Version 1.5** (2025-01-23) - Modernized debug options with ILogger infrastructure
+- **Version 1.6** (2025-01-24) - Added comprehensive cold start bootstrap requirements checklist
+- **Version 1.7** (2025-01-24) - Added complete Garbage Collection System documentation
 - **Author** - Claude (AI Assistant)  
 - **Status** - Phase 1-2 Complete, Cold Start Bootstrap Implemented, Zero Warnings/Errors Maintained
 

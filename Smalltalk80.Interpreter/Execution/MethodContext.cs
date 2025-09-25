@@ -203,6 +203,21 @@ public sealed class Stack(int capacity)
     public void Clear() => sp = -1;
 
     /// <summary>
+    /// Gets all items currently on the stack as an array.
+    /// Used for GC root collection.
+    /// </summary>
+    /// <returns>Array containing all stack items.</returns>
+    public OOP[] ToArray()
+    {
+        if (sp < 0)
+            return [];
+        
+        var result = new OOP[sp + 1];
+        Array.Copy(items, 0, result, 0, sp + 1);
+        return result;
+    }
+    
+    /// <summary>
     /// Duplicates the top value on the stack.
     /// </summary>
     public void Duplicate()

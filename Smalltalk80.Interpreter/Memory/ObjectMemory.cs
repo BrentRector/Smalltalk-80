@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Smalltalk80.Interpreter.ObjectModel;
 
 namespace Smalltalk80.Interpreter.Memory;
+
 /// <summary>
 /// Raw object memory management - allocation and access only.
 /// No semantic knowledge of Smalltalk classes or methods.
@@ -11,7 +12,10 @@ namespace Smalltalk80.Interpreter.Memory;
 public sealed class ObjectMemory
 {
     private readonly ObjectTable objectTable;
+    private OOP _specialObjectsArray = OOP.Nil;
     private uint nextObjectIndex = 1; // Start at 1, 0 is reserved for nil
+    private long totalAllocations;
+    private long totalAllocatedBytes;
 
     /// <summary>
     /// Creates a new object memory with the given initial capacity.
@@ -29,6 +33,30 @@ public sealed class ObjectMemory
         var nilObject = new ObjectLayout(nilHeader, 0);
         objectTable.StoreObject(0, nilObject);
     }
+    
+    /// <summary>
+    /// Gets the total number of allocations made.
+    /// </summary>
+    public long TotalAllocations => totalAllocations;
+    
+    /// <summary>
+    /// Gets the total bytes allocated.
+    /// </summary>
+    public long TotalAllocatedBytes => totalAllocatedBytes;
+    
+    /// <summary>
+    /// Gets the Special Objects Array, which is the sole GC root.
+    /// </summary>
+    public OOP SpecialObjectsArray => _specialObjectsArray;
+    
+    /// <summary>
+    /// Sets the Special Objects Array as the sole GC root.
+    /// </summary>
+    /// <param name="specialObjectsArray">The Special Objects Array to use as the GC root.</param>
+    public void SetSpecialObjectsArray(OOP specialObjectsArray)
+    {
+        _specialObjectsArray = specialObjectsArray;
+    }
 
     /// <summary>
     /// Allocates a raw object with the given number of fields.
@@ -43,6 +71,10 @@ public sealed class ObjectMemory
         
         uint index = AllocateIndex();
         objectTable.StoreObject(index, layout);
+        
+        // Track allocation statistics
+        totalAllocations++;
+        totalAllocatedBytes += CalculateObjectSize(layout);
         
         return OOP.FromObjectIndex(index);
     }
@@ -59,6 +91,10 @@ public sealed class ObjectMemory
         uint index = AllocateIndex();
         objectTable.StoreObject(index, layout);
         
+        // Track allocation statistics
+        totalAllocations++;
+        totalAllocatedBytes += CalculateObjectSize(layout);
+        
         return OOP.FromObjectIndex(index);
     }
 
@@ -73,6 +109,10 @@ public sealed class ObjectMemory
         
         uint index = AllocateIndex();
         objectTable.StoreObject(index, layout);
+        
+        // Track allocation statistics
+        totalAllocations++;
+        totalAllocatedBytes += CalculateObjectSize(layout);
         
         return OOP.FromObjectIndex(index);
     }
@@ -156,6 +196,7 @@ public sealed class ObjectMemory
     public IEnumerable<(OOP oop, ObjectLayout layout)> EnumerateObjects() =>
         objectTable.EnumerateObjects();
 
+    
     /// <summary>
     /// Gets memory statistics.
     /// </summary>
@@ -163,7 +204,10 @@ public sealed class ObjectMemory
     {
         TotalObjects = objectTable.Count,
         TotalCapacity = objectTable.Capacity,
-        NextIndex = nextObjectIndex
+        NextIndex = nextObjectIndex,
+        TotalAllocations = totalAllocations,
+        TotalAllocatedBytes = totalAllocatedBytes,
+        GCRootsCount = _specialObjectsArray.IsNil ? 0 : 1
     };
 
     /// <summary>
@@ -235,18 +279,91 @@ public sealed class ObjectMemory
     }
 
     /// <summary>
+    /// Marks an object as permanent (never collected).
+    /// </summary>
+    /// <param name="oop">The object to mark as permanent.</param>
+    public void MarkPermanent(OOP oop)
+    {
+        if (oop.IsSmallInteger || oop.IsNil)
+            return;
+        
+        var layout = GetObject(oop);
+        if (layout != null)
+        {
+            layout.Header.IsPermanent = true;
+        }
+    }
+    
+    /// <summary>
     /// Compacts the object table after GC.
     /// </summary>
     internal void Compact()
     {
-        // TODO: Implement compaction if needed
+        // Compaction would involve:
+        // 1. Creating a new contiguous block of memory
+        // 2. Copying all live objects to the new block
+        // 3. Updating all references to point to new locations
+        // 4. Freeing the old memory block
+        
         // For now, we rely on the object table's internal management
+        // Full compaction requires a more sophisticated approach
+        // that updates all OOP references throughout the system
+    }
+    
+    /// <summary>
+    /// Calculates the memory size of an object layout.
+    /// </summary>
+    private static long CalculateObjectSize(ObjectLayout layout)
+    {
+        const int headerSize = 16; // Estimated header overhead
+        var fieldsSize = layout.Fields.Length * sizeof(uint); // Each OOP is 4 bytes
+        return headerSize + fieldsSize;
     }
 
     private uint AllocateIndex()
     {
         // Simple linear allocation for now
-        // TODO: Reuse freed indices after GC
+        // In a production system, we would maintain a free list
+        // of indices that have been freed by the GC
         return nextObjectIndex++;
+    }
+    
+    /// <summary>
+    /// Performs validation checks on the object memory.
+    /// </summary>
+    public bool Validate()
+    {
+        try
+        {
+            // Check that nil exists at index 0
+            var nilObject = GetObject(OOP.Nil);
+            if (nilObject == null || !nilObject.Header.IsPermanent)
+                return false;
+            
+            // Check that the Special Objects Array is valid if set
+            if (!_specialObjectsArray.IsNil && !_specialObjectsArray.IsSmallInteger)
+            {
+                var specialObjects = GetObject(_specialObjectsArray);
+                if (specialObjects == null)
+                    return false;
+            }
+            
+            // Check that all objects have valid class pointers
+            foreach (var (oop, layout) in EnumerateObjects())
+            {
+                if (!layout.Header.ClassOOP.IsNil && !layout.Header.ClassOOP.IsSmallInteger)
+                {
+                    var classObj = GetObject(layout.Header.ClassOOP);
+                    if (classObj == null)
+                        return false;
+                }
+            }
+            
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

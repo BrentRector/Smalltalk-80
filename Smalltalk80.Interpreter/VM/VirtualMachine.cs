@@ -648,11 +648,119 @@ namespace Smalltalk80.Interpreter.VM
         /// <summary>
         /// Runs garbage collection.
         /// </summary>
-        public void RunGarbageCollection()
+        /// <summary>
+        /// Runs a full garbage collection cycle.
+        /// </summary>
+        /// <param name="verbose">Whether to output verbose GC information.</param>
+        /// <param name="compact">Whether to compact memory after collection.</param>
+        /// <returns>GC statistics from the collection.</returns>
+        public GCStatistics RunGarbageCollection(bool verbose = false, bool compact = false)
         {
+            // Add any active context objects as temporary roots
+            // MethodContext is a C# object, but it holds Smalltalk objects that need to be roots
+            if (activeContext != null)
+            {
+                // Add the receiver and method as roots
+                gc.AddRoot(activeContext.Receiver);
+                gc.AddRoot(activeContext.Method);
+                
+                // Add all arguments and temporaries
+                foreach (var arg in activeContext.Arguments)
+                {
+                    if (!arg.IsNil && !arg.IsSmallInteger)
+                        gc.AddRoot(arg);
+                }
+                
+                foreach (var temp in activeContext.Temporaries)
+                {
+                    if (!temp.IsNil && !temp.IsSmallInteger)
+                        gc.AddRoot(temp);
+                }
+                
+                // Add stack contents
+                foreach (var item in activeContext.Stack.ToArray())
+                {
+                    if (!item.IsNil && !item.IsSmallInteger)
+                        gc.AddRoot(item);
+                }
+            }
+            
+            // Add doItProcess if it exists
+            if (!doItProcess.IsNil)
+            {
+                gc.AddRoot(doItProcess);
+            }
+            
+            var options = new GCOptions
+            {
+                Generation = 2, // Full collection
+                Verbose = verbose,
+                Compact = compact
+            };
+            
             Console.WriteLine("[VM] Running garbage collection...");
-            var stats = gc.Collect(specialObjectsArray);
+            var stats = gc.Collect(specialObjectsArray, options);
             Console.WriteLine($"[VM] GC complete: {stats}");
+            
+            // Remove temporary roots after collection
+            if (activeContext != null)
+            {
+                gc.RemoveRoot(activeContext.Receiver);
+                gc.RemoveRoot(activeContext.Method);
+                
+                foreach (var arg in activeContext.Arguments)
+                {
+                    if (!arg.IsNil && !arg.IsSmallInteger)
+                        gc.RemoveRoot(arg);
+                }
+                
+                foreach (var temp in activeContext.Temporaries)
+                {
+                    if (!temp.IsNil && !temp.IsSmallInteger)
+                        gc.RemoveRoot(temp);
+                }
+                
+                foreach (var item in activeContext.Stack.ToArray())
+                {
+                    if (!item.IsNil && !item.IsSmallInteger)
+                        gc.RemoveRoot(item);
+                }
+            }
+            
+            if (!doItProcess.IsNil)
+            {
+                gc.RemoveRoot(doItProcess);
+            }
+            
+            return stats;
+        }
+        
+        /// <summary>
+        /// Adds a temporary GC root to prevent collection during execution.
+        /// Note: The only permanent root is the Special Objects Array.
+        /// </summary>
+        /// <param name="root">The object to add as a temporary GC root.</param>
+        public void AddGCRoot(OOP root)
+        {
+            gc.AddRoot(root);
+        }
+        
+        /// <summary>
+        /// Removes a temporary GC root, allowing collection if unreachable.
+        /// </summary>
+        /// <param name="root">The root to remove.</param>
+        public void RemoveGCRoot(OOP root)
+        {
+            gc.RemoveRoot(root);
+        }
+        
+        /// <summary>
+        /// Gets current GC statistics.
+        /// </summary>
+        /// <returns>GC performance statistics.</returns>
+        public (int TotalCollections, long TotalBytesFreed, TimeSpan TotalGCTime) GetGCStatistics()
+        {
+            return (gc.TotalCollections, gc.TotalBytesFreed, gc.TotalGCTime);
         }
 
         #region IExecutionContext Implementation
