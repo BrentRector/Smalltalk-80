@@ -1,191 +1,202 @@
-using System;
 using System.Threading;
 
-namespace Smalltalk80.Interpreter.Core
+namespace Smalltalk80.Interpreter.Core;
+
+/// <summary>
+/// Base class for all Smalltalk objects in the direct object model.
+/// Provides stable identity hashing and instance variable storage.
+/// </summary>
+public class SObject
 {
     /// <summary>
-    /// Base Smalltalk object with explicit headers and direct references.
-    /// Replaces OOP-based indirection with managed C# objects.
+    /// Direct reference to the object's class.
     /// </summary>
-    public class SObject
+    public SClass? Klass { get; set; }
+
+    /// <summary>
+    /// Storage for instance variables.
+    /// </summary>
+    public object?[]? InstVars { get; set; }
+
+    /// <summary>
+    /// Cached identity hash value for stable hashing across GC moves.
+    /// </summary>
+    protected int? _identityHash;
+
+    /// <summary>
+    /// Gets the stable identity hash for this object.
+    /// The hash is lazily allocated and remains constant for the object's lifetime.
+    /// </summary>
+    public int IdentityHash
     {
-        /// <summary>
-        /// Direct reference to this object's class.
-        /// </summary>
-        public SClass Klass { get; set; }
-
-        /// <summary>
-        /// Instance variable storage.
-        /// </summary>
-        public object[] InstVars { get; set; }
-
-        /// <summary>
-        /// Stable identity hash that survives GC moves.
-        /// Computed lazily and cached.
-        /// </summary>
-        private int? _identityHash;
-
-        /// <summary>
-        /// Gets the identity hash for this object.
-        /// Thread-safe and stable across GC moves.
-        /// </summary>
-        public int IdentityHash
+        get
         {
-            get
-            {
-                if (_identityHash.HasValue) 
-                    return _identityHash.Value;
-                
-                // Allocate a new hash atomically
-                var h = Interlocked.Increment(ref SObjectHashAllocator.Next);
-                
-                // Skip 0 as it's reserved for nil semantics
-                if (h == 0) 
-                    h = Interlocked.Increment(ref SObjectHashAllocator.Next);
-                
-                _identityHash = h;
-                return h;
-            }
-        }
-
-        /// <summary>
-        /// Creates a new SObject with the specified class and number of instance variables.
-        /// </summary>
-        public SObject(SClass klass, int instSize)
-        {
-            Klass = klass ?? throw new ArgumentNullException(nameof(klass));
-            InstVars = new object[instSize];
+            if (_identityHash.HasValue) return _identityHash.Value;
             
-            // Initialize all instance variables to nil
-            for (int i = 0; i < instSize; i++)
-            {
-                InstVars[i] = Nil.Instance;
-            }
-        }
-
-        /// <summary>
-        /// Protected constructor for special objects like Nil.
-        /// </summary>
-        protected SObject()
-        {
-            InstVars = Array.Empty<object>();
-        }
-
-        /// <summary>
-        /// Fetches an instance variable at the given index.
-        /// </summary>
-        public virtual object FetchPointer(int index)
-        {
-            if (index < 0 || index >= InstVars.Length)
-                throw new IndexOutOfRangeException($"Instance variable index {index} out of range for {Klass?.Name ?? "unknown"}");
-            
-            return InstVars[index];
-        }
-
-        /// <summary>
-        /// Stores a value in an instance variable at the given index.
-        /// </summary>
-        public virtual void StorePointer(int index, object value)
-        {
-            if (index < 0 || index >= InstVars.Length)
-                throw new IndexOutOfRangeException($"Instance variable index {index} out of range for {Klass?.Name ?? "unknown"}");
-            
-            InstVars[index] = value ?? Nil.Instance;
-        }
-
-        /// <summary>
-        /// Gets the size of this object in words (instance variables).
-        /// </summary>
-        public virtual int WordLength => InstVars.Length;
-
-        /// <summary>
-        /// Checks if this object is nil.
-        /// </summary>
-        public virtual bool IsNil => false;
-
-        /// <summary>
-        /// Returns a string representation for debugging.
-        /// </summary>
-        public override string ToString()
-        {
-            if (Klass == null)
-                return "an uninitialized object";
-            
-            return $"a {Klass.Name}";
+            var h = Interlocked.Increment(ref SObjectHashAllocator.Next);
+            if (h == 0) h = Interlocked.Increment(ref SObjectHashAllocator.Next); // Skip 0
+            _identityHash = h;
+            return h;
         }
     }
 
     /// <summary>
-    /// Thread-safe allocator for identity hashes.
+    /// Initializes a new instance of SObject.
     /// </summary>
-    internal static class SObjectHashAllocator
+    public SObject() { }
+
+    /// <summary>
+    /// Initializes a new instance of SObject with a specified class.
+    /// </summary>
+    /// <param name="klass">The class of this object.</param>
+    public SObject(SClass? klass)
     {
-        internal static int Next = 0;
+        Klass = klass;
     }
 
     /// <summary>
-    /// Special nil object singleton.
+    /// Initializes a new instance of SObject with a specified class and instance variable count.
     /// </summary>
-    public sealed class Nil : SObject
+    /// <param name="klass">The class of this object.</param>
+    /// <param name="instVarCount">The number of instance variables to allocate.</param>
+    public SObject(SClass? klass, int instVarCount)
     {
-        private static readonly Lazy<Nil> _instance = new Lazy<Nil>(() => new Nil());
+        Klass = klass;
+        if (instVarCount > 0)
+        {
+            InstVars = new object?[instVarCount];
+        }
+    }
+
+    /// <summary>
+    /// Gets an instance variable at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the instance variable.</param>
+    /// <returns>The value of the instance variable, or null if not set.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when index is out of range.</exception>
+    public object? GetInstVar(int index)
+    {
+        if (InstVars == null || index < 0 || index >= InstVars.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), $"Instance variable index {index} is out of range.");
         
-        public static Nil Instance => _instance.Value;
-
-        private Nil() : base()
-        {
-            // Nil has a fixed identity hash of 0
-            _identityHash = 0;
-        }
-
-        public override bool IsNil => true;
-
-        public override string ToString() => "nil";
-
-        public override object FetchPointer(int index)
-        {
-            throw new InvalidOperationException("Cannot fetch from nil");
-        }
-
-        public override void StorePointer(int index, object value)
-        {
-            throw new InvalidOperationException("Cannot store to nil");
-        }
-
-        public override int WordLength => 0;
+        return InstVars[index];
     }
 
     /// <summary>
-    /// Special true object singleton.
+    /// Sets an instance variable at the specified index.
     /// </summary>
-    public sealed class True : SObject
+    /// <param name="index">The zero-based index of the instance variable.</param>
+    /// <param name="value">The value to set.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when index is out of range.</exception>
+    public void SetInstVar(int index, object? value)
     {
-        private static readonly Lazy<True> _instance = new Lazy<True>(() => new True());
+        if (InstVars == null || index < 0 || index >= InstVars.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), $"Instance variable index {index} is out of range.");
         
-        public static True Instance => _instance.Value;
-
-        private True() : base()
-        {
-            _identityHash = 1;
-        }
-
-        public override string ToString() => "true";
+        InstVars[index] = value;
     }
 
     /// <summary>
-    /// Special false object singleton.
+    /// Gets the number of instance variables in this object.
     /// </summary>
-    public sealed class False : SObject
+    public int InstVarCount => InstVars?.Length ?? 0;
+
+    /// <summary>
+    /// Determines whether this object is a SmallInteger (tagged immediate).
+    /// </summary>
+    public virtual bool IsImmediate => false;
+
+    /// <summary>
+    /// Returns a string representation of this object for debugging.
+    /// </summary>
+    public override string ToString()
     {
-        private static readonly Lazy<False> _instance = new Lazy<False>(() => new False());
-        
-        public static False Instance => _instance.Value;
-
-        private False() : base()
-        {
-            _identityHash = 2;
-        }
-
-        public override string ToString() => "false";
+        var className = Klass?.Name ?? "UnknownClass";
+        return $"{className}@{IdentityHash:X8}";
     }
 }
+
+/// <summary>
+/// Global identity hash allocator for stable hash generation.
+/// </summary>
+internal static class SObjectHashAllocator
+{
+    /// <summary>
+    /// Next available identity hash value.
+    /// Starts at 3 to reserve 0, 1, 2 for special objects (nil, true, false).
+    /// </summary>
+    internal static int Next = 3;
+}
+
+/// <summary>
+/// Singleton nil object representing undefined/null in Smalltalk.
+/// </summary>
+public sealed class SNil : SObject
+{
+    /// <summary>
+    /// The singleton instance of nil.
+    /// </summary>
+    public static readonly SNil Instance = new();
+
+    /// <summary>
+    /// Private constructor to enforce singleton pattern.
+    /// </summary>
+    private SNil()
+    {
+        _identityHash = 0; // nil always has identity hash 0
+    }
+
+    /// <summary>
+    /// Returns the string representation of nil.
+    /// </summary>
+    public override string ToString() => "nil";
+}
+
+/// <summary>
+/// Singleton true object representing boolean true in Smalltalk.
+/// </summary>
+public sealed class STrue : SObject
+{
+    /// <summary>
+    /// The singleton instance of true.
+    /// </summary>
+    public static readonly STrue Instance = new();
+
+    /// <summary>
+    /// Private constructor to enforce singleton pattern.
+    /// </summary>
+    private STrue()
+    {
+        _identityHash = 1; // true always has identity hash 1
+    }
+
+    /// <summary>
+    /// Returns the string representation of true.
+    /// </summary>
+    public override string ToString() => "true";
+}
+
+/// <summary>
+/// Singleton false object representing boolean false in Smalltalk.
+/// </summary>
+public sealed class SFalse : SObject
+{
+    /// <summary>
+    /// The singleton instance of false.
+    /// </summary>
+    public static readonly SFalse Instance = new();
+
+    /// <summary>
+    /// Private constructor to enforce singleton pattern.
+    /// </summary>
+    private SFalse()
+    {
+        _identityHash = 2; // false always has identity hash 2
+    }
+
+    /// <summary>
+    /// Returns the string representation of false.
+    /// </summary>
+    public override string ToString() => "false";
+}
+
