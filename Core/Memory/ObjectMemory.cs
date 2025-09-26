@@ -26,6 +26,23 @@ public sealed class ObjectMemory : IObjectMemory
     // No special indices - all objects are treated equally
     
     /// <summary>
+    /// Controls whether [GC] logging messages are enabled.
+    /// </summary>
+    public bool EnableGCLogging { get; set; }
+    
+    /// <summary>
+    /// Logs a message with the [GC] prefix if the flag is enabled.
+    /// </summary>
+    private void LogGC(LogLevel level, string message, params object[] args)
+    {
+        if (EnableGCLogging)
+        {
+            var formattedMessage = "[GC] " + message;
+            _logger.Log(level, formattedMessage, args);
+        }
+    }
+    
+    /// <summary>
     /// Initializes a new instance of the ObjectMemory class.
     /// </summary>
     public ObjectMemory() : this(NullLogger<ObjectMemory>.Instance)
@@ -37,6 +54,24 @@ public sealed class ObjectMemory : IObjectMemory
         _logger = logger;
         _heap = new uint[InitialHeapSize];
         _heapPointer = 0;
+        EnableGCLogging = false; // Default to disabled
+    }
+    
+    public ObjectMemory(ILogger<ObjectMemory> logger, object runtimeOptions) : this(logger)
+    {
+        // Use reflection to check for EnableGCLogging property
+        if (runtimeOptions != null)
+        {
+            var gcLoggingProp = runtimeOptions.GetType().GetProperty("EnableGCLogging");
+            if (gcLoggingProp != null && gcLoggingProp.PropertyType == typeof(bool))
+            {
+                var value = gcLoggingProp.GetValue(runtimeOptions);
+                if (value is bool boolValue)
+                {
+                    EnableGCLogging = boolValue;
+                }
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -320,10 +355,10 @@ public sealed class ObjectMemory : IObjectMemory
         int totalObjectsBefore = _objectTable.Count(entry => entry.HasValue);
         long totalBytesBefore = CalculateTotalMemoryUsed();
         
-        _logger.LogInformation("[GC] ============ Starting Garbage Collection ============");
-        _logger.LogInformation("[GC] Total objects before GC: {Count:N0}", totalObjectsBefore);
-        _logger.LogInformation("[GC] Memory used: {Bytes:N0} bytes", totalBytesBefore);
-        _logger.LogInformation("[GC] Heap usage: {Used:N0} bytes of {Total:N0} bytes", _heapPointer * 4, _heap.Length * 4);
+        LogGC(LogLevel.Information, "============ Starting Garbage Collection ============");
+        LogGC(LogLevel.Information, "Total objects before GC: {Count:N0}", totalObjectsBefore);
+        LogGC(LogLevel.Information, "Memory used: {Bytes:N0} bytes", totalBytesBefore);
+        LogGC(LogLevel.Information, "Heap usage: {Used:N0} bytes of {Total:N0} bytes", _heapPointer * 4, _heap.Length * 4);
         
         // MARK PHASE - Mark all reachable objects starting from roots
         var markStartTime = stopwatch.ElapsedMilliseconds;
@@ -339,7 +374,7 @@ public sealed class ObjectMemory : IObjectMemory
         }
         else
         {
-            _logger.LogWarning("[GC] No Special Objects Array registered - nothing to mark!");
+            LogGC(LogLevel.Warning, "No Special Objects Array registered - nothing to mark!");
         }
         
         // Perform depth-first marking
@@ -376,7 +411,7 @@ public sealed class ObjectMemory : IObjectMemory
             // Objects should not already be marked if we're visiting them for the first time
             if (header.IsMarked)
             {
-                _logger.LogWarning("[GC] Object at index {Index} already marked but not in visited set!", index);
+                LogGC(LogLevel.Warning, "Object at index {Index} already marked but not in visited set!", index);
                 continue;
             }
             
@@ -464,28 +499,28 @@ public sealed class ObjectMemory : IObjectMemory
         long totalBytesAfter = CalculateTotalMemoryUsed();
         
         // Display comprehensive statistics with sanity checks
-        _logger.LogInformation("[GC] ============ Garbage Collection Complete ============");
-        _logger.LogInformation("[GC] BEFORE: {ObjBefore} objects, {BytesBefore:N0} bytes", totalObjectsBefore, totalBytesBefore);
-        _logger.LogInformation("[GC] MARKED: {Marked} objects (visited {Visited} unique objects)", objectsMarked, objectsVisited);
-        _logger.LogInformation("[GC] COLLECTED: {Collected} objects, {Freed:N0} bytes freed", objectsCollected, bytesFreed);
-        _logger.LogInformation("[GC] AFTER: {ObjAfter} objects, {BytesAfter:N0} bytes", totalObjectsAfter, totalBytesAfter);
-        _logger.LogInformation("[GC] ROOT: Special Objects Array = {SOA}", _specialObjectsArray);
-        _logger.LogInformation("[GC] TIME: {TotalMs}ms (mark: {MarkMs}ms, sweep: {SweepMs}ms)", stopwatch.ElapsedMilliseconds, markTime, sweepTime);
+        LogGC(LogLevel.Information, "============ Garbage Collection Complete ============");
+        LogGC(LogLevel.Information, "BEFORE: {ObjBefore} objects, {BytesBefore:N0} bytes", totalObjectsBefore, totalBytesBefore);
+        LogGC(LogLevel.Information, "MARKED: {Marked} objects (visited {Visited} unique objects)", objectsMarked, objectsVisited);
+        LogGC(LogLevel.Information, "COLLECTED: {Collected} objects, {Freed:N0} bytes freed", objectsCollected, bytesFreed);
+        LogGC(LogLevel.Information, "AFTER: {ObjAfter} objects, {BytesAfter:N0} bytes", totalObjectsAfter, totalBytesAfter);
+        LogGC(LogLevel.Information, "ROOT: Special Objects Array = {SOA}", _specialObjectsArray);
+        LogGC(LogLevel.Information, "TIME: {TotalMs}ms (mark: {MarkMs}ms, sweep: {SweepMs}ms)", stopwatch.ElapsedMilliseconds, markTime, sweepTime);
         
         // Sanity checks to detect bugs
         if (objectsVisited != objectsMarked)
         {
-            _logger.LogWarning("[GC] Visited {Visited} but marked {Marked} - this indicates a bug!", objectsVisited, objectsMarked);
+            LogGC(LogLevel.Warning, "Visited {Visited} but marked {Marked} - this indicates a bug!", objectsVisited, objectsMarked);
         }
         
         var unaccounted = totalObjectsBefore - (objectsMarked + objectsCollected);
         if (unaccounted != 0)
         {
-            _logger.LogWarning("[GC] {Unaccounted} objects unaccounted for!", unaccounted);
-            _logger.LogWarning("[GC] {Marked} marked + {Collected} collected != {Total} total", objectsMarked, objectsCollected, totalObjectsBefore);
+            LogGC(LogLevel.Warning, "{Unaccounted} objects unaccounted for!", unaccounted);
+            LogGC(LogLevel.Warning, "{Marked} marked + {Collected} collected != {Total} total", objectsMarked, objectsCollected, totalObjectsBefore);
             
             // Let's find which objects weren't marked
-            _logger.LogDebug("[GC] Examining first 10 objects:");
+            LogGC(LogLevel.Debug, "Examining first 10 objects:");
             for (var i = 0; i < Math.Min(_objectTable.Count, 10); i++)
             {
                 if (_objectTable[i].HasValue)
@@ -496,12 +531,12 @@ public sealed class ObjectMemory : IObjectMemory
                         
                     var header = new ObjectHeader { HeaderWord = _heap[entry.Location] };
                     var oop = OOP.FromPointer((uint)i);
-                    _logger.LogDebug("[GC]   Index {Index} (OOP {Oop}): Class={Class}, Size={Size}, Marked={Marked}", 
+                    LogGC(LogLevel.Debug, "  Index {Index} (OOP {Oop}): Class={Class}, Size={Size}, Marked={Marked}", 
                         i, oop, header.ClassOop, header.Size, header.IsMarked);
                 }
             }
         }
-        _logger.LogInformation("[GC] ======================================================");
+        LogGC(LogLevel.Information, "======================================================");
     }
 
     /// <summary>
@@ -586,7 +621,7 @@ public sealed class ObjectMemory : IObjectMemory
     /// </summary>
     public void ForceGarbageCollection()
     {
-        _logger.LogInformation("[GC] Forced garbage collection requested");
+        LogGC(LogLevel.Information, "Forced garbage collection requested");
         CollectGarbage();
     }
     
@@ -598,7 +633,7 @@ public sealed class ObjectMemory : IObjectMemory
     public void SetSpecialObjectsArray(OOP specialObjectsArray)
     {
         _specialObjectsArray = specialObjectsArray;
-        _logger.LogInformation("[GC] Set Special Objects Array as sole GC root: {SpecialObjectsArray}", specialObjectsArray);
+        LogGC(LogLevel.Information, "Set Special Objects Array as sole GC root: {SpecialObjectsArray}", specialObjectsArray);
     }
 
     /// <inheritdoc/>

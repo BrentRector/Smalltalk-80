@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Compiler", "Sma
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Compiler.Tests", "Smalltalk80.Compiler.Tests\Smalltalk80.Compiler.Tests.csproj", "{9D56D822-C89D-4ECB-ACDD-3FF34E8E7F92}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.Interpreter", "Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj", "{04AC352E-7B00-46F9-9204-33D8DBFDDB5A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Smalltalk80.SavedInterpreter", "Smalltalk80.SavedInterpreter\Smalltalk80.SavedInterpreter.csproj", "{04AC352E-7B00-46F9-9204-33D8DBFDDB5A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{79B6394D-0B08-4C30-8590-80DD13646BC3}"
 EndProject

@@ -655,7 +655,8 @@ PRIMITIVE_DECL
 // -----------------------------------------------------------------------------
 NUMBER
     : DIGITS [rR] BASEDIGIT+                                              // Radix notation: 16rFF
-    | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?           // Decimal/float
+    | DIGITS ('.' DIGITS)? (('e' | 'E') ('+' | '-')? DIGITS)?           // Decimal/float like 3.14 or 2e10
+    | '.' DIGITS (('e' | 'E') ('+' | '-')? DIGITS)?                      // Decimal starting with dot like .5 or .25e2
     | DIGITS 's' DIGITS                                                   // Scaled decimal
     ;
 

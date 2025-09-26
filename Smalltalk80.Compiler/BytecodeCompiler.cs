@@ -1022,52 +1022,62 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public CompiledMethodData CompileExpressionSource(string expressionSource)
         {
-//Console.WriteLine($"[BYTECODE] CompileExpressionSource called with: {expressionSource}");
-            
             // Initialize compilation state
             environment = new CompilationEnvironment();
             emitter = new BytecodeEmitter();
+            selector = "doIt"; // Standard selector for expressions
+            primitiveNumber = 0;
+            hasPrimitive = false;
             scratchTempIndex = -1;
             
-            try
+            // Parse the expression
+            var inputStream = new Antlr4.Runtime.AntlrInputStream(expressionSource);
+            var lexer = new Smalltalk80Lexer(inputStream);
+            var tokenStream = new Antlr4.Runtime.CommonTokenStream(lexer);
+            var parser = new Smalltalk80Parser(tokenStream);
+            parser.RemoveErrorListeners();
+            
+            // Parse as expressionEntry
+            var exprContext = parser.expressionEntry();
+            if (parser.NumberOfSyntaxErrors > 0)
             {
-                // Parse the expression
-                var inputStream = new Antlr4.Runtime.AntlrInputStream(expressionSource);
-                var lexer = new Smalltalk80Lexer(inputStream);
-                var tokenStream = new Antlr4.Runtime.CommonTokenStream(lexer);
-                var parser = new Smalltalk80Parser(tokenStream);
-                parser.RemoveErrorListeners();
-                
-                // Parse as expressionEntry
-                var exprContext = parser.expressionEntry();
-                if (parser.NumberOfSyntaxErrors > 0)
-                {
-//Console.WriteLine($"[BYTECODE] Expression parse errors: {parser.NumberOfSyntaxErrors}");
-                }
-                
-                // Compile the expression
-                if (exprContext.expression() != null)
-                {
-                    CompileExpression(exprContext.expression(), leaveOnStack: true);
-                }
-                else
-                {
-//Console.WriteLine($"[BYTECODE] No expression found, pushing nil");
-                    emitter.PushNil();
-                }
+                throw new InvalidOperationException($"Expression parse errors: {parser.NumberOfSyntaxErrors}");
             }
-            catch (Exception)
+            
+            if (exprContext.expression() == null)
             {
-//Console.WriteLine($"Error compiling expression: {ex.Message}");
-//Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                // Return minimal bytecode
-                emitter = new BytecodeEmitter();
+                // Empty expression - return nil
                 emitter.PushNil();
+                emitter.ReturnTop();
+            }
+            else
+            {
+                // No arguments or temporaries for standalone expressions
+                environment.ArgumentCount = 0;
+                environment.TemporaryCount = 0;
+                
+                // CRITICAL: Collect literals first (just like CompileExpressionFromTree does)
+                // This ensures globals like Transcript are properly registered as literals
+                var visitor = new LiteralCollector(this, emitter, environment);
+                visitor.Visit(exprContext.expression());
+                
+                // Compile the expression (with literals already collected)
+                CompileExpression(exprContext.expression(), leaveOnStack: true);
+                
+                // Expression should leave its result on the stack
+                // Add return if not already present
+                var bytecodes = emitter.GetBytecodes();
+                if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
+                {
+                    // For standalone expressions, return the top of stack
+                    // (The expression result should be on the stack)
+                    emitter.ReturnTop();
+                }
             }
             
             return new CompiledMethodData
             {
-                Selector = "doIt",
+                Selector = selector,
                 ArgumentCount = 0,
                 TemporaryCount = environment.TemporaryCount,
                 IsPrimitive = false,
