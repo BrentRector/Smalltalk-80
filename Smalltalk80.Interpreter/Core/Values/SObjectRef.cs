@@ -344,14 +344,29 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     
     #region Equality and Hashing
     
+    /// <summary>
+    /// Determines whether this reference equals another object.
+    /// </summary>
     public override bool Equals(object? obj) => obj is SObjectRef other && Equals(other);
     
+    /// <summary>
+    /// Determines whether this reference equals another reference.
+    /// </summary>
     public bool Equals(SObjectRef other) => value == other.value;
     
+    /// <summary>
+    /// Gets the hash code for this reference.
+    /// </summary>
     public override int GetHashCode() => value.GetHashCode();
     
+    /// <summary>
+    /// Determines whether two references are equal.
+    /// </summary>
     public static bool operator ==(SObjectRef left, SObjectRef right) => left.value == right.value;
     
+    /// <summary>
+    /// Determines whether two references are not equal.
+    /// </summary>
     public static bool operator !=(SObjectRef left, SObjectRef right) => left.value != right.value;
     
     /// <summary>
@@ -364,6 +379,9 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     
     #region String Conversion
     
+    /// <summary>
+    /// Returns a string representation of this reference.
+    /// </summary>
     public override string ToString()
     {
         if (IsNil) return "nil";

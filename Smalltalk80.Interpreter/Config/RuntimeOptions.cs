@@ -19,6 +19,12 @@ public sealed class RuntimeOptions
     public bool EnableGCLogging { get; set; }
     
     /// <summary>
+    /// Gets or sets whether to validate GC reachability from SOA after cold start.
+    /// Controlled by the --validate-gc command-line flag.
+    /// </summary>
+    public bool ValidateGC { get; set; }
+    
+    /// <summary>
     /// Gets or sets whether to enable [SEND] message send logging.
     /// Controlled by the --log-sends command-line flag.
     /// Logs all message sends with receiver class, selector, and arguments.
@@ -36,26 +42,6 @@ public sealed class RuntimeOptions
     /// Controlled by SMALLTALK_GC_TRACE environment variable.
     /// </summary>
     public GCTraceLevel GCTraceLevel { get; set; } = GCTraceLevel.Off;
-    
-    /// <summary>
-    /// Gets or sets whether to skip phase 3 of bootstrap.
-    /// </summary>
-    public bool SkipPhase3 { get; set; }
-    
-    /// <summary>
-    /// Gets or sets whether to skip extended library loading.
-    /// </summary>
-    public bool SkipExtended { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the path to the extended library JSON file.
-    /// </summary>
-    public string? ExtendedLibraryPath { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the path to the phase 3 file.
-    /// </summary>
-    public string? Phase3Path { get; set; }
     
     /// <summary>
     /// Gets or sets the path to the system image file.
@@ -83,9 +69,9 @@ public sealed class RuntimeOptions
     public bool ListBootstrapClasses { get; set; }
     
     /// <summary>
-    /// Gets or sets whether to list phase 2 classes.
+    /// Gets or sets whether to list all classes.
     /// </summary>
-    public bool ListPhase2Classes { get; set; }
+    public bool ListClasses { get; set; }
     
     /// <summary>
     /// Gets or sets whether to test critical methods.
@@ -103,17 +89,21 @@ public sealed class RuntimeOptions
     public bool TestOOPBug { get; set; }
     
     /// <summary>
+    /// Gets or sets whether to validate bytecode execution through method contexts.
+    /// </summary>
+    public bool ValidateBytecodeExecution { get; set; }
+    
+    /// <summary>
     /// Creates a new instance with default options.
     /// </summary>
     public static RuntimeOptions Default => new()
     {
         EnableColdStartLogging = false,
         EnableGCLogging = false,
+        ValidateGC = false,
         EnableSendLogging = false,
         VerboseLogging = false,
-        GCTraceLevel = GCTraceLevel.Off,
-        SkipPhase3 = false,
-        SkipExtended = false
+        GCTraceLevel = GCTraceLevel.Off
     };
     
     /// <summary>
@@ -161,22 +151,20 @@ public sealed class RuntimeOptions
     {
         EnableColdStartLogging = EnableColdStartLogging,
         EnableGCLogging = EnableGCLogging,
+        ValidateGC = ValidateGC,
         EnableSendLogging = EnableSendLogging,
         VerboseLogging = VerboseLogging,
         GCTraceLevel = GCTraceLevel,
-        SkipPhase3 = SkipPhase3,
-        SkipExtended = SkipExtended,
-        ExtendedLibraryPath = ExtendedLibraryPath,
-        Phase3Path = Phase3Path,
         ImagePath = ImagePath,
         SnapshotPath = SnapshotPath,
         BootstrapPath = BootstrapPath,
         ClassToPrint = ClassToPrint,
         ListBootstrapClasses = ListBootstrapClasses,
-        ListPhase2Classes = ListPhase2Classes,
+        ListClasses = ListClasses,
         TestCriticalMethods = TestCriticalMethods,
         TestClassCreation = TestClassCreation,
-        TestOOPBug = TestOOPBug
+        TestOOPBug = TestOOPBug,
+        ValidateBytecodeExecution = ValidateBytecodeExecution
     };
 }
 

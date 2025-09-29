@@ -7,7 +7,10 @@ using System.Runtime.CompilerServices;
 /// </summary>
 public class SInstance : SObject
 {
-    protected readonly SObject?[] instanceVariables;
+    /// <summary>
+    /// The array of instance variables for this object.
+    /// </summary>
+    protected SObject?[] instanceVariables;
     
     /// <summary>
     /// Initializes a new instance of the <see cref="SInstance"/> class.
@@ -83,6 +86,29 @@ public class SInstance : SObject
     /// Gets the instance variables array (for internal use).
     /// </summary>
     internal SObject?[] InstanceVariables => instanceVariables;
+    
+    /// <summary>
+    /// Resizes the instance variables array (used by MethodContext).
+    /// </summary>
+    /// <param name="newSize">The new size for the instance variables array.</param>
+    protected void ResizeInstanceVariables(int newSize)
+    {
+        if (newSize <= instanceVariables.Length)
+            return; // No need to resize
+        
+        var newArray = new SObject?[newSize];
+        
+        // Copy existing values
+        Array.Copy(instanceVariables, newArray, instanceVariables.Length);
+        
+        // Initialize new slots to nil
+        for (var i = instanceVariables.Length; i < newSize; i++)
+        {
+            newArray[i] = SNil.Instance;
+        }
+        
+        instanceVariables = newArray;
+    }
     
     /// <summary>
     /// Sets an instance variable by name.

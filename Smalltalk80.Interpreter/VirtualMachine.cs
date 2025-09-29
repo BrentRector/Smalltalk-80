@@ -49,7 +49,7 @@ public class VirtualMachine
     /// <summary>
     /// Initializes the virtual machine with the full cold-start system.
     /// </summary>
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
         if (!initialized)
         {
@@ -71,6 +71,9 @@ public class VirtualMachine
             // Phase 4: Perform post-cold-start initialization
             Bootstrap.ColdStartBootstrap.PostColdStartInitialization(interpreter);
             
+            // Phase 5: Initialize garbage collection with Special Objects Array
+            InitializeGarbageCollection();
+            
             initialized = true;
             
             if (Program.RuntimeOptions.EnableColdStartLogging)
@@ -89,6 +92,21 @@ public class VirtualMachine
                     }
                 }
                 Console.WriteLine($"[COLD START] Total methods installed: {totalInstanceMethods} instance methods");
+            }
+            
+            // Phase 6: Validate GC reachability if requested
+            if (Program.RuntimeOptions.ValidateGC)
+            {
+                Console.WriteLine("[COLD START] Validating GC reachability from Special Objects Array...");
+                var isValid = garbageCollector.ValidateReachability();
+                if (!isValid)
+                {
+                    Console.WriteLine("[COLD START] WARNING: Some objects are not reachable from SOA!");
+                }
+                else
+                {
+                    Console.WriteLine("[COLD START] GC validation passed - all critical objects are reachable");
+                }
             }
             
             // Run tests if requested
@@ -118,6 +136,8 @@ public class VirtualMachine
                 PrintClass(Program.RuntimeOptions.ClassToPrint);
             }
         }
+        
+        return Task.CompletedTask;
     }
     
     /// <summary>
@@ -411,59 +431,81 @@ public class VirtualMachine
         var intClass = SystemDictionary.SmallIntegerClass;
         
         // + method with primitive 1
-        intClass.AddMethod("+", new SCompiledMethod(
+        intClass.AddMethod("+", SCompiledMethod.CreateCompiledMethod(
             "+",
             [0xB0, 0x7C], // arithmetic +, return top
             new SArray(),
             1, 0, 1));
             
         // - method with primitive 2
-        intClass.AddMethod("-", new SCompiledMethod(
+        intClass.AddMethod("-", SCompiledMethod.CreateCompiledMethod(
             "-",
             [0xB1, 0x7C], // arithmetic -, return top
             new SArray(),
             1, 0, 2));
             
         // < method with primitive 3
-        intClass.AddMethod("<", new SCompiledMethod(
+        intClass.AddMethod("<", SCompiledMethod.CreateCompiledMethod(
             "<",
             [0xB2, 0x7C], // arithmetic <, return top
             new SArray(),
             1, 0, 3));
             
         // > method with primitive 4
-        intClass.AddMethod(">", new SCompiledMethod(
+        intClass.AddMethod(">", SCompiledMethod.CreateCompiledMethod(
             ">",
             [0xB3, 0x7C], // arithmetic >, return top
             new SArray(),
             1, 0, 4));
             
         // = method with primitive 7
-        intClass.AddMethod("=", new SCompiledMethod(
+        intClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0xB6, 0x7C], // arithmetic =, return top
             new SArray(),
             1, 0, 7));
             
         // * method with primitive 9
-        intClass.AddMethod("*", new SCompiledMethod(
+        intClass.AddMethod("*", SCompiledMethod.CreateCompiledMethod(
             "*",
             [0xB8, 0x7C], // arithmetic *, return top
             new SArray(),
             1, 0, 9));
             
         // / method with primitive 10
-        intClass.AddMethod("/", new SCompiledMethod(
+        intClass.AddMethod("/", SCompiledMethod.CreateCompiledMethod(
             "/",
             [0xB9, 0x7C], // arithmetic /, return top
             new SArray(),
             1, 0, 10));
             
         // asFloat method with primitive 40
-        intClass.AddMethod("asFloat", new SCompiledMethod(
+        intClass.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethod(
             "asFloat",
             [0x8F, 0x28, 0x00, 0x7C], // Primitive 40 with 0 args, return top
             new SArray(),
             0, 0, 40));
+    }
+    
+    /// <summary>
+    /// Initializes the garbage collection system with the Special Objects Array.
+    /// </summary>
+    private void InitializeGarbageCollection()
+    {
+        // Initialize the Special Objects Array with all system roots
+        Memory.SpecialObjectsArray.Initialize();
+        
+        // Give the GC the SOA as its only root
+        garbageCollector.SetSpecialObjectsArray(Memory.SpecialObjectsArray.GetArray());
+        
+        if (Program.RuntimeOptions.EnableColdStartLogging || Program.RuntimeOptions.EnableGCLogging)
+        {
+            Console.WriteLine("[COLD START] Special Objects Array initialized");
+            
+            if (Program.RuntimeOptions.EnableGCLogging)
+            {
+                Memory.SpecialObjectsArray.Report();
+            }
+        }
     }
 }

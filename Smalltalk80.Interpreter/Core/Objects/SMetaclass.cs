@@ -52,6 +52,7 @@ public sealed class SMetaclass : SClass
     /// <summary>
     /// Creates a new instance (which would be the class itself).
     /// </summary>
+    [Obsolete("Use CreateInstance() instead")]
     public override SObject NewInstance()
     {
         // A metaclass's instance is the class itself

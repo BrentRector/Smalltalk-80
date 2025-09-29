@@ -65,22 +65,10 @@ public static class Program
             "--show-mnemonics",
             description: "Show bytecode mnemonics");
         
-        // Phase control options
-        var skipPhase3Option = new Option<bool>(
-            "--skip-phase3",
-            description: "Skip phase 3 of bootstrap");
-        
-        var skipExtendedOption = new Option<bool>(
-            "--skip-extended",
-            description: "Skip extended library loading");
-        
-        var extendedLibraryOption = new Option<FileInfo?>(
-            "--extended-library",
-            description: "Load extended library from JSON file");
-        
-        var phase3Option = new Option<FileInfo?>(
-            "--phase3",
-            description: "Load phase 3 from specific file");
+        // GC validation option
+        var validateGCOption = new Option<bool>(
+            "--validate-gc",
+            description: "Validate that all objects are reachable from SOA after cold start");
         
         // Class inspection options
         var printClassOption = new Option<string?>(
@@ -91,9 +79,9 @@ public static class Program
             "--list-bootstrap-classes",
             description: "List all bootstrap classes");
         
-        var listPhase2ClassesOption = new Option<bool>(
-            "--list-phase2-classes",
-            description: "List phase 2 classes");
+        var listClassesOption = new Option<bool>(
+            "--list-classes",
+            description: "List all classes in the system");
         
         var inspectClassOption = new Option<string?>(
             "--inspect-class",
@@ -116,6 +104,9 @@ public static class Program
             "--test-oop-bug",
             description: "Test OOP bug");
         
+        var validateBytecodeOption = new Option<bool>(
+            "--validate-bytecode",
+            description: "Validate bytecode execution through method contexts");
         
         var bootstrapOption = new Option<FileInfo?>(
             "--bootstrap",
@@ -131,18 +122,16 @@ public static class Program
         rootCommand.AddGlobalOption(bytecodeTraceOption);
         rootCommand.AddGlobalOption(showBytecodeOption);
         rootCommand.AddGlobalOption(showMnemonicsOption);
-        rootCommand.AddGlobalOption(skipPhase3Option);
-        rootCommand.AddGlobalOption(skipExtendedOption);
-        rootCommand.AddGlobalOption(extendedLibraryOption);
-        rootCommand.AddGlobalOption(phase3Option);
+        rootCommand.AddGlobalOption(validateGCOption);
         rootCommand.AddGlobalOption(printClassOption);
         rootCommand.AddGlobalOption(listBootstrapClassesOption);
-        rootCommand.AddGlobalOption(listPhase2ClassesOption);
+        rootCommand.AddGlobalOption(listClassesOption);
         rootCommand.AddGlobalOption(inspectClassOption);
         rootCommand.AddGlobalOption(enhancedPrintOption);
         rootCommand.AddGlobalOption(testCriticalMethodsOption);
         rootCommand.AddGlobalOption(testClassCreationOption);
         rootCommand.AddGlobalOption(testOOPBugOption);
+        rootCommand.AddGlobalOption(validateBytecodeOption);
         rootCommand.AddGlobalOption(bootstrapOption);
 
         // Run command
@@ -242,6 +231,54 @@ public static class Program
             else if (token.Value == "-v" || token.Value == "--verbose")
             {
                 RuntimeOptions.VerboseLogging = true;
+            }
+            else if (token.Value == "--validate-bytecode")
+            {
+                RuntimeOptions.ValidateBytecodeExecution = true;
+            }
+            else if (token.Value == "--validate-gc")
+            {
+                RuntimeOptions.ValidateGC = true;
+            }
+            else if (token.Value == "--list-classes" || token.Value == "--list-bootstrap-classes")
+            {
+                RuntimeOptions.ListBootstrapClasses = true;
+            }
+            else if (token.Value == "--test-critical-methods")
+            {
+                RuntimeOptions.TestCriticalMethods = true;
+            }
+            else if (token.Value == "--test-class-creation-fixed")
+            {
+                RuntimeOptions.TestClassCreation = true;
+            }
+            else if (token.Value == "--test-oop-bug")
+            {
+                RuntimeOptions.TestOOPBug = true;
+            }
+            else if (token.Value == "--trace-methods")
+            {
+                DebugOptions.EnableMethodTrace = true;
+            }
+            else if (token.Value == "--bytecode-trace")
+            {
+                DebugOptions.EnableBytecodeTrace = true;
+            }
+            else if (token.Value == "--show-bytecode")
+            {
+                DebugOptions.EnableBytecodeTrace = true;
+            }
+            else if (token.Value == "--show-mnemonics")
+            {
+                DebugOptions.ShowBytecodeWithMnemonics = true;
+            }
+            else if (token.Value?.StartsWith("--debug") == true)
+            {
+                // Handle --debug=mode or following value
+                var debugMode = token.Value.Contains('=') 
+                    ? token.Value.Split('=')[1] 
+                    : "all"; // Default to all if no specific mode
+                DebugOptions.SetDebugMode(debugMode);
             }
         }
         

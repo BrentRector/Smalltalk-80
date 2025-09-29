@@ -9,6 +9,9 @@ using Smalltalk80.Interpreter.Execution;
 /// </summary>
 public abstract class PrimitiveDispatcherBase
 {
+    /// <summary>
+    /// The interpreter instance for executing bytecode.
+    /// </summary>
     protected readonly ContextBasedInterpreter interpreter;
     
     /// <summary>

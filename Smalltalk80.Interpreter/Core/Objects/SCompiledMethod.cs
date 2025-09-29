@@ -1,16 +1,60 @@
 namespace Smalltalk80.Interpreter.Core.Objects;
 
 using Smalltalk80.Interpreter.Execution;
+using Smalltalk80.Interpreter.Core.Values;
 
 /// <summary>
 /// Represents a compiled Smalltalk method.
+/// This is a proper Smalltalk object following the Blue Book specification.
 /// </summary>
-public sealed class SCompiledMethod : SObject
+/// <remarks>
+/// From the Blue Book:
+/// CompiledMethod instances contain the bytecode instructions and literals
+/// needed to execute a method. They are stored in method dictionaries.
+/// 
+/// Instance variables (conceptual - stored as properties):
+/// - header: Contains flags, arg count, temp count, stack size
+/// - literals: Array of literal objects and special bindings
+/// - bytecodes: The bytecode instructions
+/// - sourcePointer: Reference to source (optional)
+/// </remarks>
+public sealed class SCompiledMethod : SInstance
 {
+    // Properties to maintain the compiled method data
+    private string selector = "";
+    private byte[] bytecodes = [];
+    private SArray? literals;
+    private int numArgs;
+    private int numTemps;
+    private int primitiveIndex;
+    
     /// <summary>
-    /// Initializes a new SCompiledMethod.
+    /// Default constructor for creation through SClass.CreateInstance.
     /// </summary>
+    public SCompiledMethod(SClass compiledMethodClass) : base(compiledMethodClass, 0)
+    {
+        // Initialize with defaults - will be set through Initialize method
+    }
+    
+    /// <summary>
+    /// Legacy constructor for backward compatibility - DEPRECATED.
+    /// </summary>
+    [Obsolete("Use CreateCompiledMethod factory method instead")]
     public SCompiledMethod(
+        string selector,
+        byte[] bytecodes,
+        SArray literals,
+        int numArgs,
+        int numTemps,
+        int primitiveIndex = 0) : base(SystemDictionary.CompiledMethodClass, 0)
+    {
+        Initialize(selector, bytecodes, literals, numArgs, numTemps, primitiveIndex);
+    }
+    
+    /// <summary>
+    /// Initializes this compiled method with the given data.
+    /// </summary>
+    public void Initialize(
         string selector,
         byte[] bytecodes,
         SArray literals,
@@ -18,43 +62,69 @@ public sealed class SCompiledMethod : SObject
         int numTemps,
         int primitiveIndex = 0)
     {
-        Selector = selector;
-        Bytecodes = bytecodes;
-        Literals = literals;
-        NumArgs = numArgs;
-        NumTemps = numTemps;
-        PrimitiveIndex = primitiveIndex;
+        this.selector = selector;
+        this.bytecodes = bytecodes;
+        this.literals = literals;
+        this.numArgs = numArgs;
+        this.numTemps = numTemps;
+        this.primitiveIndex = primitiveIndex;
+    }
+    
+    /// <summary>
+    /// Factory method to create a CompiledMethod as a proper Smalltalk object.
+    /// </summary>
+    public static SCompiledMethod CreateCompiledMethod(
+        string selector,
+        byte[] bytecodes,
+        SArray literals,
+        int numArgs,
+        int numTemps,
+        int primitiveIndex = 0)
+    {
+        var methodClass = SystemDictionary.LookupClass("CompiledMethod")
+            ?? SystemDictionary.CompiledMethodClass
+            ?? throw new InvalidOperationException("CompiledMethod class not found");
+        
+        var method = methodClass.CreateInstance() as SCompiledMethod
+            ?? new SCompiledMethod(methodClass);
+        
+        method.Initialize(selector, bytecodes, literals, numArgs, numTemps, primitiveIndex);
+        
+        // Note: GC registration should happen through SClass.CreateInstance
+        // or by the caller who has access to the VM
+        
+        return method;
     }
     
     /// <summary>
     /// Gets the method selector.
     /// </summary>
-    public string Selector { get; }
+    public string Selector => selector;
     
     /// <summary>
     /// Gets the bytecode array.
     /// </summary>
-    public byte[] Bytecodes { get; }
+    public byte[] Bytecodes => bytecodes;
     
     /// <summary>
     /// Gets the literal array.
     /// </summary>
-    public SArray Literals { get; }
+    public SArray Literals => literals ?? new SArray(0);
     
     /// <summary>
     /// Gets the number of arguments.
     /// </summary>
-    public int NumArgs { get; }
+    public int NumArgs => numArgs;
     
     /// <summary>
     /// Gets the number of temporaries.
     /// </summary>
-    public int NumTemps { get; }
+    public int NumTemps => numTemps;
     
     /// <summary>
     /// Gets the primitive index (0 if no primitive).
     /// </summary>
-    public int PrimitiveIndex { get; }
+    public int PrimitiveIndex => primitiveIndex;
     
     /// <summary>
     /// Gets or sets the class that owns this method.
@@ -75,13 +145,11 @@ public sealed class SCompiledMethod : SObject
         {
             return null;
         }
-        return Literals.At(index);
+        // SArray uses 1-based indexing, so add 1 to the index
+        return Literals.At(index + 1);
     }
     
-    /// <summary>
-    /// Gets the class of CompiledMethod.
-    /// </summary>
-    public override SClass Class => SystemDictionary.CompiledMethodClass;
+    // Class is already handled by base SInstance class
     
     /// <summary>
     /// Executes this method with the given receiver and arguments.

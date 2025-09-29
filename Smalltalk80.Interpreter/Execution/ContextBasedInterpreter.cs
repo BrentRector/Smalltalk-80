@@ -1,5 +1,6 @@
 namespace Smalltalk80.Interpreter.Execution;
 
+using System.Linq;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Config;
@@ -22,6 +23,8 @@ public sealed class ContextBasedInterpreter
     private SObject? activeContext;
     private readonly ILogger<ContextBasedInterpreter>? logger;
     private readonly PrimitiveDispatcherBase primitiveDispatcher;
+    private bool tracingEnabled = false;
+    private int traceIndentLevel = 0;
     
     /// <summary>
     /// Gets or sets the special objects array.
@@ -32,6 +35,15 @@ public sealed class ContextBasedInterpreter
     /// Gets the current active context (supports thisContext).
     /// </summary>
     public SObject? ActiveContext => activeContext;
+    
+    /// <summary>
+    /// Enables or disables execution tracing.
+    /// </summary>
+    public bool TracingEnabled 
+    { 
+        get => tracingEnabled;
+        set => tracingEnabled = value;
+    }
     
     /// <summary>
     /// Initializes a new instance of the ContextBasedInterpreter.
@@ -51,11 +63,63 @@ public sealed class ContextBasedInterpreter
     /// <returns>The result of the method execution.</returns>
     public SObject Execute(SCompiledMethod method, SObject receiver, SObject[] arguments)
     {
-        // Create a new method context
-        var contextClass = SystemDictionary.LookupClass("MethodContext") 
-            ?? throw new InvalidOperationException("MethodContext class not found");
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(receiver);
+        ArgumentNullException.ThrowIfNull(arguments);
+        
+        if (tracingEnabled)
+        {
+            var indent = new string(' ', traceIndentLevel * 2);
+            Console.WriteLine($"{indent}==> EXECUTE SELECTOR: {method.Selector}");
+            Console.WriteLine($"{indent}    Receiver: {receiver.Class?.Name ?? "Unknown"} ({receiver.ToDisplayString()})");
+            Console.WriteLine($"{indent}    Arguments: [{string.Join(", ", arguments.Select(a => $"{a.Class?.Name ?? "Unknown"} ({a.ToDisplayString()})"))}]");
+            Console.WriteLine($"{indent}    Bytecodes: {method.Bytecodes.Length} bytes");
             
-        var newContext = new SMethodContext(contextClass, method, receiver, arguments);
+            // Show literals if there are any
+            if (method.Literals.Size > 0)
+            {
+                Console.WriteLine($"{indent}    Literals: {method.Literals.Size} literals");
+                for (int i = 0; i < method.Literals.Size; i++)
+                {
+                    var literal = method.GetLiteral(i);
+                    var literalDisplay = literal switch
+                    {
+                        SSymbol sym => $"#{sym.Value}",
+                        SmallInteger si => si.Value.ToString(),
+                        SString str => $"\"{str.Value}\"",
+                        SArray arr => $"Array[{arr.Size}]",
+                        null => "nil",
+                        _ => literal.ToDisplayString()
+                    };
+                    Console.WriteLine($"{indent}      [{i}]: {literalDisplay}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"{indent}    Literals: 0 literals");
+            }
+            
+            Console.WriteLine($"{indent}    Primitive: {(method.PrimitiveIndex > 0 ? $"#{method.PrimitiveIndex}" : "none")}");
+            traceIndentLevel++;
+        }
+        
+        // Create a new method context as a proper Smalltalk object
+        var newContext = SMethodContext.CreateMethodContext(method, receiver, arguments);
+        
+        if (tracingEnabled)
+        {
+            var indent = new string(' ', traceIndentLevel * 2);
+            try
+            {
+                Console.WriteLine($"{indent}Created MethodContext: {newContext.ToDisplayString()}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{indent}Created MethodContext (error displaying: {ex.Message})");
+                Console.WriteLine($"{indent}  Method: {method?.Selector ?? "null"}");
+                Console.WriteLine($"{indent}  Receiver: {receiver?.ToDisplayString() ?? "null"}");
+            }
+        }
         
         // Set the sender if we have an active context
         if (activeContext != null)
@@ -70,21 +134,54 @@ public sealed class ContextBasedInterpreter
         try
         {
             // Check for primitive
-            if (method.PrimitiveIndex > 0)
+            if (method!.PrimitiveIndex > 0)
             {
+                if (tracingEnabled)
+                {
+                    var indent = new string(' ', traceIndentLevel * 2);
+                    Console.WriteLine($"{indent}Attempting primitive #{method.PrimitiveIndex}...");
+                }
+                
                 var primitiveResult = primitiveDispatcher.ExecutePrimitive(
-                    method.PrimitiveIndex, receiver, arguments);
+                    method.PrimitiveIndex, receiver!, arguments);
                     
                 if (primitiveResult != null)
                 {
                     // Primitive succeeded
+                    if (tracingEnabled)
+                    {
+                        var indent = new string(' ', traceIndentLevel * 2);
+                        Console.WriteLine($"{indent}Primitive succeeded, returning: {primitiveResult.Class?.Name ?? "Unknown"} ({primitiveResult.ToDisplayString()})");
+                        traceIndentLevel--;
+                        Console.WriteLine($"{new string(' ', traceIndentLevel * 2)}<== RETURN from {method.Selector}");
+                    }
                     return primitiveResult;
                 }
                 // Primitive failed, continue with bytecode execution
+                if (tracingEnabled)
+                {
+                    var indent = new string(' ', traceIndentLevel * 2);
+                    Console.WriteLine($"{indent}Primitive failed, executing bytecode...");
+                }
             }
             
             // Execute bytecodes
-            return ExecuteBytecodes();
+            if (tracingEnabled)
+            {
+                var indent = new string(' ', traceIndentLevel * 2);
+                Console.WriteLine($"{indent}Executing bytecodes...");
+            }
+            
+            var result = ExecuteBytecodes();
+            
+            if (tracingEnabled)
+            {
+                traceIndentLevel--;
+                var indent = new string(' ', traceIndentLevel * 2);
+                Console.WriteLine($"{indent}<== RETURN from {method.Selector}: {result.Class?.Name ?? "Unknown"} ({result.ToDisplayString()})");
+            }
+            
+            return result;
         }
         finally
         {
@@ -128,12 +225,12 @@ public sealed class ContextBasedInterpreter
         
         // Determine if we're in a method or block context
         var isMethodContext = activeContext is SMethodContext;
-        var methodContext = isMethodContext 
-            ? (SMethodContext)activeContext 
-            : ((SBlockContext)activeContext).Home;
-        var context = activeContext as dynamic;
+        SMethodContext methodContext = isMethodContext 
+            ? (SMethodContext)activeContext! 
+            : ((SBlockContext)activeContext!).Home;
+        dynamic context = activeContext!;
         
-        var method = methodContext.Method;
+        var method = methodContext!.Method;
         var bytecodes = method.Bytecodes;
         
         while (true)
@@ -149,9 +246,17 @@ public sealed class ContextBasedInterpreter
             var bytecode = bytecodes[ip];
             context.InstructionPointer = SmallInteger.From(ip + 1);
             
-            if (DebugOptions.EnableBytecodeTrace)
+            if (DebugOptions.EnableBytecodeTrace || tracingEnabled)
             {
-                logger?.LogDebug($"PC={ip:D3} Bytecode=0x{bytecode:X2}");
+                if (tracingEnabled)
+                {
+                    var indent = new string(' ', (traceIndentLevel + 1) * 2);
+                    Console.WriteLine($"{indent}[PC={ip:D3}] Bytecode: 0x{bytecode:X2} ({GetBytecodeName(bytecode)})");
+                }
+                else
+                {
+                    logger?.LogDebug($"PC={ip:D3} Bytecode=0x{bytecode:X2}");
+                }
             }
             
             // Execute bytecode
@@ -160,7 +265,13 @@ public sealed class ContextBasedInterpreter
             if (shouldReturn)
             {
                 // Method or block returned
-                return context.Pop();
+                var returnValue = context.Pop();
+                if (tracingEnabled)
+                {
+                    var indent = new string(' ', (traceIndentLevel + 1) * 2);
+                    Console.WriteLine($"{indent}Returning: {returnValue.Class?.Name ?? "Unknown"} ({returnValue.ToDisplayString()})");
+                }
+                return returnValue;
             }
         }
     }
@@ -775,5 +886,80 @@ public sealed class ContextBasedInterpreter
         
         // Execute the method
         return Execute(method, receiver, arguments);
+    }
+    
+    /// <summary>
+    /// Gets a human-readable name for a bytecode.
+    /// </summary>
+    private string GetBytecodeName(byte bytecode)
+    {
+        return bytecode switch
+        {
+            <= 0x0F => $"pushReceiverVariable:{bytecode & 0x0F}",
+            >= 0x10 and <= 0x1F => $"pushTemporary:{bytecode & 0x0F}",
+            >= 0x20 and <= 0x3F => $"pushLiteral:{bytecode & 0x1F}",
+            >= 0x40 and <= 0x5F => $"pushLiteralVariable:{bytecode & 0x1F}",
+            >= 0x60 and <= 0x67 => $"popIntoReceiverVariable:{bytecode & 0x07}",
+            >= 0x68 and <= 0x6F => $"popIntoTemporary:{bytecode & 0x07}",
+            0x70 => "pushReceiver",
+            0x71 => "pushTrue",
+            0x72 => "pushFalse",
+            0x73 => "pushNil",
+            0x74 => "pushMinusOne",
+            0x75 => "pushZero",
+            0x76 => "pushOne",
+            0x77 => "pushTwo",
+            0x78 => "returnReceiver",
+            0x79 => "returnTrue",
+            0x7A => "returnFalse",
+            0x7B => "returnNil",
+            0x7C => "returnTop",
+            0x7D => "returnTopFromBlock",
+            0x80 => "extendedPush",
+            0x81 => "extendedStore",
+            0x82 => "extendedStoreAndPop",
+            0x83 => "singleExtendedSend",
+            0x84 => "doubleExtendedDoAnything",
+            0x85 => "singleExtendedSuperSend",
+            0x86 => "secondExtendedSend",
+            0x87 => "pop",
+            0x88 => "duplicateTop",
+            0x89 => "pushActiveContext",
+            >= 0x90 and <= 0x97 => $"shortJump:{(bytecode & 0x07) + 1}",
+            >= 0x98 and <= 0x9F => $"shortConditionalJump:{(bytecode & 0x07) + 1}",
+            >= 0xA0 and <= 0xA7 => $"longJump:{(bytecode & 0x07) * 256}",
+            >= 0xA8 and <= 0xAB => $"longConditionalJump:{(bytecode & 0x03) * 256}",
+            >= 0xB0 and <= 0xBF => $"sendArithmetic:{GetArithmeticSelectorName(bytecode)}",
+            >= 0xC0 and <= 0xCF => $"sendSpecial:{bytecode & 0x0F}",
+            >= 0xD0 and <= 0xDF => $"sendLiteral:{bytecode & 0x0F}",
+            >= 0xE0 and <= 0xEF => $"sendLiteralWith0Args:{bytecode & 0x0F}",
+            >= 0xF0 and <= 0xFF => $"sendLiteralWith1Arg:{bytecode & 0x0F}",
+            _ => $"unknown:0x{bytecode:X2}"
+        };
+    }
+    
+    private string GetArithmeticSelectorName(byte bytecode)
+    {
+        var index = bytecode & 0x0F;
+        return index switch
+        {
+            0x00 => "+",
+            0x01 => "-",
+            0x02 => "<",
+            0x03 => ">",
+            0x04 => "<=",
+            0x05 => ">=",
+            0x06 => "=",
+            0x07 => "~=",
+            0x08 => "*",
+            0x09 => "/",
+            0x0A => "\\\\",
+            0x0B => "@",
+            0x0C => "bitShift:",
+            0x0D => "//",
+            0x0E => "bitAnd:",
+            0x0F => "bitOr:",
+            _ => $"unknown:{index}"
+        };
     }
 }

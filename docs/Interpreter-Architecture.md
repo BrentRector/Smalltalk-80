@@ -69,7 +69,13 @@ public class VirtualMachine
 
 ### 3.1 Base Object System
 
-The object model uses a direct C# class hierarchy with Smalltalk semantics:
+**FUNDAMENTAL REQUIREMENT**: All Smalltalk objects must be managed uniformly by the Smalltalk garbage collector. This includes:
+- Regular instances (SInstance)
+- Method contexts (SMethodContext) 
+- Compiled methods (SCompiledMethod)
+- Classes and metaclasses (SClass)
+
+The object model uses a C# base class hierarchy but ALL objects are created through Smalltalk instantiation:
 
 ```csharp
 namespace Smalltalk80.Interpreter.Core.Objects;
@@ -117,14 +123,24 @@ public class SClass : SObject
     
     public SObject CreateInstance()
     {
-        return Name switch
+        // Create the appropriate C# wrapper but ensure it's registered with GC
+        SObject instance = Name switch
         {
             "Array" => new SArray(this, 0),
             "String" => new SString(this, ""),
             "Symbol" => new SSymbol(this, ""),
-            "CompiledMethod" => new CompiledMethod(),
+            "CompiledMethod" => new SCompiledMethod(this),
+            "MethodContext" => new SMethodContext(this),
             _ => new SInstance(this, InstanceSize)
         };
+        
+        // Register with GC immediately
+        if (VirtualMachine.Current?.GarbageCollector != null)
+        {
+            VirtualMachine.Current.GarbageCollector.RegisterObject(instance);
+        }
+        
+        return instance;
     }
     
     public CompiledMethod? LookupMethod(string selector)
@@ -243,29 +259,25 @@ The interpreter implements the complete Blue Book bytecode specification:
 | 128-175 | Extended Operations | Jump, conditional jump, send super |
 | 176-255 | Send | Send literal selector with 0-2 arguments |
 
-### 4.2 Bytecode Interpreter
+### 4.2 Bytecode Interpreter  
 
-The bytecode interpreter executes compiled methods:
+The bytecode interpreter executes compiled methods using proper Smalltalk objects:
 
 ```csharp
 namespace Smalltalk80.Interpreter.Execution;
 
 public class BytecodeInterpreter
 {
-    private readonly Stack<SObject> stack = new();
     private readonly VirtualMachine vm;
     
-    public SObject Execute(CompiledMethod method, SObject receiver, SObject[] args)
+    public SObject Execute(SCompiledMethod method, SObject receiver, SObject[] args)
     {
-        // Create execution context
-        var context = new MethodContext
-        {
-            Method = method,
-            Receiver = receiver,
-            Temporaries = new SObject[method.TemporaryCount],
-            Stack = new Stack<SObject>(),
-            PC = 0
-        };
+        // Create execution context as a proper Smalltalk object
+        var contextClass = SystemDictionary.LookupClass("MethodContext");
+        var contextInstance = contextClass.CreateInstance();
+        
+        // Initialize through proper Smalltalk object protocol
+        var context = SMethodContext.InitializeFrom(contextInstance, method, receiver, args);
         
         // Copy arguments to temporaries
         for (int i = 0; i < args.Length; i++)
@@ -329,18 +341,90 @@ public class BytecodeInterpreter
 
 ### 4.3 Method Context
 
-Method contexts maintain execution state:
+**CRITICAL DESIGN REQUIREMENT**: Method contexts MUST be proper Smalltalk objects managed by the Smalltalk garbage collector, NOT C# objects. This ensures uniform object model and proper memory management.
+
+Method contexts are Smalltalk objects created through the standard instantiation mechanism:
 
 ```csharp
-public class MethodContext
+// CORRECT: Create through Smalltalk class instantiation
+public static SMethodContext CreateMethodContext(SCompiledMethod method, SObject receiver, SObject[] arguments)
 {
-    public CompiledMethod Method { get; set; }
-    public SObject Receiver { get; set; }
-    public SObject[] Temporaries { get; set; }
-    public Stack<SObject> Stack { get; set; }
-    public int PC { get; set; }  // Program counter
-    public MethodContext? Sender { get; set; }  // Calling context
+    var contextClass = SystemDictionary.LookupClass("MethodContext");
+    var context = (SMethodContext)contextClass.CreateInstance();
+    context.Initialize(method, receiver, arguments);
+    
+    // NO GC registration - objects are reachable through process/context chains
+    
+    return context;
 }
+
+// INCORRECT: Direct C# instantiation (violates object model)
+// var context = new SMethodContext(contextClass, method, receiver, arguments);
+```
+
+#### Blue Book Specification
+
+From the Blue Book page 580, MethodContext has these instance variables:
+- sender: The context that sent the message (or nil)
+- instructionPointer: The current bytecode position
+- stackPointer: The current stack position  
+- method: The CompiledMethod being executed
+- receiver: The receiver of the message
+- temporaries and stack: Combined area for arguments, temps, and evaluation stack
+
+#### Reachability and GC Integration
+
+Method contexts form a chain reachable from the Process scheduler:
+```
+SpecialObjectsArray[3] -> ProcessorScheduler
+    -> activeProcess -> suspendedContext
+        -> sender -> sender -> ... (context chain)
+```
+
+This ensures contexts are properly traced during garbage collection.
+
+### 4.4 Compiled Method
+
+**CRITICAL DESIGN REQUIREMENT**: CompiledMethods MUST also be proper Smalltalk objects, not C# objects.
+
+#### Blue Book Specification
+
+CompiledMethod contains:
+- header: Method flags and counts (literals, temps, args, stack size)
+- literals: Array of literal objects and special bindings
+- bytecodes: The bytecode instructions
+- sourcePointer: Reference to source code (optional)
+
+#### Proper Creation
+
+```csharp
+// CORRECT: Create through Smalltalk instantiation
+public static SCompiledMethod CreateCompiledMethod(byte[] bytecodes, SArray literals, 
+    int numArgs, int numTemps, int stackSize)
+{
+    var methodClass = SystemDictionary.LookupClass("CompiledMethod");
+    var method = (SCompiledMethod)methodClass.CreateInstance();
+    
+    // Initialize through proper protocol
+    method.InitializeBytecodes(bytecodes);
+    method.InitializeLiterals(literals);
+    method.InitializeHeader(numArgs, numTemps, stackSize);
+    
+    // NO GC registration - objects are reachable through class method dictionaries
+    
+    return method;
+}
+
+// INCORRECT: Direct C# instantiation
+// var method = new SCompiledMethod(bytecodes, literals);
+```
+
+#### Method Dictionary Storage
+
+Methods are stored in class method dictionaries and are reachable through:
+```
+Class -> methodDictionary -> CompiledMethod instances
+Metaclass -> methodDictionary -> CompiledMethod instances (class methods)
 ```
 
 ## Primitive Operations
@@ -457,32 +541,58 @@ public class Compiler
 
 ### 7.1 Object Memory
 
-The interpreter uses C#'s managed memory with explicit object relationships:
+**CRITICAL DESIGN RULE**: NO Smalltalk objects are individually registered with the garbage collector. The GC traces all live objects from the Special Objects Array.
 
 ```csharp
-public class ObjectMemory
+public class GarbageCollector
 {
-    private readonly List<SObject> allObjects = [];
-    private int nextObjectId = 1;
+    // The ONLY root - can be C# or Smalltalk object
+    private List<SObject> specialObjectsArray = [];
     
-    public void RegisterObject(SObject obj)
-    {
-        allObjects.Add(obj);
-    }
+    // NO RegisterObject method! Objects are found by tracing.
     
     public void CollectGarbage()
     {
-        // Mark and sweep from roots
-        var roots = GetRoots();
+        // Mark phase - start ONLY from SOA
         var marked = new HashSet<SObject>();
         
-        foreach (var root in roots)
-            Mark(root, marked);
+        foreach (var specialObject in specialObjectsArray)
+        {
+            if (specialObject != null)
+                Mark(specialObject, marked);
+        }
+        
+        // Sweep phase - collect unreachable objects
+        // (implementation depends on memory model)
+    }
+    
+    private void Mark(SObject obj, HashSet<SObject> marked)
+    {
+        if (obj == null || marked.Contains(obj))
+            return;
             
-        // Sweep unmarked objects
-        allObjects.RemoveAll(obj => !marked.Contains(obj));
+        marked.Add(obj);
+        
+        // Trace all references from this object
+        // - Instance variables
+        // - Array elements  
+        // - Method literals
+        // - Context sender chains
+        // etc.
     }
 }
+```
+
+**Special Objects Array Contents**:
+```csharp
+// SOA indices (Blue Book standard + extensions)
+0: nil
+1: false
+2: true  
+3: Processor (ProcessorScheduler)
+4: Smalltalk (SystemDictionary - contains all classes/globals)
+5: SymbolTable
+6-15: Reserved for other system objects
 ```
 
 ### 7.2 Special Objects
@@ -584,6 +694,61 @@ private void RegisterClass(SClass cls)
 }
 ```
 
+## Architectural Principles
+
+### Uniform Object Model
+
+1. **Everything is a Smalltalk Object**: All runtime entities including contexts and methods
+2. **Single GC Management**: One garbage collector manages all objects uniformly
+3. **Proper Reachability**: All live objects reachable from known roots
+4. **No Hybrid Management**: Never mix C# and Smalltalk object lifecycle
+
+### Object Creation Protocol
+
+```csharp
+// Universal pattern for creating ANY Smalltalk object:
+public static T CreateSmalltalkObject<T>(string className, Action<T> initializer) where T : SObject
+{
+    var cls = SystemDictionary.LookupClass(className) 
+        ?? throw new InvalidOperationException($"Class {className} not found");
+    
+    var instance = (T)cls.CreateInstance();
+    initializer?.Invoke(instance);
+    
+    // NO GC registration - objects are reachable through references only
+    
+    return instance;
+}
+```
+
+## Design Violations to Avoid
+
+### ❌ Common Mistakes
+
+1. **Creating Smalltalk objects with `new`**: 
+   - WRONG: `new SMethodContext(class, method, receiver, args)`
+   - RIGHT: `contextClass.CreateInstance()` then initialize
+
+2. **Not registering objects with GC**:
+   - WRONG: Create object and use immediately
+   - RIGHT: Create, register with GC, then use
+
+3. **Mixing C# and Smalltalk object management**:
+   - WRONG: C# manages contexts, Smalltalk manages other objects
+   - RIGHT: All objects uniformly managed by Smalltalk GC
+
+4. **Context pooling outside of Smalltalk**:
+   - WRONG: C# object pool for contexts
+   - RIGHT: Smalltalk manages context lifecycle and reuse
+
+5. **Forgetting GC registration**:
+   - WRONG: Create object, forget to register
+   - RIGHT: Registration happens in CreateInstance or immediately after
+
+6. **Breaking reachability chains**:
+   - WRONG: Contexts not reachable from Process
+   - RIGHT: Process -> suspendedContext -> sender chain maintained
+
 ## Implementation Status
 
 ### ✅ Completed Features
@@ -639,7 +804,7 @@ private void RegisterClass(SClass cls)
 ### ❌ Not Implemented
 
 **Advanced Features**
-- [ ] Process scheduling
+- [ ] Process scheduling (contexts must be reachable from Process)
 - [ ] Semaphores
 - [ ] File I/O primitives
 - [ ] Display/graphics primitives

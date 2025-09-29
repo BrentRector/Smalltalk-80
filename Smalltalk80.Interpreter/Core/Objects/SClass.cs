@@ -110,7 +110,28 @@ public class SClass : SObject
     /// </summary>
     public virtual SObject CreateInstance()
     {
-        return new SInstance(this, TotalInstanceVariableCount);
+        // Handle special classes that need specific types
+        SObject instance = Name switch
+        {
+            "CompiledMethod" => new SCompiledMethod(this),
+            "MethodContext" => CreateMethodContextInstance(),
+            _ => new SInstance(this, TotalInstanceVariableCount)
+        };
+        
+        // Note: GC registration should be handled by the VM/Bootstrap
+        // when it creates objects, not here
+        
+        return instance;
+    }
+    
+    /// <summary>
+    /// Creates a MethodContext instance with proper size.
+    /// </summary>
+    private SInstance CreateMethodContextInstance()
+    {
+        // MethodContext needs space for fixed fields + temps + stack
+        // This is a minimal instance - actual size set when initialized
+        return new SInstance(this, 32); // Default size, will be resized as needed
     }
     
     /// <summary>
@@ -119,7 +140,12 @@ public class SClass : SObject
     /// <param name="size">The number of indexed variables.</param>
     public virtual SObject CreateInstance(int size)
     {
-        return new SIndexedInstance(this, TotalInstanceVariableCount, size);
+        var instance = new SIndexedInstance(this, TotalInstanceVariableCount, size);
+        
+        // Note: GC registration should be handled by the VM/Bootstrap
+        // when it creates objects, not here
+        
+        return instance;
     }
     
     /// <summary>

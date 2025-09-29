@@ -70,4 +70,9 @@ public sealed class SSymbol : SObject, IEquatable<SSymbol>
     /// Clears the symbol table (for testing purposes).
     /// </summary>
     internal static void ClearSymbolTable() => symbolTable.Clear();
+    
+    /// <summary>
+    /// Gets all interned symbols.
+    /// </summary>
+    internal static IEnumerable<SSymbol> GetAllSymbols() => symbolTable.Values;
 }

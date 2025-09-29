@@ -90,7 +90,7 @@ public static class CompilationMethodsInstaller
         
         // scan: aString
         // "Initialize the receiver to scan aString"
-        var scanMethod = new SCompiledMethod(
+        var scanMethod = SCompiledMethod.CreateCompiledMethod(
             "scan:",
             [112, 16, 224, 135, 112, 209, 120], // self source: aString. self scanToken. ^self
             SArray.From(SSymbol.Intern("source:"), SSymbol.Intern("scanToken")),
@@ -100,7 +100,7 @@ public static class CompilationMethodsInstaller
         
         // scanToken
         // "Scan the next token and store it in token"
-        var scanTokenMethod = new SCompiledMethod(
+        var scanTokenMethod = SCompiledMethod.CreateCompiledMethod(
             "scanToken",
             [137, 117, 200, 151, 8, 2, 208, 192, 101, 33, 198, 125, 137, 117, 200, 146, 112, 211, 125, 
              226, 135, 0, 212, 118, 177, 97, 5, 118, 192, 40, 182, 157, 112, 5, 230, 148, 112, 211, 
@@ -118,7 +118,7 @@ public static class CompilationMethodsInstaller
         
         // xLetter
         // "Scan an identifier or keyword"
-        var xLetterMethod = new SCompiledMethod(
+        var xLetterMethod = SCompiledMethod.CreateCompiledMethod(
             "xLetter",
             [7, 208, 135, 137, 117, 200, 160, 17, 8, 2, 209, 192, 104, 16, 34, 198, 137, 117, 200, 147, 
              16, 36, 198, 125, 227, 125, 137, 117, 200, 160, 15, 7, 2, 196, 135, 3, 98, 0, 197, 156, 71, 
@@ -166,7 +166,7 @@ public static class CompilationMethodsInstaller
         
         // parse:class:noPattern:context:notifying:ifFail:
         // "Main parser entry point"
-        var parseMethod = new SCompiledMethod(
+        var parseMethod = SCompiledMethod.CreateCompiledMethod(
             "parse:class:noPattern:context:notifying:ifFail:",
             [112, 16, 20, 137, 117, 200, 147, 21, 201, 125, 125, 131, 96, 135, 65, 204, 17, 19, 112, 
              131, 98, 101, 21, 129, 96, 8, 135, 112, 18, 19, 243, 110, 115, 103, 102, 129, 96, 8, 135, 
@@ -206,7 +206,7 @@ public static class CompilationMethodsInstaller
         
         // compile:in:notifying:ifFail:
         // "Compile source in the context of class"
-        var compileMethod = new SCompiledMethod(
+        var compileMethod = SCompiledMethod.CreateCompiledMethod(
             "compile:in:notifying:ifFail:",
             [112, 16, 17, 115, 18, 131, 128, 135, 112, 0, 114, 19, 131, 97, 124],
             SArray.From(
@@ -237,7 +237,7 @@ public static class CompilationMethodsInstaller
         
         // generate: trailer
         // "Generate bytecode for this method"
-        var generateMethod = new SCompiledMethod(
+        var generateMethod = SCompiledMethod.CreateCompiledMethod(
             "generate:",
             [112, 137, 118, 200, 160, 28, 118, 34, 137, 118, 200, 160, 11, 18, 18, 194, 34, 177, 24, 
              176, 16, 24, 192, 193, 125, 241, 135, 18, 112, 212, 227, 135, 18, 125, 125, 224, 135, 2, 
@@ -296,7 +296,7 @@ public static class CompilationMethodsInstaller
         
         // init:context:notifying:
         // "Initialize the encoder for a class and context"
-        var initMethod = new SCompiledMethod(
+        var initMethod = SCompiledMethod.CreateCompiledMethod(
             "init:context:notifying:",
             [112, 16, 96, 135, 112, 17, 97, 135, 112, 18, 98, 135, 112, 217, 209, 99, 135, 112, 218, 
              209, 100, 135, 112, 219, 209, 101, 135, 112, 220, 209, 102, 135, 112, 221, 209, 103, 135, 
@@ -324,7 +324,7 @@ public static class CompilationMethodsInstaller
         
         // encodeLiteral:
         // "Encode a literal value and return its index"
-        var encodeLiteralMethod = new SCompiledMethod(
+        var encodeLiteralMethod = SCompiledMethod.CreateCompiledMethod(
             "encodeLiteral:",
             [5, 16, 230, 106, 18, 115, 146, 6, 16, 194, 108, 5, 20, 193, 135, 20, 124],
             SArray.From(
@@ -339,7 +339,7 @@ public static class CompilationMethodsInstaller
         
         // tempNames
         // "Return the names of temporaries"
-        var tempNamesMethod = new SCompiledMethod(
+        var tempNamesMethod = SCompiledMethod.CreateCompiledMethod(
             "tempNames",
             [218, 209, 208, 124],
             SArray.From(
@@ -370,7 +370,7 @@ public static class CompilationMethodsInstaller
         
         // compile:notifying:trailer:ifFail:
         // "Compile source code and install the resulting method"
-        var compileMethod = new SCompiledMethod(
+        var compileMethod = SCompiledMethod.CreateCompiledMethod(
             "compile:notifying:trailer:ifFail:",
             [112, 208, 204, 16, 112, 17, 19, 131, 129, 108, 20, 210, 109, 112, 21, 20, 18, 228, 243, 
              135, 21, 124],
@@ -386,7 +386,7 @@ public static class CompilationMethodsInstaller
         
         // addSelector:withMethod:
         // "Add a method to the method dictionary"
-        var addSelectorMethod = new SCompiledMethod(
+        var addSelectorMethod = SCompiledMethod.CreateCompiledMethod(
             "addSelector:withMethod:",
             [1, 16, 224, 106, 1, 16, 17, 193, 135, 112, 209, 135, 66, 16, 137, 117, 200, 146, 68, 204, 
              125, 243, 112, 229, 158, 112, 112, 16, 66, 131, 103, 115, 135, 72, 16, 137, 117, 200, 146, 
@@ -406,7 +406,7 @@ public static class CompilationMethodsInstaller
         behaviorClass.AddMethod("addSelector:withMethod:", addSelectorMethod);
         
         // Also add compile:classified: for convenience
-        var compileClassifiedMethod = new SCompiledMethod(
+        var compileClassifiedMethod = SCompiledMethod.CreateCompiledMethod(
             "compile:classified:",
             [112, 16, 115, 115, 115, 240, 105, 112, 17, 21, 131, 98, 135, 21, 124],
             SArray.From(
@@ -499,7 +499,7 @@ public static class CompilationMethodsInstaller
         
         // Store the type table in a Scanner instance variable or as a global
         // For now, we'll create a method that returns the type table
-        var typeTableMethod = new SCompiledMethod(
+        var typeTableMethod = SCompiledMethod.CreateCompiledMethod(
             "typeTable",
             [120], // Just return self for now - would need to return the actual table
             new SArray(),
@@ -541,7 +541,7 @@ public static class CompilationMethodsInstaller
         
         // on: aCollection
         // "Create a stream on the given collection"
-        var onMethod = new SCompiledMethod(
+        var onMethod = SCompiledMethod.CreateCompiledMethod(
             "on:",
             [66, 204, 16, 233, 135, 17, 118, 193, 135, 17, 16, 194, 195, 135, 17, 124],
             SArray.From(
@@ -557,7 +557,7 @@ public static class CompilationMethodsInstaller
         
         // on:from:to:
         // "Create a stream on part of a collection"
-        var onFromToMethod = new SCompiledMethod(
+        var onFromToMethod = SCompiledMethod.CreateCompiledMethod(
             "on:from:to:",
             [112, 0, 96, 135, 112, 1, 96, 135, 112, 2, 97, 135, 112, 124],
             SArray.From(
@@ -571,7 +571,7 @@ public static class CompilationMethodsInstaller
         
         // next
         // "Answer the next element"
-        var nextMethod = new SCompiledMethod(
+        var nextMethod = SCompiledMethod.CreateCompiledMethod(
             "next",
             [2, 3, 180, 155, 115, 124, 0, 2, 118, 176, 192, 105, 112, 2, 17, 176, 97, 135, 17, 124],
             SArray.From(
@@ -587,7 +587,7 @@ public static class CompilationMethodsInstaller
         
         // atEnd
         // "Answer whether at end of stream"
-        var atEndMethod = new SCompiledMethod(
+        var atEndMethod = SCompiledMethod.CreateCompiledMethod(
             "atEnd",
             [2, 3, 181, 124],
             SArray.From(
@@ -600,7 +600,7 @@ public static class CompilationMethodsInstaller
         
         // peek
         // "Answer next element without advancing"
-        var peekMethod = new SCompiledMethod(
+        var peekMethod = SCompiledMethod.CreateCompiledMethod(
             "peek",
             [112, 211, 155, 115, 124, 0, 2, 118, 176, 192, 124],
             SArray.From(
@@ -628,7 +628,7 @@ public static class CompilationMethodsInstaller
         
         // on:
         // "Create a stream on the given collection"
-        var onMethod = new SCompiledMethod(
+        var onMethod = SCompiledMethod.CreateCompiledMethod(
             "on:",
             [66, 204, 16, 118, 16, 194, 234, 135, 17, 124],
             SArray.From(
@@ -644,7 +644,7 @@ public static class CompilationMethodsInstaller
         
         // nextPut:
         // "Add an element to the stream"
-        var nextPutMethod = new SCompiledMethod(
+        var nextPutMethod = SCompiledMethod.CreateCompiledMethod(
             "nextPut:",
             [2, 3, 180, 157, 112, 213, 135, 0, 2, 118, 176, 16, 193, 135, 112, 2, 118, 176, 97, 135, 
              3, 2, 183, 157, 112, 2, 98, 135, 16, 124],
@@ -663,7 +663,7 @@ public static class CompilationMethodsInstaller
         
         // nextPutAll:
         // "Add a collection of elements"
-        var nextPutAllMethod = new SCompiledMethod(
+        var nextPutAllMethod = SCompiledMethod.CreateCompiledMethod(
             "nextPutAll:",
             [16, 137, 118, 200, 151, 112, 17, 226, 125, 242, 135, 16, 124],
             SArray.From(
@@ -676,7 +676,7 @@ public static class CompilationMethodsInstaller
         
         // contents
         // "Answer the contents written so far"
-        var contentsMethod = new SCompiledMethod(
+        var contentsMethod = SCompiledMethod.CreateCompiledMethod(
             "contents",
             [0, 118, 2, 231, 124],
             SArray.From(
@@ -690,7 +690,7 @@ public static class CompilationMethodsInstaller
         
         // reset
         // "Reset the stream to the beginning"
-        var resetMethod = new SCompiledMethod(
+        var resetMethod = SCompiledMethod.CreateCompiledMethod(
             "reset",
             [112, 118, 96, 135, 112, 3, 197, 176, 98, 135, 120],
             SArray.From(
@@ -704,7 +704,7 @@ public static class CompilationMethodsInstaller
         
         // size
         // "Answer the size of the contents"
-        var sizeMethod = new SCompiledMethod(
+        var sizeMethod = SCompiledMethod.CreateCompiledMethod(
             "size",
             [3, 124],
             SArray.From(SSymbol.Intern("writeLimit")),
@@ -727,7 +727,7 @@ public static class CompilationMethodsInstaller
         
         // compilerClass
         // "Return the compiler class to use"
-        var compilerClassMethod = new SCompiledMethod(
+        var compilerClassMethod = SCompiledMethod.CreateCompiledMethod(
             "compilerClass",
             [65, 124],
             SArray.From(SSymbol.Intern("Compiler")),
@@ -739,7 +739,7 @@ public static class CompilationMethodsInstaller
         
         // compile:classified:
         // "Compile source code with classification"
-        var compileClassifiedMethod = new SCompiledMethod(
+        var compileClassifiedMethod = SCompiledMethod.CreateCompiledMethod(
             "compile:classified:",
             [112, 16, 115, 115, 115, 240, 105, 112, 17, 21, 131, 98, 135, 21, 124],
             SArray.From(
@@ -772,7 +772,7 @@ public static class CompilationMethodsInstaller
         
         // newMethod:header:
         // "Create a new compiled method with bytecodes and header"
-        var newMethodHeaderMethod = new SCompiledMethod(
+        var newMethodHeaderMethod = SCompiledMethod.CreateCompiledMethod(
             "newMethod:header:",
             [66, 208, 104, 16, 16, 194, 249, 105, 17, 118, 16, 194, 240, 106, 16, 118, 21, 195, 107, 
              18, 20, 193, 102, 22, 20, 194, 103, 20, 124],
@@ -792,7 +792,7 @@ public static class CompilationMethodsInstaller
         
         // numArgs:numTemps:primitive:literals:
         // "Create a method with specified parameters"
-        var numArgsMethod = new SCompiledMethod(
+        var numArgsMethod = SCompiledMethod.CreateCompiledMethod(
             "numArgs:numTemps:primitive:literals:",
             [19, 194, 104, 66, 20, 208, 105, 21, 118, 225, 102, 21, 16, 196, 103, 21, 17, 197, 104, 
              21, 18, 198, 105, 21, 20, 199, 106, 21, 124],
@@ -812,7 +812,7 @@ public static class CompilationMethodsInstaller
         
         // copyWithTempsFromMethodNode:
         // "Copy temporaries from a method node"
-        var copyWithTempsMethod = new SCompiledMethod(
+        var copyWithTempsMethod = SCompiledMethod.CreateCompiledMethod(
             "copyWithTempsFromMethodNode:",
             [112, 16, 210, 104, 20, 215, 155, 120, 112, 20, 117, 194, 197, 106, 112, 20, 117, 22, 
              196, 105, 21, 124],

@@ -20,6 +20,9 @@ using Smalltalk80.Interpreter.Core.Values;
 /// - arguments: Array of arguments (stored in first part of temporaries)
 /// - temporaries: Array for arguments and temporary variables
 /// - stack: The evaluation stack
+/// 
+/// CRITICAL: MethodContext must be created through SClass.CreateInstance,
+/// not directly with new, to ensure proper GC management.
 /// </remarks>
 public sealed class SMethodContext : SInstance
 {
@@ -33,23 +36,44 @@ public sealed class SMethodContext : SInstance
     // The stack follows the temporaries
     
     /// <summary>
-    /// Initializes a new instance of the SMethodContext class.
+    /// Legacy constructor for backward compatibility - DEPRECATED.
     /// </summary>
-    /// <param name="contextClass">The MethodContext class.</param>
-    /// <param name="method">The CompiledMethod being executed.</param>
-    /// <param name="receiver">The receiver of the message.</param>
-    /// <param name="arguments">The arguments to the method.</param>
+    [Obsolete("Use CreateMethodContext factory method instead")]
     public SMethodContext(SClass contextClass, SCompiledMethod method, SObject receiver, SObject[] arguments)
         : base(contextClass, 5 + method.NumArgs + method.NumTemps + method.StackSize)  // 5 fixed fields + temps + stack
+    {
+        Initialize(method, receiver, arguments);
+    }
+    
+    /// <summary>
+    /// Default constructor for creation through SClass.CreateInstance.
+    /// </summary>
+    internal SMethodContext(SClass contextClass, int size = 32) : base(contextClass, size)
+    {
+        // Will be initialized through Initialize method
+    }
+    
+    /// <summary>
+    /// Initializes this method context with the given data.
+    /// </summary>
+    public void Initialize(SCompiledMethod method, SObject receiver, SObject[] arguments)
     {
         // Calculate sizes for reference
         var tempSize = method.NumArgs + method.NumTemps;
         var stackSize = method.StackSize;
         
+        // Ensure we have enough space
+        var requiredSize = 5 + tempSize + stackSize;
+        if (InstanceVariableCount < requiredSize)
+        {
+            // Resize if needed - this should rarely happen with proper pre-allocation
+            ResizeInstanceVariables(requiredSize);
+        }
+        
         // Initialize fixed fields
         SetSender(null);
         SetInstructionPointer(SmallInteger.From(0));
-        SetStackPointer(SmallInteger.From(tempSize)); // Stack starts after temporaries
+        SetStackPointer(SmallInteger.From(5 + tempSize)); // Stack starts after fixed fields (5) and temporaries
         SetMethod(method);
         SetReceiver(receiver);
         
@@ -65,12 +89,11 @@ public sealed class SMethodContext : SInstance
             SetTemporary(i, SNil.Instance);
         }
         
-        // Stack is initially empty (all nil)
+        // Initialize stack area to nil
         for (int i = 0; i < stackSize; i++)
         {
-            Push(SNil.Instance);
+            SetInstanceVariable(5 + tempSize + i, SNil.Instance);
         }
-        SetStackPointer(SmallInteger.From(tempSize)); // Reset stack pointer
     }
     
     /// <summary>
@@ -105,7 +128,15 @@ public sealed class SMethodContext : SInstance
     /// </summary>
     public SCompiledMethod Method
     {
-        get => (SCompiledMethod)(GetInstanceVariable(MethodIndex) ?? throw new InvalidOperationException("Method is null"));
+        get 
+        {
+            var value = GetInstanceVariable(MethodIndex);
+            if (value == null)
+                throw new InvalidOperationException("Method is null");
+            if (value is not SCompiledMethod compiledMethod)
+                throw new InvalidOperationException($"Method is not a CompiledMethod, it's a {value.GetType().Name}: {value}");
+            return compiledMethod;
+        }
     }
     
     /// <summary>
@@ -134,7 +165,17 @@ public sealed class SMethodContext : SInstance
     /// <summary>
     /// Sets the method.
     /// </summary>
-    private void SetMethod(SCompiledMethod method) => SetInstanceVariable(MethodIndex, method);
+    private void SetMethod(SCompiledMethod method)
+    {
+        if (method == null)
+            throw new ArgumentNullException(nameof(method), "Method cannot be null");
+        SetInstanceVariable(MethodIndex, method);
+        
+        // Verify it was set correctly
+        var stored = GetInstanceVariable(MethodIndex);
+        if (stored != method)
+            throw new InvalidOperationException($"Failed to store method. Expected {method}, got {stored}");
+    }
     
     /// <summary>
     /// Sets the receiver.
@@ -205,12 +246,41 @@ public sealed class SMethodContext : SInstance
     }
     
     /// <summary>
-    /// Creates a new home context for a block.
+    /// Factory method to create a MethodContext as a proper Smalltalk object.
     /// </summary>
+    public static SMethodContext CreateMethodContext(SCompiledMethod method, SObject receiver, SObject[] arguments)
+    {
+        var contextClass = SystemDictionary.LookupClass("MethodContext")
+            ?? throw new InvalidOperationException("MethodContext class not found");
+        
+        // Calculate required size
+        var requiredSize = 5 + method.NumArgs + method.NumTemps + method.StackSize;
+        
+        // Create through proper Smalltalk instantiation
+        var context = contextClass.CreateInstance() as SMethodContext;
+        if (context == null)
+        {
+            // Fallback if class doesn't create the right type
+            context = new SMethodContext(contextClass, requiredSize);
+            
+            // Note: GC registration should happen through SClass.CreateInstance
+            // or by the caller who has access to the VM
+        }
+        
+        // Initialize the context
+        context.Initialize(method, receiver, arguments);
+        
+        return context;
+    }
+    
+    /// <summary>
+    /// Creates a new home context for a block (legacy compatibility).
+    /// </summary>
+    [Obsolete("Use CreateMethodContext instead")]
     public static SMethodContext CreateHomeContext(SClass contextClass, SCompiledMethod method, 
         SObject receiver, SObject[] arguments)
     {
-        return new SMethodContext(contextClass, method, receiver, arguments);
+        return CreateMethodContext(method, receiver, arguments);
     }
     
     /// <summary>

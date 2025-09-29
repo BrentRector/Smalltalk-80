@@ -27,7 +27,13 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     private const int TagMask = 0x3;          // Bottom 2 bits
     
     // SmallInteger range (62-bit on 64-bit systems, 30-bit on 32-bit)
+    /// <summary>
+    /// The minimum value for a SmallInteger.
+    /// </summary>
     public static readonly long SmallIntegerMinValue = IntPtr.Size == 8 ? -(1L << 62) : -(1L << 30);
+    /// <summary>
+    /// The maximum value for a SmallInteger.
+    /// </summary>
     public static readonly long SmallIntegerMaxValue = IntPtr.Size == 8 ? (1L << 62) - 1 : (1L << 30) - 1;
     
     // The actual value - either a tagged immediate or an object pointer
@@ -322,14 +328,29 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         return a.value == b.value;
     }
     
+    /// <summary>
+    /// Determines whether this reference equals another object.
+    /// </summary>
     public override bool Equals(object? obj) => obj is SObjectRef other && Equals(other);
     
+    /// <summary>
+    /// Determines whether this reference equals another reference.
+    /// </summary>
     public bool Equals(SObjectRef other) => value == other.value;
     
+    /// <summary>
+    /// Gets the hash code for this reference.
+    /// </summary>
     public override int GetHashCode() => value.GetHashCode();
     
+    /// <summary>
+    /// Determines whether two references are equal.
+    /// </summary>
     public static bool operator ==(SObjectRef left, SObjectRef right) => left.value == right.value;
     
+    /// <summary>
+    /// Determines whether two references are not equal.
+    /// </summary>
     public static bool operator !=(SObjectRef left, SObjectRef right) => left.value != right.value;
     
     /// <summary>
@@ -337,6 +358,9 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     /// </summary>
     internal nint RawValue => value;
     
+    /// <summary>
+    /// Returns a string representation of this reference.
+    /// </summary>
     public override string ToString()
     {
         if (IsNil) return "nil";

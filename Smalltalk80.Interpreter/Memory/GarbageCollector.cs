@@ -6,13 +6,19 @@ using Smalltalk80.Interpreter.Config;
 
 /// <summary>
 /// Mark-and-sweep garbage collector for the Smalltalk-80 interpreter.
+/// 
+/// CRITICAL DESIGN: The GC has exactly ONE root - the Special Objects Array.
+/// NO individual objects are registered. All live objects are found by tracing
+/// references from the SOA. Objects become collectible when no longer reachable.
 /// </summary>
 public sealed class GarbageCollector
 {
     private readonly HashSet<SObject> reachableObjects = new();
     private readonly Queue<SObject> workQueue = new();
-    private readonly List<WeakReference> allObjects = new();
     private readonly object gcLock = new();
+    
+    // The ONLY root for GC - can be C# List or Smalltalk Array
+    private List<SObject?> specialObjectsArray = new();
     
     private long totalCollections;
     private long totalObjectsCollected;
@@ -40,25 +46,51 @@ public sealed class GarbageCollector
     public long LastCollectionDurationMs => lastCollectionDuration;
     
     /// <summary>
-    /// Registers an object with the garbage collector.
+    /// Sets the Special Objects Array - the ONLY root for garbage collection.
     /// </summary>
-    /// <param name="obj">The object to register.</param>
-    public void RegisterObject(SObject obj)
+    /// <param name="soa">The special objects array.</param>
+    public void SetSpecialObjectsArray(List<SObject?> soa)
     {
-        if (obj == null) return;
-        
         lock (gcLock)
         {
-            allObjects.Add(new WeakReference(obj));
+            specialObjectsArray = soa ?? new List<SObject?>();
+        }
+    }
+    
+    /// <summary>
+    /// Gets or sets a specific special object.
+    /// </summary>
+    public SObject? GetSpecialObject(int index)
+    {
+        lock (gcLock)
+        {
+            if (index >= 0 && index < specialObjectsArray.Count)
+                return specialObjectsArray[index];
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// Sets a specific special object in the Special Objects Array.
+    /// </summary>
+    /// <param name="index">The index in the Special Objects Array.</param>
+    /// <param name="obj">The object to set at the specified index.</param>
+    public void SetSpecialObject(int index, SObject? obj)
+    {
+        lock (gcLock)
+        {
+            while (specialObjectsArray.Count <= index)
+                specialObjectsArray.Add(null);
+            specialObjectsArray[index] = obj;
         }
     }
     
     /// <summary>
     /// Performs a garbage collection cycle.
+    /// Uses ONLY the Special Objects Array as roots.
     /// </summary>
-    /// <param name="roots">The root objects to start marking from.</param>
     /// <returns>Statistics about the collection.</returns>
-    public GarbageCollectionStatistics Collect(IEnumerable<SObject> roots)
+    public GarbageCollectionStatistics Collect()
     {
         var stopwatch = Stopwatch.StartNew();
         var objectsCollected = 0;
@@ -75,12 +107,12 @@ public sealed class GarbageCollector
             reachableObjects.Clear();
             workQueue.Clear();
             
-            // Add roots to work queue
-            foreach (var root in roots)
+            // Add ONLY Special Objects Array elements as roots
+            foreach (var specialObj in specialObjectsArray)
             {
-                if (root != null && !root.IsImmediate)
+                if (specialObj != null && !specialObj.IsImmediate)
                 {
-                    workQueue.Enqueue(root);
+                    workQueue.Enqueue(specialObj);
                 }
             }
             
@@ -101,39 +133,15 @@ public sealed class GarbageCollector
                 Console.WriteLine($"[GC] Marked {reachableObjects.Count} reachable objects");
             }
             
-            // Phase 2: Sweep - remove unreachable objects
-            var newObjectList = new List<WeakReference>();
+            // Phase 2: Sweep
+            // In a real implementation, we would sweep through memory
+            // For now, just count reachable objects
+            objectsCollected = 0; // We don't track all objects anymore
             
-            foreach (var weakRef in allObjects)
+            if (Program.RuntimeOptions.GCTraceLevel == GCTraceLevel.Deep)
             {
-                if (weakRef.IsAlive)
-                {
-                    var obj = weakRef.Target as SObject;
-                    if (obj != null)
-                    {
-                        if (reachableObjects.Contains(obj))
-                        {
-                            // Object is still reachable, keep it
-                            newObjectList.Add(weakRef);
-                        }
-                        else
-                        {
-                            // Object is unreachable, it will be collected
-                            objectsCollected++;
-                            bytesFreed += EstimateObjectSize(obj);
-                            
-                            if (Program.RuntimeOptions.GCTraceLevel == GCTraceLevel.Deep)
-                            {
-                                Console.WriteLine($"[GC] Collecting: {obj.GetType().Name}");
-                            }
-                        }
-                    }
-                }
+                Console.WriteLine($"[GC] Found {reachableObjects.Count} reachable objects from SOA");
             }
-            
-            // Replace the object list with survivors
-            allObjects.Clear();
-            allObjects.AddRange(newObjectList);
             
             totalCollections++;
             totalObjectsCollected += objectsCollected;
@@ -164,9 +172,7 @@ public sealed class GarbageCollector
     /// <returns>Statistics about the collection.</returns>
     public GarbageCollectionStatistics ForceCollection()
     {
-        // Get roots from the system
-        var roots = GetSystemRoots();
-        return Collect(roots);
+        return Collect();
     }
     
     /// <summary>
@@ -178,6 +184,10 @@ public sealed class GarbageCollector
         {
             case SClass classObj:
                 TraceClass(classObj);
+                break;
+                
+            case SDictionary dict:
+                TraceDictionary(dict);
                 break;
                 
             case SCompiledMethod method:
@@ -227,6 +237,32 @@ public sealed class GarbageCollector
                 {
                     EnqueueForTracing(method);
                 }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Traces references in a dictionary object.
+    /// </summary>
+    private void TraceDictionary(SDictionary dict)
+    {
+        // First trace as an instance (for instance variables and class)
+        TraceInstance(dict);
+        
+        // Then trace all keys and values
+        foreach (var key in dict.Keys)
+        {
+            if (key != null && !key.IsImmediate)
+            {
+                EnqueueForTracing(key);
+            }
+        }
+        
+        foreach (var value in dict.Values)
+        {
+            if (value != null && !value.IsImmediate)
+            {
+                EnqueueForTracing(value);
             }
         }
     }
@@ -291,38 +327,52 @@ public sealed class GarbageCollector
     }
     
     /// <summary>
-    /// Gets the system root objects.
+    /// Validates that all objects are reachable from the SOA.
+    /// This should be run after cold start to ensure proper setup.
     /// </summary>
-    private List<SObject> GetSystemRoots()
+    /// <returns>True if all expected objects are reachable.</returns>
+    public bool ValidateReachability()
     {
-        var roots = new List<SObject>();
-        
-        // Add system dictionary entries
-        var globals = SystemDictionary.GetAllGlobals();
-        foreach (var global in globals)
+        if (Program.RuntimeOptions.EnableGCLogging)
         {
-            if (global != null)
+            Console.WriteLine("[GC] Validating all objects are reachable from SOA...");
+        }
+        
+        // Perform a collection to mark all reachable objects
+        Collect();
+        
+        // Check that critical objects are reachable
+        // With the minimal SOA, these should all be reachable through SystemDictionary
+        var criticalObjects = new List<(string name, SObject? obj)>
+        {
+            ("nil", SNil.Instance),
+            ("true", STrue.Instance),
+            ("false", SFalse.Instance),
+            ("Behavior class", SystemDictionary.BehaviorClass),
+            ("Metaclass class", SystemDictionary.MetaclassClass),
+            // Classes should be reachable through SystemDictionary
+            ("Object class (via Smalltalk)", SystemDictionary.ObjectClass),
+            ("SmallInteger class (via Smalltalk)", SystemDictionary.SmallIntegerClass),
+            ("Array class (via Smalltalk)", SystemDictionary.ArrayClass),
+            ("String class (via Smalltalk)", SystemDictionary.StringClass)
+        };
+        
+        var allReachable = true;
+        foreach (var (name, obj) in criticalObjects)
+        {
+            if (obj != null && !obj.IsImmediate && !reachableObjects.Contains(obj))
             {
-                roots.Add(global);
+                Console.WriteLine($"[GC] WARNING: {name} is not reachable from SOA!");
+                allReachable = false;
             }
         }
         
-        // Add special objects (true, false, nil)
-        roots.Add(STrue.Instance);
-        roots.Add(SFalse.Instance);
-        roots.Add(SNil.Instance);
-        
-        // Add all classes
-        var allClasses = SystemDictionary.GetAllClasses();
-        foreach (var cls in allClasses)
+        if (allReachable && Program.RuntimeOptions.EnableGCLogging)
         {
-            if (cls != null)
-            {
-                roots.Add(cls);
-            }
+            Console.WriteLine($"[GC] Validation passed: {reachableObjects.Count} objects reachable from SOA");
         }
         
-        return roots;
+        return allReachable;
     }
     
     /// <summary>
@@ -343,13 +393,15 @@ public sealed class GarbageCollector
                 size += str.Length * 2; // Unicode chars
                 break;
                 
-            case SInstance instance:
-                size += instance.InstanceVariableCount * 8; // Reference per instance var
-                break;
-                
             case SCompiledMethod method:
+                // Handle CompiledMethod specifically (before SInstance)
                 size += method.Bytecodes?.Length ?? 0;
                 size += 32; // Method metadata
+                size += method.InstanceVariableCount * 8; // Instance vars
+                break;
+                
+            case SInstance instance:
+                size += instance.InstanceVariableCount * 8; // Reference per instance var
                 break;
                 
             case SClass _:
@@ -368,7 +420,7 @@ public sealed class GarbageCollector
         TotalObjectsCollected,
         TotalBytesFreed,
         LastCollectionDurationMs,
-        allObjects.Count(wr => wr.IsAlive));
+        reachableObjects.Count);  // Live objects from last collection
     
     /// <summary>
     /// Resets all statistics.

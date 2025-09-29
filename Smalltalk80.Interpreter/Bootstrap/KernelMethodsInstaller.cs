@@ -81,7 +81,7 @@ public static class KernelMethodsInstaller
         }
         
         // == (identity comparison) - primitive 110
-        objectClass.AddMethod("==", new SCompiledMethod(
+        objectClass.AddMethod("==", SCompiledMethod.CreateCompiledMethod(
             "==",
             [0x8F, 0x6E, 0x01, 0x70, 0x71, 0xC6, 0x7C], // Primitive 110 with fallback
             new SArray(),
@@ -89,7 +89,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ~~ (identity not equal)
-        objectClass.AddMethod("~~", new SCompiledMethod(
+        objectClass.AddMethod("~~", SCompiledMethod.CreateCompiledMethod(
             "~~",
             [0x70, 0x10, 0xB6, 0x9C, 0x7C], // self == arg not
             SArray.From(SSymbol.Intern("==")),
@@ -97,7 +97,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // = (equality) - defaults to ==
-        objectClass.AddMethod("=", new SCompiledMethod(
+        objectClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0x70, 0x10, 0xB6, 0x7C], // self == arg
             SArray.From(SSymbol.Intern("==")),
@@ -105,7 +105,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ~= (not equal)
-        objectClass.AddMethod("~=", new SCompiledMethod(
+        objectClass.AddMethod("~=", SCompiledMethod.CreateCompiledMethod(
             "~=",
             [0x70, 0x10, 0xC0, 0x9C, 0x7C], // self = arg not
             SArray.From(SSymbol.Intern("=")),
@@ -113,7 +113,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // hash - primitive 75
-        objectClass.AddMethod("hash", new SCompiledMethod(
+        objectClass.AddMethod("hash", SCompiledMethod.CreateCompiledMethod(
             "hash",
             [0x8F, 0x4B, 0x00, 0x70, 0xC8, 0x7C], // Primitive 75 with fallback
             SArray.From(SSymbol.Intern("identityHash")),
@@ -121,7 +121,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // class - primitive 111
-        objectClass.AddMethod("class", new SCompiledMethod(
+        objectClass.AddMethod("class", SCompiledMethod.CreateCompiledMethod(
             "class",
             [0x8F, 0x6F, 0x00, 0x7C], // Primitive 111
             new SArray(),
@@ -129,7 +129,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // yourself
-        objectClass.AddMethod("yourself", new SCompiledMethod(
+        objectClass.AddMethod("yourself", SCompiledMethod.CreateCompiledMethod(
             "yourself",
             [0x70, 0x7C], // ^self
             new SArray(),
@@ -137,7 +137,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isNil
-        objectClass.AddMethod("isNil", new SCompiledMethod(
+        objectClass.AddMethod("isNil", SCompiledMethod.CreateCompiledMethod(
             "isNil",
             [0x72, 0x7C], // ^false
             new SArray(),
@@ -145,7 +145,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // notNil
-        objectClass.AddMethod("notNil", new SCompiledMethod(
+        objectClass.AddMethod("notNil", SCompiledMethod.CreateCompiledMethod(
             "notNil",
             [0x71, 0x7C], // ^true
             new SArray(),
@@ -153,7 +153,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifNil:
-        objectClass.AddMethod("ifNil:", new SCompiledMethod(
+        objectClass.AddMethod("ifNil:", SCompiledMethod.CreateCompiledMethod(
             "ifNil:",
             [0x73, 0x7C], // ^nil (not nil, so return nil)
             new SArray(),
@@ -161,7 +161,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifNotNil:
-        objectClass.AddMethod("ifNotNil:", new SCompiledMethod(
+        objectClass.AddMethod("ifNotNil:", SCompiledMethod.CreateCompiledMethod(
             "ifNotNil:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -169,7 +169,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // copy
-        objectClass.AddMethod("copy", new SCompiledMethod(
+        objectClass.AddMethod("copy", SCompiledMethod.CreateCompiledMethod(
             "copy",
             [0x70, 0xD0, 0x7C], // self shallowCopy
             SArray.From(SSymbol.Intern("shallowCopy")),
@@ -177,7 +177,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // shallowCopy - primitive 148
-        objectClass.AddMethod("shallowCopy", new SCompiledMethod(
+        objectClass.AddMethod("shallowCopy", SCompiledMethod.CreateCompiledMethod(
             "shallowCopy",
             [0x8F, 0x94, 0x00, 0x70, 0x7C], // Primitive 148, fallback to self
             new SArray(),
@@ -185,7 +185,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isKindOf: - primitive 9 (special object-testing primitive)
-        objectClass.AddMethod("isKindOf:", new SCompiledMethod(
+        objectClass.AddMethod("isKindOf:", SCompiledMethod.CreateCompiledMethod(
             "isKindOf:",
             [0x70, 0xD0, 0x68, // self class
              0x10, 0x69, 0xB6, 0x9A, 0x02, 0x71, 0x7C, // aClass == self class ifTrue: [^true]
@@ -200,7 +200,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isMemberOf:
-        objectClass.AddMethod("isMemberOf:", new SCompiledMethod(
+        objectClass.AddMethod("isMemberOf:", SCompiledMethod.CreateCompiledMethod(
             "isMemberOf:",
             [0x70, 0xD0, 0x10, 0xB6, 0x7C], // self class == aClass
             SArray.From(
@@ -210,7 +210,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // respondsTo:
-        objectClass.AddMethod("respondsTo:", new SCompiledMethod(
+        objectClass.AddMethod("respondsTo:", SCompiledMethod.CreateCompiledMethod(
             "respondsTo:",
             [0x70, 0xD0, 0x10, 0xE1, 0x73, 0xF0, 0x7C], // self class canUnderstand: aSymbol
             SArray.From(
@@ -220,7 +220,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // printString
-        objectClass.AddMethod("printString", new SCompiledMethod(
+        objectClass.AddMethod("printString", SCompiledMethod.CreateCompiledMethod(
             "printString",
             [0x42, 0xD1, 0x68, 0x70, 0x11, 0xE2, 0x10, 0x7C], // String streamContents: [:s | self printOn: s]
             SArray.From(
@@ -231,7 +231,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // error: - primitive 131
-        objectClass.AddMethod("error:", new SCompiledMethod(
+        objectClass.AddMethod("error:", SCompiledMethod.CreateCompiledMethod(
             "error:",
             [0x8F, 0x83, 0x01, 0x70, 0x10, 0xE3, 0x7C], // Primitive 131, fallback
             SArray.From(SSymbol.Intern("primitiveFailed")),
@@ -239,7 +239,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // halt - primitive 123
-        objectClass.AddMethod("halt", new SCompiledMethod(
+        objectClass.AddMethod("halt", SCompiledMethod.CreateCompiledMethod(
             "halt",
             [0x8F, 0x7B, 0x00, 0x70, 0x7C], // Primitive 123
             new SArray(),
@@ -273,7 +273,7 @@ public static class KernelMethodsInstaller
         }
         
         // isNil
-        undefinedObjectClass.AddMethod("isNil", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("isNil", SCompiledMethod.CreateCompiledMethod(
             "isNil",
             [0x71, 0x7C], // ^true
             new SArray(),
@@ -281,7 +281,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // notNil
-        undefinedObjectClass.AddMethod("notNil", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("notNil", SCompiledMethod.CreateCompiledMethod(
             "notNil",
             [0x72, 0x7C], // ^false
             new SArray(),
@@ -289,7 +289,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifNil:
-        undefinedObjectClass.AddMethod("ifNil:", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("ifNil:", SCompiledMethod.CreateCompiledMethod(
             "ifNil:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -297,7 +297,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifNotNil:
-        undefinedObjectClass.AddMethod("ifNotNil:", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("ifNotNil:", SCompiledMethod.CreateCompiledMethod(
             "ifNotNil:",
             [0x73, 0x7C], // ^nil (is nil, so return nil)
             new SArray(),
@@ -305,7 +305,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifNil:ifNotNil:
-        undefinedObjectClass.AddMethod("ifNil:ifNotNil:", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("ifNil:ifNotNil:", SCompiledMethod.CreateCompiledMethod(
             "ifNil:ifNotNil:",
             [0x10, 0xC9, 0x7C], // nilBlock value
             SArray.From(SSymbol.Intern("value")),
@@ -313,7 +313,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // printOn:
-        undefinedObjectClass.AddMethod("printOn:", new SCompiledMethod(
+        undefinedObjectClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
             "printOn:",
             [0x10, 0x21, 0xE0, 0x7C], // stream nextPutAll: 'nil'
             SArray.From(SSymbol.Intern("nil"), SSymbol.Intern("nextPutAll:")),
@@ -345,7 +345,7 @@ public static class KernelMethodsInstaller
         // But we'll add them as self subclassResponsibility
         
         // & (and)
-        booleanClass.AddMethod("&", new SCompiledMethod(
+        booleanClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
             "&",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -353,7 +353,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // | (or)
-        booleanClass.AddMethod("|", new SCompiledMethod(
+        booleanClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
             "|",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -361,7 +361,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // not
-        booleanClass.AddMethod("not", new SCompiledMethod(
+        booleanClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
             "not",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -390,7 +390,7 @@ public static class KernelMethodsInstaller
         }
         
         // & (and) - depends on argument
-        trueClass.AddMethod("&", new SCompiledMethod(
+        trueClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
             "&",
             [0x10, 0x7C], // ^arg
             new SArray(),
@@ -398,7 +398,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // | (or) - always true
-        trueClass.AddMethod("|", new SCompiledMethod(
+        trueClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
             "|",
             [0x71, 0x7C], // ^true
             new SArray(),
@@ -406,7 +406,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // not
-        trueClass.AddMethod("not", new SCompiledMethod(
+        trueClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
             "not",
             [0x72, 0x7C], // ^false
             new SArray(),
@@ -414,7 +414,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // and:
-        trueClass.AddMethod("and:", new SCompiledMethod(
+        trueClass.AddMethod("and:", SCompiledMethod.CreateCompiledMethod(
             "and:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -422,7 +422,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // or:
-        trueClass.AddMethod("or:", new SCompiledMethod(
+        trueClass.AddMethod("or:", SCompiledMethod.CreateCompiledMethod(
             "or:",
             [0x71, 0x7C], // ^true
             new SArray(),
@@ -430,7 +430,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifTrue:
-        trueClass.AddMethod("ifTrue:", new SCompiledMethod(
+        trueClass.AddMethod("ifTrue:", SCompiledMethod.CreateCompiledMethod(
             "ifTrue:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -438,7 +438,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifFalse:
-        trueClass.AddMethod("ifFalse:", new SCompiledMethod(
+        trueClass.AddMethod("ifFalse:", SCompiledMethod.CreateCompiledMethod(
             "ifFalse:",
             [0x73, 0x7C], // ^nil
             new SArray(),
@@ -446,7 +446,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifTrue:ifFalse:
-        trueClass.AddMethod("ifTrue:ifFalse:", new SCompiledMethod(
+        trueClass.AddMethod("ifTrue:ifFalse:", SCompiledMethod.CreateCompiledMethod(
             "ifTrue:ifFalse:",
             [0x10, 0xC9, 0x7C], // trueBlock value
             SArray.From(SSymbol.Intern("value")),
@@ -454,7 +454,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // printOn:
-        trueClass.AddMethod("printOn:", new SCompiledMethod(
+        trueClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
             "printOn:",
             [0x10, 0x21, 0xE0, 0x7C], // stream nextPutAll: 'true'
             SArray.From(SSymbol.Intern("true"), SSymbol.Intern("nextPutAll:")),
@@ -483,7 +483,7 @@ public static class KernelMethodsInstaller
         }
         
         // & (and) - always false
-        falseClass.AddMethod("&", new SCompiledMethod(
+        falseClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
             "&",
             [0x72, 0x7C], // ^false
             new SArray(),
@@ -491,7 +491,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // | (or) - depends on argument
-        falseClass.AddMethod("|", new SCompiledMethod(
+        falseClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
             "|",
             [0x10, 0x7C], // ^arg
             new SArray(),
@@ -499,7 +499,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // not
-        falseClass.AddMethod("not", new SCompiledMethod(
+        falseClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
             "not",
             [0x71, 0x7C], // ^true
             new SArray(),
@@ -507,7 +507,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // and:
-        falseClass.AddMethod("and:", new SCompiledMethod(
+        falseClass.AddMethod("and:", SCompiledMethod.CreateCompiledMethod(
             "and:",
             [0x72, 0x7C], // ^false
             new SArray(),
@@ -515,7 +515,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // or:
-        falseClass.AddMethod("or:", new SCompiledMethod(
+        falseClass.AddMethod("or:", SCompiledMethod.CreateCompiledMethod(
             "or:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -523,7 +523,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifTrue:
-        falseClass.AddMethod("ifTrue:", new SCompiledMethod(
+        falseClass.AddMethod("ifTrue:", SCompiledMethod.CreateCompiledMethod(
             "ifTrue:",
             [0x73, 0x7C], // ^nil
             new SArray(),
@@ -531,7 +531,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifFalse:
-        falseClass.AddMethod("ifFalse:", new SCompiledMethod(
+        falseClass.AddMethod("ifFalse:", SCompiledMethod.CreateCompiledMethod(
             "ifFalse:",
             [0x10, 0xC9, 0x7C], // arg value
             SArray.From(SSymbol.Intern("value")),
@@ -539,7 +539,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ifTrue:ifFalse:
-        falseClass.AddMethod("ifTrue:ifFalse:", new SCompiledMethod(
+        falseClass.AddMethod("ifTrue:ifFalse:", SCompiledMethod.CreateCompiledMethod(
             "ifTrue:ifFalse:",
             [0x11, 0xC9, 0x7C], // falseBlock value
             SArray.From(SSymbol.Intern("value")),
@@ -547,7 +547,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // printOn:
-        falseClass.AddMethod("printOn:", new SCompiledMethod(
+        falseClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
             "printOn:",
             [0x10, 0x21, 0xE0, 0x7C], // stream nextPutAll: 'false'
             SArray.From(SSymbol.Intern("false"), SSymbol.Intern("nextPutAll:")),
@@ -576,7 +576,7 @@ public static class KernelMethodsInstaller
         }
         
         // + (addition) - primitive 1
-        smallIntegerClass.AddMethod("+", new SCompiledMethod(
+        smallIntegerClass.AddMethod("+", SCompiledMethod.CreateCompiledMethod(
             "+",
             [0x8F, 0x01, 0x01, 0x7C], // Primitive 1
             new SArray(),
@@ -584,7 +584,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // - (subtraction) - primitive 2
-        smallIntegerClass.AddMethod("-", new SCompiledMethod(
+        smallIntegerClass.AddMethod("-", SCompiledMethod.CreateCompiledMethod(
             "-",
             [0x8F, 0x02, 0x01, 0x7C], // Primitive 2
             new SArray(),
@@ -592,7 +592,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // * (multiplication) - primitive 9
-        smallIntegerClass.AddMethod("*", new SCompiledMethod(
+        smallIntegerClass.AddMethod("*", SCompiledMethod.CreateCompiledMethod(
             "*",
             [0x8F, 0x09, 0x01, 0x7C], // Primitive 9
             new SArray(),
@@ -600,7 +600,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // / (division) - primitive 10
-        smallIntegerClass.AddMethod("/", new SCompiledMethod(
+        smallIntegerClass.AddMethod("/", SCompiledMethod.CreateCompiledMethod(
             "/",
             [0x8F, 0x0A, 0x01, 0x7C], // Primitive 10
             new SArray(),
@@ -608,7 +608,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // // (integer division) - primitive 12
-        smallIntegerClass.AddMethod("//", new SCompiledMethod(
+        smallIntegerClass.AddMethod("//", SCompiledMethod.CreateCompiledMethod(
             "//",
             [0x8F, 0x0C, 0x01, 0x7C], // Primitive 12
             new SArray(),
@@ -616,7 +616,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // \\ (modulo) - primitive 11
-        smallIntegerClass.AddMethod("\\\\", new SCompiledMethod(
+        smallIntegerClass.AddMethod("\\\\", SCompiledMethod.CreateCompiledMethod(
             "\\\\",
             [0x8F, 0x0B, 0x01, 0x7C], // Primitive 11
             new SArray(),
@@ -624,7 +624,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // < - primitive 3
-        smallIntegerClass.AddMethod("<", new SCompiledMethod(
+        smallIntegerClass.AddMethod("<", SCompiledMethod.CreateCompiledMethod(
             "<",
             [0x8F, 0x03, 0x01, 0x7C], // Primitive 3
             new SArray(),
@@ -632,7 +632,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // > - primitive 4
-        smallIntegerClass.AddMethod(">", new SCompiledMethod(
+        smallIntegerClass.AddMethod(">", SCompiledMethod.CreateCompiledMethod(
             ">",
             [0x8F, 0x04, 0x01, 0x7C], // Primitive 4
             new SArray(),
@@ -640,7 +640,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // <= - primitive 5
-        smallIntegerClass.AddMethod("<=", new SCompiledMethod(
+        smallIntegerClass.AddMethod("<=", SCompiledMethod.CreateCompiledMethod(
             "<=",
             [0x8F, 0x05, 0x01, 0x7C], // Primitive 5
             new SArray(),
@@ -648,7 +648,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // >= - primitive 6
-        smallIntegerClass.AddMethod(">=", new SCompiledMethod(
+        smallIntegerClass.AddMethod(">=", SCompiledMethod.CreateCompiledMethod(
             ">=",
             [0x8F, 0x06, 0x01, 0x7C], // Primitive 6
             new SArray(),
@@ -656,7 +656,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // = - primitive 7
-        smallIntegerClass.AddMethod("=", new SCompiledMethod(
+        smallIntegerClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0x8F, 0x07, 0x01, 0x7C], // Primitive 7
             new SArray(),
@@ -664,7 +664,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ~= - primitive 8
-        smallIntegerClass.AddMethod("~=", new SCompiledMethod(
+        smallIntegerClass.AddMethod("~=", SCompiledMethod.CreateCompiledMethod(
             "~=",
             [0x8F, 0x08, 0x01, 0x7C], // Primitive 8
             new SArray(),
@@ -672,7 +672,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // negated
-        smallIntegerClass.AddMethod("negated", new SCompiledMethod(
+        smallIntegerClass.AddMethod("negated", SCompiledMethod.CreateCompiledMethod(
             "negated",
             [0x75, 0x70, 0xB1, 0x7C], // 0 - self
             new SArray(),
@@ -680,7 +680,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // abs
-        smallIntegerClass.AddMethod("abs", new SCompiledMethod(
+        smallIntegerClass.AddMethod("abs", SCompiledMethod.CreateCompiledMethod(
             "abs",
             [0x70, 0x75, 0xB2, 0x9D, 0x04, 0x70, 0xD4, 0x7C, 0x70], // self < 0 ifTrue: [self negated] ifFalse: [self]
             SArray.From(SSymbol.Intern("negated")),
@@ -688,7 +688,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asFloat - primitive 40
-        smallIntegerClass.AddMethod("asFloat", new SCompiledMethod(
+        smallIntegerClass.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethod(
             "asFloat",
             [0x8F, 0x28, 0x00, 0x7C], // Primitive 40
             new SArray(),
@@ -696,7 +696,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // to:do: block iteration
-        smallIntegerClass.AddMethod("to:do:", new SCompiledMethod(
+        smallIntegerClass.AddMethod("to:do:", SCompiledMethod.CreateCompiledMethod(
             "to:do:",
             [0x70, 0x69, 0x10, 0xB5, 0xAC, 0x09, 0x11, 0x6A, 0xD5, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF4, 0x73, 0x7C],
             SArray.From(SSymbol.Intern("value:")),
@@ -704,7 +704,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // timesRepeat: block iteration
-        smallIntegerClass.AddMethod("timesRepeat:", new SCompiledMethod(
+        smallIntegerClass.AddMethod("timesRepeat:", SCompiledMethod.CreateCompiledMethod(
             "timesRepeat:",
             [0x76, 0x69, 0x70, 0xB5, 0xAC, 0x07, 0x10, 0xC9, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF6, 0x73, 0x7C],
             SArray.From(SSymbol.Intern("value")),
@@ -733,7 +733,7 @@ public static class KernelMethodsInstaller
         }
         
         // + - primitive 41
-        floatClass.AddMethod("+", new SCompiledMethod(
+        floatClass.AddMethod("+", SCompiledMethod.CreateCompiledMethod(
             "+",
             [0x8F, 0x29, 0x01, 0x7C], // Primitive 41
             new SArray(),
@@ -741,7 +741,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // - - primitive 42
-        floatClass.AddMethod("-", new SCompiledMethod(
+        floatClass.AddMethod("-", SCompiledMethod.CreateCompiledMethod(
             "-",
             [0x8F, 0x2A, 0x01, 0x7C], // Primitive 42
             new SArray(),
@@ -749,7 +749,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // * - primitive 49
-        floatClass.AddMethod("*", new SCompiledMethod(
+        floatClass.AddMethod("*", SCompiledMethod.CreateCompiledMethod(
             "*",
             [0x8F, 0x31, 0x01, 0x7C], // Primitive 49
             new SArray(),
@@ -757,7 +757,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // / - primitive 50
-        floatClass.AddMethod("/", new SCompiledMethod(
+        floatClass.AddMethod("/", SCompiledMethod.CreateCompiledMethod(
             "/",
             [0x8F, 0x32, 0x01, 0x7C], // Primitive 50
             new SArray(),
@@ -765,7 +765,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // < - primitive 43
-        floatClass.AddMethod("<", new SCompiledMethod(
+        floatClass.AddMethod("<", SCompiledMethod.CreateCompiledMethod(
             "<",
             [0x8F, 0x2B, 0x01, 0x7C], // Primitive 43
             new SArray(),
@@ -773,7 +773,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // > - primitive 44
-        floatClass.AddMethod(">", new SCompiledMethod(
+        floatClass.AddMethod(">", SCompiledMethod.CreateCompiledMethod(
             ">",
             [0x8F, 0x2C, 0x01, 0x7C], // Primitive 44
             new SArray(),
@@ -781,7 +781,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // <= - primitive 45
-        floatClass.AddMethod("<=", new SCompiledMethod(
+        floatClass.AddMethod("<=", SCompiledMethod.CreateCompiledMethod(
             "<=",
             [0x8F, 0x2D, 0x01, 0x7C], // Primitive 45
             new SArray(),
@@ -789,7 +789,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // >= - primitive 46
-        floatClass.AddMethod(">=", new SCompiledMethod(
+        floatClass.AddMethod(">=", SCompiledMethod.CreateCompiledMethod(
             ">=",
             [0x8F, 0x2E, 0x01, 0x7C], // Primitive 46
             new SArray(),
@@ -797,7 +797,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // = - primitive 47
-        floatClass.AddMethod("=", new SCompiledMethod(
+        floatClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0x8F, 0x2F, 0x01, 0x7C], // Primitive 47
             new SArray(),
@@ -805,7 +805,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // ~= - primitive 48
-        floatClass.AddMethod("~=", new SCompiledMethod(
+        floatClass.AddMethod("~=", SCompiledMethod.CreateCompiledMethod(
             "~=",
             [0x8F, 0x30, 0x01, 0x7C], // Primitive 48
             new SArray(),
@@ -813,7 +813,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // truncate - primitive 51
-        floatClass.AddMethod("truncate", new SCompiledMethod(
+        floatClass.AddMethod("truncate", SCompiledMethod.CreateCompiledMethod(
             "truncate",
             [0x8F, 0x33, 0x00, 0x7C], // Primitive 51
             new SArray(),
@@ -821,7 +821,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asFloat (returns self)
-        floatClass.AddMethod("asFloat", new SCompiledMethod(
+        floatClass.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethod(
             "asFloat",
             [0x70, 0x7C], // ^self
             new SArray(),
@@ -850,7 +850,7 @@ public static class KernelMethodsInstaller
         }
         
         // at: - primitive 60
-        arrayClass.AddMethod("at:", new SCompiledMethod(
+        arrayClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
             "at:",
             [0x8F, 0x3C, 0x01, 0x7C], // Primitive 60
             new SArray(),
@@ -858,7 +858,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // at:put: - primitive 61
-        arrayClass.AddMethod("at:put:", new SCompiledMethod(
+        arrayClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
             "at:put:",
             [0x8F, 0x3D, 0x02, 0x7C], // Primitive 61
             new SArray(),
@@ -866,7 +866,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // size - primitive 62
-        arrayClass.AddMethod("size", new SCompiledMethod(
+        arrayClass.AddMethod("size", SCompiledMethod.CreateCompiledMethod(
             "size",
             [0x8F, 0x3E, 0x00, 0x7C], // Primitive 62
             new SArray(),
@@ -874,7 +874,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // do: block iteration
-        arrayClass.AddMethod("do:", new SCompiledMethod(
+        arrayClass.AddMethod("do:", SCompiledMethod.CreateCompiledMethod(
             "do:",
             [0x76, 0x69, 0x70, 0xC2, 0x6A, 0xB5, 0xAC, 0x0B, 0x70, 0x6A, 0xC0, 0x10, 0xE6, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF2, 0x73, 0x7C],
             SArray.From(SSymbol.Intern("size"), SSymbol.Intern("at:"), SSymbol.Intern("value:")),
@@ -882,7 +882,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isEmpty
-        arrayClass.AddMethod("isEmpty", new SCompiledMethod(
+        arrayClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
             "isEmpty",
             [0x70, 0xC2, 0x75, 0xB6, 0x7C], // self size = 0
             SArray.From(SSymbol.Intern("size")),
@@ -890,7 +890,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // first
-        arrayClass.AddMethod("first", new SCompiledMethod(
+        arrayClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
             "first",
             [0x70, 0x76, 0xC0, 0x7C], // self at: 1
             SArray.From(SSymbol.Intern("at:")),
@@ -898,7 +898,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // last
-        arrayClass.AddMethod("last", new SCompiledMethod(
+        arrayClass.AddMethod("last", SCompiledMethod.CreateCompiledMethod(
             "last",
             [0x70, 0x70, 0xC2, 0xC0, 0x7C], // self at: self size
             SArray.From(SSymbol.Intern("at:"), SSymbol.Intern("size")),
@@ -906,7 +906,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // atAll:put: - sets multiple elements to same value
-        arrayClass.AddMethod("atAll:put:", new SCompiledMethod(
+        arrayClass.AddMethod("atAll:put:", SCompiledMethod.CreateCompiledMethod(
             "atAll:put:",
             [0x10, 0x8F, 0x00, 0x03, 0x70, 0x12, 0x11, 0xE1, 0xF7, 0x70, 0x7C], // indices do: [:i | self at: i put: value]. ^self
             SArray.From(
@@ -940,7 +940,7 @@ public static class KernelMethodsInstaller
         }
         
         // at: - primitive 63
-        stringClass.AddMethod("at:", new SCompiledMethod(
+        stringClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
             "at:",
             [0x8F, 0x3F, 0x01, 0x7C], // Primitive 63
             new SArray(),
@@ -948,7 +948,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // at:put: - primitive 64
-        stringClass.AddMethod("at:put:", new SCompiledMethod(
+        stringClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
             "at:put:",
             [0x8F, 0x40, 0x02, 0x7C], // Primitive 64
             new SArray(),
@@ -956,7 +956,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // size - primitive 62
-        stringClass.AddMethod("size", new SCompiledMethod(
+        stringClass.AddMethod("size", SCompiledMethod.CreateCompiledMethod(
             "size",
             [0x8F, 0x3E, 0x00, 0x7C], // Primitive 62
             new SArray(),
@@ -964,7 +964,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // = string comparison - primitive 105
-        stringClass.AddMethod("=", new SCompiledMethod(
+        stringClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0x8F, 0x69, 0x01, 0x7C], // Primitive 105
             new SArray(),
@@ -972,7 +972,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // hash - primitive 106
-        stringClass.AddMethod("hash", new SCompiledMethod(
+        stringClass.AddMethod("hash", SCompiledMethod.CreateCompiledMethod(
             "hash",
             [0x8F, 0x6A, 0x00, 0x7C], // Primitive 106
             new SArray(),
@@ -980,7 +980,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // , (concatenation)
-        stringClass.AddMethod(",", new SCompiledMethod(
+        stringClass.AddMethod(",", SCompiledMethod.CreateCompiledMethod(
             ",",
             [0x70, 0xC2, 0x10, 0xC2, 0xB0, 0x68, 0x44, 0xCC, 0x69, 0x76, 0x70, 0xC2, 0xE8, 0x6B,
              0x76, 0x10, 0xC2, 0xE8, 0x69, 0x7C], // Implementation of string concatenation
@@ -993,7 +993,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asSymbol - primitive 110
-        stringClass.AddMethod("asSymbol", new SCompiledMethod(
+        stringClass.AddMethod("asSymbol", SCompiledMethod.CreateCompiledMethod(
             "asSymbol",
             [0x8F, 0x6E, 0x00, 0x7C], // Primitive 110 (intern as symbol)
             new SArray(),
@@ -1001,7 +1001,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asString (returns self for String)
-        stringClass.AddMethod("asString", new SCompiledMethod(
+        stringClass.AddMethod("asString", SCompiledMethod.CreateCompiledMethod(
             "asString",
             [0x70, 0x7C], // ^self
             new SArray(),
@@ -1009,7 +1009,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // keywords - extracts keyword selectors from a string
-        stringClass.AddMethod("keywords", new SCompiledMethod(
+        stringClass.AddMethod("keywords", SCompiledMethod.CreateCompiledMethod(
             "keywords",
             [0x41, 0xD0, 0x68, // OrderedCollection new
              0x76, 0x69, 0x6A, // index := 1, start := 1
@@ -1032,7 +1032,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // numArgs - counts the number of arguments in a selector
-        stringClass.AddMethod("numArgs", new SCompiledMethod(
+        stringClass.AddMethod("numArgs", SCompiledMethod.CreateCompiledMethod(
             "numArgs",
             [0x75, 0x68, // count := 0
              0x70, 0x8F, 0x00, 0x03, // self do: [:c |
@@ -1046,7 +1046,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isKeyword - checks if string is a keyword selector
-        stringClass.AddMethod("isKeyword", new SCompiledMethod(
+        stringClass.AddMethod("isKeyword", SCompiledMethod.CreateCompiledMethod(
             "isKeyword",
             [0x70, 0xC2, 0x75, 0xB3, 0x9D, 0x02, 0x72, 0x7C, // self size > 0 ifFalse: [^false]
              0x70, 0x70, 0xC2, 0xC0, 0x21, 0xB6, 0x7C], // (self at: self size) = $:
@@ -1060,7 +1060,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // printOn:
-        stringClass.AddMethod("printOn:", new SCompiledMethod(
+        stringClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
             "printOn:",
             [0x10, 0x70, 0xE0, 0x7C], // stream nextPutAll: self
             SArray.From(SSymbol.Intern("nextPutAll:")),
@@ -1092,7 +1092,7 @@ public static class KernelMethodsInstaller
         }
         
         // = (symbol comparison uses identity)
-        symbolClass.AddMethod("=", new SCompiledMethod(
+        symbolClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
             "=",
             [0x70, 0x10, 0xB6, 0x7C], // self == arg
             SArray.From(SSymbol.Intern("==")),
@@ -1100,7 +1100,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // hash (symbols hash to themselves)
-        symbolClass.AddMethod("hash", new SCompiledMethod(
+        symbolClass.AddMethod("hash", SCompiledMethod.CreateCompiledMethod(
             "hash",
             [0x70, 0xC8, 0x7C], // self identityHash
             SArray.From(SSymbol.Intern("identityHash")),
@@ -1108,7 +1108,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asString
-        symbolClass.AddMethod("asString", new SCompiledMethod(
+        symbolClass.AddMethod("asString", SCompiledMethod.CreateCompiledMethod(
             "asString",
             [0x70, 0xD0, 0x7C], // self copy (symbols are strings, so copy returns a String)
             SArray.From(SSymbol.Intern("copy")),
@@ -1116,7 +1116,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asSymbol (returns self)
-        symbolClass.AddMethod("asSymbol", new SCompiledMethod(
+        symbolClass.AddMethod("asSymbol", SCompiledMethod.CreateCompiledMethod(
             "asSymbol",
             [0x70, 0x7C], // ^self
             new SArray(),
@@ -1124,7 +1124,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // asString
-        symbolClass.AddMethod("asString", new SCompiledMethod(
+        symbolClass.AddMethod("asString", SCompiledMethod.CreateCompiledMethod(
             "asString",
             [0x44, 0x70, 0xC2, 0xCC, 0x68, // String new: self size
              0x76, 0x70, 0xE1, 0x68, 0x7C], // result replaceFrom: 1 to: self size with: self. ^result
@@ -1156,7 +1156,7 @@ public static class KernelMethodsInstaller
         }
         
         // new
-        behaviorClass.AddMethod("new", new SCompiledMethod(
+        behaviorClass.AddMethod("new", SCompiledMethod.CreateCompiledMethod(
             "new",
             [0x70, 0xCB, 0xD2, 0x7C], // self basicNew initialize
             SArray.From(SSymbol.Intern("basicNew"), SSymbol.Intern("initialize")),
@@ -1164,7 +1164,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // new: with size
-        behaviorClass.AddMethod("new:", new SCompiledMethod(
+        behaviorClass.AddMethod("new:", SCompiledMethod.CreateCompiledMethod(
             "new:",
             [0x70, 0x10, 0xCC, 0xD2, 0x7C], // self basicNew: size initialize
             SArray.From(SSymbol.Intern("basicNew:"), SSymbol.Intern("initialize")),
@@ -1172,7 +1172,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // basicNew - primitive 70
-        behaviorClass.AddMethod("basicNew", new SCompiledMethod(
+        behaviorClass.AddMethod("basicNew", SCompiledMethod.CreateCompiledMethod(
             "basicNew",
             [0x8F, 0x46, 0x00, 0x7C], // Primitive 70
             new SArray(),
@@ -1180,7 +1180,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // basicNew: - primitive 71
-        behaviorClass.AddMethod("basicNew:", new SCompiledMethod(
+        behaviorClass.AddMethod("basicNew:", SCompiledMethod.CreateCompiledMethod(
             "basicNew:",
             [0x8F, 0x47, 0x01, 0x7C], // Primitive 71
             new SArray(),
@@ -1241,7 +1241,7 @@ public static class KernelMethodsInstaller
         // These are abstract in Magnitude, subclasses must implement <
         
         // > (greater than in terms of <)
-        magnitudeClass.AddMethod(">", new SCompiledMethod(
+        magnitudeClass.AddMethod(">", SCompiledMethod.CreateCompiledMethod(
             ">",
             [0x10, 0x70, 0xB2, 0x7C], // arg < self
             SArray.From(SSymbol.Intern("<")),
@@ -1249,7 +1249,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // <= (less than or equal)
-        magnitudeClass.AddMethod("<=", new SCompiledMethod(
+        magnitudeClass.AddMethod("<=", SCompiledMethod.CreateCompiledMethod(
             "<=",
             [0x70, 0x10, 0xB3, 0x9C, 0x7C], // (self > arg) not
             SArray.From(SSymbol.Intern(">")),
@@ -1257,7 +1257,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // >= (greater than or equal)
-        magnitudeClass.AddMethod(">=", new SCompiledMethod(
+        magnitudeClass.AddMethod(">=", SCompiledMethod.CreateCompiledMethod(
             ">=",
             [0x70, 0x10, 0xB2, 0x9C, 0x7C], // (self < arg) not
             SArray.From(SSymbol.Intern("<")),
@@ -1265,7 +1265,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // between:and:
-        magnitudeClass.AddMethod("between:and:", new SCompiledMethod(
+        magnitudeClass.AddMethod("between:and:", SCompiledMethod.CreateCompiledMethod(
             "between:and:",
             [0x70, 0x10, 0xB5, 0x9D, 0x05, 0x70, 0x11, 0xB5, 0x91, 0x72, 0x7C], // self >= low and: [self <= high]
             SArray.From(SSymbol.Intern(">=")),
@@ -1273,7 +1273,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // min:
-        magnitudeClass.AddMethod("min:", new SCompiledMethod(
+        magnitudeClass.AddMethod("min:", SCompiledMethod.CreateCompiledMethod(
             "min:",
             [0x70, 0x10, 0xB2, 0x99, 0x02, 0x70, 0x7C, 0x10, 0x7C], // self < arg ifTrue: [self] ifFalse: [arg]
             SArray.From(SSymbol.Intern("<")),
@@ -1281,7 +1281,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // max:
-        magnitudeClass.AddMethod("max:", new SCompiledMethod(
+        magnitudeClass.AddMethod("max:", SCompiledMethod.CreateCompiledMethod(
             "max:",
             [0x70, 0x10, 0xB3, 0x99, 0x02, 0x70, 0x7C, 0x10, 0x7C], // self > arg ifTrue: [self] ifFalse: [arg]
             SArray.From(SSymbol.Intern(">")),
@@ -1307,7 +1307,7 @@ public static class KernelMethodsInstaller
         }
         
         // negated
-        numberClass.AddMethod("negated", new SCompiledMethod(
+        numberClass.AddMethod("negated", SCompiledMethod.CreateCompiledMethod(
             "negated",
             [0x75, 0x70, 0xB1, 0x7C], // 0 - self
             SArray.From(SSymbol.Intern("-")),
@@ -1315,7 +1315,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // abs
-        numberClass.AddMethod("abs", new SCompiledMethod(
+        numberClass.AddMethod("abs", SCompiledMethod.CreateCompiledMethod(
             "abs",
             [0x70, 0x75, 0xB2, 0x9D, 0x04, 0x70, 0xD4, 0x7C, 0x70], // self < 0 ifTrue: [self negated] ifFalse: [self]
             SArray.From(SSymbol.Intern("<"), SSymbol.Intern("negated")),
@@ -1323,7 +1323,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // positive
-        numberClass.AddMethod("positive", new SCompiledMethod(
+        numberClass.AddMethod("positive", SCompiledMethod.CreateCompiledMethod(
             "positive",
             [0x70, 0x75, 0xB3, 0x7C], // self > 0
             SArray.From(SSymbol.Intern(">")),
@@ -1331,7 +1331,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // negative
-        numberClass.AddMethod("negative", new SCompiledMethod(
+        numberClass.AddMethod("negative", SCompiledMethod.CreateCompiledMethod(
             "negative",
             [0x70, 0x75, 0xB2, 0x7C], // self < 0
             SArray.From(SSymbol.Intern("<")),
@@ -1339,7 +1339,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isZero
-        numberClass.AddMethod("isZero", new SCompiledMethod(
+        numberClass.AddMethod("isZero", SCompiledMethod.CreateCompiledMethod(
             "isZero",
             [0x70, 0x75, 0xB6, 0x7C], // self = 0
             SArray.From(SSymbol.Intern("=")),
@@ -1376,7 +1376,7 @@ public static class KernelMethodsInstaller
         }
         
         // asInteger - primitive 171
-        characterClass.AddMethod("asInteger", new SCompiledMethod(
+        characterClass.AddMethod("asInteger", SCompiledMethod.CreateCompiledMethod(
             "asInteger",
             [0x8F, 0xAB, 0x00, 0x7C], // Primitive 171
             new SArray(),
@@ -1384,7 +1384,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isLetter - checks if character is a letter (A-Z, a-z)
-        characterClass.AddMethod("isLetter", new SCompiledMethod(
+        characterClass.AddMethod("isLetter", SCompiledMethod.CreateCompiledMethod(
             "isLetter",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x41, 0xB5, 0x9D, 0x06, // >= 65 ($A)
@@ -1404,7 +1404,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isDigit - checks if character is a digit (0-9)
-        characterClass.AddMethod("isDigit", new SCompiledMethod(
+        characterClass.AddMethod("isDigit", SCompiledMethod.CreateCompiledMethod(
             "isDigit",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x30, 0xB5, 0x9D, 0x06, // >= 48 ($0)
@@ -1420,7 +1420,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isAlphaNumeric - letter or digit
-        characterClass.AddMethod("isAlphaNumeric", new SCompiledMethod(
+        characterClass.AddMethod("isAlphaNumeric", SCompiledMethod.CreateCompiledMethod(
             "isAlphaNumeric",
             [0x70, 0xD0, 0x99, 0x02, 0x71, 0x7C, // self isLetter ifTrue: [^true]
              0x70, 0xD1, 0x7C], // self isDigit
@@ -1431,7 +1431,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isSeparator - space, tab, cr, lf, etc.
-        characterClass.AddMethod("isSeparator", new SCompiledMethod(
+        characterClass.AddMethod("isSeparator", SCompiledMethod.CreateCompiledMethod(
             "isSeparator",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x20, 0xB6, 0x99, 0x02, 0x71, 0x7C, // = 32 (space) -> true
@@ -1449,7 +1449,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // isSpecial - special characters used in Smalltalk syntax
-        characterClass.AddMethod("isSpecial", new SCompiledMethod(
+        characterClass.AddMethod("isSpecial", SCompiledMethod.CreateCompiledMethod(
             "isSpecial",
             [0x21, 0x10, 0xE0, 0x7C], // '+/\\*~<>=@%|&?!' includes: self
             SArray.From(
@@ -1513,7 +1513,7 @@ public static class KernelMethodsInstaller
         }
         
         // key - primitive 86
-        associationClass.AddMethod("key", new SCompiledMethod(
+        associationClass.AddMethod("key", SCompiledMethod.CreateCompiledMethod(
             "key",
             [0x8F, 0x56, 0x00, 0x7C], // Primitive 86
             new SArray(),
@@ -1521,7 +1521,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // value - primitive 87
-        associationClass.AddMethod("value", new SCompiledMethod(
+        associationClass.AddMethod("value", SCompiledMethod.CreateCompiledMethod(
             "value",
             [0x8F, 0x57, 0x00, 0x7C], // Primitive 87
             new SArray(),
@@ -1529,7 +1529,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // key: - primitive 88
-        associationClass.AddMethod("key:", new SCompiledMethod(
+        associationClass.AddMethod("key:", SCompiledMethod.CreateCompiledMethod(
             "key:",
             [0x8F, 0x58, 0x01, 0x7C], // Primitive 88
             new SArray(),
@@ -1537,7 +1537,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // value: - primitive 89
-        associationClass.AddMethod("value:", new SCompiledMethod(
+        associationClass.AddMethod("value:", SCompiledMethod.CreateCompiledMethod(
             "value:",
             [0x8F, 0x59, 0x01, 0x7C], // Primitive 89
             new SArray(),
@@ -1566,7 +1566,7 @@ public static class KernelMethodsInstaller
         }
         
         // at: - primitive 105
-        dictionaryClass.AddMethod("at:", new SCompiledMethod(
+        dictionaryClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
             "at:",
             [0x8F, 0x69, 0x01, 0x7C], // Primitive 105
             new SArray(),
@@ -1574,7 +1574,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // at:put: - primitive 106
-        dictionaryClass.AddMethod("at:put:", new SCompiledMethod(
+        dictionaryClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
             "at:put:",
             [0x8F, 0x6A, 0x02, 0x7C], // Primitive 106
             new SArray(),
@@ -1582,7 +1582,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // at:ifAbsent: - looks up key, evaluates block if not found
-        dictionaryClass.AddMethod("at:ifAbsent:", new SCompiledMethod(
+        dictionaryClass.AddMethod("at:ifAbsent:", SCompiledMethod.CreateCompiledMethod(
             "at:ifAbsent:",
             [0x70, 0x10, 0xE0, 0x68, // assoc := self associationAt: key
              0x68, 0x73, 0xB6, 0x9D, 0x03, 0x11, 0xC9, 0x7C, // assoc isNil ifTrue: [^absentBlock value]
@@ -1595,7 +1595,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // associationAt: - returns the association for a key
-        dictionaryClass.AddMethod("associationAt:", new SCompiledMethod(
+        dictionaryClass.AddMethod("associationAt:", SCompiledMethod.CreateCompiledMethod(
             "associationAt:",
             [0x70, 0x10, 0xE0, 0x7C], // self findAssociation: key (would need primitive)
             SArray.From(SSymbol.Intern("findAssociation:")),
@@ -1603,7 +1603,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // associationAt:ifAbsent: - returns association or evaluates block
-        dictionaryClass.AddMethod("associationAt:ifAbsent:", new SCompiledMethod(
+        dictionaryClass.AddMethod("associationAt:ifAbsent:", SCompiledMethod.CreateCompiledMethod(
             "associationAt:ifAbsent:",
             [0x70, 0x10, 0xE0, 0x68, // assoc := self findAssociation: key
              0x68, 0x73, 0xB6, 0x9D, 0x03, 0x11, 0xC9, 0x7C, // assoc isNil ifTrue: [^absentBlock value]
@@ -1645,7 +1645,7 @@ public static class KernelMethodsInstaller
         }
         
         // resume - primitive 87
-        processClass.AddMethod("resume", new SCompiledMethod(
+        processClass.AddMethod("resume", SCompiledMethod.CreateCompiledMethod(
             "resume",
             [0x8F, 0x57, 0x00, 0x7C], // Primitive 87
             new SArray(),
@@ -1653,7 +1653,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // suspend - primitive 88
-        processClass.AddMethod("suspend", new SCompiledMethod(
+        processClass.AddMethod("suspend", SCompiledMethod.CreateCompiledMethod(
             "suspend",
             [0x8F, 0x58, 0x00, 0x7C], // Primitive 88
             new SArray(),
@@ -1661,7 +1661,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // terminate - primitive 91
-        processClass.AddMethod("terminate", new SCompiledMethod(
+        processClass.AddMethod("terminate", SCompiledMethod.CreateCompiledMethod(
             "terminate",
             [0x8F, 0x5B, 0x00, 0x7C], // Primitive 91
             new SArray(),
@@ -1679,9 +1679,92 @@ public static class KernelMethodsInstaller
         var linkedListClass = SystemDictionary.LinkedListClass;
         if (linkedListClass == null) return;
         
+        var instanceMethodCount = 0;
+        
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] LinkedList: 0 instance methods installed");
+            Console.WriteLine("[COLD START] Installing LinkedList instance methods: #isEmpty, #addFirst:, #addLast:, #removeFirst, #first");
+        }
+        
+        // isEmpty
+        // ^firstLink == nil
+        linkedListClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
+            "isEmpty",
+            [0x00, 0x71, 0xC6, 0x7C], // Push firstLink, push nil, ==, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // addFirst: aLink
+        // firstLink := aLink. lastLink ifNil: [lastLink := aLink]. ^aLink
+        linkedListClass.AddMethod("addFirst:", SCompiledMethod.CreateCompiledMethod(
+            "addFirst:",
+            [0x10, 0x60, 0x01, 0xC7, // Push arg, store in firstLink
+             0x01, 0x71, 0x99, 0x04, // Push lastLink, nil check, jump if not nil
+             0x10, 0x61,             // Push arg, store in lastLink
+             0x10, 0x7C],            // Push arg, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // addLast: aLink
+        // isEmpty ifTrue: [firstLink := aLink] ifFalse: [lastLink nextLink: aLink].
+        // lastLink := aLink. ^aLink
+        linkedListClass.AddMethod("addLast:", SCompiledMethod.CreateCompiledMethod(
+            "addLast:",
+            [0x70, 0xCE,             // Push self, send isEmpty
+             0x99, 0x06,             // Jump if false
+             0x10, 0x60,             // Push arg, store in firstLink
+             0xA4, 0x05,             // Jump to end
+             0x01, 0x10, 0xE0,       // Push lastLink, push arg, send nextLink:
+             0x87,                   // Pop
+             0x10, 0x61,             // Push arg, store in lastLink
+             0x10, 0x7C],            // Push arg, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // removeFirst
+        // | oldLink | 
+        // self emptyCheck.
+        // oldLink := firstLink.
+        // firstLink == lastLink
+        //     ifTrue: [firstLink := nil. lastLink := nil]
+        //     ifFalse: [firstLink := oldLink nextLink].
+        // oldLink nextLink: nil.
+        // ^oldLink
+        linkedListClass.AddMethod("removeFirst", SCompiledMethod.CreateCompiledMethod(
+            "removeFirst",
+            [0x70, 0xD0,             // Push self, send emptyCheck
+             0x87,                   // Pop
+             0x00, 0x68,             // Push firstLink, store temp 0 (oldLink)
+             0x00, 0x01, 0xC6,       // Push firstLink, lastLink, ==
+             0x99, 0x08,             // Jump if false
+             0x71, 0x60,             // nil, store firstLink
+             0x71, 0x61,             // nil, store lastLink
+             0xA4, 0x06,             // Jump to end
+             0x11, 0xCF, 0x60,       // Push oldLink, nextLink, store firstLink
+             0x11, 0x71, 0xE0,       // Push oldLink, nil, send nextLink:
+             0x87,                   // Pop
+             0x11, 0x7C],            // Push oldLink, return
+            new SArray(),
+            0, 1));
+        instanceMethodCount++;
+        
+        // first
+        // self emptyCheck. ^firstLink
+        linkedListClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
+            "first",
+            [0x70, 0xD0,             // Push self, send emptyCheck
+             0x87,                   // Pop
+             0x00, 0x7C],            // Push firstLink, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] LinkedList: {instanceMethodCount} instance methods installed");
         }
     }
     
@@ -1698,7 +1781,7 @@ public static class KernelMethodsInstaller
         }
         
         // signal - primitive 85
-        semaphoreClass.AddMethod("signal", new SCompiledMethod(
+        semaphoreClass.AddMethod("signal", SCompiledMethod.CreateCompiledMethod(
             "signal",
             [0x8F, 0x55, 0x00, 0x7C], // Primitive 85
             new SArray(),
@@ -1706,7 +1789,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // wait - primitive 86
-        semaphoreClass.AddMethod("wait", new SCompiledMethod(
+        semaphoreClass.AddMethod("wait", SCompiledMethod.CreateCompiledMethod(
             "wait",
             [0x8F, 0x56, 0x00, 0x7C], // Primitive 86
             new SArray(),
@@ -1724,9 +1807,53 @@ public static class KernelMethodsInstaller
         var processorSchedulerClass = SystemDictionary.ProcessorSchedulerClass;
         if (processorSchedulerClass == null) return;
         
+        var instanceMethodCount = 0;
+        
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] ProcessorScheduler: 0 instance methods installed");
+            Console.WriteLine("[COLD START] Installing ProcessorScheduler instance methods: #activeProcess, #activePriority, #yield, #terminateActive");
+        }
+        
+        // activeProcess
+        // ^activeProcess
+        processorSchedulerClass.AddMethod("activeProcess", SCompiledMethod.CreateCompiledMethod(
+            "activeProcess",
+            [0x01, 0x7C], // Push activeProcess instance var, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // activePriority  
+        // ^activeProcess priority
+        var activePriorityLiterals = SArray.From(SSymbol.Intern("priority"));
+        processorSchedulerClass.AddMethod("activePriority", SCompiledMethod.CreateCompiledMethod(
+            "activePriority",
+            [0x01, 0xD0, 0x7C], // Push activeProcess, send priority, return
+            activePriorityLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        // yield - primitive 167
+        processorSchedulerClass.AddMethod("yield", SCompiledMethod.CreateCompiledMethod(
+            "yield",
+            [0x8F, 0xA7, 0x00, 0x7C], // Primitive 167
+            new SArray(),
+            0, 0, 167));
+        instanceMethodCount++;
+        
+        // terminateActive
+        // activeProcess terminate
+        var terminateActiveLiterals = SArray.From(SSymbol.Intern("terminate"));
+        processorSchedulerClass.AddMethod("terminateActive", SCompiledMethod.CreateCompiledMethod(
+            "terminateActive",
+            [0x01, 0xD0, 0x7C], // Push activeProcess, send terminate, return
+            terminateActiveLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] ProcessorScheduler: {instanceMethodCount} instance methods installed");
         }
     }
     
@@ -1744,7 +1871,7 @@ public static class KernelMethodsInstaller
         
         // Abstract methods - subclasses must implement
         // next
-        streamClass.AddMethod("next", new SCompiledMethod(
+        streamClass.AddMethod("next", SCompiledMethod.CreateCompiledMethod(
             "next",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -1752,7 +1879,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // nextPut:
-        streamClass.AddMethod("nextPut:", new SCompiledMethod(
+        streamClass.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethod(
             "nextPut:",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -1760,7 +1887,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // atEnd
-        streamClass.AddMethod("atEnd", new SCompiledMethod(
+        streamClass.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethod(
             "atEnd",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
             SArray.From(SSymbol.Intern("subclassResponsibility")),
@@ -1768,7 +1895,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // nextPutAll:
-        streamClass.AddMethod("nextPutAll:", new SCompiledMethod(
+        streamClass.AddMethod("nextPutAll:", SCompiledMethod.CreateCompiledMethod(
             "nextPutAll:",
             [0x10, 0x8F, 0x00, 0x02, 0x70, 0x11, 0xE1, 0xF7, 0x10, 0x7C], // aCollection do: [:each | self nextPut: each]. ^aCollection
             SArray.From(SSymbol.Intern("do:"), SSymbol.Intern("nextPut:")),
@@ -1805,7 +1932,7 @@ public static class KernelMethodsInstaller
         }
         
         // nextPut:
-        writeStreamClass.AddMethod("nextPut:", new SCompiledMethod(
+        writeStreamClass.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethod(
             "nextPut:",
             [0x00, 0x01, 0x76, 0xB0, 0x60, 0x01, 0x10, 0xC1, 0x60, 0x76, 0xB0, 0x60, 0x10, 0x7C],
             SArray.From(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("at:put:")),
@@ -1813,7 +1940,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // position - return current position
-        writeStreamClass.AddMethod("position", new SCompiledMethod(
+        writeStreamClass.AddMethod("position", SCompiledMethod.CreateCompiledMethod(
             "position",
             [0x01, 0x7C], // ^position
             SArray.From(SSymbol.Intern("position")),
@@ -1821,7 +1948,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // space - write a space character
-        writeStreamClass.AddMethod("space", new SCompiledMethod(
+        writeStreamClass.AddMethod("space", SCompiledMethod.CreateCompiledMethod(
             "space",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 32)
             SArray.From(
@@ -1833,7 +1960,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // cr - write a carriage return
-        writeStreamClass.AddMethod("cr", new SCompiledMethod(
+        writeStreamClass.AddMethod("cr", SCompiledMethod.CreateCompiledMethod(
             "cr",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 13)
             SArray.From(
@@ -1845,7 +1972,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // tab - write a tab character
-        writeStreamClass.AddMethod("tab", new SCompiledMethod(
+        writeStreamClass.AddMethod("tab", SCompiledMethod.CreateCompiledMethod(
             "tab",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 9)
             SArray.From(
@@ -1857,7 +1984,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // contents
-        writeStreamClass.AddMethod("contents", new SCompiledMethod(
+        writeStreamClass.AddMethod("contents", SCompiledMethod.CreateCompiledMethod(
             "contents",
             [0x00, 0x76, 0x01, 0xF0, 0x7C], // collection copyFrom: 1 to: position
             SArray.From(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("copyFrom:to:")),
@@ -1886,7 +2013,7 @@ public static class KernelMethodsInstaller
         }
         
         // next - read and advance position
-        readStreamClass.AddMethod("next", new SCompiledMethod(
+        readStreamClass.AddMethod("next", SCompiledMethod.CreateCompiledMethod(
             "next",
             [0x01, 0x01, 0x76, 0xB0, 0x60, // position := position + 1
              0x00, 0x01, 0xC1, 0x7C], // ^collection at: position
@@ -1898,7 +2025,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // peek - look at next element without advancing
-        readStreamClass.AddMethod("peek", new SCompiledMethod(
+        readStreamClass.AddMethod("peek", SCompiledMethod.CreateCompiledMethod(
             "peek",
             [0x01, 0x00, 0xC2, 0xB5, 0x9D, 0x02, 0x73, 0x7C, // position >= collection size ifTrue: [^nil]
              0x00, 0x01, 0x76, 0xB0, 0xC1, 0x7C], // ^collection at: position + 1
@@ -1912,7 +2039,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // position - return current position
-        readStreamClass.AddMethod("position", new SCompiledMethod(
+        readStreamClass.AddMethod("position", SCompiledMethod.CreateCompiledMethod(
             "position",
             [0x01, 0x7C], // ^position
             SArray.From(SSymbol.Intern("position")),
@@ -1920,7 +2047,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // position: - set position
-        readStreamClass.AddMethod("position:", new SCompiledMethod(
+        readStreamClass.AddMethod("position:", SCompiledMethod.CreateCompiledMethod(
             "position:",
             [0x10, 0x61, 0x10, 0x7C], // position := anInteger. ^anInteger
             SArray.From(SSymbol.Intern("position")),
@@ -1928,7 +2055,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // skip: - advance position by n
-        readStreamClass.AddMethod("skip:", new SCompiledMethod(
+        readStreamClass.AddMethod("skip:", SCompiledMethod.CreateCompiledMethod(
             "skip:",
             [0x01, 0x10, 0xB0, 0x61, 0x70, 0x7C], // position := position + n. ^self
             SArray.From(SSymbol.Intern("position")),
@@ -1936,7 +2063,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // upTo: - read elements up to a delimiter
-        readStreamClass.AddMethod("upTo:", new SCompiledMethod(
+        readStreamClass.AddMethod("upTo:", SCompiledMethod.CreateCompiledMethod(
             "upTo:",
             [0x41, 0xD0, 0x68, // result := OrderedCollection new
              0x70, 0xD2, 0x9C, 0xAC, 0x12, // [self atEnd not] whileTrue:
@@ -1955,7 +2082,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // atEnd - check if at end of stream
-        readStreamClass.AddMethod("atEnd", new SCompiledMethod(
+        readStreamClass.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethod(
             "atEnd",
             [0x01, 0x00, 0xC2, 0xB5, 0x7C], // ^position >= collection size
             SArray.From(
@@ -2003,11 +2130,11 @@ public static class KernelMethodsInstaller
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Installing BlockContext instance methods: #value, #value:, #value:value:, #whileTrue:, #whileFalse:");
+            Console.WriteLine("[COLD START] Installing BlockContext instance methods: #value, #value:, #value:value:, #fork, #newProcess");
         }
         
         // value - primitive 81
-        blockContextClass.AddMethod("value", new SCompiledMethod(
+        blockContextClass.AddMethod("value", SCompiledMethod.CreateCompiledMethod(
             "value",
             [0x8F, 0x51, 0x00, 0x7C], // Primitive 81
             new SArray(),
@@ -2015,7 +2142,7 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // value: - primitive 81
-        blockContextClass.AddMethod("value:", new SCompiledMethod(
+        blockContextClass.AddMethod("value:", SCompiledMethod.CreateCompiledMethod(
             "value:",
             [0x8F, 0x51, 0x01, 0x7C], // Primitive 81 with 1 arg
             new SArray(),
@@ -2023,11 +2150,46 @@ public static class KernelMethodsInstaller
         instanceMethodCount++;
         
         // value:value: - primitive 81
-        blockContextClass.AddMethod("value:value:", new SCompiledMethod(
+        blockContextClass.AddMethod("value:value:", SCompiledMethod.CreateCompiledMethod(
             "value:value:",
             [0x8F, 0x51, 0x02, 0x7C], // Primitive 81 with 2 args
             new SArray(),
             2, 0, 81));
+        instanceMethodCount++;
+        
+        // fork
+        // self newProcess resume
+        var forkLiterals = SArray.From(
+            SSymbol.Intern("newProcess"),
+            SSymbol.Intern("resume"));
+        blockContextClass.AddMethod("fork", SCompiledMethod.CreateCompiledMethod(
+            "fork",
+            [0x70, 0xD0,     // Push self, send newProcess
+             0xD1, 0x7C],    // Send resume, return
+            forkLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        // newProcess
+        // ^Process forContext: [self value. Processor terminateActive] priority: Processor activePriority
+        var newProcessLiterals = SArray.From(
+            SystemDictionary.ProcessClass,
+            SSymbol.Intern("forContext:priority:"),
+            SSymbol.Intern("value"),
+            SystemDictionary.LookupGlobal("Processor"),
+            SSymbol.Intern("terminateActive"),
+            SSymbol.Intern("activePriority"));
+        blockContextClass.AddMethod("newProcess", SCompiledMethod.CreateCompiledMethod(
+            "newProcess",
+            [0x8F, 0x89, 0x00,  // Create block context (primitive 137)
+             0x06,              // Block size
+             0x70, 0xD2,        // self value
+             0x87,              // Pop
+             0xC3, 0xD4, 0x7D,  // Processor terminateActive, blockReturn
+             0xC3, 0xD5,        // Processor activePriority
+             0xC0, 0xF1, 0x7C], // Process forContext:priority:, return
+            newProcessLiterals,
+            0, 0));
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -2051,7 +2213,7 @@ public static class KernelMethodsInstaller
         var scannerClass = SystemDictionary.ScannerClass;
         if (scannerClass != null)
         {
-            scannerClass.AddMethod("new", new SCompiledMethod(
+            scannerClass.AddMethod("new", SCompiledMethod.CreateCompiledMethod(
                 "new",
                 [0x70, 0xCB, 0x7C], // self basicNew
                 SArray.From(SSymbol.Intern("basicNew")),
@@ -2062,7 +2224,7 @@ public static class KernelMethodsInstaller
         var parserClass = SystemDictionary.ParserClass;
         if (parserClass != null)
         {
-            parserClass.AddMethod("new", new SCompiledMethod(
+            parserClass.AddMethod("new", SCompiledMethod.CreateCompiledMethod(
                 "new",
                 [0x70, 0xCB, 0x7C], // self basicNew
                 SArray.From(SSymbol.Intern("basicNew")),
@@ -2073,7 +2235,7 @@ public static class KernelMethodsInstaller
         var encoderClass = SystemDictionary.EncoderClass;
         if (encoderClass != null)
         {
-            encoderClass.AddMethod("new", new SCompiledMethod(
+            encoderClass.AddMethod("new", SCompiledMethod.CreateCompiledMethod(
                 "new",
                 [0x70, 0xCB, 0x7C], // self basicNew
                 SArray.From(SSymbol.Intern("basicNew")),
@@ -2084,7 +2246,7 @@ public static class KernelMethodsInstaller
         var compilerClass = SystemDictionary.CompilerClass;
         if (compilerClass != null)
         {
-            compilerClass.AddMethod("new", new SCompiledMethod(
+            compilerClass.AddMethod("new", SCompiledMethod.CreateCompiledMethod(
                 "new",
                 [0x70, 0xCB, 0x7C], // self basicNew
                 SArray.From(SSymbol.Intern("basicNew")),
@@ -2096,7 +2258,7 @@ public static class KernelMethodsInstaller
         if (collectionClass != null)
         {
             // size - basic size method
-            collectionClass.AddMethod("size", new SCompiledMethod(
+            collectionClass.AddMethod("size", SCompiledMethod.CreateCompiledMethod(
                 "size",
                 [0x75, 0x68, // tally := 0
                  0x70, 0x8F, 0x00, 0x02, 0x68, 0x76, 0xB0, 0x69, 0xF7, // self do: [:each | tally := tally + 1]
@@ -2107,7 +2269,7 @@ public static class KernelMethodsInstaller
                 0, 1, 0));
             
             // isEmpty
-            collectionClass.AddMethod("isEmpty", new SCompiledMethod(
+            collectionClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
                 "isEmpty",
                 [0x70, 0xC0, 0x75, 0xB6, 0x7C], // ^self size = 0
                 SArray.From(
@@ -2117,7 +2279,7 @@ public static class KernelMethodsInstaller
                 0, 0, 0));
             
             // do: - abstract, subclasses must override
-            collectionClass.AddMethod("do:", new SCompiledMethod(
+            collectionClass.AddMethod("do:", SCompiledMethod.CreateCompiledMethod(
                 "do:",
                 [0x70, 0x21, 0xE0, 0x7C], // self subclassResponsibility
                 SArray.From(
@@ -2130,7 +2292,7 @@ public static class KernelMethodsInstaller
         if (sequenceableCollectionClass != null)
         {
             // first
-            sequenceableCollectionClass.AddMethod("first", new SCompiledMethod(
+            sequenceableCollectionClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
                 "first",
                 [0x70, 0x76, 0xC0, 0x7C], // ^self at: 1
                 SArray.From(
@@ -2139,7 +2301,7 @@ public static class KernelMethodsInstaller
                 0, 0, 0));
             
             // last
-            sequenceableCollectionClass.AddMethod("last", new SCompiledMethod(
+            sequenceableCollectionClass.AddMethod("last", SCompiledMethod.CreateCompiledMethod(
                 "last",
                 [0x70, 0x70, 0xC0, 0xC1, 0x7C], // ^self at: self size
                 SArray.From(
@@ -2148,7 +2310,7 @@ public static class KernelMethodsInstaller
                 0, 0, 0));
             
             // at:ifAbsent:
-            sequenceableCollectionClass.AddMethod("at:ifAbsent:", new SCompiledMethod(
+            sequenceableCollectionClass.AddMethod("at:ifAbsent:", SCompiledMethod.CreateCompiledMethod(
                 "at:ifAbsent:",
                 [0x10, 0x76, 0xB2, 0x9B, 0x08, // index < 1 ifTrue:
                  0x10, 0x70, 0xC0, 0xB4, 0x99, 0x03, // index > self size ifTrue:
@@ -2169,14 +2331,14 @@ public static class KernelMethodsInstaller
         if (orderedCollectionClass != null)
         {
             // add:
-            orderedCollectionClass.AddMethod("add:", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("add:", SCompiledMethod.CreateCompiledMethod(
                 "add:",
                 [0x70, 0x10, 0xE0, 0x10, 0x7C], // self addLast: anObject. ^anObject
                 SArray.From(SSymbol.Intern("addLast:")),
                 1, 0, 0));
             
             // addLast:
-            orderedCollectionClass.AddMethod("addLast:", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("addLast:", SCompiledMethod.CreateCompiledMethod(
                 "addLast:",
                 [0x00, 0x01, 0x76, 0xB0, 0x60, // lastIndex := lastIndex + 1
                  0x00, 0x01, 0x10, 0xE1, 0x10, 0x7C], // self at: lastIndex put: anObject. ^anObject
@@ -2186,7 +2348,7 @@ public static class KernelMethodsInstaller
                 1, 0, 0));
             
             // addAll:
-            orderedCollectionClass.AddMethod("addAll:", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("addAll:", SCompiledMethod.CreateCompiledMethod(
                 "addAll:",
                 [0x10, 0x8F, 0x00, 0x02, 0x70, 0x11, 0xE0, 0xF7, 0x10, 0x7C], // aCollection do: [:each | self add: each]. ^aCollection
                 SArray.From(
@@ -2195,7 +2357,7 @@ public static class KernelMethodsInstaller
                 1, 0, 0));
             
             // isEmpty
-            orderedCollectionClass.AddMethod("isEmpty", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
                 "isEmpty",
                 [0x00, 0x01, 0xB6, 0x7C], // firstIndex > lastIndex
                 SArray.From(
@@ -2205,7 +2367,7 @@ public static class KernelMethodsInstaller
                 0, 0, 0));
             
             // first
-            orderedCollectionClass.AddMethod("first", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
                 "first",
                 [0x70, 0x00, 0xC0, 0x7C], // self at: firstIndex
                 SArray.From(
@@ -2214,7 +2376,7 @@ public static class KernelMethodsInstaller
                 0, 0, 0));
             
             // last
-            orderedCollectionClass.AddMethod("last", new SCompiledMethod(
+            orderedCollectionClass.AddMethod("last", SCompiledMethod.CreateCompiledMethod(
                 "last",
                 [0x70, 0x00, 0xC0, 0x7C], // self at: lastIndex
                 SArray.From(
@@ -2228,7 +2390,7 @@ public static class KernelMethodsInstaller
         if (setClass != null)
         {
             // add:
-            setClass.AddMethod("add:", new SCompiledMethod(
+            setClass.AddMethod("add:", SCompiledMethod.CreateCompiledMethod(
                 "add:",
                 [0x70, 0x10, 0xE0, 0x68, // index := self findElementOrNil: anObject
                  0x00, 0x68, 0xC1, 0x73, 0xB6, 0x9D, 0x05, // (self at: index) isNil ifTrue:
@@ -2242,7 +2404,7 @@ public static class KernelMethodsInstaller
                 1, 1, 0));
             
             // includes:
-            setClass.AddMethod("includes:", new SCompiledMethod(
+            setClass.AddMethod("includes:", SCompiledMethod.CreateCompiledMethod(
                 "includes:",
                 [0x70, 0x10, 0xE0, 0x68, // index := self findElementOrNil: anObject
                  0x00, 0x68, 0xC1, 0x73, 0xB6, 0x9C, 0x7C], // ^(self at: index) isNil not
@@ -2257,7 +2419,7 @@ public static class KernelMethodsInstaller
         var readStreamClass = SystemDictionary.ReadStreamClass;
         if (readStreamClass != null)
         {
-            readStreamClass.AddMethod("on:", new SCompiledMethod(
+            readStreamClass.AddMethod("on:", SCompiledMethod.CreateCompiledMethod(
                 "on:",
                 [0x70, 0xCB, 0x68, // stream := self basicNew
                  0x68, 0x10, 0xE0, // stream collection: aCollection
@@ -2274,7 +2436,7 @@ public static class KernelMethodsInstaller
         var writeStreamClass = SystemDictionary.WriteStreamClass;
         if (writeStreamClass != null)
         {
-            writeStreamClass.AddMethod("on:", new SCompiledMethod(
+            writeStreamClass.AddMethod("on:", SCompiledMethod.CreateCompiledMethod(
                 "on:",
                 [0x70, 0xCB, 0x68, // stream := self basicNew
                  0x68, 0x10, 0xE0, // stream collection: aCollection
@@ -2291,7 +2453,7 @@ public static class KernelMethodsInstaller
         var symbolClass = SystemDictionary.SymbolClass;
         if (symbolClass != null)
         {
-            symbolClass.AddMethod("intern:", new SCompiledMethod(
+            symbolClass.AddMethod("intern:", SCompiledMethod.CreateCompiledMethod(
                 "intern:",
                 [0x10, 0xD0, 0x7C], // aString asSymbol
                 SArray.From(SSymbol.Intern("asSymbol")),
@@ -2302,11 +2464,37 @@ public static class KernelMethodsInstaller
         var characterClass = SystemDictionary.CharacterClass;
         if (characterClass != null)
         {
-            characterClass.AddMethod("value:", new SCompiledMethod(
+            characterClass.AddMethod("value:", SCompiledMethod.CreateCompiledMethod(
                 "value:",
                 [0x8F, 0xAA, 0x01, 0x7C], // Primitive 170 (Character from integer)
                 new SArray(),
                 1, 0, 170));
+        }
+        
+        // Install class methods for Process
+        var processClass = SystemDictionary.ProcessClass;
+        if (processClass != null)
+        {
+            // forContext:priority:
+            // | newProcess |
+            // newProcess := self new.
+            // newProcess suspendedContext: aContext.
+            // newProcess priority: anInteger.
+            // ^newProcess
+            var forContextLiterals = SArray.From(
+                SSymbol.Intern("new"),
+                SSymbol.Intern("suspendedContext:"),
+                SSymbol.Intern("priority:"));
+            processClass.AddMethod("forContext:priority:", SCompiledMethod.CreateCompiledMethod(
+                "forContext:priority:",
+                [0x70, 0xD0, 0x68,  // self new, store temp
+                 0x11, 0x10, 0xF1,  // push temp, push arg0, send suspendedContext:
+                 0x87,              // Pop
+                 0x11, 0x12, 0xF2,  // push temp, push arg1, send priority:
+                 0x87,              // Pop
+                 0x11, 0x7C],       // push temp, return
+                forContextLiterals,
+                2, 1));
         }
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)

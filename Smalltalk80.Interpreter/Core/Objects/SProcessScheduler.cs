@@ -23,13 +23,37 @@ public sealed class SProcessScheduler : SInstance
     private const int ActiveProcessIndex = 1;
     
     // Priority levels (Blue Book standard)
+    /// <summary>
+    /// The lowest system priority level (1).
+    /// </summary>
     public const int SystemRockBottomPriority = 1;
+    /// <summary>
+    /// The system background priority level (2).
+    /// </summary>
     public const int SystemBackgroundPriority = 2;
+    /// <summary>
+    /// The user background priority level (3).
+    /// </summary>
     public const int UserBackgroundPriority = 3;
+    /// <summary>
+    /// The user scheduling priority level (4).
+    /// </summary>
     public const int UserSchedulingPriority = 4;
+    /// <summary>
+    /// The user interrupt priority level (5).
+    /// </summary>
     public const int UserInterruptPriority = 5;
+    /// <summary>
+    /// The low I/O priority level (6).
+    /// </summary>
     public const int LowIOPriority = 6;
+    /// <summary>
+    /// The high I/O priority level (7).
+    /// </summary>
     public const int HighIOPriority = 7;
+    /// <summary>
+    /// The timing priority level (8).
+    /// </summary>
     public const int TimingPriority = 8;
     
     private readonly List<Queue<SProcess>>[] priorityQueues;
