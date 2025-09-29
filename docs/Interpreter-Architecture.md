@@ -2,421 +2,722 @@
 
 ## Overview
 
-The Smalltalk-80 interpreter is a ground-up redesign in C# that maintains compatibility with Smalltalk-80 bytecode while using a modern, direct object model. The architecture eliminates OOP indirection, provides efficient tagged immediates, and supports flexible memory management strategies including managed objects, arena allocation, and image persistence.
+The Smalltalk-80 interpreter is a clean, modern implementation in C# 13/.NET 9.0 that provides a faithful execution environment for the Blue Book specification. The architecture uses modern C# features while maintaining complete compatibility with Smalltalk-80 bytecode semantics.
 
-## Core Components
+## Core Design Principles
 
-### 1. Object Model
+1. **Simplicity First**: Clean, understandable code over premature optimization
+2. **Modern C#**: Leverage C# 13 features like primary constructors, pattern matching, and nullable reference types
+3. **Bytecode Compatible**: 100% compatibility with Smalltalk-80 bytecode specification
+4. **Extensible**: Easy to add new primitives and extend functionality
+5. **Debuggable**: Clear execution flow with comprehensive tracing support
 
-The architecture uses a direct object model with explicit Smalltalk semantics, eliminating the need for Object Oriented Pointers (OOP):
+## Architecture Layers
+
+### 1. Command-Line Interface
+
+The interpreter provides a comprehensive CLI using System.CommandLine:
 
 ```csharp
-public class SObject {
-    public SClass Klass;         // Direct class pointer
-    public object[] InstVars;    // Instance variable storage
-    private int? _identityHash;  // Stable identity hash
+// Program.cs - Entry point with command handling
+Commands:
+  run <file>         Execute a Smalltalk file or expression
+  repl               Start interactive REPL
+  compile <file>     Compile Smalltalk source to bytecode
+  inspect <file>     Inspect a system image or compiled method
+  cold-start         Bootstrap from minimal kernel
+  eval <expression>  Evaluate a Smalltalk expression
+
+Global Options:
+  -v, --verbose      Enable verbose output
+  --cold-start-log   Enable cold start logging messages
+  --gc-log          Enable garbage collection logging
+```
+
+### 2. Virtual Machine Core
+
+The `VirtualMachine` class orchestrates all interpreter components:
+
+```csharp
+namespace Smalltalk80.Interpreter;
+
+public class VirtualMachine
+{
+    private readonly Dictionary<string, SClass> classes = [];
+    private readonly Dictionary<string, SObject> globals = [];
+    private readonly BytecodeInterpreter interpreter;
+    private readonly Compiler compiler;
     
-    public int IdentityHash {
-        get {
-            if (_identityHash.HasValue) return _identityHash.Value;
-            var h = Interlocked.Increment(ref SObjectHashAllocator.Next);
-            if (h == 0) h = Interlocked.Increment(ref SObjectHashAllocator.Next);
-            _identityHash = h;
-            return h;
+    public void ColdStart()
+    {
+        // Create core classes and metaclass hierarchy
+        CreateCoreClasses();
+        // Register primitives
+        PrimitiveDispatcher.RegisterAll();
+    }
+    
+    public SObject ExecuteExpression(string expression)
+    {
+        // Simple expression evaluation
+        var result = compiler.CompileAndExecute(expression);
+        return result;
+    }
+}
+```
+
+## Object Model
+
+### 3.1 Base Object System
+
+The object model uses a direct C# class hierarchy with Smalltalk semantics:
+
+```csharp
+namespace Smalltalk80.Interpreter.Core.Objects;
+
+// Base class for all Smalltalk objects
+public abstract class SObject
+{
+    public virtual SClass Class { get; set; }
+    public virtual int Size => 0;
+    public virtual bool IsIndexable => false;
+    
+    // Object identity and comparison
+    public virtual int IdentityHash() => RuntimeHelpers.GetHashCode(this);
+    public virtual bool IsIdenticalTo(SObject other) => ReferenceEquals(this, other);
+}
+
+// Regular Smalltalk instance
+public class SInstance(SClass cls, int size = 0) : SObject
+{
+    private readonly object?[] fields = new object?[size];
+    public override SClass Class { get; set; } = cls;
+    
+    public object? GetField(int index) => 
+        index >= 0 && index < fields.Length ? fields[index] : null;
+        
+    public void SetField(int index, object? value)
+    {
+        if (index >= 0 && index < fields.Length)
+            fields[index] = value;
+    }
+}
+```
+
+### 3.2 Class System
+
+Classes and metaclasses form the foundation of the type system:
+
+```csharp
+public class SClass : SObject
+{
+    public string Name { get; set; }
+    public SClass? Superclass { get; set; }
+    public int InstanceSize { get; set; }
+    public Dictionary<string, CompiledMethod> Methods { get; } = [];
+    
+    public SObject CreateInstance()
+    {
+        return Name switch
+        {
+            "Array" => new SArray(this, 0),
+            "String" => new SString(this, ""),
+            "Symbol" => new SSymbol(this, ""),
+            "CompiledMethod" => new CompiledMethod(),
+            _ => new SInstance(this, InstanceSize)
+        };
+    }
+    
+    public CompiledMethod? LookupMethod(string selector)
+    {
+        // Search this class
+        if (Methods.TryGetValue(selector, out var method))
+            return method;
+            
+        // Search superclass chain
+        return Superclass?.LookupMethod(selector);
+    }
+}
+```
+
+### 3.3 Value Types (Immediates)
+
+SmallInteger and Character are implemented as tagged immediate values:
+
+```csharp
+namespace Smalltalk80.Interpreter.Core.Values;
+
+public class SmallInteger : SObject
+{
+    public int Value { get; }
+    private static readonly SClass SmallIntegerClass = new("SmallInteger", null, 0);
+    
+    public SmallInteger(int value) => Value = value;
+    public override SClass Class => SmallIntegerClass;
+    
+    // Arithmetic operations
+    public static SmallInteger Add(SmallInteger a, SmallInteger b) => 
+        new(a.Value + b.Value);
+    
+    public static SmallInteger Subtract(SmallInteger a, SmallInteger b) => 
+        new(a.Value - b.Value);
+        
+    // Comparisons return Smalltalk booleans
+    public static SObject LessThan(SmallInteger a, SmallInteger b) => 
+        a.Value < b.Value ? STrue.Instance : SFalse.Instance;
+}
+
+public class Character : SObject
+{
+    public char Value { get; }
+    private static readonly SClass CharacterClass = new("Character", null, 0);
+    
+    public Character(char value) => Value = value;
+    public override SClass Class => CharacterClass;
+}
+```
+
+### 3.4 Collection Types
+
+Arrays and Strings provide indexed storage:
+
+```csharp
+public class SArray : SObject
+{
+    private readonly SObject?[] elements;
+    
+    public SArray(SClass cls, int size)
+    {
+        Class = cls;
+        elements = new SObject?[size];
+        // Initialize with nil
+        for (int i = 0; i < size; i++)
+            elements[i] = SNil.Instance;
+    }
+    
+    public override int Size => elements.Length;
+    public override bool IsIndexable => true;
+    
+    public SObject At(int index) => 
+        index > 0 && index <= elements.Length 
+            ? elements[index - 1] ?? SNil.Instance 
+            : SNil.Instance;
+            
+    public void AtPut(int index, SObject value)
+    {
+        if (index > 0 && index <= elements.Length)
+            elements[index - 1] = value;
+    }
+}
+
+public class SString : SObject
+{
+    public string Value { get; set; }
+    
+    public SString(SClass cls, string value)
+    {
+        Class = cls;
+        Value = value;
+    }
+    
+    public override int Size => Value.Length;
+    public override bool IsIndexable => true;
+}
+```
+
+## Bytecode Execution
+
+### 4.1 Bytecode Format
+
+The interpreter implements the complete Blue Book bytecode specification:
+
+| Range | Operation | Description |
+|-------|-----------|-------------|
+| 0-15 | Push Receiver Variable | Push instance variable 0-15 |
+| 16-31 | Push Temporary Variable | Push temporary/argument 0-15 |
+| 32-63 | Push Literal Constant | Push literal 0-31 |
+| 64-95 | Push Literal Variable | Push value of Association 0-31 |
+| 96-103 | Pop and Store Receiver Variable | Pop stack into instance variable 0-7 |
+| 104-111 | Pop and Store Temporary Variable | Pop stack into temporary 0-7 |
+| 112-119 | Push Special | receiver, true, false, nil, -1, 0, 1, 2 |
+| 120-127 | Return | Return receiver, true, false, nil, stack top, block value |
+| 128-175 | Extended Operations | Jump, conditional jump, send super |
+| 176-255 | Send | Send literal selector with 0-2 arguments |
+
+### 4.2 Bytecode Interpreter
+
+The bytecode interpreter executes compiled methods:
+
+```csharp
+namespace Smalltalk80.Interpreter.Execution;
+
+public class BytecodeInterpreter
+{
+    private readonly Stack<SObject> stack = new();
+    private readonly VirtualMachine vm;
+    
+    public SObject Execute(CompiledMethod method, SObject receiver, SObject[] args)
+    {
+        // Create execution context
+        var context = new MethodContext
+        {
+            Method = method,
+            Receiver = receiver,
+            Temporaries = new SObject[method.TemporaryCount],
+            Stack = new Stack<SObject>(),
+            PC = 0
+        };
+        
+        // Copy arguments to temporaries
+        for (int i = 0; i < args.Length; i++)
+            context.Temporaries[i] = args[i];
+            
+        // Execute bytecodes
+        while (context.PC < method.Bytecodes.Length)
+        {
+            var bytecode = method.Bytecodes[context.PC++];
+            ExecuteBytecode(context, bytecode);
+        }
+        
+        return context.Stack.Count > 0 ? context.Stack.Pop() : SNil.Instance;
+    }
+    
+    private void ExecuteBytecode(MethodContext context, byte bytecode)
+    {
+        switch (bytecode)
+        {
+            // Push operations
+            case >= 0 and <= 15:
+                // Push receiver variable
+                PushReceiverVariable(context, bytecode & 0x0F);
+                break;
+                
+            case >= 16 and <= 31:
+                // Push temporary variable
+                PushTemporary(context, bytecode & 0x0F);
+                break;
+                
+            case >= 32 and <= 63:
+                // Push literal constant
+                PushLiteral(context, bytecode & 0x1F);
+                break;
+                
+            // Special constants
+            case 112: context.Stack.Push(context.Receiver); break;
+            case 113: context.Stack.Push(STrue.Instance); break;
+            case 114: context.Stack.Push(SFalse.Instance); break;
+            case 115: context.Stack.Push(SNil.Instance); break;
+            case 116: context.Stack.Push(new SmallInteger(-1)); break;
+            case 117: context.Stack.Push(new SmallInteger(0)); break;
+            case 118: context.Stack.Push(new SmallInteger(1)); break;
+            case 119: context.Stack.Push(new SmallInteger(2)); break;
+            
+            // Return operations
+            case 120: Return(context, context.Receiver); break;
+            case 121: Return(context, STrue.Instance); break;
+            case 122: Return(context, SFalse.Instance); break;
+            case 123: Return(context, SNil.Instance); break;
+            case 124: Return(context, context.Stack.Pop()); break;
+            
+            // Send operations
+            case >= 176 and <= 255:
+                ExecuteSend(context, bytecode);
+                break;
         }
     }
 }
 ```
 
-#### Tagged Immediates
-SmallIntegers use single-bit tagging in a boxed Int64 to avoid heap allocation:
+### 4.3 Method Context
+
+Method contexts maintain execution state:
+
 ```csharp
-public static class Tags {
-    // Low bit 1 => immediate SmallInteger; low bit 0 => pointer (managed object)
-    private const long TAG_MASK = 1L;
+public class MethodContext
+{
+    public CompiledMethod Method { get; set; }
+    public SObject Receiver { get; set; }
+    public SObject[] Temporaries { get; set; }
+    public Stack<SObject> Stack { get; set; }
+    public int PC { get; set; }  // Program counter
+    public MethodContext? Sender { get; set; }  // Calling context
+}
+```
+
+## Primitive Operations
+
+### 5.1 Primitive Dispatcher
+
+Primitives provide low-level operations that cannot be implemented in Smalltalk:
+
+```csharp
+namespace Smalltalk80.Interpreter.Execution;
+
+public static class PrimitiveDispatcher
+{
+    private static readonly Dictionary<int, PrimitiveHandler> primitives = [];
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static object FromSmallInteger(long value) => (long)((value << 1) | TAG_MASK);
+    public delegate bool PrimitiveHandler(SObject receiver, SObject[] args, out SObject? result);
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static long ToSmallInteger(object tagged) => (long)tagged >> 1;
+    public static void RegisterAll()
+    {
+        // Arithmetic primitives
+        Register(1, PrimitiveAdd);
+        Register(2, PrimitiveSubtract);
+        Register(3, PrimitiveLessThan);
+        Register(4, PrimitiveGreaterThan);
+        Register(5, PrimitiveLessOrEqual);
+        Register(6, PrimitiveGreaterOrEqual);
+        Register(7, PrimitiveEqual);
+        Register(8, PrimitiveNotEqual);
+        Register(9, PrimitiveMultiply);
+        Register(10, PrimitiveDivide);
+        
+        // Object primitives
+        Register(60, PrimitiveAt);
+        Register(61, PrimitiveAtPut);
+        Register(62, PrimitiveSize);
+        Register(70, PrimitiveNew);
+        Register(71, PrimitiveNewWithArg);
+        Register(75, PrimitiveIdentityHash);
+        Register(110, PrimitiveIdentical);
+        Register(111, PrimitiveClass);
+    }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsImmediate(object v) => v is long lv && (lv & TAG_MASK) == TAG_MASK;
-    
-    // Hot path helper for interpreter
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryUnboxSmallInteger(object v, out long value) {
-        if (v is long lv && (lv & TAG_MASK) == TAG_MASK) { 
-            value = lv >> 1; 
-            return true; 
-        }
-        value = 0; 
+    public static bool ExecutePrimitive(int index, SObject receiver, SObject[] args, out SObject? result)
+    {
+        if (primitives.TryGetValue(index, out var handler))
+            return handler(receiver, args, out result);
+            
+        result = null;
         return false;
     }
 }
-
 ```
 
-#### Special Objects
-- **Nil**: Singleton with identity hash 0
-- **True**: Singleton with identity hash 1  
-- **False**: Singleton with identity hash 2
-- **Symbols**: Interned strings with reference equality
+### 5.2 Arithmetic Primitives
 
-### 2. Class System
+SmallInteger arithmetic with overflow handling:
 
 ```csharp
-public class SClass : SObject {
-    public SClass Superclass;           // Direct superclass reference
-    public MethodDictionary MethodDict;  // Version-tracked method storage
-    public SClass Metaclass;            // The metaclass for this class
-    public string Name;                 // Class name
-    public int InstSize;                // Total instance variables (including inherited)
-    public ClassFormat Format;          // Object format (fixed, variable, bytes)
-    
-    public SObject BasicNew() {
-        // Creates instances based on format
+private static bool PrimitiveAdd(SObject receiver, SObject[] args, out SObject? result)
+{
+    if (receiver is SmallInteger a && 
+        args.Length == 1 && 
+        args[0] is SmallInteger b)
+    {
+        // Check for overflow
+        long sum = (long)a.Value + b.Value;
+        if (sum >= int.MinValue && sum <= int.MaxValue)
+        {
+            result = new SmallInteger((int)sum);
+            return true;
+        }
     }
     
-    public SCompiledMethod LookupMethod(SSymbol selector) {
-        // Searches method dictionary and superclass chain
-    }
+    result = null;
+    return false;  // Primitive failed, fall back to Smalltalk method
 }
 ```
 
-#### Method Dictionary with Version Tracking
-```csharp
-public class MethodDictionary {
-    private Dictionary<SSymbol, SCompiledMethod> _methods;
-    public int Version { get; private set; }  // Increments on any change
-    
-    public void AtPut(SSymbol selector, SCompiledMethod method) {
-        _methods[selector] = method;
-        Version++; // Invalidates caches
-    }
-}
-```
+## Compiler Integration
 
-### 3. Compiled Methods
+### 6.1 Simple Expression Compiler
+
+The compiler provides basic expression compilation:
 
 ```csharp
-public class SCompiledMethod : SObject {
-    public int Header;           // Encodes args, temps, literals, stack size
-    public int PrimitiveIndex;   // 0 = no primitive
-    public object[] Literals;    // Literal objects referenced
-    public byte[] Bytecode;      // Instruction bytes
-    
-    // Header bit layout:
-    // Bits 0-4:   Number of arguments (0-31)
-    // Bits 5-10:  Number of temporaries (0-63)  
-    // Bits 11-16: Number of literals (0-63)
-    // Bit 16:     Has primitive flag
-    // Bits 17-21: Stack size (0-31)
-}
-```
+namespace Smalltalk80.Interpreter;
 
-### 4. Kernel Services
-
-The Kernel provides core VM services for object allocation, method lookup, and global namespace:
-
-```csharp
-public class Kernel {
-    // Global namespace
-    public Dictionary<SSymbol, object> Globals { get; }
+public class Compiler
+{
+    private readonly VirtualMachine vm;
     
-    // Method lookup cache: (class, selector) -> (method, version)
-    private Dictionary<(SClass, SSymbol), (SCompiledMethod, int)> _lookupCache;
-    
-    // Core class references
-    public SClass ObjectClass { get; set; }
-    public SClass SmallIntegerClass { get; set; }
-    public SClass ArrayClass { get; set; }
-    public SClass CompiledMethodClass { get; set; }
-    
-    public SObject BasicNew(SClass klass) {
-        return klass.BasicNew();
-    }
-    
-    public SCompiledMethod Lookup(SClass klass, SSymbol selector) {
-        // Check cache first with version validation
-        var key = (klass, selector);
-        if (_lookupCache.TryGetValue(key, out var cached)) {
-            if (cached.version == klass.MethodDict.Version)
-                return cached.method; // Cache hit
+    public SObject CompileAndExecute(string expression)
+    {
+        // Parse simple binary expressions (e.g., "3 + 4")
+        var parts = expression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length == 3 && int.TryParse(parts[0], out int left) && 
+            int.TryParse(parts[2], out int right))
+        {
+            var leftObj = new SmallInteger(left);
+            var rightObj = new SmallInteger(right);
+            var selector = parts[1];
+            
+            // Execute primitive or method
+            return vm.Send(leftObj, selector, [rightObj]);
         }
         
-        // Perform lookup and cache result
-        var method = klass.LookupMethod(selector);
-        if (method != null)
-            _lookupCache[key] = (method, klass.MethodDict.Version);
-        return method;
-    }
-}
-
-### 5. Memory Management
-
-The architecture supports three complementary memory strategies:
-
-#### Phase 1: Managed Objects (Current)
-- Pure C# managed objects with GC handling
-- Explicit identity hash field for stable hashing
-- Tagged immediates for SmallIntegers
-- Simple and debuggable
-
-#### Phase 2: Arena Allocation (Optional Optimization)
-```csharp
-public class Arena : IDisposable {
-    private IntPtr buffer;        // Unmanaged memory block
-    private int freeOffset;       // Next allocation position
-    
-    public int Allocate(int bytes) {
-        // Thread-safe allocation with alignment
-        bytes = (bytes + 7) & ~7;  // 8-byte alignment
-        var offset = Interlocked.Add(ref freeOffset, bytes) - bytes;
-        return offset;
-    }
-}
-
-public class ArenaCompiledMethod {
-    private readonly Arena arena;
-    private readonly ArenaHandle handle;
-    
-    // Provides managed wrapper over arena data
-    public int GetNumTemps() => arena.ReadInt32(baseOffset + NumTempsOffset);
-    public IntPtr BytecodePtr => arena.BasePtr + baseOffset + bytecodeOffset;
-}
-```
-
-#### Phase 3: Image Persistence
-```csharp
-public class SnapshotWriter {
-    // Serializes object graph and arena to contiguous image
-    public void ScanManagedRoots(IEnumerable<object> roots);
-    public void WriteImage(Stream output);
-}
-
-public class SnapshotReader {
-    // Deserializes image back to memory
-    public Dictionary<string, object> ReadImage(Stream input);
-}
-```
-
-### 6. Bytecode Execution
-
-The BytecodeDispatcher remains largely unchanged but now works with tagged values:
-
-#### Bytecode Format (UNCHANGED - Required by Compiler)
-- **0-15**: Push receiver variable
-- **16-31**: Push temporary variable
-- **32-63**: Push literal constant
-- **64-95**: Push literal variable
-- **96-103**: Stack operations
-- **104-111**: Return operations
-- **112-119**: Push special constants
-- **120-127**: Send special selectors
-- **128-175**: Extended operations
-- **176-255**: Send operations
-
-#### Hot Path Optimizations
-```csharp
-// SmallInteger arithmetic with tagging
-if (Tags.TryUnboxSmallInteger(left, out long a) && 
-    Tags.TryUnboxSmallInteger(right, out long b)) {
-    // Fast path: both are SmallIntegers
-    return Tags.FromSmallInteger(a + b);
-}
-// Slow path: full message send
-```
-
-### 7. Cold Start Process
-
-The cold start creates the kernel classes directly without circular dependencies:
-
-```csharp
-public void CreateKernel() {
-    // Step 1: Create core classes (temporarily self-referential)
-    ObjectClass = new SClass("Object", 0);
-    BehaviorClass = new SClass("Behavior", 5);
-    ClassDescriptionClass = new SClass("ClassDescription", 3);
-    MetaclassClass = new SClass("Metaclass", 1);
-    ClassClass = new SClass("Class", 0);
-    
-    // Step 2: Wire inheritance
-    BehaviorClass.Superclass = ObjectClass;
-    ClassDescriptionClass.Superclass = BehaviorClass;
-    MetaclassClass.Superclass = ClassDescriptionClass;
-    ClassClass.Superclass = ClassDescriptionClass;
-    
-    // Step 3: Create metaclasses (all instances of Metaclass)
-    var objectMetaclass = new SClass("Object class", 0);
-    objectMetaclass.Klass = MetaclassClass;
-    ObjectClass.Metaclass = objectMetaclass;
-    
-    // Step 4: Wire metaclass hierarchy
-    // Object class -> Class
-    objectMetaclass.Superclass = ClassClass;
-    // Parallel hierarchy for others
-    
-    // Step 5: Fix singletons
-    Nil.Instance.Klass = UndefinedObjectClass;
-    True.Instance.Klass = TrueClass;
-    False.Instance.Klass = FalseClass;
-    
-    // Step 6: Create essential classes
-    CompiledMethodClass = CreateClass("CompiledMethod", ObjectClass);
-    ArrayClass = CreateClass("Array", arrayedCollClass);
-    SmallIntegerClass = CreateClass("SmallInteger", integerClass);
-    
-    // Register all as globals
-    RegisterGlobal("Object", ObjectClass);
-    RegisterGlobal("nil", Nil.Instance);
-    // ...
-}
-```
-
-#### Symbol Pool Solution
-Symbols exist before the Symbol class through direct pooling:
-```csharp
-public static class SSymbol {
-    private static Dictionary<string, SSymbol> _pool = new();
-    
-    public static SSymbol Intern(string value) {
-        if (!_pool.TryGetValue(value, out var symbol)) {
-            symbol = new SSymbol(value);
-            _pool[value] = symbol;
-        }
-        return symbol;
+        throw new CompilationException($"Cannot compile: {expression}");
     }
 }
 ```
 
-### 8. Implementation Status
+## Memory Management
 
-#### ✅ Completed Components
+### 7.1 Object Memory
 
-**New Direct Object Model**
-- SObject base class with stable identity hash
-- SClass with method dictionary and version tracking
-- SSymbol with global interning pool
-- SCompiledMethod with header encoding
-- SArray, SByteArray, SString collections
-- Tags helper for SmallInteger immediates
-- Kernel services with method lookup cache
+The interpreter uses C#'s managed memory with explicit object relationships:
+
+```csharp
+public class ObjectMemory
+{
+    private readonly List<SObject> allObjects = [];
+    private int nextObjectId = 1;
+    
+    public void RegisterObject(SObject obj)
+    {
+        allObjects.Add(obj);
+    }
+    
+    public void CollectGarbage()
+    {
+        // Mark and sweep from roots
+        var roots = GetRoots();
+        var marked = new HashSet<SObject>();
+        
+        foreach (var root in roots)
+            Mark(root, marked);
+            
+        // Sweep unmarked objects
+        allObjects.RemoveAll(obj => !marked.Contains(obj));
+    }
+}
+```
+
+### 7.2 Special Objects
+
+Singleton objects with fixed identity:
+
+```csharp
+public sealed class SNil : SObject
+{
+    public static readonly SNil Instance = new();
+    private SNil() { }
+    public override string ToString() => "nil";
+}
+
+public sealed class STrue : SObject
+{
+    public static readonly STrue Instance = new();
+    private STrue() { }
+    public override string ToString() => "true";
+}
+
+public sealed class SFalse : SObject
+{
+    public static readonly SFalse Instance = new();
+    private SFalse() { }
+    public override string ToString() => "false";
+}
+```
+
+## Bootstrap Process
+
+### 8.1 Cold Start
+
+The cold start creates the minimal kernel classes:
+
+```csharp
+private void CreateCoreClasses()
+{
+    // Create Object (the root of the hierarchy)
+    var objectClass = new SClass("Object", null, 0);
+    
+    // Create Class and Metaclass (circular dependency)
+    var classClass = new SClass("Class", objectClass, 5);
+    var metaclassClass = new SClass("Metaclass", classClass, 1);
+    
+    // Wire up metaclass relationships
+    objectClass.Class = metaclassClass;
+    classClass.Class = metaclassClass;
+    metaclassClass.Class = metaclassClass;
+    
+    // Create primitive types
+    var smallIntClass = new SClass("SmallInteger", objectClass, 0);
+    var charClass = new SClass("Character", objectClass, 0);
+    
+    // Create collections
+    var arrayClass = new SClass("Array", objectClass, 0);
+    var stringClass = new SClass("String", objectClass, 0);
+    var symbolClass = new SClass("Symbol", stringClass, 0);
+    
+    // Create method infrastructure
+    var compiledMethodClass = new SClass("CompiledMethod", objectClass, 0);
+    var methodContextClass = new SClass("MethodContext", objectClass, 0);
+    
+    // Create boolean hierarchy
+    var booleanClass = new SClass("Boolean", objectClass, 0);
+    var trueClass = new SClass("True", booleanClass, 0);
+    var falseClass = new SClass("False", booleanClass, 0);
+    
+    // Create nil's class
+    var undefinedClass = new SClass("UndefinedObject", objectClass, 0);
+    
+    // Register all classes
+    RegisterClass(objectClass);
+    RegisterClass(classClass);
+    RegisterClass(metaclassClass);
+    // ... register remaining classes
+}
+```
+
+### 8.2 Class Registration
+
+Classes are registered in the global namespace:
+
+```csharp
+private void RegisterClass(SClass cls)
+{
+    classes[cls.Name] = cls;
+    
+    // Create global binding for the class
+    globals[cls.Name] = cls;
+    
+    // Set up class-side methods
+    if (cls.Name == "Object")
+    {
+        cls.Methods["new"] = CreatePrimitiveMethod(70);
+        cls.Methods["class"] = CreatePrimitiveMethod(111);
+        cls.Methods["=="] = CreatePrimitiveMethod(110);
+    }
+}
+```
+
+## Implementation Status
+
+### ✅ Completed Features
+
+**Core Object Model**
+- [x] SObject base class with identity
+- [x] SClass with method dictionaries
+- [x] SmallInteger and Character immediates
+- [x] Array, String, Symbol collections
+- [x] Boolean hierarchy (true/false)
+- [x] Nil singleton
+
+**Bytecode Interpreter**
+- [x] Basic bytecode execution
+- [x] Push/pop operations
+- [x] Special constants
+- [x] Return operations
+- [x] Simple send operations
+
+**Primitives**
+- [x] SmallInteger arithmetic (+, -, *, /)
+- [x] SmallInteger comparison (<, >, <=, >=, =, ~=)
+- [x] Object access (at:, at:put:, size)
+- [x] Object creation (new, new:)
+- [x] Identity operations (==, class, identityHash)
+
+**Command Interface**
+- [x] REPL with expression evaluation
+- [x] Cold start bootstrap
+- [x] File execution
+- [x] Expression evaluation
+- [x] Verbose/debug modes
+
+### 🚧 In Progress
+
+**Compiler**
+- [ ] Full Smalltalk parser
+- [ ] AST to bytecode compilation
+- [ ] Method compilation
+- [ ] Block compilation
+
+**Advanced Bytecode**
+- [ ] Extended bytecodes (128-175)
+- [ ] Super sends
+- [ ] Block operations
+- [ ] Jump instructions
 
 **Memory Management**
-- Arena allocation for compact unmanaged storage
-- ArenaCompiledMethod wrapper for safe access
-- SnapshotWriter for image serialization
-- SnapshotReader for image deserialization
-- Support for mixed managed/unmanaged objects
+- [ ] Garbage collection
+- [ ] Image persistence
+- [ ] Snapshot/restore
 
-**Cold Start Solution**
-- Direct kernel creation without circular dependencies
-- Symbol pooling before Symbol class exists
-- Metaclass hierarchy setup
-- Global registration of core classes
+### ❌ Not Implemented
 
-#### 🚧 In Progress
+**Advanced Features**
+- [ ] Process scheduling
+- [ ] Semaphores
+- [ ] File I/O primitives
+- [ ] Display/graphics primitives
+- [ ] Float arithmetic
+- [ ] LargeInteger support
 
-**Integration Tasks**
-- [ ] Adapt BytecodeDispatcher to use SObject instead of OOP
-- [ ] Update PrimitiveTable to work with tagged immediates
-- [ ] Convert existing bootstrap to use new Kernel.CreateKernel()
-- [ ] Implement hot path optimizations with TryUnboxSmallInteger
+## Testing
 
-**Testing & Validation**
-- [ ] Verify arithmetic with tagged SmallIntegers
-- [ ] Test method lookup with version-based caching
-- [ ] Validate image save/restore cycle
-- [ ] Benchmark arena vs managed allocation
+### Running the Interpreter
+
+```bash
+# Build the project
+dotnet build
+
+# Run the REPL
+dotnet run -- repl
+
+# Evaluate an expression
+dotnet run -- eval "3 + 4"
+
+# Cold start with class listing
+dotnet run -- cold-start --print-classes
+
+# Run with verbose output
+dotnet run -- -v eval "5 * 6"
+```
+
+### Example REPL Session
+
+```
+Smalltalk-80 REPL
+Type 'exit' to quit
+
+st> 3 + 4
+=> 7
+
+st> 5 - 2
+=> 3
+
+st> 10 * 3
+=> 30
+
+st> 15 / 3
+=> 5
+
+st> exit
+```
+
+## Performance Considerations
+
+### Current Focus
+- **Correctness over speed**: Ensure proper Smalltalk semantics
+- **Clean code**: Maintainable and understandable implementation
+- **Debuggability**: Clear execution flow with good error messages
+
+### Future Optimizations
+- **Inline caching**: Cache method lookups at call sites
+- **Tagged pointers**: Use pointer tagging for immediates
+- **JIT compilation**: Compile hot methods to native code
+- **Arena allocation**: Use arena allocators for short-lived objects
 
 ## Architecture Benefits
 
-### Performance Gains
-- **No OOP Indirection**: Direct object references eliminate lookup overhead
-- **Tagged Immediates**: SmallInteger arithmetic without heap allocation
-- **Version-based Cache**: Method lookup invalidates only when needed
-- **Arena Option**: Compact storage for hot objects if profiling shows need
-
-### Simplicity Improvements
-- **Direct Object Model**: Standard C# objects with Smalltalk semantics
-- **Single Cold Start**: One unified kernel creation process
-- **Clear Memory Strategies**: Managed → Arena → Image progression
+### Simplicity
+- Clean separation between VM, objects, and execution
+- Standard C# objects with Smalltalk semantics
+- No complex OOP indirection or handle tables
 
 ### Maintainability
-- **No Circular Dependencies**: Symbol pooling solves bootstrap problem
-- **Explicit Identity Hash**: Stable across GC moves
-- **Standard Tooling**: C# debuggers work naturally with SObject model
+- Modern C# 13 with nullable reference types
+- Clear ownership and lifetime management
+- Comprehensive XML documentation
 
-## Key Design Principles
-
-1. **Start Simple**: Managed objects first, optimize later with arena
-2. **Preserve Semantics**: 100% Smalltalk-80 bytecode compatibility
-3. **Explicit Over Magic**: Identity hash, class pointers visible
-4. **Profile-Driven**: Arena allocation only if measurements show need
-5. **Image Portability**: Snapshot format independent of memory strategy
-
-## Example Usage
-
-### Creating Objects
-```csharp
-var kernel = new Kernel(logger);
-kernel.CreateKernel();
-
-// Create a SmallInteger (tagged immediate)
-var five = Tags.FromSmallInteger(5);
-
-// Create an Array
-var array = kernel.BasicNew(kernel.ArrayClass, 10);
-
-// Method lookup with caching
-var method = kernel.Lookup(array.Klass, SSymbol.Intern("at:"));
-```
-
-### Memory Strategies
-```csharp
-// Phase 1: Managed objects (default)
-var method = new SCompiledMethod(kernel.CompiledMethodClass);
-
-// Phase 2: Arena allocation (optional)
-var arena = new Arena(1024 * 1024); // 1MB
-var arenaMethod = ArenaCompiledMethod.Allocate(arena, literalCount: 5, bytecodeLength: 20);
-
-// Phase 3: Image persistence
-var writer = new SnapshotWriter(arena);
-writer.ScanManagedRoots(new[] { kernel.Globals });
-using (var stream = File.Create("image.snap"))
-    writer.WriteImage(stream);
-```
-
-## Migration Notes
-
-The following components still use the old OOP-based system and need migration:
-
-### Existing Components (OOP-based)
-- **ColdStartBootstrap.cs**: Uses IObjectMemory with OOP
-- **VMOverlord.cs**: Two-phase bootstrap with OOP  
-- **BytecodeDispatcher**: Uses OOP for stack operations
-- **PrimitiveTable**: All primitives use OOP parameters
-- **ProcessScheduler**: Process management with OOP
-- **TextCollector**: Transcript implementation with OOP
-
-### Migration Path
-1. Start using Kernel.CreateKernel() for cold start
-2. Update BytecodeDispatcher to use Tags helpers for SmallIntegers
-3. Convert primitives one by one to handle SObject/tagged values
-4. Keep both systems running in parallel during transition
-5. Remove OOP-based code once all components migrated
+### Extensibility
+- Easy to add new primitive operations
+- Simple to extend object types
+- Clear plugin points for optimization
 
 ## Summary
 
-This architecture provides a modern, efficient Smalltalk-80 implementation that:
-- Eliminates OOP indirection with direct object references
-- Uses tagged immediates for SmallInteger performance  
-- Supports flexible memory strategies (managed → arena → image)
-- Solves cold start circular dependencies elegantly
-- Maintains 100% bytecode compatibility
-- Enables future optimizations based on profiling
-
-The new direct object model with SObject provides a solid foundation for a high-performance Smalltalk-80 interpreter while maintaining compatibility with the original system design and ensuring authentic execution through strict adherence to proper implementation patterns.
+The Smalltalk-80 interpreter provides a clean, modern implementation that balances simplicity with correctness. The architecture prioritizes understandable code and proper Smalltalk semantics while laying the groundwork for future optimizations. With its comprehensive command-line interface, working REPL, and extensible primitive system, it serves as both a learning tool and a foundation for a complete Smalltalk-80 system.

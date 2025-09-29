@@ -1,0 +1,202 @@
+namespace Smalltalk80.Interpreter.Config;
+
+/// <summary>
+/// Runtime options for controlling various aspects of the Smalltalk-80 interpreter.
+/// These options can be set via command-line flags and environment variables.
+/// </summary>
+public sealed class RuntimeOptions
+{
+    /// <summary>
+    /// Gets or sets whether to enable [COLD START] logging messages.
+    /// Controlled by the --cold-start-log command-line flag.
+    /// </summary>
+    public bool EnableColdStartLogging { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to enable [GC] garbage collection logging messages.
+    /// Controlled by the --gc-log command-line flag.
+    /// </summary>
+    public bool EnableGCLogging { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to enable [SEND] message send logging.
+    /// Controlled by the --log-sends command-line flag.
+    /// Logs all message sends with receiver class, selector, and arguments.
+    /// </summary>
+    public bool EnableSendLogging { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether verbose logging is enabled.
+    /// Controlled by the -v or --verbose command-line flag.
+    /// </summary>
+    public bool VerboseLogging { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the GC trace level.
+    /// Controlled by SMALLTALK_GC_TRACE environment variable.
+    /// </summary>
+    public GCTraceLevel GCTraceLevel { get; set; } = GCTraceLevel.Off;
+    
+    /// <summary>
+    /// Gets or sets whether to skip phase 3 of bootstrap.
+    /// </summary>
+    public bool SkipPhase3 { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to skip extended library loading.
+    /// </summary>
+    public bool SkipExtended { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the path to the extended library JSON file.
+    /// </summary>
+    public string? ExtendedLibraryPath { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the path to the phase 3 file.
+    /// </summary>
+    public string? Phase3Path { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the path to the system image file.
+    /// </summary>
+    public string? ImagePath { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the path for saving snapshots.
+    /// </summary>
+    public string? SnapshotPath { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the path to the bootstrap file.
+    /// </summary>
+    public string? BootstrapPath { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the class name to print or inspect.
+    /// </summary>
+    public string? ClassToPrint { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to list all bootstrap classes.
+    /// </summary>
+    public bool ListBootstrapClasses { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to list phase 2 classes.
+    /// </summary>
+    public bool ListPhase2Classes { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to test critical methods.
+    /// </summary>
+    public bool TestCriticalMethods { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to test class creation.
+    /// </summary>
+    public bool TestClassCreation { get; set; }
+    
+    /// <summary>
+    /// Gets or sets whether to test OOP bug.
+    /// </summary>
+    public bool TestOOPBug { get; set; }
+    
+    /// <summary>
+    /// Creates a new instance with default options.
+    /// </summary>
+    public static RuntimeOptions Default => new()
+    {
+        EnableColdStartLogging = false,
+        EnableGCLogging = false,
+        EnableSendLogging = false,
+        VerboseLogging = false,
+        GCTraceLevel = GCTraceLevel.Off,
+        SkipPhase3 = false,
+        SkipExtended = false
+    };
+    
+    /// <summary>
+    /// Creates runtime options from environment variables.
+    /// </summary>
+    public static RuntimeOptions FromEnvironment()
+    {
+        var options = Default;
+        
+        // Check SMALLTALK_GC_TRACE
+        var gcTrace = Environment.GetEnvironmentVariable("SMALLTALK_GC_TRACE");
+        if (!string.IsNullOrEmpty(gcTrace))
+        {
+            options.GCTraceLevel = gcTrace.ToLowerInvariant() switch
+            {
+                "off" => GCTraceLevel.Off,
+                "basic" => GCTraceLevel.Basic,
+                "deep" => GCTraceLevel.Deep,
+                _ => GCTraceLevel.Off
+            };
+            options.EnableGCLogging = options.GCTraceLevel != GCTraceLevel.Off;
+        }
+        
+        // Check LOGGING__LOGLEVEL__DEFAULT
+        var logLevel = Environment.GetEnvironmentVariable("LOGGING__LOGLEVEL__DEFAULT");
+        if (!string.IsNullOrEmpty(logLevel))
+        {
+            options.VerboseLogging = logLevel.ToLowerInvariant() switch
+            {
+                "debug" => true,
+                "trace" => true,
+                "verbose" => true,
+                _ => false
+            };
+        }
+        
+        return options;
+    }
+    
+    /// <summary>
+    /// Creates a copy of the current options.
+    /// </summary>
+    /// <returns>A new RuntimeOptions instance with the same settings.</returns>
+    public RuntimeOptions Clone() => new()
+    {
+        EnableColdStartLogging = EnableColdStartLogging,
+        EnableGCLogging = EnableGCLogging,
+        EnableSendLogging = EnableSendLogging,
+        VerboseLogging = VerboseLogging,
+        GCTraceLevel = GCTraceLevel,
+        SkipPhase3 = SkipPhase3,
+        SkipExtended = SkipExtended,
+        ExtendedLibraryPath = ExtendedLibraryPath,
+        Phase3Path = Phase3Path,
+        ImagePath = ImagePath,
+        SnapshotPath = SnapshotPath,
+        BootstrapPath = BootstrapPath,
+        ClassToPrint = ClassToPrint,
+        ListBootstrapClasses = ListBootstrapClasses,
+        ListPhase2Classes = ListPhase2Classes,
+        TestCriticalMethods = TestCriticalMethods,
+        TestClassCreation = TestClassCreation,
+        TestOOPBug = TestOOPBug
+    };
+}
+
+/// <summary>
+/// Garbage collection trace levels.
+/// </summary>
+public enum GCTraceLevel
+{
+    /// <summary>
+    /// No GC tracing.
+    /// </summary>
+    Off,
+    
+    /// <summary>
+    /// Basic GC tracing (start/end, object counts).
+    /// </summary>
+    Basic,
+    
+    /// <summary>
+    /// Deep GC tracing (includes object traversal details).
+    /// </summary>
+    Deep
+}

@@ -71,8 +71,8 @@ initialize
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    "Open the file. Mode can be 'r', 'w', 'rw', or 'a'. Primitive 98."
-    <primitive: 98>
+    "Open the file. Mode can be 'r', 'w', 'rw', or 'a'. Primitive 156 (was 98)."
+    <primitive: 156>
     "Primitive failed - perform fallback initialization"
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
@@ -83,16 +83,16 @@ openNamed: aFileName mode: modeString
     ^self!
 
 close
-    "Close the file. Primitive 99."
-    <primitive: 99>
+    "Close the file. Primitive 157 (was 99)."
+    <primitive: 157>
     "Primitive failed - perform fallback close"
     fileHandle ifNotNil: [
         self primClose: fileHandle.
         fileHandle _ nil]!
 
 delete
-    "Delete the file. Primitive 100."
-    <primitive: 100>
+    "Delete the file. Primitive 158 (was 100)."
+    <primitive: 158>
     "Primitive failed - perform fallback delete"
     self close.
     self primDelete: fileName! !
@@ -100,20 +100,20 @@ delete
 !WindowsFile methodsFor: 'accessing'!
 
 size
-    "Answer the size of the file in bytes. Primitive 92."
-    <primitive: 92>
+    "Answer the size of the file in bytes. Primitive 152 (was 92)."
+    <primitive: 152>
     "Primitive failed - perform fallback"
     ^self primSize: fileHandle!
 
 position
-    "Answer the current file position. Primitive 93."
-    <primitive: 93>
+    "Answer the current file position. Primitive 153 (was 93)."
+    <primitive: 153>
     "Primitive failed - perform fallback"
     ^position!
 
 position: anInteger
-    "Set the file position. Primitive 94."
-    <primitive: 94>
+    "Set the file position. Primitive 154 (was 94)."
+    <primitive: 154>
     "Primitive failed - perform fallback"
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger!
@@ -147,8 +147,8 @@ next
     ^byte!
 
 nextByte
-    "Read a single byte. Primitive 91."
-    <primitive: 91>
+    "Read a single byte. Primitive 151 (was 91)."
+    <primitive: 151>
     "Primitive failed - perform fallback without local variables"
     position _ position + 1.
     ^self primAt: fileHandle position: position - 1!
@@ -186,8 +186,8 @@ nextPut: aByte
     ^aByte!
 
 nextPutByte: aByte
-    "Write a single byte. Primitive 90."
-    <primitive: 90>
+    "Write a single byte. Primitive 150 (was 90)."
+    <primitive: 150>
     "Primitive failed - perform fallback"
     self primAt: fileHandle position: position put: aByte.
     position _ position + 1.
@@ -248,43 +248,43 @@ setToEnd
 !WindowsFile methodsFor: 'private-primitives'!
 
 primOpen: aFileName mode: modeString
-    "Private - Primitive 98: Open file"
-    <primitive: 98>
+    "Private - Primitive 156 (was 98): Open file"
+    <primitive: 156>
     self primitiveFailed!
 
 primClose: handle
-    "Private - Primitive 99: Close file"
-    <primitive: 99>
+    "Private - Primitive 157 (was 99): Close file"
+    <primitive: 157>
     self primitiveFailed!
 
 primDelete: aFileName
-    "Private - Primitive 100: Delete file"
-    <primitive: 100>
+    "Private - Primitive 158 (was 100): Delete file"
+    <primitive: 158>
     self primitiveFailed!
 
 primAt: handle position: pos
-    "Private - Primitive 91: Read byte at position"
-    <primitive: 91>
+    "Private - Primitive 151 (was 91): Read byte at position"
+    <primitive: 151>
     self primitiveFailed!
 
 primAt: handle position: pos put: byte
-    "Private - Primitive 90: Write byte at position"
-    <primitive: 90>
+    "Private - Primitive 150 (was 90): Write byte at position"
+    <primitive: 150>
     self primitiveFailed!
 
 primSize: handle
-    "Private - Primitive 92: Get file size"
-    <primitive: 92>
+    "Private - Primitive 152 (was 92): Get file size"
+    <primitive: 152>
     self primitiveFailed!
 
 primPosition: handle
-    "Private - Primitive 93: Get file position"
-    <primitive: 93>
+    "Private - Primitive 153 (was 93): Get file position"
+    <primitive: 153>
     self primitiveFailed!
 
 primSetPosition: handle to: pos
-    "Private - Primitive 94: Set file position"
-    <primitive: 94>
+    "Private - Primitive 154 (was 94): Set file position"
+    <primitive: 154>
     self primitiveFailed! !
 
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
@@ -371,8 +371,8 @@ directoryNamed: dirName
     ^self class on: (self fullNameFor: dirName)!
 
 entries
-    "Answer a collection of file and directory names. Primitive 95."
-    <primitive: 95>
+    "Answer a collection of file and directory names. Primitive 155 (was 95)."
+    <primitive: 155>
     "Primitive failed - perform fallback"
     ^self primLookup: pathName pattern: '*'!
 
@@ -400,8 +400,8 @@ includesKey: fileName
 !WindowsFileDirectory methodsFor: 'private-primitives'!
 
 primLookup: dirPath pattern: pattern
-    "Private - Primitive 95: Directory lookup"
-    <primitive: 95>
+    "Private - Primitive 155 (was 95): Directory lookup"
+    <primitive: 155>
     "Return empty collection if primitive fails"
     ^OrderedCollection new! !
 
