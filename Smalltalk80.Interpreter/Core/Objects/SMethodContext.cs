@@ -1,6 +1,7 @@
 namespace Smalltalk80.Interpreter.Core.Objects;
 
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Represents a method context (activation record) in the Smalltalk-80 virtual machine.
@@ -34,6 +35,11 @@ public sealed class SMethodContext : SInstance
     private const int ReceiverIndex = 4;
     // Note: Arguments and temporaries start at index 5
     // The stack follows the temporaries
+
+    /// <summary>
+    /// Gets this context as a STMethodContextCorrect layout for type-safe access.
+    /// </summary>
+    private STMethodContextCorrect AsLayout() => new STMethodContextCorrect(SObjectRef.FromObject(this));
     
     /// <summary>
     /// Legacy constructor for backward compatibility - DEPRECATED.
@@ -72,55 +78,67 @@ public sealed class SMethodContext : SInstance
         
         // Initialize fixed fields
         SetSender(null);
-        SetInstructionPointer(SmallInteger.From(0));
-        SetStackPointer(SmallInteger.From(5 + tempSize)); // Stack starts after fixed fields (5) and temporaries
+        SetInstructionPointer(SObjectRef.FromSmallInteger(0));
+        SetStackPointer(SObjectRef.FromSmallInteger(5 + tempSize)); // Stack starts after fixed fields (5) and temporaries
         SetMethod(method);
         SetReceiver(receiver);
-        
+
         // Copy arguments into temporaries area
         for (int i = 0; i < arguments.Length && i < method.NumArgs; i++)
         {
-            SetTemporary(i, arguments[i]);
+            SetTemporary(i, SObjectRef.FromObject(arguments[i]));
         }
-        
+
         // Initialize remaining temporaries to nil
         for (int i = arguments.Length; i < tempSize; i++)
         {
-            SetTemporary(i, SNil.Instance);
+            SetTemporary(i, SObjectRef.Nil);
         }
-        
+
         // Initialize stack area to nil
         for (int i = 0; i < stackSize; i++)
         {
-            SetInstanceVariable(5 + tempSize + i, SNil.Instance);
+            SetInstanceVariable(5 + tempSize + i, SObjectRef.Nil);
         }
     }
     
     /// <summary>
     /// Gets or sets the sender context.
     /// </summary>
-    public SObject? Sender
+    public SObjectRef Sender
     {
-        get => GetInstanceVariable(SenderIndex);
-        set => SetInstanceVariable(SenderIndex, value ?? SNil.Instance);
+        get => AsLayout().Sender;
+        set
+        {
+            var layout = AsLayout();
+            layout.Sender = value;
+        }
     }
-    
+
     /// <summary>
     /// Gets or sets the instruction pointer as a SmallInteger.
     /// </summary>
-    public SmallInteger InstructionPointer
+    public int InstructionPointer
     {
-        get => (SmallInteger)(GetInstanceVariable(InstructionPointerIndex) ?? SmallInteger.From(0));
-        set => SetInstanceVariable(InstructionPointerIndex, value);
+        get => AsLayout().IP;
+        set
+        {
+            var layout = AsLayout();
+            layout.IP = value;
+        }
     }
-    
+
     /// <summary>
     /// Gets or sets the stack pointer as a SmallInteger.
     /// </summary>
-    public SmallInteger StackPointer
+    public int StackPointer
     {
-        get => (SmallInteger)(GetInstanceVariable(StackPointerIndex) ?? SmallInteger.From(0));
-        set => SetInstanceVariable(StackPointerIndex, value);
+        get => AsLayout().SP;
+        set
+        {
+            var layout = AsLayout();
+            layout.SP = value;
+        }
     }
     
     /// <summary>
@@ -128,40 +146,53 @@ public sealed class SMethodContext : SInstance
     /// </summary>
     public SCompiledMethod Method
     {
-        get 
+        get
         {
-            var value = GetInstanceVariable(MethodIndex);
-            if (value == null)
-                throw new InvalidOperationException("Method is null");
+            var valueRef = AsLayout().Method;
+            if (!valueRef.IsHeapObject)
+                throw new InvalidOperationException("Method is not a heap object");
+            var value = valueRef.AsObject();
             if (value is not SCompiledMethod compiledMethod)
-                throw new InvalidOperationException($"Method is not a CompiledMethod, it's a {value.GetType().Name}: {value}");
+                throw new InvalidOperationException($"Method is not a CompiledMethod, it's a {value!.GetType().Name}: {value}");
             return compiledMethod;
         }
     }
-    
+
     /// <summary>
     /// Gets the receiver of the message.
     /// </summary>
-    public SObject Receiver
+    public SObjectRef Receiver
     {
-        get => GetInstanceVariable(ReceiverIndex) ?? SNil.Instance;
+        get => AsLayout().Receiver;
     }
     
     /// <summary>
     /// Sets the sender context.
     /// </summary>
-    private void SetSender(SObject? sender) => SetInstanceVariable(SenderIndex, sender ?? SNil.Instance);
-    
+    private void SetSender(SObject? sender)
+    {
+        var layout = AsLayout();
+        layout.Sender = sender != null ? SObjectRef.FromObject(sender) : SObjectRef.Nil;
+    }
+
     /// <summary>
     /// Sets the instruction pointer.
     /// </summary>
-    private void SetInstructionPointer(SmallInteger ip) => SetInstanceVariable(InstructionPointerIndex, ip);
-    
+    private void SetInstructionPointer(SObjectRef ip)
+    {
+        var layout = AsLayout();
+        layout.InstructionPointer = ip;
+    }
+
     /// <summary>
     /// Sets the stack pointer.
     /// </summary>
-    private void SetStackPointer(SmallInteger sp) => SetInstanceVariable(StackPointerIndex, sp);
-    
+    private void SetStackPointer(SObjectRef sp)
+    {
+        var layout = AsLayout();
+        layout.StackPointer = sp;
+    }
+
     /// <summary>
     /// Sets the method.
     /// </summary>
@@ -169,80 +200,72 @@ public sealed class SMethodContext : SInstance
     {
         if (method == null)
             throw new ArgumentNullException(nameof(method), "Method cannot be null");
-        SetInstanceVariable(MethodIndex, method);
-        
+        var layout = AsLayout();
+        layout.Method = SObjectRef.FromObject(method);
+
         // Verify it was set correctly
-        var stored = GetInstanceVariable(MethodIndex);
-        if (stored != method)
+        var stored = layout.Method;
+        if (!stored.IsHeapObject || stored.AsObject() != method)
             throw new InvalidOperationException($"Failed to store method. Expected {method}, got {stored}");
     }
-    
+
     /// <summary>
     /// Sets the receiver.
     /// </summary>
-    private void SetReceiver(SObject receiver) => SetInstanceVariable(ReceiverIndex, receiver);
+    private void SetReceiver(SObject receiver)
+    {
+        var layout = AsLayout();
+        layout.Receiver = SObjectRef.FromObject(receiver);
+    }
     
     /// <summary>
     /// Gets a temporary variable by index.
     /// </summary>
-    public SObject GetTemporary(int index)
+    public SObjectRef GetTemporary(int index)
     {
-        return GetInstanceVariable(5 + index) ?? SNil.Instance;
+        return AsLayout().GetTemporary(index);
     }
-    
+
     /// <summary>
     /// Sets a temporary variable by index.
     /// </summary>
-    public void SetTemporary(int index, SObject value)
+    public void SetTemporary(int index, SObjectRef value)
     {
-        SetInstanceVariable(5 + index, value);
+        AsLayout().SetTemporary(index, value);
     }
-    
+
     /// <summary>
     /// Pushes a value onto the stack.
     /// </summary>
-    public void Push(SObject value)
+    public void Push(SObjectRef value)
     {
-        var sp = StackPointer.Value;
-        SetInstanceVariable((int)sp, value);
-        SetStackPointer(SmallInteger.From(sp + 1));
+        AsLayout().Push(value);
     }
-    
+
     /// <summary>
     /// Pops a value from the stack.
     /// </summary>
-    public SObject Pop()
+    public SObjectRef Pop()
     {
-        var sp = StackPointer.Value - 1;
-        if (sp < Method.NumArgs + Method.NumTemps)
-        {
-            throw new InvalidOperationException("Stack underflow");
-        }
-        SetStackPointer(SmallInteger.From(sp));
-        return GetInstanceVariable((int)sp) ?? SNil.Instance;
+        return AsLayout().Pop();
     }
-    
+
     /// <summary>
     /// Gets the value at the top of the stack without removing it.
     /// </summary>
-    public SObject Top()
+    public SObjectRef Top()
     {
-        var sp = StackPointer.Value - 1;
-        if (sp < Method.NumArgs + Method.NumTemps)
-        {
-            throw new InvalidOperationException("Stack is empty");
-        }
-        return GetInstanceVariable((int)sp) ?? SNil.Instance;
+        return AsLayout().Top();
     }
-    
+
     /// <summary>
     /// Gets the current stack depth.
     /// </summary>
     public int StackDepth()
     {
-        var sp = StackPointer.Value;
+        var sp = StackPointer;
         var baseStack = Method.NumArgs + Method.NumTemps;
-        return (int)(sp - baseStack);
+        return sp - baseStack;
     }
     
     /// <summary>
@@ -294,7 +317,7 @@ public sealed class SMethodContext : SInstance
     public override string ToDisplayString()
     {
         var methodName = Method?.Selector ?? "unknown";
-        var className = Receiver?.Class?.Name ?? "Unknown";
+        var className = Receiver.AsObject()?.Class?.Name ?? "Unknown";
         return $"{className}>>{methodName}";
     }
 }

@@ -2,6 +2,7 @@ namespace Smalltalk80.Interpreter.Memory;
 
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Config;
 
 /// <summary>
@@ -303,14 +304,18 @@ public sealed class GarbageCollector
         {
             EnqueueForTracing(instance.Class);
         }
-        
+
         // Trace instance variables
         for (var i = 0; i < instance.InstanceVariableCount; i++)
         {
-            var value = instance.GetInstanceVariable(i);
-            if (value != null && !value.IsImmediate)
+            var valueRef = instance.GetInstanceVariable(i);
+            if (!valueRef.IsNil && valueRef.IsHeapObject)
             {
-                EnqueueForTracing(value);
+                var valueObj = valueRef.AsObject();
+                if (valueObj != null && !valueObj.IsImmediate)
+                {
+                    EnqueueForTracing(valueObj);
+                }
             }
         }
     }
@@ -345,7 +350,7 @@ public sealed class GarbageCollector
         // With the minimal SOA, these should all be reachable through SystemDictionary
         var criticalObjects = new List<(string name, SObject? obj)>
         {
-            ("nil", SNil.Instance),
+            ("nil", SObjectRef.Nil.AsObject()),
             ("true", STrue.Instance),
             ("false", SFalse.Instance),
             ("Behavior class", SystemDictionary.BehaviorClass),

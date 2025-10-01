@@ -75,9 +75,9 @@ public static class Program
             "--print-class",
             description: "Print a specific class and its methods");
         
-        var listBootstrapClassesOption = new Option<bool>(
-            "--list-bootstrap-classes",
-            description: "List all bootstrap classes");
+        var listColdStartClassesOption = new Option<bool>(
+            "--list-cold-start-classes",
+            description: "List all cold start classes");
         
         var listClassesOption = new Option<bool>(
             "--list-classes",
@@ -108,9 +108,9 @@ public static class Program
             "--validate-bytecode",
             description: "Validate bytecode execution through method contexts");
         
-        var bootstrapOption = new Option<FileInfo?>(
-            "--bootstrap",
-            description: "Bootstrap from specific file");
+        var coldStartOption = new Option<FileInfo?>(
+            "--cold-start",
+            description: "Cold start from specific file");
 
         // Add all global options
         rootCommand.AddGlobalOption(verboseOption);
@@ -124,7 +124,7 @@ public static class Program
         rootCommand.AddGlobalOption(showMnemonicsOption);
         rootCommand.AddGlobalOption(validateGCOption);
         rootCommand.AddGlobalOption(printClassOption);
-        rootCommand.AddGlobalOption(listBootstrapClassesOption);
+        rootCommand.AddGlobalOption(listColdStartClassesOption);
         rootCommand.AddGlobalOption(listClassesOption);
         rootCommand.AddGlobalOption(inspectClassOption);
         rootCommand.AddGlobalOption(enhancedPrintOption);
@@ -132,7 +132,7 @@ public static class Program
         rootCommand.AddGlobalOption(testClassCreationOption);
         rootCommand.AddGlobalOption(testOOPBugOption);
         rootCommand.AddGlobalOption(validateBytecodeOption);
-        rootCommand.AddGlobalOption(bootstrapOption);
+        rootCommand.AddGlobalOption(coldStartOption);
 
         // Run command
         var runCommand = new Command("run", "Execute a Smalltalk file or expression");
@@ -214,9 +214,23 @@ public static class Program
     {
         // Update runtime options from parsed command line arguments
         // Check each token in the parsed result
-        foreach (var token in parseResult.Tokens)
+        var tokens = parseResult.Tokens.ToList();
+        for (var i = 0; i < tokens.Count; i++)
         {
-            if (token.Value == "--cold-start-log")
+            var token = tokens[i];
+
+            // Handle options with values
+            if (token.Value == "--print-class" && i + 1 < tokens.Count)
+            {
+                RuntimeOptions.ClassToPrint = tokens[i + 1].Value;
+                i++; // Skip the next token since we consumed it
+            }
+            else if (token.Value == "--inspect-class" && i + 1 < tokens.Count)
+            {
+                RuntimeOptions.ClassToInspect = tokens[i + 1].Value;
+                i++; // Skip the next token since we consumed it
+            }
+            else if (token.Value == "--cold-start-log")
             {
                 RuntimeOptions.EnableColdStartLogging = true;
             }
@@ -240,9 +254,9 @@ public static class Program
             {
                 RuntimeOptions.ValidateGC = true;
             }
-            else if (token.Value == "--list-classes" || token.Value == "--list-bootstrap-classes")
+            else if (token.Value == "--list-classes" || token.Value == "--list-cold-start-classes")
             {
-                RuntimeOptions.ListBootstrapClasses = true;
+                RuntimeOptions.ListColdStartClasses = true;
             }
             else if (token.Value == "--test-critical-methods")
             {
@@ -275,13 +289,13 @@ public static class Program
             else if (token.Value?.StartsWith("--debug") == true)
             {
                 // Handle --debug=mode or following value
-                var debugMode = token.Value.Contains('=') 
-                    ? token.Value.Split('=')[1] 
+                var debugMode = token.Value.Contains('=')
+                    ? token.Value.Split('=')[1]
                     : "all"; // Default to all if no specific mode
                 DebugOptions.SetDebugMode(debugMode);
             }
         }
-        
+
         // Initialize logger factory with the updated options
         LoggerFactory = LoggingConfiguration.CreateLoggerFactory(RuntimeOptions.VerboseLogging);
     }
@@ -438,10 +452,7 @@ public static class Program
     private static void HandleError(Exception ex)
     {
         Console.Error.WriteLine($"Error: {ex.Message}");
-        if (VerboseMode)
-        {
-            Console.Error.WriteLine(ex.StackTrace);
-        }
+        Console.Error.WriteLine($"\nFull exception details:\n{ex}");
         Environment.Exit(1);
     }
 }

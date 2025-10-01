@@ -45,7 +45,7 @@ public abstract class PrimitiveDispatcherBase
             var result = left.Value + right.Value;
             if (result >= SmallInteger.MinValue && result <= SmallInteger.MaxValue)
             {
-                return SmallInteger.From(result);
+                return SObjectRef.FromSmallInteger(result).AsObject();
             }
             // Overflow - would return LargeInteger
         }
@@ -64,7 +64,7 @@ public abstract class PrimitiveDispatcherBase
             var result = left.Value - right.Value;
             if (result >= SmallInteger.MinValue && result <= SmallInteger.MaxValue)
             {
-                return SmallInteger.From(result);
+                return SObjectRef.FromSmallInteger(result).AsObject();
             }
             // Overflow - would return LargeInteger
         }
@@ -167,7 +167,7 @@ public abstract class PrimitiveDispatcherBase
             var result = left.Value * right.Value;
             if (result >= SmallInteger.MinValue && result <= SmallInteger.MaxValue)
             {
-                return SmallInteger.From(result);
+                return SObjectRef.FromSmallInteger(result).AsObject();
             }
             // Overflow - would return LargeInteger
         }
@@ -189,7 +189,7 @@ public abstract class PrimitiveDispatcherBase
             var result = Math.Floor((double)left.Value / right.Value);
             if (result >= SmallInteger.MinValue && result <= SmallInteger.MaxValue)
             {
-                return SmallInteger.From((int)result);
+                return SObjectRef.FromSmallInteger((int)result).AsObject();
             }
         }
         return null;
@@ -212,7 +212,7 @@ public abstract class PrimitiveDispatcherBase
             {
                 result += Math.Abs(right.Value);
             }
-            return SmallInteger.From(result);
+            return SObjectRef.FromSmallInteger(result).AsObject();
         }
         return null;
     }
@@ -229,7 +229,7 @@ public abstract class PrimitiveDispatcherBase
             if (right.Value == 0) return null; // Division by zero
             
             var result = left.Value / right.Value;
-            return SmallInteger.From(result);
+            return SObjectRef.FromSmallInteger(result).AsObject();
         }
         return null;
     }
@@ -246,7 +246,7 @@ public abstract class PrimitiveDispatcherBase
             if (right.Value == 0) return null; // Division by zero
             
             var result = Math.Truncate((double)left.Value / right.Value);
-            return SmallInteger.From((int)result);
+            return SObjectRef.FromSmallInteger((int)result).AsObject();
         }
         return null;
     }
@@ -260,7 +260,7 @@ public abstract class PrimitiveDispatcherBase
         
         if (receiver is SmallInteger left && arguments[0] is SmallInteger right)
         {
-            return SmallInteger.From(left.Value & right.Value);
+            return SObjectRef.FromSmallInteger(left.Value & right.Value).AsObject();
         }
         return null;
     }
@@ -274,7 +274,7 @@ public abstract class PrimitiveDispatcherBase
         
         if (receiver is SmallInteger left && arguments[0] is SmallInteger right)
         {
-            return SmallInteger.From(left.Value | right.Value);
+            return SObjectRef.FromSmallInteger(left.Value | right.Value).AsObject();
         }
         return null;
     }
@@ -288,7 +288,7 @@ public abstract class PrimitiveDispatcherBase
         
         if (receiver is SmallInteger left && arguments[0] is SmallInteger right)
         {
-            return SmallInteger.From(left.Value ^ right.Value);
+            return SObjectRef.FromSmallInteger(left.Value ^ right.Value).AsObject();
         }
         return null;
     }
@@ -304,11 +304,11 @@ public abstract class PrimitiveDispatcherBase
         {
             if (shift.Value >= 0)
             {
-                return SmallInteger.From(value.Value << (int)shift.Value);
+                return SObjectRef.FromSmallInteger(value.Value << (int)shift.Value).AsObject();
             }
             else
             {
-                return SmallInteger.From(value.Value >> (int)(-shift.Value));
+                return SObjectRef.FromSmallInteger(value.Value >> (int)(-shift.Value)).AsObject();
             }
         }
         return null;
@@ -492,7 +492,7 @@ public abstract class PrimitiveDispatcherBase
             var idx = (int)index.Value - 1; // Smalltalk indices are 1-based
             if (idx >= 0 && idx < array.Size)
             {
-                return array.At(idx) ?? SNil.Instance;
+                return array.At(idx) ;
             }
         }
         return null;
@@ -526,8 +526,8 @@ public abstract class PrimitiveDispatcherBase
         
         return receiver switch
         {
-            SArray array => SmallInteger.From(array.Size),
-            SString str => SmallInteger.From(str.Value.Length),
+            SArray array => SObjectRef.FromSmallInteger(array.Size).AsObject(),
+            SString str => SObjectRef.FromSmallInteger(str.Value.Length).AsObject(),
             _ => null
         };
     }
@@ -585,7 +585,7 @@ public abstract class PrimitiveDispatcherBase
         if (receiver is SInstance instance && arguments[0] is SmallInteger index)
         {
             var idx = (int)index.Value - 1; // Smalltalk indices are 1-based
-            return instance.GetIndexedVariable(idx);
+            return instance.GetIndexedVariable(idx).AsObject();
         }
         return null;
     }
@@ -600,7 +600,7 @@ public abstract class PrimitiveDispatcherBase
         if (receiver is SInstance instance && arguments[0] is SmallInteger index)
         {
             var idx = (int)index.Value - 1; // Smalltalk indices are 1-based
-            instance.SetIndexedVariable(idx, arguments[1]);
+            instance.SetIndexedVariable(idx, SObjectRef.FromObject(arguments[1]));
             return arguments[1];
         }
         return null;

@@ -197,29 +197,29 @@ public static class PrimitiveDispatcher
     {
         if (receiver is SmallInteger a && args.Length > 0 && args[0] is SmallInteger b)
         {
-            return SmallInteger.From(a.Value & b.Value);
+            return SObjectRef.FromSmallInteger(a.Value & b.Value).AsObject();
         }
         return null;
     }
-    
+
     private static SObject? IntegerBitOr(SObject receiver, SObject[] args)
     {
         if (receiver is SmallInteger a && args.Length > 0 && args[0] is SmallInteger b)
         {
-            return SmallInteger.From(a.Value | b.Value);
+            return SObjectRef.FromSmallInteger(a.Value | b.Value).AsObject();
         }
         return null;
     }
-    
+
     private static SObject? IntegerBitXor(SObject receiver, SObject[] args)
     {
         if (receiver is SmallInteger a && args.Length > 0 && args[0] is SmallInteger b)
         {
-            return SmallInteger.From(a.Value ^ b.Value);
+            return SObjectRef.FromSmallInteger(a.Value ^ b.Value).AsObject();
         }
         return null;
     }
-    
+
     private static SObject? IntegerBitShift(SObject receiver, SObject[] args)
     {
         if (receiver is SmallInteger a && args.Length > 0 && args[0] is SmallInteger b)
@@ -227,11 +227,11 @@ public static class PrimitiveDispatcher
             var shift = b.Value;
             if (shift > 0)
             {
-                return SmallInteger.From(a.Value << shift);
+                return SObjectRef.FromSmallInteger(a.Value << shift).AsObject();
             }
             else
             {
-                return SmallInteger.From(a.Value >> -shift);
+                return SObjectRef.FromSmallInteger(a.Value >> -shift).AsObject();
             }
         }
         return null;
@@ -383,7 +383,7 @@ public static class PrimitiveDispatcher
     {
         if (receiver is SArray array && args.Length > 0 && args[0] is SmallInteger index)
         {
-            return array.At(index.Value) ?? SNil.Instance;
+            return array.At(index.Value) ;
         }
         return null;
     }
@@ -402,11 +402,11 @@ public static class PrimitiveDispatcher
     {
         if (receiver is SArray array)
         {
-            return SmallInteger.From(array.Size);
+            return SObjectRef.FromSmallInteger(array.Size).AsObject();
         }
         return null;
     }
-    
+
     // String primitives
     private static SObject? StringAt(SObject receiver, SObject[] args)
     {
@@ -416,47 +416,47 @@ public static class PrimitiveDispatcher
         }
         return null;
     }
-    
+
     private static SObject? StringAtPut(SObject receiver, SObject[] args)
     {
         // Strings are immutable in our implementation
         return null;
     }
-    
+
     private static SObject? StringSize(SObject receiver, SObject[] args)
     {
         if (receiver is SString str)
         {
-            return SmallInteger.From(str.Length);
+            return SObjectRef.FromSmallInteger(str.Length).AsObject();
         }
         return null;
     }
-    
+
     // Object primitives
     private static SObject? ObjectAt(SObject receiver, SObject[] args)
     {
         if (receiver is SInstance instance && args.Length > 0 && args[0] is SmallInteger index)
         {
-            return instance.GetInstanceVariable(index.Value - 1) ?? SNil.Instance;
+            return instance.GetInstanceVariable(index.Value - 1).AsObject();
         }
         return null;
     }
-    
+
     private static SObject? ObjectAtPut(SObject receiver, SObject[] args)
     {
         if (receiver is SInstance instance && args.Length >= 2 && args[0] is SmallInteger index)
         {
-            instance.SetInstanceVariable(index.Value - 1, args[1]);
+            instance.SetInstanceVariable(index.Value - 1, SObjectRef.FromObject(args[1]));
             return args[1];
         }
         return null;
     }
-    
+
     private static SObject? ObjectSize(SObject receiver, SObject[] args)
     {
         if (receiver is SInstance instance)
         {
-            return SmallInteger.From(instance.Class.TotalInstanceVariableCount);
+            return SObjectRef.FromSmallInteger(instance.Class.TotalInstanceVariableCount).AsObject();
         }
         return null;
     }

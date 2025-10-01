@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Execution;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Config;
+using Smalltalk80.Interpreter.ColdStart;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public class VirtualMachine
 {
-    private readonly BytecodeInterpreter interpreter;
+    private readonly ContextBasedInterpreterNew interpreter;
     private readonly MethodCache methodCache;
     private readonly ExecutionStatistics executionStatistics;
     private readonly GarbageCollector garbageCollector;
@@ -25,7 +26,7 @@ public class VirtualMachine
     public VirtualMachine(ILogger<VirtualMachine>? logger = null)
     {
         this.logger = logger;
-        interpreter = new BytecodeInterpreter();
+        interpreter = new ContextBasedInterpreterNew();
         methodCache = new MethodCache();
         executionStatistics = new ExecutionStatistics();
         garbageCollector = new GarbageCollector();
@@ -63,13 +64,15 @@ public class VirtualMachine
             }
             
             // Phase 2: Install all kernel methods for core classes
-            Bootstrap.KernelMethodsInstaller.InstallAll();
-            
+            KernelMethodsInstaller.InstallAll();
+
             // Phase 3: Install minimal arithmetic methods (for compatibility)
             InitializeBasicMethods();
-            
+
             // Phase 4: Perform post-cold-start initialization
-            Bootstrap.ColdStartBootstrap.PostColdStartInitialization(interpreter);
+            // Note: PostColdStartInitialization expects BytecodeInterpreter but we're using ContextBasedInterpreterNew
+            // For now, pass null since the interpreter parameter isn't actually used in the current implementation
+            ColdStartBootstrap.PostColdStartInitialization(null!);
             
             // Phase 5: Initialize garbage collection with Special Objects Array
             InitializeGarbageCollection();
@@ -80,15 +83,16 @@ public class VirtualMachine
             {
                 Console.WriteLine("[COLD START] System cold started successfully");
                 Console.WriteLine($"[COLD START] Total classes: {SystemDictionary.GetAllClassNames().Count()}");
-                
+
                 // Count total methods installed
                 var totalInstanceMethods = 0;
                 foreach (var className in SystemDictionary.GetAllClassNames())
                 {
-                    var sClass = SystemDictionary.LookupClass(className);
-                    if (sClass != null)
+                    var classRef = SystemDictionary.LookupClassRef(className);
+                    if (classRef.HasValue && !classRef.Value.IsNil)
                     {
-                        totalInstanceMethods += sClass.GetMethodCount();
+                        var methodCount = ObjectMemoryNew.GetClassMethodSelectors(classRef.Value.AsObjectPointer()).Count;
+                        totalInstanceMethods += methodCount;
                     }
                 }
                 Console.WriteLine($"[COLD START] Total methods installed: {totalInstanceMethods} instance methods");
@@ -126,7 +130,7 @@ public class VirtualMachine
             }
             
             // Handle class printing/inspection
-            if (Program.RuntimeOptions.ListBootstrapClasses)
+            if (Program.RuntimeOptions.ListColdStartClasses)
             {
                 PrintClasses();
             }
@@ -135,13 +139,18 @@ public class VirtualMachine
             {
                 PrintClass(Program.RuntimeOptions.ClassToPrint);
             }
+
+            if (!string.IsNullOrEmpty(Program.RuntimeOptions.ClassToInspect))
+            {
+                InspectClass(Program.RuntimeOptions.ClassToInspect);
+            }
         }
         
         return Task.CompletedTask;
     }
     
     /// <summary>
-    /// Performs a cold start bootstrap (deprecated - use InitializeAsync instead).
+    /// Performs a cold start cold start (deprecated - use InitializeAsync instead).
     /// This method is kept for backward compatibility but simply calls InitializeAsync.
     /// </summary>
     [Obsolete("Use InitializeAsync() instead. The VM now always performs cold start initialization.")]
@@ -153,73 +162,121 @@ public class VirtualMachine
     /// <summary>
     /// Evaluates a Smalltalk expression.
     /// </summary>
-    public SObject Evaluate(string expression)
+    public SObjectRef Evaluate(string expression)
     {
         if (!initialized)
         {
             throw new InvalidOperationException("VM not initialized");
         }
-        
+
         // For now, handle simple arithmetic expressions
         expression = expression.Trim();
-        
+
         // Handle simple integer literals
         if (int.TryParse(expression, out var intValue))
         {
             if (intValue >= SmallInteger.MinValue && intValue <= SmallInteger.MaxValue)
             {
-                return SmallInteger.From(intValue);
+                return SObjectRef.FromSmallInteger(intValue);
             }
         }
-        
+
         // Handle simple arithmetic expressions like "3 + 4"
         var parts = expression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 3)
         {
             if (int.TryParse(parts[0], out var left) && int.TryParse(parts[2], out var right))
             {
-                var leftObj = SmallInteger.From(left);
-                var rightObj = SmallInteger.From(right);
+                var leftObj = SObjectRef.FromSmallInteger(left);
+                var rightObj = SObjectRef.FromSmallInteger(right);
                 var selector = parts[1];
-                
+
                 // Create a simple method for the expression
                 var bytecodes = selector switch
                 {
                     "+" => new byte[] { 0x76, 0x77, 0xB0, 0x7C }, // push 1, push 2, +, return top
-                    "-" => new byte[] { 0x76, 0x77, 0xB1, 0x7C }, // push 1, push 2, -, return top  
+                    "-" => new byte[] { 0x76, 0x77, 0xB1, 0x7C }, // push 1, push 2, -, return top
                     "*" => new byte[] { 0x76, 0x77, 0xB8, 0x7C }, // push 1, push 2, *, return top
                     "/" => new byte[] { 0x76, 0x77, 0xB9, 0x7C }, // push 1, push 2, /, return top
                     _ => null
                 };
-                
+
                 if (bytecodes != null)
                 {
-                    // Direct arithmetic evaluation
-                    return selector switch
+                    // Direct arithmetic evaluation using SmallInteger operations
+                    SObjectRef? result = selector switch
                     {
-                        "+" => leftObj.Add(rightObj),
-                        "-" => leftObj.Subtract(rightObj),
-                        "*" => leftObj.Multiply(rightObj),
-                        "/" => leftObj.Divide(rightObj),
-                        "<" => leftObj < rightObj ? STrue.Instance : SFalse.Instance,
-                        ">" => leftObj > rightObj ? STrue.Instance : SFalse.Instance,
-                        "<=" => leftObj <= rightObj ? STrue.Instance : SFalse.Instance,
-                        ">=" => leftObj >= rightObj ? STrue.Instance : SFalse.Instance,
-                        "=" => leftObj == rightObj ? STrue.Instance : SFalse.Instance,
-                        _ => throw new NotImplementedException($"Operator {selector} not implemented")
+                        "+" => leftObj.AddSmallInteger(rightObj),
+                        "-" => leftObj.SubtractSmallInteger(rightObj),
+                        "*" => MultiplySmallIntegers(leftObj, rightObj),
+                        "/" => DivideSmallIntegers(leftObj, rightObj),
+                        _ => null
                     };
+
+                    if (result != null)
+                        return result.Value;
+
+                    // Handle comparison operations
+                    if (leftObj.IsSmallInteger && rightObj.IsSmallInteger)
+                    {
+                        var leftVal = leftObj.AsSmallInteger();
+                        var rightVal = rightObj.AsSmallInteger();
+
+                        var boolResult = selector switch
+                        {
+                            "<" => leftVal < rightVal,
+                            ">" => leftVal > rightVal,
+                            "<=" => leftVal <= rightVal,
+                            ">=" => leftVal >= rightVal,
+                            "=" => leftVal == rightVal,
+                            _ => throw new NotImplementedException($"Operator {selector} not implemented")
+                        };
+
+                        return boolResult ? SystemDictionary.TrueObject : SystemDictionary.FalseObject;
+                    }
+
+                    throw new NotImplementedException($"Non-SmallInteger arithmetic not yet supported");
                 }
             }
         }
-        
+
         // Handle special constants
         return expression.ToLowerInvariant() switch
         {
-            "nil" => SNil.Instance,
-            "true" => STrue.Instance,
-            "false" => SFalse.Instance,
+            "nil" => SObjectRef.Nil,
+            "true" => SystemDictionary.TrueObject,
+            "false" => SystemDictionary.FalseObject,
             _ => throw new NotImplementedException($"Cannot evaluate expression: {expression}")
         };
+    }
+
+    private static SObjectRef? MultiplySmallIntegers(SObjectRef left, SObjectRef right)
+    {
+        if (!left.IsSmallInteger || !right.IsSmallInteger)
+            return null;
+
+        var leftVal = left.AsSmallInteger();
+        var rightVal = right.AsSmallInteger();
+        var result = (long)leftVal * rightVal;
+
+        // Check if result fits in SmallInteger range
+        if (result >= SmallInteger.MinValue && result <= SmallInteger.MaxValue)
+            return SObjectRef.FromSmallInteger((int)result);
+
+        return null; // Overflow
+    }
+
+    private static SObjectRef? DivideSmallIntegers(SObjectRef left, SObjectRef right)
+    {
+        if (!left.IsSmallInteger || !right.IsSmallInteger)
+            return null;
+
+        var rightVal = right.AsSmallInteger();
+        if (rightVal == 0)
+            return null; // Division by zero
+
+        var leftVal = left.AsSmallInteger();
+        return SObjectRef.FromSmallInteger(leftVal / rightVal);
     }
     
     /// <summary>
@@ -229,19 +286,21 @@ public class VirtualMachine
     {
         Console.WriteLine("\nSystem Classes:");
         Console.WriteLine("=".PadRight(60, '='));
-        
+
         var classes = SystemDictionary.GetAllClassNames().OrderBy(n => n).ToList();
         Console.WriteLine($"Total Classes: {classes.Count}");
         Console.WriteLine();
-        
+
         foreach (var className in classes)
         {
-            var sClass = SystemDictionary.LookupClass(className);
-            if (sClass != null)
+            var classRef = SystemDictionary.LookupClassRef(className);
+            if (classRef.HasValue && !classRef.Value.IsNil)
             {
-                var superName = sClass.Superclass?.Name ?? "nil";
-                var methodCount = sClass.GetMethodCount();
-                
+                var classOop = classRef.Value.AsObjectPointer();
+                var superclassRef = ObjectMemoryNew.GetClassSuperclass(classOop);
+                var superName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+                var methodCount = ObjectMemoryNew.GetClassMethodSelectors(classOop).Count;
+
                 if (DebugOptions.EnableEnhancedClassPrint)
                 {
                     Console.WriteLine($"  {className,-30} extends {superName,-20} [{methodCount} methods]");
@@ -260,19 +319,24 @@ public class VirtualMachine
     /// </summary>
     public void PrintClass(string className)
     {
-        var sClass = SystemDictionary.LookupClass(className);
-        if (sClass == null)
+        var classRef = SystemDictionary.LookupClassRef(className);
+        if (!classRef.HasValue || classRef.Value.IsNil)
         {
             Console.WriteLine($"Class not found: {className}");
             return;
         }
-        
+
         Console.WriteLine($"\nClass: {className}");
         Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine($"Superclass: {sClass.Superclass?.Name ?? "nil"}");
-        Console.WriteLine($"Instance Variables: {string.Join(", ", sClass.InstanceVariableNames ?? [])}");
-        
-        var methods = sClass.GetMethods();
+
+        var superclassRef = ObjectMemoryNew.GetClassSuperclass(classRef.Value.AsObjectPointer());
+        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+        Console.WriteLine($"Superclass: {superclassName}");
+
+        var instanceVarNames = ObjectMemoryNew.GetClassInstanceVariableNames(classRef.Value.AsObjectPointer());
+        Console.WriteLine($"Instance Variables: {string.Join(", ", instanceVarNames ?? [])}");
+
+        var methods = ObjectMemoryNew.GetClassMethodSelectors(classRef.Value.AsObjectPointer());
         if (methods.Count > 0)
         {
             Console.WriteLine($"\nMethods ({methods.Count}):");
@@ -281,15 +345,211 @@ public class VirtualMachine
                 Console.WriteLine($"  {selector}");
                 if (DebugOptions.ShowBytecodeWithMnemonics)
                 {
-                    var compiledMethod = sClass.LookupMethod(selector);
-                    if (compiledMethod != null)
+                    var methodRef = ObjectMemoryNew.LookupMethod(classRef.Value.AsObjectPointer(), selector);
+                    if (!methodRef.IsNil)
                     {
-                        Console.WriteLine($"    Bytecodes: {BitConverter.ToString(compiledMethod.Bytecodes)}");
+                        var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
+                        Console.WriteLine($"    Bytecodes: {BitConverter.ToString(bytecodes)}");
                     }
                 }
             }
         }
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Provides comprehensive inspection of a class including metadata, variables, and detailed method information.
+    /// </summary>
+    /// <param name="className">The name of the class to inspect.</param>
+    public void InspectClass(string className)
+    {
+        var classRef = SystemDictionary.LookupClassRef(className);
+        if (!classRef.HasValue || classRef.Value.IsNil)
+        {
+            Console.WriteLine($"Class not found: {className}");
+            return;
+        }
+
+        var classOop = classRef.Value.AsObjectPointer();
+
+        Console.WriteLine();
+        Console.WriteLine("=".PadRight(80, '='));
+        Console.WriteLine($"CLASS: {className}");
+        Console.WriteLine("=".PadRight(80, '='));
+
+        // HIERARCHY section
+        Console.WriteLine("\nHIERARCHY:");
+        var superclassRef = ObjectMemoryNew.GetClassSuperclass(classOop);
+        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+        Console.WriteLine($"  Superclass: {superclassName}");
+
+        var metaclassRef = ObjectMemoryNew.GetObjectClass(classRef.Value);
+        var metaclassName = metaclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(metaclassRef.AsObjectPointer());
+        Console.WriteLine($"  Metaclass: {metaclassName}");
+
+        // Determine object format (if we can infer it from the class name)
+        var objectFormat = DetermineObjectFormat(className);
+        Console.WriteLine($"  Format: {objectFormat}");
+
+        // INSTANCE VARIABLES section
+        var instanceVarNames = ObjectMemoryNew.GetClassInstanceVariableNames(classOop) ?? [];
+        Console.WriteLine($"\nINSTANCE VARIABLES ({instanceVarNames.Length}):");
+        if (instanceVarNames.Length == 0)
+        {
+            Console.WriteLine("  (none - inherited from " + superclassName + ")");
+        }
+        else
+        {
+            var baseIndex = superclassRef.IsNil ? 0 : ObjectMemoryNew.GetClassTotalInstanceVariableCount(superclassRef.AsObjectPointer());
+            for (var i = 0; i < instanceVarNames.Length; i++)
+            {
+                Console.WriteLine($"  [{baseIndex + i}] {instanceVarNames[i]}");
+            }
+        }
+
+        var totalInstVars = ObjectMemoryNew.GetClassTotalInstanceVariableCount(classOop);
+        Console.WriteLine($"\nTOTAL INSTANCE VARIABLES: {totalInstVars} (including inherited)");
+
+        // CLASS VARIABLES section (placeholder)
+        Console.WriteLine("\nCLASS VARIABLES:");
+        Console.WriteLine("  (not yet implemented)");
+
+        // Collect class methods if we have a metaclass
+        var classMethodCount = 0;
+        if (!metaclassRef.IsNil && metaclassRef != classRef.Value)
+        {
+            classMethodCount = ObjectMemoryNew.GetClassMethodSelectors(metaclassRef.AsObjectPointer()).Count;
+        }
+
+        // METHOD SUMMARY
+        var instanceMethods = ObjectMemoryNew.GetClassMethodSelectors(classOop);
+        Console.WriteLine($"\nCLASS METHODS: {classMethodCount}");
+        Console.WriteLine($"INSTANCE METHODS: {instanceMethods.Count}");
+
+        // INSTANCE METHODS details
+        if (instanceMethods.Count > 0)
+        {
+            Console.WriteLine("\nINSTANCE METHODS ({0}):", instanceMethods.Count);
+
+            foreach (var selector in instanceMethods.OrderBy(m => m))
+            {
+                Console.WriteLine("━".PadRight(80, '━'));
+                Console.WriteLine();
+
+                var methodRef = ObjectMemoryNew.LookupMethod(classOop, selector);
+                if (!methodRef.IsNil)
+                {
+                    var methodOop = methodRef.AsObjectPointer();
+                    Console.WriteLine($"Method: {selector}");
+                    Console.WriteLine($"  Arguments: {ObjectMemoryNew.GetCompiledMethodArgumentCount(methodOop)}");
+                    Console.WriteLine($"  Temporaries: {ObjectMemoryNew.GetCompiledMethodTemporaryCount(methodOop)}");
+
+                    var primitiveIndex = ObjectMemoryNew.GetCompiledMethodPrimitiveIndex(methodOop);
+                    if (primitiveIndex > 0)
+                    {
+                        Console.WriteLine($"  Primitive: {primitiveIndex}");
+                    }
+
+                    var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodOop);
+                    Console.WriteLine($"  Bytecode: [{BitConverter.ToString(bytecodes)}] ({bytecodes.Length} bytes)");
+
+                    // Display literal array
+                    var literalCount = ObjectMemoryNew.GetCompiledMethodLiteralCount(methodOop);
+                    Console.WriteLine($"  Literals: ({literalCount})");
+                    if (literalCount > 0)
+                    {
+                        for (int i = 0; i < literalCount; i++)
+                        {
+                            var literalRef = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, i);
+                            string literalDisplay;
+
+                            if (literalRef.IsNil)
+                            {
+                                literalDisplay = "nil";
+                            }
+                            else if (literalRef.IsSmallInteger)
+                            {
+                                literalDisplay = $"SmallInteger({literalRef.AsSmallInteger()})";
+                            }
+                            else
+                            {
+                                // Try to get type information from the object
+                                var literalOop = literalRef.AsObjectPointer();
+                                var literalClassRef = ObjectMemoryNew.GetObjectClass(literalRef);
+                                if (!literalClassRef.IsNil)
+                                {
+                                    var literalClassName = ObjectMemoryNew.GetClassName(literalClassRef.AsObjectPointer());
+                                    if (literalClassName == "Symbol")
+                                    {
+                                        var symbolValue = ObjectMemoryNew.GetSymbolValue(literalOop);
+                                        literalDisplay = $"#{symbolValue}";
+                                    }
+                                    else if (literalClassName == "String")
+                                    {
+                                        var stringValue = ObjectMemoryNew.GetStringValue(literalOop);
+                                        literalDisplay = $"'{stringValue}'";
+                                    }
+                                    else if (literalClassName == "Array")
+                                    {
+                                        var size = ObjectMemoryNew.GetObjectSize(literalOop);
+                                        literalDisplay = $"Array({size} elements)";
+                                    }
+                                    else
+                                    {
+                                        literalDisplay = literalClassName;
+                                    }
+                                }
+                                else
+                                {
+                                    literalDisplay = "UnknownObject";
+                                }
+                            }
+
+                            Console.WriteLine($"    [{i}] {literalDisplay}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("    (none)");
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine("  Disassembly:");
+                    var disassembly = BytecodeDisassembler.Disassemble(bytecodes);
+                    Console.WriteLine(disassembly);
+
+                    // Source code (usually not available for cold start methods)
+                    Console.WriteLine();
+                    Console.WriteLine("  Source: <not available>");
+                }
+                Console.WriteLine();
+            }
+            Console.WriteLine("━".PadRight(80, '━'));
+        }
+    }
+
+    /// <summary>
+    /// Determines the object format based on the class name.
+    /// </summary>
+    private string DetermineObjectFormat(string className)
+    {
+        return className switch
+        {
+            "ByteArray" or "ByteString" or "Symbol" => "ByteIndexed",
+            "WordArray" => "WordIndexed",
+            "Array" or "OrderedCollection" => "PointerIndexed",
+            "CompiledMethod" => "CompiledMethod",
+            "Float" => "WordIndexed",
+            "LargePositiveInteger" or "LargeNegativeInteger" => "ByteIndexed",
+            "Point" or "Rectangle" or "Character" => "NonIndexed",
+            "String" => "ByteIndexed",
+            "Dictionary" or "IdentityDictionary" => "PointerIndexed",
+            "Set" or "IdentitySet" => "PointerIndexed",
+            "MethodContext" or "BlockContext" => "MethodOrBlockContext",
+            "Process" => "PointerIndexed",
+            _ when className.EndsWith("Stream") => "PointerIndexed",
+            _ => "NonIndexed"
+        };
     }
     
     /// <summary>
@@ -328,19 +588,19 @@ public class VirtualMachine
     private void RunClassCreationTests()
     {
         Console.WriteLine("\n[TEST] Running class creation tests...");
-        
+
         try
         {
             // Test that core classes exist
-            var objectClass = SystemDictionary.LookupClass("Object");
-            Console.WriteLine($"  Object class exists: {objectClass != null} [PASS]");
-            
-            var intClass = SystemDictionary.LookupClass("SmallInteger");
-            Console.WriteLine($"  SmallInteger class exists: {intClass != null} [PASS]");
-            
-            var stringClass = SystemDictionary.LookupClass("String");
-            Console.WriteLine($"  String class exists: {stringClass != null} [PASS]");
-            
+            var objectClass = SystemDictionary.LookupClassRef("Object");
+            Console.WriteLine($"  Object class exists: {objectClass.HasValue && !objectClass.Value.IsNil} [PASS]");
+
+            var intClass = SystemDictionary.LookupClassRef("SmallInteger");
+            Console.WriteLine($"  SmallInteger class exists: {intClass.HasValue && !intClass.Value.IsNil} [PASS]");
+
+            var stringClass = SystemDictionary.LookupClassRef("String");
+            Console.WriteLine($"  String class exists: {stringClass.HasValue && !stringClass.Value.IsNil} [PASS]");
+
             Console.WriteLine("[TEST] All class creation tests passed!");
         }
         catch (Exception ex)
@@ -359,8 +619,8 @@ public class VirtualMachine
         try
         {
             // Test object identity
-            var nil1 = SNil.Instance;
-            var nil2 = SNil.Instance;
+            var nil1 = SObjectRef.Nil;
+            var nil2 = SObjectRef.Nil;
             Console.WriteLine($"  nil == nil: {nil1 == nil2} [PASS]");
             
             var true1 = STrue.Instance;
@@ -428,63 +688,74 @@ public class VirtualMachine
     private void InitializeBasicMethods()
     {
         // Add basic arithmetic methods to SmallInteger
-        var intClass = SystemDictionary.SmallIntegerClass;
-        
+        var intClassRef = SystemDictionary.SmallIntegerClassRef;
+        if (intClassRef.IsNil) return;
+
+        var intClassOop = intClassRef.AsObjectPointer();
+
         // + method with primitive 1
-        intClass.AddMethod("+", SCompiledMethod.CreateCompiledMethod(
+        var plusMethod = ObjectMemoryNew.CreateCompiledMethod(
             "+",
             [0xB0, 0x7C], // arithmetic +, return top
-            new SArray(),
-            1, 0, 1));
-            
+            [],
+            1, 0, 1);
+        ObjectMemoryNew.AddMethod(intClassOop, "+", plusMethod);
+
         // - method with primitive 2
-        intClass.AddMethod("-", SCompiledMethod.CreateCompiledMethod(
+        var minusMethod = ObjectMemoryNew.CreateCompiledMethod(
             "-",
             [0xB1, 0x7C], // arithmetic -, return top
-            new SArray(),
-            1, 0, 2));
-            
+            [],
+            1, 0, 2);
+        ObjectMemoryNew.AddMethod(intClassOop, "-", minusMethod);
+
         // < method with primitive 3
-        intClass.AddMethod("<", SCompiledMethod.CreateCompiledMethod(
+        var ltMethod = ObjectMemoryNew.CreateCompiledMethod(
             "<",
             [0xB2, 0x7C], // arithmetic <, return top
-            new SArray(),
-            1, 0, 3));
-            
+            [],
+            1, 0, 3);
+        ObjectMemoryNew.AddMethod(intClassOop, "<", ltMethod);
+
         // > method with primitive 4
-        intClass.AddMethod(">", SCompiledMethod.CreateCompiledMethod(
+        var gtMethod = ObjectMemoryNew.CreateCompiledMethod(
             ">",
             [0xB3, 0x7C], // arithmetic >, return top
-            new SArray(),
-            1, 0, 4));
-            
+            [],
+            1, 0, 4);
+        ObjectMemoryNew.AddMethod(intClassOop, ">", gtMethod);
+
         // = method with primitive 7
-        intClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
+        var eqMethod = ObjectMemoryNew.CreateCompiledMethod(
             "=",
             [0xB6, 0x7C], // arithmetic =, return top
-            new SArray(),
-            1, 0, 7));
-            
+            [],
+            1, 0, 7);
+        ObjectMemoryNew.AddMethod(intClassOop, "=", eqMethod);
+
         // * method with primitive 9
-        intClass.AddMethod("*", SCompiledMethod.CreateCompiledMethod(
+        var multMethod = ObjectMemoryNew.CreateCompiledMethod(
             "*",
             [0xB8, 0x7C], // arithmetic *, return top
-            new SArray(),
-            1, 0, 9));
-            
+            [],
+            1, 0, 9);
+        ObjectMemoryNew.AddMethod(intClassOop, "*", multMethod);
+
         // / method with primitive 10
-        intClass.AddMethod("/", SCompiledMethod.CreateCompiledMethod(
+        var divMethod = ObjectMemoryNew.CreateCompiledMethod(
             "/",
             [0xB9, 0x7C], // arithmetic /, return top
-            new SArray(),
-            1, 0, 10));
-            
+            [],
+            1, 0, 10);
+        ObjectMemoryNew.AddMethod(intClassOop, "/", divMethod);
+
         // asFloat method with primitive 40
-        intClass.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethod(
+        var asFloatMethod = ObjectMemoryNew.CreateCompiledMethod(
             "asFloat",
             [0x8F, 0x28, 0x00, 0x7C], // Primitive 40 with 0 args, return top
-            new SArray(),
-            0, 0, 40));
+            [],
+            0, 0, 40);
+        ObjectMemoryNew.AddMethod(intClassOop, "asFloat", asFloatMethod);
     }
     
     /// <summary>

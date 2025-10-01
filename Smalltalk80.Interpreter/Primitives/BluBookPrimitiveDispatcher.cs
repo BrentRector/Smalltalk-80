@@ -308,7 +308,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         }
         
         var idx = (int)index.Value - 1; // Smalltalk indices are 1-based
-        return instance.GetInstanceVariable(idx) ?? SNil.Instance;
+        return instance.GetInstanceVariable(idx).AsObject();
     }
     
     /// <summary>
@@ -332,7 +332,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         }
         
         var idx = (int)index.Value - 1; // Smalltalk indices are 1-based
-        instance.SetInstanceVariable(idx, arguments[1]);
+        instance.SetInstanceVariable(idx, SObjectRef.FromObject(arguments[1]));
         return arguments[1];
     }
     
@@ -347,7 +347,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         }
         
         // In Smalltalk, hash is typically based on object identity
-        return SmallInteger.From(receiver.GetHashCode() & 0x7FFFFFFF);
+        return SObjectRef.FromSmallInteger(receiver.GetHashCode() & 0x7FFFFFFF).AsObject();
     }
     
     /// <summary>
@@ -376,11 +376,11 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         // Update stack pointer in context
         if (arguments[1] is SMethodContext methodCtx)
         {
-            methodCtx.StackPointer = sp;
+            methodCtx.StackPointer = sp.Value;
         }
         else if (arguments[1] is SBlockContext blockCtx)
         {
-            blockCtx.StackPointer = sp;
+            blockCtx.StackPointer = sp.Value;
         }
         
         return receiver;
@@ -403,7 +403,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         
         // This would scan object memory for an instance of the class
         // For now, return nil (no instances found)
-        return SNil.Instance;
+        return SObjectRef.Nil.AsObject();
     }
     
     /// <summary>
@@ -418,7 +418,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         
         // This would scan object memory for the next instance
         // For now, return nil (no more instances)
-        return SNil.Instance;
+        return SObjectRef.Nil.AsObject();
     }
     
     /// <summary>
@@ -469,7 +469,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         }
         
         // The initial IP should be the current IP (after the blockCopy bytecode)
-        var initialIP = homeContext.InstructionPointer.Value;
+        var initialIP = homeContext.InstructionPointer;
         
         var blockContext = new SBlockContext(
             blockClass,
@@ -583,7 +583,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         var performArgs = new SObject[argArray.Size];
         for (int i = 0; i < argArray.Size; i++)
         {
-            performArgs[i] = argArray.At(i) ?? SNil.Instance;
+            performArgs[i] = argArray.At(i)!;
         }
         
         return interpreter.Execute(method, receiver, performArgs);
@@ -705,7 +705,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         
         // Return available memory in bytes
         var memInfo = GC.GetTotalMemory(false);
-        return SmallInteger.From((int)(int.MaxValue - memInfo));
+        return SObjectRef.FromSmallInteger((int)(int.MaxValue - memInfo)).AsObject();
     }
     
     /// <summary>
@@ -737,7 +737,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         }
         
         // Return approximate number of objects that can still be allocated
-        return SmallInteger.From(1000000); // Placeholder
+        return SObjectRef.FromSmallInteger(1000000).AsObject(); // Placeholder
     }
     
     /// <summary>
@@ -750,7 +750,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
             return null;
         }
         
-        return interpreter.SpecialObjectsArray ?? (SObject)SNil.Instance;
+        return interpreter.SpecialObjectsArray ?? SObjectRef.Nil.AsObject();
     }
     
     /// <summary>
@@ -767,7 +767,7 @@ public sealed class BluBookPrimitiveDispatcher : PrimitiveDispatcherBase
         GC.WaitForPendingFinalizers();
         GC.Collect();
         
-        return SmallInteger.From((int)GC.GetTotalMemory(false));
+        return SObjectRef.FromSmallInteger((int)GC.GetTotalMemory(false)).AsObject();
     }
     
     #endregion

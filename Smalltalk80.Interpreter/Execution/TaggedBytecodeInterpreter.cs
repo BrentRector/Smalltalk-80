@@ -5,7 +5,6 @@ using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Config;
-using SObjectRef = Smalltalk80.Interpreter.Core.SObjectRef;
 
 /// <summary>
 /// High-performance bytecode interpreter using tagged immediates.
@@ -303,12 +302,12 @@ public sealed class TaggedBytecodeInterpreter
         {
             throw new InvalidOperationException("Cannot access instance variables of immediate value");
         }
-        
-        var obj = receiver.ToObject();
-        if (obj is SInstance instance && index < instance.InstanceVariables.Length)
+
+        var obj = receiver.AsObject();
+        if (obj is SInstance instance && index < instance.InstanceVariableCount)
         {
-            var value = instance.InstanceVariables[index];
-            stack.Push(value == null ? NilRef : SObjectRef.FromObject(value));
+            var value = instance.GetInstanceVariable(index);
+            stack.Push(value);
         }
         else
         {
@@ -349,7 +348,7 @@ public sealed class TaggedBytecodeInterpreter
             }
             else if (literal is Character ch)
             {
-                stack.Push(SObjectRef.FromCharacter(ch.Value));
+                stack.Push(SObjectRef.FromObject(ch));
             }
             else if (literal == null)
             {
@@ -384,16 +383,16 @@ public sealed class TaggedBytecodeInterpreter
     private void PopAndStoreReceiverVariable(int index)
     {
         var value = stack.Pop();
-        
+
         if (!receiver.IsObject)
         {
             throw new InvalidOperationException("Cannot set instance variables of immediate value");
         }
-        
-        var obj = receiver.ToObject();
-        if (obj is SInstance instance && index < instance.InstanceVariables.Length)
+
+        var obj = receiver.AsObject();
+        if (obj is SInstance instance && index < instance.InstanceVariableCount)
         {
-            instance.InstanceVariables[index] = value.IsNil ? null : value.ToObject();
+            instance.SetInstanceVariable(index, value);
         }
         else
         {

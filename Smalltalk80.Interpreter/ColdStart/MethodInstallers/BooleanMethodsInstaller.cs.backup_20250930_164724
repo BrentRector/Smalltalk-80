@@ -1,0 +1,254 @@
+namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
+
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
+
+/// <summary>
+/// Installs kernel methods for Boolean, True, and False classes.
+/// </summary>
+public static class BooleanMethodsInstaller
+{
+    /// <summary>
+    /// Installs all Boolean, True, and False methods.
+    /// </summary>
+    public static void Install()
+    {
+        InstallBooleanMethods();
+        InstallTrueMethods();
+        InstallFalseMethods();
+    }
+    
+    /// <summary>
+    /// Installs Boolean methods.
+    /// </summary>
+    private static void InstallBooleanMethods()
+    {
+        var booleanClass = SystemDictionary.BooleanClass;
+        if (booleanClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Boolean instance methods: #&, #|, #not, #and:, #or:, #ifTrue:, #ifFalse:, #ifTrue:ifFalse:");
+        }
+        
+        // These are abstract in Boolean, implemented in True/False subclasses
+        // But we'll add them as self subclassResponsibility
+        
+        // & (and)
+        booleanClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
+            "&",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // | (or)
+        booleanClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
+            "|",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // not
+        booleanClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
+            "not",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Boolean: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs True methods.
+    /// </summary>
+    private static void InstallTrueMethods()
+    {
+        var trueClass = SystemDictionary.TrueClass;
+        if (trueClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing True instance methods: #&, #|, #not, #and:, #or:, #ifTrue:, #ifFalse:, #ifTrue:ifFalse:, #printOn:");
+        }
+        
+        // & (and) - depends on argument
+        trueClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
+            "&",
+            [0x10, 0x7C], // ^arg
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // | (or) - always true
+        trueClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
+            "|",
+            [0x71, 0x7C], // ^true
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // not
+        trueClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
+            "not",
+            [0x72, 0x7C], // ^false
+            new SArray(),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // and:
+        trueClass.AddMethod("and:", SCompiledMethod.CreateCompiledMethod(
+            "and:",
+            [0x10, 0xC9, 0x7C], // arg value
+            SArray.From(SSymbol.Intern("value")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // or:
+        trueClass.AddMethod("or:", SCompiledMethod.CreateCompiledMethod(
+            "or:",
+            [0x71, 0x7C], // ^true
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifTrue:
+        trueClass.AddMethod("ifTrue:", SCompiledMethod.CreateCompiledMethod(
+            "ifTrue:",
+            [0x10, 0xC9, 0x7C], // arg value
+            SArray.From(SSymbol.Intern("value")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifFalse:
+        trueClass.AddMethod("ifFalse:", SCompiledMethod.CreateCompiledMethod(
+            "ifFalse:",
+            [0x73, 0x7C], // ^nil
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifTrue:ifFalse:
+        trueClass.AddMethod("ifTrue:ifFalse:", SCompiledMethod.CreateCompiledMethod(
+            "ifTrue:ifFalse:",
+            [0x10, 0xC9, 0x7C], // trueBlock value
+            SArray.From(SSymbol.Intern("value")),
+            2, 0, 0));
+        instanceMethodCount++;
+        
+        // printOn:
+        trueClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
+            "printOn:",
+            [0x10, 0x21, 0xE0, 0x7C], // stream nextPutAll: 'true'
+            SArray.From(SSymbol.Intern("true"), SSymbol.Intern("nextPutAll:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] True: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs False methods.
+    /// </summary>
+    private static void InstallFalseMethods()
+    {
+        var falseClass = SystemDictionary.FalseClass;
+        if (falseClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing False instance methods: #&, #|, #not, #and:, #or:, #ifTrue:, #ifFalse:, #ifTrue:ifFalse:, #printOn:");
+        }
+        
+        // & (and) - always false
+        falseClass.AddMethod("&", SCompiledMethod.CreateCompiledMethod(
+            "&",
+            [0x72, 0x7C], // ^false
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // | (or) - depends on argument
+        falseClass.AddMethod("|", SCompiledMethod.CreateCompiledMethod(
+            "|",
+            [0x10, 0x7C], // ^arg
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // not
+        falseClass.AddMethod("not", SCompiledMethod.CreateCompiledMethod(
+            "not",
+            [0x71, 0x7C], // ^true
+            new SArray(),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // and:
+        falseClass.AddMethod("and:", SCompiledMethod.CreateCompiledMethod(
+            "and:",
+            [0x72, 0x7C], // ^false
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // or:
+        falseClass.AddMethod("or:", SCompiledMethod.CreateCompiledMethod(
+            "or:",
+            [0x10, 0xC9, 0x7C], // arg value
+            SArray.From(SSymbol.Intern("value")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifTrue:
+        falseClass.AddMethod("ifTrue:", SCompiledMethod.CreateCompiledMethod(
+            "ifTrue:",
+            [0x73, 0x7C], // ^nil
+            new SArray(),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifFalse:
+        falseClass.AddMethod("ifFalse:", SCompiledMethod.CreateCompiledMethod(
+            "ifFalse:",
+            [0x10, 0xC9, 0x7C], // arg value
+            SArray.From(SSymbol.Intern("value")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // ifTrue:ifFalse:
+        falseClass.AddMethod("ifTrue:ifFalse:", SCompiledMethod.CreateCompiledMethod(
+            "ifTrue:ifFalse:",
+            [0x11, 0xC9, 0x7C], // falseBlock value
+            SArray.From(SSymbol.Intern("value")),
+            2, 0, 0));
+        instanceMethodCount++;
+        
+        // printOn:
+        falseClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
+            "printOn:",
+            [0x10, 0x21, 0xE0, 0x7C], // stream nextPutAll: 'false'
+            SArray.From(SSymbol.Intern("false"), SSymbol.Intern("nextPutAll:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] False: {instanceMethodCount} instance methods installed");
+        }
+    }
+}

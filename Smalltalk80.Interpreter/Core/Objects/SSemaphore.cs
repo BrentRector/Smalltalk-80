@@ -32,33 +32,33 @@ public sealed class SSemaphore : SInstance
         : base(semaphoreClass, 2) // 2 instance variables
     {
         waitingProcesses = new Queue<SProcess>();
-        SetExcessSignals(SmallInteger.From(initialSignals));
-        
+        SetExcessSignals(SObjectRef.FromSmallInteger(initialSignals));
+
         // Create a LinkedList object for waiting processes
         var listClass = SystemDictionary.LookupClass("LinkedList");
         if (listClass != null)
         {
-            SetInstanceVariable(WaitingProcessesIndex, new SInstance(listClass));
+            SetInstanceVariable(WaitingProcessesIndex, SObjectRef.FromObject(new SInstance(listClass)));
         }
         else
         {
-            SetInstanceVariable(WaitingProcessesIndex, SNil.Instance);
+            SetInstanceVariable(WaitingProcessesIndex, SObjectRef.Nil);
         }
     }
     
     /// <summary>
     /// Gets or sets the number of excess signals.
     /// </summary>
-    public SmallInteger ExcessSignals
+    public int ExcessSignals
     {
-        get => (SmallInteger)(GetInstanceVariable(ExcessSignalsIndex) ?? SmallInteger.From(0));
-        set => SetInstanceVariable(ExcessSignalsIndex, value);
+        get => GetInstanceVariable(ExcessSignalsIndex).AsSmallInteger();
+        set => SetInstanceVariable(ExcessSignalsIndex, SObjectRef.FromSmallInteger(value));
     }
-    
+
     /// <summary>
     /// Sets the excess signals count.
     /// </summary>
-    private void SetExcessSignals(SmallInteger count)
+    private void SetExcessSignals(SObjectRef count)
     {
         SetInstanceVariable(ExcessSignalsIndex, count);
     }
@@ -88,19 +88,19 @@ public sealed class SSemaphore : SInstance
     /// </summary>
     public void IncrementExcessSignals()
     {
-        var current = ExcessSignals.Value;
-        SetExcessSignals(SmallInteger.From(current + 1));
+        var current = ExcessSignals;
+        SetExcessSignals(SObjectRef.FromSmallInteger(current + 1));
     }
-    
+
     /// <summary>
     /// Decrements the excess signals count.
     /// </summary>
     public bool DecrementExcessSignals()
     {
-        var current = ExcessSignals.Value;
+        var current = ExcessSignals;
         if (current > 0)
         {
-            SetExcessSignals(SmallInteger.From(current - 1));
+            SetExcessSignals(SObjectRef.FromSmallInteger(current - 1));
             return true;
         }
         return false;
@@ -151,7 +151,7 @@ public sealed class SSemaphore : SInstance
     /// </summary>
     public override string ToDisplayString()
     {
-        var excess = ExcessSignals.Value;
+        var excess = ExcessSignals;
         var waiting = WaitingCount;
         return $"Semaphore(excess={excess}, waiting={waiting})";
     }

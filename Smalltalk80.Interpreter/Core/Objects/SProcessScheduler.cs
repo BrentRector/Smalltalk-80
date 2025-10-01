@@ -83,10 +83,10 @@ public sealed class SProcessScheduler : SInstance
         if (listsClass != null)
         {
             var lists = new SArray(8);
-            SetInstanceVariable(QuiescentProcessListsIndex, lists);
+            SetInstanceVariable(QuiescentProcessListsIndex, SObjectRef.FromObject(lists));
         }
-        
-        SetInstanceVariable(ActiveProcessIndex, SNil.Instance);
+
+        SetInstanceVariable(ActiveProcessIndex, SObjectRef.Nil);
     }
     
     /// <summary>
@@ -112,7 +112,7 @@ public sealed class SProcessScheduler : SInstance
         private set
         {
             activeProcess = value;
-            SetInstanceVariable(ActiveProcessIndex, value ?? (SObject)SNil.Instance);
+            SetInstanceVariable(ActiveProcessIndex, value != null ? SObjectRef.FromObject(value) : SObjectRef.Nil);
         }
     }
     
@@ -126,8 +126,8 @@ public sealed class SProcessScheduler : SInstance
             throw new ArgumentOutOfRangeException(nameof(priority), "Priority must be between 1 and 8");
         }
         
-        process.Priority = SmallInteger.From(priority);
-        process.MyList = this;
+        process.Priority = priority;
+        process.MyList = SObjectRef.FromObject(this);
         priorityQueues[priority][0].Enqueue(process);
     }
     
@@ -141,7 +141,7 @@ public sealed class SProcessScheduler : SInstance
             return ScheduleNextProcess();
         }
         
-        var currentPriority = (int)activeProcess.Priority.Value;
+        var currentPriority = (int)activeProcess.Priority;
         
         // Put the current process at the end of its priority queue
         priorityQueues[currentPriority][0].Enqueue(activeProcess);
@@ -158,7 +158,7 @@ public sealed class SProcessScheduler : SInstance
         if (activeProcess != null)
         {
             activeProcess.Suspend(suspendedContext);
-            activeProcess.MyList = SNil.Instance;
+            activeProcess.MyList = SObjectRef.Nil;
         }
         
         return ScheduleNextProcess();
@@ -169,23 +169,24 @@ public sealed class SProcessScheduler : SInstance
     /// </summary>
     public void Resume(SProcess process)
     {
-        if (process.IsTerminated())
-        {
-            throw new InvalidOperationException("Cannot resume a terminated process");
-        }
-        
-        var priority = (int)process.Priority.Value;
+        // TODO: Add state checking when ProcessState enum is available
+        // if (process.State == ProcessState.Terminated)
+        // {
+        //     throw new InvalidOperationException("Cannot resume a terminated process");
+        // }
+
+        var priority = (int)process.Priority;
         Schedule(process, priority);
-        
+
         // If the resumed process has higher priority than active, switch to it
-        if (activeProcess != null && priority > activeProcess.Priority.Value)
+        if (activeProcess != null && priority > (int)activeProcess.Priority)
         {
             // Preempt current process
             var current = activeProcess;
             ActiveProcess = process;
-            
+
             // Put preempted process back in queue
-            Schedule(current, (int)current.Priority.Value);
+            Schedule(current, (int)current.Priority);
         }
     }
     
@@ -202,7 +203,7 @@ public sealed class SProcessScheduler : SInstance
         }
         
         // Remove from any queue it might be in
-        var priority = (int)process.Priority.Value;
+        var priority = (int)process.Priority;
         if (priority >= 1 && priority <= 8)
         {
             var queue = priorityQueues[priority][0];

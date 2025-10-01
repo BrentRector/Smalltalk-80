@@ -1,5 +1,8 @@
 namespace Smalltalk80.Interpreter.Core.Objects;
 
+using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Memory;
+
 /// <summary>
 /// Represents a Smalltalk class.
 /// </summary>
@@ -38,7 +41,20 @@ public class SClass : SObject
     /// Gets the instance variable names.
     /// </summary>
     public string[] InstanceVariableNames { get; }
-    
+
+    /// <summary>
+    /// Gets the superclass of this class as an SObjectRef.
+    /// </summary>
+    public SObjectRef GetSuperclass()
+    {
+        if (Superclass != null)
+        {
+            var superclassOop = ObjectMemoryNew.RegisterBootstrapObject(Superclass);
+            return SObjectRef.FromObjectPointer(superclassOop);
+        }
+        return SObjectRef.Nil;
+    }
+
     private SClass metaclass;
     
     /// <summary>
@@ -118,7 +134,7 @@ public class SClass : SObject
             _ => new SInstance(this, TotalInstanceVariableCount)
         };
         
-        // Note: GC registration should be handled by the VM/Bootstrap
+        // Note: GC registration should be handled by the VM/cold start
         // when it creates objects, not here
         
         return instance;
@@ -140,11 +156,13 @@ public class SClass : SObject
     /// <param name="size">The number of indexed variables.</param>
     public virtual SObject CreateInstance(int size)
     {
-        var instance = new SIndexedInstance(this, TotalInstanceVariableCount, size);
-        
-        // Note: GC registration should be handled by the VM/Bootstrap
+        // Determine the format based on the class
+        var objectFormat = DetermineObjectFormat();
+        var instance = new SInstance(this, TotalInstanceVariableCount, objectFormat, size);
+
+        // Note: GC registration should be handled by the VM/cold start
         // when it creates objects, not here
-        
+
         return instance;
     }
     
@@ -204,6 +222,22 @@ public class SClass : SObject
         return -1;
     }
     
+    /// <summary>
+    /// Determines the object format for instances of this class.
+    /// </summary>
+    private ObjectFormat DetermineObjectFormat()
+    {
+        // Check class name for common indexed types
+        return Name switch
+        {
+            "ByteArray" or "ByteString" or "Symbol" => ObjectFormat.ByteIndexed,
+            "WordArray" => ObjectFormat.WordIndexed,
+            "Array" or "OrderedCollection" => ObjectFormat.PointerIndexed,
+            "CompiledMethod" => ObjectFormat.CompiledMethod,
+            _ => ObjectFormat.PointerIndexed // Default for indexed instances
+        };
+    }
+
     /// <summary>
     /// Converts this class to a display string.
     /// </summary>

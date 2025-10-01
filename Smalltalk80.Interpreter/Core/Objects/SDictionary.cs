@@ -13,13 +13,17 @@ public class SDictionary : SInstance
     /// <summary>
     /// Initializes a new instance of the <see cref="SDictionary"/> class.
     /// </summary>
-    public SDictionary() : base(SystemDictionary.DictionaryClass, 2)
+    public SDictionary() : base(null!, 2) // TODO: DictionaryClass removed during SObjectRef migration
     {
         // Dictionary has 2 instance variables: tally and array
-        instanceVariables[0] = SmallInteger.From(0); // tally
-        instanceVariables[1] = new SArray(16); // initial array size
+        instanceVariables[0] = SObjectRef.FromSmallInteger(0); // tally
+
+        // Create an array using RegisterBootstrapObject
+        var array = new SArray(16);
+        var arrayOop = Smalltalk80.Interpreter.Memory.ObjectMemoryNew.RegisterBootstrapObject(array);
+        instanceVariables[1] = SObjectRef.FromObjectPointer(arrayOop); // initial array size
     }
-    
+
     /// <summary>
     /// Adds or updates a key-value pair in the dictionary.
     /// </summary>
@@ -27,7 +31,7 @@ public class SDictionary : SInstance
     {
         items[key] = value;
         // Update tally
-        instanceVariables[0] = SmallInteger.From(items.Count);
+        instanceVariables[0] = SObjectRef.FromSmallInteger(items.Count);
     }
     
     /// <summary>
@@ -62,7 +66,7 @@ public class SDictionary : SInstance
         var removed = items.Remove(key);
         if (removed)
         {
-            instanceVariables[0] = SmallInteger.From(items.Count);
+            instanceVariables[0] = SObjectRef.FromSmallInteger(items.Count);
         }
         return removed;
     }
@@ -114,7 +118,7 @@ public class SDictionary : SInstance
         }
         
         // Add the special objects
-        dict.AtPut(SSymbol.Intern("nil"), SNil.Instance);
+        dict.AtPut(SSymbol.Intern("nil"), SObjectRef.Nil.AsObject()!);
         dict.AtPut(SSymbol.Intern("true"), STrue.Instance);
         dict.AtPut(SSymbol.Intern("false"), SFalse.Instance);
         

@@ -1,6 +1,7 @@
 namespace Smalltalk80.Interpreter.Core.Objects;
 
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Represents a block context (block closure activation) in the Smalltalk-80 virtual machine.
@@ -29,6 +30,11 @@ public sealed class SBlockContext : SInstance
     private const int InitialIPIndex = 4;
     private const int HomeIndex = 5;
     // Stack starts at index 6
+
+    /// <summary>
+    /// Gets this context as a STBlockContextCorrect layout for type-safe access.
+    /// </summary>
+    private STBlockContextCorrect AsLayout() => new STBlockContextCorrect(SObjectRef.FromObject(this));
     
     /// <summary>
     /// Initializes a new instance of the SBlockContext class.
@@ -45,69 +51,86 @@ public sealed class SBlockContext : SInstance
         
         // Initialize fixed fields
         SetCaller(null);
-        SetInstructionPointer(SmallInteger.From(initialIP));
-        SetStackPointer(SmallInteger.From(6)); // Stack starts at index 6
-        SetArgumentCount(SmallInteger.From(argumentCount));
-        SetInitialIP(SmallInteger.From(initialIP));
+        SetInstructionPointer(SObjectRef.FromSmallInteger(initialIP));
+        SetStackPointer(SObjectRef.FromSmallInteger(6)); // Stack starts at index 6
+        SetArgumentCount(SObjectRef.FromSmallInteger(argumentCount));
+        SetInitialIP(SObjectRef.FromSmallInteger(initialIP));
         SetHome(home);
-        
+
         // Initialize stack to nil
         for (int i = 0; i < stackSize; i++)
         {
-            SetInstanceVariable(6 + i, SNil.Instance);
+            SetInstanceVariable(6 + i, SObjectRef.Nil);
         }
     }
     
     /// <summary>
     /// Gets or sets the caller context.
     /// </summary>
-    public SObject? Caller
+    public SObjectRef Caller
     {
-        get => GetInstanceVariable(CallerIndex);
-        set => SetInstanceVariable(CallerIndex, value ?? SNil.Instance);
+        get => AsLayout().Sender; // Note: BlockContext uses Sender field for caller
+        set
+        {
+            var layout = AsLayout();
+            layout.Sender = value;
+        }
     }
     
     /// <summary>
     /// Gets or sets the instruction pointer as a SmallInteger.
     /// </summary>
-    public SmallInteger InstructionPointer
+    public int InstructionPointer
     {
-        get => (SmallInteger)(GetInstanceVariable(InstructionPointerIndex) ?? SmallInteger.From(0));
-        set => SetInstanceVariable(InstructionPointerIndex, value);
+        get => AsLayout().IP;
+        set
+        {
+            var layout = AsLayout();
+            layout.IP = value;
+        }
     }
-    
+
     /// <summary>
     /// Gets or sets the stack pointer as a SmallInteger.
     /// </summary>
-    public SmallInteger StackPointer
+    public int StackPointer
     {
-        get => (SmallInteger)(GetInstanceVariable(StackPointerIndex) ?? SmallInteger.From(6));
-        set => SetInstanceVariable(StackPointerIndex, value);
+        get => AsLayout().SP;
+        set
+        {
+            var layout = AsLayout();
+            layout.SP = value;
+        }
     }
-    
+
     /// <summary>
     /// Gets the number of arguments this block expects.
     /// </summary>
-    public SmallInteger ArgumentCount
+    public int ArgumentCount
     {
-        get => (SmallInteger)(GetInstanceVariable(ArgumentCountIndex) ?? SmallInteger.From(0));
+        get => AsLayout().NumArgs;
     }
-    
+
     /// <summary>
     /// Gets the initial instruction pointer for the block.
     /// </summary>
-    public SmallInteger InitialIP
+    public int InitialIP
     {
-        get => (SmallInteger)(GetInstanceVariable(InitialIPIndex) ?? SmallInteger.From(0));
+        get => AsLayout().StartPCValue;
     }
-    
+
     /// <summary>
     /// Gets the home MethodContext.
     /// </summary>
     public SMethodContext Home
     {
-        get => (SMethodContext)(GetInstanceVariable(HomeIndex) ?? 
-            throw new InvalidOperationException("Home context is null"));
+        get
+        {
+            var homeRef = AsLayout().Home;
+            if (!homeRef.IsHeapObject)
+                throw new InvalidOperationException("Home context is not a heap object");
+            return (SMethodContext)homeRef.AsObject()!;
+        }
     }
     
     /// <summary>
@@ -118,89 +141,100 @@ public sealed class SBlockContext : SInstance
     /// <summary>
     /// Gets the receiver from the home context.
     /// </summary>
-    public SObject Receiver => Home.Receiver;
-    
+    public SObjectRef Receiver => Home.Receiver;
+
     /// <summary>
     /// Sets the caller context.
     /// </summary>
-    private void SetCaller(SObject? caller) => SetInstanceVariable(CallerIndex, caller ?? SNil.Instance);
-    
+    private void SetCaller(SObject? caller)
+    {
+        var layout = AsLayout();
+        layout.Sender = caller != null ? SObjectRef.FromObject(caller) : SObjectRef.Nil;
+    }
+
     /// <summary>
     /// Sets the instruction pointer.
     /// </summary>
-    private void SetInstructionPointer(SmallInteger ip) => SetInstanceVariable(InstructionPointerIndex, ip);
-    
+    private void SetInstructionPointer(SObjectRef ip)
+    {
+        var layout = AsLayout();
+        layout.InstructionPointer = ip;
+    }
+
     /// <summary>
     /// Sets the stack pointer.
     /// </summary>
-    private void SetStackPointer(SmallInteger sp) => SetInstanceVariable(StackPointerIndex, sp);
-    
+    private void SetStackPointer(SObjectRef sp)
+    {
+        var layout = AsLayout();
+        layout.StackPointer = sp;
+    }
+
     /// <summary>
     /// Sets the argument count.
     /// </summary>
-    private void SetArgumentCount(SmallInteger count) => SetInstanceVariable(ArgumentCountIndex, count);
-    
+    private void SetArgumentCount(SObjectRef count)
+    {
+        var layout = AsLayout();
+        layout.Nargs = count;
+    }
+
     /// <summary>
     /// Sets the initial IP.
     /// </summary>
-    private void SetInitialIP(SmallInteger ip) => SetInstanceVariable(InitialIPIndex, ip);
-    
+    private void SetInitialIP(SObjectRef ip)
+    {
+        var layout = AsLayout();
+        layout.StartPC = ip;
+    }
+
     /// <summary>
     /// Sets the home context.
     /// </summary>
-    private void SetHome(SMethodContext home) => SetInstanceVariable(HomeIndex, home);
+    private void SetHome(SMethodContext home)
+    {
+        var layout = AsLayout();
+        layout.Home = SObjectRef.FromObject(home);
+    }
     
     /// <summary>
     /// Gets a temporary variable from the home context.
     /// </summary>
-    public SObject GetTemporary(int index)
+    public SObjectRef GetTemporary(int index)
     {
         return Home.GetTemporary(index);
     }
-    
+
     /// <summary>
     /// Sets a temporary variable in the home context.
     /// </summary>
-    public void SetTemporary(int index, SObject value)
+    public void SetTemporary(int index, SObjectRef value)
     {
         Home.SetTemporary(index, value);
     }
-    
+
     /// <summary>
     /// Pushes a value onto the stack.
     /// </summary>
-    public void Push(SObject value)
+    public void Push(SObjectRef value)
     {
-        var sp = StackPointer.Value;
-        SetInstanceVariable((int)sp, value);
-        SetStackPointer(SmallInteger.From(sp + 1));
+        AsLayout().Push(value);
     }
-    
+
     /// <summary>
     /// Pops a value from the stack.
     /// </summary>
-    public SObject Pop()
+    public SObjectRef Pop()
     {
-        var sp = StackPointer.Value - 1;
-        if (sp < 6) // Stack starts at index 6
-        {
-            throw new InvalidOperationException("Stack underflow");
-        }
-        SetStackPointer(SmallInteger.From(sp));
-        return GetInstanceVariable((int)sp) ?? SNil.Instance;
+        return AsLayout().Pop();
     }
-    
+
     /// <summary>
     /// Gets the value at the top of the stack without removing it.
     /// </summary>
-    public SObject Top()
+    public SObjectRef Top()
     {
-        var sp = StackPointer.Value - 1;
-        if (sp < 6)
-        {
-            throw new InvalidOperationException("Stack is empty");
-        }
-        return GetInstanceVariable((int)sp) ?? SNil.Instance;
+        return AsLayout().Top();
     }
     
     /// <summary>
@@ -208,37 +242,37 @@ public sealed class SBlockContext : SInstance
     /// </summary>
     public int StackDepth()
     {
-        return (int)(StackPointer.Value - 6);
+        return StackPointer - 6;
     }
-    
+
     /// <summary>
     /// Copies arguments from the caller's stack to this block's stack.
     /// </summary>
-    public void CopyArgumentsFrom(SObject[] arguments)
+    public void CopyArgumentsFrom(SObjectRef[] arguments)
     {
-        if (arguments.Length != ArgumentCount.Value)
+        if (arguments.Length != ArgumentCount)
         {
-            throw new ArgumentException($"Block expects {ArgumentCount.Value} arguments but got {arguments.Length}");
+            throw new ArgumentException($"Block expects {ArgumentCount} arguments but got {arguments.Length}");
         }
-        
+
         // Push arguments onto the block's stack
         foreach (var arg in arguments)
         {
             Push(arg);
         }
     }
-    
+
     /// <summary>
     /// Activates this block with the given arguments.
     /// </summary>
-    public void Activate(SObject? caller, SObject[] arguments)
+    public void Activate(SObject? caller, SObjectRef[] arguments)
     {
         SetCaller(caller);
-        SetInstructionPointer(InitialIP);
-        SetStackPointer(SmallInteger.From(6)); // Reset stack
+        InstructionPointer = InitialIP;
+        StackPointer = 6; // Reset stack
         CopyArgumentsFrom(arguments);
     }
-    
+
     /// <summary>
     /// Performs a non-local return from this block.
     /// </summary>
@@ -246,7 +280,7 @@ public sealed class SBlockContext : SInstance
     /// Non-local returns must return from the home method context,
     /// not just from the block itself.
     /// </remarks>
-    public (SMethodContext homeContext, SObject returnValue) NonLocalReturn(SObject returnValue)
+    public (SMethodContext homeContext, SObjectRef returnValue) NonLocalReturn(SObjectRef returnValue)
     {
         return (Home, returnValue);
     }
@@ -261,8 +295,11 @@ public sealed class SBlockContext : SInstance
     /// </summary>
     public override string ToDisplayString()
     {
-        var homeMethod = Home?.Method?.Selector ?? "unknown";
-        var className = Home?.Receiver?.Class?.Name ?? "Unknown";
+        var homeMethod = Home.Method.Selector ?? "unknown";
+        var receiverRef = Home.Receiver;
+        var className = receiverRef.IsHeapObject && receiverRef.AsObject() != null
+            ? receiverRef.AsObject()!.Class?.Name ?? "Unknown"
+            : "Unknown";
         return $"[] in {className}>>{homeMethod}";
     }
 }

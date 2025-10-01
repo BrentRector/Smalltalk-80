@@ -54,19 +54,24 @@ public sealed class RuntimeOptions
     public string? SnapshotPath { get; set; }
     
     /// <summary>
-    /// Gets or sets the path to the bootstrap file.
+    /// Gets or sets the path to the cold start file.
     /// </summary>
-    public string? BootstrapPath { get; set; }
+    public string? ColdStartPath { get; set; }
     
     /// <summary>
     /// Gets or sets the class name to print or inspect.
     /// </summary>
     public string? ClassToPrint { get; set; }
-    
+
     /// <summary>
-    /// Gets or sets whether to list all bootstrap classes.
+    /// Gets or sets the class name to inspect comprehensively.
     /// </summary>
-    public bool ListBootstrapClasses { get; set; }
+    public string? ClassToInspect { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to list all cold start classes.
+    /// </summary>
+    public bool ListColdStartClasses { get; set; }
     
     /// <summary>
     /// Gets or sets whether to list all classes.
@@ -157,9 +162,10 @@ public sealed class RuntimeOptions
         GCTraceLevel = GCTraceLevel,
         ImagePath = ImagePath,
         SnapshotPath = SnapshotPath,
-        BootstrapPath = BootstrapPath,
+        ColdStartPath = ColdStartPath,
         ClassToPrint = ClassToPrint,
-        ListBootstrapClasses = ListBootstrapClasses,
+        ClassToInspect = ClassToInspect,
+        ListColdStartClasses = ListColdStartClasses,
         ListClasses = ListClasses,
         TestCriticalMethods = TestCriticalMethods,
         TestClassCreation = TestClassCreation,

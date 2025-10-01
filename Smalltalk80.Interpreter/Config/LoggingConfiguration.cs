@@ -52,7 +52,7 @@ public static class LoggingConfiguration
         builder.SetMinimumLevel(defaultLogLevel);
         
         // Configure specific categories if needed
-        builder.AddFilter("Smalltalk80.Interpreter.Bootstrap", verbose ? LogLevel.Debug : LogLevel.Information);
+        builder.AddFilter("Smalltalk80.Interpreter.cold start", verbose ? LogLevel.Debug : LogLevel.Information);
         builder.AddFilter("Smalltalk80.Interpreter.VM", verbose ? LogLevel.Debug : LogLevel.Information);
         builder.AddFilter("Smalltalk80.Interpreter.Memory", verbose ? LogLevel.Debug : LogLevel.Warning);
         builder.AddFilter("Smalltalk80.Interpreter.Execution", verbose ? LogLevel.Debug : LogLevel.Warning);

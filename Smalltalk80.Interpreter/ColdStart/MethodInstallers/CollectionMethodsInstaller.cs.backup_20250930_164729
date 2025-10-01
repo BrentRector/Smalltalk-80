@@ -1,0 +1,480 @@
+namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
+
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
+
+/// <summary>
+/// Installs kernel methods for collection classes including Array, String, Symbol, 
+/// ByteArray, Dictionary, Association, and MethodDictionary.
+/// </summary>
+public static class CollectionMethodsInstaller
+{
+    /// <summary>
+    /// Installs all collection-related methods.
+    /// </summary>
+    public static void Install()
+    {
+        InstallArrayMethods();
+        InstallStringMethods();
+        InstallSymbolMethods();
+        InstallByteArrayMethods();
+        InstallDictionaryMethods();
+        InstallAssociationMethods();
+        InstallMethodDictionaryMethods();
+    }
+    
+    /// <summary>
+    /// Installs Array methods.
+    /// </summary>
+    private static void InstallArrayMethods()
+    {
+        var arrayClass = SystemDictionary.ArrayClass;
+        if (arrayClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Array instance methods: #at:, #at:put:, #size, #do:, #collect:, #select:, #reject:, #includes:, #isEmpty, #first, #last, #atAll:put:");
+        }
+        
+        // at: - primitive 60
+        arrayClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
+            "at:",
+            [0x70, 0xD0, 0x7C], // self primitiveFailed (fallback for primitive 60)
+            new SArray(),
+            1, 0, 60));
+        instanceMethodCount++;
+        
+        // at:put: - primitive 61
+        arrayClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
+            "at:put:",
+            [0x11, 0x7C], // ^arg2 (return value for primitive 61)
+            new SArray(),
+            2, 0, 61));
+        instanceMethodCount++;
+        
+        // size - primitive 62
+        arrayClass.AddMethod("size", SCompiledMethod.CreateCompiledMethod(
+            "size",
+            [], // No fallback needed - primitive 62 cannot fail
+            new SArray(),
+            0, 0, 62));
+        instanceMethodCount++;
+        
+        // do: block iteration
+        arrayClass.AddMethod("do:", SCompiledMethod.CreateCompiledMethod(
+            "do:",
+            [0x76, 0x69, 0x70, 0xC2, 0x6A, 0xB5, 0xAC, 0x0B, 0x70, 0x6A, 0xC0, 0x10, 0xE6, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF2, 0x73, 0x7C],
+            SArray.From(SSymbol.Intern("size"), SSymbol.Intern("at:"), SSymbol.Intern("value:")),
+            1, 2, 0));
+        instanceMethodCount++;
+        
+        // isEmpty
+        arrayClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
+            "isEmpty",
+            [0x70, 0xC2, 0x75, 0xB6, 0x7C], // self size = 0
+            SArray.From(SSymbol.Intern("size")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // first
+        arrayClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
+            "first",
+            [0x70, 0x76, 0xC0, 0x7C], // self at: 1
+            SArray.From(SSymbol.Intern("at:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // last
+        arrayClass.AddMethod("last", SCompiledMethod.CreateCompiledMethod(
+            "last",
+            [0x70, 0x70, 0xC2, 0xC0, 0x7C], // self at: self size
+            SArray.From(SSymbol.Intern("at:"), SSymbol.Intern("size")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // atAll:put: - sets multiple elements to same value
+        arrayClass.AddMethod("atAll:put:", SCompiledMethod.CreateCompiledMethod(
+            "atAll:put:",
+            [0x10, 0x8F, 0x00, 0x03, 0x70, 0x12, 0x11, 0xE1, 0xF7, 0x70, 0x7C], // indices do: [:i | self at: i put: value]. ^self
+            SArray.From(
+                SSymbol.Intern("do:"),
+                SSymbol.Intern("at:put:")),
+            2, 0, 0));
+        instanceMethodCount++;
+        
+        // Note: Class methods would be installed on Array's metaclass
+        // They would include: #new:, #with:, #with:with:
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Array: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs String methods.
+    /// </summary>
+    private static void InstallStringMethods()
+    {
+        var stringClass = SystemDictionary.StringClass;
+        if (stringClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing String instance methods: #at:, #at:put:, #size, #=, #hash, #,, #copyFrom:to:, #asSymbol, #asString, #keywords, #numArgs, #isKeyword, #printOn:");
+        }
+        
+        // at: - primitive 63
+        stringClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
+            "at:",
+            [0x70, 0xD0, 0x7C], // self primitiveFailed (fallback for primitive 63)
+            new SArray(),
+            1, 0, 63));
+        instanceMethodCount++;
+        
+        // at:put: - primitive 64
+        stringClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
+            "at:put:",
+            [0x11, 0x7C], // ^arg2 (return value for primitive 64)
+            new SArray(),
+            2, 0, 64));
+        instanceMethodCount++;
+        
+        // size - primitive 62
+        stringClass.AddMethod("size", SCompiledMethod.CreateCompiledMethod(
+            "size",
+            [], // No fallback needed - primitive 62 cannot fail
+            new SArray(),
+            0, 0, 62));
+        instanceMethodCount++;
+        
+        // = string comparison - primitive 105
+        stringClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
+            "=",
+            [0x72, 0x7C], // push false, return (fallback for primitive 105)
+            new SArray(),
+            1, 0, 105));
+        instanceMethodCount++;
+        
+        // hash - primitive 106
+        stringClass.AddMethod("hash", SCompiledMethod.CreateCompiledMethod(
+            "hash",
+            [0x70, 0xC8, 0x7C], // self identityHash (fallback for primitive 106)
+            new SArray(),
+            0, 0, 106));
+        instanceMethodCount++;
+        
+        // , (concatenation)
+        stringClass.AddMethod(",", SCompiledMethod.CreateCompiledMethod(
+            ",",
+            [0x70, 0xC2, 0x10, 0xC2, 0xB0, 0x68, 0x44, 0xCC, 0x69, 0x76, 0x70, 0xC2, 0xE8, 0x6B,
+             0x76, 0x10, 0xC2, 0xE8, 0x69, 0x7C], // Implementation of string concatenation
+            SArray.From(
+                SSymbol.Intern("size"),
+                SSymbol.Intern("String"),
+                SSymbol.Intern("new:"),
+                SSymbol.Intern("replaceFrom:to:with:")),
+            1, 2, 0));
+        instanceMethodCount++;
+        
+        // asSymbol - primitive 110
+        stringClass.AddMethod("asSymbol", SCompiledMethod.CreateCompiledMethod(
+            "asSymbol",
+            [], // No fallback needed - primitive 110 cannot fail
+            new SArray(),
+            0, 0, 110));
+        instanceMethodCount++;
+        
+        // asString (returns self for String)
+        stringClass.AddMethod("asString", SCompiledMethod.CreateCompiledMethod(
+            "asString",
+            [0x70, 0x7C], // ^self
+            new SArray(),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // keywords - extracts keyword selectors from a string
+        stringClass.AddMethod("keywords", SCompiledMethod.CreateCompiledMethod(
+            "keywords",
+            [0x41, 0xD0, 0x68, // OrderedCollection new
+             0x76, 0x69, 0x6A, // index := 1, start := 1
+             0x6A, 0x70, 0xC2, 0xB5, 0xAC, 0x20, // [index <= self size] whileTrue:
+             0x70, 0x6A, 0xC0, 0x21, 0xE1, 0x9D, 0x0E, // (self at: index) = $: ifTrue:
+             0x6B, 0x70, 0x6A, 0x76, 0xB1, 0x6B, 0xE2, 0xD2, // add from start to index
+             0x6A, 0x76, 0xB0, 0x6B, 0x69, // index := index + 1, start := index
+             0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xDF, // index := index + 1, loop
+             0x68, 0x7C], // ^result
+            SArray.From(
+                SSymbol.Intern("OrderedCollection"),
+                SSymbol.Intern("new"),
+                SSymbol.Intern("size"),
+                SSymbol.Intern("<="),
+                SSymbol.Intern("at:"),
+                SSymbol.Intern(":"),
+                SSymbol.Intern("copyFrom:to:"),
+                SSymbol.Intern("add:")),
+            0, 3, 0));
+        instanceMethodCount++;
+        
+        // numArgs - counts the number of arguments in a selector
+        stringClass.AddMethod("numArgs", SCompiledMethod.CreateCompiledMethod(
+            "numArgs",
+            [0x75, 0x68, // count := 0
+             0x70, 0x8F, 0x00, 0x03, // self do: [:c |
+             0x10, 0x21, 0xB6, 0x9D, 0x04, 0x68, 0x76, 0xB0, 0x68, // c = $: ifTrue: [count := count + 1]
+             0xF7, 0x68, 0x7C], // ]. ^count
+            SArray.From(
+                SSymbol.Intern("do:"),
+                SSymbol.Intern(":"),
+                SSymbol.Intern("=")),
+            0, 1, 0));
+        instanceMethodCount++;
+        
+        // isKeyword - checks if string is a keyword selector
+        stringClass.AddMethod("isKeyword", SCompiledMethod.CreateCompiledMethod(
+            "isKeyword",
+            [0x70, 0xC2, 0x75, 0xB3, 0x9D, 0x02, 0x72, 0x7C, // self size > 0 ifFalse: [^false]
+             0x70, 0x70, 0xC2, 0xC0, 0x21, 0xB6, 0x7C], // (self at: self size) = $:
+            SArray.From(
+                SSymbol.Intern("size"),
+                SSymbol.Intern(">"),
+                SSymbol.Intern("at:"),
+                SSymbol.Intern(":"),
+                SSymbol.Intern("=")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // printOn:
+        stringClass.AddMethod("printOn:", SCompiledMethod.CreateCompiledMethod(
+            "printOn:",
+            [0x10, 0x70, 0xE0, 0x7C], // stream nextPutAll: self
+            SArray.From(SSymbol.Intern("nextPutAll:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // Note: Class methods would be installed on String's metaclass
+        // They would include: #new:, #streamContents:
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] String: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs Symbol methods.
+    /// </summary>
+    private static void InstallSymbolMethods()
+    {
+        var symbolClass = SystemDictionary.SymbolClass;
+        if (symbolClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Symbol instance methods: #=, #hash, #asString, #asSymbol");
+        }
+        
+        // = (symbol comparison uses identity)
+        symbolClass.AddMethod("=", SCompiledMethod.CreateCompiledMethod(
+            "=",
+            [0x70, 0x10, 0xB6, 0x7C], // self == arg
+            SArray.From(SSymbol.Intern("==")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // hash (symbols hash to themselves)
+        symbolClass.AddMethod("hash", SCompiledMethod.CreateCompiledMethod(
+            "hash",
+            [0x70, 0xC8, 0x7C], // self identityHash
+            SArray.From(SSymbol.Intern("identityHash")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // asString
+        symbolClass.AddMethod("asString", SCompiledMethod.CreateCompiledMethod(
+            "asString",
+            [0x44, 0x70, 0xC2, 0xCC, 0x68, // String new: self size
+             0x76, 0x70, 0xE1, 0x68, 0x7C], // result replaceFrom: 1 to: self size with: self. ^result
+            SArray.From(
+                SSymbol.Intern("String"),
+                SSymbol.Intern("size"),
+                SSymbol.Intern("new:"),
+                SSymbol.Intern("replaceFrom:to:with:")),
+            0, 1, 0));
+        instanceMethodCount++;
+        
+        // asSymbol (returns self)
+        symbolClass.AddMethod("asSymbol", SCompiledMethod.CreateCompiledMethod(
+            "asSymbol",
+            [0x70, 0x7C], // ^self
+            new SArray(),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Symbol: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs ByteArray methods.
+    /// </summary>
+    private static void InstallByteArrayMethods()
+    {
+        var byteArrayClass = SystemDictionary.ByteArrayClass;
+        if (byteArrayClass == null) return;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] ByteArray: 0 instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs Dictionary methods.
+    /// </summary>
+    private static void InstallDictionaryMethods()
+    {
+        var dictionaryClass = SystemDictionary.DictionaryClass;
+        if (dictionaryClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Dictionary instance methods: #at:, #at:put:, #at:ifAbsent:, #associationAt:, #associationAt:ifAbsent:, #includesKey:, #removeKey:");
+        }
+        
+        // at: - primitive 105
+        dictionaryClass.AddMethod("at:", SCompiledMethod.CreateCompiledMethod(
+            "at:",
+            [0x72, 0x7C], // push false, return (fallback for primitive 105)
+            new SArray(),
+            1, 0, 105));
+        instanceMethodCount++;
+        
+        // at:put: - primitive 106
+        dictionaryClass.AddMethod("at:put:", SCompiledMethod.CreateCompiledMethod(
+            "at:put:",
+            [0x11, 0x7C], // ^arg2 (return value for primitive 106)
+            new SArray(),
+            2, 0, 106));
+        instanceMethodCount++;
+        
+        // at:ifAbsent: - looks up key, evaluates block if not found
+        dictionaryClass.AddMethod("at:ifAbsent:", SCompiledMethod.CreateCompiledMethod(
+            "at:ifAbsent:",
+            [0x70, 0x10, 0xE0, 0x68, // assoc := self associationAt: key
+             0x68, 0x73, 0xB6, 0x9D, 0x03, 0x11, 0xC9, 0x7C, // assoc isNil ifTrue: [^absentBlock value]
+             0x68, 0xD1, 0x7C], // ^assoc value
+            SArray.From(
+                SSymbol.Intern("associationAt:"),
+                SSymbol.Intern("="),
+                SSymbol.Intern("value")),
+            2, 1, 0));
+        instanceMethodCount++;
+        
+        // associationAt: - returns the association for a key
+        dictionaryClass.AddMethod("associationAt:", SCompiledMethod.CreateCompiledMethod(
+            "associationAt:",
+            [0x70, 0x10, 0xE0, 0x7C], // self findAssociation: key (would need primitive)
+            SArray.From(SSymbol.Intern("findAssociation:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // associationAt:ifAbsent: - returns association or evaluates block
+        dictionaryClass.AddMethod("associationAt:ifAbsent:", SCompiledMethod.CreateCompiledMethod(
+            "associationAt:ifAbsent:",
+            [0x70, 0x10, 0xE0, 0x68, // assoc := self findAssociation: key
+             0x68, 0x73, 0xB6, 0x9D, 0x03, 0x11, 0xC9, 0x7C, // assoc isNil ifTrue: [^absentBlock value]
+             0x68, 0x7C], // ^assoc
+            SArray.From(
+                SSymbol.Intern("findAssociation:"),
+                SSymbol.Intern("="),
+                SSymbol.Intern("value")),
+            2, 1, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Dictionary: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs Association methods.
+    /// </summary>
+    private static void InstallAssociationMethods()
+    {
+        var associationClass = SystemDictionary.AssociationClass;
+        if (associationClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Association instance methods: #key, #value, #key:, #value:");
+        }
+        
+        // key - primitive 86
+        associationClass.AddMethod("key", SCompiledMethod.CreateCompiledMethod(
+            "key",
+            [], // No fallback needed - primitive 86 cannot fail
+            new SArray(),
+            0, 0, 86));
+        instanceMethodCount++;
+        
+        // value - primitive 87
+        associationClass.AddMethod("value", SCompiledMethod.CreateCompiledMethod(
+            "value",
+            [], // No fallback needed - primitive 87 cannot fail
+            new SArray(),
+            0, 0, 87));
+        instanceMethodCount++;
+        
+        // key: - primitive 88
+        associationClass.AddMethod("key:", SCompiledMethod.CreateCompiledMethod(
+            "key:",
+            [0x10, 0x7C], // ^arg (return new key for primitive 88)
+            new SArray(),
+            1, 0, 88));
+        instanceMethodCount++;
+        
+        // value: - primitive 89
+        associationClass.AddMethod("value:", SCompiledMethod.CreateCompiledMethod(
+            "value:",
+            [0x10, 0x7C], // ^arg (return new value for primitive 89)
+            new SArray(),
+            1, 0, 89));
+        instanceMethodCount++;
+        
+        // Note: Class methods would be installed on Association's metaclass
+        // They would include: #key:value:
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Association: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs MethodDictionary methods.
+    /// </summary>
+    private static void InstallMethodDictionaryMethods()
+    {
+        var methodDictionaryClass = SystemDictionary.MethodDictionaryClass;
+        if (methodDictionaryClass == null) return;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] MethodDictionary: 0 instance methods installed");
+        }
+    }
+}

@@ -221,23 +221,23 @@ public class BytecodeInterpreter
                 return null;
                 
             case Bytecodes.PushNil:
-                stack.Push(SNil.Instance);
+                stack.Push(SObjectRef.Nil.AsObject()!);
                 return null;
-                
+
             case Bytecodes.PushMinusOne:
-                stack.Push(SmallInteger.From(-1));
+                stack.Push(SObjectRef.FromSmallInteger(-1).AsObject()!);
                 return null;
-                
+
             case Bytecodes.PushZero:
-                stack.Push(SmallInteger.From(0));
+                stack.Push(SObjectRef.FromSmallInteger(0).AsObject()!);
                 return null;
-                
+
             case Bytecodes.PushOne:
-                stack.Push(SmallInteger.From(1));
+                stack.Push(SObjectRef.FromSmallInteger(1).AsObject()!);
                 return null;
-                
+
             case Bytecodes.PushTwo:
-                stack.Push(SmallInteger.From(2));
+                stack.Push(SObjectRef.FromSmallInteger(2).AsObject()!);
                 return null;
                 
             case Bytecodes.ReturnReceiver:
@@ -250,7 +250,7 @@ public class BytecodeInterpreter
                 return SFalse.Instance;
                 
             case Bytecodes.ReturnNil:
-                return SNil.Instance;
+                return SObjectRef.Nil.AsObject();
                 
             case Bytecodes.ReturnTopFromMethod:
                 return stack.Pop();
@@ -321,13 +321,13 @@ public class BytecodeInterpreter
     {
         if (receiver is SInstance instance)
         {
-            var value = instance.GetInstanceVariable(index) ?? SNil.Instance;
-            stack.Push(value);
+            var value = instance.GetInstanceVariable(index);
+            stack.Push(value.AsObject()!);
         }
         else
         {
             // For non-instance receivers (like SmallInteger), push nil
-            stack.Push(SNil.Instance);
+            stack.Push(SObjectRef.Nil.AsObject()!);
         }
     }
     
@@ -337,13 +337,13 @@ public class BytecodeInterpreter
         {
             throw new InvalidOperationException($"Temporary index {index} out of range");
         }
-        stack.Push(temporaries[index] ?? SNil.Instance);
+        stack.Push(temporaries[index]!);
     }
     
     private void PushLiteral(int index)
     {
-        var literal = method.Literals.At(index + 1) ?? SNil.Instance;
-        stack.Push(literal);
+        var literal = method.Literals.At(index + 1) ;
+        stack.Push(literal!);
     }
     
     private void PushLiteralVariable(int index)
@@ -351,20 +351,20 @@ public class BytecodeInterpreter
         var association = method.Literals.At(index + 1);
         if (association is SArray array && array.Size == 2)
         {
-            var value = array.At(2) ?? SNil.Instance;
-            stack.Push(value);
+            var value = array.At(2) ;
+            stack.Push(value!);
         }
         else
         {
             // Try as global variable name
             if (association is SSymbol symbol)
             {
-                var global = SystemDictionary.LookupGlobal(symbol.Value) ?? SNil.Instance;
-                stack.Push(global);
+                var global = SystemDictionary.LookupGlobal(symbol.Value) ;
+                stack.Push(global!);
             }
             else
             {
-                stack.Push(SNil.Instance);
+                stack.Push(SObjectRef.Nil.AsObject()!);
             }
         }
     }
@@ -374,7 +374,7 @@ public class BytecodeInterpreter
         var value = stack.Pop();
         if (receiver is SInstance instance)
         {
-            instance.SetInstanceVariable(index, value);
+            instance.SetInstanceVariable(index, SObjectRef.FromObject(value));
         }
     }
     
@@ -449,12 +449,12 @@ public class BytecodeInterpreter
             case "size":
                 if (messageReceiver is SArray array)
                 {
-                    stack.Push(SmallInteger.From(array.Size));
+                    stack.Push(SObjectRef.FromSmallInteger(array.Size).AsObject()!);
                     return;
                 }
                 else if (messageReceiver is SString str)
                 {
-                    stack.Push(SmallInteger.From(str.Length));
+                    stack.Push(SObjectRef.FromSmallInteger(str.Length).AsObject()!);
                     return;
                 }
                 break;
@@ -518,5 +518,29 @@ public class BytecodeInterpreter
         }
         
         return null;
+    }
+
+    /// <summary>
+    /// Disposes of interpreter resources.
+    /// </summary>
+    public void Dispose()
+    {
+        // Clear any resources
+        stack.Clear();
+        receiver = null!;
+        method = null!;
+        arguments = null!;
+        temporaries = null!;
+    }
+
+    /// <summary>
+    /// Gets the processor (ProcessorScheduler).
+    /// NOTE: This is a simplified stub - proper implementation would return the actual ProcessorScheduler singleton.
+    /// </summary>
+    public SObject GetProcessor()
+    {
+        // Return the ProcessorScheduler singleton
+        // In a full implementation, this would be properly initialized
+        return SystemDictionary.ProcessorSchedulerClass?.CreateInstance() ?? SObjectRef.Nil.AsObject()!;
     }
 }

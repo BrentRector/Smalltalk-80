@@ -1,0 +1,276 @@
+namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
+
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
+
+/// <summary>
+/// Installs kernel methods for stream-related classes including Stream, 
+/// PositionableStream, ReadStream, and WriteStream.
+/// </summary>
+public static class StreamMethodsInstaller
+{
+    /// <summary>
+    /// Installs all stream-related methods.
+    /// </summary>
+    public static void Install()
+    {
+        InstallStreamMethods();
+        InstallPositionableStreamMethods();
+        InstallWriteStreamMethods();
+        InstallReadStreamMethods();
+    }
+    
+    /// <summary>
+    /// Installs Stream methods.
+    /// </summary>
+    private static void InstallStreamMethods()
+    {
+        var streamClass = SystemDictionary.StreamClass;
+        if (streamClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Stream instance methods: #next, #next:, #nextPut:, #nextPutAll:, #atEnd");
+        }
+        
+        // Abstract methods - subclasses must implement
+        // next
+        streamClass.AddMethod("next", SCompiledMethod.CreateCompiledMethod(
+            "next",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // nextPut:
+        streamClass.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethod(
+            "nextPut:",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // atEnd
+        streamClass.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethod(
+            "atEnd",
+            [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
+            SArray.From(SSymbol.Intern("subclassResponsibility")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // nextPutAll:
+        streamClass.AddMethod("nextPutAll:", SCompiledMethod.CreateCompiledMethod(
+            "nextPutAll:",
+            [0x10, 0x8F, 0x00, 0x02, 0x70, 0x11, 0xE1, 0xF7, 0x10, 0x7C], // aCollection do: [:each | self nextPut: each]. ^aCollection
+            SArray.From(SSymbol.Intern("do:"), SSymbol.Intern("nextPut:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Stream: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs PositionableStream methods.
+    /// </summary>
+    private static void InstallPositionableStreamMethods()
+    {
+        var positionableStreamClass = SystemDictionary.PositionableStreamClass;
+        if (positionableStreamClass == null) return;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] PositionableStream: 0 instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs WriteStream methods.
+    /// </summary>
+    private static void InstallWriteStreamMethods()
+    {
+        var writeStreamClass = SystemDictionary.WriteStreamClass;
+        if (writeStreamClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing WriteStream instance methods: #nextPut:, #nextPutAll:, #contents, #position, #space, #cr, #tab");
+        }
+        
+        // nextPut:
+        writeStreamClass.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethod(
+            "nextPut:",
+            [0x00, 0x01, 0x76, 0xB0, 0x60, 0x01, 0x10, 0xC1, 0x60, 0x76, 0xB0, 0x60, 0x10, 0x7C],
+            SArray.From(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("at:put:")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // position - return current position
+        writeStreamClass.AddMethod("position", SCompiledMethod.CreateCompiledMethod(
+            "position",
+            [0x01, 0x7C], // ^position
+            SArray.From(SSymbol.Intern("position")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // space - write a space character
+        writeStreamClass.AddMethod("space", SCompiledMethod.CreateCompiledMethod(
+            "space",
+            [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 32)
+            SArray.From(
+                SSymbol.Intern("Character"),
+                new SmallInteger(32),
+                SSymbol.Intern("value:"),
+                SSymbol.Intern("nextPut:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // cr - write a carriage return
+        writeStreamClass.AddMethod("cr", SCompiledMethod.CreateCompiledMethod(
+            "cr",
+            [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 13)
+            SArray.From(
+                SSymbol.Intern("Character"),
+                new SmallInteger(13),
+                SSymbol.Intern("value:"),
+                SSymbol.Intern("nextPut:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // tab - write a tab character
+        writeStreamClass.AddMethod("tab", SCompiledMethod.CreateCompiledMethod(
+            "tab",
+            [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 9)
+            SArray.From(
+                SSymbol.Intern("Character"),
+                new SmallInteger(9),
+                SSymbol.Intern("value:"),
+                SSymbol.Intern("nextPut:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // contents
+        writeStreamClass.AddMethod("contents", SCompiledMethod.CreateCompiledMethod(
+            "contents",
+            [0x00, 0x76, 0x01, 0xF0, 0x7C], // collection copyFrom: 1 to: position
+            SArray.From(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("copyFrom:to:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // Note: Class methods would be installed on WriteStream's metaclass
+        // They would include: #on:
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] WriteStream: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs ReadStream methods.
+    /// </summary>
+    private static void InstallReadStreamMethods()
+    {
+        var readStreamClass = SystemDictionary.ReadStreamClass;
+        if (readStreamClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing ReadStream instance methods: #next, #peek, #position, #position:, #skip:, #upTo:, #atEnd");
+        }
+        
+        // next - read and advance position
+        readStreamClass.AddMethod("next", SCompiledMethod.CreateCompiledMethod(
+            "next",
+            [0x01, 0x01, 0x76, 0xB0, 0x60, // position := position + 1
+             0x00, 0x01, 0xC1, 0x7C], // ^collection at: position
+            SArray.From(
+                SSymbol.Intern("collection"),
+                SSymbol.Intern("position"),
+                SSymbol.Intern("at:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // peek - look at next element without advancing
+        readStreamClass.AddMethod("peek", SCompiledMethod.CreateCompiledMethod(
+            "peek",
+            [0x01, 0x00, 0xC2, 0xB5, 0x9D, 0x02, 0x73, 0x7C, // position >= collection size ifTrue: [^nil]
+             0x00, 0x01, 0x76, 0xB0, 0xC1, 0x7C], // ^collection at: position + 1
+            SArray.From(
+                SSymbol.Intern("collection"),
+                SSymbol.Intern("position"),
+                SSymbol.Intern("size"),
+                SSymbol.Intern(">="),
+                SSymbol.Intern("at:")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // position - return current position
+        readStreamClass.AddMethod("position", SCompiledMethod.CreateCompiledMethod(
+            "position",
+            [0x01, 0x7C], // ^position
+            SArray.From(SSymbol.Intern("position")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        // position: - set position
+        readStreamClass.AddMethod("position:", SCompiledMethod.CreateCompiledMethod(
+            "position:",
+            [0x10, 0x61, 0x10, 0x7C], // position := anInteger. ^anInteger
+            SArray.From(SSymbol.Intern("position")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // skip: - advance position by n
+        readStreamClass.AddMethod("skip:", SCompiledMethod.CreateCompiledMethod(
+            "skip:",
+            [0x01, 0x10, 0xB0, 0x61, 0x70, 0x7C], // position := position + n. ^self
+            SArray.From(SSymbol.Intern("position")),
+            1, 0, 0));
+        instanceMethodCount++;
+        
+        // upTo: - read elements up to a delimiter
+        readStreamClass.AddMethod("upTo:", SCompiledMethod.CreateCompiledMethod(
+            "upTo:",
+            [0x41, 0xD0, 0x68, // result := OrderedCollection new
+             0x70, 0xD2, 0x9C, 0xAC, 0x12, // [self atEnd not] whileTrue:
+             0x70, 0xD3, 0x69, // element := self next
+             0x69, 0x10, 0xB6, 0x99, 0x02, 0x68, 0x7C, // element = delimiter ifTrue: [^result]
+             0x68, 0x69, 0xD2, 0xA3, 0xEB, // result add: element. loop
+             0x68, 0x7C], // ^result
+            SArray.From(
+                SSymbol.Intern("OrderedCollection"),
+                SSymbol.Intern("new"),
+                SSymbol.Intern("atEnd"),
+                SSymbol.Intern("next"),
+                SSymbol.Intern("="),
+                SSymbol.Intern("add:")),
+            1, 2, 0));
+        instanceMethodCount++;
+        
+        // atEnd - check if at end of stream
+        readStreamClass.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethod(
+            "atEnd",
+            [0x01, 0x00, 0xC2, 0xB5, 0x7C], // ^position >= collection size
+            SArray.From(
+                SSymbol.Intern("position"),
+                SSymbol.Intern("collection"),
+                SSymbol.Intern("size"),
+                SSymbol.Intern(">=")),
+            0, 0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] ReadStream: {instanceMethodCount} instance methods installed");
+        }
+    }
+}

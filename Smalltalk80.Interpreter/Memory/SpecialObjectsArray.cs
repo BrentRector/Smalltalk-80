@@ -1,97 +1,109 @@
 namespace Smalltalk80.Interpreter.Memory;
 
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
 
 /// <summary>
-/// Manages the Special Objects Array - the ONLY root for garbage collection.
-/// The SOA is a VM-level structure that is never accessed by Smalltalk code.
-/// It can be implemented as either a C# List or a Smalltalk Array.
+/// Manages the GC root objects array - the essential objects needed for garbage collection
+/// to mark all reachable objects in the system.
+///
+/// This is NOT the Blue Book's broader "Special Objects Array" concept which includes
+/// special selectors and other cached objects. This array contains ONLY the root objects
+/// necessary for garbage collection to function correctly.
+///
+/// All objects in the system must be reachable from one of these roots:
+/// - System singletons (nil, true, false)
+/// - Metaclass hierarchy roots (Behavior, Metaclass)
+/// - SystemDictionary (contains all classes and globals)
+/// - SymbolTable (contains all interned symbols)
+/// - Process management (ProcessList, ProcessorScheduler)
 /// </summary>
 public static class SpecialObjectsArray
 {
     /// <summary>
-    /// Index of nil object in Special Objects Array.
+    /// Index of nil object (UndefinedObject singleton).
     /// </summary>
     public const int NilIndex = 0;
-    
+
     /// <summary>
-    /// Index of false object in Special Objects Array.
+    /// Index of false object (False singleton).
     /// </summary>
     public const int FalseIndex = 1;
-    
+
     /// <summary>
-    /// Index of true object in Special Objects Array.
+    /// Index of true object (True singleton).
     /// </summary>
     public const int TrueIndex = 2;
-    
+
     /// <summary>
     /// Index of Behavior class - root for metaclass hierarchy.
     /// </summary>
     public const int BehaviorClassIndex = 3;
-    
+
     /// <summary>
     /// Index of Metaclass class - root for metaclass hierarchy.
     /// </summary>
     public const int MetaclassClassIndex = 4;
-    
+
     /// <summary>
-    /// Index of SystemDictionary (Smalltalk global) - contains all classes and globals.
+    /// Index of SystemDictionary (Smalltalk global) - main root containing all classes and globals.
     /// </summary>
     public const int SystemDictionaryIndex = 5;
-    
+
     /// <summary>
-    /// Index of SymbolTable - contains all interned symbols including special selectors.
+    /// Index of SymbolTable - contains all interned symbols.
     /// </summary>
     public const int SymbolTableIndex = 6;
-    
+
     /// <summary>
     /// Index of ProcessList - contains all active processes.
     /// </summary>
     public const int ProcessListIndex = 7;
-    
+
     /// <summary>
     /// Index of ProcessorScheduler singleton instance.
     /// </summary>
     public const int ProcessorSchedulerIndex = 8;
-    
+
     /// <summary>
-    /// Total count of Special Objects Array entries (exactly 9).
+    /// Total count of GC root objects.
     /// </summary>
     public const int Count = 9;
-    
-    private static readonly List<SObject?> array = new(32);
-    
+
+    private static readonly List<SObject?> array = new(Count);
+
     /// <summary>
-    /// Initializes the Special Objects Array with system objects.
+    /// Initializes the GC roots array with essential system objects.
     /// Called after cold start when all system objects exist.
     /// </summary>
     public static void Initialize()
     {
-        // Clear and resize to minimal size
+        // Clear and resize to exactly 9 entries
         array.Clear();
-        for (int i = 0; i < Count; i++)  // Exactly 9 entries
+        for (int i = 0; i < Count; i++)
             array.Add(null);
-        
-        // Core singleton objects (must be roots)
-        array[NilIndex] = SNil.Instance;
+
+        // System singletons
+        // Nil needs special handling - create an instance of UndefinedObject
+        array[NilIndex] = SystemDictionary.UndefinedObjectClass?.CreateInstance()
+            ?? new SInstance(SystemDictionary.UndefinedObjectClass ?? SystemDictionary.ObjectClass!, 0);
         array[FalseIndex] = SFalse.Instance;
         array[TrueIndex] = STrue.Instance;
-        
+
         // Metaclass hierarchy roots (needed for class structure)
         array[BehaviorClassIndex] = SystemDictionary.BehaviorClass;
         array[MetaclassClassIndex] = SystemDictionary.MetaclassClass;
-        
+
         // System dictionary (contains ALL classes and globals - main root)
         // This is THE critical entry - all classes are reachable through it
         array[SystemDictionaryIndex] = SDictionary.CreateSystemDictionary();
-        
-        // Symbol table (contains all interned symbols including special selectors)
-        // Special selectors like #doesNotUnderstand: are reachable through here
+
+        // Symbol table (contains all interned symbols)
         array[SymbolTableIndex] = SDictionary.CreateSymbolTable();
-        
+
         // Process list (TODO: create actual process list)
         array[ProcessListIndex] = null;  // Will be set when process system is initialized
-        
+
         // Process scheduler (if created)
         var scheduler = SystemDictionary.LookupGlobal("Processor");
         if (scheduler != null)
@@ -99,14 +111,14 @@ public static class SpecialObjectsArray
             array[ProcessorSchedulerIndex] = scheduler;
         }
     }
-    
+
     /// <summary>
-    /// Gets the Special Objects Array for GC use.
+    /// Gets the GC roots array for garbage collection use.
     /// </summary>
     public static List<SObject?> GetArray() => array;
-    
+
     /// <summary>
-    /// Gets a specific special object.
+    /// Gets a specific GC root object.
     /// </summary>
     public static SObject? Get(int index)
     {
@@ -114,9 +126,9 @@ public static class SpecialObjectsArray
             return array[index];
         return null;
     }
-    
+
     /// <summary>
-    /// Sets a specific special object.
+    /// Sets a specific GC root object.
     /// </summary>
     public static void Set(int index, SObject? obj)
     {
@@ -124,35 +136,44 @@ public static class SpecialObjectsArray
             array.Add(null);
         array[index] = obj;
     }
-    
+
     /// <summary>
-    /// Reports the contents of the SOA for debugging.
+    /// Reports the contents of the GC roots array for debugging.
     /// </summary>
     public static void Report()
     {
-        Console.WriteLine("\nSpecial Objects Array Contents:");
+        Console.WriteLine("\nGC Roots Array Contents:");
         Console.WriteLine("=" . PadRight(60, '='));
-        
+
         var namedIndices = new (int index, string name)[]
         {
-            (NilIndex, "nil"),
-            (FalseIndex, "false"),
-            (TrueIndex, "true"),
+            (NilIndex, "nil (UndefinedObject singleton)"),
+            (FalseIndex, "false (False singleton)"),
+            (TrueIndex, "true (True singleton)"),
             (BehaviorClassIndex, "Behavior class"),
             (MetaclassClassIndex, "Metaclass class"),
-            (SystemDictionaryIndex, "Smalltalk (SystemDict)"),
+            (SystemDictionaryIndex, "SystemDictionary (Smalltalk global)"),
             (SymbolTableIndex, "SymbolTable"),
             (ProcessListIndex, "ProcessList"),
             (ProcessorSchedulerIndex, "ProcessorScheduler")
         };
-        
+
         foreach (var (index, name) in namedIndices)
         {
             var obj = Get(index);
-            var status = obj == null ? "NOT SET" : obj.ToDisplayString();
-            Console.WriteLine($"  [{index,2}] {name,-25} = {status}");
+            var status = obj == null ? "NULL" : obj.ToDisplayString();
+            Console.WriteLine($"  [{index}] {name,-40} = {status}");
         }
-        
+
+        // Summary statistics
+        var populatedCount = 0;
+        for (int i = 0; i < Count; i++)
+        {
+            if (Get(i) != null) populatedCount++;
+        }
+
+        Console.WriteLine("\n" + "=" . PadRight(60, '='));
+        Console.WriteLine($"  Total entries: {Count}, Populated: {populatedCount}, Empty: {Count - populatedCount}");
         Console.WriteLine();
     }
 }

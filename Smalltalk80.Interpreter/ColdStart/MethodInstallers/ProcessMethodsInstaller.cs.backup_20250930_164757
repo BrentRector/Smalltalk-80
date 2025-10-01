@@ -1,0 +1,408 @@
+namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
+
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
+
+/// <summary>
+/// Installs kernel methods for process-related classes including Process, 
+/// ProcessorScheduler, Semaphore, LinkedList, and Link.
+/// </summary>
+public static class ProcessMethodsInstaller
+{
+    /// <summary>
+    /// Installs all process-related methods.
+    /// </summary>
+    public static void Install()
+    {
+        InstallProcessMethods();
+        InstallProcessorSchedulerMethods();
+        InstallSemaphoreMethods();
+        InstallLinkedListMethods();
+        InstallLinkMethods();
+    }
+    
+    /// <summary>
+    /// Installs Process methods.
+    /// </summary>
+    private static void InstallProcessMethods()
+    {
+        var processClass = SystemDictionary.ProcessClass;
+        if (processClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Process instance methods: #resume, #suspend, #terminate, #priority, #priority:, #suspendedContext, #suspendedContext:, #offList");
+        }
+        
+        // resume - primitive 87
+        processClass.AddMethod("resume", SCompiledMethod.CreateCompiledMethod(
+            "resume",
+            [], // No fallback needed - primitive 87 cannot fail
+            new SArray(),
+            0, 0, 87));
+        instanceMethodCount++;
+        
+        // suspend - primitive 88
+        processClass.AddMethod("suspend", SCompiledMethod.CreateCompiledMethod(
+            "suspend",
+            [], // No fallback needed - primitive 88 cannot fail
+            new SArray(),
+            0, 0, 88));
+        instanceMethodCount++;
+        
+        // terminate - primitive 91
+        processClass.AddMethod("terminate", SCompiledMethod.CreateCompiledMethod(
+            "terminate",
+            [], // No fallback needed - primitive 91 cannot fail
+            new SArray(),
+            0, 0, 91));
+        instanceMethodCount++;
+        
+        // priority
+        // ^priority
+        processClass.AddMethod("priority", SCompiledMethod.CreateCompiledMethod(
+            "priority",
+            [0x01, 0x7C], // Push priority instance var (index 1), return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // priority: anInteger
+        // priority := anInteger
+        processClass.AddMethod("priority:", SCompiledMethod.CreateCompiledMethod(
+            "priority:",
+            [0x10, 0x61, 0x70, 0x7C], // Push arg, store in priority (index 1), push self, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // suspendedContext
+        // ^suspendedContext
+        processClass.AddMethod("suspendedContext", SCompiledMethod.CreateCompiledMethod(
+            "suspendedContext",
+            [0x00, 0x7C], // Push suspendedContext instance var (index 0), return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // suspendedContext: aContext (private)
+        // suspendedContext := aContext
+        processClass.AddMethod("suspendedContext:", SCompiledMethod.CreateCompiledMethod(
+            "suspendedContext:",
+            [0x10, 0x60, 0x70, 0x7C], // Push arg, store in suspendedContext (index 0), push self, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // offList
+        // myList := nil
+        processClass.AddMethod("offList", SCompiledMethod.CreateCompiledMethod(
+            "offList",
+            [0x71, 0x62, 0x70, 0x7C], // Push nil, store in myList (index 2), push self, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Process: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs ProcessorScheduler methods.
+    /// </summary>
+    private static void InstallProcessorSchedulerMethods()
+    {
+        var processorSchedulerClass = SystemDictionary.ProcessorSchedulerClass;
+        if (processorSchedulerClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing ProcessorScheduler instance methods");
+        }
+        
+        // activeProcess
+        // ^activeProcess
+        processorSchedulerClass.AddMethod("activeProcess", SCompiledMethod.CreateCompiledMethod(
+            "activeProcess",
+            [0x01, 0x7C], // Push activeProcess instance var, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // activePriority  
+        // ^activeProcess priority
+        var activePriorityLiterals = SArray.From(SSymbol.Intern("priority"));
+        processorSchedulerClass.AddMethod("activePriority", SCompiledMethod.CreateCompiledMethod(
+            "activePriority",
+            [0x01, 0xD0, 0x7C], // Push activeProcess, send priority, return
+            activePriorityLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        // highestPriority
+        // ^quiescentProcessLists size
+        var highestPriorityLiterals = SArray.From(SSymbol.Intern("size"));
+        processorSchedulerClass.AddMethod("highestPriority", SCompiledMethod.CreateCompiledMethod(
+            "highestPriority",
+            [0x00, 0xD0, 0x7C], // Push quiescentProcessLists, send size, return
+            highestPriorityLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        // yield
+        // | semaphore |
+        // semaphore := Semaphore new.
+        // [semaphore signal] fork.
+        // semaphore wait
+        var yieldLiterals = SArray.From(
+            SSymbol.Intern("Semaphore"),
+            SSymbol.Intern("new"),
+            SSymbol.Intern("signal"),
+            SSymbol.Intern("fork"),
+            SSymbol.Intern("wait"));
+        processorSchedulerClass.AddMethod("yield", SCompiledMethod.CreateCompiledMethod(
+            "yield",
+            [0x40, 0xD1, 0x68,      // Push Semaphore, send new, store temp
+             0x89, 0x11, 0xD2, 0x7D, // Push block [semaphore signal]
+             0xC8, 0xD3,            // Send fork
+             0x87,                  // Pop
+             0x11, 0xD4, 0x7C],     // Push temp, send wait, return
+            yieldLiterals,
+            0, 1));  // 0 args, 1 temp
+        instanceMethodCount++;
+        
+        // terminateActive
+        // activeProcess terminate
+        var terminateActiveLiterals = SArray.From(SSymbol.Intern("terminate"));
+        processorSchedulerClass.AddMethod("terminateActive", SCompiledMethod.CreateCompiledMethod(
+            "terminateActive",
+            [0x01, 0xD0, 0x7C], // Push activeProcess, send terminate, return
+            terminateActiveLiterals,
+            0, 0));
+        instanceMethodCount++;
+        
+        // Priority name methods - return constants
+        // highIOPriority - returns 7
+        processorSchedulerClass.AddMethod("highIOPriority", SCompiledMethod.CreateCompiledMethod(
+            "highIOPriority",
+            [0x77, 0x7C], // Push 7, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // lowIOPriority - returns 6  
+        processorSchedulerClass.AddMethod("lowIOPriority", SCompiledMethod.CreateCompiledMethod(
+            "lowIOPriority",
+            [0x76, 0x7C], // Push 6, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // systemBackgroundPriority - returns 2
+        processorSchedulerClass.AddMethod("systemBackgroundPriority", SCompiledMethod.CreateCompiledMethod(
+            "systemBackgroundPriority",
+            [0x72, 0x7C], // Push 2, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // timingPriority - returns 8
+        processorSchedulerClass.AddMethod("timingPriority", SCompiledMethod.CreateCompiledMethod(
+            "timingPriority",
+            [0x78, 0x7C], // Push 8, return  
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // userBackgroundPriority - returns 3
+        processorSchedulerClass.AddMethod("userBackgroundPriority", SCompiledMethod.CreateCompiledMethod(
+            "userBackgroundPriority",
+            [0x73, 0x7C], // Push 3, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // userInterruptPriority - returns 5
+        processorSchedulerClass.AddMethod("userInterruptPriority", SCompiledMethod.CreateCompiledMethod(
+            "userInterruptPriority",
+            [0x75, 0x7C], // Push 5, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // userSchedulingPriority - returns 4
+        processorSchedulerClass.AddMethod("userSchedulingPriority", SCompiledMethod.CreateCompiledMethod(
+            "userSchedulingPriority",
+            [0x74, 0x7C], // Push 4, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // signal:atMilliseconds: - primitive 100
+        processorSchedulerClass.AddMethod("signal:atMilliseconds:", SCompiledMethod.CreateCompiledMethod(
+            "signal:atMilliseconds:",
+            [0x70, 0xD0, 0x7C], // self primitiveFailed (fallback for primitive 100)
+            SArray.From(SSymbol.Intern("primitiveFailed")),
+            2, 0, 100));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] ProcessorScheduler: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs Semaphore methods.
+    /// </summary>
+    private static void InstallSemaphoreMethods()
+    {
+        var semaphoreClass = SystemDictionary.SemaphoreClass;
+        if (semaphoreClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing Semaphore instance methods: #signal, #wait");
+        }
+        
+        // signal - primitive 85
+        semaphoreClass.AddMethod("signal", SCompiledMethod.CreateCompiledMethod(
+            "signal",
+            [], // No fallback needed - primitive 85 cannot fail
+            new SArray(),
+            0, 0, 85));
+        instanceMethodCount++;
+        
+        // wait - primitive 86
+        semaphoreClass.AddMethod("wait", SCompiledMethod.CreateCompiledMethod(
+            "wait",
+            [], // No fallback needed - primitive 86 cannot fail
+            new SArray(),
+            0, 0, 86));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] Semaphore: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs LinkedList methods.
+    /// </summary>
+    private static void InstallLinkedListMethods()
+    {
+        var linkedListClass = SystemDictionary.LinkedListClass;
+        if (linkedListClass == null) return;
+        
+        var instanceMethodCount = 0;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Installing LinkedList instance methods: #isEmpty, #addFirst:, #addLast:, #removeFirst, #first");
+        }
+        
+        // isEmpty
+        // ^firstLink == nil
+        linkedListClass.AddMethod("isEmpty", SCompiledMethod.CreateCompiledMethod(
+            "isEmpty",
+            [0x00, 0x71, 0xC6, 0x7C], // Push firstLink, push nil, ==, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        // addFirst: aLink
+        // firstLink := aLink. lastLink ifNil: [lastLink := aLink]. ^aLink
+        linkedListClass.AddMethod("addFirst:", SCompiledMethod.CreateCompiledMethod(
+            "addFirst:",
+            [0x10, 0x60, 0x01, 0xC7, // Push arg, store in firstLink
+             0x01, 0x71, 0x99, 0x04, // Push lastLink, nil check, jump if not nil
+             0x10, 0x61,             // Push arg, store in lastLink
+             0x10, 0x7C],            // Push arg, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // addLast: aLink
+        // isEmpty ifTrue: [firstLink := aLink] ifFalse: [lastLink nextLink: aLink].
+        // lastLink := aLink. ^aLink
+        linkedListClass.AddMethod("addLast:", SCompiledMethod.CreateCompiledMethod(
+            "addLast:",
+            [0x70, 0xCE,             // Push self, send isEmpty
+             0x99, 0x06,             // Jump if false
+             0x10, 0x60,             // Push arg, store in firstLink
+             0xA4, 0x05,             // Jump to end
+             0x01, 0x10, 0xE0,       // Push lastLink, push arg, send nextLink:
+             0x87,                   // Pop
+             0x10, 0x61,             // Push arg, store in lastLink
+             0x10, 0x7C],            // Push arg, return
+            new SArray(),
+            1, 0));
+        instanceMethodCount++;
+        
+        // removeFirst
+        // | oldLink | 
+        // self emptyCheck.
+        // oldLink := firstLink.
+        // firstLink == lastLink
+        //     ifTrue: [firstLink := nil. lastLink := nil]
+        //     ifFalse: [firstLink := oldLink nextLink].
+        // oldLink nextLink: nil.
+        // ^oldLink
+        linkedListClass.AddMethod("removeFirst", SCompiledMethod.CreateCompiledMethod(
+            "removeFirst",
+            [0x70, 0xD0,             // Push self, send emptyCheck
+             0x87,                   // Pop
+             0x00, 0x68,             // Push firstLink, store temp 0 (oldLink)
+             0x00, 0x01, 0xC6,       // Push firstLink, lastLink, ==
+             0x99, 0x08,             // Jump if false
+             0x71, 0x60,             // nil, store firstLink
+             0x71, 0x61,             // nil, store lastLink
+             0xA4, 0x06,             // Jump to end
+             0x11, 0xCF, 0x60,       // Push oldLink, nextLink, store firstLink
+             0x11, 0x71, 0xE0,       // Push oldLink, nil, send nextLink:
+             0x87,                   // Pop
+             0x11, 0x7C],            // Push oldLink, return
+            new SArray(),
+            0, 1));
+        instanceMethodCount++;
+        
+        // first
+        // self emptyCheck. ^firstLink
+        linkedListClass.AddMethod("first", SCompiledMethod.CreateCompiledMethod(
+            "first",
+            [0x70, 0xD0,             // Push self, send emptyCheck
+             0x87,                   // Pop
+             0x00, 0x7C],            // Push firstLink, return
+            new SArray(),
+            0, 0));
+        instanceMethodCount++;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[COLD START] LinkedList: {instanceMethodCount} instance methods installed");
+        }
+    }
+    
+    /// <summary>
+    /// Installs Link methods.
+    /// </summary>
+    private static void InstallLinkMethods()
+    {
+        var linkClass = SystemDictionary.LinkClass;
+        if (linkClass == null) return;
+        
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine("[COLD START] Link: 0 instance methods installed");
+        }
+    }
+}

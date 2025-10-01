@@ -9,7 +9,7 @@ using Smalltalk80.Interpreter.Core.Values;
 /// From the Blue Book page 252:
 /// A Process represents a sequence of actions described by context objects.
 /// Each process has a priority and can be suspended, resumed, or terminated.
-/// 
+///
 /// Instance variables:
 /// - suspendedContext: The context at which the process was suspended
 /// - priority: The process priority (1-8 in standard Smalltalk)
@@ -21,7 +21,7 @@ public sealed class SProcess : SInstance
     private const int SuspendedContextIndex = 0;
     private const int PriorityIndex = 1;
     private const int MyListIndex = 2;
-    
+
     /// <summary>
     /// Initializes a new instance of the SProcess class.
     /// </summary>
@@ -32,61 +32,65 @@ public sealed class SProcess : SInstance
         : base(processClass, 3) // 3 instance variables
     {
         SetSuspendedContext(initialContext);
-        SetPriority(SmallInteger.From(priority));
-        SetMyList(SNil.Instance);
+        SetPriority(priority);
+        SetMyList(null);
     }
-    
+
     /// <summary>
     /// Gets or sets the suspended context.
     /// </summary>
-    public SObject SuspendedContext
+    public SObjectRef SuspendedContext
     {
-        get => GetInstanceVariable(SuspendedContextIndex) ?? SNil.Instance;
+        get => GetInstanceVariable(SuspendedContextIndex);
         set => SetInstanceVariable(SuspendedContextIndex, value);
     }
-    
+
     /// <summary>
     /// Gets or sets the process priority.
     /// </summary>
-    public SmallInteger Priority
+    public int Priority
     {
-        get => (SmallInteger)(GetInstanceVariable(PriorityIndex) ?? SmallInteger.From(4));
-        set => SetInstanceVariable(PriorityIndex, value);
+        get
+        {
+            var priorityRef = GetInstanceVariable(PriorityIndex);
+            return priorityRef.IsSmallInteger ? priorityRef.AsSmallInteger() : 4;
+        }
+        set => SetInstanceVariable(PriorityIndex, SObjectRef.FromSmallInteger(value));
     }
-    
+
     /// <summary>
     /// Gets or sets the process list this process belongs to.
     /// </summary>
-    public SObject MyList
+    public SObjectRef MyList
     {
-        get => GetInstanceVariable(MyListIndex) ?? SNil.Instance;
+        get => GetInstanceVariable(MyListIndex);
         set => SetInstanceVariable(MyListIndex, value);
     }
-    
+
     /// <summary>
     /// Sets the suspended context.
     /// </summary>
-    private void SetSuspendedContext(SObject context)
+    private void SetSuspendedContext(SObject? context)
     {
-        SetInstanceVariable(SuspendedContextIndex, context);
+        SetInstanceVariable(SuspendedContextIndex, context != null ? SObjectRef.FromObject(context) : SObjectRef.Nil);
     }
-    
+
     /// <summary>
     /// Sets the priority.
     /// </summary>
-    private void SetPriority(SmallInteger priority)
+    private void SetPriority(int priority)
     {
-        SetInstanceVariable(PriorityIndex, priority);
+        SetInstanceVariable(PriorityIndex, SObjectRef.FromSmallInteger(priority));
     }
-    
+
     /// <summary>
     /// Sets the process list.
     /// </summary>
-    private void SetMyList(SObject list)
+    private void SetMyList(SObject? list)
     {
-        SetInstanceVariable(MyListIndex, list);
+        SetInstanceVariable(MyListIndex, list != null ? SObjectRef.FromObject(list) : SObjectRef.Nil);
     }
-    
+
     /// <summary>
     /// Suspends this process at the given context.
     /// </summary>
@@ -94,39 +98,34 @@ public sealed class SProcess : SInstance
     {
         SetSuspendedContext(context);
     }
-    
+
     /// <summary>
     /// Resumes this process from its suspended context.
     /// </summary>
-    public SObject Resume()
+    /// <returns>The context to resume execution from.</returns>
+    public SObjectRef Resume()
     {
         return SuspendedContext;
     }
-    
-    /// <summary>
-    /// Checks if this process is terminated.
-    /// </summary>
-    public bool IsTerminated()
-    {
-        return SuspendedContext == SNil.Instance;
-    }
-    
+
     /// <summary>
     /// Terminates this process.
     /// </summary>
     public void Terminate()
     {
-        SetSuspendedContext(SNil.Instance);
-        SetMyList(SNil.Instance);
+        // Clear the suspended context
+        SetSuspendedContext(null);
+        // Remove from any list
+        SetMyList(null);
     }
-    
+
     /// <summary>
     /// Returns a string representation of this process.
     /// </summary>
     public override string ToDisplayString()
     {
-        var priorityValue = Priority.Value;
-        var status = IsTerminated() ? "terminated" : "suspended";
-        return $"Process(priority={priorityValue}, {status})";
+        var contextRef = SuspendedContext;
+        var contextDisplay = contextRef.IsNil ? "terminated" : "suspended";
+        return $"Process(priority: {Priority}, {contextDisplay})";
     }
 }

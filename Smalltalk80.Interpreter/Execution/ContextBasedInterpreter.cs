@@ -124,7 +124,7 @@ public sealed class ContextBasedInterpreter
         // Set the sender if we have an active context
         if (activeContext != null)
         {
-            newContext.Sender = activeContext;
+            newContext.Sender = SObjectRef.FromObject(activeContext);
         }
         
         // Make this the active context
@@ -196,7 +196,7 @@ public sealed class ContextBasedInterpreter
     public SObject ExecuteBlock(SBlockContext blockContext, SObject[] arguments)
     {
         // Activate the block with arguments
-        blockContext.Activate(activeContext, arguments);
+        blockContext.Activate(activeContext, arguments.Select(SObjectRef.FromObject).ToArray());
         
         // Make this the active context
         var previousContext = activeContext;
@@ -240,11 +240,11 @@ public sealed class ContextBasedInterpreter
             if (ip >= bytecodes.Length)
             {
                 // End of bytecodes without explicit return
-                return methodContext.Receiver;
+                return methodContext.Receiver.AsObject()!;
             }
             
             var bytecode = bytecodes[ip];
-            context.InstructionPointer = SmallInteger.From(ip + 1);
+            context.InstructionPointer = SObjectRef.FromSmallInteger(ip + 1);
             
             if (DebugOptions.EnableBytecodeTrace || tracingEnabled)
             {
@@ -287,13 +287,13 @@ public sealed class ContextBasedInterpreter
         {
             var index = bytecode & 0x0F;
             var receiver = homeContext.Receiver;
-            if (receiver is SInstance instance)
+            if (receiver.AsObject() is SInstance instance)
             {
-                context.Push(instance.GetInstanceVariable(index) ?? SNil.Instance);
+                context.Push(instance.GetInstanceVariable(index) );
             }
             else
             {
-                context.Push(SNil.Instance);
+                context.Push(SObjectRef.Nil);
             }
             return false;
         }
@@ -311,7 +311,7 @@ public sealed class ContextBasedInterpreter
         {
             var index = bytecode & 0x1F;
             var literal = homeContext.Method.GetLiteral(index);
-            context.Push(literal ?? SNil.Instance);
+            context.Push(literal );
             return false;
         }
         
@@ -322,11 +322,11 @@ public sealed class ContextBasedInterpreter
             var association = homeContext.Method.GetLiteral(index);
             if (association is SArray arr && arr.Size >= 2)
             {
-                context.Push(arr.At(1) ?? SNil.Instance);
+                context.Push(arr.At(1) );
             }
             else
             {
-                context.Push(SNil.Instance);
+                context.Push(SObjectRef.Nil);
             }
             return false;
         }
@@ -337,7 +337,7 @@ public sealed class ContextBasedInterpreter
             var index = bytecode & 0x07;
             var value = context.Pop();
             var receiver = homeContext.Receiver;
-            if (receiver is SInstance instance)
+            if (receiver.AsObject() is SInstance instance)
             {
                 instance.SetInstanceVariable(index, value);
             }
@@ -369,23 +369,23 @@ public sealed class ContextBasedInterpreter
                 return false;
                 
             case 0x73: // pushNil
-                context.Push(SNil.Instance);
+                context.Push(SObjectRef.Nil);
                 return false;
                 
             case 0x74: // pushMinusOne
-                context.Push(SmallInteger.From(-1));
+                context.Push(SObjectRef.FromSmallInteger(-1));
                 return false;
                 
             case 0x75: // pushZero
-                context.Push(SmallInteger.From(0));
+                context.Push(SObjectRef.FromSmallInteger(0));
                 return false;
                 
             case 0x76: // pushOne
-                context.Push(SmallInteger.From(1));
+                context.Push(SObjectRef.FromSmallInteger(1));
                 return false;
                 
             case 0x77: // pushTwo
-                context.Push(SmallInteger.From(2));
+                context.Push(SObjectRef.FromSmallInteger(2));
                 return false;
                 
             case 0x78: // return receiver
@@ -401,7 +401,7 @@ public sealed class ContextBasedInterpreter
                 return true;
                 
             case 0x7B: // return nil
-                context.Push(SNil.Instance);
+                context.Push(SObjectRef.Nil);
                 return true;
                 
             case 0x7C: // return top
@@ -495,7 +495,7 @@ public sealed class ContextBasedInterpreter
         if (bytecode >= 0x90 && bytecode <= 0x97)
         {
             var offset = (bytecode & 0x07) + 1;
-            context.InstructionPointer = SmallInteger.From(
+            context.InstructionPointer = SObjectRef.FromSmallInteger(
                 context.InstructionPointer.Value + offset);
             return false;
         }
@@ -507,7 +507,7 @@ public sealed class ContextBasedInterpreter
             var condition = context.Pop();
             if (condition == SFalse.Instance)
             {
-                context.InstructionPointer = SmallInteger.From(
+                context.InstructionPointer = SObjectRef.FromSmallInteger(
                     context.InstructionPointer.Value + offset);
             }
             return false;
@@ -536,7 +536,7 @@ public sealed class ContextBasedInterpreter
         }
         
         var nextByte = bytecodes[ip];
-        context.InstructionPointer = SmallInteger.From(ip + 1);
+        context.InstructionPointer = SObjectRef.FromSmallInteger(ip + 1);
         return nextByte;
     }
     
@@ -556,9 +556,9 @@ public sealed class ContextBasedInterpreter
             {
                 case 0: // Extended push receiver variable
                     var receiver = homeContext.Receiver;
-                    if (receiver is SInstance instance)
+                    if (receiver.AsObject() is SInstance instance)
                     {
-                        context.Push(instance.GetInstanceVariable(operand) ?? SNil.Instance);
+                        context.Push(instance.GetInstanceVariable(operand) );
                     }
                     return false;
                     
@@ -568,39 +568,39 @@ public sealed class ContextBasedInterpreter
                     
                 case 2: // Extended push literal
                     var literal = homeContext.Method.GetLiteral(operand);
-                    context.Push(literal ?? SNil.Instance);
+                    context.Push(literal );
                     return false;
                     
                 case 3: // Extended push literal variable
                     var assoc = homeContext.Method.GetLiteral(operand);
                     if (assoc is SArray arr && arr.Size >= 2)
                     {
-                        context.Push(arr.At(1) ?? SNil.Instance);
+                        context.Push(arr.At(1) );
                     }
                     return false;
                     
                 case 4: // Extended store receiver variable
                     var value = context.Top();
                     var rcvr = homeContext.Receiver;
-                    if (rcvr is SInstance inst)
+                    if (rcvr.AsObject() is SInstance inst)
                     {
                         inst.SetInstanceVariable(operand, value);
                     }
                     return false;
-                    
+
                 case 5: // Extended store temporary
                     homeContext.SetTemporary(operand, context.Top());
                     return false;
-                    
+
                 case 6: // Extended store and pop receiver variable
                     var val = context.Pop();
                     var rec = homeContext.Receiver;
-                    if (rec is SInstance ins)
+                    if (rec.AsObject() is SInstance ins)
                     {
                         ins.SetInstanceVariable(operand, val);
                     }
                     return false;
-                    
+
                 case 7: // Extended store and pop temporary
                     homeContext.SetTemporary(operand, context.Pop());
                     return false;
@@ -616,45 +616,45 @@ public sealed class ContextBasedInterpreter
                 case 0: // Extended send
                     ExecuteSend(operand, extendedType & 0x1F, context, homeContext);
                     return false;
-                    
+
                 case 1: // Extended super send
                     ExecuteSuperSend(operand, extendedType & 0x1F, context, homeContext);
                     return false;
-                    
+
                 case 2: // Extended push receiver variable
                     var receiver = homeContext.Receiver;
-                    if (receiver is SInstance instance)
+                    if (receiver.AsObject() is SInstance instance)
                     {
-                        context.Push(instance.GetInstanceVariable(operand) ?? SNil.Instance);
+                        context.Push(instance.GetInstanceVariable(operand) );
                     }
                     return false;
                     
                 case 3: // Extended push literal
                     var literal = homeContext.Method.GetLiteral(operand);
-                    context.Push(literal ?? SNil.Instance);
+                    context.Push(literal );
                     return false;
                     
                 case 4: // Extended push literal variable
                     var assoc = homeContext.Method.GetLiteral(operand);
                     if (assoc is SArray arr && arr.Size >= 2)
                     {
-                        context.Push(arr.At(1) ?? SNil.Instance);
+                        context.Push(arr.At(1) );
                     }
                     return false;
                     
                 case 5: // Extended store receiver variable
                     var value = context.Top();
                     var rcvr = homeContext.Receiver;
-                    if (rcvr is SInstance inst)
+                    if (rcvr.AsObject() is SInstance inst)
                     {
                         inst.SetInstanceVariable(operand, value);
                     }
                     return false;
-                    
+
                 case 6: // Extended store and pop receiver variable
                     var val = context.Pop();
                     var rec = homeContext.Receiver;
-                    if (rec is SInstance ins)
+                    if (rec.AsObject() is SInstance ins)
                     {
                         ins.SetInstanceVariable(operand, val);
                     }
@@ -686,7 +686,7 @@ public sealed class ContextBasedInterpreter
         switch (type)
         {
             case 0: // Long unconditional jump
-                context.InstructionPointer = SmallInteger.From(
+                context.InstructionPointer = SObjectRef.FromSmallInteger(
                     context.InstructionPointer.Value + offset);
                 return false;
                 
@@ -694,7 +694,7 @@ public sealed class ContextBasedInterpreter
                 var condTrue = context.Pop();
                 if (condTrue == STrue.Instance)
                 {
-                    context.InstructionPointer = SmallInteger.From(
+                    context.InstructionPointer = SObjectRef.FromSmallInteger(
                         context.InstructionPointer.Value + offset);
                 }
                 return false;
@@ -703,7 +703,7 @@ public sealed class ContextBasedInterpreter
                 var condFalse = context.Pop();
                 if (condFalse == SFalse.Instance)
                 {
-                    context.InstructionPointer = SmallInteger.From(
+                    context.InstructionPointer = SObjectRef.FromSmallInteger(
                         context.InstructionPointer.Value + offset);
                 }
                 return false;

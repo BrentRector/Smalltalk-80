@@ -18,4 +18,25 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude old architecture files from compilation -->
+    <Compile Remove="**\*.OLD.cs" />
+  </ItemGroup>
+
+  <!-- Auto-generate STObjectsLayout.cs from Smalltalk-80.st when source changes -->
+  <PropertyGroup>
+    <SmalltalkSourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SmalltalkSourceFile>
+    <LayoutGeneratorOutput>$(MSBuildProjectDirectory)\Generated\STObjectsLayout.cs</LayoutGeneratorOutput>
+    <ColdStartClasses>Object,Behavior,ClassDescription,Class,Metaclass,Magnitude,Number,Integer,LookupKey,Association,Collection,SequenceableCollection,ArrayedCollection,Array,String,Symbol,ByteArray,CompiledMethod,InstructionStream,ContextPart,BlockContext,MethodContext,Link,LinkedList,Process,Semaphore,ProcessorScheduler,UndefinedObject,Boolean,True,False,SmallInteger,LargePositiveInteger,LargeNegativeInteger,Float,Fraction,Point,Rectangle,Character,Set,Dictionary,IdentityDictionary,MethodDictionary,SystemDictionary</ColdStartClasses>
+  </PropertyGroup>
+
+  <Target Name="GenerateSTObjectsLayout"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(SmalltalkSourceFile)"
+          Outputs="$(LayoutGeneratorOutput)">
+    <Message Text="Regenerating STObjectsLayout.cs from Smalltalk-80.st..." Importance="high" />
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; -- generate-layouts &quot;$(SmalltalkSourceFile)&quot; &quot;$(LayoutGeneratorOutput)&quot; --classes $(ColdStartClasses)"
+          WorkingDirectory="$(MSBuildProjectDirectory)\.." />
+  </Target>
+
 </Project>

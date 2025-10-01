@@ -31,7 +31,7 @@ public sealed class SFloat : SObject
     public override SClass Class => floatClass ?? throw new InvalidOperationException("Float class not initialized");
     
     /// <summary>
-    /// Sets the Float class (called during bootstrap).
+    /// Sets the Float class (called during cold start).
     /// </summary>
     internal static void SetFloatClass(SClass sClass)
     {
@@ -142,7 +142,7 @@ public sealed class SFloat : SObject
         var truncated = (int)Math.Truncate(value);
         if (truncated >= SmallInteger.MinValue && truncated <= SmallInteger.MaxValue)
         {
-            return SmallInteger.From(truncated);
+            return new SmallInteger(truncated);
         }
         throw new OverflowException($"Truncated value {truncated} exceeds SmallInteger range");
     }
@@ -160,11 +160,11 @@ public sealed class SFloat : SObject
     /// </summary>
     public SmallInteger Exponent()
     {
-        if (value == 0.0) return SmallInteger.From(0);
-        
+        if (value == 0.0) return new SmallInteger(0);
+
         var bits = BitConverter.DoubleToInt64Bits(value);
         var exponent = (int)((bits >> 52) & 0x7FF) - 1023;
-        return SmallInteger.From(exponent);
+        return new SmallInteger(exponent);
     }
     
     /// <summary>

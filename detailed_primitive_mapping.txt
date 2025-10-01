@@ -1,8 +1,0 @@
-COMPREHENSIVE SMALLTALK-80 PRIMITIVE ASSIGNMENTS
-================================================
-Format: Primitive# | Class | Method | Standard/Windows | Notes
----------------------------------------------------------------
-
-
-=== CONFLICTS DETECTED ===
-
