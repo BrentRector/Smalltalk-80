@@ -529,37 +529,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     
     #region Type Resolution
 
-    /// <summary>
-    /// Gets the Smalltalk class of this reference.
-    /// Blue Book: Only SmallInteger and nil are special cases.
-    /// All other objects (including Character, Symbol, etc.) are heap objects.
-    /// </summary>
-    public SClass GetClass()
-    {
-        if (IsNil)
-            return SystemDictionary.UndefinedObjectClass;
-
-        if (IsSmallInteger)
-            return SystemDictionary.SmallIntegerClass;
-
-        // All other types are heap objects with their own class pointer
-        return AsObject()?.Class ?? SystemDictionary.ObjectClass;
-    }
-
-    /// <summary>
-    /// Returns true if this reference is of the given class or subclass.
-    /// </summary>
-    public bool IsKindOf(SClass cls)
-    {
-        var myClass = GetClass();
-        while (myClass != null)
-        {
-            if (myClass == cls)
-                return true;
-            myClass = myClass.Superclass;
-        }
-        return false;
-    }
+    // TODO: Add GetClass() and IsKindOf() methods here when needed
 
     #endregion
     

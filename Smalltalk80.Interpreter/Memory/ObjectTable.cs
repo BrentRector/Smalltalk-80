@@ -11,7 +11,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 /// Design:
 /// - Each segment contains 4096 OOP entries (fixed size)
 /// - Segments are allocated on demand and never moved
-/// - OOP = absolute index << 2 (4-byte alignment, LSB=0 for object pointers)
+/// - OOP = absolute index shifted left 2 bits (4-byte alignment, LSB=0 for object pointers)
 /// - Free list (Stack of OOPs) provides O(1) allocation of recycled slots
 /// - No copying on growth - just allocate new segment and link it
 /// - GC mark bit stored in ObjectData.Marked field
@@ -52,6 +52,9 @@ public sealed class ObjectTable
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObjectTable"/> class.
+    /// </summary>
     public ObjectTable()
     {
         _segments = new List<ObjectTableEntry[]>(INITIAL_SEGMENTS);
@@ -62,7 +65,8 @@ public sealed class ObjectTable
             AllocateSegment();
         }
 
-        _nextIndex = 0;
+        // Start at index 1 to avoid OOP 0, which is reserved for nil
+        _nextIndex = 1;
         _freeList = new Stack<int>(1024);
         _totalAllocations = 0;
         _totalFrees = 0;
@@ -195,7 +199,7 @@ public sealed class ObjectTable
 
     /// <summary>
     /// Converts an OOP (object-oriented pointer) to a table index.
-    /// OOP encoding: index << 2 (ensures 4-byte alignment, LSB=0).
+    /// OOP encoding: index shifted left 2 bits (ensures 4-byte alignment, LSB=0).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int IndexFromOop(nint oop)
@@ -205,7 +209,7 @@ public sealed class ObjectTable
 
     /// <summary>
     /// Converts a table index to an OOP (object-oriented pointer).
-    /// OOP encoding: index << 2 (ensures 4-byte alignment, LSB=0).
+    /// OOP encoding: index shifted left 2 bits (ensures 4-byte alignment, LSB=0).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static nint OopFromIndex(int index)
@@ -538,6 +542,35 @@ public sealed class ObjectTable
         lock (_tableLock)
         {
             return (_segments.Count, SEGMENT_SIZE, _segments.Count * SEGMENT_SIZE);
+        }
+    }
+
+    /// <summary>
+    /// Gets all allocated object indices for GC traversal.
+    /// </summary>
+    public IEnumerable<int> GetAllocatedIndices()
+    {
+        lock (_tableLock)
+        {
+            for (int i = 1; i < _nextIndex; i++)
+            {
+                var entry = GetEntry(i);
+                if (!entry.IsFree && entry.Data != null)
+                {
+                    yield return i;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the total count of allocated objects.
+    /// </summary>
+    public int GetAllocatedCount()
+    {
+        lock (_tableLock)
+        {
+            return GetAllocatedIndices().Count();
         }
     }
 }

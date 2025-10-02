@@ -353,9 +353,213 @@ SObjectRef key = assoc.Key;     // Works via ISTLookupKey interface
 
 ### Cold Start Classes
 
-The following classes are included in STObjectsLayout.cs for cold start bootstrap:
+The layout generator produces structs **only for classes used by cold start** and their superclasses. This focused approach keeps the generated code maintainable while providing all necessary infrastructure.
 
-Object, Behavior, ClassDescription, Class, Metaclass, Magnitude, LookupKey, Association, Collection, SequenceableCollection, ArrayedCollection, Array, String, Symbol, ByteArray, CompiledMethod, Context, BlockContext, MethodContext, Link, Process, Semaphore, ProcessorScheduler, UndefinedObject, Boolean, True, False, SmallInteger, LargePositiveInteger, LargeNegativeInteger, Float, Fraction, Point, Rectangle, Character, Set, Dictionary, IdentityDictionary, MethodDictionary, SystemDictionary
+**Directly Used Classes (15):**
+- Class, Metaclass
+- MethodDictionary, CompiledMethod
+- Array, Dictionary, SystemDictionary, Association
+- String, Symbol
+- MethodContext, BlockContext
+- Process, Semaphore
+- Character
+
+**Including Superclasses (29 total):**
+1. Object
+2. Magnitude → Character
+3. LookupKey → Association
+4. Behavior → ClassDescription → Class, Metaclass
+5. Collection → SequenceableCollection → ArrayedCollection → Array, String, Symbol, ByteArray, CompiledMethod
+6. Collection → SequenceableCollection → LinkedList → Semaphore
+7. Collection → Set → Dictionary → IdentityDictionary → MethodDictionary, SystemDictionary
+8. Link → Process
+9. ContextPart → MethodContext, BlockContext
+
+### Enhanced Layout Struct Features
+
+Beyond basic instance variable properties, the layout generator provides specialized features for different class categories:
+
+#### 1. All Classes Get
+
+```csharp
+public readonly struct ST{ClassName}
+{
+    private readonly SObjectRef _ref;
+
+    // Instance variable properties (inherited + own)
+    public SObjectRef {PropertyName} { get; set; }
+
+    // Constants
+    public const int InstanceVarCount = N;
+    public const ObjectFormat IndexedFormat = ObjectFormat.{Format};
+
+    // Conversions
+    public ST{ClassName}(SObjectRef objectRef) => _ref = objectRef;
+    public static implicit operator SObjectRef(ST{ClassName} obj) => obj._ref;
+    public static implicit operator ST{ClassName}(SObjectRef r) => new(r);
+}
+```
+
+**ObjectFormat Detection**: The generator parses Smalltalk class definition keywords to determine the correct format:
+- `subclass:` → `ObjectFormat.FixedPointer`
+- `variableSubclass:` → `ObjectFormat.PointerIndexed`
+- `variableByteSubclass:` → `ObjectFormat.ByteIndexed`
+- `variableWordSubclass:` → `ObjectFormat.WordIndexed`
+- Special case: CompiledMethod → `ObjectFormat.CompiledMethod`
+
+#### 2. Variable Classes Get Indexers
+
+**Simple Pointer Indexed** (Array, Set, Dictionary, LinkedList):
+```csharp
+public SObjectRef this[int index]
+{
+    get => _ref.GetIndexedPointer(index);
+    set => _ref.SetIndexedPointer(index, value);
+}
+public int Length => _ref.GetIndexedSize();
+
+// Usage: array[5] = value
+```
+
+**Simple Byte Indexed** (String, Symbol, ByteArray):
+```csharp
+public byte this[int index]
+{
+    get => _ref.GetIndexedByte(index);
+    set => _ref.SetIndexedByte(index, value);
+}
+public int Length => _ref.GetIndexedSize();
+
+// Usage: string[5] = (byte)'A'
+```
+
+**Parallel Array Indexed** (IdentityDictionary, MethodDictionary):
+```csharp
+public KeysCollection Keys => new KeysCollection(_ref);
+public ValuesCollection Values => new ValuesCollection(_ref);
+
+public readonly struct KeysCollection
+{
+    private readonly SObjectRef _dictRef;
+    internal KeysCollection(SObjectRef dictRef) => _dictRef = dictRef;
+
+    public SObjectRef this[int index]
+    {
+        get => _dictRef.GetIndexedPointer(index);
+        set => _dictRef.SetIndexedPointer(index, value);
+    }
+    public int Length => _dictRef.GetIndexedSize();
+}
+
+public readonly struct ValuesCollection
+{
+    private readonly SObjectRef _dictRef;
+
+    public SObjectRef this[int index]
+    {
+        get
+        {
+            var valueArrayRef = _dictRef.GetInstanceVariable(1);
+            STArray valueArray = valueArrayRef;
+            return valueArray[index];
+        }
+        set { /* similar */ }
+    }
+    public int Length { /* from valueArray */ }
+}
+
+// Usage: dict.Keys[5] = keyRef; dict.Values[5] = valueRef;
+```
+
+**Context Semantic Accessors** (MethodContext, BlockContext):
+```csharp
+// Semantic accessors for temps and stack (not raw indexers)
+public SObjectRef GetTemporary(int index) => _ref.GetIndexedPointer(index);
+public void SetTemporary(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+public SObjectRef GetStackSlot(int index) => _ref.GetIndexedPointer(index);
+public void SetStackSlot(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+// Usage: context.SetTemporary(0, value); context.SetStackSlot(5, result);
+```
+
+**CompiledMethod Array Properties**:
+```csharp
+// Direct array access for heterogeneous data
+public SObjectRef[] Literals => _ref.GetCompiledMethodLiterals();
+public byte[] Bytecodes => _ref.GetCompiledMethodBytecodes();
+public ushort Header { get; set; }
+
+// Usage: method.Literals[0] = selector; method.Bytecodes[5] = 0x10;
+```
+
+#### 3. Factory Methods for Object Creation
+
+Only directly instantiated classes get factory methods that encapsulate proper initialization:
+
+```csharp
+public static STMethodContext Create(
+    SObjectRef classRef,
+    SObjectRef method,
+    SObjectRef receiver,
+    int tempCount,
+    int stackSize)
+{
+    var totalSize = InstanceVarCount + tempCount + stackSize;
+    var oop = ObjectMemoryNew.AllocateObject(
+        classRef,
+        IndexedFormat,
+        totalSize,
+        0);
+
+    var context = new STMethodContext(SObjectRef.FromObjectPointer(oop));
+
+    // Initialize all fields
+    context.Sender = SObjectRef.Nil;
+    context.Pc = SObjectRef.FromSmallInteger(0);
+    context.Stackp = SObjectRef.FromSmallInteger(InstanceVarCount + tempCount);
+    context.Method = method;
+    context.ReceiverMap = SObjectRef.Nil;
+    context.Receiver = receiver;
+
+    // Indexed portion (temps/stack) already initialized to nil
+
+    return context;
+}
+
+// Usage: var ctx = STMethodContext.Create(methodCtxClass, method, receiver, 3, 10);
+```
+
+#### 4. Convenience Properties
+
+```csharp
+// For classes with 'tally' field
+public int Count => Tally.AsSmallInteger();
+
+// For contexts
+public int StackPointer => Stackp.AsSmallInteger();
+public int ProgramCounter => Pc.AsSmallInteger();
+```
+
+### Layout Generation Philosophy
+
+**Purpose**: Layout structs exist solely to support cold start initialization:
+1. **Initialize all fields properly** (via factory - set everything to zero/nil)
+2. **Provide high-level field access** for cold start to link objects together
+
+**Indexing Convention**: All indexers use **0-based indexing** (C# convention) since this is cold start infrastructure written in C#. The Smalltalk VM (when running) will handle 1-based indexing through primitives.
+
+**Generation Algorithm**:
+1. Parse Smalltalk-80.st to get class definitions
+2. Start with 15 directly used classes (seed set)
+3. Walk superclass chains to collect all 29 required classes
+4. For each class:
+   - Determine ObjectFormat from class definition keywords
+   - Generate instance variable properties (inherited + own)
+   - Generate indexers if variable class
+   - Generate factory if directly instantiated
+   - Generate convenience properties as needed
+5. Generate in dependency order (superclasses before subclasses)
 
 ### SpecialObjectsArray (GC Roots)
 

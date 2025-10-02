@@ -3,6 +3,7 @@ namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Installs kernel methods for behavior-related classes including Behavior, 
@@ -38,35 +39,39 @@ public static class BehaviorMethodsInstaller
         }
         
         // new
-        behaviorClassRef.AddMethod("new", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "new",
             [0x70, 0xCB, 0xD2, 0x7C], // self basicNew initialize
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("basicNew"), SSymbol.Intern("initialize")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("basicNew"), ObjectMemoryNew.InternSymbol("initialize")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "new", method1);
         instanceMethodCount++;
-        
+
         // new: with size
-        behaviorClassRef.AddMethod("new:", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "new:",
             [0x70, 0x10, 0xCC, 0xD2, 0x7C], // self basicNew: size initialize
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("basicNew:"), SSymbol.Intern("initialize")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("basicNew:"), ObjectMemoryNew.InternSymbol("initialize")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "new:", method2);
         instanceMethodCount++;
-        
+
         // basicNew - primitive 70
-        behaviorClassRef.AddMethod("basicNew", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "basicNew",
             [0x70, 0xD0, 0x7C], // self primitiveFailed (fallback for primitive 70)
             [],
-            0, 0, 70));
+            0, 0, 70);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "basicNew", method3);
         instanceMethodCount++;
-        
+
         // basicNew: - primitive 71
-        behaviorClassRef.AddMethod("basicNew:", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "basicNew:",
             [0x70, 0xD0, 0x7C], // self primitiveFailed (fallback for primitive 71)
             [],
-            1, 0, 71));
+            1, 0, 71);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "basicNew:", method4);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)

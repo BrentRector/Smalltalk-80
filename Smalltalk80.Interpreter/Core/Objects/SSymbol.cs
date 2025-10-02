@@ -24,7 +24,6 @@ public sealed class SSymbol : SObject, IEquatable<SSymbol>
     /// <summary>
     /// Gets the class of Symbol.
     /// </summary>
-    public override SClass Class => SystemDictionary.SymbolClass;
     
     /// <summary>
     /// Interns a string to get the unique symbol.

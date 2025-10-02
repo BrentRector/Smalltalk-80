@@ -7,166 +7,152 @@ using Smalltalk80.Interpreter.Config;
 
 /// <summary>
 /// Mark-and-sweep garbage collector for the Smalltalk-80 interpreter.
-/// 
-/// CRITICAL DESIGN: The GC has exactly ONE root - the Special Objects Array.
-/// NO individual objects are registered. All live objects are found by tracing
-/// references from the SOA. Objects become collectible when no longer reachable.
+///
+/// ARCHITECTURE:
+/// - GC is a client of ObjectTable - no special integration needed
+/// - The only root is the Special Objects Array (SOA), which stores raw OOPs
+/// - Mark phase: Starting from SOA, recursively mark all reachable objects
+/// - Sweep phase: Walk all ObjectTable entries, call ObjectTable.Free() for unmarked ones
+///
+/// CRITICAL DESIGN:
+/// - The GC works with OOPs (nint), not SObjectRef, for its internal operations
+/// - ObjectTable handles all allocation/deallocation details
+/// - Clean separation: GC knows nothing about ObjectTable's internal free list, segmentation, etc.
 /// </summary>
 public sealed class GarbageCollector
 {
-    private readonly HashSet<SObject> reachableObjects = new();
-    private readonly Queue<SObject> workQueue = new();
+    private readonly ObjectTable objectTable;
+    private readonly Stack<nint> gcStack = new();
     private readonly object gcLock = new();
-    
-    // The ONLY root for GC - can be C# List or Smalltalk Array
-    private List<SObject?> specialObjectsArray = new();
-    
+
+    // The ONLY root for GC - stores raw OOPs
+    private List<nint> specialObjectsArray = new();
+
+    // Statistics
     private long totalCollections;
     private long totalObjectsCollected;
-    private long totalBytesFreed;
     private long lastCollectionDuration;
-    
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GarbageCollector"/> class.
+    /// </summary>
+    /// <param name="objectTable">The object table to manage.</param>
+    public GarbageCollector(ObjectTable objectTable)
+    {
+        this.objectTable = objectTable ?? throw new ArgumentNullException(nameof(objectTable));
+    }
+
     /// <summary>
     /// Gets the total number of garbage collections performed.
     /// </summary>
     public long TotalCollections => totalCollections;
-    
+
     /// <summary>
     /// Gets the total number of objects collected.
     /// </summary>
     public long TotalObjectsCollected => totalObjectsCollected;
-    
-    /// <summary>
-    /// Gets the total amount of memory freed in bytes.
-    /// </summary>
-    public long TotalBytesFreed => totalBytesFreed;
-    
+
     /// <summary>
     /// Gets the duration of the last collection in milliseconds.
     /// </summary>
     public long LastCollectionDurationMs => lastCollectionDuration;
-    
+
     /// <summary>
     /// Sets the Special Objects Array - the ONLY root for garbage collection.
     /// </summary>
-    /// <param name="soa">The special objects array.</param>
-    public void SetSpecialObjectsArray(List<SObject?> soa)
+    /// <param name="soa">The special objects array as OOPs.</param>
+    public void SetSpecialObjectsArray(List<nint> soa)
     {
         lock (gcLock)
         {
-            specialObjectsArray = soa ?? new List<SObject?>();
+            specialObjectsArray = soa ?? new List<nint>();
         }
     }
-    
+
     /// <summary>
-    /// Gets or sets a specific special object.
+    /// Sets the Special Objects Array from SObjectRefs.
     /// </summary>
-    public SObject? GetSpecialObject(int index)
+    /// <param name="refs">The special objects array as SObjectRefs.</param>
+    public void SetSpecialObjectsArrayFromRefs(List<SObjectRef> refs)
     {
         lock (gcLock)
         {
-            if (index >= 0 && index < specialObjectsArray.Count)
-                return specialObjectsArray[index];
-            return null;
+            specialObjectsArray = new List<nint>();
+            foreach (var objRef in refs)
+            {
+                if (!objRef.IsNil && objRef.IsHeapObject)
+                {
+                    specialObjectsArray.Add(objRef.AsObjectPointer());
+                }
+                else if (!objRef.IsNil && !objRef.IsSmallInteger)
+                {
+                    // Store immediates as 0 (they don't need GC)
+                    specialObjectsArray.Add(0);
+                }
+                else
+                {
+                    specialObjectsArray.Add(0); // nil or SmallInteger
+                }
+            }
         }
     }
-    
-    /// <summary>
-    /// Sets a specific special object in the Special Objects Array.
-    /// </summary>
-    /// <param name="index">The index in the Special Objects Array.</param>
-    /// <param name="obj">The object to set at the specified index.</param>
-    public void SetSpecialObject(int index, SObject? obj)
-    {
-        lock (gcLock)
-        {
-            while (specialObjectsArray.Count <= index)
-                specialObjectsArray.Add(null);
-            specialObjectsArray[index] = obj;
-        }
-    }
-    
+
     /// <summary>
     /// Performs a garbage collection cycle.
-    /// Uses ONLY the Special Objects Array as roots.
     /// </summary>
     /// <returns>Statistics about the collection.</returns>
     public GarbageCollectionStatistics Collect()
     {
         var stopwatch = Stopwatch.StartNew();
-        var objectsCollected = 0;
-        var bytesFreed = 0L;
-        
+
         lock (gcLock)
         {
+            // Get total object count by counting all non-free entries
+            int totalObjects = CountAllocatedObjects();
+
             if (Program.RuntimeOptions.EnableGCLogging)
             {
-                Console.WriteLine($"[GC] Starting collection #{totalCollections + 1}...");
+                Console.WriteLine($"\n[GC] Starting collection #{totalCollections + 1}");
+                Console.WriteLine($"[GC] Total allocated objects: {totalObjects}");
             }
-            
-            // Phase 1: Mark all reachable objects
-            reachableObjects.Clear();
-            workQueue.Clear();
-            
-            // Add ONLY Special Objects Array elements as roots
-            foreach (var specialObj in specialObjectsArray)
-            {
-                if (specialObj != null && !specialObj.IsImmediate)
-                {
-                    workQueue.Enqueue(specialObj);
-                }
-            }
-            
-            // Mark phase - trace all reachable objects
-            while (workQueue.Count > 0)
-            {
-                var obj = workQueue.Dequeue();
-                
-                if (reachableObjects.Add(obj))
-                {
-                    // First time seeing this object, trace its references
-                    TraceObject(obj);
-                }
-            }
-            
-            if (Program.RuntimeOptions.GCTraceLevel == GCTraceLevel.Deep)
-            {
-                Console.WriteLine($"[GC] Marked {reachableObjects.Count} reachable objects");
-            }
-            
-            // Phase 2: Sweep
-            // In a real implementation, we would sweep through memory
-            // For now, just count reachable objects
-            objectsCollected = 0; // We don't track all objects anymore
-            
-            if (Program.RuntimeOptions.GCTraceLevel == GCTraceLevel.Deep)
-            {
-                Console.WriteLine($"[GC] Found {reachableObjects.Count} reachable objects from SOA");
-            }
-            
+
+            // MARK PHASE
+            ClearAllMarkBits();
+            MarkFromRoots();
+            int reachableObjects = CountMarkedObjects();
+
+            // SWEEP PHASE
+            int collected = SweepUnmarkedObjects();
+
+            // Update statistics
             totalCollections++;
-            totalObjectsCollected += objectsCollected;
-            totalBytesFreed += bytesFreed;
+            totalObjectsCollected += collected;
+
+            stopwatch.Stop();
+            lastCollectionDuration = stopwatch.ElapsedMilliseconds;
+
+            // Log results
+            if (Program.RuntimeOptions.EnableGCLogging)
+            {
+                Console.WriteLine($"[GC] Reachable objects: {reachableObjects}");
+                Console.WriteLine($"[GC] Objects collected: {collected}");
+                Console.WriteLine($"[GC] Collection time: {lastCollectionDuration}ms");
+
+                if (collected == 0)
+                {
+                    Console.WriteLine("[GC] ✓ All objects reachable - cold start initialization is correct");
+                }
+                else
+                {
+                    Console.WriteLine($"[GC] WARNING: Collected {collected} objects after cold start!");
+                    Console.WriteLine("[GC] This indicates a cold start initialization error - all objects should be reachable from SOA");
+                }
+            }
+
+            return new GarbageCollectionStatistics(collected, 0, lastCollectionDuration, totalCollections);
         }
-        
-        stopwatch.Stop();
-        lastCollectionDuration = stopwatch.ElapsedMilliseconds;
-        
-        if (Program.RuntimeOptions.EnableGCLogging)
-        {
-            Console.WriteLine($"[GC] Collection #{totalCollections} complete: " +
-                            $"{objectsCollected} objects collected, " +
-                            $"{bytesFreed:N0} bytes freed, " +
-                            $"{lastCollectionDuration}ms");
-        }
-        
-        return new GarbageCollectionStatistics(
-            objectsCollected,
-            bytesFreed,
-            lastCollectionDuration,
-            totalCollections);
     }
-    
+
     /// <summary>
     /// Forces a garbage collection.
     /// </summary>
@@ -175,258 +161,234 @@ public sealed class GarbageCollector
     {
         return Collect();
     }
-    
+
     /// <summary>
-    /// Traces all objects referenced by the given object.
+    /// Clears all mark bits in the object table.
     /// </summary>
-    private void TraceObject(SObject obj)
+    private void ClearAllMarkBits()
     {
-        switch (obj)
+        // Iterate through all allocated objects and clear their mark bits
+        foreach (var (index, data) in objectTable.EnumerateLiveObjects())
         {
-            case SClass classObj:
-                TraceClass(classObj);
-                break;
-                
-            case SDictionary dict:
-                TraceDictionary(dict);
-                break;
-                
-            case SCompiledMethod method:
-                TraceMethod(method);
-                break;
-                
-            case SArray array:
-                TraceArray(array);
-                break;
-                
-            case SInstance instance:
-                TraceInstance(instance);
-                break;
-                
-            case SString _:
-            case SSymbol _:
-            case SNil _:
-            case SBoolean _:
-                // These have no references to trace
-                break;
-                
-            default:
-                // Unknown object type, trace conservatively if needed
-                if (Program.RuntimeOptions.GCTraceLevel == GCTraceLevel.Deep)
-                {
-                    Console.WriteLine($"[GC] Unknown object type for tracing: {obj.GetType()}");
-                }
-                break;
+            data.Marked = false;
         }
     }
-    
+
     /// <summary>
-    /// Traces references in a class object.
+    /// Marks all objects reachable from the roots (Special Objects Array).
     /// </summary>
-    private void TraceClass(SClass classObj)
+    private void MarkFromRoots()
     {
-        if (classObj.Superclass != null && !classObj.Superclass.IsImmediate)
+        gcStack.Clear();
+
+        // Push all SOA entries onto stack (skip nil and SmallIntegers)
+        foreach (var oop in specialObjectsArray)
         {
-            EnqueueForTracing(classObj.Superclass);
-        }
-        
-        if (classObj.MethodDictionary != null)
-        {
-            foreach (var method in classObj.MethodDictionary.Values)
+            if (oop != 0 && (oop & 0x01) == 0) // Not nil and not SmallInteger (LSB = 0 for objects)
             {
-                if (method != null && !method.IsImmediate)
-                {
-                    EnqueueForTracing(method);
-                }
+                gcStack.Push(oop);
             }
-        }
-    }
-    
-    /// <summary>
-    /// Traces references in a dictionary object.
-    /// </summary>
-    private void TraceDictionary(SDictionary dict)
-    {
-        // First trace as an instance (for instance variables and class)
-        TraceInstance(dict);
-        
-        // Then trace all keys and values
-        foreach (var key in dict.Keys)
-        {
-            if (key != null && !key.IsImmediate)
-            {
-                EnqueueForTracing(key);
-            }
-        }
-        
-        foreach (var value in dict.Values)
-        {
-            if (value != null && !value.IsImmediate)
-            {
-                EnqueueForTracing(value);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Traces references in a compiled method.
-    /// </summary>
-    private void TraceMethod(SCompiledMethod method)
-    {
-        if (method.Literals != null && !method.Literals.IsImmediate)
-        {
-            EnqueueForTracing(method.Literals);
-        }
-    }
-    
-    /// <summary>
-    /// Traces references in an array.
-    /// </summary>
-    private void TraceArray(SArray array)
-    {
-        for (var i = 1; i <= array.Size; i++)
-        {
-            var element = array.At(i);
-            if (element != null && !element.IsImmediate)
-            {
-                EnqueueForTracing(element);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Traces references in an instance object.
-    /// </summary>
-    private void TraceInstance(SInstance instance)
-    {
-        // Trace the class
-        if (instance.Class != null && !instance.Class.IsImmediate)
-        {
-            EnqueueForTracing(instance.Class);
         }
 
-        // Trace instance variables
-        for (var i = 0; i < instance.InstanceVariableCount; i++)
+        // Recursively mark
+        while (gcStack.Count > 0)
         {
-            var valueRef = instance.GetInstanceVariable(i);
-            if (!valueRef.IsNil && valueRef.IsHeapObject)
+            var oop = gcStack.Pop();
+            MarkObject(oop);
+        }
+    }
+
+    /// <summary>
+    /// Marks an object and traces its references.
+    /// </summary>
+    /// <param name="oop">The OOP of the object to mark.</param>
+    private void MarkObject(nint oop)
+    {
+        // Skip nil and immediates
+        if (oop == 0 || (oop & 0x01) == 1) // nil or SmallInteger
+            return;
+
+        // Get object data from ObjectTable
+        int index = ObjectTable.IndexFromOop(oop);
+        var data = objectTable.Get(index);
+
+        if (data == null)
+            return; // Invalid OOP
+
+        // If already marked, skip (already visited)
+        if (data.Marked)
+            return;
+
+        // Mark this object
+        data.Marked = true;
+
+        // Trace class reference
+        if (!data.ClassRef.IsNil && data.ClassRef.IsHeapObject)
+        {
+            gcStack.Push(data.ClassRef.AsObjectPointer());
+        }
+
+        // Trace instance variables (always SObjectRef[])
+        foreach (var fieldRef in data.InstanceVariables)
+        {
+            if (!fieldRef.IsNil && fieldRef.IsHeapObject)
             {
-                var valueObj = valueRef.AsObject();
-                if (valueObj != null && !valueObj.IsImmediate)
+                gcStack.Push(fieldRef.AsObjectPointer());
+            }
+        }
+
+        // Trace indexed data based on format
+        switch (data.Format)
+        {
+            case ObjectFormat.PointerIndexed:
+                if (data.IndexedData is SObjectRef[] pointers)
                 {
-                    EnqueueForTracing(valueObj);
+                    foreach (var ptr in pointers)
+                    {
+                        if (!ptr.IsNil && ptr.IsHeapObject)
+                        {
+                            gcStack.Push(ptr.AsObjectPointer());
+                        }
+                    }
+                }
+                break;
+
+            case ObjectFormat.CompiledMethod:
+                // CompiledMethod has literals in instance variables (already handled above)
+                // Bytecodes are in IndexedData as byte[] which contains no pointers
+                break;
+
+            // ByteIndexed, WordIndexed have no pointers in their indexed data
+            case ObjectFormat.ByteIndexed:
+            case ObjectFormat.WordIndexed:
+            case ObjectFormat.FixedPointer:
+                // No additional pointers to trace
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Sweeps all unmarked objects by freeing them in the object table.
+    /// </summary>
+    /// <returns>The number of objects collected.</returns>
+    private int SweepUnmarkedObjects()
+    {
+        int collected = 0;
+
+        // Collect indices to free (can't modify while iterating)
+        var indicesToFree = new List<int>();
+
+        // Iterate through all allocated objects
+        foreach (var (index, data) in objectTable.EnumerateLiveObjects())
+        {
+            if (!data.Marked)
+            {
+                indicesToFree.Add(index);
+            }
+        }
+
+        // Free all unmarked objects
+        foreach (var index in indicesToFree)
+        {
+            objectTable.Free(index); // Let ObjectTable handle the details
+            collected++;
+        }
+
+        return collected;
+    }
+
+    private string GetClassName(SObjectRef classRef)
+    {
+        try
+        {
+            // Try to get the class name by reading the Name instance variable
+            var nameRef = classRef.GetInstanceVariable(6); // Name field in Class
+            if (!nameRef.IsNil && nameRef.IsHeapObject)
+            {
+                var data = objectTable.Get((int)(nameRef.AsObjectPointer() >> 2));
+                if (data != null && data.Format == ObjectFormat.ByteIndexed && data.IndexedData is byte[] bytes)
+                {
+                    return System.Text.Encoding.UTF8.GetString(bytes);
                 }
             }
         }
-    }
-    
-    /// <summary>
-    /// Enqueues an object for tracing if not already marked.
-    /// </summary>
-    private void EnqueueForTracing(SObject obj)
-    {
-        if (!reachableObjects.Contains(obj))
+        catch
         {
-            workQueue.Enqueue(obj);
+            // Ignore errors during debugging
         }
+        return "?";
     }
-    
+
+    /// <summary>
+    /// Counts the total number of allocated objects in the object table.
+    /// </summary>
+    /// <returns>The count of allocated objects.</returns>
+    private int CountAllocatedObjects()
+    {
+        return objectTable.GetAllocatedCount();
+    }
+
+    /// <summary>
+    /// Counts the number of marked objects after mark phase.
+    /// </summary>
+    /// <returns>The count of marked objects.</returns>
+    private int CountMarkedObjects()
+    {
+        int count = 0;
+        foreach (var (_, data) in objectTable.EnumerateLiveObjects())
+        {
+            if (data.Marked)
+                count++;
+        }
+        return count;
+    }
+
     /// <summary>
     /// Validates that all objects are reachable from the SOA.
     /// This should be run after cold start to ensure proper setup.
     /// </summary>
-    /// <returns>True if all expected objects are reachable.</returns>
+    /// <returns>True if validation passes.</returns>
     public bool ValidateReachability()
     {
         if (Program.RuntimeOptions.EnableGCLogging)
         {
-            Console.WriteLine("[GC] Validating all objects are reachable from SOA...");
+            Console.WriteLine("\n[GC] Validating all objects are reachable from SOA...");
         }
-        
+
         // Perform a collection to mark all reachable objects
-        Collect();
-        
-        // Check that critical objects are reachable
-        // With the minimal SOA, these should all be reachable through SystemDictionary
-        var criticalObjects = new List<(string name, SObject? obj)>
+        var stats = Collect();
+
+        bool isValid = stats.ObjectsCollected == 0;
+
+        if (isValid && Program.RuntimeOptions.EnableGCLogging)
         {
-            ("nil", SObjectRef.Nil.AsObject()),
-            ("true", STrue.Instance),
-            ("false", SFalse.Instance),
-            ("Behavior class", SystemDictionary.BehaviorClass),
-            ("Metaclass class", SystemDictionary.MetaclassClass),
-            // Classes should be reachable through SystemDictionary
-            ("Object class (via Smalltalk)", SystemDictionary.ObjectClass),
-            ("SmallInteger class (via Smalltalk)", SystemDictionary.SmallIntegerClass),
-            ("Array class (via Smalltalk)", SystemDictionary.ArrayClass),
-            ("String class (via Smalltalk)", SystemDictionary.StringClass)
-        };
-        
-        var allReachable = true;
-        foreach (var (name, obj) in criticalObjects)
-        {
-            if (obj != null && !obj.IsImmediate && !reachableObjects.Contains(obj))
-            {
-                Console.WriteLine($"[GC] WARNING: {name} is not reachable from SOA!");
-                allReachable = false;
-            }
+            Console.WriteLine("[GC] ✓ Validation passed: All objects are reachable from SOA");
         }
-        
-        if (allReachable && Program.RuntimeOptions.EnableGCLogging)
+        else if (!isValid)
         {
-            Console.WriteLine($"[GC] Validation passed: {reachableObjects.Count} objects reachable from SOA");
+            Console.WriteLine($"[GC] ✗ Validation failed: {stats.ObjectsCollected} objects were not reachable from SOA");
         }
-        
-        return allReachable;
+
+        return isValid;
     }
-    
-    /// <summary>
-    /// Estimates the size of an object in bytes.
-    /// </summary>
-    private static long EstimateObjectSize(SObject obj)
-    {
-        // Base object overhead (estimated)
-        var size = 24L; // Object header + reference
-        
-        switch (obj)
-        {
-            case SArray array:
-                size += array.Size * 8; // Reference per element
-                break;
-                
-            case SString str:
-                size += str.Length * 2; // Unicode chars
-                break;
-                
-            case SCompiledMethod method:
-                // Handle CompiledMethod specifically (before SInstance)
-                size += method.Bytecodes?.Length ?? 0;
-                size += 32; // Method metadata
-                size += method.InstanceVariableCount * 8; // Instance vars
-                break;
-                
-            case SInstance instance:
-                size += instance.InstanceVariableCount * 8; // Reference per instance var
-                break;
-                
-            case SClass _:
-                size += 128; // Class metadata and dictionary
-                break;
-        }
-        
-        return size;
-    }
-    
+
     /// <summary>
     /// Gets statistics about the garbage collector.
     /// </summary>
-    public GarbageCollectorStatistics GetStatistics() => new(
-        TotalCollections,
-        TotalObjectsCollected,
-        TotalBytesFreed,
-        LastCollectionDurationMs,
-        reachableObjects.Count);  // Live objects from last collection
-    
+    public GarbageCollectorStatistics GetStatistics()
+    {
+        lock (gcLock)
+        {
+            int liveObjects = CountAllocatedObjects();
+            return new GarbageCollectorStatistics(
+                TotalCollections,
+                TotalObjectsCollected,
+                0, // BytesFreed not tracked in new architecture
+                LastCollectionDurationMs,
+                liveObjects);
+        }
+    }
+
     /// <summary>
     /// Resets all statistics.
     /// </summary>
@@ -434,7 +396,6 @@ public sealed class GarbageCollector
     {
         totalCollections = 0;
         totalObjectsCollected = 0;
-        totalBytesFreed = 0;
         lastCollectionDuration = 0;
     }
 }
@@ -452,7 +413,7 @@ public readonly record struct GarbageCollectionStatistics(
     /// Returns a string representation of the statistics.
     /// </summary>
     public override string ToString() =>
-        $"GC[Collection #{TotalCollections}: {ObjectsCollected} objects, {BytesFreed:N0} bytes, {DurationMs}ms]";
+        $"GC[Collection #{TotalCollections}: {ObjectsCollected} objects collected, {DurationMs}ms]";
 }
 
 /// <summary>

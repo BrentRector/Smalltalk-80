@@ -41,7 +41,6 @@ public sealed class STrue : SBoolean
     /// <summary>
     /// Gets the class of true (True).
     /// </summary>
-    public override SClass Class => SystemDictionary.TrueClass;
     
     /// <summary>
     /// Converts true to a display string.
@@ -84,7 +83,6 @@ public sealed class SFalse : SBoolean
     /// <summary>
     /// Gets the class of false (False).
     /// </summary>
-    public override SClass Class => SystemDictionary.FalseClass;
     
     /// <summary>
     /// Converts false to a display string.

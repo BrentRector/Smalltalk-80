@@ -35,7 +35,8 @@ public static class BlueBookFactory
         int stackSize)
     {
         // Calculate total size: 6 fixed fields + temps + stack
-        var totalSize = BlueBookLayouts.MethodContext.FixedFieldCount + tempCount + stackSize;
+        const int FixedFieldCount = 6;
+        var totalSize = FixedFieldCount + tempCount + stackSize;
 
         var oop = ObjectMemoryNew.AllocateObject(
             methodContextClass,
@@ -44,24 +45,24 @@ public static class BlueBookFactory
             indexedSize: 0
         );
 
-        var context = SObjectRef.FromObjectPointer(oop);
+        STMethodContextCorrect context = SObjectRef.FromObjectPointer(oop);
 
-        // Initialize fixed fields to nil
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.SenderIndex, SObjectRef.Nil);
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.PcIndex, SObjectRef.FromSmallInteger(0));
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.StackpIndex,
-            SObjectRef.FromSmallInteger(BlueBookLayouts.MethodContext.FixedFieldCount + tempCount));
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.MethodIndex, method);
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.ReceiverMapIndex, SObjectRef.Nil);
-        context.SetInstanceVariable(BlueBookLayouts.MethodContext.ReceiverIndex, receiver);
+        // Initialize fixed fields using type-safe layout struct
+        context.Sender = SObjectRef.Nil;
+        context.InstructionPointer = SObjectRef.FromSmallInteger(0);
+        context.StackPointer = SObjectRef.FromSmallInteger(FixedFieldCount + tempCount);
+        context.Method = method;
+        context.ReceiverMap = SObjectRef.Nil;
+        context.Receiver = receiver;
 
         // Initialize temps and stack to nil
-        for (var i = BlueBookLayouts.MethodContext.FixedFieldCount; i < totalSize; i++)
+        var contextRef = context.AsRef;
+        for (var i = FixedFieldCount; i < totalSize; i++)
         {
-            context.SetInstanceVariable(i, SObjectRef.Nil);
+            contextRef.SetInstanceVariable(i, SObjectRef.Nil);
         }
 
-        return context;
+        return contextRef;
     }
 
     /// <summary>
@@ -82,7 +83,8 @@ public static class BlueBookFactory
         int stackSize)
     {
         // Calculate total size: 6 fixed fields + stack
-        var totalSize = BlueBookLayouts.BlockContext.FixedFieldCount + stackSize;
+        const int FixedFieldCount = 6;
+        var totalSize = FixedFieldCount + stackSize;
 
         var oop = ObjectMemoryNew.AllocateObject(
             blockContextClass,
@@ -91,24 +93,24 @@ public static class BlueBookFactory
             indexedSize: 0
         );
 
-        var context = SObjectRef.FromObjectPointer(oop);
+        STBlockContextCorrect context = SObjectRef.FromObjectPointer(oop);
 
-        // Initialize fixed fields
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.SenderIndex, SObjectRef.Nil);
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.PcIndex, SObjectRef.FromSmallInteger(startpc));
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.StackpIndex,
-            SObjectRef.FromSmallInteger(BlueBookLayouts.BlockContext.FixedFieldCount));
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.NargsIndex, SObjectRef.FromSmallInteger(nargs));
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.StartpcIndex, SObjectRef.FromSmallInteger(startpc));
-        context.SetInstanceVariable(BlueBookLayouts.BlockContext.HomeIndex, home);
+        // Initialize fixed fields using type-safe layout struct
+        context.Sender = SObjectRef.Nil;
+        context.InstructionPointer = SObjectRef.FromSmallInteger(startpc);
+        context.StackPointer = SObjectRef.FromSmallInteger(FixedFieldCount);
+        context.Nargs = SObjectRef.FromSmallInteger(nargs);
+        context.StartPC = SObjectRef.FromSmallInteger(startpc);
+        context.Home = home;
 
         // Initialize stack to nil
-        for (var i = BlueBookLayouts.BlockContext.FixedFieldCount; i < totalSize; i++)
+        var contextRef = context.AsRef;
+        for (var i = FixedFieldCount; i < totalSize; i++)
         {
-            context.SetInstanceVariable(i, SObjectRef.Nil);
+            contextRef.SetInstanceVariable(i, SObjectRef.Nil);
         }
 
-        return context;
+        return contextRef;
     }
 
     /// <summary>
@@ -127,7 +129,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             processClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Process.FixedFieldCount,
+            instanceVarCount: STProcess.InstanceVarCount,
             indexedSize: 0
         );
 
@@ -157,19 +159,18 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             semaphoreClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Semaphore.FixedFieldCount,
+            instanceVarCount: STSemaphore.InstanceVarCount,
             indexedSize: 0
         );
 
-        var semaphore = SObjectRef.FromObjectPointer(oop);
+        STSemaphore semaphore = SObjectRef.FromObjectPointer(oop);
 
-        // Initialize fields
-        semaphore.SetInstanceVariable(BlueBookLayouts.Semaphore.FirstLinkIndex, SObjectRef.Nil);
-        semaphore.SetInstanceVariable(BlueBookLayouts.Semaphore.LastLinkIndex, SObjectRef.Nil);
-        semaphore.SetInstanceVariable(BlueBookLayouts.Semaphore.ExcessSignalsIndex,
-            SObjectRef.FromSmallInteger(initialSignals));
+        // Initialize fields using type-safe layout struct
+        semaphore.FirstLink = SObjectRef.Nil;
+        semaphore.LastLink = SObjectRef.Nil;
+        semaphore.ExcessSignals = SObjectRef.FromSmallInteger(initialSignals);
 
-        return semaphore;
+        return semaphore.AsRef;
     }
 
     /// <summary>
@@ -203,7 +204,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             dictionaryClass,
             ObjectFormat.PointerIndexed,
-            instanceVarCount: BlueBookLayouts.Dictionary.FixedFieldCount,
+            instanceVarCount: STDictionary.InstanceVarCount,
             indexedSize: initialCapacity
         );
 
@@ -239,7 +240,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             associationClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Association.FixedFieldCount,
+            instanceVarCount: STAssociation.InstanceVarCount,
             indexedSize: 0
         );
 
@@ -265,7 +266,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             characterClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Character.FixedFieldCount,
+            instanceVarCount: STCharacter.InstanceVarCount,
             indexedSize: 0
         );
 
@@ -290,7 +291,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             arrayClass,
             ObjectFormat.PointerIndexed,
-            instanceVarCount: BlueBookLayouts.Array.FixedFieldCount,  // 0
+            instanceVarCount: STArray.InstanceVarCount,  // 0
             indexedSize: size
         );
 
@@ -319,7 +320,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             stringClass,
             ObjectFormat.ByteIndexed,
-            instanceVarCount: BlueBookLayouts.String.FixedFieldCount,  // 0
+            instanceVarCount: STString.InstanceVarCount,  // 0
             indexedSize: length
         );
 
@@ -360,7 +361,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             symbolClass,
             ObjectFormat.ByteIndexed,
-            instanceVarCount: BlueBookLayouts.Symbol.FixedFieldCount,  // 0
+            instanceVarCount: STSymbol.InstanceVarCount,  // 0
             indexedSize: symbolString.Length
         );
 
@@ -388,7 +389,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             byteArrayClass,
             ObjectFormat.ByteIndexed,
-            instanceVarCount: BlueBookLayouts.ByteArray.FixedFieldCount,  // 0
+            instanceVarCount: STByteArray.InstanceVarCount,  // 0
             indexedSize: size
         );
 
@@ -413,7 +414,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             behaviorClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Behavior.FixedFieldCount,
+            instanceVarCount: STBehavior.InstanceVarCount,
             indexedSize: 0
         );
 
@@ -446,7 +447,7 @@ public static class BlueBookFactory
         var oop = ObjectMemoryNew.AllocateObject(
             classClass,
             ObjectFormat.FixedPointer,
-            instanceVarCount: BlueBookLayouts.Class.FixedFieldCount,
+            instanceVarCount: STClass.InstanceVarCount,
             indexedSize: 0
         );
 

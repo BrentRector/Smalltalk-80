@@ -34,7 +34,6 @@ public sealed class Character : SObject, IEquatable<Character>, IComparable<Char
     /// <summary>
     /// Gets the class of Character.
     /// </summary>
-    public override SClass Class => SystemDictionary.CharacterClass;
     
     /// <summary>
     /// Gets whether this is an immediate value.

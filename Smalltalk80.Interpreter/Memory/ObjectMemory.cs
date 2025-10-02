@@ -30,6 +30,11 @@ public static partial class ObjectMemoryNew
     private static nint nextOop = 0x1000;
 
     /// <summary>
+    /// Gets the object table instance for GC access.
+    /// </summary>
+    internal static ObjectTable ObjectTable => objectTable;
+
+    /// <summary>
     /// Internal storage for a Smalltalk object's data.
     /// This is NEVER exposed outside ObjectMemory - only accessed via SObjectRef methods.
     /// </summary>
@@ -65,6 +70,12 @@ public static partial class ObjectMemoryNew
         /// </summary>
         public bool Marked { get; set; }
 
+        /// <summary>
+        /// Initializes a new instance of the ObjectData class.
+        /// </summary>
+        /// <param name="classRef">The class of this object.</param>
+        /// <param name="format">The format of this object.</param>
+        /// <param name="instanceVarCount">The number of instance variables.</param>
         public ObjectData(SObjectRef classRef, ObjectFormat format, int instanceVarCount)
         {
             ClassRef = classRef;
@@ -92,17 +103,17 @@ public static partial class ObjectMemoryNew
         var data = new ObjectData(classRef, format, instanceVarCount);
 
         // Initialize indexed data based on format
-        if (indexedSize > 0)
+        // IMPORTANT: PointerIndexed objects must ALWAYS have an array (even if empty)
+        // to ensure GC can traverse them correctly
+        data.IndexedData = format switch
         {
-            data.IndexedData = format switch
-            {
-                ObjectFormat.PointerIndexed => InitializePointerIndexed(indexedSize),
-                ObjectFormat.ByteIndexed => new byte[indexedSize],
-                ObjectFormat.WordIndexed => new ushort[indexedSize],
-                ObjectFormat.CompiledMethod => new byte[indexedSize],  // TODO: proper encoding
-                _ => null
-            };
-        }
+            ObjectFormat.PointerIndexed => InitializePointerIndexed(indexedSize),
+            ObjectFormat.ByteIndexed => indexedSize > 0 ? new byte[indexedSize] : null,
+            ObjectFormat.WordIndexed => indexedSize > 0 ? new ushort[indexedSize] : null,
+            ObjectFormat.CompiledMethod => indexedSize > 0 ? new byte[indexedSize] : new byte[0],
+            ObjectFormat.FixedPointer => null,  // Fixed pointer objects never have indexed data
+            _ => null
+        };
 
         // Allocate slot in object table (O(1) operation)
         int index = objectTable.Allocate(data);
@@ -352,15 +363,16 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static SObjectRef GetClass(nint oop)
     {
+        // TODO: Reimplement bootstrap map support when SObject classes are migrated
         // Check bootstrap map first
-        if (bootstrapObjectMap.TryGetValue(oop, out var bootstrapObj))
-        {
-            // Get the class from the bootstrap object
-            var objClass = bootstrapObj.Class;
-            // Register the class if not already registered
-            var classOop = RegisterBootstrapObject(objClass);
-            return SObjectRef.FromObjectPointer(classOop);
-        }
+        // if (bootstrapObjectMap.TryGetValue(oop, out var bootstrapObj))
+        // {
+        //     // Get the class from the bootstrap object
+        //     var objClass = bootstrapObj.Class;
+        //     // Register the class if not already registered
+        //     var classOop = RegisterBootstrapObject(objClass);
+        //     return SObjectRef.FromObjectPointer(classOop);
+        // }
 
         var data = GetObjectData(oop);
         return data.ClassRef;
@@ -887,13 +899,14 @@ public static partial class ObjectMemoryNew
             if (association.IsNil)
                 continue;
 
-            // Association has two instance variables: key (index 0) and value (index 1)
-            var assocKey = GetInstanceVariable(association.AsObjectPointer(), 0);
+            // Association has two instance variables: key and value
+            Generated.Layouts.STAssociation assoc = association;
+            var assocKey = assoc.Key;
 
             // Check for key equality (identity comparison for now, should use = in real implementation)
             if (SObjectRef.AreIdentical(assocKey, key))
             {
-                return GetInstanceVariable(association.AsObjectPointer(), 1);
+                return assoc.Value;
             }
         }
 
@@ -924,21 +937,22 @@ public static partial class ObjectMemoryNew
                 var newAssoc = AllocateObject(
                     GetAssociationClass(),
                     ObjectFormat.FixedPointer,
-                    2,  // Association has 2 instance variables: key and value
+                    Generated.Layouts.STAssociation.InstanceVarCount,
                     0);
 
-                SetInstanceVariable(newAssoc, 0, key);
-                SetInstanceVariable(newAssoc, 1, value);
+                Generated.Layouts.STAssociation newAssocStruct = SObjectRef.FromObjectPointer(newAssoc);
+                newAssocStruct.Key = key;
+                newAssocStruct.Value = value;
                 SetIndexedPointer(dictionaryRef.AsObjectPointer(), i, SObjectRef.FromObjectPointer(newAssoc));
                 return;
             }
 
             // Check if this association has matching key
-            var assocKey = GetInstanceVariable(association.AsObjectPointer(), 0);
-            if (SObjectRef.AreIdentical(assocKey, key))
+            Generated.Layouts.STAssociation assoc = association;
+            if (SObjectRef.AreIdentical(assoc.Key, key))
             {
                 // Update existing association
-                SetInstanceVariable(association.AsObjectPointer(), 1, value);
+                assoc.Value = value;
                 return;
             }
         }
@@ -1042,6 +1056,9 @@ public static partial class ObjectMemoryNew
             Console.WriteLine($"[DEBUG] Creating Association class with NO SUPERCLASS: direct instVars={instanceVariableNames.Length}, total={instVarCount}");
         }
 
+        // Set subclasses to nil (will be populated when subclasses are created)
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Subclasses, SObjectRef.Nil);
+
         // Encode format as SmallInteger
         // Format encoding: bits 0-5 = inst var count, bits 6-7 = indexability, bit 8 = pointers flag
         int formatValue = instVarCount & 0x3F;  // Instance variable count (6 bits)
@@ -1143,15 +1160,19 @@ public static partial class ObjectMemoryNew
         // Set format (metaclasses have 0 instance variables)
         SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Format, SObjectRef.Zero);
 
-        // Set empty instance variables array
+        // Set subclasses to nil
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Subclasses, SObjectRef.Nil);
+
+        // Set empty instance variables array (Metaclass doesn't define any instance variables for its instances)
         var emptyArray = AllocateObject(GetArrayClass(), ObjectFormat.PointerIndexed, 0, 0);
         SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.InstanceVariables, SObjectRef.FromObjectPointer(emptyArray));
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Organization, SObjectRef.Nil);
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Name, SObjectRef.Nil);  // Metaclasses don't have names
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.ClassPool, SObjectRef.FromObjectPointer(emptyArray));
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.SharedPools, SObjectRef.FromObjectPointer(emptyArray));
 
-        // Set the thisClass instance variable
+        // Set organization to nil
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Organization, SObjectRef.Nil);
+
+        // Set the thisClass instance variable (field 6 in Metaclass)
+        // NOTE: Metaclass does NOT have name, classPool, or sharedPools fields!
+        // Metaclass inherits from ClassDescription (6 fields), not Class (9 fields)
         SetInstanceVariable(metaclassOop, Core.BlueBook.MetaclassLayout.ThisClass, classRef);
 
         return metaclassRef;

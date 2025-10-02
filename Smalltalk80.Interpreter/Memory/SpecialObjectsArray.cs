@@ -84,32 +84,29 @@ public static class SpecialObjectsArray
             array.Add(null);
 
         // System singletons
-        // Nil needs special handling - create an instance of UndefinedObject
-        array[NilIndex] = SystemDictionary.UndefinedObjectClass?.CreateInstance()
-            ?? new SInstance(SystemDictionary.UndefinedObjectClass ?? SystemDictionary.ObjectClass!, 0);
-        array[FalseIndex] = SFalse.Instance;
-        array[TrueIndex] = STrue.Instance;
+        // These will be set later during bootstrap - for now just initialize to null
+        array[NilIndex] = null;
+        array[FalseIndex] = null;  // Will be set during bootstrap
+        array[TrueIndex] = null;   // Will be set during bootstrap
 
         // Metaclass hierarchy roots (needed for class structure)
-        array[BehaviorClassIndex] = SystemDictionary.BehaviorClass;
-        array[MetaclassClassIndex] = SystemDictionary.MetaclassClass;
+        // These will be set during bootstrap
+        array[BehaviorClassIndex] = null;
+        array[MetaclassClassIndex] = null;
 
         // System dictionary (contains ALL classes and globals - main root)
-        // This is THE critical entry - all classes are reachable through it
-        array[SystemDictionaryIndex] = SDictionary.CreateSystemDictionary();
+        // This will be set during bootstrap
+        array[SystemDictionaryIndex] = null;
 
         // Symbol table (contains all interned symbols)
-        array[SymbolTableIndex] = SDictionary.CreateSymbolTable();
+        // This will be set during bootstrap
+        array[SymbolTableIndex] = null;
 
         // Process list (TODO: create actual process list)
         array[ProcessListIndex] = null;  // Will be set when process system is initialized
 
-        // Process scheduler (if created)
-        var scheduler = SystemDictionary.LookupGlobal("Processor");
-        if (scheduler != null)
-        {
-            array[ProcessorSchedulerIndex] = scheduler;
-        }
+        // Process scheduler - will be set during bootstrap
+        array[ProcessorSchedulerIndex] = null;
     }
 
     /// <summary>

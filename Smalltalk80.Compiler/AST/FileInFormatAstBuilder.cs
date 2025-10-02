@@ -78,17 +78,28 @@ namespace Smalltalk80.Compiler.AST
         {
             var classHeader = context.classHeader();
             var classBody = context.classBody();
-            
+
             // Extract class name and superclass
             string className = "";
             string superclassName = "Object";
-            
+            string subclassKind = "subclass:";  // Default to fixed pointer
+
             // Get superclass name from className()
             if (classHeader.className() != null)
             {
                 superclassName = classHeader.className().IDENTIFIER().GetText();
             }
-            
+
+            // Get subclass kind from subclassKind()
+            if (classHeader.subclassKind() != null)
+            {
+                var kindContext = classHeader.subclassKind();
+                if (kindContext.identifierColon() != null)
+                {
+                    subclassKind = kindContext.identifierColon().GetText();
+                }
+            }
+
             // Get actual class name from symbolConst
             if (classHeader.symbolConst() != null)
             {
@@ -100,6 +111,7 @@ namespace Smalltalk80.Compiler.AST
             {
                 Name = className,
                 Superclass = superclassName,
+                SubclassKind = subclassKind,
                 InstanceVariables = new List<string>(),
                 ClassVariables = new List<string>(),
                 PoolDictionaries = new List<string>(),
@@ -1096,6 +1108,9 @@ namespace Smalltalk80.Compiler.AST
 
         [JsonPropertyName("superclass")]
         public string Superclass { get; set; } = "";
+
+        [JsonPropertyName("subclassKind")]
+        public string SubclassKind { get; set; } = "subclass:";  // Default to fixed pointer
 
         [JsonPropertyName("instanceVariables")]
         public List<string> InstanceVariables { get; set; } = new();

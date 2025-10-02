@@ -3,6 +3,7 @@ namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Installs kernel methods for stream-related classes including Stream, 
@@ -38,35 +39,39 @@ public static class StreamMethodsInstaller
         
         // Abstract methods - subclasses must implement
         // next
-        streamClassRef.AddMethod("next", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "next",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("subclassResponsibility")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("subclassResponsibility")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(streamClassRef.AsObjectPointer(), "next", method1);
         instanceMethodCount++;
-        
+
         // nextPut:
-        streamClassRef.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "nextPut:",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("subclassResponsibility")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("subclassResponsibility")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(streamClassRef.AsObjectPointer(), "nextPut:", method2);
         instanceMethodCount++;
-        
+
         // atEnd
-        streamClassRef.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "atEnd",
             [0x70, 0x20, 0xD3, 0x7C], // self subclassResponsibility
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("subclassResponsibility")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("subclassResponsibility")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(streamClassRef.AsObjectPointer(), "atEnd", method3);
         instanceMethodCount++;
-        
+
         // nextPutAll:
-        streamClassRef.AddMethod("nextPutAll:", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "nextPutAll:",
             [0x10, 0x8F, 0x00, 0x02, 0x70, 0x11, 0xE1, 0xF7, 0x10, 0x7C], // aCollection do: [:each | self nextPut: each]. ^aCollection
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("do:"), SSymbol.Intern("nextPut:")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("do:"), ObjectMemoryNew.InternSymbol("nextPut:")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(streamClassRef.AsObjectPointer(), "nextPutAll:", method4);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -105,63 +110,66 @@ public static class StreamMethodsInstaller
         }
         
         // nextPut:
-        writeStreamClassRef.AddMethod("nextPut:", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "nextPut:",
             [0x00, 0x01, 0x76, 0xB0, 0x60, 0x01, 0x10, 0xC1, 0x60, 0x76, 0xB0, 0x60, 0x10, 0x7C],
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("at:put:")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("collection"), ObjectMemoryNew.InternSymbol("position"), ObjectMemoryNew.InternSymbol("at:put:")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "nextPut:", method5);
         instanceMethodCount++;
-        
+
         // position - return current position
-        writeStreamClassRef.AddMethod("position", SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             "position",
             [0x01, 0x7C], // ^position
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("position")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("position")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "position", method6);
         instanceMethodCount++;
-        
+
         // space - write a space character
-        writeStreamClassRef.AddMethod("space", SCompiledMethod.CreateCompiledMethodRef(
+        var method7 = ObjectMemoryNew.CreateCompiledMethod(
             "space",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 32)
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("Character"),
-                new SmallInteger(32),
-                SSymbol.Intern("value:"),
-                SSymbol.Intern("nextPut:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("Character"),
+             SObjectRef.FromSmallInteger(32),
+             ObjectMemoryNew.InternSymbol("value:"),
+             ObjectMemoryNew.InternSymbol("nextPut:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "space", method7);
         instanceMethodCount++;
-        
+
         // cr - write a carriage return
-        writeStreamClassRef.AddMethod("cr", SCompiledMethod.CreateCompiledMethodRef(
+        var method8 = ObjectMemoryNew.CreateCompiledMethod(
             "cr",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 13)
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("Character"),
-                new SmallInteger(13),
-                SSymbol.Intern("value:"),
-                SSymbol.Intern("nextPut:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("Character"),
+             SObjectRef.FromSmallInteger(13),
+             ObjectMemoryNew.InternSymbol("value:"),
+             ObjectMemoryNew.InternSymbol("nextPut:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "cr", method8);
         instanceMethodCount++;
-        
+
         // tab - write a tab character
-        writeStreamClassRef.AddMethod("tab", SCompiledMethod.CreateCompiledMethodRef(
+        var method9 = ObjectMemoryNew.CreateCompiledMethod(
             "tab",
             [0x70, 0x42, 0x20, 0xCC, 0xE1, 0x7C], // self nextPut: (Character value: 9)
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("Character"),
-                new SmallInteger(9),
-                SSymbol.Intern("value:"),
-                SSymbol.Intern("nextPut:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("Character"),
+             SObjectRef.FromSmallInteger(9),
+             ObjectMemoryNew.InternSymbol("value:"),
+             ObjectMemoryNew.InternSymbol("nextPut:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "tab", method9);
         instanceMethodCount++;
-        
+
         // contents
-        writeStreamClassRef.AddMethod("contents", SCompiledMethod.CreateCompiledMethodRef(
+        var method10 = ObjectMemoryNew.CreateCompiledMethod(
             "contents",
             [0x00, 0x76, 0x01, 0xF0, 0x7C], // collection copyFrom: 1 to: position
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("collection"), SSymbol.Intern("position"), SSymbol.Intern("copyFrom:to:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("collection"), ObjectMemoryNew.InternSymbol("position"), ObjectMemoryNew.InternSymbol("copyFrom:to:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(writeStreamClassRef.AsObjectPointer(), "contents", method10);
         instanceMethodCount++;
         
         // Note: Class methods would be installed on WriteStream's metaclass
@@ -189,57 +197,60 @@ public static class StreamMethodsInstaller
         }
         
         // next - read and advance position
-        readStreamClassRef.AddMethod("next", SCompiledMethod.CreateCompiledMethodRef(
+        var method11 = ObjectMemoryNew.CreateCompiledMethod(
             "next",
             [0x01, 0x01, 0x76, 0xB0, 0x60, // position := position + 1
              0x00, 0x01, 0xC1, 0x7C], // ^collection at: position
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("position"),
-                SSymbol.Intern("at:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("collection"),
+             ObjectMemoryNew.InternSymbol("position"),
+             ObjectMemoryNew.InternSymbol("at:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "next", method11);
         instanceMethodCount++;
-        
+
         // peek - look at next element without advancing
-        readStreamClassRef.AddMethod("peek", SCompiledMethod.CreateCompiledMethodRef(
+        var method12 = ObjectMemoryNew.CreateCompiledMethod(
             "peek",
             [0x01, 0x00, 0xC2, 0xB5, 0x9D, 0x02, 0x73, 0x7C, // position >= collection size ifTrue: [^nil]
              0x00, 0x01, 0x76, 0xB0, 0xC1, 0x7C], // ^collection at: position + 1
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("position"),
-                SSymbol.Intern("size"),
-                SSymbol.Intern(">="),
-                SSymbol.Intern("at:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("collection"),
+             ObjectMemoryNew.InternSymbol("position"),
+             ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol(">="),
+             ObjectMemoryNew.InternSymbol("at:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "peek", method12);
         instanceMethodCount++;
-        
+
         // position - return current position
-        readStreamClassRef.AddMethod("position", SCompiledMethod.CreateCompiledMethodRef(
+        var method13 = ObjectMemoryNew.CreateCompiledMethod(
             "position",
             [0x01, 0x7C], // ^position
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("position")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("position")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "position", method13);
         instanceMethodCount++;
-        
+
         // position: - set position
-        readStreamClassRef.AddMethod("position:", SCompiledMethod.CreateCompiledMethodRef(
+        var method14 = ObjectMemoryNew.CreateCompiledMethod(
             "position:",
             [0x10, 0x61, 0x10, 0x7C], // position := anInteger. ^anInteger
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("position")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("position")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "position:", method14);
         instanceMethodCount++;
-        
+
         // skip: - advance position by n
-        readStreamClassRef.AddMethod("skip:", SCompiledMethod.CreateCompiledMethodRef(
+        var method15 = ObjectMemoryNew.CreateCompiledMethod(
             "skip:",
             [0x01, 0x10, 0xB0, 0x61, 0x70, 0x7C], // position := position + n. ^self
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("position")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("position")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "skip:", method15);
         instanceMethodCount++;
-        
+
         // upTo: - read elements up to a delimiter
-        readStreamClassRef.AddMethod("upTo:", SCompiledMethod.CreateCompiledMethodRef(
+        var method16 = ObjectMemoryNew.CreateCompiledMethod(
             "upTo:",
             [0x41, 0xD0, 0x68, // result := OrderedCollection new
              0x70, 0xD2, 0x9C, 0xAC, 0x12, // [self atEnd not] whileTrue:
@@ -247,26 +258,26 @@ public static class StreamMethodsInstaller
              0x69, 0x10, 0xB6, 0x99, 0x02, 0x68, 0x7C, // element = delimiter ifTrue: [^result]
              0x68, 0x69, 0xD2, 0xA3, 0xEB, // result add: element. loop
              0x68, 0x7C], // ^result
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("OrderedCollection"),
-                SSymbol.Intern("new"),
-                SSymbol.Intern("atEnd"),
-                SSymbol.Intern("next"),
-                SSymbol.Intern("="),
-                SSymbol.Intern("add:")),
-            1, 2, 0));
+            [ObjectMemoryNew.InternSymbol("OrderedCollection"),
+             ObjectMemoryNew.InternSymbol("new"),
+             ObjectMemoryNew.InternSymbol("atEnd"),
+             ObjectMemoryNew.InternSymbol("next"),
+             ObjectMemoryNew.InternSymbol("="),
+             ObjectMemoryNew.InternSymbol("add:")],
+            1, 2, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "upTo:", method16);
         instanceMethodCount++;
-        
+
         // atEnd - check if at end of stream
-        readStreamClassRef.AddMethod("atEnd", SCompiledMethod.CreateCompiledMethodRef(
+        var method17 = ObjectMemoryNew.CreateCompiledMethod(
             "atEnd",
             [0x01, 0x00, 0xC2, 0xB5, 0x7C], // ^position >= collection size
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("position"),
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("size"),
-                SSymbol.Intern(">=")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("position"),
+             ObjectMemoryNew.InternSymbol("collection"),
+             ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol(">=")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(readStreamClassRef.AsObjectPointer(), "atEnd", method17);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)

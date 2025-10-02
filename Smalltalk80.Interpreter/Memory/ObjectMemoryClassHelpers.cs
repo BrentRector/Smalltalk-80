@@ -18,11 +18,22 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static class ClassLayout
     {
+        /// <summary>Index of the superclass field in Class objects.</summary>
         public const int SuperclassIndex = 0;
+
+        /// <summary>Index of the method dictionary field in Class objects.</summary>
         public const int MethodDictionaryIndex = 1;
+
+        /// <summary>Index of the instance specification field in Class objects.</summary>
         public const int InstanceSpecificationIndex = 2;
+
+        /// <summary>Index of the subclasses field in Class objects.</summary>
         public const int SubclassesIndex = 3;
+
+        /// <summary>Index of the instance variables field in Class objects.</summary>
         public const int InstanceVariablesIndex = 4;
+
+        /// <summary>Index of the name field in Class objects.</summary>
         public const int NameIndex = 5;
     }
 
@@ -128,45 +139,51 @@ public static partial class ObjectMemoryNew
 
     /// <summary>
     /// MethodDictionary layout constants.
+    /// Per Blue Book: MethodDictionary inherits from IdentityDictionary which uses parallel arrays.
     /// </summary>
     public static class MethodDictionaryLayout
     {
-        public const int TallyIndex = 0; // Number of elements
-        public const int ArrayIndex = 1; // Array of associations
+        /// <summary>Index of the tally field in MethodDictionary objects.</summary>
+        public const int TallyIndex = 0;    // Instance var 0: tally (number of elements)
+
+        /// <summary>Index of the array field in MethodDictionary objects.</summary>
+        public const int ArrayIndex = 1;    // Instance var 1: valueArray (array of CompiledMethods)
+        // Note: The MethodDictionary also has indexed slots that contain the selector Symbols (keys)
     }
 
     /// <summary>
     /// Looks up a method in a method dictionary.
+    /// MethodDictionary uses parallel arrays: keys in indexed slots, values in valueArray.
     /// </summary>
     public static SObjectRef LookupInMethodDictionary(nint dictOop, string selector)
     {
-        // Get the array of associations
-        STMethodDictionary dict = SObjectRef.FromObjectPointer(dictOop);
-        var arrayRef = dict.ValueArray;
-        if (arrayRef.IsNil)
+        // MethodDictionary structure (per Blue Book):
+        // - Instance var 0 (tally): number of elements
+        // - Instance var 1 (valueArray): array of CompiledMethod objects
+        // - Indexed slots: array of selector Symbols (keys)
+
+        var dictSize = GetIndexedSize(dictOop);
+
+        // Get valueArray from instance variable 1
+        var valueArrayRef = GetInstanceVariable(dictOop, MethodDictionaryLayout.ArrayIndex);
+        if (valueArrayRef.IsNil)
             return SObjectRef.Nil;
 
-        var arrayOop = arrayRef.AsObjectPointer();
-        var size = GetIndexedSize(arrayOop);
+        var valueArrayOop = valueArrayRef.AsObjectPointer();
 
-        // Linear search through associations (simplified - real implementation would use hashing)
-        for (int i = 0; i < size; i++)
+        // Linear search through keys (simplified - real implementation would use hashing)
+        for (int i = 0; i < dictSize; i++)
         {
-            var assocRef = GetIndexedPointer(arrayOop, i);
-            if (!assocRef.IsNil)
-            {
-                // Use type-safe wrapper for Association
-                STAssociation assoc = assocRef;
-                var keyRef = assoc.Key;
+            // Get selector from MethodDictionary's indexed slots (the keys)
+            var selectorRef = GetIndexedPointer(dictOop, i);
 
-                if (!keyRef.IsNil)
+            if (!selectorRef.IsNil)
+            {
+                var selectorString = SymbolToString(selectorRef);
+                if (selectorString == selector)
                 {
-                    var keyString = SymbolToString(keyRef);
-                    if (keyString == selector)
-                    {
-                        // Found it - return the method (value of association)
-                        return assoc.Value;
-                    }
+                    // Found it - return the method from parallel valueArray
+                    return GetIndexedPointer(valueArrayOop, i);
                 }
             }
         }
@@ -176,59 +193,62 @@ public static partial class ObjectMemoryNew
 
     /// <summary>
     /// Adds a method to a method dictionary.
+    /// MethodDictionary uses parallel arrays: keys in indexed slots, values in valueArray.
     /// </summary>
     public static void AddMethodToDictionary(nint dictOop, string selector, SObjectRef methodRef)
     {
-        // Get the array of associations
-        STMethodDictionary dict = SObjectRef.FromObjectPointer(dictOop);
-        var arrayRef = dict.ValueArray;
-        if (arrayRef.IsNil)
+        // MethodDictionary structure (per Blue Book):
+        // - Instance var 0 (tally): number of elements
+        // - Instance var 1 (valueArray): array of CompiledMethod objects
+        // - Indexed slots: array of selector Symbols (keys)
+
+        var dictSize = GetIndexedSize(dictOop);
+
+        // Get valueArray from instance variable 1
+        var valueArrayRef = GetInstanceVariable(dictOop, MethodDictionaryLayout.ArrayIndex);
+        if (valueArrayRef.IsNil)
             return; // Can't add to nil array
 
-        var arrayOop = arrayRef.AsObjectPointer();
-        var size = GetIndexedSize(arrayOop);
+        var valueArrayOop = valueArrayRef.AsObjectPointer();
 
         // Find an empty slot or matching selector
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < dictSize; i++)
         {
-            var assocRef = GetIndexedPointer(arrayOop, i);
+            // Get selector from MethodDictionary's indexed slots (the keys)
+            var selectorRef = GetIndexedPointer(dictOop, i);
 
-            if (assocRef.IsNil)
+            if (selectorRef.IsNil)
             {
-                // Found empty slot - create new association
-                var selectorRef = InternSymbol(selector);
-                var newAssocOop = CreateAssociation(selectorRef, methodRef);
-                SetIndexedPointer(arrayOop, i, SObjectRef.FromObjectPointer(newAssocOop));
+                // Found empty slot - add new method
+                var selectorSymbol = InternSymbol(selector);
+                SetIndexedPointer(dictOop, i, selectorSymbol);  // Set key in indexed slot
+                SetIndexedPointer(valueArrayOop, i, methodRef); // Set method in valueArray
 
                 // Update tally
-                var tallyRef = dict.Tally;
+                var tallyRef = GetInstanceVariable(dictOop, MethodDictionaryLayout.TallyIndex);
                 if (tallyRef.IsSmallInteger)
                 {
-                    dict.Tally = SObjectRef.FromSmallInteger(tallyRef.AsSmallInteger() + 1);
+                    SetInstanceVariable(dictOop, MethodDictionaryLayout.TallyIndex,
+                        SObjectRef.FromSmallInteger(tallyRef.AsSmallInteger() + 1));
                 }
                 return;
             }
 
-            // Check if this association has the same selector
-            STAssociation assoc = assocRef;
-            // Debug: check association structure
-            var assocOop = assocRef.AsObjectPointer();
-            var assocData = GetObjectData(assocOop);
-            Console.WriteLine($"[DEBUG] AddMethodToDictionary: checking existing association OOP={assocOop}, instVars={assocData.InstanceVariables.Length}, format={assocData.Format}");
-            var keyRef = assoc.Key;
-            if (!keyRef.IsNil)
+            // Check if this slot has the same selector
+            var selectorString = SymbolToString(selectorRef);
+            if (selectorString == selector)
             {
-                var keyString = SymbolToString(keyRef);
-                if (keyString == selector)
-                {
-                    // Update existing method
-                    assoc.Value = methodRef;
-                    return;
-                }
+                // Update existing method in parallel valueArray
+                SetIndexedPointer(valueArrayOop, i, methodRef);
+                return;
             }
         }
 
         // No space found - would need to grow the dictionary (not implemented here)
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[ERROR] Method dictionary full! Cannot add method '{selector}'. Dictionary size={dictSize}");
+        }
         throw new InvalidOperationException($"Method dictionary is full, cannot add {selector}");
     }
 

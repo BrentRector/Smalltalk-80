@@ -27,10 +27,7 @@ public sealed class SString : SObject, IEquatable<SString>
     /// </summary>
     public int Length => value.Length;
     
-    /// <summary>
-    /// Gets the class of String.
-    /// </summary>
-    public override SClass Class => SystemDictionary.StringClass;
+    // Class property removed - deprecated SystemDictionary.StringClass no longer exists
     
     /// <summary>
     /// Creates an SString from a .NET string.

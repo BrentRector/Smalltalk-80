@@ -3,6 +3,7 @@ namespace Smalltalk80.Interpreter.ColdStart.MethodInstallers;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Installs kernel methods for numeric classes including Magnitude, Number, Integer, 
@@ -41,51 +42,57 @@ public static class NumericMethodsInstaller
         // These are abstract in Magnitude, subclasses must implement <
         
         // > (greater than in terms of <)
-        magnitudeClassRef.AddMethod(">", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             ">",
             [0x10, 0x70, 0xB2, 0x7C], // arg < self
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("<")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("<")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), ">", method1);
         instanceMethodCount++;
         
         // <= (less than or equal)
-        magnitudeClassRef.AddMethod("<=", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "<=",
             [0x70, 0x10, 0xB3, 0x9C, 0x7C], // (self > arg) not
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern(">")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol(">")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), "<=", method2);
         instanceMethodCount++;
-        
+
         // >= (greater than or equal)
-        magnitudeClassRef.AddMethod(">=", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             ">=",
             [0x70, 0x10, 0xB2, 0x9C, 0x7C], // (self < arg) not
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("<")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("<")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), ">=", method3);
         instanceMethodCount++;
-        
+
         // between:and:
-        magnitudeClassRef.AddMethod("between:and:", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "between:and:",
             [0x70, 0x10, 0xB5, 0x9D, 0x05, 0x70, 0x11, 0xB5, 0x91, 0x72, 0x7C], // self >= low and: [self <= high]
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern(">=")),
-            2, 0, 0));
+            [ObjectMemoryNew.InternSymbol(">=")],
+            2, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), "between:and:", method4);
         instanceMethodCount++;
-        
+
         // min:
-        magnitudeClassRef.AddMethod("min:", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "min:",
             [0x70, 0x10, 0xB2, 0x99, 0x02, 0x70, 0x7C, 0x10, 0x7C], // self < arg ifTrue: [self] ifFalse: [arg]
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("<")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol("<")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), "min:", method5);
         instanceMethodCount++;
-        
+
         // max:
-        magnitudeClassRef.AddMethod("max:", SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             "max:",
             [0x70, 0x10, 0xB3, 0x99, 0x02, 0x70, 0x7C, 0x10, 0x7C], // self > arg ifTrue: [self] ifFalse: [arg]
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern(">")),
-            1, 0, 0));
+            [ObjectMemoryNew.InternSymbol(">")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(magnitudeClassRef.AsObjectPointer(), "max:", method6);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -110,43 +117,48 @@ public static class NumericMethodsInstaller
         }
         
         // negated
-        numberClassRef.AddMethod("negated", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "negated",
             [0x75, 0x70, 0xB1, 0x7C], // 0 - self
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("-")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("-")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(numberClassRef.AsObjectPointer(), "negated", method1);
         instanceMethodCount++;
-        
+
         // abs
-        numberClassRef.AddMethod("abs", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "abs",
             [0x70, 0x75, 0xB2, 0x9D, 0x04, 0x70, 0xD4, 0x7C, 0x70], // self < 0 ifTrue: [self negated] ifFalse: [self]
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("<"), SSymbol.Intern("negated")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("<"), ObjectMemoryNew.InternSymbol("negated")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(numberClassRef.AsObjectPointer(), "abs", method2);
         instanceMethodCount++;
-        
+
         // positive
-        numberClassRef.AddMethod("positive", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "positive",
             [0x70, 0x75, 0xB3, 0x7C], // self > 0
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern(">")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol(">")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(numberClassRef.AsObjectPointer(), "positive", method3);
         instanceMethodCount++;
-        
+
         // negative
-        numberClassRef.AddMethod("negative", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "negative",
             [0x70, 0x75, 0xB2, 0x7C], // self < 0
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("<")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("<")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(numberClassRef.AsObjectPointer(), "negative", method4);
         instanceMethodCount++;
-        
+
         // isZero
-        numberClassRef.AddMethod("isZero", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "isZero",
             [0x70, 0x75, 0xB6, 0x7C], // self = 0
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("=")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("=")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(numberClassRef.AsObjectPointer(), "isZero", method5);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -185,139 +197,156 @@ public static class NumericMethodsInstaller
         }
         
         // + (addition) - primitive 1
-        smallIntegerClassRef.AddMethod("+", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "+",
             [0x85, 0x10, 0xE0, 0x7C], // super + arg (fallback for primitive 1)
             [],
-            1, 0, 1));
+            1, 0, 1);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "+", method1);
         instanceMethodCount++;
         
         // - (subtraction) - primitive 2
-        smallIntegerClassRef.AddMethod("-", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "-",
             [0x85, 0x10, 0xE1, 0x7C], // super - arg (fallback for primitive 2)
             [],
-            1, 0, 2));
+            1, 0, 2);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "-", method2);
         instanceMethodCount++;
-        
+
         // * (multiplication) - primitive 9
-        smallIntegerClassRef.AddMethod("*", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "*",
             [0x85, 0x10, 0xE0, 0x7C], // super * arg (fallback for primitive 9)
             [],
-            1, 0, 9));
+            1, 0, 9);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "*", method3);
         instanceMethodCount++;
-        
+
         // / (division) - primitive 10
-        smallIntegerClassRef.AddMethod("/", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "/",
             [0x85, 0x10, 0xE0, 0x7C], // super / arg (fallback for primitive 10)
             [],
-            1, 0, 10));
+            1, 0, 10);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "/", method4);
         instanceMethodCount++;
-        
+
         // // (integer division) - primitive 12
-        smallIntegerClassRef.AddMethod("//", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "//",
             [0x85, 0x10, 0xE0, 0x7C], // super // arg (fallback for primitive 12)
             [],
-            1, 0, 12));
+            1, 0, 12);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "//", method5);
         instanceMethodCount++;
-        
+
         // \\ (modulo) - primitive 11
-        smallIntegerClassRef.AddMethod("\\\\", SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             "\\\\",
             [0x85, 0x10, 0xE0, 0x7C], // super \\ arg (fallback for primitive 11)
             [],
-            1, 0, 11));
+            1, 0, 11);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "\\\\", method6);
         instanceMethodCount++;
-        
+
         // < - primitive 3
-        smallIntegerClassRef.AddMethod("<", SCompiledMethod.CreateCompiledMethodRef(
+        var method7 = ObjectMemoryNew.CreateCompiledMethod(
             "<",
             [0x72, 0x7C], // push false, return (fallback for primitive 3)
             [],
-            1, 0, 3));
+            1, 0, 3);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "<", method7);
         instanceMethodCount++;
-        
+
         // > - primitive 4
-        smallIntegerClassRef.AddMethod(">", SCompiledMethod.CreateCompiledMethodRef(
+        var method8 = ObjectMemoryNew.CreateCompiledMethod(
             ">",
             [0x72, 0x7C], // push false, return (fallback for primitive 4)
             [],
-            1, 0, 4));
+            1, 0, 4);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), ">", method8);
         instanceMethodCount++;
-        
+
         // <= - primitive 5
-        smallIntegerClassRef.AddMethod("<=", SCompiledMethod.CreateCompiledMethodRef(
+        var method9 = ObjectMemoryNew.CreateCompiledMethod(
             "<=",
             [0x72, 0x7C], // push false, return (fallback for primitive 5)
             [],
-            1, 0, 5));
+            1, 0, 5);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "<=", method9);
         instanceMethodCount++;
-        
+
         // >= - primitive 6
-        smallIntegerClassRef.AddMethod(">=", SCompiledMethod.CreateCompiledMethodRef(
+        var method10 = ObjectMemoryNew.CreateCompiledMethod(
             ">=",
             [0x72, 0x7C], // push false, return (fallback for primitive 6)
             [],
-            1, 0, 6));
+            1, 0, 6);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), ">=", method10);
         instanceMethodCount++;
-        
+
         // = - primitive 7
-        smallIntegerClassRef.AddMethod("=", SCompiledMethod.CreateCompiledMethodRef(
+        var method11 = ObjectMemoryNew.CreateCompiledMethod(
             "=",
             [0x72, 0x7C], // push false, return (fallback for primitive 7)
             [],
-            1, 0, 7));
+            1, 0, 7);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "=", method11);
         instanceMethodCount++;
-        
+
         // ~= - primitive 8
-        smallIntegerClassRef.AddMethod("~=", SCompiledMethod.CreateCompiledMethodRef(
+        var method12 = ObjectMemoryNew.CreateCompiledMethod(
             "~=",
             [0x71, 0x7C], // push true, return (fallback for primitive 8)
             [],
-            1, 0, 8));
+            1, 0, 8);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "~=", method12);
         instanceMethodCount++;
-        
+
         // negated
-        smallIntegerClassRef.AddMethod("negated", SCompiledMethod.CreateCompiledMethodRef(
+        var method13 = ObjectMemoryNew.CreateCompiledMethod(
             "negated",
             [0x75, 0x70, 0xB1, 0x7C], // 0 - self
             [],
-            0, 0, 0));
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "negated", method13);
         instanceMethodCount++;
-        
+
         // abs
-        smallIntegerClassRef.AddMethod("abs", SCompiledMethod.CreateCompiledMethodRef(
+        var method14 = ObjectMemoryNew.CreateCompiledMethod(
             "abs",
             [0x70, 0x75, 0xB2, 0x9D, 0x04, 0x70, 0xD4, 0x7C, 0x70], // self < 0 ifTrue: [self negated] ifFalse: [self]
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("negated")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("negated")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "abs", method14);
         instanceMethodCount++;
-        
+
         // asFloat - primitive 40
-        smallIntegerClassRef.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethodRef(
+        var method15 = ObjectMemoryNew.CreateCompiledMethod(
             "asFloat",
             [], // No fallback needed - primitive 40 cannot fail
             [],
-            0, 0, 40));
+            0, 0, 40);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "asFloat", method15);
         instanceMethodCount++;
-        
+
         // to:do: block iteration
-        smallIntegerClassRef.AddMethod("to:do:", SCompiledMethod.CreateCompiledMethodRef(
+        var method16 = ObjectMemoryNew.CreateCompiledMethod(
             "to:do:",
             [0x70, 0x69, 0x10, 0xB5, 0xAC, 0x09, 0x11, 0x6A, 0xD5, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF4, 0x73, 0x7C],
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("value:")),
-            2, 1, 0));
+            [ObjectMemoryNew.InternSymbol("value:")],
+            2, 1, 0);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "to:do:", method16);
         instanceMethodCount++;
-        
+
         // timesRepeat: block iteration
-        smallIntegerClassRef.AddMethod("timesRepeat:", SCompiledMethod.CreateCompiledMethodRef(
+        var method17 = ObjectMemoryNew.CreateCompiledMethod(
             "timesRepeat:",
             [0x76, 0x69, 0x70, 0xB5, 0xAC, 0x07, 0x10, 0xC9, 0x6A, 0x76, 0xB0, 0x69, 0xA3, 0xF6, 0x73, 0x7C],
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("value")),
-            1, 1, 0));
+            [ObjectMemoryNew.InternSymbol("value")],
+            1, 1, 0);
+        ObjectMemoryNew.AddMethod(smallIntegerClassRef.AsObjectPointer(), "timesRepeat:", method17);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -342,99 +371,111 @@ public static class NumericMethodsInstaller
         }
         
         // + - primitive 41
-        floatClassRef.AddMethod("+", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "+",
             [0x85, 0x10, 0xE0, 0x7C], // super + arg (fallback for primitive 41)
             [],
-            1, 0, 41));
+            1, 0, 41);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "+", method1);
         instanceMethodCount++;
-        
+
         // - - primitive 42
-        floatClassRef.AddMethod("-", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "-",
             [0x85, 0x10, 0xE1, 0x7C], // super - arg (fallback for primitive 42)
             [],
-            1, 0, 42));
+            1, 0, 42);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "-", method2);
         instanceMethodCount++;
-        
+
         // * - primitive 49
-        floatClassRef.AddMethod("*", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "*",
             [0x85, 0x10, 0xE0, 0x7C], // super * arg (fallback for primitive 49)
             [],
-            1, 0, 49));
+            1, 0, 49);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "*", method3);
         instanceMethodCount++;
-        
+
         // / - primitive 50
-        floatClassRef.AddMethod("/", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "/",
             [0x85, 0x10, 0xE0, 0x7C], // super / arg (fallback for primitive 50)
             [],
-            1, 0, 50));
+            1, 0, 50);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "/", method4);
         instanceMethodCount++;
-        
+
         // < - primitive 43
-        floatClassRef.AddMethod("<", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "<",
             [0x72, 0x7C], // push false, return (fallback for primitive 43)
             [],
-            1, 0, 43));
+            1, 0, 43);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "<", method5);
         instanceMethodCount++;
-        
+
         // > - primitive 44
-        floatClassRef.AddMethod(">", SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             ">",
             [0x72, 0x7C], // push false, return (fallback for primitive 44)
             [],
-            1, 0, 44));
+            1, 0, 44);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), ">", method6);
         instanceMethodCount++;
-        
+
         // <= - primitive 45
-        floatClassRef.AddMethod("<=", SCompiledMethod.CreateCompiledMethodRef(
+        var method7 = ObjectMemoryNew.CreateCompiledMethod(
             "<=",
             [0x72, 0x7C], // push false, return (fallback for primitive 45)
             [],
-            1, 0, 45));
+            1, 0, 45);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "<=", method7);
         instanceMethodCount++;
-        
+
         // >= - primitive 46
-        floatClassRef.AddMethod(">=", SCompiledMethod.CreateCompiledMethodRef(
+        var method8 = ObjectMemoryNew.CreateCompiledMethod(
             ">=",
             [0x72, 0x7C], // push false, return (fallback for primitive 46)
             [],
-            1, 0, 46));
+            1, 0, 46);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), ">=", method8);
         instanceMethodCount++;
-        
+
         // = - primitive 47
-        floatClassRef.AddMethod("=", SCompiledMethod.CreateCompiledMethodRef(
+        var method9 = ObjectMemoryNew.CreateCompiledMethod(
             "=",
             [0x72, 0x7C], // push false, return (fallback for primitive 47)
             [],
-            1, 0, 47));
+            1, 0, 47);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "=", method9);
         instanceMethodCount++;
-        
+
         // ~= - primitive 48
-        floatClassRef.AddMethod("~=", SCompiledMethod.CreateCompiledMethodRef(
+        var method10 = ObjectMemoryNew.CreateCompiledMethod(
             "~=",
             [0x71, 0x7C], // push true, return (fallback for primitive 48)
             [],
-            1, 0, 48));
+            1, 0, 48);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "~=", method10);
         instanceMethodCount++;
-        
+
         // truncate - primitive 51
-        floatClassRef.AddMethod("truncate", SCompiledMethod.CreateCompiledMethodRef(
+        var method11 = ObjectMemoryNew.CreateCompiledMethod(
             "truncate",
             [], // No fallback needed - primitive 51 cannot fail
             [],
-            0, 0, 51));
+            0, 0, 51);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "truncate", method11);
         instanceMethodCount++;
-        
+
         // asFloat (returns self)
-        floatClassRef.AddMethod("asFloat", SCompiledMethod.CreateCompiledMethodRef(
+        var method12 = ObjectMemoryNew.CreateCompiledMethod(
             "asFloat",
             [0x70, 0x7C], // ^self
             [],
-            0, 0, 0));
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(floatClassRef.AsObjectPointer(), "asFloat", method12);
         instanceMethodCount++;
         
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -459,15 +500,16 @@ public static class NumericMethodsInstaller
         }
         
         // asInteger - primitive 171
-        characterClassRef.AddMethod("asInteger", SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "asInteger",
             [], // No fallback needed - primitive 171 cannot fail
             [],
-            0, 0, 171));
+            0, 0, 171);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "asInteger", method1);
         instanceMethodCount++;
-        
+
         // isLetter - checks if character is a letter (A-Z, a-z)
-        characterClassRef.AddMethod("isLetter", SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "isLetter",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x41, 0xB5, 0x9D, 0x06, // >= 65 ($A)
@@ -475,70 +517,70 @@ public static class NumericMethodsInstaller
              0x68, 0x22, 0x61, 0xB5, 0x9D, 0x06, // >= 97 ($a)
              0x68, 0x22, 0x7A, 0xB5, 0x91, 0x71, 0x7C, // <= 122 ($z) -> true
              0x72, 0x7C], // false
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("asInteger"),
-                new SmallInteger(65),
-                SSymbol.Intern(">="),
-                new SmallInteger(90),
-                SSymbol.Intern("<="),
-                new SmallInteger(97),
-                new SmallInteger(122)),
-            0, 1, 0));
+            [ObjectMemoryNew.InternSymbol("asInteger"),
+             SObjectRef.FromSmallInteger(65),
+             ObjectMemoryNew.InternSymbol(">="),
+             SObjectRef.FromSmallInteger(90),
+             ObjectMemoryNew.InternSymbol("<="),
+             SObjectRef.FromSmallInteger(97),
+             SObjectRef.FromSmallInteger(122)],
+            0, 1, 0);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "isLetter", method2);
         instanceMethodCount++;
-        
+
         // isDigit - checks if character is a digit (0-9)
-        characterClassRef.AddMethod("isDigit", SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "isDigit",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x30, 0xB5, 0x9D, 0x06, // >= 48 ($0)
              0x68, 0x22, 0x39, 0xB5, 0x91, 0x71, 0x7C, // <= 57 ($9) -> true
              0x72, 0x7C], // false
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("asInteger"),
-                new SmallInteger(48),
-                SSymbol.Intern(">="),
-                new SmallInteger(57),
-                SSymbol.Intern("<=")),
-            0, 1, 0));
+            [ObjectMemoryNew.InternSymbol("asInteger"),
+             SObjectRef.FromSmallInteger(48),
+             ObjectMemoryNew.InternSymbol(">="),
+             SObjectRef.FromSmallInteger(57),
+             ObjectMemoryNew.InternSymbol("<=")],
+            0, 1, 0);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "isDigit", method3);
         instanceMethodCount++;
-        
+
         // isAlphaNumeric - letter or digit
-        characterClassRef.AddMethod("isAlphaNumeric", SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "isAlphaNumeric",
             [0x70, 0xD0, 0x99, 0x02, 0x71, 0x7C, // self isLetter ifTrue: [^true]
              0x70, 0xD1, 0x7C], // self isDigit
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("isLetter"),
-                SSymbol.Intern("isDigit")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("isLetter"),
+             ObjectMemoryNew.InternSymbol("isDigit")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "isAlphaNumeric", method4);
         instanceMethodCount++;
-        
+
         // isSeparator - space, tab, cr, lf, etc.
-        characterClassRef.AddMethod("isSeparator", SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "isSeparator",
             [0x70, 0xD0, 0x68, // self asInteger
              0x22, 0x20, 0xB6, 0x99, 0x02, 0x71, 0x7C, // = 32 (space) -> true
              0x68, 0x22, 0x09, 0xB6, 0x99, 0x02, 0x71, 0x7C, // = 9 (tab) -> true
              0x68, 0x22, 0x0D, 0xB6, 0x99, 0x02, 0x71, 0x7C, // = 13 (cr) -> true
              0x68, 0x22, 0x0A, 0xB6, 0x7C], // = 10 (lf)
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("asInteger"),
-                new SmallInteger(32),
-                SSymbol.Intern("="),
-                new SmallInteger(9),
-                new SmallInteger(13),
-                new SmallInteger(10)),
-            0, 1, 0));
+            [ObjectMemoryNew.InternSymbol("asInteger"),
+             SObjectRef.FromSmallInteger(32),
+             ObjectMemoryNew.InternSymbol("="),
+             SObjectRef.FromSmallInteger(9),
+             SObjectRef.FromSmallInteger(13),
+             SObjectRef.FromSmallInteger(10)],
+            0, 1, 0);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "isSeparator", method5);
         instanceMethodCount++;
-        
+
         // isSpecial - special characters used in Smalltalk syntax
-        characterClassRef.AddMethod("isSpecial", SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             "isSpecial",
             [0x21, 0x10, 0xE0, 0x7C], // '+/\\*~<>=@%|&?!' includes: self
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("+/\\*~<>=@%|&?!"),
-                SSymbol.Intern("includes:")),
-            0, 0, 0));
+            [ObjectMemoryNew.InternSymbol("+/\\*~<>=@%|&?!"),
+             ObjectMemoryNew.InternSymbol("includes:")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(characterClassRef.AsObjectPointer(), "isSpecial", method6);
         instanceMethodCount++;
         
         // Note: Class methods would be installed on Character's metaclass

@@ -320,7 +320,8 @@ public sealed class ContextBasedInterpreterNew
 
                 if (format == ObjectFormat.PointerIndexed || format == ObjectFormat.FixedPointer)
                 {
-                    var value = ObjectMemoryNew.GetInstanceVariable(assocOop, 1); // Value is at index 1
+                    Generated.Layouts.STAssociation assoc = association;
+                    var value = assoc.Value;
                     ObjectMemoryNew.ContextPush(contextOop, value);
                 }
                 else

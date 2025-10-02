@@ -16,7 +16,6 @@ using Smalltalk80.Interpreter.Memory;
 public static class SObjectRefClassExtensions
 {
     // Thread-safe method cache for LookupMethod
-    private static readonly MethodCache methodCache = new();
 
     /// <summary>
     /// Gets the name of this class as a string.

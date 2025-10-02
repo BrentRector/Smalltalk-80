@@ -4,6 +4,7 @@
 //     the code is regenerated.
 // </auto-generated>
 
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
 
@@ -51,7 +52,12 @@ public readonly struct STObject : ISTObject
     /// <summary>
     /// The total number of instance variables for STObject.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STObject.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -92,7 +98,12 @@ public readonly struct STCollection : ISTCollection
     /// <summary>
     /// The total number of instance variables for STCollection.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STCollection.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -133,7 +144,12 @@ public readonly struct STSequenceableCollection : ISTSequenceableCollection
     /// <summary>
     /// The total number of instance variables for STSequenceableCollection.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STSequenceableCollection.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -174,7 +190,12 @@ public readonly struct STArrayedCollection : ISTArrayedCollection
     /// <summary>
     /// The total number of instance variables for STArrayedCollection.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STArrayedCollection.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -215,7 +236,26 @@ public readonly struct STArray : ISTArray
     /// <summary>
     /// The total number of instance variables for STArray.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STArray.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed pointer at the specified index.
+    /// </summary>
+    public SObjectRef this[int index]
+    {
+        get => _ref.GetIndexedPointer(index);
+        set => _ref.SetIndexedPointer(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -256,7 +296,12 @@ public readonly struct STMagnitude : ISTMagnitude
     /// <summary>
     /// The total number of instance variables for STMagnitude.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STMagnitude.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -312,7 +357,12 @@ public readonly struct STLookupKey : ISTLookupKey
     /// <summary>
     /// The total number of instance variables for STLookupKey.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STLookupKey.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -378,7 +428,12 @@ public readonly struct STAssociation : ISTAssociation
     /// <summary>
     /// The total number of instance variables for STAssociation.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STAssociation.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -473,7 +528,12 @@ public readonly struct STBehavior : ISTBehavior
     /// <summary>
     /// The total number of instance variables for STBehavior.
     /// </summary>
-    internal const int InstanceVarCount = 4;
+    public const int InstanceVarCount = 4;
+
+    /// <summary>
+    /// The object format for STBehavior.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -542,7 +602,12 @@ public readonly struct STInstructionStream : ISTInstructionStream
     /// <summary>
     /// The total number of instance variables for STInstructionStream.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STInstructionStream.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -617,7 +682,45 @@ public readonly struct STContextPart : ISTContextPart
     /// <summary>
     /// The total number of instance variables for STContextPart.
     /// </summary>
-    internal const int InstanceVarCount = 3;
+    public const int InstanceVarCount = 3;
+
+    /// <summary>
+    /// The object format for STContextPart.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
+
+    /// <summary>
+    /// Gets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <returns>The temporary variable value.</returns>
+    public SObjectRef GetTemporary(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetTemporary(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <returns>The stack slot value.</returns>
+    public SObjectRef GetStackSlot(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetStackSlot(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets the number of indexed slots (temporaries and stack).
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -727,7 +830,55 @@ public readonly struct STBlockContext : ISTBlockContext
     /// <summary>
     /// The total number of instance variables for STBlockContext.
     /// </summary>
-    internal const int InstanceVarCount = 6;
+    public const int InstanceVarCount = 6;
+
+    /// <summary>
+    /// The object format for STBlockContext.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <returns>The temporary variable value.</returns>
+    public SObjectRef GetTemporary(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetTemporary(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <returns>The stack slot value.</returns>
+    public SObjectRef GetStackSlot(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetStackSlot(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets the number of indexed slots (temporaries and stack).
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+
+    /// <summary>
+    /// Gets the stack pointer as an integer.
+    /// </summary>
+    public int StackPointer => Stackp.AsSmallInteger();
+
+    /// <summary>
+    /// Gets the program counter as an integer.
+    /// </summary>
+    public int ProgramCounter => Pc.AsSmallInteger();
 }
 
 /// <summary>
@@ -768,7 +919,12 @@ public readonly struct STBoolean : ISTBoolean
     /// <summary>
     /// The total number of instance variables for STBoolean.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STBoolean.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -809,7 +965,26 @@ public readonly struct STByteArray : ISTByteArray
     /// <summary>
     /// The total number of instance variables for STByteArray.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STByteArray.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.ByteIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed byte at the specified index.
+    /// </summary>
+    public byte this[int index]
+    {
+        get => _ref.GetIndexedByte(index);
+        set => _ref.SetIndexedByte(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -865,7 +1040,12 @@ public readonly struct STCharacter : ISTCharacter
     /// <summary>
     /// The total number of instance variables for STCharacter.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STCharacter.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -971,7 +1151,12 @@ public readonly struct STClassDescription : ISTClassDescription
     /// <summary>
     /// The total number of instance variables for STClassDescription.
     /// </summary>
-    internal const int InstanceVarCount = 6;
+    public const int InstanceVarCount = 6;
+
+    /// <summary>
+    /// The object format for STClassDescription.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1108,7 +1293,12 @@ public readonly struct STClass : ISTClass
     /// <summary>
     /// The total number of instance variables for STClass.
     /// </summary>
-    internal const int InstanceVarCount = 9;
+    public const int InstanceVarCount = 9;
+
+    /// <summary>
+    /// The object format for STClass.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1149,7 +1339,17 @@ public readonly struct STCompiledMethod : ISTCompiledMethod
     /// <summary>
     /// The total number of instance variables for STCompiledMethod.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STCompiledMethod.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.CompiledMethod;
+
+    /// <summary>
+    /// Gets the length of the bytecode array.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -1205,7 +1405,31 @@ public readonly struct STSet : ISTSet
     /// <summary>
     /// The total number of instance variables for STSet.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STSet.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed pointer at the specified index.
+    /// </summary>
+    public SObjectRef this[int index]
+    {
+        get => _ref.GetIndexedPointer(index);
+        set => _ref.SetIndexedPointer(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+
+    /// <summary>
+    /// Gets the count (tally converted to int).
+    /// </summary>
+    public int Count => Tally.AsSmallInteger();
 }
 
 /// <summary>
@@ -1257,7 +1481,31 @@ public readonly struct STDictionary : ISTDictionary
     /// <summary>
     /// The total number of instance variables for STDictionary.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STDictionary.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed pointer at the specified index.
+    /// </summary>
+    public SObjectRef this[int index]
+    {
+        get => _ref.GetIndexedPointer(index);
+        set => _ref.SetIndexedPointer(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+
+    /// <summary>
+    /// Gets the count (tally converted to int).
+    /// </summary>
+    public int Count => Tally.AsSmallInteger();
 }
 
 /// <summary>
@@ -1298,7 +1546,12 @@ public readonly struct STFalse : ISTFalse
     /// <summary>
     /// The total number of instance variables for STFalse.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STFalse.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1339,7 +1592,12 @@ public readonly struct STNumber : ISTNumber
     /// <summary>
     /// The total number of instance variables for STNumber.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STNumber.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1380,7 +1638,26 @@ public readonly struct STFloat : ISTFloat
     /// <summary>
     /// The total number of instance variables for STFloat.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STFloat.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.WordIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed word at the specified index.
+    /// </summary>
+    public ushort this[int index]
+    {
+        get => _ref.GetIndexedWord(index);
+        set => _ref.SetIndexedWord(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -1449,7 +1726,12 @@ public readonly struct STFraction : ISTFraction
     /// <summary>
     /// The total number of instance variables for STFraction.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STFraction.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1515,7 +1797,94 @@ public readonly struct STIdentityDictionary : ISTIdentityDictionary
     /// <summary>
     /// The total number of instance variables for STIdentityDictionary.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STIdentityDictionary.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets the keys collection for indexed access.
+    /// </summary>
+    public KeysCollection Keys => new KeysCollection(_ref);
+
+    /// <summary>
+    /// Gets the values collection for indexed access.
+    /// </summary>
+    public ValuesCollection Values => new ValuesCollection(_ref);
+
+    /// <summary>
+    /// Collection for accessing dictionary keys.
+    /// </summary>
+    public readonly struct KeysCollection
+    {
+        private readonly SObjectRef _dictRef;
+
+        internal KeysCollection(SObjectRef dictRef) => _dictRef = dictRef;
+
+        /// <summary>
+        /// Gets or sets the key at the specified index.
+        /// </summary>
+        public SObjectRef this[int index]
+        {
+            get => _dictRef.GetIndexedPointer(index);
+            set => _dictRef.SetIndexedPointer(index, value);
+        }
+
+        /// <summary>
+        /// Gets the number of keys.
+        /// </summary>
+        public int Length => _dictRef.GetIndexedSize();
+    }
+
+    /// <summary>
+    /// Collection for accessing dictionary values.
+    /// </summary>
+    public readonly struct ValuesCollection
+    {
+        private readonly SObjectRef _dictRef;
+        private const int ValueArrayIndex = 1;
+
+        internal ValuesCollection(SObjectRef dictRef) => _dictRef = dictRef;
+
+        /// <summary>
+        /// Gets or sets the value at the specified index.
+        /// </summary>
+        public SObjectRef this[int index]
+        {
+            get
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                return valueArray[index];
+            }
+            set
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                valueArray[index] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets the number of values.
+        /// </summary>
+        public int Length
+        {
+            get
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                return valueArray.Length;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the count (tally converted to int).
+    /// </summary>
+    public int Count => Tally.AsSmallInteger();
 }
 
 /// <summary>
@@ -1556,7 +1925,12 @@ public readonly struct STInteger : ISTInteger
     /// <summary>
     /// The total number of instance variables for STInteger.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STInteger.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1597,7 +1971,26 @@ public readonly struct STLargeNegativeInteger : ISTLargeNegativeInteger
     /// <summary>
     /// The total number of instance variables for STLargeNegativeInteger.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STLargeNegativeInteger.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.ByteIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed byte at the specified index.
+    /// </summary>
+    public byte this[int index]
+    {
+        get => _ref.GetIndexedByte(index);
+        set => _ref.SetIndexedByte(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -1638,7 +2031,26 @@ public readonly struct STLargePositiveInteger : ISTLargePositiveInteger
     /// <summary>
     /// The total number of instance variables for STLargePositiveInteger.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STLargePositiveInteger.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.ByteIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed byte at the specified index.
+    /// </summary>
+    public byte this[int index]
+    {
+        get => _ref.GetIndexedByte(index);
+        set => _ref.SetIndexedByte(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -1694,7 +2106,12 @@ public readonly struct STLink : ISTLink
     /// <summary>
     /// The total number of instance variables for STLink.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STLink.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1763,7 +2180,12 @@ public readonly struct STLinkedList : ISTLinkedList
     /// <summary>
     /// The total number of instance variables for STLinkedList.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STLinkedList.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1874,7 +2296,12 @@ public readonly struct STMetaclass : ISTMetaclass
     /// <summary>
     /// The total number of instance variables for STMetaclass.
     /// </summary>
-    internal const int InstanceVarCount = 7;
+    public const int InstanceVarCount = 7;
+
+    /// <summary>
+    /// The object format for STMetaclass.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -1984,7 +2411,55 @@ public readonly struct STMethodContext : ISTMethodContext
     /// <summary>
     /// The total number of instance variables for STMethodContext.
     /// </summary>
-    internal const int InstanceVarCount = 6;
+    public const int InstanceVarCount = 6;
+
+    /// <summary>
+    /// The object format for STMethodContext.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <returns>The temporary variable value.</returns>
+    public SObjectRef GetTemporary(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a temporary variable at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the temporary variable.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetTemporary(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <returns>The stack slot value.</returns>
+    public SObjectRef GetStackSlot(int index) => _ref.GetIndexedPointer(index);
+
+    /// <summary>
+    /// Sets a stack slot at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the stack slot.</param>
+    /// <param name="value">The value to set.</param>
+    public void SetStackSlot(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);
+
+    /// <summary>
+    /// Gets the number of indexed slots (temporaries and stack).
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+
+    /// <summary>
+    /// Gets the stack pointer as an integer.
+    /// </summary>
+    public int StackPointer => Stackp.AsSmallInteger();
+
+    /// <summary>
+    /// Gets the program counter as an integer.
+    /// </summary>
+    public int ProgramCounter => Pc.AsSmallInteger();
 }
 
 /// <summary>
@@ -2045,7 +2520,94 @@ public readonly struct STMethodDictionary : ISTMethodDictionary
     /// <summary>
     /// The total number of instance variables for STMethodDictionary.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STMethodDictionary.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets the keys collection for indexed access.
+    /// </summary>
+    public KeysCollection Keys => new KeysCollection(_ref);
+
+    /// <summary>
+    /// Gets the values collection for indexed access.
+    /// </summary>
+    public ValuesCollection Values => new ValuesCollection(_ref);
+
+    /// <summary>
+    /// Collection for accessing dictionary keys.
+    /// </summary>
+    public readonly struct KeysCollection
+    {
+        private readonly SObjectRef _dictRef;
+
+        internal KeysCollection(SObjectRef dictRef) => _dictRef = dictRef;
+
+        /// <summary>
+        /// Gets or sets the key at the specified index.
+        /// </summary>
+        public SObjectRef this[int index]
+        {
+            get => _dictRef.GetIndexedPointer(index);
+            set => _dictRef.SetIndexedPointer(index, value);
+        }
+
+        /// <summary>
+        /// Gets the number of keys.
+        /// </summary>
+        public int Length => _dictRef.GetIndexedSize();
+    }
+
+    /// <summary>
+    /// Collection for accessing dictionary values.
+    /// </summary>
+    public readonly struct ValuesCollection
+    {
+        private readonly SObjectRef _dictRef;
+        private const int ValueArrayIndex = 1;
+
+        internal ValuesCollection(SObjectRef dictRef) => _dictRef = dictRef;
+
+        /// <summary>
+        /// Gets or sets the value at the specified index.
+        /// </summary>
+        public SObjectRef this[int index]
+        {
+            get
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                return valueArray[index];
+            }
+            set
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                valueArray[index] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets the number of values.
+        /// </summary>
+        public int Length
+        {
+            get
+            {
+                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);
+                STArray valueArray = valueArrayRef;
+                return valueArray.Length;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the count (tally converted to int).
+    /// </summary>
+    public int Count => Tally.AsSmallInteger();
 }
 
 /// <summary>
@@ -2114,7 +2676,12 @@ public readonly struct STPoint : ISTPoint
     /// <summary>
     /// The total number of instance variables for STPoint.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STPoint.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2206,7 +2773,12 @@ public readonly struct STProcess : ISTProcess
     /// <summary>
     /// The total number of instance variables for STProcess.
     /// </summary>
-    internal const int InstanceVarCount = 4;
+    public const int InstanceVarCount = 4;
+
+    /// <summary>
+    /// The object format for STProcess.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2275,7 +2847,12 @@ public readonly struct STProcessorScheduler : ISTProcessorScheduler
     /// <summary>
     /// The total number of instance variables for STProcessorScheduler.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STProcessorScheduler.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2344,7 +2921,12 @@ public readonly struct STRectangle : ISTRectangle
     /// <summary>
     /// The total number of instance variables for STRectangle.
     /// </summary>
-    internal const int InstanceVarCount = 2;
+    public const int InstanceVarCount = 2;
+
+    /// <summary>
+    /// The object format for STRectangle.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2419,7 +3001,12 @@ public readonly struct STSemaphore : ISTSemaphore
     /// <summary>
     /// The total number of instance variables for STSemaphore.
     /// </summary>
-    internal const int InstanceVarCount = 3;
+    public const int InstanceVarCount = 3;
+
+    /// <summary>
+    /// The object format for STSemaphore.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2460,7 +3047,12 @@ public readonly struct STSmallInteger : ISTSmallInteger
     /// <summary>
     /// The total number of instance variables for STSmallInteger.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STSmallInteger.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2501,7 +3093,26 @@ public readonly struct STString : ISTString
     /// <summary>
     /// The total number of instance variables for STString.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STString.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.ByteIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed byte at the specified index.
+    /// </summary>
+    public byte this[int index]
+    {
+        get => _ref.GetIndexedByte(index);
+        set => _ref.SetIndexedByte(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -2542,7 +3153,26 @@ public readonly struct STSymbol : ISTSymbol
     /// <summary>
     /// The total number of instance variables for STSymbol.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STSymbol.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.ByteIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed byte at the specified index.
+    /// </summary>
+    public byte this[int index]
+    {
+        get => _ref.GetIndexedByte(index);
+        set => _ref.SetIndexedByte(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
 }
 
 /// <summary>
@@ -2594,7 +3224,31 @@ public readonly struct STSystemDictionary : ISTSystemDictionary
     /// <summary>
     /// The total number of instance variables for STSystemDictionary.
     /// </summary>
-    internal const int InstanceVarCount = 1;
+    public const int InstanceVarCount = 1;
+
+    /// <summary>
+    /// The object format for STSystemDictionary.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed pointer at the specified index.
+    /// </summary>
+    public SObjectRef this[int index]
+    {
+        get => _ref.GetIndexedPointer(index);
+        set => _ref.SetIndexedPointer(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+
+    /// <summary>
+    /// Gets the count (tally converted to int).
+    /// </summary>
+    public int Count => Tally.AsSmallInteger();
 }
 
 /// <summary>
@@ -2635,7 +3289,12 @@ public readonly struct STTrue : ISTTrue
     /// <summary>
     /// The total number of instance variables for STTrue.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STTrue.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 
 /// <summary>
@@ -2676,6 +3335,11 @@ public readonly struct STUndefinedObject : ISTUndefinedObject
     /// <summary>
     /// The total number of instance variables for STUndefinedObject.
     /// </summary>
-    internal const int InstanceVarCount = 0;
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STUndefinedObject.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
 

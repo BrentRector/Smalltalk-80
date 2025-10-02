@@ -211,19 +211,22 @@ file sealed class Program
             List<ClassDefinitionNode> classesToGenerate = result.Classes;
             if (classFilter?.Count > 0)
             {
-                classesToGenerate = result.Classes
-                    .Where(c => classFilter.Contains(c.Name))
-                    .ToList();
+                // Expand the filter to include all superclasses
+                var expandedClasses = ExpandClassFilterWithSuperclasses(classFilter, result.Classes);
 
-                if (classesToGenerate.Count == 0)
+                if (expandedClasses.MissingClasses.Count > 0)
                 {
-                    Console.Error.WriteLine($"Error: None of the specified classes were found in the input file.");
-                    Console.Error.WriteLine($"Specified: {string.Join(", ", classFilter)}");
-                    Console.Error.WriteLine($"Available: {string.Join(", ", result.Classes.Select(c => c.Name))}");
+                    Console.Error.WriteLine($"Error: The following requested classes were not found in the input file:");
+                    Console.Error.WriteLine($"  Missing: {string.Join(", ", expandedClasses.MissingClasses)}");
+                    Console.Error.WriteLine($"  Available: {string.Join(", ", result.Classes.Select(c => c.Name))}");
                     return 1;
                 }
 
-                Console.WriteLine($"  Filtering to {classesToGenerate.Count} classes: {string.Join(", ", classesToGenerate.Select(c => c.Name))}");
+                classesToGenerate = expandedClasses.Classes;
+
+                // Show both requested and expanded class lists
+                Console.WriteLine($"  Requested: {string.Join(", ", classFilter)}");
+                Console.WriteLine($"  Generating {classesToGenerate.Count} classes (including superclasses): {string.Join(", ", classesToGenerate.Select(c => c.Name))}");
             }
 
             // Generate C# layout code
@@ -241,6 +244,83 @@ file sealed class Program
             Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Expands a set of seed class names to include all their superclasses.
+    /// </summary>
+    /// <param name="seedClassNames">The initial set of class names requested by the user.</param>
+    /// <param name="availableClasses">All available class definitions from the parsed source.</param>
+    /// <returns>A tuple containing the expanded list of classes in dependency order and any missing seed classes.</returns>
+    private static (List<ClassDefinitionNode> Classes, HashSet<string> MissingClasses) ExpandClassFilterWithSuperclasses(
+        HashSet<string> seedClassNames,
+        List<ClassDefinitionNode> availableClasses)
+    {
+        // Create a lookup dictionary for quick class retrieval
+        var classLookup = availableClasses.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+
+        // Track which seed classes are missing
+        var missingClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Use a HashSet to track all classes we need (including superclasses)
+        var requiredClassNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Process each seed class
+        foreach (var seedClassName in seedClassNames)
+        {
+            if (!classLookup.TryGetValue(seedClassName, out var seedClass))
+            {
+                missingClasses.Add(seedClassName);
+                continue;
+            }
+
+            // Walk up the superclass chain for this seed class
+            var currentClass = seedClass;
+            var visitedClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // Prevent circular references
+
+            while (currentClass is not null)
+            {
+                // Add current class to required set
+                requiredClassNames.Add(currentClass.Name);
+
+                // Check for circular reference (defensive programming)
+                if (!visitedClasses.Add(currentClass.Name))
+                {
+                    Console.WriteLine($"  Warning: Circular reference detected in class hierarchy for {currentClass.Name}");
+                    break;
+                }
+
+                // Check if we've reached the top of the hierarchy
+                if (string.IsNullOrEmpty(currentClass.Superclass) ||
+                    currentClass.Superclass.Equals("nil", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                // Move to the superclass
+                if (!classLookup.TryGetValue(currentClass.Superclass, out var superclass))
+                {
+                    // Superclass not found in available classes - this is normal for system classes like Object
+                    // that may be defined elsewhere
+                    break;
+                }
+
+                currentClass = superclass;
+            }
+        }
+
+        // If any seed classes are missing, return early with error information
+        if (missingClasses.Count > 0)
+        {
+            return ([], missingClasses);
+        }
+
+        // Return the filtered list in the original order (preserves dependency order from the source)
+        var expandedClasses = availableClasses
+            .Where(c => requiredClassNames.Contains(c.Name))
+            .ToList();
+
+        return (expandedClasses, missingClasses);
     }
 
     /// <summary>

@@ -25,7 +25,6 @@ public sealed class SNil : SObject
     /// <summary>
     /// Gets the class of nil (UndefinedObject).
     /// </summary>
-    public override SClass Class => SystemDictionary.UndefinedObjectClass;
     
     /// <summary>
     /// Converts nil to a display string.

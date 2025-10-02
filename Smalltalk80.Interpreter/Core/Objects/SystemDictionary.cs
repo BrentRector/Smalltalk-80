@@ -13,73 +13,6 @@ public static partial class SystemDictionary
 {
     private static bool initialized = false;
 
-    // PHASE 1: Keep old SClass properties but make them throw NotImplementedException
-    // These will be removed in Phase 4 of the migration
-
-    /// <summary>
-    /// Gets the Object class. (DEPRECATED - use ObjectClassRef)
-    /// </summary>
-    public static SClass ObjectClass => throw new NotImplementedException("Use ObjectClassRef instead");
-
-    /// <summary>
-    /// Gets the Class class. (DEPRECATED - use ClassClassRef)
-    /// </summary>
-    public static SClass ClassClass => throw new NotImplementedException("Use ClassClassRef instead");
-
-    /// <summary>
-    /// Gets the Metaclass class. (DEPRECATED - use MetaclassClassRef)
-    /// </summary>
-    public static SClass MetaclassClass { get => throw new NotImplementedException("Use MetaclassClassRef instead"); internal set => throw new NotImplementedException(); }
-
-    /// <summary>
-    /// Gets the SmallInteger class. (DEPRECATED - use SmallIntegerClassRef)
-    /// </summary>
-    public static SClass SmallIntegerClass => throw new NotImplementedException("Use SmallIntegerClassRef instead");
-
-    /// <summary>
-    /// Gets the Character class. (DEPRECATED - use CharacterClassRef)
-    /// </summary>
-    public static SClass CharacterClass => throw new NotImplementedException("Use CharacterClassRef instead");
-
-    /// <summary>
-    /// Gets the String class. (DEPRECATED - use StringClassRef)
-    /// </summary>
-    public static SClass StringClass => throw new NotImplementedException("Use StringClassRef instead");
-
-    /// <summary>
-    /// Gets the Symbol class. (DEPRECATED - use SymbolClassRef)
-    /// </summary>
-    public static SClass SymbolClass => throw new NotImplementedException("Use SymbolClassRef instead");
-
-    /// <summary>
-    /// Gets the Array class. (DEPRECATED - use ArrayClassRef)
-    /// </summary>
-    public static SClass ArrayClass => throw new NotImplementedException("Use ArrayClassRef instead");
-
-    /// <summary>
-    /// Gets the CompiledMethod class. (DEPRECATED - use CompiledMethodClassRef)
-    /// </summary>
-    public static SClass CompiledMethodClass => throw new NotImplementedException("Use CompiledMethodClassRef instead");
-
-    /// <summary>
-    /// Gets the UndefinedObject class. (DEPRECATED - use UndefinedObjectClassRef)
-    /// </summary>
-    public static SClass UndefinedObjectClass => throw new NotImplementedException("Use UndefinedObjectClassRef instead");
-
-    /// <summary>
-    /// Gets the True class. (DEPRECATED - use TrueClassRef)
-    /// </summary>
-    public static SClass TrueClass => throw new NotImplementedException("Use TrueClassRef instead");
-
-    /// <summary>
-    /// Gets the False class. (DEPRECATED - use FalseClassRef)
-    /// </summary>
-    public static SClass FalseClass => throw new NotImplementedException("Use FalseClassRef instead");
-
-    /// <summary>
-    /// Gets the Boolean class. (DEPRECATED - use BooleanClassRef)
-    /// </summary>
-    public static SClass BooleanClass => throw new NotImplementedException("Use BooleanClassRef instead");
 
     // Singleton instances
 
@@ -103,66 +36,134 @@ public static partial class SystemDictionary
     /// </summary>
     public static SObjectRef Instance { get; private set; }
 
-    /// <summary>
-    /// Gets the symbol table containing all interned symbols.
-    /// </summary>
-    public static SDictionary SymbolTable { get; private set; } = null!;
+    // Core class references (SObjectRef-based)
 
-    // Additional core classes from Blue Book - all deprecated properties
-
-    public static SClass BehaviorClass => throw new NotImplementedException("Use BehaviorClassRef instead");
-    public static SClass ClassDescriptionClass => throw new NotImplementedException("Use ClassDescriptionClassRef instead");
-    public static SClass MethodDictionaryClass => throw new NotImplementedException("Use MethodDictionaryClassRef instead");
-    public static SClass ByteArrayClass => throw new NotImplementedException("Use ByteArrayClassRef instead");
-    public static SClass AssociationClass => throw new NotImplementedException("Use AssociationClassRef instead");
-    public static SClass DictionaryClass => throw new NotImplementedException("Use DictionaryClassRef instead");
-    public static SClass MagnitudeClass => throw new NotImplementedException("Use MagnitudeClassRef instead");
-    public static SClass NumberClass => throw new NotImplementedException("Use NumberClassRef instead");
-    public static SClass IntegerClass => throw new NotImplementedException("Use IntegerClassRef instead");
-    public static SClass FloatClass => throw new NotImplementedException("Use FloatClassRef instead");
-    public static SClass LargePositiveIntegerClass => throw new NotImplementedException("Use LargePositiveIntegerClassRef instead");
-    public static SClass LargeNegativeIntegerClass => throw new NotImplementedException("Use LargeNegativeIntegerClassRef instead");
-    public static SClass CollectionClass => throw new NotImplementedException("Use CollectionClassRef instead");
-    public static SClass SequenceableCollectionClass => throw new NotImplementedException("Use SequenceableCollectionClassRef instead");
-    public static SClass OrderedCollectionClass => throw new NotImplementedException("Use OrderedCollectionClassRef instead");
-    public static SClass SetClass => throw new NotImplementedException("Use SetClassRef instead");
-    public static SClass LinkClass => throw new NotImplementedException("Use LinkClassRef instead");
-    public static SClass ProcessClass => throw new NotImplementedException("Use ProcessClassRef instead");
-    public static SClass LinkedListClass => throw new NotImplementedException("Use LinkedListClassRef instead");
-    public static SClass SemaphoreClass => throw new NotImplementedException("Use SemaphoreClassRef instead");
-    public static SClass ProcessorSchedulerClass => throw new NotImplementedException("Use ProcessorSchedulerClassRef instead");
-    public static SClass InstructionStreamClass => throw new NotImplementedException("Use InstructionStreamClassRef instead");
-    public static SClass ContextPartClass => throw new NotImplementedException("Use ContextPartClassRef instead");
-    public static SClass StreamClass => throw new NotImplementedException("Use StreamClassRef instead");
-    public static SClass PositionableStreamClass => throw new NotImplementedException("Use PositionableStreamClassRef instead");
-    public static SClass WriteStreamClass => throw new NotImplementedException("Use WriteStreamClassRef instead");
-    public static SClass ReadStreamClass => throw new NotImplementedException("Use ReadStreamClassRef instead");
-    public static SClass StringHolderClass => throw new NotImplementedException("Use StringHolderClassRef instead");
-    public static SClass TextCollectorClass => throw new NotImplementedException("Use TextCollectorClassRef instead");
-    public static SClass TextClass => throw new NotImplementedException("Use TextClassRef instead");
-    public static SClass ParseNodeClass => throw new NotImplementedException("Use ParseNodeClassRef instead");
-    public static SClass LeafNodeClass => throw new NotImplementedException("Use LeafNodeClassRef instead");
-    public static SClass ScannerClass => throw new NotImplementedException("Use ScannerClassRef instead");
-    public static SClass ParserClass => throw new NotImplementedException("Use ParserClassRef instead");
-    public static SClass CompilerClass => throw new NotImplementedException("Use CompilerClassRef instead");
-    public static SClass EncoderClass => throw new NotImplementedException("Use EncoderClassRef instead");
-    public static SClass VariableNodeClass => throw new NotImplementedException("Use VariableNodeClassRef instead");
-    public static SClass LiteralNodeClass => throw new NotImplementedException("Use LiteralNodeClassRef instead");
-    public static SClass SelectorNodeClass => throw new NotImplementedException("Use SelectorNodeClassRef instead");
-    public static SClass MessageNodeClass => throw new NotImplementedException("Use MessageNodeClassRef instead");
-    public static SClass AssignmentNodeClass => throw new NotImplementedException("Use AssignmentNodeClassRef instead");
-    public static SClass ReturnNodeClass => throw new NotImplementedException("Use ReturnNodeClassRef instead");
-    public static SClass BlockNodeClass => throw new NotImplementedException("Use BlockNodeClassRef instead");
-    public static SClass CascadeNodeClass => throw new NotImplementedException("Use CascadeNodeClassRef instead");
-    public static SClass MethodNodeClass => throw new NotImplementedException("Use MethodNodeClassRef instead");
-    public static SClass MethodContextClass => throw new NotImplementedException("Use MethodContextClassRef instead");
-    public static SClass BlockContextClass => throw new NotImplementedException("Use BlockContextClassRef instead");
-
-    // Legacy globals dictionary - still needed for now but will be migrated
-    private static readonly Dictionary<string, SObject> globals = [];
-
-    // New SObjectRef globals dictionary for pure SObjectRef architecture
-    private static readonly Dictionary<string, SObjectRef> globalRefs = [];
+    /// <summary>Reference to the Object class.</summary>
+    public static SObjectRef ObjectClassRef { get; private set; }
+    /// <summary>Reference to the Behavior class.</summary>
+    public static SObjectRef BehaviorClassRef { get; private set; }
+    /// <summary>Reference to the ClassDescription class.</summary>
+    public static SObjectRef ClassDescriptionClassRef { get; private set; }
+    /// <summary>Reference to the Metaclass class.</summary>
+    public static SObjectRef MetaclassClassRef { get; private set; }
+    /// <summary>Reference to the Class class.</summary>
+    public static SObjectRef ClassClassRef { get; private set; }
+    /// <summary>Reference to the CompiledMethod class.</summary>
+    public static SObjectRef CompiledMethodClassRef { get; private set; }
+    /// <summary>Reference to the InstructionStream class.</summary>
+    public static SObjectRef InstructionStreamClassRef { get; private set; }
+    /// <summary>Reference to the ContextPart class.</summary>
+    public static SObjectRef ContextPartClassRef { get; private set; }
+    /// <summary>Reference to the MethodContext class.</summary>
+    public static SObjectRef MethodContextClassRef { get; private set; }
+    /// <summary>Reference to the BlockContext class.</summary>
+    public static SObjectRef BlockContextClassRef { get; private set; }
+    /// <summary>Reference to the Collection class.</summary>
+    public static SObjectRef CollectionClassRef { get; private set; }
+    /// <summary>Reference to the SequenceableCollection class.</summary>
+    public static SObjectRef SequenceableCollectionClassRef { get; private set; }
+    /// <summary>Reference to the OrderedCollection class.</summary>
+    public static SObjectRef OrderedCollectionClassRef { get; private set; }
+    /// <summary>Reference to the Set class.</summary>
+    public static SObjectRef SetClassRef { get; private set; }
+    /// <summary>Reference to the Dictionary class.</summary>
+    public static SObjectRef DictionaryClassRef { get; private set; }
+    /// <summary>Reference to the IdentityDictionary class.</summary>
+    public static SObjectRef IdentityDictionaryClassRef { get; private set; }
+    /// <summary>Reference to the MethodDictionary class.</summary>
+    public static SObjectRef MethodDictionaryClassRef { get; private set; }
+    /// <summary>Reference to the Array class.</summary>
+    public static SObjectRef ArrayClassRef { get; private set; }
+    /// <summary>Reference to the ByteArray class.</summary>
+    public static SObjectRef ByteArrayClassRef { get; private set; }
+    /// <summary>Reference to the String class.</summary>
+    public static SObjectRef StringClassRef { get; private set; }
+    /// <summary>Reference to the Symbol class.</summary>
+    public static SObjectRef SymbolClassRef { get; private set; }
+    /// <summary>Reference to the Magnitude class.</summary>
+    public static SObjectRef MagnitudeClassRef { get; private set; }
+    /// <summary>Reference to the Character class.</summary>
+    public static SObjectRef CharacterClassRef { get; private set; }
+    /// <summary>Reference to the Number class.</summary>
+    public static SObjectRef NumberClassRef { get; private set; }
+    /// <summary>Reference to the Integer class.</summary>
+    public static SObjectRef IntegerClassRef { get; private set; }
+    /// <summary>Reference to the SmallInteger class.</summary>
+    public static SObjectRef SmallIntegerClassRef { get; private set; }
+    /// <summary>Reference to the Float class.</summary>
+    public static SObjectRef FloatClassRef { get; private set; }
+    /// <summary>Reference to the LargePositiveInteger class.</summary>
+    public static SObjectRef LargePositiveIntegerClassRef { get; private set; }
+    /// <summary>Reference to the LargeNegativeInteger class.</summary>
+    public static SObjectRef LargeNegativeIntegerClassRef { get; private set; }
+    /// <summary>Reference to the UndefinedObject class.</summary>
+    public static SObjectRef UndefinedObjectClassRef { get; private set; }
+    /// <summary>Reference to the Boolean class.</summary>
+    public static SObjectRef BooleanClassRef { get; private set; }
+    /// <summary>Reference to the True class.</summary>
+    public static SObjectRef TrueClassRef { get; private set; }
+    /// <summary>Reference to the False class.</summary>
+    public static SObjectRef FalseClassRef { get; private set; }
+    /// <summary>Reference to the Link class.</summary>
+    public static SObjectRef LinkClassRef { get; private set; }
+    /// <summary>Reference to the Process class.</summary>
+    public static SObjectRef ProcessClassRef { get; private set; }
+    /// <summary>Reference to the LinkedList class.</summary>
+    public static SObjectRef LinkedListClassRef { get; private set; }
+    /// <summary>Reference to the Semaphore class.</summary>
+    public static SObjectRef SemaphoreClassRef { get; private set; }
+    /// <summary>Reference to the ProcessorScheduler class.</summary>
+    public static SObjectRef ProcessorSchedulerClassRef { get; private set; }
+    /// <summary>Reference to the LookupKey class.</summary>
+    public static SObjectRef LookupKeyClassRef { get; private set; }
+    /// <summary>Reference to the Association class.</summary>
+    public static SObjectRef AssociationClassRef { get; private set; }
+    /// <summary>Reference to the SystemDictionary class.</summary>
+    public static SObjectRef SystemDictionaryClassRef { get; private set; }
+    /// <summary>Reference to the Stream class.</summary>
+    public static SObjectRef StreamClassRef { get; private set; }
+    /// <summary>Reference to the PositionableStream class.</summary>
+    public static SObjectRef PositionableStreamClassRef { get; private set; }
+    /// <summary>Reference to the ReadStream class.</summary>
+    public static SObjectRef ReadStreamClassRef { get; private set; }
+    /// <summary>Reference to the WriteStream class.</summary>
+    public static SObjectRef WriteStreamClassRef { get; private set; }
+    /// <summary>Reference to the Text class.</summary>
+    public static SObjectRef TextClassRef { get; private set; }
+    /// <summary>Reference to the TextCollector class.</summary>
+    public static SObjectRef TextCollectorClassRef { get; private set; }
+    /// <summary>Reference to the StringHolder class.</summary>
+    public static SObjectRef StringHolderClassRef { get; private set; }
+    /// <summary>Reference to the ParseNode class.</summary>
+    public static SObjectRef ParseNodeClassRef { get; private set; }
+    /// <summary>Reference to the LeafNode class.</summary>
+    public static SObjectRef LeafNodeClassRef { get; private set; }
+    /// <summary>Reference to the VariableNode class.</summary>
+    public static SObjectRef VariableNodeClassRef { get; private set; }
+    /// <summary>Reference to the LiteralNode class.</summary>
+    public static SObjectRef LiteralNodeClassRef { get; private set; }
+    /// <summary>Reference to the SelectorNode class.</summary>
+    public static SObjectRef SelectorNodeClassRef { get; private set; }
+    /// <summary>Reference to the MessageNode class.</summary>
+    public static SObjectRef MessageNodeClassRef { get; private set; }
+    /// <summary>Reference to the AssignmentNode class.</summary>
+    public static SObjectRef AssignmentNodeClassRef { get; private set; }
+    /// <summary>Reference to the ReturnNode class.</summary>
+    public static SObjectRef ReturnNodeClassRef { get; private set; }
+    /// <summary>Reference to the BlockNode class.</summary>
+    public static SObjectRef BlockNodeClassRef { get; private set; }
+    /// <summary>Reference to the CascadeNode class.</summary>
+    public static SObjectRef CascadeNodeClassRef { get; private set; }
+    /// <summary>Reference to the MethodNode class.</summary>
+    public static SObjectRef MethodNodeClassRef { get; private set; }
+    /// <summary>Reference to the Scanner class.</summary>
+    public static SObjectRef ScannerClassRef { get; private set; }
+    /// <summary>Reference to the Parser class.</summary>
+    public static SObjectRef ParserClassRef { get; private set; }
+    /// <summary>Reference to the Compiler class.</summary>
+    public static SObjectRef CompilerClassRef { get; private set; }
+    /// <summary>Reference to the Encoder class.</summary>
+    public static SObjectRef EncoderClassRef { get; private set; }
 
     /// <summary>
     /// Initializes the system dictionary with the complete Smalltalk-80 class hierarchy.
@@ -253,6 +254,7 @@ public static partial class SystemDictionary
         LogColdStart("Creating Symbol class");
         SymbolClassRef = ObjectMemoryNew.CreateClassObject("Symbol", StringClassRef, [], ObjectFormat.ByteIndexed);
         RegisterClassRef("Symbol", SymbolClassRef);
+        ObjectMemoryNew.SetWellKnownClass("Symbol", SymbolClassRef);
 
         LogColdStart("Creating Array class");
         ArrayClassRef = ObjectMemoryNew.CreateClassObject("Array", SequenceableCollectionClassRef, [], ObjectFormat.PointerIndexed);
@@ -273,11 +275,58 @@ public static partial class SystemDictionary
 
         LogColdStart("Creating Dictionary class");
         DictionaryClassRef = ObjectMemoryNew.CreateClassObject("Dictionary", SetClassRef, [], ObjectFormat.PointerIndexed);
+
+        // Create SystemDictionary instance NOW, before registering any more classes
+        // This allows us to use it as the sole source of truth for class storage
+        LogColdStart("Creating SystemDictionary instance");
+        Instance = DictionaryClassRef.CreateInstance(100);
+
+        // Add all previously created classes to the Instance
+        // (These were created before Dictionary class existed)
+        var preDictionaryClasses = new[] {
+            ("Object", ObjectClassRef),
+            ("Behavior", BehaviorClassRef),
+            ("ClassDescription", ClassDescriptionClassRef),
+            ("Metaclass", MetaclassClassRef),
+            ("Class", ClassClassRef),
+            ("CompiledMethod", CompiledMethodClassRef),
+            ("InstructionStream", InstructionStreamClassRef),
+            ("ContextPart", ContextPartClassRef),
+            ("MethodContext", MethodContextClassRef),
+            ("BlockContext", BlockContextClassRef),
+            ("Collection", CollectionClassRef),
+            ("SequenceableCollection", SequenceableCollectionClassRef),
+            ("OrderedCollection", OrderedCollectionClassRef),
+            ("Set", SetClassRef),
+            ("ByteArray", ByteArrayClassRef),
+            ("String", StringClassRef),
+            ("Symbol", SymbolClassRef),
+            ("Array", ArrayClassRef),
+            ("Magnitude", MagnitudeClassRef),
+            ("LookupKey", LookupKeyClassRef),
+            ("Association", AssociationClassRef)
+        };
+
+        foreach (var (name, classRef) in preDictionaryClasses)
+        {
+            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
+            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, classRef);
+        }
+
+        // Now register Dictionary class and all subsequent classes will go directly into Instance
         RegisterClassRef("Dictionary", DictionaryClassRef);
 
         LogColdStart("Creating IdentityDictionary class");
         IdentityDictionaryClassRef = ObjectMemoryNew.CreateClassObject("IdentityDictionary", DictionaryClassRef, ["valueArray"], ObjectFormat.PointerIndexed);
         RegisterClassRef("IdentityDictionary", IdentityDictionaryClassRef);
+
+        LogColdStart("Creating MethodDictionary class");
+        MethodDictionaryClassRef = ObjectMemoryNew.CreateClassObject("MethodDictionary", IdentityDictionaryClassRef, [], ObjectFormat.PointerIndexed);
+        RegisterClassRef("MethodDictionary", MethodDictionaryClassRef);
+
+        LogColdStart("Creating SystemDictionary class");
+        SystemDictionaryClassRef = ObjectMemoryNew.CreateClassObject("SystemDictionary", DictionaryClassRef, [], ObjectFormat.PointerIndexed);
+        RegisterClassRef("SystemDictionary", SystemDictionaryClassRef);
 
         // Continue Numeric Class Hierarchy
         LogColdStart("Creating Number class");
@@ -451,20 +500,15 @@ public static partial class SystemDictionary
         FalseObject = FalseClassRef.CreateInstance();
         // TODO: ObjectMemoryNew.SetWellKnownObject("false", FalseObject);
 
-        // Create the symbol table as a proper Dictionary
+        // Create the symbol table as a proper Dictionary and store it in SystemDictionary
         var symbolTableRef = DictionaryClassRef.CreateInstance(100);
-        // TODO: ObjectMemoryNew.SetWellKnownObject("SymbolTable", symbolTableRef);
+        var symbolTableSymbol = ObjectMemoryNew.InternSymbol("SymbolTable");
+        ObjectMemoryNew.DictionaryAtPut(Instance, symbolTableSymbol, symbolTableRef);
 
-        // TODO: Reimplement SymbolTable using pure SObjectRef
-        // For now, skip SymbolTable creation as SDictionary uses old architecture
-        // SymbolTable = SDictionary.CreateSymbolTable();
-        // globals["SymbolTable"] = SymbolTable;
-
-        // Create SystemDictionary instance as a Dictionary
-        Instance = DictionaryClassRef.CreateInstance(100);
+        // SystemDictionary.Instance was already created when Dictionary class was created
+        // All classes have been stored directly in Instance via RegisterClassRef
+        LogColdStart($"SystemDictionary instance contains all 61 core classes");
         // TODO: ObjectMemoryNew.SetWellKnownObject("Smalltalk", Instance);
-
-        LogColdStart($"Created {classRefRegistry.Count} core classes successfully using pure SObjectRef architecture");
 
         initialized = true;
     }
@@ -481,45 +525,51 @@ public static partial class SystemDictionary
     }
 
     /// <summary>
+    /// Registers a class in the SystemDictionary instance (sole source of truth).
+    /// </summary>
+    internal static void RegisterClassRef(string className, SObjectRef classRef)
+    {
+        // Store in the actual SystemDictionary instance if it exists
+        // This is the ONLY storage - no C# dictionary duplication
+        if (!Instance.IsNil)
+        {
+            var nameSymbol = ObjectMemoryNew.InternSymbol(className);
+            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, classRef);
+        }
+    }
+
+    /// <summary>
+    /// Looks up a class by name and returns its SObjectRef from SystemDictionary.Instance.
+    /// </summary>
+    public static SObjectRef? LookupClassRef(string name)
+    {
+        if (Instance.IsNil)
+            return null;
+
+        var nameSymbol = ObjectMemoryNew.InternSymbol(name);
+        return ObjectMemoryNew.DictionaryAt(Instance, nameSymbol);
+    }
+
+    /// <summary>
     /// Registers a class in the system dictionary (legacy - for compatibility).
     /// </summary>
-    internal static void RegisterClass(SClass sClass)
-    {
-        // No longer used - we only use RegisterClassRef now
-        throw new NotImplementedException("Use RegisterClassRef instead");
-    }
 
     /// <summary>
     /// Looks up a class by name (legacy - for compatibility).
     /// </summary>
-    public static SClass? LookupClass(string name)
-    {
-        // This should eventually use classRefRegistry, but for now throw
-        throw new NotImplementedException("Use LookupClassRef instead");
-    }
 
-    /// <summary>
-    /// Looks up a global variable by name.
-    /// </summary>
-    public static SObject? LookupGlobal(string name)
-    {
-        return globals.TryGetValue(name, out var value) ? value : null;
-    }
-
-    /// <summary>
-    /// Registers a global variable.
-    /// </summary>
-    public static void RegisterGlobal(string name, SObject value)
-    {
-        globals[name] = value;
-    }
 
     /// <summary>
     /// Registers a global object as an SObjectRef (for migration to pure SObjectRef).
     /// </summary>
     public static void RegisterGlobalRef(string name, SObjectRef valueRef)
     {
-        globalRefs[name] = valueRef;
+        // Store in SystemDictionary.Instance (sole source of truth)
+        if (!Instance.IsNil)
+        {
+            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
+            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, valueRef);
+        }
     }
 
     /// <summary>
@@ -527,23 +577,31 @@ public static partial class SystemDictionary
     /// </summary>
     public static SObjectRef? LookupGlobalRef(string name)
     {
-        return globalRefs.TryGetValue(name, out var valueRef) ? valueRef : null;
+        if (Instance.IsNil)
+            return null;
+
+        var nameSymbol = ObjectMemoryNew.InternSymbol(name);
+        return ObjectMemoryNew.DictionaryAt(Instance, nameSymbol);
     }
 
     /// <summary>
     /// Gets all class names.
+    /// TODO: Implement by iterating through SystemDictionary.Instance
     /// </summary>
-    public static IEnumerable<string> GetAllClassNames() => classRefRegistry.Keys;
+    public static IEnumerable<string> GetAllClassNames()
+    {
+        // TODO: Implement by reading from SystemDictionary.Instance
+        // For now, return the class property names via reflection as a fallback
+        return typeof(SystemDictionary)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(p => p.Name.EndsWith("ClassRef") && p.PropertyType == typeof(SObjectRef))
+            .Select(p => p.Name.Replace("ClassRef", ""));
+    }
 
     /// <summary>
     /// Gets all classes in the system (legacy - returns empty).
     /// </summary>
-    public static IEnumerable<SClass> GetAllClasses() => [];
 
-    /// <summary>
-    /// Gets all global variables.
-    /// </summary>
-    public static IEnumerable<SObject> GetAllGlobals() => globals.Values;
 
     /// <summary>
     /// Resets the system dictionary (for testing).
@@ -551,8 +609,7 @@ public static partial class SystemDictionary
     internal static void Reset()
     {
         initialized = false;
-        classRefRegistry.Clear();
-        globals.Clear();
+        Instance = SObjectRef.Nil;
         SSymbol.ClearSymbolTable();
     }
 }

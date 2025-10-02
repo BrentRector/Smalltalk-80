@@ -32,10 +32,7 @@ public sealed class SArray : SObject
     /// </summary>
     public int Size => elements.Length;
     
-    /// <summary>
-    /// Gets the class of Array.
-    /// </summary>
-    public override SClass Class => SystemDictionary.ArrayClass;
+    // Class property removed - deprecated SystemDictionary.ArrayClass no longer exists
     
     /// <summary>
     /// Gets an element at the specified index (1-based like Smalltalk).

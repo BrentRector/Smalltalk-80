@@ -15,12 +15,41 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static class ContextLayout
     {
+        /// <summary>
+        /// Index of the sender field in a MethodContext (offset 0).
+        /// </summary>
         public const int SenderIndex = 0;
+
+        /// <summary>
+        /// Index of the instruction pointer field in a MethodContext (offset 1).
+        /// </summary>
         public const int InstructionPointerIndex = 1;
+
+        /// <summary>
+        /// Index of the stack pointer field in a MethodContext (offset 2).
+        /// </summary>
         public const int StackPointerIndex = 2;
+
+        /// <summary>
+        /// Index of the method field in a MethodContext (offset 3).
+        /// </summary>
         public const int MethodIndex = 3;
-        public const int ReceiverIndex = 4;
-        // Note: Arguments and temporaries start at index 5
+
+        /// <summary>
+        /// Index of the receiverMap field in a MethodContext (offset 4).
+        /// </summary>
+        public const int ReceiverMapIndex = 4;
+
+        /// <summary>
+        /// Index of the receiver field in a MethodContext (offset 5).
+        /// </summary>
+        public const int ReceiverIndex = 5;
+
+        /// <summary>
+        /// Base offset for temporary variables and stack in a MethodContext.
+        /// Temporaries and stack start after all fixed fields (sender, ip, sp, method, receiverMap, receiver).
+        /// </summary>
+        public const int TemporaryBaseOffset = 6;
     }
 
     /// <summary>
@@ -123,7 +152,7 @@ public static partial class ObjectMemoryNew
     public static SObjectRef ContextPop(nint contextOop)
     {
         var sp = GetContextStackPointer(contextOop);
-        if (sp <= 5) // Stack starts after fixed fields
+        if (sp <= 6) // Stack starts after fixed fields (sender, ip, sp, method, receiverMap, receiver)
             throw new InvalidOperationException("Stack underflow");
 
         sp--;
@@ -137,7 +166,7 @@ public static partial class ObjectMemoryNew
     public static SObjectRef ContextTop(nint contextOop)
     {
         var sp = GetContextStackPointer(contextOop);
-        if (sp <= 5) // Stack starts after fixed fields
+        if (sp <= 6) // Stack starts after fixed fields (sender, ip, sp, method, receiverMap, receiver)
             throw new InvalidOperationException("Stack is empty");
 
         return GetInstanceVariable(contextOop, sp - 1);
@@ -148,7 +177,7 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static SObjectRef GetContextTemporary(nint contextOop, int index)
     {
-        return GetInstanceVariable(contextOop, 5 + index); // Temps start at index 5
+        return GetInstanceVariable(contextOop, ContextLayout.TemporaryBaseOffset + index);
     }
 
     /// <summary>
@@ -156,7 +185,7 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static void SetContextTemporary(nint contextOop, int index, SObjectRef value)
     {
-        SetInstanceVariable(contextOop, 5 + index, value); // Temps start at index 5
+        SetInstanceVariable(contextOop, ContextLayout.TemporaryBaseOffset + index, value);
     }
 
     #endregion

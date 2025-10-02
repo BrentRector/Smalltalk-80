@@ -14,7 +14,6 @@ using Microsoft.Extensions.Logging;
 public class VirtualMachine
 {
     private readonly ContextBasedInterpreterNew interpreter;
-    private readonly MethodCache methodCache;
     private readonly ExecutionStatistics executionStatistics;
     private readonly GarbageCollector garbageCollector;
     private readonly ILogger<VirtualMachine>? logger;
@@ -27,15 +26,13 @@ public class VirtualMachine
     {
         this.logger = logger;
         interpreter = new ContextBasedInterpreterNew();
-        methodCache = new MethodCache();
         executionStatistics = new ExecutionStatistics();
-        garbageCollector = new GarbageCollector();
+        garbageCollector = new GarbageCollector(ObjectMemoryNew.ObjectTable);
     }
     
     /// <summary>
     /// Gets the method cache for performance monitoring.
     /// </summary>
-    public MethodCache MethodCache => methodCache;
     
     /// <summary>
     /// Gets the execution statistics.
@@ -66,13 +63,11 @@ public class VirtualMachine
             // Phase 2: Install all kernel methods for core classes
             KernelMethodsInstaller.InstallAll();
 
-            // Phase 3: Install minimal arithmetic methods (for compatibility)
-            InitializeBasicMethods();
+            // Phase 3: Arithmetic methods are now installed by NumericMethodsInstaller in kernel methods
+            // No need to install them again here - removed duplicate installation
 
             // Phase 4: Perform post-cold-start initialization
-            // Note: PostColdStartInitialization expects BytecodeInterpreter but we're using ContextBasedInterpreterNew
-            // For now, pass null since the interpreter parameter isn't actually used in the current implementation
-            ColdStartBootstrap.PostColdStartInitialization(null!);
+            ColdStartBootstrap.PostColdStartInitialization();
             
             // Phase 5: Initialize garbage collection with Special Objects Array
             InitializeGarbageCollection();
@@ -126,13 +121,23 @@ public class VirtualMachine
             
             if (Program.RuntimeOptions.TestOOPBug)
             {
-                RunOOPBugTests();
+                // RunOOPBugTests() method has been removed
             }
             
             // Handle class printing/inspection
             if (Program.RuntimeOptions.ListColdStartClasses)
             {
                 PrintClasses();
+
+                // Run GC after class listing if --gc-log is enabled
+                if (Program.RuntimeOptions.EnableGCLogging)
+                {
+                    Console.WriteLine("\n" + "=".PadRight(60, '='));
+                    Console.WriteLine("Running Garbage Collection");
+                    Console.WriteLine("=".PadRight(60, '=') + "\n");
+
+                    garbageCollector.Collect();
+                }
             }
             
             if (!string.IsNullOrEmpty(Program.RuntimeOptions.ClassToPrint))
@@ -612,28 +617,6 @@ public class VirtualMachine
     /// <summary>
     /// Runs OOP bug tests.
     /// </summary>
-    private void RunOOPBugTests()
-    {
-        Console.WriteLine("\n[TEST] Running OOP bug tests...");
-        
-        try
-        {
-            // Test object identity
-            var nil1 = SObjectRef.Nil;
-            var nil2 = SObjectRef.Nil;
-            Console.WriteLine($"  nil == nil: {nil1 == nil2} [PASS]");
-            
-            var true1 = STrue.Instance;
-            var true2 = STrue.Instance;
-            Console.WriteLine($"  true == true: {true1 == true2} [PASS]");
-            
-            Console.WriteLine("[TEST] All OOP bug tests passed!");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[TEST] OOP bug test failed: {ex.Message}");
-        }
-    }
     
     /// <summary>
     /// Gets comprehensive statistics about the VM.
@@ -642,7 +625,6 @@ public class VirtualMachine
     public string GetStatistics()
     {
         var execStats = executionStatistics.GetSnapshot();
-        var cacheStats = methodCache.GetStatistics();
         var gcStats = garbageCollector.GetStatistics();
         
         return $"""
@@ -650,7 +632,6 @@ public class VirtualMachine
             
             {executionStatistics}
             
-            {cacheStats}
             
             {gcStats}
             """;
@@ -676,7 +657,6 @@ public class VirtualMachine
     public void ResetStatistics()
     {
         executionStatistics.Reset();
-        methodCache.Clear();
         garbageCollector.ResetStatistics();
         
         logger?.LogInformation("All VM statistics have been reset");
@@ -765,17 +745,49 @@ public class VirtualMachine
     {
         // Initialize the Special Objects Array with all system roots
         Memory.SpecialObjectsArray.Initialize();
-        
-        // Give the GC the SOA as its only root
-        garbageCollector.SetSpecialObjectsArray(Memory.SpecialObjectsArray.GetArray());
-        
+
+        // Build SOA using the new architecture's SObjectRefs
+        var soaOops = new List<nint>();
+
+        // Add the critical system objects as roots
+        // These are the minimal roots needed for a cold-started system
+
+        // 1. SystemDictionary itself (contains all classes)
+        if (!SystemDictionary.Instance.IsNil)
+        {
+            soaOops.Add(SystemDictionary.Instance.AsObjectPointer());
+        }
+
+        // 2. Core singleton objects
+        soaOops.Add(SystemDictionary.NilObject.AsObjectPointer());
+        soaOops.Add(SystemDictionary.TrueObject.AsObjectPointer());
+        soaOops.Add(SystemDictionary.FalseObject.AsObjectPointer());
+
+        // 3. Core classes (these should all be reachable via SystemDictionary,
+        // but we add them as direct roots for safety during transition)
+        if (!SystemDictionary.ObjectClassRef.IsNil)
+            soaOops.Add(SystemDictionary.ObjectClassRef.AsObjectPointer());
+        if (!SystemDictionary.BehaviorClassRef.IsNil)
+            soaOops.Add(SystemDictionary.BehaviorClassRef.AsObjectPointer());
+        if (!SystemDictionary.ClassClassRef.IsNil)
+            soaOops.Add(SystemDictionary.ClassClassRef.AsObjectPointer());
+        if (!SystemDictionary.MetaclassClassRef.IsNil)
+            soaOops.Add(SystemDictionary.MetaclassClassRef.AsObjectPointer());
+
+        // Give the GC the SOA as its only root (as OOPs)
+        garbageCollector.SetSpecialObjectsArray(soaOops);
+
         if (Program.RuntimeOptions.EnableColdStartLogging || Program.RuntimeOptions.EnableGCLogging)
         {
-            Console.WriteLine("[COLD START] Special Objects Array initialized");
-            
+            Console.WriteLine("[COLD START] Special Objects Array initialized with new architecture");
+            Console.WriteLine($"[COLD START] SOA contains {soaOops.Count} root objects");
+
             if (Program.RuntimeOptions.EnableGCLogging)
             {
-                Memory.SpecialObjectsArray.Report();
+                Console.WriteLine("[COLD START] SOA roots:");
+                Console.WriteLine("  - SystemDictionary (Smalltalk global dictionary)");
+                Console.WriteLine("  - nil, true, false singleton objects");
+                Console.WriteLine("  - Core metaclasses (Object, Behavior, Class, Metaclass)");
             }
         }
     }

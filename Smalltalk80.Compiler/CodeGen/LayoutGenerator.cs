@@ -18,6 +18,7 @@ public sealed class LayoutGenerator
     private sealed record ClassInfo(
         string Name,
         string? SuperclassName,
+        string SubclassKind,
         List<string> InstanceVariables,
         List<string> AllInstanceVariables,
         int TotalInstanceVarCount
@@ -65,10 +66,14 @@ public sealed class LayoutGenerator
                 : classNode.Superclass;
 
             var instanceVars = classNode.InstanceVariables ?? [];
+            var subclassKind = string.IsNullOrEmpty(classNode.SubclassKind)
+                ? "subclass:"
+                : classNode.SubclassKind;
 
             _classInfoMap[name] = new ClassInfo(
                 Name: name,
                 SuperclassName: superclass,
+                SubclassKind: subclassKind,
                 InstanceVariables: instanceVars,
                 AllInstanceVariables: [], // Will be filled in second pass
                 TotalInstanceVarCount: 0  // Will be calculated in second pass
@@ -131,6 +136,7 @@ public sealed class LayoutGenerator
         _output.AppendLine("//     the code is regenerated.");
         _output.AppendLine("// </auto-generated>");
         _output.AppendLine();
+        _output.AppendLine("using Smalltalk80.Interpreter.Core.Objects;");
         _output.AppendLine("using Smalltalk80.Interpreter.Core.Values;");
         _output.AppendLine("using Smalltalk80.Interpreter.Memory;");
         _output.AppendLine();
@@ -292,10 +298,312 @@ public sealed class LayoutGenerator
         _output.AppendLine($"    /// <summary>");
         _output.AppendLine($"    /// The total number of instance variables for {structName}.");
         _output.AppendLine($"    /// </summary>");
-        _output.AppendLine($"    internal const int InstanceVarCount = {classInfo.TotalInstanceVarCount};");
+        _output.AppendLine($"    public const int InstanceVarCount = {classInfo.TotalInstanceVarCount};");
+
+        // Determine format from subclass kind - check CompiledMethod special case first
+        var format = classInfo.Name == "CompiledMethod"
+            ? "ObjectFormat.CompiledMethod"
+            : classInfo.SubclassKind switch
+            {
+                "subclass:" => "ObjectFormat.FixedPointer",
+                "variableSubclass:" => "ObjectFormat.PointerIndexed",
+                "variableByteSubclass:" => "ObjectFormat.ByteIndexed",
+                "variableWordSubclass:" => "ObjectFormat.WordIndexed",
+                _ => "ObjectFormat.FixedPointer"
+            };
+
+        _output.AppendLine();
+        _output.AppendLine($"    /// <summary>");
+        _output.AppendLine($"    /// The object format for {structName}.");
+        _output.AppendLine($"    /// </summary>");
+        _output.AppendLine($"    public const ObjectFormat IndexedFormat = {format};");
+
+        // Generate special accessors based on class type
+        GenerateSpecialAccessors(classInfo);
+
+        // Generate convenience properties
+        GenerateConvenienceProperties(classInfo);
 
         _output.AppendLine("}");
         _output.AppendLine();
+    }
+
+    /// <summary>
+    /// Generates special accessors for specific class types.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateSpecialAccessors(ClassInfo classInfo)
+    {
+        // Handle IdentityDictionary and MethodDictionary with parallel array structure
+        if (classInfo.Name is "IdentityDictionary" or "MethodDictionary")
+        {
+            GenerateDictionaryAccessors(classInfo);
+        }
+        // Handle Context classes with semantic accessors
+        else if (classInfo.Name is "MethodContext" or "BlockContext" or "ContextPart")
+        {
+            GenerateContextAccessors(classInfo);
+        }
+        // Handle CompiledMethod special properties
+        else if (classInfo.Name == "CompiledMethod")
+        {
+            GenerateCompiledMethodAccessors(classInfo);
+        }
+        // Default indexers for other variable classes
+        else
+        {
+            GenerateDefaultIndexers(classInfo);
+        }
+    }
+
+    /// <summary>
+    /// Generates parallel array accessors for dictionary classes.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateDictionaryAccessors(ClassInfo classInfo)
+    {
+        // Find the valueArray instance variable index
+        var valueArrayIndex = classInfo.AllInstanceVariables.IndexOf("valueArray");
+
+        if (valueArrayIndex == -1)
+        {
+            // Fallback to default indexers if valueArray not found
+            GenerateDefaultIndexers(classInfo);
+            return;
+        }
+
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets the keys collection for indexed access.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public KeysCollection Keys => new KeysCollection(_ref);");
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets the values collection for indexed access.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public ValuesCollection Values => new ValuesCollection(_ref);");
+
+        // Generate nested KeysCollection struct
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Collection for accessing dictionary keys.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public readonly struct KeysCollection");
+        _output.AppendLine("    {");
+        _output.AppendLine("        private readonly SObjectRef _dictRef;");
+        _output.AppendLine();
+        _output.AppendLine("        internal KeysCollection(SObjectRef dictRef) => _dictRef = dictRef;");
+        _output.AppendLine();
+        _output.AppendLine("        /// <summary>");
+        _output.AppendLine("        /// Gets or sets the key at the specified index.");
+        _output.AppendLine("        /// </summary>");
+        _output.AppendLine("        public SObjectRef this[int index]");
+        _output.AppendLine("        {");
+        _output.AppendLine("            get => _dictRef.GetIndexedPointer(index);");
+        _output.AppendLine("            set => _dictRef.SetIndexedPointer(index, value);");
+        _output.AppendLine("        }");
+        _output.AppendLine();
+        _output.AppendLine("        /// <summary>");
+        _output.AppendLine("        /// Gets the number of keys.");
+        _output.AppendLine("        /// </summary>");
+        _output.AppendLine("        public int Length => _dictRef.GetIndexedSize();");
+        _output.AppendLine("    }");
+
+        // Generate nested ValuesCollection struct - need to pass valueArrayIndex as const
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Collection for accessing dictionary values.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public readonly struct ValuesCollection");
+        _output.AppendLine("    {");
+        _output.AppendLine("        private readonly SObjectRef _dictRef;");
+        _output.AppendLine($"        private const int ValueArrayIndex = {valueArrayIndex};");
+        _output.AppendLine();
+        _output.AppendLine("        internal ValuesCollection(SObjectRef dictRef) => _dictRef = dictRef;");
+        _output.AppendLine();
+        _output.AppendLine("        /// <summary>");
+        _output.AppendLine("        /// Gets or sets the value at the specified index.");
+        _output.AppendLine("        /// </summary>");
+        _output.AppendLine("        public SObjectRef this[int index]");
+        _output.AppendLine("        {");
+        _output.AppendLine("            get");
+        _output.AppendLine("            {");
+        _output.AppendLine("                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);");
+        _output.AppendLine("                STArray valueArray = valueArrayRef;");
+        _output.AppendLine("                return valueArray[index];");
+        _output.AppendLine("            }");
+        _output.AppendLine("            set");
+        _output.AppendLine("            {");
+        _output.AppendLine("                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);");
+        _output.AppendLine("                STArray valueArray = valueArrayRef;");
+        _output.AppendLine("                valueArray[index] = value;");
+        _output.AppendLine("            }");
+        _output.AppendLine("        }");
+        _output.AppendLine();
+        _output.AppendLine("        /// <summary>");
+        _output.AppendLine("        /// Gets the number of values.");
+        _output.AppendLine("        /// </summary>");
+        _output.AppendLine("        public int Length");
+        _output.AppendLine("        {");
+        _output.AppendLine("            get");
+        _output.AppendLine("            {");
+        _output.AppendLine("                var valueArrayRef = _dictRef.GetInstanceVariable(ValueArrayIndex);");
+        _output.AppendLine("                STArray valueArray = valueArrayRef;");
+        _output.AppendLine("                return valueArray.Length;");
+        _output.AppendLine("            }");
+        _output.AppendLine("        }");
+        _output.AppendLine("    }");
+    }
+
+    /// <summary>
+    /// Generates semantic accessors for context classes.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateContextAccessors(ClassInfo classInfo)
+    {
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets a temporary variable at the specified index.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    /// <param name=\"index\">The index of the temporary variable.</param>");
+        _output.AppendLine("    /// <returns>The temporary variable value.</returns>");
+        _output.AppendLine("    public SObjectRef GetTemporary(int index) => _ref.GetIndexedPointer(index);");
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Sets a temporary variable at the specified index.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    /// <param name=\"index\">The index of the temporary variable.</param>");
+        _output.AppendLine("    /// <param name=\"value\">The value to set.</param>");
+        _output.AppendLine("    public void SetTemporary(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);");
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets a stack slot at the specified index.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    /// <param name=\"index\">The index of the stack slot.</param>");
+        _output.AppendLine("    /// <returns>The stack slot value.</returns>");
+        _output.AppendLine("    public SObjectRef GetStackSlot(int index) => _ref.GetIndexedPointer(index);");
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Sets a stack slot at the specified index.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    /// <param name=\"index\">The index of the stack slot.</param>");
+        _output.AppendLine("    /// <param name=\"value\">The value to set.</param>");
+        _output.AppendLine("    public void SetStackSlot(int index, SObjectRef value) => _ref.SetIndexedPointer(index, value);");
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets the number of indexed slots (temporaries and stack).");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public int Length => _ref.GetIndexedSize();");
+    }
+
+    /// <summary>
+    /// Generates special accessors for CompiledMethod.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateCompiledMethodAccessors(ClassInfo classInfo)
+    {
+        _output.AppendLine();
+        _output.AppendLine("    /// <summary>");
+        _output.AppendLine("    /// Gets the length of the bytecode array.");
+        _output.AppendLine("    /// </summary>");
+        _output.AppendLine("    public int Length => _ref.GetIndexedSize();");
+    }
+
+    /// <summary>
+    /// Generates default indexers for variable classes.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateDefaultIndexers(ClassInfo classInfo)
+    {
+        if (classInfo.SubclassKind == "variableSubclass:")
+        {
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets or sets the indexed pointer at the specified index.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public SObjectRef this[int index]");
+            _output.AppendLine("    {");
+            _output.AppendLine("        get => _ref.GetIndexedPointer(index);");
+            _output.AppendLine("        set => _ref.SetIndexedPointer(index, value);");
+            _output.AppendLine("    }");
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets the length of the indexed portion.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public int Length => _ref.GetIndexedSize();");
+        }
+        else if (classInfo.SubclassKind == "variableByteSubclass:")
+        {
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets or sets the indexed byte at the specified index.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public byte this[int index]");
+            _output.AppendLine("    {");
+            _output.AppendLine("        get => _ref.GetIndexedByte(index);");
+            _output.AppendLine("        set => _ref.SetIndexedByte(index, value);");
+            _output.AppendLine("    }");
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets the length of the indexed portion.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public int Length => _ref.GetIndexedSize();");
+        }
+        else if (classInfo.SubclassKind == "variableWordSubclass:")
+        {
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets or sets the indexed word at the specified index.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public ushort this[int index]");
+            _output.AppendLine("    {");
+            _output.AppendLine("        get => _ref.GetIndexedWord(index);");
+            _output.AppendLine("        set => _ref.SetIndexedWord(index, value);");
+            _output.AppendLine("    }");
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets the length of the indexed portion.");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public int Length => _ref.GetIndexedSize();");
+        }
+    }
+
+    /// <summary>
+    /// Generates convenience properties for specific classes.
+    /// </summary>
+    /// <param name="classInfo">The class information.</param>
+    private void GenerateConvenienceProperties(ClassInfo classInfo)
+    {
+        // Add Count property for classes with tally
+        if (classInfo.AllInstanceVariables.Contains("tally"))
+        {
+            _output.AppendLine();
+            _output.AppendLine("    /// <summary>");
+            _output.AppendLine("    /// Gets the count (tally converted to int).");
+            _output.AppendLine("    /// </summary>");
+            _output.AppendLine("    public int Count => Tally.AsSmallInteger();");
+        }
+
+        // Add convenience properties for context classes
+        if (classInfo.Name is "MethodContext" or "BlockContext")
+        {
+            if (classInfo.AllInstanceVariables.Contains("stackp"))
+            {
+                _output.AppendLine();
+                _output.AppendLine("    /// <summary>");
+                _output.AppendLine("    /// Gets the stack pointer as an integer.");
+                _output.AppendLine("    /// </summary>");
+                _output.AppendLine("    public int StackPointer => Stackp.AsSmallInteger();");
+            }
+            if (classInfo.AllInstanceVariables.Contains("pc"))
+            {
+                _output.AppendLine();
+                _output.AppendLine("    /// <summary>");
+                _output.AppendLine("    /// Gets the program counter as an integer.");
+                _output.AppendLine("    /// </summary>");
+                _output.AppendLine("    public int ProgramCounter => Pc.AsSmallInteger();");
+            }
+        }
     }
 
     /// <summary>

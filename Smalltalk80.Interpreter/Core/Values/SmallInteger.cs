@@ -39,7 +39,6 @@ public sealed class SmallInteger : SObject, IEquatable<SmallInteger>, IComparabl
     /// <summary>
     /// Gets the class of SmallInteger.
     /// </summary>
-    public override SClass Class => SystemDictionary.SmallIntegerClass;
     
     /// <summary>
     /// Gets whether this is an immediate value.

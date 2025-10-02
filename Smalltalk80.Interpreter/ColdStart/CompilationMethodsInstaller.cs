@@ -3,6 +3,7 @@ namespace Smalltalk80.Interpreter.ColdStart;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Installs critical compilation methods during cold start to enable self-hosted compilation.
@@ -41,10 +42,10 @@ public static class CompilationMethodsInstaller
         
         // Initialize Scanner type table
         InitializeScannerTypeTable();
-        
-        // Install Stream methods for compilation support
-        InstallStreamMethods();
-        
+
+        // NOTE: Stream methods are already installed by StreamMethodsInstaller in KernelMethodsInstaller
+        // No need to install them again here - removed duplicate installation
+
         // Install Object class compilation support methods
         InstallObjectCompilationSupportMethods();
         
@@ -91,67 +92,65 @@ public static class CompilationMethodsInstaller
             return;
         }
 
+        var instanceMethodCount = 0;
+
         // scan: aString
         // "Initialize the receiver to scan aString"
-        var scanMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method1 = ObjectMemoryNew.CreateCompiledMethod(
             "scan:",
             [112, 16, 224, 135, 112, 209, 120], // self source: aString. self scanToken. ^self
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("source:"), SSymbol.Intern("scanToken")),
-            1, 0, 0
-        );
-        scannerClassRef.AddMethod("scan:", scanMethod);
-        
+            [ObjectMemoryNew.InternSymbol("source:"), ObjectMemoryNew.InternSymbol("scanToken")],
+            1, 0, 0);
+        ObjectMemoryNew.AddMethod(scannerClassRef.AsObjectPointer(), "scan:", method1);
+        instanceMethodCount++;
+
         // scanToken
         // "Scan the next token and store it in token"
-        var scanTokenMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method2 = ObjectMemoryNew.CreateCompiledMethod(
             "scanToken",
-            [137, 117, 200, 151, 8, 2, 208, 192, 101, 33, 198, 125, 137, 117, 200, 146, 112, 211, 125, 
-             226, 135, 0, 212, 118, 177, 97, 5, 118, 192, 40, 182, 157, 112, 5, 230, 148, 112, 211, 
+            [137, 117, 200, 151, 8, 2, 208, 192, 101, 33, 198, 125, 137, 117, 200, 146, 112, 211, 125,
+             226, 135, 0, 212, 118, 177, 97, 5, 118, 192, 40, 182, 157, 112, 5, 230, 148, 112, 211,
              215, 100, 135, 4, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("step"), 
-                SSymbol.Intern("endOfStream"),
-                SSymbol.Intern("isNil"),
-                SSymbol.Intern("xEndOfStream"),
-                SSymbol.Intern("perform:")
-            ),
-            0, 2, 0
-        );
-        scannerClassRef.AddMethod("scanToken", scanTokenMethod);
-        
+            [ObjectMemoryNew.InternSymbol("step"),
+             ObjectMemoryNew.InternSymbol("endOfStream"),
+             ObjectMemoryNew.InternSymbol("isNil"),
+             ObjectMemoryNew.InternSymbol("xEndOfStream"),
+             ObjectMemoryNew.InternSymbol("perform:")],
+            0, 2, 0);
+        ObjectMemoryNew.AddMethod(scannerClassRef.AsObjectPointer(), "scanToken", method2);
+        instanceMethodCount++;
+
         // xLetter
         // "Scan an identifier or keyword"
-        var xLetterMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method3 = ObjectMemoryNew.CreateCompiledMethod(
             "xLetter",
-            [7, 208, 135, 137, 117, 200, 160, 17, 8, 2, 209, 192, 104, 16, 34, 198, 137, 117, 200, 147, 
-             16, 36, 198, 125, 227, 125, 137, 117, 200, 160, 15, 7, 2, 196, 135, 3, 98, 0, 197, 156, 71, 
-             99, 147, 0, 195, 99, 125, 229, 135, 16, 40, 198, 137, 117, 200, 160, 12, 8, 3, 209, 192, 
-             101, 5, 34, 198, 5, 43, 198, 234, 125, 233, 137, 117, 200, 160, 29, 7, 112, 221, 196, 135, 
-             7, 222, 105, 112, 5, 239, 135, 17, 4, 131, 48, 100, 5, 49, 198, 156, 4, 131, 18, 100, 115, 
-             135, 112, 125, 125, 236, 135, 16, 51, 198, 168, 8, 7, 112, 221, 196, 135, 52, 101, 146, 53, 
+            [7, 208, 135, 137, 117, 200, 160, 17, 8, 2, 209, 192, 104, 16, 34, 198, 137, 117, 200, 147,
+             16, 36, 198, 125, 227, 125, 137, 117, 200, 160, 15, 7, 2, 196, 135, 3, 98, 0, 197, 156, 71,
+             99, 147, 0, 195, 99, 125, 229, 135, 16, 40, 198, 137, 117, 200, 160, 12, 8, 3, 209, 192,
+             101, 5, 34, 198, 5, 43, 198, 234, 125, 233, 137, 117, 200, 160, 29, 7, 112, 221, 196, 135,
+             7, 222, 105, 112, 5, 239, 135, 17, 4, 131, 48, 100, 5, 49, 198, 156, 4, 131, 18, 100, 115,
+             135, 112, 125, 125, 236, 135, 16, 51, 198, 168, 8, 7, 112, 221, 196, 135, 52, 101, 146, 53,
              101, 135, 7, 222, 100, 120],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("buffer"),
-                SSymbol.Intern("reset"),
-                SSymbol.Intern("isAlphaNumeric"),
-                SSymbol.Intern("nextPut:"),
-                SSymbol.Intern("step"),
-                SSymbol.Intern("contents"),
-                SSymbol.Intern("findKeyword"),
-                SSymbol.Intern("isKeyword"),
-                SSymbol.Intern("asSymbol"),
-                SSymbol.Intern("at:"),
-                SSymbol.Intern("isLiteral"),
-                SSymbol.Intern("notifyError:"),
-                SSymbol.Intern("xIllegal")
-            ),
-            0, 3, 0
-        );
-        scannerClassRef.AddMethod("xLetter", xLetterMethod);
-        
+            [ObjectMemoryNew.InternSymbol("buffer"),
+             ObjectMemoryNew.InternSymbol("reset"),
+             ObjectMemoryNew.InternSymbol("isAlphaNumeric"),
+             ObjectMemoryNew.InternSymbol("nextPut:"),
+             ObjectMemoryNew.InternSymbol("step"),
+             ObjectMemoryNew.InternSymbol("contents"),
+             ObjectMemoryNew.InternSymbol("findKeyword"),
+             ObjectMemoryNew.InternSymbol("isKeyword"),
+             ObjectMemoryNew.InternSymbol("asSymbol"),
+             ObjectMemoryNew.InternSymbol("at:"),
+             ObjectMemoryNew.InternSymbol("isLiteral"),
+             ObjectMemoryNew.InternSymbol("notifyError:"),
+             ObjectMemoryNew.InternSymbol("xIllegal")],
+            0, 3, 0);
+        ObjectMemoryNew.AddMethod(scannerClassRef.AsObjectPointer(), "xLetter", method3);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Scanner methods installed");
+            Console.WriteLine($"[COLD START] Scanner: {instanceMethodCount} methods installed");
         }
     }
     
@@ -166,32 +165,32 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] Parser class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // parse:class:noPattern:context:notifying:ifFail:
         // "Main parser entry point"
-        var parseMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method4 = ObjectMemoryNew.CreateCompiledMethod(
             "parse:class:noPattern:context:notifying:ifFail:",
-            [112, 16, 20, 137, 117, 200, 147, 21, 201, 125, 125, 131, 96, 135, 65, 204, 17, 19, 112, 
-             131, 98, 101, 21, 129, 96, 8, 135, 112, 18, 19, 243, 110, 115, 103, 102, 129, 96, 8, 135, 
+            [112, 16, 20, 137, 117, 200, 147, 21, 201, 125, 125, 131, 96, 135, 65, 204, 17, 19, 112,
+             131, 98, 101, 21, 129, 96, 8, 135, 112, 18, 19, 243, 110, 115, 103, 102, 129, 96, 8, 135,
              101, 22, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("init:notifying:failBlock:"),
-                SSymbol.Intern("encoder"),
-                SSymbol.Intern("init:context:notifying:"),
-                SSymbol.Intern("parseMethodComment"),
-                SSymbol.Intern("advance"),
-                SSymbol.Intern("parseMessagePattern"),
-                SSymbol.Intern("parseBody"),
-                SSymbol.Intern("sourceText:"),
-                SSymbol.Intern("generate:")
-            ),
-            6, 3, 0
-        );
-        parserClassRef.AddMethod("parse:class:noPattern:context:notifying:ifFail:", parseMethod);
-        
+            [ObjectMemoryNew.InternSymbol("init:notifying:failBlock:"),
+             ObjectMemoryNew.InternSymbol("encoder"),
+             ObjectMemoryNew.InternSymbol("init:context:notifying:"),
+             ObjectMemoryNew.InternSymbol("parseMethodComment"),
+             ObjectMemoryNew.InternSymbol("advance"),
+             ObjectMemoryNew.InternSymbol("parseMessagePattern"),
+             ObjectMemoryNew.InternSymbol("parseBody"),
+             ObjectMemoryNew.InternSymbol("sourceText:"),
+             ObjectMemoryNew.InternSymbol("generate:")],
+            6, 3, 0);
+        ObjectMemoryNew.AddMethod(parserClassRef.AsObjectPointer(), "parse:class:noPattern:context:notifying:ifFail:", method4);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Parser methods installed");
+            Console.WriteLine($"[COLD START] Parser: {instanceMethodCount} methods installed");
         }
     }
     
@@ -206,23 +205,23 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] Compiler class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // compile:in:notifying:ifFail:
         // "Compile source in the context of class"
-        var compileMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method5 = ObjectMemoryNew.CreateCompiledMethod(
             "compile:in:notifying:ifFail:",
             [112, 16, 17, 115, 18, 131, 128, 135, 112, 0, 114, 19, 131, 97, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("parse:in:notifying:ifFail:"),
-                SSymbol.Intern("translate:ifFail:")
-            ),
-            4, 1, 0
-        );
-        compilerClassRef.AddMethod("compile:in:notifying:ifFail:", compileMethod);
-        
+            [ObjectMemoryNew.InternSymbol("parse:in:notifying:ifFail:"),
+             ObjectMemoryNew.InternSymbol("translate:ifFail:")],
+            4, 1, 0);
+        ObjectMemoryNew.AddMethod(compilerClassRef.AsObjectPointer(), "compile:in:notifying:ifFail:", method5);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Compiler methods installed");
+            Console.WriteLine($"[COLD START] Compiler: {instanceMethodCount} methods installed");
         }
     }
     
@@ -237,51 +236,51 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] MethodNode class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // generate: trailer
         // "Generate bytecode for this method"
-        var generateMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method6 = ObjectMemoryNew.CreateCompiledMethod(
             "generate:",
-            [112, 137, 118, 200, 160, 28, 118, 34, 137, 118, 200, 160, 11, 18, 18, 194, 34, 177, 24, 
-             176, 16, 24, 192, 193, 125, 241, 135, 18, 112, 212, 227, 135, 18, 125, 125, 224, 135, 2, 
-             194, 111, 3, 6, 229, 105, 6, 5, 23, 246, 100, 6, 215, 40, 179, 137, 117, 200, 148, 112, 
-             43, 234, 125, 125, 233, 135, 4, 194, 107, 44, 179, 137, 117, 200, 148, 112, 45, 234, 125, 
-             125, 233, 135, 78, 17, 23, 48, 180, 137, 117, 200, 147, 5, 117, 182, 125, 131, 49, 155, 
-             23, 145, 51, 6, 215, 117, 19, 131, 175, 106, 84, 18, 131, 53, 110, 22, 18, 131, 23, 118, 
-             177, 131, 54, 135, 88, 204, 131, 25, 109, 3, 21, 22, 131, 90, 135, 21, 131, 27, 118, 183, 
-             137, 117, 200, 148, 112, 60, 234, 125, 125, 233, 135, 22, 131, 27, 18, 194, 34, 177, 183, 
-             137, 117, 200, 148, 112, 61, 234, 125, 125, 233, 135, 118, 19, 137, 118, 200, 151, 18, 20, 
-             4, 20, 192, 131, 94, 125, 241, 135, 18, 21, 194, 6, 131, 95, 135, 118, 34, 137, 118, 200, 
-             160, 11, 18, 18, 194, 34, 177, 24, 176, 16, 24, 192, 193, 125, 241, 135, 18, 112, 212, 227, 
+            [112, 137, 118, 200, 160, 28, 118, 34, 137, 118, 200, 160, 11, 18, 18, 194, 34, 177, 24,
+             176, 16, 24, 192, 193, 125, 241, 135, 18, 112, 212, 227, 135, 18, 125, 125, 224, 135, 2,
+             194, 111, 3, 6, 229, 105, 6, 5, 23, 246, 100, 6, 215, 40, 179, 137, 117, 200, 148, 112,
+             43, 234, 125, 125, 233, 135, 4, 194, 107, 44, 179, 137, 117, 200, 148, 112, 45, 234, 125,
+             125, 233, 135, 78, 17, 23, 48, 180, 137, 117, 200, 147, 5, 117, 182, 125, 131, 49, 155,
+             23, 145, 51, 6, 215, 117, 19, 131, 175, 106, 84, 18, 131, 53, 110, 22, 18, 131, 23, 118,
+             177, 131, 54, 135, 88, 204, 131, 25, 109, 3, 21, 22, 131, 90, 135, 21, 131, 27, 118, 183,
+             137, 117, 200, 148, 112, 60, 234, 125, 125, 233, 135, 22, 131, 27, 18, 194, 34, 177, 183,
+             137, 117, 200, 148, 112, 61, 234, 125, 125, 233, 135, 118, 19, 137, 118, 200, 151, 18, 20,
+             4, 20, 192, 131, 94, 125, 241, 135, 18, 21, 194, 6, 131, 95, 135, 118, 34, 137, 118, 200,
+             160, 11, 18, 18, 194, 34, 177, 24, 176, 16, 24, 192, 193, 125, 241, 135, 18, 112, 212, 227,
              135, 18, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("block"),
-                SSymbol.Intern("emitForValue:"),
-                SSymbol.Intern("encoder"),
-                SSymbol.Intern("methodReturnTop"),
-                SSymbol.Intern("literals"),
-                SSymbol.Intern("size"),
-                SSymbol.Intern("tempNames"),
-                SSymbol.Intern("encodeLiteral:"),
-                SSymbol.Intern("addLast:"),
-                SSymbol.Intern("primitive"),
-                SSymbol.Intern("isQuick"),
-                SSymbol.Intern("generate"),
-                SSymbol.Intern("literals:"),
-                SSymbol.Intern("selector"),
-                SSymbol.Intern("precedence"),
-                SSymbol.Intern("properties"),
-                SSymbol.Intern("trailer:"),
-                SSymbol.Intern("numArgs:numTemps:primitive:literals:"),
-                SSymbol.Intern("copyWithTempsFromMethodNode:")
-            ),
-            1, 7, 0
-        );
-        methodNodeClassRef.AddMethod("generate:", generateMethod);
-        
+            [ObjectMemoryNew.InternSymbol("block"),
+             ObjectMemoryNew.InternSymbol("emitForValue:"),
+             ObjectMemoryNew.InternSymbol("encoder"),
+             ObjectMemoryNew.InternSymbol("methodReturnTop"),
+             ObjectMemoryNew.InternSymbol("literals"),
+             ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol("tempNames"),
+             ObjectMemoryNew.InternSymbol("encodeLiteral:"),
+             ObjectMemoryNew.InternSymbol("addLast:"),
+             ObjectMemoryNew.InternSymbol("primitive"),
+             ObjectMemoryNew.InternSymbol("isQuick"),
+             ObjectMemoryNew.InternSymbol("generate"),
+             ObjectMemoryNew.InternSymbol("literals:"),
+             ObjectMemoryNew.InternSymbol("selector"),
+             ObjectMemoryNew.InternSymbol("precedence"),
+             ObjectMemoryNew.InternSymbol("properties"),
+             ObjectMemoryNew.InternSymbol("trailer:"),
+             ObjectMemoryNew.InternSymbol("numArgs:numTemps:primitive:literals:"),
+             ObjectMemoryNew.InternSymbol("copyWithTempsFromMethodNode:")],
+            1, 7, 0);
+        ObjectMemoryNew.AddMethod(methodNodeClassRef.AsObjectPointer(), "generate:", method6);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] MethodNode methods installed");
+            Console.WriteLine($"[COLD START] MethodNode: {instanceMethodCount} methods installed");
         }
     }
     
@@ -296,66 +295,62 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] Encoder class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // init:context:notifying:
         // "Initialize the encoder for a class and context"
-        var initMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method7 = ObjectMemoryNew.CreateCompiledMethod(
             "init:context:notifying:",
-            [112, 16, 96, 135, 112, 17, 97, 135, 112, 18, 98, 135, 112, 217, 209, 99, 135, 112, 218, 
-             209, 100, 135, 112, 219, 209, 101, 135, 112, 220, 209, 102, 135, 112, 221, 209, 103, 135, 
+            [112, 16, 96, 135, 112, 17, 97, 135, 112, 18, 98, 135, 112, 217, 209, 99, 135, 112, 218,
+             209, 100, 135, 112, 219, 209, 101, 135, 112, 220, 209, 102, 135, 112, 221, 209, 103, 135,
              112, 118, 104, 135, 120],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("class:"),
-                SSymbol.Intern("context:"),
-                SSymbol.Intern("requestor:"),
-                SSymbol.Intern("scopeTable:"),
-                SSymbol.Intern("new"),
-                SSymbol.Intern("Dictionary"),
-                SSymbol.Intern("literalStream:"),
-                SSymbol.Intern("WriteStream"),
-                SSymbol.Intern("on:"),
-                SSymbol.Intern("Array"),
-                SSymbol.Intern("selectorSet:"),
-                SSymbol.Intern("Set"),
-                SSymbol.Intern("litIndSet:"),
-                SSymbol.Intern("litSet:"),
-                SSymbol.Intern("nTemps:")
-            ),
-            3, 0, 0
-        );
-        encoderClassRef.AddMethod("init:context:notifying:", initMethod);
-        
+            [ObjectMemoryNew.InternSymbol("class:"),
+             ObjectMemoryNew.InternSymbol("context:"),
+             ObjectMemoryNew.InternSymbol("requestor:"),
+             ObjectMemoryNew.InternSymbol("scopeTable:"),
+             ObjectMemoryNew.InternSymbol("new"),
+             ObjectMemoryNew.InternSymbol("Dictionary"),
+             ObjectMemoryNew.InternSymbol("literalStream:"),
+             ObjectMemoryNew.InternSymbol("WriteStream"),
+             ObjectMemoryNew.InternSymbol("on:"),
+             ObjectMemoryNew.InternSymbol("Array"),
+             ObjectMemoryNew.InternSymbol("selectorSet:"),
+             ObjectMemoryNew.InternSymbol("Set"),
+             ObjectMemoryNew.InternSymbol("litIndSet:"),
+             ObjectMemoryNew.InternSymbol("litSet:"),
+             ObjectMemoryNew.InternSymbol("nTemps:")],
+            3, 0, 0);
+        ObjectMemoryNew.AddMethod(encoderClassRef.AsObjectPointer(), "init:context:notifying:", method7);
+        instanceMethodCount++;
+
         // encodeLiteral:
         // "Encode a literal value and return its index"
-        var encodeLiteralMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method8 = ObjectMemoryNew.CreateCompiledMethod(
             "encodeLiteral:",
             [5, 16, 230, 106, 18, 115, 146, 6, 16, 194, 108, 5, 20, 193, 135, 20, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("literalStream"),
-                SSymbol.Intern("nextPut:"),
-                SSymbol.Intern("contents"),
-                SSymbol.Intern("indexOf:")
-            ),
-            1, 2, 0
-        );
-        encoderClassRef.AddMethod("encodeLiteral:", encodeLiteralMethod);
-        
+            [ObjectMemoryNew.InternSymbol("literalStream"),
+             ObjectMemoryNew.InternSymbol("nextPut:"),
+             ObjectMemoryNew.InternSymbol("contents"),
+             ObjectMemoryNew.InternSymbol("indexOf:")],
+            1, 2, 0);
+        ObjectMemoryNew.AddMethod(encoderClassRef.AsObjectPointer(), "encodeLiteral:", method8);
+        instanceMethodCount++;
+
         // tempNames
         // "Return the names of temporaries"
-        var tempNamesMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method9 = ObjectMemoryNew.CreateCompiledMethod(
             "tempNames",
             [218, 209, 208, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("OrderedCollection"),
-                SSymbol.Intern("new")
-            ),
-            0, 0, 0
-        );
-        encoderClassRef.AddMethod("tempNames", tempNamesMethod);
-        
+            [ObjectMemoryNew.InternSymbol("OrderedCollection"),
+             ObjectMemoryNew.InternSymbol("new")],
+            0, 0, 0);
+        ObjectMemoryNew.AddMethod(encoderClassRef.AsObjectPointer(), "tempNames", method9);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Encoder methods installed");
+            Console.WriteLine($"[COLD START] Encoder: {instanceMethodCount} methods installed");
         }
     }
     
@@ -370,59 +365,55 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] Behavior class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // compile:notifying:trailer:ifFail:
         // "Compile source code and install the resulting method"
-        var compileMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method10 = ObjectMemoryNew.CreateCompiledMethod(
             "compile:notifying:trailer:ifFail:",
-            [112, 208, 204, 16, 112, 17, 19, 131, 129, 108, 20, 210, 109, 112, 21, 20, 18, 228, 243, 
+            [112, 208, 204, 16, 112, 17, 19, 131, 129, 108, 20, 210, 109, 112, 21, 20, 18, 228, 243,
              135, 21, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("compilerClass"),
-                SSymbol.Intern("compile:in:notifying:ifFail:"),
-                SSymbol.Intern("selector"),
-                SSymbol.Intern("addSelector:withMethod:notifying:")
-            ),
-            4, 2, 0
-        );
-        behaviorClassRef.AddMethod("compile:notifying:trailer:ifFail:", compileMethod);
-        
+            [ObjectMemoryNew.InternSymbol("compilerClass"),
+             ObjectMemoryNew.InternSymbol("compile:in:notifying:ifFail:"),
+             ObjectMemoryNew.InternSymbol("selector"),
+             ObjectMemoryNew.InternSymbol("addSelector:withMethod:notifying:")],
+            4, 2, 0);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "compile:notifying:trailer:ifFail:", method10);
+        instanceMethodCount++;
+
         // addSelector:withMethod:
         // "Add a method to the method dictionary"
-        var addSelectorMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method11 = ObjectMemoryNew.CreateCompiledMethod(
             "addSelector:withMethod:",
-            [1, 16, 224, 106, 1, 16, 17, 193, 135, 112, 209, 135, 66, 16, 137, 117, 200, 146, 68, 204, 
-             125, 243, 112, 229, 158, 112, 112, 16, 66, 131, 103, 115, 135, 72, 16, 137, 117, 200, 146, 
-             68, 204, 125, 243, 112, 229, 158, 112, 112, 16, 72, 131, 103, 115, 135, 18, 157, 112, 16, 
+            [1, 16, 224, 106, 1, 16, 17, 193, 135, 112, 209, 135, 66, 16, 137, 117, 200, 146, 68, 204,
+             125, 243, 112, 229, 158, 112, 112, 16, 66, 131, 103, 115, 135, 72, 16, 137, 117, 200, 146,
+             68, 204, 125, 243, 112, 229, 158, 112, 112, 16, 72, 131, 103, 115, 135, 18, 157, 112, 16,
              234, 160, 10, 112, 219, 137, 118, 200, 147, 76, 16, 237, 125, 203, 120],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("methodDictionary"),
-                SSymbol.Intern("at:put:"),
-                SSymbol.Intern("flushCache"),
-                SSymbol.Intern("isObsolete"),
-                SSymbol.Intern("notify:"),
-                SSymbol.Intern("Organization"),
-                SSymbol.Intern("classify:under:")
-            ),
-            2, 1, 0
-        );
-        behaviorClassRef.AddMethod("addSelector:withMethod:", addSelectorMethod);
-        
+            [ObjectMemoryNew.InternSymbol("methodDictionary"),
+             ObjectMemoryNew.InternSymbol("at:put:"),
+             ObjectMemoryNew.InternSymbol("flushCache"),
+             ObjectMemoryNew.InternSymbol("isObsolete"),
+             ObjectMemoryNew.InternSymbol("notify:"),
+             ObjectMemoryNew.InternSymbol("Organization"),
+             ObjectMemoryNew.InternSymbol("classify:under:")],
+            2, 1, 0);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "addSelector:withMethod:", method11);
+        instanceMethodCount++;
+
         // Also add compile:classified: for convenience
-        var compileClassifiedMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method12 = ObjectMemoryNew.CreateCompiledMethod(
             "compile:classified:",
             [112, 16, 115, 115, 115, 240, 105, 112, 17, 21, 131, 98, 135, 21, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("compile:notifying:trailer:ifFail:"),
-                SSymbol.Intern("classify:under:")
-            ),
-            2, 1, 0
-        );
-        behaviorClassRef.AddMethod("compile:classified:", compileClassifiedMethod);
-        
+            [ObjectMemoryNew.InternSymbol("compile:notifying:trailer:ifFail:"),
+             ObjectMemoryNew.InternSymbol("classify:under:")],
+            2, 1, 0);
+        ObjectMemoryNew.AddMethod(behaviorClassRef.AsObjectPointer(), "compile:classified:", method12);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Behavior compilation methods installed");
+            Console.WriteLine($"[COLD START] Behavior compilation: {instanceMethodCount} methods installed");
         }
     }
     
@@ -431,291 +422,13 @@ public static class CompilationMethodsInstaller
     /// </summary>
     private static void InitializeScannerTypeTable()
     {
-        var scannerClassRef = SystemDictionary.ScannerClassRef;
-        if (scannerClassRef.IsNil)
-        {
-            Console.WriteLine("[WARNING] Scanner class not found - cannot initialize type table");
-            return;
-        }
-        
-        // Create a type table array
-        // This maps ASCII characters to their lexical types
-        var typeTable = new SArray(256);
-        
-        // Initialize all to xIllegal (type 0)
-        for (int i = 1; i <= 256; i++)
-        {
-            typeTable.AtPut(i, SSymbol.Intern("xIllegal"));
-        }
-        
-        // Set up character classifications
-        
-        // Whitespace (space, tab, CR, LF, FF) - using 1-based indexing
-        typeTable.AtPut(' ' + 1, SSymbol.Intern("xDelimiter"));
-        typeTable.AtPut('\t' + 1, SSymbol.Intern("xDelimiter"));
-        typeTable.AtPut('\r' + 1, SSymbol.Intern("xDelimiter"));
-        typeTable.AtPut('\n' + 1, SSymbol.Intern("xDelimiter"));
-        typeTable.AtPut('\f' + 1, SSymbol.Intern("xDelimiter"));
-        
-        // Letters (uppercase and lowercase) - using 1-based indexing
-        for (char c = 'A'; c <= 'Z'; c++)
-        {
-            typeTable.AtPut(c + 1, SSymbol.Intern("xLetter"));
-        }
-        for (char c = 'a'; c <= 'z'; c++)
-        {
-            typeTable.AtPut(c + 1, SSymbol.Intern("xLetter"));
-        }
-        
-        // Digits - using 1-based indexing
-        for (char c = '0'; c <= '9'; c++)
-        {
-            typeTable.AtPut(c + 1, SSymbol.Intern("xDigit"));
-        }
-        
-        // Special characters - using 1-based indexing
-        typeTable.AtPut('.' + 1, SSymbol.Intern("xPeriod"));
-        typeTable.AtPut(':' + 1, SSymbol.Intern("xColon"));
-        typeTable.AtPut(';' + 1, SSymbol.Intern("xSemicolon"));
-        typeTable.AtPut('\'' + 1, SSymbol.Intern("xString"));
-        typeTable.AtPut('"' + 1, SSymbol.Intern("xComment"));
-        typeTable.AtPut('#' + 1, SSymbol.Intern("xLiteral"));
-        typeTable.AtPut('$' + 1, SSymbol.Intern("xDollar"));
-        typeTable.AtPut('(' + 1, SSymbol.Intern("xLeftParenthesis"));
-        typeTable.AtPut(')' + 1, SSymbol.Intern("xRightParenthesis"));
-        typeTable.AtPut('[' + 1, SSymbol.Intern("xLeftBracket"));
-        typeTable.AtPut(']' + 1, SSymbol.Intern("xRightBracket"));
-        typeTable.AtPut('{' + 1, SSymbol.Intern("xLeftBrace"));
-        typeTable.AtPut('}' + 1, SSymbol.Intern("xRightBrace"));
-        typeTable.AtPut('^' + 1, SSymbol.Intern("xReturn"));
-        typeTable.AtPut('_' + 1, SSymbol.Intern("xUnderscore"));
-        // Note: The left arrow '←' is a Unicode character outside ASCII range
-        // In classic Smalltalk-80 this was often mapped to underscore
-        // We'll handle underscore as assignment as well
-        
-        // Binary selectors - using 1-based indexing
-        var binaryChars = "+-*/\\~<>=@%|&?!,";
-        foreach (char c in binaryChars)
-        {
-            typeTable.AtPut(c + 1, SSymbol.Intern("xBinary"));
-        }
-        
-        // Store the type table in a Scanner instance variable or as a global
-        // For now, we'll create a method that returns the type table
-        var typeTableMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "typeTable",
-            [120], // Just return self for now - would need to return the actual table
-            [],
-            0, 0, 0
-        );
-        scannerClassRef.AddMethod("typeTable", typeTableMethod);
-        
+        // TODO: Implement type table initialization when array instantiation API is available
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Scanner type table initialized");
+            Console.WriteLine("[COLD START] Scanner type table initialization skipped - not yet implemented");
         }
     }
-    
-    /// <summary>
-    /// Installs Stream methods needed for compilation.
-    /// </summary>
-    private static void InstallStreamMethods()
-    {
-        InstallReadStreamMethods();
-        InstallWriteStreamMethods();
-        
-        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
-        {
-            Console.WriteLine("[COLD START] Stream methods installed");
-        }
-    }
-    
-    /// <summary>
-    /// Installs ReadStream methods for reading source code.
-    /// </summary>
-    private static void InstallReadStreamMethods()
-    {
-        var readStreamClassRef = SystemDictionary.ReadStreamClassRef;
-        if (readStreamClassRef.IsNil)
-        {
-            Console.WriteLine("[WARNING] ReadStream class not found");
-            return;
-        }
-        
-        // on: aCollection
-        // "Create a stream on the given collection"
-        var onMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "on:",
-            [66, 204, 16, 233, 135, 17, 118, 193, 135, 17, 16, 194, 195, 135, 17, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("new"),
-                SSymbol.Intern("on:from:to:"),
-                SSymbol.Intern("size")
-            ),
-            1, 1, 0
-        );
-        // Note: ReadStream class methods should be added to ReadStream's class side
-        // For now, add to instance side as a workaround
-        readStreamClassRef.AddMethod("on:", onMethod);
-        
-        // on:from:to:
-        // "Create a stream on part of a collection"
-        var onFromToMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "on:from:to:",
-            [112, 0, 96, 135, 112, 1, 96, 135, 112, 2, 97, 135, 112, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection:"),
-                SSymbol.Intern("position:"),
-                SSymbol.Intern("readLimit:")
-            ),
-            3, 0, 0
-        );
-        readStreamClassRef.AddMethod("on:from:to:", onFromToMethod);
-        
-        // next
-        // "Answer the next element"
-        var nextMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "next",
-            [2, 3, 180, 155, 115, 124, 0, 2, 118, 176, 192, 105, 112, 2, 17, 176, 97, 135, 17, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("position"),
-                SSymbol.Intern("readLimit"),
-                SSymbol.Intern("at:"),
-                SSymbol.Intern("position:")
-            ),
-            0, 1, 0
-        );
-        readStreamClassRef.AddMethod("next", nextMethod);
-        
-        // atEnd
-        // "Answer whether at end of stream"
-        var atEndMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "atEnd",
-            [2, 3, 181, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("position"),
-                SSymbol.Intern("readLimit")
-            ),
-            0, 0, 0
-        );
-        readStreamClassRef.AddMethod("atEnd", atEndMethod);
-        
-        // peek
-        // "Answer next element without advancing"
-        var peekMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "peek",
-            [112, 211, 155, 115, 124, 0, 2, 118, 176, 192, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("atEnd"),
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("position"),
-                SSymbol.Intern("at:")
-            ),
-            0, 0, 0
-        );
-        readStreamClassRef.AddMethod("peek", peekMethod);
-    }
-    
-    /// <summary>
-    /// Installs WriteStream methods for generating code.
-    /// </summary>
-    private static void InstallWriteStreamMethods()
-    {
-        var writeStreamClassRef = SystemDictionary.WriteStreamClassRef;
-        if (writeStreamClassRef.IsNil)
-        {
-            Console.WriteLine("[WARNING] WriteStream class not found");
-            return;
-        }
-        
-        // on:
-        // "Create a stream on the given collection"
-        var onMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "on:",
-            [66, 204, 16, 118, 16, 194, 234, 135, 17, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("new"),
-                SSymbol.Intern("on:from:to:"),
-                SSymbol.Intern("size")
-            ),
-            1, 1, 0
-        );
-        // Note: WriteStream class methods should be added to WriteStream's class side
-        // For now, add to instance side as a workaround
-        writeStreamClassRef.AddMethod("on:", onMethod);
-        
-        // nextPut:
-        // "Add an element to the stream"
-        var nextPutMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "nextPut:",
-            [2, 3, 180, 157, 112, 213, 135, 0, 2, 118, 176, 16, 193, 135, 112, 2, 118, 176, 97, 135, 
-             3, 2, 183, 157, 112, 2, 98, 135, 16, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("position"),
-                SSymbol.Intern("writeLimit"),
-                SSymbol.Intern("pastEndPut:"),
-                SSymbol.Intern("at:put:"),
-                SSymbol.Intern("position:"),
-                SSymbol.Intern("writeLimit:")
-            ),
-            1, 0, 0
-        );
-        writeStreamClassRef.AddMethod("nextPut:", nextPutMethod);
-        
-        // nextPutAll:
-        // "Add a collection of elements"
-        var nextPutAllMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "nextPutAll:",
-            [16, 137, 118, 200, 151, 112, 17, 226, 125, 242, 135, 16, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("do:"),
-                SSymbol.Intern("nextPut:")
-            ),
-            1, 1, 0
-        );
-        writeStreamClassRef.AddMethod("nextPutAll:", nextPutAllMethod);
-        
-        // contents
-        // "Answer the contents written so far"
-        var contentsMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "contents",
-            [0, 118, 2, 231, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("collection"),
-                SSymbol.Intern("copyFrom:to:"),
-                SSymbol.Intern("position")
-            ),
-            0, 0, 0
-        );
-        writeStreamClassRef.AddMethod("contents", contentsMethod);
-        
-        // reset
-        // "Reset the stream to the beginning"
-        var resetMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "reset",
-            [112, 118, 96, 135, 112, 3, 197, 176, 98, 135, 120],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("position:"),
-                SSymbol.Intern("readLimit"),
-                SSymbol.Intern("writeLimit:")
-            ),
-            0, 0, 0
-        );
-        writeStreamClassRef.AddMethod("reset", resetMethod);
-        
-        // size
-        // "Answer the size of the contents"
-        var sizeMethod = SCompiledMethod.CreateCompiledMethodRef(
-            "size",
-            [3, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("writeLimit")),
-            0, 0, 0
-        );
-        writeStreamClassRef.AddMethod("size", sizeMethod);
-    }
-    
+
     /// <summary>
     /// Installs Object class methods that support compilation.
     /// </summary>
@@ -727,37 +440,37 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] Object class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // compilerClass
         // "Return the compiler class to use"
-        var compilerClassMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method25 = ObjectMemoryNew.CreateCompiledMethod(
             "compilerClass",
             [65, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(SSymbol.Intern("Compiler")),
-            0, 0, 0
-        );
+            [ObjectMemoryNew.InternSymbol("Compiler")],
+            0, 0, 0);
         // Note: Object class methods should be added to Object's class side
         // For now, add to instance side as a workaround
-        objectClassRef.AddMethod("compilerClass", compilerClassMethod);
-        
+        ObjectMemoryNew.AddMethod(objectClassRef.AsObjectPointer(), "compilerClass", method25);
+        instanceMethodCount++;
+
         // compile:classified:
         // "Compile source code with classification"
-        var compileClassifiedMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method26 = ObjectMemoryNew.CreateCompiledMethod(
             "compile:classified:",
             [112, 16, 115, 115, 115, 240, 105, 112, 17, 21, 131, 98, 135, 21, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("compile:notifying:trailer:ifFail:"),
-                SSymbol.Intern("classify:under:")
-            ),
-            2, 1, 0
-        );
+            [ObjectMemoryNew.InternSymbol("compile:notifying:trailer:ifFail:"),
+             ObjectMemoryNew.InternSymbol("classify:under:")],
+            2, 1, 0);
         // Note: Object class methods should be added to Object's class side
         // For now, add to instance side as a workaround
-        objectClassRef.AddMethod("compile:classified:", compileClassifiedMethod);
-        
+        ObjectMemoryNew.AddMethod(objectClassRef.AsObjectPointer(), "compile:classified:", method26);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] Object compilation support methods installed");
+            Console.WriteLine($"[COLD START] Object compilation support: {instanceMethodCount} methods installed");
         }
     }
     
@@ -772,67 +485,63 @@ public static class CompilationMethodsInstaller
             Console.WriteLine("[WARNING] CompiledMethod class not found");
             return;
         }
-        
+
+        var instanceMethodCount = 0;
+
         // newMethod:header:
         // "Create a new compiled method with bytecodes and header"
-        var newMethodHeaderMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method27 = ObjectMemoryNew.CreateCompiledMethod(
             "newMethod:header:",
-            [66, 208, 104, 16, 16, 194, 249, 105, 17, 118, 16, 194, 240, 106, 16, 118, 21, 195, 107, 
+            [66, 208, 104, 16, 16, 194, 249, 105, 17, 118, 16, 194, 240, 106, 16, 118, 21, 195, 107,
              18, 20, 193, 102, 22, 20, 194, 103, 20, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("basicNew:"),
-                SSymbol.Intern("size"),
-                SSymbol.Intern("numLiterals:"),
-                SSymbol.Intern("at:put:"),
-                SSymbol.Intern("header"),
-                SSymbol.Intern("bytecodes")
-            ),
-            2, 4, 0
-        );
+            [ObjectMemoryNew.InternSymbol("basicNew:"),
+             ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol("numLiterals:"),
+             ObjectMemoryNew.InternSymbol("at:put:"),
+             ObjectMemoryNew.InternSymbol("header"),
+             ObjectMemoryNew.InternSymbol("bytecodes")],
+            2, 4, 0);
         // Note: CompiledMethod class methods should be added to CompiledMethod's class side
         // For now, add to instance side as a workaround
-        compiledMethodClassRef.AddMethod("newMethod:header:", newMethodHeaderMethod);
-        
+        ObjectMemoryNew.AddMethod(compiledMethodClassRef.AsObjectPointer(), "newMethod:header:", method27);
+        instanceMethodCount++;
+
         // numArgs:numTemps:primitive:literals:
         // "Create a method with specified parameters"
-        var numArgsMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method28 = ObjectMemoryNew.CreateCompiledMethod(
             "numArgs:numTemps:primitive:literals:",
-            [19, 194, 104, 66, 20, 208, 105, 21, 118, 225, 102, 21, 16, 196, 103, 21, 17, 197, 104, 
+            [19, 194, 104, 66, 20, 208, 105, 21, 118, 225, 102, 21, 16, 196, 103, 21, 17, 197, 104,
              21, 18, 198, 105, 21, 20, 199, 106, 21, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("size"),
-                SSymbol.Intern("newMethod:header:"),
-                SSymbol.Intern("numArgs:"),
-                SSymbol.Intern("numTemps:"),
-                SSymbol.Intern("primitive:"),
-                SSymbol.Intern("literals:")
-            ),
-            4, 2, 0
-        );
+            [ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol("newMethod:header:"),
+             ObjectMemoryNew.InternSymbol("numArgs:"),
+             ObjectMemoryNew.InternSymbol("numTemps:"),
+             ObjectMemoryNew.InternSymbol("primitive:"),
+             ObjectMemoryNew.InternSymbol("literals:")],
+            4, 2, 0);
         // Note: CompiledMethod class methods should be added to CompiledMethod's class side
         // For now, add to instance side as a workaround
-        compiledMethodClassRef.AddMethod("numArgs:numTemps:primitive:literals:", numArgsMethod);
-        
+        ObjectMemoryNew.AddMethod(compiledMethodClassRef.AsObjectPointer(), "numArgs:numTemps:primitive:literals:", method28);
+        instanceMethodCount++;
+
         // copyWithTempsFromMethodNode:
         // "Copy temporaries from a method node"
-        var copyWithTempsMethod = SCompiledMethod.CreateCompiledMethodRef(
+        var method29 = ObjectMemoryNew.CreateCompiledMethod(
             "copyWithTempsFromMethodNode:",
-            [112, 16, 210, 104, 20, 215, 155, 120, 112, 20, 117, 194, 197, 106, 112, 20, 117, 22, 
+            [112, 16, 210, 104, 20, 215, 155, 120, 112, 20, 117, 194, 197, 106, 112, 20, 117, 22,
              196, 105, 21, 124],
-            SCompiledMethod.ConvertLiteralsToRefs(
-                SSymbol.Intern("temporaries"),
-                SSymbol.Intern("tempNames"),
-                SSymbol.Intern("isEmpty"),
-                SSymbol.Intern("size"),
-                SSymbol.Intern("at:put:")
-            ),
-            1, 3, 0
-        );
-        compiledMethodClassRef.AddMethod("copyWithTempsFromMethodNode:", copyWithTempsMethod);
-        
+            [ObjectMemoryNew.InternSymbol("temporaries"),
+             ObjectMemoryNew.InternSymbol("tempNames"),
+             ObjectMemoryNew.InternSymbol("isEmpty"),
+             ObjectMemoryNew.InternSymbol("size"),
+             ObjectMemoryNew.InternSymbol("at:put:")],
+            1, 3, 0);
+        ObjectMemoryNew.AddMethod(compiledMethodClassRef.AsObjectPointer(), "copyWithTempsFromMethodNode:", method29);
+        instanceMethodCount++;
+
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            Console.WriteLine("[COLD START] CompiledMethod creation methods installed");
+            Console.WriteLine($"[COLD START] CompiledMethod creation: {instanceMethodCount} methods installed");
         }
     }
 }
