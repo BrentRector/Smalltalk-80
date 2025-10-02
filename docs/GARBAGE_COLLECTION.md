@@ -1,394 +1,423 @@
-# Smalltalk-80 VM Garbage Collection Design
+# Smalltalk-80 Garbage Collection
 
 ## Overview
 
-This document describes the garbage collection implementation for the Smalltalk-80 VM. The system uses **Option D: Manual Garbage Collection with Explicit Memory Management** to maintain full Smalltalk-80 semantics (including `become:` and instance enumeration) while preventing unbounded memory growth.
+The Smalltalk-80 interpreter implements a **mark-and-sweep garbage collector** integrated with the ObjectTable architecture. The GC operates as a client of ObjectTable, using the Special Objects Array (SOA) as the sole root for marking reachable objects.
 
-## Design Philosophy
+### Key Design Principles
 
-### Why Manual GC?
-
-The Smalltalk-80 language requires several features that make automatic garbage collection challenging:
-
-1. **`become:` primitive** - Must find and update ALL references to swapped objects
-2. **Instance enumeration** - Must be able to find all instances of any class
-3. **Object enumeration** - Must be able to iterate through all objects
-4. **Stable OOPs** - Object pointers must remain stable for debugging and identity
-
-These requirements mean we must maintain a global object table that tracks all objects ever created. This prevents automatic collection by .NET's GC since the object table holds strong references.
-
-### Option D: Manual GC Solution
-
-Our implementation maintains a global object table but implements manual garbage collection using a mark-and-sweep algorithm. This provides:
-
-- Full Smalltalk-80 semantics support
-- Controlled memory management
-- Predictable GC behavior
-- No unsafe code required
+1. **SOA as Single Root**: The Special Objects Array is the ONLY permanent GC root - all live objects must be reachable from it
+2. **SObjectRef Architecture**: All object references use SObjectRef values (not object pointers)
+3. **ObjectTable Integration**: GC is a clean client of ObjectTable with no special privileges
+4. **Zero Collection at Cold Start**: Properly initialized system shows 0 objects collected (perfect GC)
 
 ## Architecture
 
-### Object Table Structure
+### Object Memory Model
+
+The system uses a three-layer architecture:
 
 ```csharp
-// Object table - uses array for O(1) access by OOP
-private static SmalltalkObject?[] objects = new SmalltalkObject?[65536];
-private static int nextFreeIndex = 0;
-private static readonly Queue<int> freeList = new();
-```
-
-- **Fixed-size array** initially (65536 slots)
-- **Grows dynamically** when needed (2x growth factor)
-- **Free list** maintains available slots from freed objects
-- **OOP encoding**: `OOP = index << 1` (even numbers for objects, odd for SmallIntegers)
-
-### Root Set Management
-
-The GC maintains two types of roots:
-
-#### Permanent Roots
-Objects that should never be collected:
-- All classes and metaclasses
-- Singleton objects (nil, true, false)
-- System dictionary (Smalltalk globals)
-- Critical system objects
-
-```csharp
-ObjectMemory.AddPermanentRoot(classObject);
-```
-
-#### Transient Roots
-Objects needed during current execution:
-- Current execution context
-- Active method receivers
-- Temporary computation results
-
-```csharp
-ObjectMemory.AddTransientRoot(currentReceiver);
-// ... execution ...
-ObjectMemory.ClearTransientRoots();
-```
-
-## Garbage Collection Algorithm
-
-### Mark-and-Sweep Implementation
-
-The GC uses a traditional mark-and-sweep algorithm:
-
-#### Phase 1: Mark
-1. Start from all root objects (permanent + transient)
-2. Recursively mark all reachable objects
-3. Track marked objects in a HashSet for efficiency
-
-```csharp
-private static void MarkReachable(SmalltalkObject obj, HashSet<int> reachable)
+/// <summary>
+/// Layer 1: SObjectRef - A value type representing an object reference.
+/// Encodes both object pointers and immediate values (SmallInteger, Character).
+/// </summary>
+public readonly struct SObjectRef
 {
-    if (obj == null) return;
-    
-    int index = obj.Oop >> 1;
-    if (reachable.Contains(index)) return;
-    
-    reachable.Add(index);
-    
-    // Mark class pointer
-    if (obj.ClassPointer != null)
-        MarkReachable(obj.ClassPointer, reachable);
-    
-    // Mark all fields
-    foreach (var field in obj.Fields)
+    private readonly nint value;  // Tagged pointer or immediate value
+
+    // LSB = 0: Object pointer (OOP)
+    // LSB = 1: SmallInteger (31-bit value)
+    // Special patterns for Character, nil, true, false
+}
+
+/// <summary>
+/// Layer 2: ObjectTable - Manages object allocation and storage.
+/// Maps object indices to ObjectData instances.
+/// </summary>
+public sealed class ObjectTable
+{
+    private ObjectData?[] objects;     // Object storage array
+    private Queue<int> freeList;       // Reusable slots
+
+    public ObjectData? Get(int index);
+    public void Free(int index);
+}
+
+/// <summary>
+/// Layer 3: ObjectData - Internal storage for object state.
+/// Never exposed directly - accessed only via SObjectRef methods.
+/// </summary>
+public class ObjectData
+{
+    public SObjectRef ClassRef { get; set; }
+    public ObjectFormat Format { get; set; }
+    public SObjectRef[] InstanceVariables { get; set; }
+    public object? IndexedData { get; set; }
+    public bool Marked { get; set; }  // GC mark bit
+}
+```
+
+### Garbage Collector Design
+
+The GarbageCollector is a standalone component that:
+- Takes ObjectTable as a dependency (constructor injection)
+- Stores the Special Objects Array as raw OOPs (`List<nint>`)
+- Implements standard mark-and-sweep algorithm
+- Has no special integration with ObjectTable
+
+```csharp
+public sealed class GarbageCollector
+{
+    private readonly ObjectTable objectTable;
+    private List<nint> specialObjectsArray = new();
+
+    public GarbageCollector(ObjectTable objectTable)
     {
-        if (field is SmalltalkObject fieldObj)
-            MarkReachable(fieldObj, reachable);
+        this.objectTable = objectTable;
+    }
+
+    public void SetSpecialObjectsArray(List<nint> soa)
+    {
+        specialObjectsArray = soa;
     }
 }
 ```
 
-#### Phase 2: Sweep
-1. Scan entire object table
-2. Free unmarked objects (set to null)
-3. Add freed slots to free list for reuse
+## Algorithm
+
+### Mark Phase
+
+Starting from the Special Objects Array, recursively mark all reachable objects:
 
 ```csharp
-for (int i = 0; i < nextFreeIndex; i++)
+private void MarkFromRoots()
 {
-    if (objects[i] != null && !reachable.Contains(i))
+    gcStack.Clear();
+
+    // Push all SOA entries (skip nil and SmallIntegers)
+    foreach (var oop in specialObjectsArray)
     {
-        objects[i] = null;
-        freeList.Enqueue(i);
-        freedCount++;
-    }
-}
-```
-
-## GC Triggering
-
-### Automatic Triggers
-
-GC runs automatically when:
-- Allocated object count exceeds HIGH_WATER_MARK (50,000 objects)
-- Free list drops below LOW_FREE_COUNT (1,000 slots)
-- At least 1 second has passed since last GC (prevents thrashing)
-
-### Manual Triggers
-
-GC can be triggered from:
-
-#### Interpreter Check Points
-- Every 10,000 bytecodes executed
-- On method returns
-- When switching contexts
-
-```csharp
-if (++bytecodesSinceGC >= GC_CHECK_INTERVAL)
-{
-    bytecodesSinceGC = 0;
-    if (ObjectMemory.AllocatedObjectCount > 40000)
-    {
-        ObjectMemory.ManualGC();
-    }
-}
-```
-
-#### Smalltalk Primitives
-- **Primitive 130**: `garbageCollect` - Runs GC and returns freed count
-- **Primitive 131**: `gcStats` - Returns GC statistics array
-- **Primitive 132**: `forceGC` - Forces immediate GC
-
-```smalltalk
-"Run garbage collection from Smalltalk"
-System garbageCollect.
-
-"Get GC statistics"
-System gcStats. "Returns: #(allocated free total collections totalFreed)"
-
-"Force immediate GC"
-System forceGC.
-```
-
-## Memory Management
-
-### Object Allocation
-
-1. **Check free list** for available slots
-2. **Use free slot** if available
-3. **Allocate new slot** at end of table if no free slots
-4. **Grow table** if at capacity (doubles size)
-5. **Trigger GC** if thresholds exceeded
-
-```csharp
-internal static void Register(SmalltalkObject obj)
-{
-    int index;
-    if (freeList.Count > 0)
-    {
-        index = freeList.Dequeue();
-        objects[index] = obj;
-    }
-    else
-    {
-        if (nextFreeIndex >= objects.Length)
-            GrowObjectTable();
-        index = nextFreeIndex++;
-        objects[index] = obj;
-    }
-    obj.Oop = index << 1;
-    
-    if (ShouldTriggerGC())
-        ManualGC();
-}
-```
-
-### Memory Statistics
-
-The system tracks:
-- Total allocations
-- Total collections performed
-- Total objects freed
-- Current live object count
-- Free slot count
-
-```csharp
-var stats = ObjectMemory.GetMemoryStats();
-// Returns: (allocated, free, total, collections)
-```
-
-## Special Considerations
-
-### become: Support
-
-The `become:` primitive requires scanning ALL live objects to swap references:
-
-```csharp
-public static void SwapPointers(SmalltalkObject a, SmalltalkObject b)
-{
-    // Swap in object table
-    (objects[indexA], objects[indexB]) = (objects[indexB], objects[indexA]);
-    (a.Oop, b.Oop) = (b.Oop, a.Oop);
-    
-    // Update all references in all live objects
-    for (int i = 0; i < nextFreeIndex; i++)
-    {
-        var obj = objects[i];
-        if (obj != null)
+        if (oop != 0 && (oop & 0x01) == 0)  // Object pointer
         {
-            // Swap references in fields
-            for (int j = 0; j < obj.Fields.Length; j++)
-            {
-                if (ReferenceEquals(obj.Fields[j], a)) 
-                    obj.Fields[j] = b;
-                else if (ReferenceEquals(obj.Fields[j], b)) 
-                    obj.Fields[j] = a;
-            }
+            gcStack.Push(oop);
+        }
+    }
+
+    // Recursively mark reachable objects
+    while (gcStack.Count > 0)
+    {
+        var oop = gcStack.Pop();
+        MarkObject(oop);
+    }
+}
+
+private void MarkObject(nint oop)
+{
+    // Skip immediates
+    if (oop == 0 || (oop & 0x01) == 1) return;
+
+    // Get object from table
+    int index = ObjectTable.IndexFromOop(oop);
+    var data = objectTable.Get(index);
+
+    if (data == null || data.Marked) return;
+
+    // Mark this object
+    data.Marked = true;
+
+    // Trace class reference
+    if (data.ClassRef.IsHeapObject)
+        gcStack.Push(data.ClassRef.AsObjectPointer());
+
+    // Trace instance variables
+    foreach (var fieldRef in data.InstanceVariables)
+    {
+        if (fieldRef.IsHeapObject)
+            gcStack.Push(fieldRef.AsObjectPointer());
+    }
+
+    // Trace indexed data for pointer formats
+    if (data.Format == ObjectFormat.PointerIndexed)
+    {
+        foreach (var ptr in (SObjectRef[])data.IndexedData)
+        {
+            if (ptr.IsHeapObject)
+                gcStack.Push(ptr.AsObjectPointer());
         }
     }
 }
 ```
 
-### Instance Enumeration
+### Sweep Phase
 
-The system supports finding all instances of a class:
+Free all unmarked objects:
 
 ```csharp
-public static SmalltalkObject? SomeInstance(SmalltalkObject cls)
+private int SweepUnmarkedObjects()
 {
-    for (int i = 0; i < nextFreeIndex; i++)
+    int collected = 0;
+    var indicesToFree = new List<int>();
+
+    // Find all unmarked objects
+    foreach (var (index, data) in objectTable.EnumerateLiveObjects())
     {
-        var obj = objects[i];
-        if (obj != null && ReferenceEquals(obj.ClassPointer, cls))
-            return obj;
+        if (!data.Marked)
+        {
+            indicesToFree.Add(index);
+        }
     }
-    return null;
+
+    // Free them
+    foreach (var index in indicesToFree)
+    {
+        objectTable.Free(index);  // ObjectTable handles the details
+        collected++;
+    }
+
+    return collected;
 }
 ```
 
-## Performance Characteristics
+## Root Set Management
 
-### Time Complexity
-- **Mark phase**: O(n) where n = number of reachable objects
-- **Sweep phase**: O(m) where m = total allocated slots
-- **become:**: O(m * f) where f = average fields per object
-- **Object allocation**: O(1) amortized
+### Special Objects Array (SOA)
 
-### Space Complexity
-- **Object table**: 8 bytes per slot (pointer size)
-- **Free list**: 4 bytes per free slot
-- **Mark set**: ~4 bytes per live object during GC
+The SOA is the **ONLY** permanent root for garbage collection. It contains exactly 9 essential objects:
 
-### GC Pause Times
-- Typical collection: 10-50ms for 10,000 objects
-- Large collection: 100-500ms for 50,000 objects
-- Logged when >100ms or any objects freed
+| Index | Object | Purpose |
+|-------|--------|---------|
+| 0 | nil | UndefinedObject singleton |
+| 1 | false | False singleton |
+| 2 | true | True singleton |
+| 3 | Behavior | Metaclass hierarchy root |
+| 4 | Metaclass | Metaclass hierarchy root |
+| 5 | **SystemDictionary** | Main root - contains ALL classes and globals |
+| 6 | SymbolTable | All interned symbols |
+| 7 | ProcessList | All active processes |
+| 8 | ProcessorScheduler | Process scheduler singleton |
 
-## Configuration
+**Critical**: SystemDictionary (index 5) is the primary root that keeps most objects alive. It contains:
+- All classes and metaclasses
+- All global variables
+- All class variables
+- Method dictionaries (via classes)
 
-### Tunable Parameters
+### Root Reachability Chain
+
+```
+Special Objects Array
+    └─> SystemDictionary
+        └─> All Classes
+            └─> Method Dictionaries
+                └─> CompiledMethods
+                    └─> Literals (including Symbols)
+            └─> Class Variables
+            └─> Metaclasses
+                └─> Instance Creation Methods
+        └─> Global Variables
+        └─> Processes (via ProcessList)
+            └─> Contexts
+                └─> Temporary Variables
+                └─> Stack Values
+```
+
+## Integration
+
+### Cold Start Bootstrap
+
+The cold start process ensures all objects are reachable:
 
 ```csharp
-// GC triggers
-private const int HIGH_WATER_MARK = 50000;  // Trigger GC above this
-private const int LOW_FREE_COUNT = 1000;    // Trigger GC below this
+// Phase 1: Create essential objects
+var nil = CreateNilObject();
+var systemDict = CreateSystemDictionary();
 
-// Growth
-private const int GROWTH_FACTOR = 2;        // Table growth multiplier
+// Phase 2: Build SOA
+var soa = new List<SObjectRef>();
+soa.Add(nil);
+soa.Add(falseObj);
+soa.Add(trueObj);
+soa.Add(behaviorClass);
+soa.Add(metaclass);
+soa.Add(systemDict);  // Critical: contains everything
+soa.Add(symbolTable);
+soa.Add(processList);
+soa.Add(scheduler);
 
-// Timing
-private const int GC_CHECK_INTERVAL = 10000; // Bytecodes between checks
+// Phase 3: Set SOA as GC root
+garbageCollector.SetSpecialObjectsArrayFromRefs(soa);
+
+// Phase 4: Validate (should collect 0 objects)
+var stats = garbageCollector.Collect();
+if (stats.ObjectsCollected != 0)
+{
+    throw new InvalidOperationException(
+        $"Cold start error: {stats.ObjectsCollected} unreachable objects!");
+}
 ```
 
-### Adjusting for Different Workloads
+### Virtual Machine Integration
 
-#### Memory-Constrained Environment
-- Lower HIGH_WATER_MARK (e.g., 10000)
-- More frequent GC checks
-- Smaller initial table size
-
-#### Performance-Critical Environment
-- Higher HIGH_WATER_MARK (e.g., 100000)
-- Less frequent GC checks
-- Larger initial table size
-
-## Debugging Support
-
-### GC Logging
-
-The system logs GC activity when:
-- Objects are freed
-- Collection takes >100ms
-- Forced GC is requested
-
-```
-[GC] Collection #1: Freed 1523 objects in 45ms. Live objects: 8477, Total freed: 1523
-[ObjectMemory] Grew object table from 65536 to 131072
-[GC] Forced collection requested
-```
-
-### Memory Leak Detection
-
-To detect leaks:
-1. Monitor `AllocatedObjectCount` over time
-2. Check GC statistics for low freed counts
-3. Use `CountInstancesOf` to find accumulating objects
-4. Review root set for unnecessary permanent roots
-
-## Limitations
-
-### Current Implementation
-1. **No generational GC** - All objects treated equally
-2. **Stop-the-world** - GC pauses execution
-3. **No compaction** - Fragmentation possible
-4. **Conservative marking** - May retain some garbage
-
-### Future Improvements
-1. **Generational collection** - Separate young/old objects
-2. **Incremental marking** - Reduce pause times
-3. **Weak references** - For caches
-4. **Finalizers** - Resource cleanup
-
-## Usage Examples
-
-### From C#
 ```csharp
-// Manual GC
-int freed = ObjectMemory.ManualGC();
+public class VirtualMachine
+{
+    private readonly ObjectTable objectTable;
+    private readonly GarbageCollector gc;
 
-// Force GC
-ObjectMemory.ForceGC();
+    public VirtualMachine()
+    {
+        objectTable = ObjectMemoryNew.ObjectTable;
+        gc = new GarbageCollector(objectTable);
+    }
 
-// Get statistics
-var stats = ObjectMemory.GetMemoryStats();
+    private void InitializeGarbageCollection()
+    {
+        // Build SOA from SystemDictionary
+        var soa = new List<nint>();
 
-// Add permanent root
-ObjectMemory.AddPermanentRoot(systemDictionary);
+        // Add all essential roots as OOPs
+        soa.Add(SNil.Instance.AsObjectPointer());
+        soa.Add(SBoolean.False.AsObjectPointer());
+        soa.Add(SBoolean.True.AsObjectPointer());
+        // ... etc
 
-// Manage transient roots
-ObjectMemory.AddTransientRoot(currentContext);
-// ... do work ...
-ObjectMemory.ClearTransientRoots();
+        gc.SetSpecialObjectsArray(soa);
+    }
+}
 ```
 
-### From Smalltalk
+### Triggering Collection
+
+Collections can be triggered:
+
+1. **Manually from C#**:
+```csharp
+var stats = gc.Collect();
+Console.WriteLine($"Collected {stats.ObjectsCollected} objects");
+```
+
+2. **From Interpreter** (periodic checks):
+```csharp
+if (++bytecodesSinceGC >= 10000)
+{
+    bytecodesSinceGC = 0;
+    if (objectTable.GetAllocatedCount() > 40000)
+    {
+        gc.Collect();
+    }
+}
+```
+
+3. **From Smalltalk** (via primitives):
 ```smalltalk
-"Run garbage collection"
+"Primitive 130 - Run GC and return freed count"
 System garbageCollect.
 
-"Check memory usage"
-| stats |
-stats := System gcStats.
-Transcript show: 'Live objects: ', (stats at: 1) printString; cr.
-Transcript show: 'Free slots: ', (stats at: 2) printString; cr.
-Transcript show: 'Collections: ', (stats at: 4) printString; cr.
-
-"Force collection"
-System forceGC.
+"Primitive 131 - Get GC statistics"
+System gcStats.
 ```
+
+## Performance
+
+### Characteristics
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Mark Phase** | O(n) | n = reachable objects |
+| **Sweep Phase** | O(m) | m = total allocated objects |
+| **Typical Pause** | 10-50ms | For ~10K objects |
+| **Memory Overhead** | ~16 bytes/object | ObjectData + table entry |
+
+### Cold Start Statistics
+
+Perfect cold start shows:
+- **988 total objects** created during bootstrap
+- **988 reachable objects** from SOA
+- **0 objects collected** (100% reachability)
+
+If any objects are collected after cold start, it indicates an initialization bug where objects aren't properly connected to the SOA roots.
+
+## Validation
+
+### GC Correctness Test
+
+```csharp
+public bool ValidateReachability()
+{
+    // Run a collection
+    var stats = gc.Collect();
+
+    // All objects should be reachable from SOA
+    bool isValid = stats.ObjectsCollected == 0;
+
+    if (!isValid)
+    {
+        Console.WriteLine(
+            $"ERROR: {stats.ObjectsCollected} unreachable objects!");
+    }
+
+    return isValid;
+}
+```
+
+### Command-Line Testing
+
+```bash
+# Run with GC logging
+dotnet run -- eval "nil" --gc-log
+
+# Validate all objects reachable
+dotnet run -- eval "nil" --validate-gc
+
+# List cold start classes and run GC
+dotnet run -- eval "nil" --list-cold-start-classes --gc-log
+```
+
+### Expected Output
+
+```
+[GC] Starting collection #1
+[GC] Total allocated objects: 988
+[GC] Reachable objects: 988
+[GC] Objects collected: 0
+[GC] Collection time: 12ms
+[GC] ✓ All objects reachable - cold start initialization is correct
+```
+
+## Design Rationale
+
+### Why Manual GC?
+
+The Smalltalk-80 language requires features incompatible with automatic .NET GC:
+
+1. **become: primitive** - Swaps object identity system-wide
+2. **Instance enumeration** - Find all instances of a class
+3. **Object enumeration** - Iterate all objects
+4. **Stable OOPs** - Object pointers must remain constant
+
+### Why SOA as Single Root?
+
+1. **Simplicity** - One root to rule them all
+2. **Correctness** - Easy to verify all objects are reachable
+3. **Blue Book Compliance** - Matches Smalltalk-80 architecture
+4. **No C# Collections** - SystemDictionary is the sole source of truth
+
+### ObjectTable Integration
+
+The GC operates as a clean client of ObjectTable:
+- No special privileges or backdoor access
+- Uses public `Get()` and `Free()` methods
+- Doesn't know about internal free lists or segmentation
+- ObjectTable handles all allocation/deallocation details
 
 ## Summary
 
-The manual garbage collection system provides:
-- **Full Smalltalk-80 semantics** including `become:` and enumeration
-- **Controlled memory management** preventing unbounded growth
-- **Predictable behavior** with configurable triggers
-- **Good performance** for typical Smalltalk programs
-- **Debugging support** with statistics and logging
+The garbage collector provides:
+- **Full Smalltalk-80 semantics** including become: and enumeration
+- **Clean architecture** with SOA as the single root
+- **Perfect cold start** with 0 objects collected
+- **ObjectTable integration** as a well-behaved client
+- **Predictable performance** with ~10-50ms pauses
 
-This design balances the requirements of Smalltalk-80 with practical memory management needs, enabling long-running programs while maintaining language compatibility.
+This design ensures the interpreter can run long-lived Smalltalk programs with controlled memory usage while maintaining complete language compatibility.
