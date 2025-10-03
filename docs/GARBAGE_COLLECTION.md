@@ -181,45 +181,63 @@ private int SweepUnmarkedObjects()
 
 ## Root Set Management
 
-### Special Objects Array (SOA)
+### Special Objects Array (SOA) - Blue Book Minimal Specification
 
-The SOA is the **ONLY** permanent root for garbage collection. It contains exactly 9 essential objects:
+Per Goldberg & Robson (1983), the SOA is the **ONLY** permanent root for garbage collection. It contains exactly **5 essential objects** for complete reachability:
 
-| Index | Object | Purpose |
-|-------|--------|---------|
-| 0 | nil | UndefinedObject singleton |
-| 1 | false | False singleton |
-| 2 | true | True singleton |
-| 3 | Behavior | Metaclass hierarchy root |
-| 4 | Metaclass | Metaclass hierarchy root |
-| 5 | **SystemDictionary** | Main root - contains ALL classes and globals |
-| 6 | SymbolTable | All interned symbols |
-| 7 | ProcessList | All active processes |
-| 8 | ProcessorScheduler | Process scheduler singleton |
+| Index | Object | Purpose | Reachability |
+|-------|--------|---------|--------------|
+| 0 | nil | UndefinedObject singleton | Required for pushNil bytecode (113) |
+| 1 | false | False singleton | Required for pushFalse bytecode (114) |
+| 2 | true | True singleton | Required for pushTrue bytecode (113) |
+| 3 | **Smalltalk** | SystemDictionary instance | **ALL classes, methods, symbols, globals** |
+| 4 | ProcessorScheduler | Process scheduler singleton | **ALL live processes and execution contexts** |
 
-**Critical**: SystemDictionary (index 5) is the primary root that keeps most objects alive. It contains:
-- All classes and metaclasses
-- All global variables
-- All class variables
-- Method dictionaries (via classes)
+#### Why Only 5 Roots Are Sufficient
 
-### Root Reachability Chain
+**Removed as Redundant:**
+- ~~Behavior class~~ → Already in `Smalltalk at: #Behavior`
+- ~~Metaclass class~~ → Already in `Smalltalk at: #Metaclass`
+- ~~SymbolTable~~ → Already in `Symbol class → classPool → #USTable`
+- ~~ProcessList~~ → Processes are in `ProcessorScheduler → quiescentProcessLists`
+
+### Complete Reachability Chain
 
 ```
-Special Objects Array
-    └─> SystemDictionary
-        └─> All Classes
-            └─> Method Dictionaries
-                └─> CompiledMethods
-                    └─> Literals (including Symbols)
-            └─> Class Variables
-            └─> Metaclasses
-                └─> Instance Creation Methods
-        └─> Global Variables
-        └─> Processes (via ProcessList)
-            └─> Contexts
-                └─> Temporary Variables
-                └─> Stack Values
+Special Objects Array (5 roots)
+  ├─> nil, true, false (indices 0-2)
+  │    └─> Singletons (always reachable via bytecode pushes)
+  │
+  ├─> SystemDictionary (index 3 - "Smalltalk" global)
+  │    ├─> Association(#Object -> Object class)
+  │    │    └─> methodDict (MethodDictionary)
+  │    │         └─> Associations → CompiledMethod instances
+  │    │              └─> literals (method constants)
+  │    ├─> Association(#Symbol -> Symbol class)
+  │    │    └─> classPool (Dictionary at slot 7)
+  │    │         └─> Association(#USTable -> Symbol table Array[256])
+  │    │              └─> Symbol buckets → ALL Symbol instances
+  │    ├─> Association(#Character -> Character class)
+  │    │    └─> classPool
+  │    │         └─> Association(#CharacterTable -> Array[256])
+  │    │              └─> ALL Character instances (0-255)
+  │    ├─> ALL other classes, metaclasses, and globals
+  │    └─> Each class
+  │         ├─> methodDict → instance methods
+  │         ├─> class (metaclass)
+  │         │    └─> methodDict → class methods
+  │         └─> classPool → class variables
+  │
+  └─> ProcessorScheduler (index 4)
+       ├─> activeProcess (currently executing)
+       │    └─> suspendedContext → MethodContext/BlockContext
+       │         ├─> sender (context chain)
+       │         ├─> receiver
+       │         ├─> method (CompiledMethod)
+       │         └─> temporaries and stack
+       └─> quiescentProcessLists (Array[100])
+            └─> LinkedList chains of runnable/waiting Processes
+                 └─> Each process → suspendedContext chains
 ```
 
 ## Integration
@@ -332,11 +350,30 @@ System gcStats.
 ### Cold Start Statistics
 
 Perfect cold start shows:
-- **988 total objects** created during bootstrap
-- **988 reachable objects** from SOA
+- **Total objects** created during bootstrap
+- **All objects reachable** from SOA
 - **0 objects collected** (100% reachability)
 
 If any objects are collected after cold start, it indicates an initialization bug where objects aren't properly connected to the SOA roots.
+
+### Context Architecture
+
+**Important**: MethodContext and BlockContext are **PointerIndexed** format, not FixedPointer:
+
+- **6 fixed instance variables** (inherited from ContextPart):
+  - sender (index 0)
+  - instructionPointer (index 1)
+  - stackPointer (index 2)
+  - method (index 3)
+  - receiverMap (index 4)
+  - receiver (index 5)
+
+- **Indexed slots** hold the temporary frame and stack:
+  - Slot 0..numArgs-1: method arguments
+  - Slot numArgs..numArgs+numTemps-1: temporary variables
+  - Slot numArgs+numTemps..end: evaluation stack
+
+This matches the Blue Book specification: "Both kinds of context have six fixed fields corresponding to six named instance variables. These fixed fields are followed by some indexable fields."
 
 ## Validation
 

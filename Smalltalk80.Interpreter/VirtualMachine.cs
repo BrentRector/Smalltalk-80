@@ -15,10 +15,10 @@ public class VirtualMachine
 {
     private readonly ContextBasedInterpreterNew interpreter;
     private readonly ExecutionStatistics executionStatistics;
-    private readonly GarbageCollector garbageCollector;
+    private readonly GarbageCollectorNew garbageCollector;
     private readonly ILogger<VirtualMachine>? logger;
     private bool initialized = false;
-    
+
     /// <summary>
     /// Initializes a new instance of the VirtualMachine.
     /// </summary>
@@ -27,7 +27,10 @@ public class VirtualMachine
         this.logger = logger;
         interpreter = new ContextBasedInterpreterNew();
         executionStatistics = new ExecutionStatistics();
-        garbageCollector = new GarbageCollector(ObjectMemoryNew.ObjectTable);
+        garbageCollector = new GarbageCollectorNew(ObjectMemoryNew.ObjectTable);
+
+        // Wire up garbage collector to interpreter for primitive 133
+        interpreter.GarbageCollector = garbageCollector;
     }
     
     /// <summary>
@@ -42,7 +45,7 @@ public class VirtualMachine
     /// <summary>
     /// Gets the garbage collector.
     /// </summary>
-    public GarbageCollector GarbageCollector => garbageCollector;
+    public GarbageCollectorNew GarbageCollector => garbageCollector;
     
     /// <summary>
     /// Initializes the virtual machine with the full cold-start system.
@@ -283,7 +286,97 @@ public class VirtualMachine
         var leftVal = left.AsSmallInteger();
         return SObjectRef.FromSmallInteger(leftVal / rightVal);
     }
-    
+
+    /// <summary>
+    /// Executes a precompiled method on a class.
+    /// This creates an instance of the class and executes the specified selector.
+    /// </summary>
+    /// <param name="className">The name of the class (e.g., "TestClass")</param>
+    /// <param name="selector">The method selector to execute (e.g., "testAddition")</param>
+    /// <param name="args">Optional arguments to pass to the method</param>
+    /// <returns>The result of the method execution</returns>
+    public SObjectRef ExecutePrecompiledMethod(string className, string selector, params SObjectRef[] args)
+    {
+        if (!initialized)
+        {
+            throw new InvalidOperationException("VM not initialized");
+        }
+
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[EXECUTE] Executing {className}>>{selector}");
+        }
+
+        // Look up the class
+        var classRef = SystemDictionary.LookupClassRef(className);
+        if (!classRef.HasValue || classRef.Value.IsNil)
+        {
+            throw new InvalidOperationException($"Class not found: {className}");
+        }
+
+        // Look up the method
+        var methodRef = ObjectMemoryNew.LookupMethod(classRef.Value.AsObjectPointer(), selector);
+        if (methodRef.IsNil)
+        {
+            throw new InvalidOperationException($"Method not found: {className}>>{selector}");
+        }
+
+        // Create an instance of the class (or use the class itself for class methods)
+        var receiver = CreateReceiverFor(classRef.Value, className);
+
+        // Execute the method via the interpreter (tracing is automatically enabled based on DebugOptions)
+        var result = interpreter.Execute(methodRef, receiver, args ?? Array.Empty<SObjectRef>());
+
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[EXECUTE] Result: {FormatResult(result)}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Creates an appropriate receiver for method execution.
+    /// For TestClass, creates an instance. For other cases, may use the class itself.
+    /// </summary>
+    private SObjectRef CreateReceiverFor(SObjectRef classRef, string className)
+    {
+        // For test classes, create an instance
+        if (className == "TestClass")
+        {
+            var instVarCount = ObjectMemoryNew.GetClassTotalInstanceVariableCount(classRef.AsObjectPointer());
+            var instance = ObjectMemoryNew.CreateInstance(classRef.AsObjectPointer(), instVarCount);
+
+            // Initialize the "value" instance variable to 100 for testing
+            if (instVarCount > 0)
+            {
+                ObjectMemoryNew.SetInstanceVariable(instance.AsObjectPointer(), 0, SObjectRef.FromSmallInteger(100));
+            }
+
+            return instance;
+        }
+
+        // For other classes, use the class itself (for class methods)
+        return classRef;
+    }
+
+    /// <summary>
+    /// Formats a result for display.
+    /// </summary>
+    private string FormatResult(SObjectRef result)
+    {
+        if (result.IsNil)
+            return "nil";
+        if (result.IsSmallInteger)
+            return result.AsSmallInteger().ToString();
+        if (result == SystemDictionary.TrueObject)
+            return "true";
+        if (result == SystemDictionary.FalseObject)
+            return "false";
+
+        return result.ToString() ?? "object";
+    }
+
     /// <summary>
     /// Prints all classes in the system.
     /// </summary>
@@ -740,54 +833,56 @@ public class VirtualMachine
     
     /// <summary>
     /// Initializes the garbage collection system with the Special Objects Array.
+    /// Per Blue Book specification: Only 5 roots are needed for complete reachability.
+    /// The SOA is a C# array containing the 5 root SObjectRefs.
     /// </summary>
     private void InitializeGarbageCollection()
     {
-        // Initialize the Special Objects Array with all system roots
-        Memory.SpecialObjectsArray.Initialize();
+        // Create the Special Objects Array as a C# array with 5 fixed roots
+        var soa = new SObjectRef[Memory.SpecialObjectsArray.Count]; // 5 entries
 
-        // Build SOA using the new architecture's SObjectRefs
-        var soaOops = new List<nint>();
+        // Index 0: nil
+        soa[Memory.SpecialObjectsArray.NilIndex] = SystemDictionary.NilObject;
 
-        // Add the critical system objects as roots
-        // These are the minimal roots needed for a cold-started system
+        // Index 1: false
+        soa[Memory.SpecialObjectsArray.FalseIndex] = SystemDictionary.FalseObject;
 
-        // 1. SystemDictionary itself (contains all classes)
-        if (!SystemDictionary.Instance.IsNil)
-        {
-            soaOops.Add(SystemDictionary.Instance.AsObjectPointer());
-        }
+        // Index 2: true
+        soa[Memory.SpecialObjectsArray.TrueIndex] = SystemDictionary.TrueObject;
 
-        // 2. Core singleton objects
-        soaOops.Add(SystemDictionary.NilObject.AsObjectPointer());
-        soaOops.Add(SystemDictionary.TrueObject.AsObjectPointer());
-        soaOops.Add(SystemDictionary.FalseObject.AsObjectPointer());
+        // Index 3: SystemDictionary (Smalltalk global - contains ALL classes, symbols, globals)
+        if (SystemDictionary.Instance.IsNil)
+            throw new InvalidOperationException("SystemDictionary.Instance is nil during GC initialization");
+        soa[Memory.SpecialObjectsArray.SystemDictionaryIndex] = SystemDictionary.Instance;
 
-        // 3. Core classes (these should all be reachable via SystemDictionary,
-        // but we add them as direct roots for safety during transition)
-        if (!SystemDictionary.ObjectClassRef.IsNil)
-            soaOops.Add(SystemDictionary.ObjectClassRef.AsObjectPointer());
-        if (!SystemDictionary.BehaviorClassRef.IsNil)
-            soaOops.Add(SystemDictionary.BehaviorClassRef.AsObjectPointer());
-        if (!SystemDictionary.ClassClassRef.IsNil)
-            soaOops.Add(SystemDictionary.ClassClassRef.AsObjectPointer());
-        if (!SystemDictionary.MetaclassClassRef.IsNil)
-            soaOops.Add(SystemDictionary.MetaclassClassRef.AsObjectPointer());
+        // Index 4: ProcessorScheduler (contains ALL processes and execution contexts)
+        var processorSchedulerRef = ColdStart.ProcessSystemInitializer.GetProcessorScheduler();
+        if (processorSchedulerRef.IsNil)
+            throw new InvalidOperationException("ProcessorScheduler is nil during GC initialization");
+        soa[Memory.SpecialObjectsArray.ProcessorSchedulerIndex] = processorSchedulerRef;
 
-        // Give the GC the SOA as its only root (as OOPs)
-        garbageCollector.SetSpecialObjectsArray(soaOops);
+        // Give the GC the SOA C# array
+        garbageCollector.SetSpecialObjectsArray(soa);
 
         if (Program.RuntimeOptions.EnableColdStartLogging || Program.RuntimeOptions.EnableGCLogging)
         {
-            Console.WriteLine("[COLD START] Special Objects Array initialized with new architecture");
-            Console.WriteLine($"[COLD START] SOA contains {soaOops.Count} root objects");
+            Console.WriteLine("[COLD START] Special Objects Array initialized (Blue Book minimal spec)");
+            Console.WriteLine($"[COLD START] SOA contains {soa.Length} root objects");
 
             if (Program.RuntimeOptions.EnableGCLogging)
             {
-                Console.WriteLine("[COLD START] SOA roots:");
-                Console.WriteLine("  - SystemDictionary (Smalltalk global dictionary)");
-                Console.WriteLine("  - nil, true, false singleton objects");
-                Console.WriteLine("  - Core metaclasses (Object, Behavior, Class, Metaclass)");
+                Console.WriteLine("[COLD START] SOA roots (5-root minimal specification):");
+                Console.WriteLine("  [0] nil");
+                Console.WriteLine("  [1] false");
+                Console.WriteLine("  [2] true");
+                Console.WriteLine("  [3] SystemDictionary (ALL classes, methods, symbols, globals)");
+                Console.WriteLine("  [4] ProcessorScheduler (ALL processes and contexts)");
+                Console.WriteLine();
+                Console.WriteLine("[COLD START] Reachability verification:");
+                Console.WriteLine("  - Classes: via SystemDictionary");
+                Console.WriteLine("  - Methods: via Class -> methodDict");
+                Console.WriteLine("  - Symbols: via Symbol class -> classPool -> #USTable");
+                Console.WriteLine("  - Processes: via ProcessorScheduler -> process queues");
             }
         }
     }

@@ -1,5 +1,7 @@
 using System.CommandLine;
 using Smalltalk80.Interpreter.Config;
+using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Core.Objects;
 using Microsoft.Extensions.Logging;
 
 namespace Smalltalk80.Interpreter;
@@ -103,7 +105,11 @@ public static class Program
         var testOOPBugOption = new Option<bool>(
             "--test-oop-bug",
             description: "Test OOP bug");
-        
+
+        var testPrecompiledOption = new Option<bool>(
+            "--test-precompiled",
+            description: "Test execution of precompiled methods in TestClass");
+
         var validateBytecodeOption = new Option<bool>(
             "--validate-bytecode",
             description: "Validate bytecode execution through method contexts");
@@ -131,6 +137,7 @@ public static class Program
         rootCommand.AddGlobalOption(testCriticalMethodsOption);
         rootCommand.AddGlobalOption(testClassCreationOption);
         rootCommand.AddGlobalOption(testOOPBugOption);
+        rootCommand.AddGlobalOption(testPrecompiledOption);
         rootCommand.AddGlobalOption(validateBytecodeOption);
         rootCommand.AddGlobalOption(coldStartOption);
 
@@ -270,6 +277,10 @@ public static class Program
             {
                 RuntimeOptions.TestOOPBug = true;
             }
+            else if (token.Value == "--test-precompiled")
+            {
+                RuntimeOptions.TestPrecompiled = true;
+            }
             else if (token.Value == "--trace-methods")
             {
                 DebugOptions.EnableMethodTrace = true;
@@ -302,11 +313,18 @@ public static class Program
 
     private static async Task ExecuteRun(FileInfo? file, string? expression)
     {
-        
+
         try
         {
             var vm = new VirtualMachine();
             await vm.InitializeAsync();
+
+            // Handle test precompiled option
+            if (RuntimeOptions.TestPrecompiled)
+            {
+                RunPrecompiledTests(vm);
+                return;
+            }
 
             if (file != null)
             {
@@ -381,6 +399,243 @@ public static class Program
         }
     }
 
+    /// <summary>
+    /// Runs precompiled method tests on TestClass.
+    /// </summary>
+    private static void RunPrecompiledTests(VirtualMachine vm)
+    {
+        Console.WriteLine("\n" + "=".PadRight(70, '='));
+        Console.WriteLine("PRECOMPILED METHOD EXECUTION TESTS");
+        Console.WriteLine("=".PadRight(70, '=') + "\n");
+
+        int passed = 0;
+        int failed = 0;
+
+        // Test 1: testReturnConstant - should return 42
+        try
+        {
+            Console.WriteLine("[TEST 1] TestClass>>testReturnConstant");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testReturnConstant");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 42)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 42");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"  ✗ FAILED - Expected: 42, Got: {result}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 2: testAddition - should return 7 (3 + 4)
+        try
+        {
+            Console.WriteLine("[TEST 2] TestClass>>testAddition");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testAddition");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 7)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 7");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"  ✗ FAILED - Expected: 7, Got: {result}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine($"     {ex.StackTrace?.Split('\n')[0]}");
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 3: testGetValue - should return 100 (value instance variable)
+        try
+        {
+            Console.WriteLine("[TEST 3] TestClass>>testGetValue");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testGetValue");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 100)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 100");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"  ✗ FAILED - Expected: 100, Got: {result}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine($"     {ex.StackTrace?.Split('\n')[0]}");
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 4: testMultiplication - should return 42 (6 * 7)
+        try
+        {
+            Console.WriteLine("[TEST 4] TestClass>>testMultiplication");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testMultiplication");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 42)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 42");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"  ✗ FAILED - Expected: 42, Got: {result}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine($"     {ex.StackTrace?.Split('\n')[0]}");
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 5: testTemporary - temporary variable store/load
+        try
+        {
+            Console.WriteLine("[TEST 5] TestClass>>testTemporary");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testTemporary");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 99)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 99");
+                passed++;
+            }
+            else
+            {
+                Console.WriteLine($"  ✗ FAILED - Expected: 99, Got: {result}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine($"Stack trace:\n{ex.StackTrace}");
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 6: testNestedLevel3 - nested sends with GC at deepest level
+        try
+        {
+            Console.WriteLine("[TEST 6] TestClass>>testNestedLevel3 (4 nested calls with GC)");
+            var result = vm.ExecutePrecompiledMethod("TestClass", "testNestedLevel3");
+            if (result.IsSmallInteger && result.AsSmallInteger() == 88)
+            {
+                Console.WriteLine($"  ✓ PASSED - Result: 88 (GC triggered at deepest level)");
+                passed++;
+            }
+            else
+            {
+                var resultStr = result.IsSmallInteger ? result.AsSmallInteger().ToString() : $"OOP({result.AsObjectPointer()})";
+                Console.WriteLine($"  ✗ FAILED - Expected: 88, Got: {resultStr}");
+                failed++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ FAILED - Exception: {ex.Message}");
+            Console.WriteLine($"Stack trace:\n{ex.StackTrace}");
+            failed++;
+        }
+
+        Console.WriteLine();
+
+        // Test 7: Remove TestClass from SystemDictionary using Smalltalk removeKey:ifAbsent:
+        Console.WriteLine("[POST-TEST] Deregistering TestClass from SystemDictionary...");
+        try
+        {
+            // Before removal - verify TestClass exists
+            var testClassBefore = SystemDictionary.LookupGlobalRef("TestClass");
+            if (testClassBefore.HasValue && !testClassBefore.Value.IsNil)
+            {
+                Console.WriteLine($"  TestClass found before removal: OOP({testClassBefore.Value.AsObjectPointer()})");
+            }
+
+            // Remove TestClass from Smalltalk dictionary
+            SystemDictionary.UnregisterGlobalRef("TestClass");
+
+            // After removal - verify TestClass is gone
+            var testClassAfter = SystemDictionary.LookupGlobalRef("TestClass");
+            if (!testClassAfter.HasValue || testClassAfter.Value.IsNil)
+            {
+                Console.WriteLine("  ✓ TestClass successfully removed from SystemDictionary");
+            }
+            else
+            {
+                Console.WriteLine("  ✗ TestClass still exists after removal!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ✗ Failed to remove TestClass: {ex.Message}");
+        }
+
+        Console.WriteLine();
+
+        // Post-test GC validation
+        Console.WriteLine("[POST-TEST] Running final garbage collection...");
+        var beforeGC = ObjectMemoryNew.ObjectTable.Count;
+        var gcStats = vm.GarbageCollector.ForceCollection();
+        Console.WriteLine($"  Final GC: {gcStats.ObjectsCollected} objects collected");
+        Console.WriteLine($"  Objects before GC: {beforeGC}, after GC: {ObjectMemoryNew.ObjectTable.Count}");
+
+        // Dump all remaining classes
+        Console.WriteLine();
+        Console.WriteLine("[POST-TEST] Remaining classes in SystemDictionary:");
+        var remainingClasses = SystemDictionary.GetAllClassNames().OrderBy(n => n).ToList();
+        Console.WriteLine($"  Total classes: {remainingClasses.Count}");
+        foreach (var className in remainingClasses.Take(10))
+        {
+            Console.WriteLine($"    - {className}");
+        }
+        if (remainingClasses.Count > 10)
+        {
+            Console.WriteLine($"    ... and {remainingClasses.Count - 10} more");
+        }
+
+        // Verify TestClass is not in the list
+        if (remainingClasses.Contains("TestClass"))
+        {
+            Console.WriteLine("  ✗ WARNING: TestClass still in class list after removal!");
+        }
+        else
+        {
+            Console.WriteLine("  ✓ Confirmed: TestClass not in class list");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("=".PadRight(70, '='));
+        Console.WriteLine($"RESULTS: {passed} passed, {failed} failed");
+        Console.WriteLine("=".PadRight(70, '='));
+
+        if (failed > 0)
+        {
+            Environment.ExitCode = 1;
+        }
+    }
+
     private static async Task CompileSource(FileInfo file, FileInfo? output)
     {
         
@@ -433,12 +688,19 @@ public static class Program
 
     private static async Task ExecuteEval(string expression)
     {
-        
+
         try
         {
             var vm = new VirtualMachine();
             await vm.InitializeAsync();
-            
+
+            // Handle test precompiled option
+            if (RuntimeOptions.TestPrecompiled)
+            {
+                RunPrecompiledTests(vm);
+                return;
+            }
+
             var result = vm.Evaluate(expression);
             Console.WriteLine($"Result: {result}");
         }

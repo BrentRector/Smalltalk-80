@@ -142,7 +142,8 @@ public static partial class ObjectMemoryNew
     public static void ContextPush(nint contextOop, SObjectRef value)
     {
         var sp = GetContextStackPointer(contextOop);
-        SetInstanceVariable(contextOop, sp, value);
+        // Stack is in indexed slots: sp - 6 = indexed slot index
+        SetIndexedPointer(contextOop, sp - 6, value);
         SetContextStackPointer(contextOop, sp + 1);
     }
 
@@ -157,7 +158,8 @@ public static partial class ObjectMemoryNew
 
         sp--;
         SetContextStackPointer(contextOop, sp);
-        return GetInstanceVariable(contextOop, sp);
+        // Stack is in indexed slots: sp - 6 = indexed slot index
+        return GetIndexedPointer(contextOop, sp - 6);
     }
 
     /// <summary>
@@ -169,23 +171,26 @@ public static partial class ObjectMemoryNew
         if (sp <= 6) // Stack starts after fixed fields (sender, ip, sp, method, receiverMap, receiver)
             throw new InvalidOperationException("Stack is empty");
 
-        return GetInstanceVariable(contextOop, sp - 1);
+        // Stack is in indexed slots: (sp - 1) - 6 = indexed slot index
+        return GetIndexedPointer(contextOop, sp - 1 - 6);
     }
 
     /// <summary>
     /// Gets a temporary variable from a context.
+    /// Temps are stored in indexed slots (temp 0 = indexed slot 0).
     /// </summary>
     public static SObjectRef GetContextTemporary(nint contextOop, int index)
     {
-        return GetInstanceVariable(contextOop, ContextLayout.TemporaryBaseOffset + index);
+        return GetIndexedPointer(contextOop, index);
     }
 
     /// <summary>
     /// Sets a temporary variable in a context.
+    /// Temps are stored in indexed slots (temp 0 = indexed slot 0).
     /// </summary>
     public static void SetContextTemporary(nint contextOop, int index, SObjectRef value)
     {
-        SetInstanceVariable(contextOop, ContextLayout.TemporaryBaseOffset + index, value);
+        SetIndexedPointer(contextOop, index, value);
     }
 
     #endregion

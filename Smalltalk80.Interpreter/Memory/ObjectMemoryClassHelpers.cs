@@ -65,6 +65,9 @@ public static partial class ObjectMemoryNew
         if (nameRef.IsNil)
             return "Unknown";
 
+        if (!nameRef.IsHeapObject)
+            return $"Invalid({nameRef})";
+
         // Assuming the name is stored as a Symbol
         return SymbolToString(nameRef);
     }
@@ -109,19 +112,27 @@ public static partial class ObjectMemoryNew
         if (instSpec.IsSmallInteger)
         {
             var spec = instSpec.AsSmallInteger();
-            // Decode instance specification (simplified - full implementation would decode properly)
+            // Decode instance specification to match CreateClassObject encoding
+            // Bits 0-5: instance variable count
+            // Bit 6 (0x40): indexable flag
+            // Bit 7 (0x80): byte-indexed flag
             instVarCount = spec & 0x3F; // Lower 6 bits for instance variable count
-            var formatCode = (spec >> 7) & 0x0F; // Bits 7-10 for format
 
-            format = formatCode switch
+            bool isIndexable = (spec & 0x40) != 0;   // Bit 6
+            bool isByteIndexed = (spec & 0x80) != 0; // Bit 7
+
+            if (!isIndexable)
             {
-                0 => ObjectFormat.FixedPointer,
-                1 => ObjectFormat.PointerIndexed,
-                2 => ObjectFormat.ByteIndexed,
-                3 => ObjectFormat.WordIndexed,
-                4 => ObjectFormat.CompiledMethod,
-                _ => ObjectFormat.FixedPointer
-            };
+                format = ObjectFormat.FixedPointer;
+            }
+            else if (isByteIndexed)
+            {
+                format = ObjectFormat.ByteIndexed;
+            }
+            else
+            {
+                format = ObjectFormat.PointerIndexed;
+            }
         }
 
         var oop = AllocateObject(
@@ -177,7 +188,7 @@ public static partial class ObjectMemoryNew
             // Get selector from MethodDictionary's indexed slots (the keys)
             var selectorRef = GetIndexedPointer(dictOop, i);
 
-            if (!selectorRef.IsNil)
+            if (!selectorRef.IsNil && selectorRef.IsHeapObject)
             {
                 var selectorString = SymbolToString(selectorRef);
                 if (selectorString == selector)
@@ -234,13 +245,16 @@ public static partial class ObjectMemoryNew
                 return;
             }
 
-            // Check if this slot has the same selector
-            var selectorString = SymbolToString(selectorRef);
-            if (selectorString == selector)
+            // Check if this slot has the same selector (and is a heap object)
+            if (selectorRef.IsHeapObject)
             {
-                // Update existing method in parallel valueArray
-                SetIndexedPointer(valueArrayOop, i, methodRef);
-                return;
+                var selectorString = SymbolToString(selectorRef);
+                if (selectorString == selector)
+                {
+                    // Update existing method in parallel valueArray
+                    SetIndexedPointer(valueArrayOop, i, methodRef);
+                    return;
+                }
             }
         }
 
@@ -419,15 +433,34 @@ public static partial class ObjectMemoryNew
         }
 
         // Create and set header
+        // Header format: bits 0-2: arg count, bits 3-7: temp count, bits 8-14: literal count, bit 15: flag bit
         ushort header = 0;
-        header |= (ushort)((numTemps & 0x1F) << 3);
-        header |= (ushort)((literals.Length & 0x7F) << 8);
+        header |= (ushort)(numArgs & 0x07);                    // Bits 0-2: arg count
+        header |= (ushort)((numTemps & 0x1F) << 3);           // Bits 3-7: temp count
+        header |= (ushort)((literals.Length & 0x7F) << 8);    // Bits 8-14: literal count
 
-        // Set header as first two bytes, followed by bytecodes
-        var fullData = new byte[bytecodes.Length + 2];
+        if (primitiveIndex > 0)
+        {
+            header |= 0x8000; // Set bit 15 to indicate primitive/extended header
+        }
+
+        // Set header as first two bytes
+        var headerSize = primitiveIndex > 0 ? 4 : 2; // Extended header has 4 bytes (header + primitive index)
+        var fullData = new byte[bytecodes.Length + headerSize];
         fullData[0] = (byte)(header & 0xFF);
         fullData[1] = (byte)((header >> 8) & 0xFF);
-        Array.Copy(bytecodes, 0, fullData, 2, bytecodes.Length);
+
+        if (primitiveIndex > 0)
+        {
+            // Extended header: bytes 2-3 contain primitive index
+            fullData[2] = (byte)(primitiveIndex & 0xFF);
+            fullData[3] = (byte)((primitiveIndex >> 8) & 0xFF);
+            Array.Copy(bytecodes, 0, fullData, 4, bytecodes.Length);
+        }
+        else
+        {
+            Array.Copy(bytecodes, 0, fullData, 2, bytecodes.Length);
+        }
 
         // Set the bytecode data
         SetByteIndexedData(methodOop, fullData);

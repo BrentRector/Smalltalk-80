@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Config;
+using Smalltalk80.Interpreter.Primitives;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -22,6 +23,9 @@ public sealed class ContextBasedInterpreterNew
     private readonly ILogger<ContextBasedInterpreterNew>? logger;
     private bool tracingEnabled = false;
     private int traceIndentLevel = 0;
+    private GarbageCollectorNew? garbageCollector;
+    private readonly PrimitiveTable primitiveTable;
+    private readonly InterpreterPrimitiveContext primitiveContext;
 
     // Cached references for performance
     private static SObjectRef? cachedTrueRef;
@@ -34,11 +38,21 @@ public sealed class ContextBasedInterpreterNew
 
     /// <summary>
     /// Enables or disables execution tracing.
+    /// Checks DebugOptions if not explicitly set.
     /// </summary>
     public bool TracingEnabled
     {
-        get => tracingEnabled;
+        get => tracingEnabled || DebugOptions.EnableMethodTrace || DebugOptions.EnableBytecodeTrace;
         set => tracingEnabled = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the garbage collector for primitive 133.
+    /// </summary>
+    public GarbageCollectorNew? GarbageCollector
+    {
+        get => garbageCollector;
+        set => garbageCollector = value;
     }
 
     /// <summary>
@@ -47,6 +61,11 @@ public sealed class ContextBasedInterpreterNew
     public ContextBasedInterpreterNew(ILogger<ContextBasedInterpreterNew>? logger = null)
     {
         this.logger = logger;
+        this.primitiveTable = new PrimitiveTable();
+        this.primitiveContext = new InterpreterPrimitiveContext(this);
+
+        // Register all primitives
+        PrimitiveRegistry.RegisterAll(primitiveTable);
     }
 
     /// <summary>
@@ -65,13 +84,13 @@ public sealed class ContextBasedInterpreterNew
         if (argumentRefs == null)
             throw new ArgumentNullException(nameof(argumentRefs));
 
-        if (tracingEnabled)
+        if (TracingEnabled)
         {
             var indent = new string(' ', traceIndentLevel * 2);
             var selector = ObjectMemoryNew.GetCompiledMethodSelector(methodRef.AsObjectPointer());
             Console.WriteLine($"{indent}==> EXECUTE SELECTOR: {selector}");
-            Console.WriteLine($"{indent}    Receiver: {receiverRef}");
-            Console.WriteLine($"{indent}    Arguments: [{string.Join(", ", argumentRefs.Select(a => a.ToString()))}]");
+            Console.WriteLine($"{indent}    Receiver: {FormatRef(receiverRef)}");
+            Console.WriteLine($"{indent}    Arguments: [{string.Join(", ", argumentRefs.Select(FormatRef))}]");
 
             var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
             Console.WriteLine($"{indent}    Bytecodes: {bytecodes.Length} bytes");
@@ -82,10 +101,10 @@ public sealed class ContextBasedInterpreterNew
         // Create a new method context
         var newContext = CreateMethodContext(methodRef, receiverRef, argumentRefs);
 
-        if (tracingEnabled)
+        if (TracingEnabled)
         {
             var indent = new string(' ', traceIndentLevel * 2);
-            Console.WriteLine($"{indent}Created MethodContext: {newContext}");
+            Console.WriteLine($"{indent}Created MethodContext: {FormatRef(newContext)}");
         }
 
         // Set the sender if we have an active context
@@ -98,6 +117,9 @@ public sealed class ContextBasedInterpreterNew
         var previousContext = activeContext;
         activeContext = newContext;
 
+        // Link to process for GC reachability
+        UpdateProcessSuspendedContext(newContext);
+
         try
         {
             // Check for primitive
@@ -106,7 +128,7 @@ public sealed class ContextBasedInterpreterNew
 
             if (primitiveIndex > 0)
             {
-                if (tracingEnabled)
+                if (TracingEnabled)
                 {
                     var indent = new string(' ', traceIndentLevel * 2);
                     Console.WriteLine($"{indent}Attempting primitive #{primitiveIndex}...");
@@ -117,16 +139,16 @@ public sealed class ContextBasedInterpreterNew
                 if (!primitiveResult.IsNil)
                 {
                     // Primitive succeeded
-                    if (tracingEnabled)
+                    if (TracingEnabled)
                     {
                         var indent = new string(' ', traceIndentLevel * 2);
-                        Console.WriteLine($"{indent}Primitive succeeded, returning: {primitiveResult}");
+                        Console.WriteLine($"{indent}Primitive succeeded, returning: {FormatRef(primitiveResult)}");
                         traceIndentLevel--;
                     }
                     return primitiveResult;
                 }
                 // Primitive failed, continue with bytecode execution
-                if (tracingEnabled)
+                if (TracingEnabled)
                 {
                     var indent = new string(' ', traceIndentLevel * 2);
                     Console.WriteLine($"{indent}Primitive failed, executing bytecode...");
@@ -134,7 +156,7 @@ public sealed class ContextBasedInterpreterNew
             }
 
             // Execute bytecodes
-            if (tracingEnabled)
+            if (TracingEnabled)
             {
                 var indent = new string(' ', traceIndentLevel * 2);
                 Console.WriteLine($"{indent}Executing bytecodes...");
@@ -142,12 +164,12 @@ public sealed class ContextBasedInterpreterNew
 
             var result = ExecuteBytecodes();
 
-            if (tracingEnabled)
+            if (TracingEnabled)
             {
                 traceIndentLevel--;
                 var indent = new string(' ', traceIndentLevel * 2);
                 var selector = ObjectMemoryNew.GetCompiledMethodSelector(methodRef.AsObjectPointer());
-                Console.WriteLine($"{indent}<== RETURN from {selector}: {result}");
+                Console.WriteLine($"{indent}<== RETURN from {selector}: {FormatRef(result)}");
             }
 
             return result;
@@ -169,21 +191,22 @@ public sealed class ContextBasedInterpreterNew
         var numTemps = ObjectMemoryNew.GetCompiledMethodTemporaryCount(methodOop);
         var numArgs = ObjectMemoryNew.GetCompiledMethodArgumentCount(methodOop);
 
-        // Calculate context size: 5 fixed fields + args + temps + stack
+        // Calculate indexed size: args + temps + stack
+        // MethodContext has 6 instance variables (fixed fields), indexed slots hold temp frame + stack
         var stackSize = 16; // Default stack size
-        var contextSize = 5 + numArgs + numTemps + stackSize;
+        var indexedSize = numArgs + numTemps + stackSize;
 
-        // Create the context object
+        // Create the context object (PointerIndexed format)
         var contextRef = ObjectMemoryNew.CreateInstance(
             SystemDictionary.MethodContextClassRef.AsObjectPointer(),
-            contextSize);
+            indexedSize);
 
         var contextOop = contextRef.AsObjectPointer();
 
-        // Initialize fixed fields
+        // Initialize fixed instance variables (indices 0-5)
         ObjectMemoryNew.SetContextSender(contextOop, SObjectRef.Nil);
         ObjectMemoryNew.SetContextInstructionPointer(contextOop, 0);
-        ObjectMemoryNew.SetContextStackPointer(contextOop, 5 + numArgs + numTemps); // Stack starts after fixed fields and temps
+        ObjectMemoryNew.SetContextStackPointer(contextOop, 6 + numArgs + numTemps); // Stack starts after instance vars + temp frame
         ObjectMemoryNew.SetContextMethod(contextOop, methodRef);
         ObjectMemoryNew.SetContextReceiver(contextOop, receiverRef);
 
@@ -232,7 +255,7 @@ public sealed class ContextBasedInterpreterNew
 
             if (DebugOptions.EnableBytecodeTrace || tracingEnabled)
             {
-                if (tracingEnabled)
+                if (TracingEnabled)
                 {
                     var indent = new string(' ', (traceIndentLevel + 1) * 2);
                     Console.WriteLine($"{indent}[PC={ip:D3}] Bytecode: 0x{bytecode:X2} ({GetBytecodeName(bytecode)})");
@@ -250,10 +273,10 @@ public sealed class ContextBasedInterpreterNew
             {
                 // Method or block returned
                 var returnValue = ObjectMemoryNew.ContextPop(contextOop);
-                if (tracingEnabled)
+                if (TracingEnabled)
                 {
                     var indent = new string(' ', (traceIndentLevel + 1) * 2);
-                    Console.WriteLine($"{indent}Returning: {returnValue}");
+                    Console.WriteLine($"{indent}Returning: {FormatRef(returnValue)}");
                 }
                 return returnValue;
             }
@@ -441,6 +464,22 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0xC0 && bytecode <= 0xCF)
         {
             ExecuteSendSpecial(bytecode, contextOop);
+            return false;
+        }
+
+        // Send literal selector with 0 args (0xD0-0xDF)
+        if (bytecode >= 0xD0 && bytecode <= 0xDF)
+        {
+            var selectorIndex = bytecode & 0x0F;
+            var selectorRef = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, selectorIndex);
+            var selector = ObjectMemoryNew.SymbolToString(selectorRef);
+
+            // Pop receiver
+            var receiver = ObjectMemoryNew.ContextPop(contextOop);
+
+            // Perform message send with 0 arguments
+            var result = SendMessage(receiver, selector, Array.Empty<SObjectRef>());
+            ObjectMemoryNew.ContextPush(contextOop, result);
             return false;
         }
 
@@ -640,85 +679,131 @@ public sealed class ContextBasedInterpreterNew
     }
 
     /// <summary>
-    /// Executes a primitive.
+    /// Executes a primitive using the primitive table.
     /// </summary>
     private SObjectRef ExecutePrimitive(int primitiveIndex, SObjectRef receiver, SObjectRef[] arguments)
     {
-        // Simplified primitive implementation
-        // Full implementation would handle all Blue Book primitives
-
-        switch (primitiveIndex)
+        // Special handling for primitive 133 (forceGC) - requires GarbageCollector access
+        if (primitiveIndex == 133)
         {
-            case 1: // Integer addition
-                if (receiver.IsSmallInteger && arguments.Length > 0 && arguments[0].IsSmallInteger)
-                {
-                    try
-                    {
-                        return SObjectRef.FromSmallInteger(
-                            receiver.AsSmallInteger() + arguments[0].AsSmallInteger());
-                    }
-                    catch { }
-                }
-                break;
+            if (arguments.Length != 0)
+                return SObjectRef.Nil; // Failure
 
-            case 2: // Integer subtraction
-                if (receiver.IsSmallInteger && arguments.Length > 0 && arguments[0].IsSmallInteger)
-                {
-                    try
-                    {
-                        return SObjectRef.FromSmallInteger(
-                            receiver.AsSmallInteger() - arguments[0].AsSmallInteger());
-                    }
-                    catch { }
-                }
-                break;
+            if (TracingEnabled)
+            {
+                var indent = new string(' ', (traceIndentLevel + 2) * 2);
+                Console.WriteLine($"{indent}[GC] Forcing garbage collection...");
+            }
 
-            case 60: // Array at:
-                if (receiver.IsHeapObject && arguments.Length > 0 && arguments[0].IsSmallInteger)
-                {
-                    var index = arguments[0].AsSmallInteger();
-                    if (index > 0) // Smalltalk uses 1-based indexing
-                    {
-                        try
-                        {
-                            return ObjectMemoryNew.GetIndexedPointer(receiver.AsObjectPointer(), index - 1);
-                        }
-                        catch { }
-                    }
-                }
-                break;
+            // Trigger GC and report results
+            if (garbageCollector != null)
+            {
+                var stats = garbageCollector.ForceCollection();
 
-            case 61: // Array at:put:
-                if (receiver.IsHeapObject && arguments.Length >= 2 && arguments[0].IsSmallInteger)
+                if (TracingEnabled)
                 {
-                    var index = arguments[0].AsSmallInteger();
-                    if (index > 0) // Smalltalk uses 1-based indexing
-                    {
-                        try
-                        {
-                            ObjectMemoryNew.SetIndexedPointer(receiver.AsObjectPointer(), index - 1, arguments[1]);
-                            return arguments[1]; // Return the value that was stored
-                        }
-                        catch { }
-                    }
+                    var indent = new string(' ', (traceIndentLevel + 2) * 2);
+                    var remaining = ObjectMemoryNew.ObjectTable.Count;
+                    Console.WriteLine($"{indent}[GC] Collected {stats.ObjectsCollected} objects, {remaining} remain");
                 }
-                break;
+            }
 
-            case 62: // Array size
-                if (receiver.IsHeapObject)
-                {
-                    try
-                    {
-                        var size = ObjectMemoryNew.GetIndexedSize(receiver.AsObjectPointer());
-                        return SObjectRef.FromSmallInteger(size);
-                    }
-                    catch { }
-                }
-                break;
+            // Return receiver to indicate success
+            return receiver;
         }
 
-        // Primitive failed
+        // Use the primitive table to execute other primitives
+        var result = primitiveTable.Execute(primitiveIndex, receiver, arguments, primitiveContext);
+
+        if (result.Success)
+        {
+            return result.Value;
+        }
+
+        // Primitive failed - return nil to signal failure
+        // This will cause the method's bytecodes to execute
         return SObjectRef.Nil;
+    }
+
+    /// <summary>
+    /// Sends a message to a receiver by looking up the method and executing it.
+    /// </summary>
+    private SObjectRef SendMessage(SObjectRef receiverRef, string selector, SObjectRef[] args)
+    {
+        if (TracingEnabled)
+        {
+            var indent = new string(' ', (traceIndentLevel + 2) * 2);
+            Console.WriteLine($"{indent}[SEND] {selector} to {FormatRef(receiverRef)}");
+        }
+
+        // Look up receiver's class
+        nint classOop;
+        if (receiverRef.IsSmallInteger)
+        {
+            classOop = SystemDictionary.SmallIntegerClassRef.AsObjectPointer();
+        }
+        else if (receiverRef.IsNil)
+        {
+            classOop = SystemDictionary.UndefinedObjectClassRef.AsObjectPointer();
+        }
+        else if (receiverRef.IsHeapObject)
+        {
+            var receiverClass = ObjectMemoryNew.GetClass(receiverRef.AsObjectPointer());
+            classOop = receiverClass.AsObjectPointer();
+        }
+        else
+        {
+            throw new InvalidOperationException($"Cannot send message to {receiverRef}");
+        }
+
+        // Look up method
+        var methodRef = ObjectMemoryNew.LookupMethod(classOop, selector);
+        if (methodRef.IsNil)
+        {
+            throw new InvalidOperationException($"Method not found: {selector}");
+        }
+
+        // Check for primitive (bit 15 of header indicates extended header with primitive)
+        var methodOop = methodRef.AsObjectPointer();
+        var header = ObjectMemoryNew.GetCompiledMethodHeader(methodOop);
+        var hasPrimitive = (header & 0x8000) != 0; // Bit 15 set means extended header
+
+        if (hasPrimitive)
+        {
+            // Extended header: primitive index is in bytes 2-3 of the bytecode data
+            var bytecodeData = ObjectMemoryNew.GetByteIndexedData(methodOop);
+            if (bytecodeData.Length >= 4)
+            {
+                // Bytes 0-1: header, Bytes 2-3: primitive index, Bytes 4+: bytecodes
+                var primitiveIndex = bytecodeData[2] | (bytecodeData[3] << 8);
+
+                if (TracingEnabled)
+                {
+                    var indent = new string(' ', (traceIndentLevel + 2) * 2);
+                    Console.WriteLine($"{indent}[PRIMITIVE] Trying primitive #{primitiveIndex}");
+                }
+
+                var primitiveResult = ExecutePrimitive(primitiveIndex, receiverRef, args);
+                if (!primitiveResult.IsNil)
+                {
+                    if (TracingEnabled)
+                    {
+                        var indent = new string(' ', (traceIndentLevel + 2) * 2);
+                        Console.WriteLine($"{indent}[PRIMITIVE] Succeeded, returning {FormatRef(primitiveResult)}");
+                    }
+                    return primitiveResult;
+                }
+
+                if (TracingEnabled)
+                {
+                    var indent = new string(' ', (traceIndentLevel + 2) * 2);
+                    Console.WriteLine($"{indent}[PRIMITIVE] Failed, executing bytecodes");
+                }
+            }
+        }
+
+        // Execute method in new context
+        return Execute(methodRef, receiverRef, args);
     }
 
     /// <summary>
@@ -808,6 +893,42 @@ public sealed class ContextBasedInterpreterNew
     }
 
     /// <summary>
+    /// Updates the active process's suspendedContext to ensure GC reachability.
+    /// This links the executing context chain to the process system roots.
+    /// Reachability path: SOA → Processor (global) → activeProcess → suspendedContext → context chain
+    /// </summary>
+    private void UpdateProcessSuspendedContext(SObjectRef contextRef)
+    {
+        // Get ProcessorScheduler from global "Processor"
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil || !schedulerRef.Value.IsHeapObject)
+        {
+            if (TracingEnabled)
+                Console.WriteLine("    [WARNING] ProcessorScheduler not found!");
+            return;
+        }
+
+        // Get activeProcess from ProcessorScheduler (instance var 1)
+        var activeProcessRef = ObjectMemoryNew.GetInstanceVariable(schedulerRef.Value.AsObjectPointer(), 1);
+        if (activeProcessRef.IsNil || !activeProcessRef.IsHeapObject)
+        {
+            if (TracingEnabled)
+                Console.WriteLine("    [WARNING] activeProcess not found!");
+            return;
+        }
+
+        // Update Process.suspendedContext (instance var 1) to link to current context
+        // This ensures the entire context chain (via sender field) remains reachable
+        ObjectMemoryNew.SetInstanceVariable(activeProcessRef.AsObjectPointer(), 1, contextRef);
+
+        if (TracingEnabled && DebugOptions.EnableBytecodeTrace)
+        {
+            var indent = new string(' ', traceIndentLevel * 2);
+            Console.WriteLine($"{indent}[PROCESS] Linked {FormatRef(contextRef)} to Process.suspendedContext");
+        }
+    }
+
+    /// <summary>
     /// Gets the cached reference to the false object.
     /// </summary>
     private static SObjectRef GetFalseRef()
@@ -829,5 +950,19 @@ public sealed class ContextBasedInterpreterNew
             }
         }
         return cachedFalseRef.Value;
+    }
+
+    /// <summary>
+    /// Formats an SObjectRef for display without calling ToString (which requires GetObject).
+    /// </summary>
+    private static string FormatRef(SObjectRef objRef)
+    {
+        if (objRef.IsNil)
+            return "nil";
+        if (objRef.IsSmallInteger)
+            return objRef.AsSmallInteger().ToString();
+        if (objRef.IsHeapObject)
+            return $"OOP({objRef.AsObjectPointer()})";
+        return "Unknown";
     }
 }

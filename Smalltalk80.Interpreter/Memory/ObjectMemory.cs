@@ -202,7 +202,7 @@ public static partial class ObjectMemoryNew
             var callerInfo = $"{callerMethod?.DeclaringType?.Name}.{callerMethod?.Name}";
 
             throw new InvalidOperationException(
-                $"DETAILED ERROR: SetInstanceVariable failed - oop={oop}, index={index}, instVarCount={data.InstanceVariables.Length}, format={data.Format}, classRef={data.ClassRef}, caller={callerInfo}\nStack trace:\n{stackTrace}");
+                $"DETAILED ERROR: SetInstanceVariable failed - oop={oop}, index={index}, instVarCount={data.InstanceVariables.Length}, format={data.Format}, caller={callerInfo}\nStack trace:\n{stackTrace}");
         }
 
         data.InstanceVariables[index] = value;
@@ -630,15 +630,25 @@ public static partial class ObjectMemoryNew
         if (data.Format != ObjectFormat.CompiledMethod)
             throw new InvalidOperationException("Object is not a CompiledMethod");
 
-        // For CompiledMethods, indexed data contains header (2 bytes) + bytecodes
+        // For CompiledMethods, indexed data contains:
+        // - 2 bytes: header
+        // - 2 bytes: primitive index (if bit 15 of header is set)
+        // - N bytes: bytecodes
         var fullData = (byte[])data.IndexedData!;
 
-        // Skip the first 2 bytes (header) and return only the bytecodes
-        if (fullData.Length <= 2)
+        if (fullData.Length < 2)
             return Array.Empty<byte>();
 
-        var bytecodes = new byte[fullData.Length - 2];
-        Array.Copy(fullData, 2, bytecodes, 0, bytecodes.Length);
+        // Check if extended header (bit 15 set)
+        var header = (ushort)(fullData[0] | (fullData[1] << 8));
+        var hasPrimitive = (header & 0x8000) != 0;
+        var headerSize = hasPrimitive ? 4 : 2;
+
+        if (fullData.Length <= headerSize)
+            return Array.Empty<byte>();
+
+        var bytecodes = new byte[fullData.Length - headerSize];
+        Array.Copy(fullData, headerSize, bytecodes, 0, bytecodes.Length);
         return bytecodes;
     }
 
@@ -681,7 +691,7 @@ public static partial class ObjectMemoryNew
     {
         objectTable.Clear();
         nextOop = 0x1000;
-        symbolTable.Clear();
+        bootstrapSymbolTable.Clear();
         methodCache.Clear();
     }
 
@@ -690,24 +700,48 @@ public static partial class ObjectMemoryNew
     #region Symbol Table
 
     /// <summary>
-    /// Symbol interning table - maps string to Symbol OOP.
-    /// Symbols are unique byte-indexed objects containing UTF-8 bytes.
+    /// BOOTSTRAP-ONLY temporary symbol table used before USTable is created.
+    /// Once USTable exists in Symbol class classPool, this is no longer used.
+    /// All symbols created during bootstrap are migrated to USTable.
     /// </summary>
-    private static readonly Dictionary<string, nint> symbolTable = new();
+    private static readonly Dictionary<string, nint> bootstrapSymbolTable = new();
 
     /// <summary>
     /// Interns a string as a Symbol, returning an existing Symbol if one exists
     /// for the string, or creating a new one if not.
+    ///
+    /// ARCHITECTURE: Symbols are stored in USTable (Symbol class -> classPool -> #USTable).
+    /// During bootstrap (before USTable exists), we temporarily use bootstrapSymbolTable.
     /// </summary>
     /// <param name="str">The string to intern as a Symbol.</param>
     /// <returns>An SObjectRef to the Symbol object.</returns>
     public static SObjectRef InternSymbol(string str)
     {
-        if (symbolTable.TryGetValue(str, out var oop))
+        // Try to get USTable from Symbol class classPool
+        var usTableRef = ColdStart.SymbolTableBuilder.GetUSTable();
+
+        if (usTableRef.HasValue && !usTableRef.Value.IsNil)
+        {
+            // USTable exists - use heap-based symbol table
+            return InternSymbolInUSTable(str, usTableRef.Value);
+        }
+        else
+        {
+            // USTable doesn't exist yet (early bootstrap) - use temporary C# table
+            return InternSymbolBootstrap(str);
+        }
+    }
+
+    /// <summary>
+    /// Bootstrap-only symbol interning using C# dictionary.
+    /// Used only during early cold start before USTable is created.
+    /// </summary>
+    private static SObjectRef InternSymbolBootstrap(string str)
+    {
+        if (bootstrapSymbolTable.TryGetValue(str, out var oop))
             return SObjectRef.FromObjectPointer(oop);
 
         // Create new symbol
-        // Symbols are byte-indexed objects containing UTF-8 bytes
         var bytes = System.Text.Encoding.UTF8.GetBytes(str);
         var symbolOop = AllocateObject(
             GetSymbolClass(),
@@ -715,11 +749,150 @@ public static partial class ObjectMemoryNew
             0,
             bytes.Length);
 
-        // Set the bytes
         SetByteIndexedData(symbolOop, bytes);
-
-        symbolTable[str] = symbolOop;
+        bootstrapSymbolTable[str] = symbolOop;
         return SObjectRef.FromObjectPointer(symbolOop);
+    }
+
+    /// <summary>
+    /// Interns a symbol using the heap-based USTable.
+    /// This is the correct Smalltalk-80 implementation.
+    /// </summary>
+    private static SObjectRef InternSymbolInUSTable(string str, SObjectRef usTable)
+    {
+        // Hash the string to find bucket
+        int hash = str.GetHashCode();
+        int bucketCount = GetIndexedSize(usTable.AsObjectPointer());
+        int bucketIndex = (hash & 0x7FFFFFFF) % bucketCount;
+
+        // Get the bucket (Array of Symbol instances)
+        var bucket = usTable.GetIndexedPointer(bucketIndex);
+
+        if (!bucket.IsNil)
+        {
+            // Search bucket for existing symbol
+            int bucketSize = GetIndexedSize(bucket.AsObjectPointer());
+            for (int i = 0; i < bucketSize; i++)
+            {
+                var symbolRef = bucket.GetIndexedPointer(i);
+                if (!symbolRef.IsNil)
+                {
+                    // Compare symbol string value
+                    var symbolStr = SymbolToString(symbolRef);
+                    if (symbolStr == str)
+                    {
+                        return symbolRef; // Found existing symbol
+                    }
+                }
+            }
+        }
+
+        // Symbol not found - create new one and add to bucket
+        var bytes = System.Text.Encoding.UTF8.GetBytes(str);
+        var newSymbolOop = AllocateObject(
+            GetSymbolClass(),
+            ObjectFormat.ByteIndexed,
+            0,
+            bytes.Length);
+        SetByteIndexedData(newSymbolOop, bytes);
+        var newSymbol = SObjectRef.FromObjectPointer(newSymbolOop);
+
+        // Add to bucket (grow bucket array if needed)
+        var arrayClassRef = SystemDictionary.ArrayClassRef;
+        if (bucket.IsNil)
+        {
+            // Create new bucket with single symbol
+            var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, 1);
+            var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
+            newBucket.SetIndexedPointer(0, newSymbol);
+            usTable.SetIndexedPointer(bucketIndex, newBucket);
+        }
+        else
+        {
+            // Grow existing bucket
+            int oldSize = GetIndexedSize(bucket.AsObjectPointer());
+            var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, oldSize + 1);
+            var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
+
+            // Copy old symbols
+            for (int i = 0; i < oldSize; i++)
+            {
+                newBucket.SetIndexedPointer(i, bucket.GetIndexedPointer(i));
+            }
+
+            // Add new symbol
+            newBucket.SetIndexedPointer(oldSize, newSymbol);
+            usTable.SetIndexedPointer(bucketIndex, newBucket);
+        }
+
+        return newSymbol;
+    }
+
+    /// <summary>
+    /// Migrates all bootstrap symbols to USTable.
+    /// Called after USTable is created during cold start.
+    /// IMPORTANT: Adds the EXISTING bootstrap symbol objects to USTable, not new copies.
+    /// </summary>
+    public static void MigrateBootstrapSymbolsToUSTable()
+    {
+        var usTableRef = ColdStart.SymbolTableBuilder.GetUSTable();
+        if (!usTableRef.HasValue || usTableRef.Value.IsNil)
+        {
+            throw new InvalidOperationException("USTable must exist before migrating bootstrap symbols");
+        }
+
+        var usTable = usTableRef.Value;
+        var bucketCount = GetIndexedSize(usTable.AsObjectPointer());
+        var arrayClassRef = SystemDictionary.ArrayClassRef;
+
+        int migratedCount = 0;
+        foreach (var (str, oop) in bootstrapSymbolTable)
+        {
+            // Hash the string to find bucket
+            int hash = str.GetHashCode();
+            int bucketIndex = (hash & 0x7FFFFFFF) % bucketCount;
+
+            // Get the bucket (Array of Symbol instances)
+            var bucket = usTable.GetIndexedPointer(bucketIndex);
+            var symbolRef = SObjectRef.FromObjectPointer(oop);
+
+            // Add existing bootstrap symbol to bucket
+            if (bucket.IsNil)
+            {
+                // Create new bucket with single symbol
+                var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, 1);
+                var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
+                newBucket.SetIndexedPointer(0, symbolRef);
+                usTable.SetIndexedPointer(bucketIndex, newBucket);
+            }
+            else
+            {
+                // Grow existing bucket
+                int oldSize = GetIndexedSize(bucket.AsObjectPointer());
+                var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, oldSize + 1);
+                var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
+
+                // Copy old symbols
+                for (int i = 0; i < oldSize; i++)
+                {
+                    newBucket.SetIndexedPointer(i, bucket.GetIndexedPointer(i));
+                }
+
+                // Add bootstrap symbol
+                newBucket.SetIndexedPointer(oldSize, symbolRef);
+                usTable.SetIndexedPointer(bucketIndex, newBucket);
+            }
+
+            migratedCount++;
+        }
+
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[ObjectMemory] Migrated {migratedCount} bootstrap symbols to USTable");
+        }
+
+        // Clear bootstrap table - no longer needed
+        bootstrapSymbolTable.Clear();
     }
 
     /// <summary>
@@ -962,6 +1135,40 @@ public static partial class ObjectMemoryNew
         throw new InvalidOperationException("Dictionary is full and growing is not yet implemented");
     }
 
+    /// <summary>
+    /// Removes a key from a dictionary (removeKey:ifAbsent:).
+    /// Sets the association to nil if found.
+    /// </summary>
+    /// <param name="dictionaryRef">The dictionary to remove from.</param>
+    /// <param name="key">The key to remove.</param>
+    /// <returns>True if the key was found and removed, false otherwise.</returns>
+    public static bool DictionaryRemoveKey(SObjectRef dictionaryRef, SObjectRef key)
+    {
+        if (!dictionaryRef.IsHeapObject)
+            return false;
+
+        var size = GetIndexedSize(dictionaryRef.AsObjectPointer());
+
+        // Search for the association with matching key
+        for (int i = 0; i < size; i++)
+        {
+            var association = GetIndexedPointer(dictionaryRef.AsObjectPointer(), i);
+            if (association.IsNil)
+                continue;
+
+            // Check if this association has matching key
+            Generated.Layouts.STAssociation assoc = association;
+            if (SObjectRef.AreIdentical(assoc.Key, key))
+            {
+                // Found it - set slot to nil to remove
+                SetIndexedPointer(dictionaryRef.AsObjectPointer(), i, SObjectRef.Nil);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     #endregion
 
     #region Class Creation
@@ -1043,17 +1250,7 @@ public static partial class ObjectMemoryNew
             {
                 int superInstVars = superFormat.AsSmallInteger() & 0x3F; // Extract inst var count (bits 0-5)
                 instVarCount += superInstVars;
-
-                // Debug logging for Association and LookupKey classes
-                if (name == "Association" || name == "LookupKey")
-                {
-                    Console.WriteLine($"[DEBUG] Creating {name} class: direct instVars={instanceVariableNames.Length}, super instVars={superInstVars}, total={instVarCount}");
-                }
             }
-        }
-        else if (name == "Association")
-        {
-            Console.WriteLine($"[DEBUG] Creating Association class with NO SUPERCLASS: direct instVars={instanceVariableNames.Length}, total={instVarCount}");
         }
 
         // Set subclasses to nil (will be populated when subclasses are created)

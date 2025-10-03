@@ -20,9 +20,15 @@ public static partial class ObjectMemoryNew
         int numTemps,
         int primitiveIndex = 0)
     {
-        // The selector is typically stored in the method's literals or associated with the method dictionary
-        // For now, we'll use the existing CreateCompiledMethod that doesn't take selector
-        return CreateCompiledMethod(bytecodes, literals, numTemps, numArgs, primitiveIndex);
+        // Per Blue Book: the selector is stored as the LAST literal in the literals array
+        var selectorSymbol = InternSymbol(selector);
+
+        // Add selector as the last literal
+        var allLiterals = new SObjectRef[literals.Length + 1];
+        Array.Copy(literals, 0, allLiterals, 0, literals.Length);
+        allLiterals[literals.Length] = selectorSymbol;  // Selector is last literal
+
+        return CreateCompiledMethod(bytecodes, allLiterals, numTemps, numArgs, primitiveIndex);
     }
 
     /// <summary>

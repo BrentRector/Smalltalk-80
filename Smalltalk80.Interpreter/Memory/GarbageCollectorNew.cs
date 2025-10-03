@@ -13,8 +13,8 @@ public sealed class GarbageCollectorNew
     private readonly ObjectTable objectTable;
     private readonly object gcLock = new();
 
-    // The ONLY roots for GC - Special Objects Array entries
-    private readonly List<SObjectRef> specialObjectsArray = new();
+    // The ONLY roots for GC - Special Objects Array entries (C# array, not List)
+    private SObjectRef[] specialObjectsArray = Array.Empty<SObjectRef>();
 
     // Statistics
     private long totalCollections;
@@ -61,15 +61,11 @@ public sealed class GarbageCollectorNew
     /// Sets the Special Objects Array - the ONLY roots for garbage collection.
     /// </summary>
     /// <param name="soa">The special objects array.</param>
-    public void SetSpecialObjectsArray(List<SObjectRef> soa)
+    public void SetSpecialObjectsArray(SObjectRef[] soa)
     {
         lock (gcLock)
         {
-            specialObjectsArray.Clear();
-            if (soa != null)
-            {
-                specialObjectsArray.AddRange(soa);
-            }
+            specialObjectsArray = soa ?? Array.Empty<SObjectRef>();
         }
     }
 
@@ -82,7 +78,7 @@ public sealed class GarbageCollectorNew
     {
         lock (gcLock)
         {
-            if (index >= 0 && index < specialObjectsArray.Count)
+            if (index >= 0 && index < specialObjectsArray.Length)
                 return specialObjectsArray[index];
             return SObjectRef.Nil;
         }
@@ -97,8 +93,8 @@ public sealed class GarbageCollectorNew
     {
         lock (gcLock)
         {
-            while (specialObjectsArray.Count <= index)
-                specialObjectsArray.Add(SObjectRef.Nil);
+            if (index >= specialObjectsArray.Length)
+                throw new InvalidOperationException($"SOA index {index} out of bounds (size={specialObjectsArray.Length})");
             specialObjectsArray[index] = obj;
         }
     }
@@ -190,10 +186,11 @@ public sealed class GarbageCollectorNew
         }
 
         return new GarbageCollectionStatistics(
+            totalCollections,
             objectsCollected,
             bytesFreed,
             lastCollectionDuration,
-            totalCollections);
+            lastLiveObjectCount);
     }
 
     /// <summary>
@@ -286,10 +283,11 @@ public sealed class GarbageCollectorNew
         }
 
         return new GarbageCollectionStatistics(
+            totalCollections,
             objectsCollected,
             bytesFreed,
             lastCollectionDuration,
-            totalCollections);
+            lastLiveObjectCount);
     }
 
     /// <summary>
@@ -395,6 +393,41 @@ public sealed class GarbageCollectorNew
         }
         return Collect();
     }
+}
+
+/// <summary>
+/// Statistics about a single garbage collection run.
+/// </summary>
+public readonly record struct GarbageCollectionStatistics(
+    long TotalCollections,
+    long TotalObjectsCollected,
+    long TotalBytesFreed,
+    long CollectionDurationMs,
+    int LiveObjectsRemaining)
+{
+    /// <summary>
+    /// Alias for TotalObjectsCollected (for backward compatibility).
+    /// </summary>
+    public long ObjectsCollected => TotalObjectsCollected;
+
+    public override string ToString() =>
+        $"Collections: {TotalCollections}, Objects Collected: {TotalObjectsCollected}, " +
+        $"Bytes Freed: {TotalBytesFreed}, Duration: {CollectionDurationMs}ms, Live: {LiveObjectsRemaining}";
+}
+
+/// <summary>
+/// Extended statistics about the garbage collector.
+/// </summary>
+public readonly record struct GarbageCollectorStatistics(
+    long TotalCollections,
+    long TotalObjectsCollected,
+    long TotalBytesFreed,
+    long LastCollectionDurationMs,
+    int LiveObjects)
+{
+    public override string ToString() =>
+        $"Total Collections: {TotalCollections}, Total Collected: {TotalObjectsCollected}, " +
+        $"Total Bytes Freed: {TotalBytesFreed}, Last Duration: {LastCollectionDurationMs}ms, Live: {LiveObjects}";
 }
 
 /// <summary>

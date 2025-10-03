@@ -118,9 +118,8 @@ public static class ObjectMemoryTableIntegration
         GarbageCollectorNew garbageCollector,
         SObjectRef[] roots)
     {
-        // Convert roots to list for the new GC
-        var soaList = new List<SObjectRef>(roots);
-        garbageCollector.SetSpecialObjectsArray(soaList);
+        // Pass roots array directly to the new GC
+        garbageCollector.SetSpecialObjectsArray(roots);
 
         // Perform collection using the new GC
         var stats = garbageCollector.Collect();

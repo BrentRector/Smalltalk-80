@@ -92,7 +92,12 @@ public sealed class RuntimeOptions
     /// Gets or sets whether to test OOP bug.
     /// </summary>
     public bool TestOOPBug { get; set; }
-    
+
+    /// <summary>
+    /// Gets or sets whether to test precompiled method execution.
+    /// </summary>
+    public bool TestPrecompiled { get; set; }
+
     /// <summary>
     /// Gets or sets whether to validate bytecode execution through method contexts.
     /// </summary>
@@ -170,6 +175,7 @@ public sealed class RuntimeOptions
         TestCriticalMethods = TestCriticalMethods,
         TestClassCreation = TestClassCreation,
         TestOOPBug = TestOOPBug,
+        TestPrecompiled = TestPrecompiled,
         ValidateBytecodeExecution = ValidateBytecodeExecution
     };
 }

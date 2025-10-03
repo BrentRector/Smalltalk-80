@@ -104,9 +104,8 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static void CollectGarbageWithTable(SObjectRef[] roots)
     {
-        // Convert roots to Special Objects Array format
-        var soaList = new List<SObjectRef>(roots);
-        garbageCollector.SetSpecialObjectsArray(soaList);
+        // Pass roots array directly to the GC
+        garbageCollector.SetSpecialObjectsArray(roots);
 
         // Perform collection
         var stats = garbageCollector.Collect();
@@ -122,8 +121,7 @@ public static partial class ObjectMemoryNew
     /// </summary>
     public static void CollectGarbageWithContext(SObjectRef[] specialObjects, IEnumerable<SObjectRef> contextRoots)
     {
-        var soaList = new List<SObjectRef>(specialObjects);
-        garbageCollector.SetSpecialObjectsArray(soaList);
+        garbageCollector.SetSpecialObjectsArray(specialObjects);
 
         var stats = garbageCollector.CollectWithContextRoots(contextRoots);
 
@@ -247,7 +245,8 @@ public static partial class ObjectMemoryNew
     {
         objectTableNew.Clear();
         garbageCollector.ResetStatistics();
-        symbolTable.Clear();
+        // Symbol table is now in Smalltalk heap (Symbol class -> classPool -> #USTable)
+        // bootstrapSymbolTable in ObjectMemory.cs is only for early bootstrap
         methodCache.Clear();
         bootstrapObjectMap.Clear();
     }

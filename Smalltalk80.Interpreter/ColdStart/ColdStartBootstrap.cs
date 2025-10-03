@@ -30,16 +30,9 @@ public static class ColdStartBootstrap
         
         // Install compilation methods for self-hosted compilation
         CompilationMethodsInstaller.InstallAll();
-        
-        // TODO: Reimplement bytecode validation tests using pure SObjectRef
-        // For now, skip these tests as they use old SObjects
-        if ((Program.RuntimeOptions?.ValidateBytecodeExecution ?? false)
-            || DebugOptions.EnableMethodTrace
-            || DebugOptions.EnableBytecodeTrace)
-        {
-            Console.WriteLine("[COLD START] Bytecode validation tests skipped (TODO: migrate to SObjectRef)");
-            // RunBytecodeValidationTest();
-        }
+
+        // Create TestClass with precompiled methods for validation
+        TestClassBuilder.CreateTestClass();
     }
     
     /// <summary>
@@ -76,12 +69,7 @@ public static class ColdStartBootstrap
     /// </summary>
     private static void InitializeProcessSystem()
     {
-        // TODO: Reimplement this using pure SObjectRef once the rest of the system is working
-        // For now, skip process initialization as it's not critical for basic tests
-        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
-        {
-            Console.WriteLine("[COLD START] Process system initialization skipped (TODO: migrate to SObjectRef)");
-        }
+        ProcessSystemInitializer.Initialize();
     }
     
     /// <summary>

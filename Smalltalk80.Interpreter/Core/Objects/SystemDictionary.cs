@@ -215,15 +215,15 @@ public static partial class SystemDictionary
         RegisterClassRef("InstructionStream", InstructionStreamClassRef);
 
         LogColdStart("Creating ContextPart class");
-        ContextPartClassRef = ObjectMemoryNew.CreateClassObject("ContextPart", InstructionStreamClassRef, ["stackp", "stack", "method", "tempframe"], ObjectFormat.FixedPointer);
+        ContextPartClassRef = ObjectMemoryNew.CreateClassObject("ContextPart", InstructionStreamClassRef, ["sender", "ip", "sp", "method", "receiverMap"], ObjectFormat.PointerIndexed);
         RegisterClassRef("ContextPart", ContextPartClassRef);
 
         LogColdStart("Creating MethodContext class");
-        MethodContextClassRef = ObjectMemoryNew.CreateClassObject("MethodContext", ContextPartClassRef, ["receiver"], ObjectFormat.FixedPointer);
+        MethodContextClassRef = ObjectMemoryNew.CreateClassObject("MethodContext", ContextPartClassRef, ["receiver"], ObjectFormat.PointerIndexed);
         RegisterClassRef("MethodContext", MethodContextClassRef);
 
         LogColdStart("Creating BlockContext class");
-        BlockContextClassRef = ObjectMemoryNew.CreateClassObject("BlockContext", ContextPartClassRef, ["nargs", "startpc", "home"], ObjectFormat.FixedPointer);
+        BlockContextClassRef = ObjectMemoryNew.CreateClassObject("BlockContext", ContextPartClassRef, ["nargs", "startpc", "home"], ObjectFormat.PointerIndexed);
         RegisterClassRef("BlockContext", BlockContextClassRef);
 
         // Phase 4: Collection Classes
@@ -500,10 +500,15 @@ public static partial class SystemDictionary
         FalseObject = FalseClassRef.CreateInstance();
         // TODO: ObjectMemoryNew.SetWellKnownObject("false", FalseObject);
 
-        // Create the symbol table as a proper Dictionary and store it in SystemDictionary
-        var symbolTableRef = DictionaryClassRef.CreateInstance(100);
-        var symbolTableSymbol = ObjectMemoryNew.InternSymbol("SymbolTable");
-        ObjectMemoryNew.DictionaryAtPut(Instance, symbolTableSymbol, symbolTableRef);
+        // Create USTable (Unique String Table) for Symbol class
+        // This MUST be done before any symbol interning that expects USTable to exist
+        LogColdStart("Creating Symbol class USTable (symbol hash table)");
+        var usTable = ColdStart.SymbolTableBuilder.CreateUSTable();
+        ColdStart.SymbolTableBuilder.InstallUSTable(usTable);
+
+        // Migrate all bootstrap symbols to USTable
+        LogColdStart("Migrating bootstrap symbols to USTable");
+        ObjectMemoryNew.MigrateBootstrapSymbolsToUSTable();
 
         // SystemDictionary.Instance was already created when Dictionary class was created
         // All classes have been stored directly in Instance via RegisterClassRef
@@ -585,6 +590,19 @@ public static partial class SystemDictionary
     }
 
     /// <summary>
+    /// Removes a global variable from the SystemDictionary.
+    /// In Smalltalk-80, this is: Smalltalk removeKey: #ClassName
+    /// </summary>
+    public static void UnregisterGlobalRef(string name)
+    {
+        if (!Instance.IsNil)
+        {
+            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
+            ObjectMemoryNew.DictionaryRemoveKey(Instance, nameSymbol);
+        }
+    }
+
+    /// <summary>
     /// Gets all class names.
     /// TODO: Implement by iterating through SystemDictionary.Instance
     /// </summary>
@@ -610,6 +628,7 @@ public static partial class SystemDictionary
     {
         initialized = false;
         Instance = SObjectRef.Nil;
-        SSymbol.ClearSymbolTable();
+        // Note: Symbol table is now in heap (Symbol class -> classPool -> #USTable)
+        // Bootstrap symbol table is only used during early cold start
     }
 }

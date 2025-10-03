@@ -541,61 +541,222 @@ public class Compiler
 
 ### 7.1 Object Memory
 
-**CRITICAL DESIGN RULE**: NO Smalltalk objects are individually registered with the garbage collector. The GC traces all live objects from the Special Objects Array.
+The interpreter uses a **table-based object memory** with explicit object pointers (OOPs) and structured object data. All Smalltalk data structures are maintained in the Smalltalk heap, not as C# proxy objects.
 
 ```csharp
-public class GarbageCollector
+namespace Smalltalk80.Interpreter.Memory;
+
+public static class ObjectMemoryNew
 {
-    // The ONLY root - can be C# or Smalltalk object
-    private List<SObject> specialObjectsArray = [];
-    
-    // NO RegisterObject method! Objects are found by tracing.
-    
-    public void CollectGarbage()
+    // Object table maps OOP to object data
+    private static readonly Dictionary<nint, ObjectData> objectTable = [];
+
+    // Symbol table is in HEAP (Symbol class -> classPool -> #USTable), not C#
+    // During bootstrap only, we use a temporary C# table:
+    private static readonly Dictionary<string, nint> bootstrapSymbolTable = new();
+
+    public static SObjectRef InternSymbol(string str)
     {
-        // Mark phase - start ONLY from SOA
-        var marked = new HashSet<SObject>();
-        
-        foreach (var specialObject in specialObjectsArray)
+        // Check if USTable exists in heap
+        var usTableRef = SymbolTableBuilder.GetUSTable();
+
+        if (usTableRef.HasValue && !usTableRef.Value.IsNil)
         {
-            if (specialObject != null)
-                Mark(specialObject, marked);
+            // Use heap-based symbol table (Smalltalk object)
+            return InternSymbolInUSTable(str, usTableRef.Value);
         }
-        
-        // Sweep phase - collect unreachable objects
-        // (implementation depends on memory model)
-    }
-    
-    private void Mark(SObject obj, HashSet<SObject> marked)
-    {
-        if (obj == null || marked.Contains(obj))
-            return;
-            
-        marked.Add(obj);
-        
-        // Trace all references from this object
-        // - Instance variables
-        // - Array elements  
-        // - Method literals
-        // - Context sender chains
-        // etc.
+        else
+        {
+            // Bootstrap only - use temporary C# table
+            return InternSymbolBootstrap(str);
+        }
     }
 }
 ```
 
-**Special Objects Array Contents**:
+### 7.2 Garbage Collection
+
+**CRITICAL DESIGN RULE**: The GC traces all live objects from the **Special Objects Array (SOA)**. All Smalltalk objects must be reachable from one of the 5 GC roots.
+
+#### Blue Book Minimal GC Root Specification
+
+Per Goldberg & Robson (1983), only **5 roots** are needed for complete reachability:
+
 ```csharp
-// SOA indices (Blue Book standard + extensions)
-0: nil
-1: false
-2: true  
-3: Processor (ProcessorScheduler)
-4: Smalltalk (SystemDictionary - contains all classes/globals)
-5: SymbolTable
-6-15: Reserved for other system objects
+public static class SpecialObjectsArray
+{
+    // Singletons (required for hardwired bytecode references)
+    public const int NilIndex = 0;              // nil
+    public const int FalseIndex = 1;            // false
+    public const int TrueIndex = 2;             // true
+
+    // Main GC root for all classes, methods, symbols, and globals
+    public const int SystemDictionaryIndex = 3; // Smalltalk global dictionary
+
+    // Process scheduler and all live execution contexts
+    public const int ProcessorSchedulerIndex = 4; // ProcessorScheduler singleton
+
+    public const int Count = 5;
+}
 ```
 
-### 7.2 Special Objects
+#### Complete Reachability Graph
+
+From these 5 roots, **ALL objects** are reachable:
+
+**1. nil, true, false** (indices 0-2)
+   - Singletons required for bytecode operations (pushNil, pushTrue, pushFalse)
+
+**2. SystemDictionary** (index 3) - Root of class hierarchy and symbols
+```
+SystemDictionary (Smalltalk global)
+  ├─> Association(#Object -> Object class)
+  │    └─> methodDict -> Associations -> CompiledMethod instances
+  ├─> Association(#String -> String class)
+  ├─> Association(#Symbol -> Symbol class)
+  │    └─> classPool (Dictionary at slot 7)
+  │         └─> Association(#USTable -> Symbol table Array)
+  │              └─> Symbol buckets -> ALL Symbol instances
+  ├─> Association(#Character -> Character class)
+  │    └─> classPool
+  │         └─> Association(#CharacterTable -> Array[256])
+  │              └─> ALL Character instances (0-255)
+  └─> ALL other classes, globals, and class-side methods
+```
+
+**3. ProcessorScheduler** (index 4) - Root of all live processes and contexts
+```
+ProcessorScheduler
+  ├─> activeProcess -> Process
+  │    └─> suspendedContext -> MethodContext
+  │         └─> sender -> MethodContext chain
+  │              ├─> receiver
+  │              ├─> method (CompiledMethod)
+  │              └─> temps/stack (live objects)
+  └─> quiescentProcessLists -> Array[100] of LinkedLists
+       └─> Process chains (runnable/waiting processes)
+            └─> suspended contexts
+```
+
+#### Garbage Collector Implementation
+
+```csharp
+public class GarbageCollectorNew
+{
+    public GCStatistics Collect()
+    {
+        // Mark phase - trace from 5 GC roots ONLY
+        var marked = new HashSet<nint>();
+
+        for (int i = 0; i < SpecialObjectsArray.Count; i++)
+        {
+            var root = SpecialObjectsArray.Get(i);
+            if (root != null && !root.IsNil)
+            {
+                MarkObject(root.AsObjectPointer(), marked);
+            }
+        }
+
+        // Sweep phase - collect unmarked objects
+        int collected = 0;
+        var allOops = ObjectTable.Keys.ToList();
+
+        foreach (var oop in allOops)
+        {
+            if (!marked.Contains(oop))
+            {
+                ObjectTable.Remove(oop);
+                collected++;
+            }
+        }
+
+        return new GCStatistics { ObjectsCollected = collected };
+    }
+
+    private void MarkObject(nint oop, HashSet<nint> marked)
+    {
+        if (marked.Contains(oop))
+            return;
+
+        marked.Add(oop);
+
+        var data = ObjectMemoryNew.GetObjectData(oop);
+
+        // Trace instance variables
+        foreach (var fieldRef in data.InstanceVariables)
+        {
+            if (fieldRef.IsHeapObject)
+                MarkObject(fieldRef.AsObjectPointer(), marked);
+        }
+
+        // Trace indexed pointers (arrays, method literals, etc.)
+        foreach (var indexedRef in data.IndexedPointers)
+        {
+            if (indexedRef.IsHeapObject)
+                MarkObject(indexedRef.AsObjectPointer(), marked);
+        }
+    }
+}
+```
+
+### 7.3 Heap-Based Symbol Table
+
+**CRITICAL ARCHITECTURE PRINCIPLE**: The symbol table (USTable) is a **Smalltalk heap object**, NOT a C# proxy structure.
+
+#### Why Heap-Based Symbols Matter
+
+When Smalltalk code runs (e.g., `Symbol intern: 'newSelector'`), it updates the USTable directly in the Smalltalk heap. If symbols were stored in a C# dictionary:
+- ❌ Smalltalk code updates would be invisible to C#
+- ❌ C# code updates would be invisible to Smalltalk
+- ❌ Two separate symbol tables would diverge immediately
+
+#### Implementation
+
+```csharp
+// Symbol class has classVariable 'USTable' per Blue Book
+Symbol class
+  -> classPool (Dictionary at slot 7)
+      -> Association(#USTable -> Array[256] of symbol buckets)
+           -> Each bucket is an Array of Symbol instances
+
+// Symbol interning checks heap USTable
+public static SObjectRef InternSymbol(string str)
+{
+    var usTableRef = SymbolTableBuilder.GetUSTable();
+
+    if (usTableRef.HasValue && !usTableRef.Value.IsNil)
+    {
+        // Search heap-based USTable
+        return InternSymbolInUSTable(str, usTableRef.Value);
+    }
+    else
+    {
+        // Bootstrap only - before USTable created
+        return InternSymbolBootstrap(str);
+    }
+}
+
+// Smalltalk code: Symbol intern: 'foo'
+// This updates the SAME USTable object in heap that C# reads
+```
+
+#### Bootstrap Process
+
+1. **Early Bootstrap**: Use temporary C# `bootstrapSymbolTable` to create initial symbols during class creation
+2. **Create USTable**: After Symbol class exists, create USTable as Smalltalk Array in heap
+3. **Migration**: Copy all bootstrap symbols into USTable buckets
+4. **Switch Over**: All subsequent symbol interning uses heap-based USTable
+5. **Clear Bootstrap Table**: Delete C# temporary table
+
+```csharp
+// In SystemDictionary.Initialize() after creating Symbol class:
+var usTable = SymbolTableBuilder.CreateUSTable();          // Smalltalk Array[256]
+SymbolTableBuilder.InstallUSTable(usTable);                // Put in Symbol.classPool
+ObjectMemoryNew.MigrateBootstrapSymbolsToUSTable();        // Move existing symbols
+bootstrapSymbolTable.Clear();                               // Delete C# temporary
+```
+
+### 7.4 Special Objects
 
 Singleton objects with fixed identity:
 
