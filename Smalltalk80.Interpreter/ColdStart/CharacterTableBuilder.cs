@@ -10,7 +10,7 @@ using Smalltalk80.Interpreter.Memory;
 /// Per Blue Book: All 256 possible Character instances are pre-created and stored in a table.
 ///
 /// COLD START KNOWLEDGE (isolated to this file):
-/// - Uses BlueBookLayouts.Character for correct field indices
+/// - Uses STCharacter layout for correct field indices
 /// - Character class has 1 instance variable named 'value'
 /// - Character stores ASCII value 0-255 as SmallInteger
 /// - Characters are unique (only one instance per ASCII value)

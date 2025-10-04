@@ -305,10 +305,35 @@ Output shows inheritance with box-drawing characters (├─, └─).
 
 ### Before Committing
 
-1. **Build clean**: `dotnet build --no-restore` (0 errors)
-2. **Test zero garbage**: Run with `--gc-log --validate-gc`
-3. **Update docs**: Update Interpreter-Architecture.md if architecture changed
-4. **Run tests**: Verify all functionality works
+**CRITICAL: Both compiler and interpreter MUST compile and run without errors before committing.**
+
+1. **Build verification** (REQUIRED - must pass):
+   ```bash
+   # Build compiler
+   cd Smalltalk80.Compiler
+   dotnet build --no-restore
+   # Must show: 0 Error(s)
+
+   # Build interpreter
+   cd ../Smalltalk80.Interpreter
+   dotnet build --no-restore
+   # Must show: 0 Error(s)
+   ```
+
+2. **Runtime verification** (IDEAL - should pass):
+   ```bash
+   # Test interpreter cold start with GC validation
+   cd Smalltalk80.Interpreter
+   dotnet run --no-build -- repl --gc-log --validate-gc
+   # Ideally: Should complete without exceptions
+   # Ideally: Should show "0 objects collected" on all GC runs
+   ```
+
+3. **Update documentation**: Update Interpreter-Architecture.md if architecture changed
+
+4. **Warnings acceptable**: Build warnings are acceptable but should be minimized
+
+**DO NOT commit if either project has compilation errors.**
 
 ### Commit Message Format
 

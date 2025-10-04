@@ -6,7 +6,7 @@ using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Config;
 using System.Reflection;
 using Smalltalk80.Interpreter.Generated;
-using Smalltalk80.Interpreter.Core.BlueBook;
+using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
 /// Main orchestrator for the Smalltalk-80 cold start initialization.
@@ -159,11 +159,8 @@ public static class ColdStartBootstrap
 
         // 5. Fix up Object's superclass to point to real nil singleton
         var objectClass = _createdClasses["Object"];
-        ObjectMemoryNew.SetInstanceVariable(
-            objectClass.AsObjectPointer(),
-            Core.BlueBook.ClassLayout.Superclass,
-            nilObject
-        );
+        STClass objectClassStruct = objectClass;
+        objectClassStruct.Superclass = nilObject;
 
         LogColdStart("  Created nil singleton and fixed Object.superclass");
     }
@@ -431,25 +428,17 @@ public static class ColdStartBootstrap
                 string nameStr = "unknown";
                 try
                 {
-                    if (currentData.InstanceVariables.Length > ClassLayout.Name)
-                    {
-                        var nameRef = currentClass.GetInstanceVariable(ClassLayout.Name);
-                        nameStr = nameRef.IsNil ? "nil" : ObjectMemoryNew.SymbolToString(nameRef);
-                    }
+                    STClass currentClassStruct = currentClass;
+                    var nameRef = currentClassStruct.Name;
+                    nameStr = nameRef.IsNil ? "nil" : ObjectMemoryNew.SymbolToString(nameRef);
                 }
                 catch { }
 
                 Console.WriteLine($"[DEBUG]   Superclass chain[{depth}]: {nameStr} (OOP={currentOop}, InstVars={currentData.InstanceVariables.Length})");
 
                 // Get superclass safely
-                if (currentData.InstanceVariables.Length > ClassLayout.Superclass)
-                {
-                    currentClass = currentClass.GetInstanceVariable(ClassLayout.Superclass);
-                }
-                else
-                {
-                    break;
-                }
+                STClass classStruct = currentClass;
+                currentClass = classStruct.Superclass;
                 depth++;
             }
         }
@@ -781,7 +770,8 @@ public static class ColdStartBootstrap
         var classOop = classRef.AsObjectPointer();
 
         // Set superclass (index 0 - from Behavior)
-        ObjectMemoryNew.SetInstanceVariable(classOop, ClassLayout.Superclass, superclassRef);
+        STClass classStruct = SObjectRef.FromObjectPointer(classOop);
+        classStruct.Superclass = superclassRef;
 
         // Initialize method dictionary (index 1 - from Behavior) - CRITICAL for method installation
         // Create method dictionary even during early bootstrap (before MethodDictionary class exists)
@@ -809,13 +799,11 @@ public static class ColdStartBootstrap
         ObjectMemoryNew.SetInstanceVariable(methodDict, 1, SObjectRef.FromObjectPointer(valueArray));
 
         // Set method dictionary in the class/metaclass
-        ObjectMemoryNew.SetInstanceVariable(classOop, ClassLayout.MethodDictionary,
-            SObjectRef.FromObjectPointer(methodDict));
+        classStruct.MethodDict = SObjectRef.FromObjectPointer(methodDict);
 
         // Set format (index 2 - from Behavior)
         var format = DetermineObjectFormat(metadata.SubclassKind, metadata.ClassName);
-        ObjectMemoryNew.SetInstanceVariable(classOop, ClassLayout.Format,
-            SObjectRef.FromSmallInteger((int)format));
+        classStruct.Format = SObjectRef.FromSmallInteger((int)format);
 
         // Set instance variable names (index 4 - from ClassDescription)
         if (metadata.InstanceVariableNames.Length > 0)
@@ -833,8 +821,7 @@ public static class ColdStartBootstrap
                     instVarsArray.SetIndexedPointer(i, symbol);
                 }
 
-                ObjectMemoryNew.SetInstanceVariable(classOop,
-                    ClassLayout.InstanceVariables, instVarsArray);
+                classStruct.InstanceVariables = instVarsArray;
             }
         }
 
@@ -844,7 +831,7 @@ public static class ColdStartBootstrap
         if (!metadata.ClassName.EndsWith(" class"))
         {
             var nameSymbol = ObjectMemoryNew.InternSymbolBootstrap(metadata.ClassName);
-            ObjectMemoryNew.SetInstanceVariable(classOop, ClassLayout.Name, nameSymbol);
+            classStruct.Name = nameSymbol;
         }
     }
 
@@ -859,11 +846,8 @@ public static class ColdStartBootstrap
         classData.ClassRef = metaclassRef;
 
         // Set metaclass.thisClass = class (this IS an instance variable)
-        ObjectMemoryNew.SetInstanceVariable(
-            metaclassRef.AsObjectPointer(),
-            MetaclassLayout.ThisClass,
-            classRef
-        );
+        STMetaclass metaclassStruct = metaclassRef;
+        metaclassStruct.ThisClass = classRef;
     }
 
     /// <summary>

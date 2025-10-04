@@ -2,7 +2,6 @@ namespace Smalltalk80.Interpreter.Memory;
 
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
-using Smalltalk80.Interpreter.Core.BlueBook;
 
 /// <summary>
 /// The Special Objects Array - GC roots for the Smalltalk-80 Virtual Machine.
@@ -101,8 +100,9 @@ public readonly struct SpecialObjectsArray
             if (ProcessorScheduler.IsNil)
                 return SObjectRef.Nil;
 
-            // ProcessorScheduler layout: [0]=superclass, [1]=methodDict, [2]=format, [3]=activeProcess, ...
-            return ProcessorScheduler.GetInstanceVariable(BlueBookLayouts.ProcessorScheduler.ActiveProcess);
+            // ProcessorScheduler has 2 instance variables: [0]=quiescentProcessLists, [1]=activeProcess
+            Generated.Layouts.STProcessorScheduler scheduler = ProcessorScheduler;
+            return scheduler.ActiveProcess;
         }
     }
 
@@ -149,4 +149,115 @@ public readonly struct SpecialObjectsArray
     {
         return $"SOA[Nil={Nil.AsObjectPointer():X}, False={False.AsObjectPointer():X}, True={True.AsObjectPointer():X}, Smalltalk={Smalltalk.AsObjectPointer():X}, ProcessorScheduler={ProcessorScheduler.AsObjectPointer():X}]";
     }
+
+    // ========================================
+    // Static instance management for VM
+    // ========================================
+
+    /// <summary>
+    /// The current Special Objects Array instance (static for now, will be per-VM in future).
+    /// </summary>
+    private static SpecialObjectsArray _instance;
+
+    /// <summary>
+    /// Gets the current SOA instance.
+    /// </summary>
+    public static SpecialObjectsArray Instance => _instance;
+
+    /// <summary>
+    /// Initializes the Special Objects Array (called at start of cold start).
+    /// </summary>
+    public static void Initialize()
+    {
+        // Create empty SOA (will be populated during bootstrap)
+        _instance = new SpecialObjectsArray(
+            SObjectRef.Nil,
+            SObjectRef.Nil,
+            SObjectRef.Nil,
+            SObjectRef.Nil,
+            SObjectRef.Nil
+        );
+    }
+
+    /// <summary>
+    /// Sets the nil singleton and caches it in SObjectRef.
+    /// </summary>
+    public static void SetNil(SObjectRef nilObject)
+    {
+        _instance = new SpecialObjectsArray(
+            nilObject,
+            _instance.False,
+            _instance.True,
+            _instance.Smalltalk,
+            _instance.ProcessorScheduler
+        );
+        Core.Values.SObjectRef.SetNilOop(nilObject.AsObjectPointer());
+    }
+
+    /// <summary>
+    /// Sets the false singleton.
+    /// </summary>
+    public static void SetFalse(SObjectRef falseObject)
+    {
+        _instance = new SpecialObjectsArray(
+            _instance.Nil,
+            falseObject,
+            _instance.True,
+            _instance.Smalltalk,
+            _instance.ProcessorScheduler
+        );
+    }
+
+    /// <summary>
+    /// Sets the true singleton.
+    /// </summary>
+    public static void SetTrue(SObjectRef trueObject)
+    {
+        _instance = new SpecialObjectsArray(
+            _instance.Nil,
+            _instance.False,
+            trueObject,
+            _instance.Smalltalk,
+            _instance.ProcessorScheduler
+        );
+    }
+
+    /// <summary>
+    /// Sets the Smalltalk global (SystemDictionary).
+    /// </summary>
+    public static void SetSmalltalk(SObjectRef smalltalkObject)
+    {
+        _instance = new SpecialObjectsArray(
+            _instance.Nil,
+            _instance.False,
+            _instance.True,
+            smalltalkObject,
+            _instance.ProcessorScheduler
+        );
+    }
+
+    /// <summary>
+    /// Sets the ProcessorScheduler singleton.
+    /// </summary>
+    public static void SetProcessorScheduler(SObjectRef processorSchedulerObject)
+    {
+        _instance = new SpecialObjectsArray(
+            _instance.Nil,
+            _instance.False,
+            _instance.True,
+            _instance.Smalltalk,
+            processorSchedulerObject
+        );
+    }
+
+    /// <summary>
+    /// Sets the active process (no-op, kept for compatibility).
+    /// ActiveProcess is accessed via ProcessorScheduler.activeProcess instance variable.
+    /// </summary>
+    public static void SetActiveProcess(SObjectRef activeProcessObject)
+    {
+        // No-op: ActiveProcess is not stored in SOA, it's ProcessorScheduler.activeProcess
+        // This method exists for compatibility during migration
+    }
+
 }

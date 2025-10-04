@@ -4,7 +4,6 @@ using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Config;
-using Smalltalk80.Interpreter.Core.BlueBook;
 
 /// <summary>
 /// Creates a TestClass with precompiled methods for validating bytecode execution.

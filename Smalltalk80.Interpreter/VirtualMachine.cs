@@ -829,7 +829,7 @@ public class VirtualMachine
     private void InitializeGarbageCollection()
     {
         // Get the GC roots from the SpecialObjectsArray (fixed struct, no heap allocation)
-        var soa = Memory.SpecialObjectsArray.GetRootsForGC();
+        var soa = Memory.SpecialObjectsArray.Instance.GetRootsForGC();
 
         // Give the GC the SOA array
         garbageCollector.SetSpecialObjectsArray(soa);
