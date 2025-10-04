@@ -736,7 +736,7 @@ public static partial class ObjectMemoryNew
     /// Bootstrap-only symbol interning using C# dictionary.
     /// Used only during early cold start before USTable is created.
     /// </summary>
-    private static SObjectRef InternSymbolBootstrap(string str)
+    public static SObjectRef InternSymbolBootstrap(string str)
     {
         if (bootstrapSymbolTable.TryGetValue(str, out var oop))
             return SObjectRef.FromObjectPointer(oop);
@@ -760,13 +760,21 @@ public static partial class ObjectMemoryNew
     /// </summary>
     private static SObjectRef InternSymbolInUSTable(string str, SObjectRef usTable)
     {
-        // Hash the string to find bucket
-        int hash = str.GetHashCode();
+        bool isKernelSelector = str.Length <= 3 && (str == "==" || str == "~~" || str == "=" || str == "~=" || str.StartsWith("if"));
+
+        // Hash the string to find bucket - CRITICAL: Must use Smalltalk-80 hash!
+        int hash = ComputeSmalltalkStringHash(str);
         int bucketCount = GetIndexedSize(usTable.AsObjectPointer());
-        int bucketIndex = (hash & 0x7FFFFFFF) % bucketCount;
+        int bucketIndex = hash % bucketCount;  // Plain modulo - no & 0x7FFFFFFF needed
 
         // Get the bucket (Array of Symbol instances)
         var bucket = usTable.GetIndexedPointer(bucketIndex);
+
+        if (isKernelSelector && (Program.RuntimeOptions?.EnableColdStartLogging ?? false))
+        {
+            int bucketSize = bucket.IsNil ? -1 : GetIndexedSize(bucket.AsObjectPointer());
+            Console.WriteLine($"[InternSymbol] Looking for '{str}' in bucket {bucketIndex}, bucket size = {bucketSize}");
+        }
 
         if (!bucket.IsNil)
         {
@@ -779,10 +787,21 @@ public static partial class ObjectMemoryNew
                 {
                     // Compare symbol string value
                     var symbolStr = SymbolToString(symbolRef);
+
+                    if (isKernelSelector && (Program.RuntimeOptions?.EnableColdStartLogging ?? false))
+                    {
+                        Console.WriteLine($"[InternSymbol]   Slot {i}: '{symbolStr}' (match={symbolStr == str})");
+                    }
+
                     if (symbolStr == str)
                     {
                         return symbolRef; // Found existing symbol
                     }
+                }
+                else if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+                {
+                    // Found nil slot during search - symbol not found yet but empty slot available
+                    // This is expected during cold start when buckets are pre-sized
                 }
             }
         }
@@ -797,7 +816,7 @@ public static partial class ObjectMemoryNew
         SetByteIndexedData(newSymbolOop, bytes);
         var newSymbol = SObjectRef.FromObjectPointer(newSymbolOop);
 
-        // Add to bucket (grow bucket array if needed)
+        // Add to bucket (use pre-sized bucket if available, otherwise grow)
         var arrayClassRef = SystemDictionary.ArrayClassRef;
         if (bucket.IsNil)
         {
@@ -809,23 +828,132 @@ public static partial class ObjectMemoryNew
         }
         else
         {
-            // Grow existing bucket
-            int oldSize = GetIndexedSize(bucket.AsObjectPointer());
-            var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, oldSize + 1);
-            var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
-
-            // Copy old symbols
-            for (int i = 0; i < oldSize; i++)
+            // Check if there's an empty slot in the existing bucket (from pre-sizing)
+            int bucketSize = GetIndexedSize(bucket.AsObjectPointer());
+            int emptySlot = -1;
+            for (int i = 0; i < bucketSize; i++)
             {
-                newBucket.SetIndexedPointer(i, bucket.GetIndexedPointer(i));
+                if (bucket.GetIndexedPointer(i).IsNil)
+                {
+                    emptySlot = i;
+                    break;
+                }
             }
 
-            // Add new symbol
-            newBucket.SetIndexedPointer(oldSize, newSymbol);
-            usTable.SetIndexedPointer(bucketIndex, newBucket);
+            if (emptySlot >= 0)
+            {
+                // Use empty slot in pre-sized bucket (no allocation needed!)
+                bucket.SetIndexedPointer(emptySlot, newSymbol);
+                if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+                {
+                    Console.WriteLine($"[InternSymbol] Reused empty slot {emptySlot} in bucket {bucketIndex} for symbol '{str}'");
+                }
+            }
+            else
+            {
+                // No empty slots - grow bucket array (creates garbage!)
+                if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+                {
+                    Console.WriteLine($"[InternSymbol] Growing bucket {bucketIndex} from size {bucketSize} to {bucketSize + 1} for symbol '{str}' (creates garbage!)");
+                }
+                var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, bucketSize + 1);
+                var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
+
+                // Copy old symbols
+                for (int i = 0; i < bucketSize; i++)
+                {
+                    newBucket.SetIndexedPointer(i, bucket.GetIndexedPointer(i));
+                }
+
+                // Add new symbol
+                newBucket.SetIndexedPointer(bucketSize, newSymbol);
+                usTable.SetIndexedPointer(bucketIndex, newBucket);
+            }
         }
 
         return newSymbol;
+    }
+
+    /// <summary>
+    /// Gets the bootstrap symbol table (for pre-sizing USTable buckets).
+    /// </summary>
+    public static IReadOnlyDictionary<string, nint> GetBootstrapSymbolTable()
+    {
+        return bootstrapSymbolTable;
+    }
+
+    /// <summary>
+    /// Computes the Smalltalk-80 string hash as defined in String>>hash.
+    /// CRITICAL: This MUST match the exact algorithm from Smalltalk-80.st (lines 36399-36409)
+    /// to ensure C# bootstrap and Smalltalk runtime use the same buckets!
+    /// </summary>
+    public static int ComputeSmalltalkStringHash(string str)
+    {
+        int l = str.Length;
+        int m = l;
+
+        if (l <= 2)
+        {
+            if (l == 2)
+            {
+                m = 3;
+                // Smalltalk: ^(self at: 1) asciiValue * 48 + ((self at: (m - 1)) asciiValue + l)
+                // With m=3, (m-1)=2, l=2
+                // In 0-based C#: char[0]*48 + (char[1] + 2)
+                return (int)str[0] * 48 + ((int)str[1] + 2);
+            }
+            else if (l == 1)
+            {
+                // Smalltalk: ^((self at: 1) asciiValue bitAnd: 127) * 106
+                return ((int)str[0] & 127) * 106;
+            }
+            else // l == 0
+            {
+                // Smalltalk: ^21845
+                return 21845;
+            }
+        }
+        else // l >= 3
+        {
+            // Smalltalk: ^(self at: 1) asciiValue * 48 + ((self at: (m - 1)) asciiValue + l)
+            // In 0-based C#: char[0]*48 + (char[m-2] + l)
+            return (int)str[0] * 48 + ((int)str[m - 2] + l);
+        }
+    }
+
+    /// <summary>
+    /// Computes bucket assignments for bootstrap symbols.
+    /// Returns a dictionary mapping bucketIndex → list of (string, oop) pairs.
+    /// </summary>
+    public static Dictionary<int, List<(string, nint)>> ComputeSymbolBuckets(int bucketCount)
+    {
+        if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
+        {
+            Console.WriteLine($"[ComputeSymbolBuckets] Computing buckets for {bootstrapSymbolTable.Count} bootstrap symbols");
+        }
+
+        var buckets = new Dictionary<int, List<(string, nint)>>();
+
+        foreach (var (str, oop) in bootstrapSymbolTable)
+        {
+            // CRITICAL: Use Smalltalk-80 hash algorithm, NOT C# GetHashCode()!
+            int hash = ComputeSmalltalkStringHash(str);
+            int bucketIndex = hash % bucketCount;  // Plain modulo - no & 0x7FFFFFFF needed
+
+            if (!buckets.ContainsKey(bucketIndex))
+            {
+                buckets[bucketIndex] = new List<(string, nint)>();
+            }
+            buckets[bucketIndex].Add((str, oop));
+
+            // Debug logging for kernel selectors
+            if ((Program.RuntimeOptions?.EnableColdStartLogging ?? false) && str == "==")
+            {
+                Console.WriteLine($"[ComputeSymbolBuckets] Symbol '==' hashes to bucket {bucketIndex}");
+            }
+        }
+
+        return buckets;
     }
 
     /// <summary>
@@ -843,47 +971,28 @@ public static partial class ObjectMemoryNew
 
         var usTable = usTableRef.Value;
         var bucketCount = GetIndexedSize(usTable.AsObjectPointer());
-        var arrayClassRef = SystemDictionary.ArrayClassRef;
+
+        // Get bucket assignments (must match what CreateUSTable used)
+        var buckets = ComputeSymbolBuckets(bucketCount);
 
         int migratedCount = 0;
-        foreach (var (str, oop) in bootstrapSymbolTable)
+        foreach (var (bucketIndex, symbols) in buckets)
         {
-            // Hash the string to find bucket
-            int hash = str.GetHashCode();
-            int bucketIndex = (hash & 0x7FFFFFFF) % bucketCount;
-
-            // Get the bucket (Array of Symbol instances)
             var bucket = usTable.GetIndexedPointer(bucketIndex);
-            var symbolRef = SObjectRef.FromObjectPointer(oop);
+            int bucketSize = GetIndexedSize(bucket.AsObjectPointer());
 
-            // Add existing bootstrap symbol to bucket
-            if (bucket.IsNil)
+            if (symbols.Count > bucketSize)
             {
-                // Create new bucket with single symbol
-                var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, 1);
-                var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
-                newBucket.SetIndexedPointer(0, symbolRef);
-                usTable.SetIndexedPointer(bucketIndex, newBucket);
-            }
-            else
-            {
-                // Grow existing bucket
-                int oldSize = GetIndexedSize(bucket.AsObjectPointer());
-                var newBucketOop = AllocateObject(arrayClassRef, ObjectFormat.PointerIndexed, 0, oldSize + 1);
-                var newBucket = SObjectRef.FromObjectPointer(newBucketOop);
-
-                // Copy old symbols
-                for (int i = 0; i < oldSize; i++)
-                {
-                    newBucket.SetIndexedPointer(i, bucket.GetIndexedPointer(i));
-                }
-
-                // Add bootstrap symbol
-                newBucket.SetIndexedPointer(oldSize, symbolRef);
-                usTable.SetIndexedPointer(bucketIndex, newBucket);
+                throw new InvalidOperationException($"Bucket {bucketIndex} has {symbols.Count} symbols but was allocated with size {bucketSize}");
             }
 
-            migratedCount++;
+            // Fill pre-sized bucket with symbols
+            for (int i = 0; i < symbols.Count; i++)
+            {
+                var symbolRef = SObjectRef.FromObjectPointer(symbols[i].Item2);
+                bucket.SetIndexedPointer(i, symbolRef);
+                migratedCount++;
+            }
         }
 
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
@@ -1180,12 +1289,14 @@ public static partial class ObjectMemoryNew
     /// <param name="superclassRef">Reference to the superclass, or nil for no superclass.</param>
     /// <param name="instanceVariableNames">Array of instance variable names.</param>
     /// <param name="instanceFormat">The format for instances of this class.</param>
+    /// <param name="methodDictionaryCapacity">Initial capacity for the method dictionary (default 128).</param>
     /// <returns>An SObjectRef to the newly created class.</returns>
     public static SObjectRef CreateClassObject(
         string name,
         SObjectRef superclassRef,
         string[] instanceVariableNames,
-        ObjectFormat instanceFormat)
+        ObjectFormat instanceFormat,
+        int methodDictionaryCapacity = 128)
     {
         // Get Class class (may be Nil during bootstrap)
         var classClass = GetClassClass();
@@ -1217,11 +1328,15 @@ public static partial class ObjectMemoryNew
             // Create a minimal method dictionary without a proper class
             methodDictClass = SObjectRef.Nil;
         }
+
+        // Use provided capacity (from ColdStartData) or default to 128
+        int capacity = methodDictionaryCapacity > 0 ? methodDictionaryCapacity : 128;
+
         var methodDict = AllocateObject(
             methodDictClass,
             ObjectFormat.PointerIndexed,
             methodDictInstVars,  // tally (0) and valueArray (1)
-            128);  // Start with capacity for 128 methods (increased from 16 to avoid resizing during cold start)
+            capacity);  // Pre-sized to exact capacity needed
 
         // Initialize method dictionary: set tally to 0 and create valueArray
         SetInstanceVariable(methodDict, 0, SObjectRef.FromSmallInteger(0));  // tally = 0
@@ -1235,7 +1350,7 @@ public static partial class ObjectMemoryNew
             valueArrayClass,
             ObjectFormat.PointerIndexed,
             0,
-            128);  // Same capacity as method dictionary
+            capacity);  // Same capacity as method dictionary
         SetInstanceVariable(methodDict, 1, SObjectRef.FromObjectPointer(valueArray));  // valueArray
 
         SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.MethodDictionary, SObjectRef.FromObjectPointer(methodDict));

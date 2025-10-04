@@ -12,7 +12,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 /// 1. Replace the ConcurrentDictionary with ObjectTable in ObjectMemory.cs
 /// 2. Update AllocateObject to use objectTable.Allocate()
 /// 3. Update GetObjectData to use objectTable.Get()
-/// 4. Update CollectGarbage to use the new GarbageCollectorNew
+/// 4. Update CollectGarbage to use the new GarbageCollector
 /// 5. Update Become to swap entries in the ObjectTable
 /// </summary>
 public static class ObjectMemoryTableIntegration
@@ -115,7 +115,7 @@ public static class ObjectMemoryTableIntegration
     /// </summary>
     public static void CollectGarbageExample(
         ObjectTable objectTable,
-        GarbageCollectorNew garbageCollector,
+        GarbageCollector garbageCollector,
         SObjectRef[] roots)
     {
         // Pass roots array directly to the new GC
@@ -153,7 +153,7 @@ public static class ObjectMemoryTableIntegration
 
         // NEW:
         private static readonly ObjectTable objectTable = new();
-        private static readonly GarbageCollectorNew garbageCollector = new(objectTable);
+        private static readonly GarbageCollector garbageCollector = new(objectTable);
 
         // OLD (lines 26-30):
         // private static nint nextOop = 0x1000;
@@ -178,7 +178,7 @@ public static class ObjectMemoryTableIntegration
          *    - Remove: nint nextOop
          *    - Remove: object allocationLock
          *    - Add: ObjectTable objectTable = new(65536)
-         *    - Add: GarbageCollectorNew garbageCollector = new(objectTable)
+         *    - Add: GarbageCollector garbageCollector = new(objectTable)
          *
          * 3. Update AllocateObject method (lines 85-122):
          *    - Remove lock statement

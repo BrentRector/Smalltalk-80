@@ -25,6 +25,22 @@ public sealed class LayoutGenerator
     );
 
     /// <summary>
+    /// Escapes a string for use in XML comments.
+    /// </summary>
+    private static string EscapeXmlComment(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "";
+
+        return input
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\"", "&quot;")
+            .Replace("'", "&apos;");
+    }
+
+    /// <summary>
     /// Generates C# layout code from a list of Smalltalk class definitions.
     /// </summary>
     /// <param name="classes">The list of class definitions to process.</param>
@@ -184,7 +200,7 @@ public sealed class LayoutGenerator
             : $" : IST{classInfo.SuperclassName}";
 
         _output.AppendLine($"/// <summary>");
-        _output.AppendLine($"/// Interface for {classInfo.Name} memory layout.");
+        _output.AppendLine($"/// Interface for {EscapeXmlComment(classInfo.Name)} memory layout.");
         _output.AppendLine($"/// </summary>");
         _output.AppendLine($"public interface {interfaceName}{baseInterface}");
         _output.AppendLine("{");
@@ -194,7 +210,7 @@ public sealed class LayoutGenerator
         {
             var propertyName = ToPascalCase(varName);
             _output.AppendLine($"    /// <summary>");
-            _output.AppendLine($"    /// Gets or sets the {varName} instance variable.");
+            _output.AppendLine($"    /// Gets or sets the {EscapeXmlComment(varName)} instance variable.");
             _output.AppendLine($"    /// </summary>");
             _output.AppendLine($"    SObjectRef {propertyName} {{ get; set; }}");
         }
@@ -222,7 +238,7 @@ public sealed class LayoutGenerator
         var interfaceName = $"IST{classInfo.Name}";
 
         _output.AppendLine($"/// <summary>");
-        _output.AppendLine($"/// Memory layout for {classInfo.Name} objects.");
+        _output.AppendLine($"/// Memory layout for {EscapeXmlComment(classInfo.Name)} objects.");
         _output.AppendLine($"/// </summary>");
         _output.AppendLine($"public readonly struct {structName} : {interfaceName}");
         _output.AppendLine("{");
@@ -283,7 +299,7 @@ public sealed class LayoutGenerator
                 }
 
                 _output.AppendLine($"    /// <summary>");
-                _output.AppendLine($"    /// Gets or sets the {varName} instance variable at offset {i}.");
+                _output.AppendLine($"    /// Gets or sets the {EscapeXmlComment(varName)} instance variable at offset {i}.");
                 _output.AppendLine($"    /// </summary>");
                 _output.AppendLine($"    public SObjectRef {propertyName}");
                 _output.AppendLine("    {");

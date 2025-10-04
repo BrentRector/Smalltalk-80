@@ -23,7 +23,7 @@ public sealed class ContextBasedInterpreterNew
     private readonly ILogger<ContextBasedInterpreterNew>? logger;
     private bool tracingEnabled = false;
     private int traceIndentLevel = 0;
-    private GarbageCollectorNew? garbageCollector;
+    private GarbageCollector? garbageCollector;
     private readonly PrimitiveTable primitiveTable;
     private readonly InterpreterPrimitiveContext primitiveContext;
 
@@ -49,7 +49,7 @@ public sealed class ContextBasedInterpreterNew
     /// <summary>
     /// Gets or sets the garbage collector for primitive 133.
     /// </summary>
-    public GarbageCollectorNew? GarbageCollector
+    public GarbageCollector? GarbageCollector
     {
         get => garbageCollector;
         set => garbageCollector = value;

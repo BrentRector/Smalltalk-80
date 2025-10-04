@@ -31,7 +31,7 @@ file sealed class Program
         return args[0].ToLowerInvariant() switch
         {
             "compile" => ExecuteCompileCommand(args[1..]),
-            "generate-layouts" => ExecuteGenerateLayoutsCommand(args[1..]),
+            "generate-coldstart" => ExecuteGenerateColdStartCommand(args[1..]),
             "--help" or "-h" or "/?" => ShowHelp(),
             _ => HandleUnknownCommand(args[0])
         };
@@ -55,18 +55,21 @@ file sealed class Program
         Console.WriteLine("    Options:");
         Console.WriteLine("      --verbose    Show detailed error information");
         Console.WriteLine();
-        Console.WriteLine("  generate-layouts <input.st> <output.cs> [--classes Class1,Class2,...]");
-        Console.WriteLine("    Generates C# memory layout definitions from Smalltalk class definitions.");
+        Console.WriteLine("  generate-coldstart <input.st> <output-dir> --classes Class1,Class2,...");
+        Console.WriteLine("    Generates complete cold start artifacts for specified classes (and their superclasses):");
+        Console.WriteLine("      - Memory layouts (Layouts.cs)");
+        Console.WriteLine("      - Initialization data with exact sizes (ColdStartData.cs)");
+        Console.WriteLine("      - Pre-intern symbol list (ColdStartLiterals.cs)");
         Console.WriteLine("    Options:");
-        Console.WriteLine("      --classes    Comma-separated list of specific classes to generate (default: all)");
+        Console.WriteLine("      --classes    REQUIRED: Comma-separated list of cold start classes");
         Console.WriteLine();
         Console.WriteLine("  --help, -h, /?");
         Console.WriteLine("    Shows this help message.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  Smalltalk80.Compiler compile SystemClasses.st output.json");
-        Console.WriteLine("  Smalltalk80.Compiler generate-layouts SystemClasses.st Layouts.cs");
-        Console.WriteLine("  Smalltalk80.Compiler generate-layouts SystemClasses.st Layouts.cs --classes Object,Class,String");
+        Console.WriteLine("  Smalltalk80.Compiler generate-coldstart Smalltalk-80.st ./Generated \\");
+        Console.WriteLine("      --classes Object,Behavior,Class,Metaclass,CompiledMethod,Array,Dictionary");
 
         return 0;
     }
@@ -151,24 +154,25 @@ file sealed class Program
     }
 
     /// <summary>
-    /// Executes the generate-layouts command to create C# layout definitions.
+    /// Executes the unified generate-coldstart command.
+    /// Generates layouts, initialization data, and literals for specified cold start classes.
     /// </summary>
     /// <param name="args">Command arguments.</param>
     /// <returns>Exit code: 0 for success, non-zero for failure.</returns>
-    private static int ExecuteGenerateLayoutsCommand(string[] args)
+    private static int ExecuteGenerateColdStartCommand(string[] args)
     {
         if (args.Length < 2)
         {
-            Console.Error.WriteLine("Error: generate-layouts command requires <input.st> and <output.cs> arguments");
-            Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-layouts <input.st> <output.cs> [--classes Class1,Class2,...]");
+            Console.Error.WriteLine("Error: generate-coldstart command requires <input.st> and <output-dir> arguments");
+            Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-coldstart <input.st> <output-dir> --classes Class1,Class2,...");
             return 1;
         }
 
         string inputFile = args[0];
-        string outputFile = args[1];
+        string outputDir = args[1];
         HashSet<string>? classFilter = null;
 
-        // Parse optional --classes argument
+        // Parse required --classes argument
         for (int i = 2; i < args.Length; i++)
         {
             if (args[i].StartsWith("--classes", StringComparison.OrdinalIgnoreCase))
@@ -194,6 +198,118 @@ file sealed class Program
             }
         }
 
+        if (classFilter == null || classFilter.Count == 0)
+        {
+            Console.Error.WriteLine("Error: --classes option is required");
+            Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-coldstart <input.st> <output-dir> --classes Class1,Class2,...");
+            return 1;
+        }
+
+        if (!File.Exists(inputFile))
+        {
+            Console.Error.WriteLine($"Error: Input file '{inputFile}' not found.");
+            return 1;
+        }
+
+        // Create output directory if it doesn't exist
+        Directory.CreateDirectory(outputDir);
+
+        try
+        {
+            Console.WriteLine($"Generating cold start artifacts from {inputFile}...");
+            Console.WriteLine($"  Output directory: {outputDir}");
+            Console.WriteLine($"  Requested classes: {string.Join(", ", classFilter)}");
+            Console.WriteLine();
+
+            // Parse the Smalltalk source
+            var result = ParseSmalltalkSource(inputFile);
+
+            // Expand the filter to include all superclasses
+            var expandedClasses = ExpandClassFilterWithSuperclasses(classFilter, result.Classes);
+
+            if (expandedClasses.MissingClasses.Count > 0)
+            {
+                Console.Error.WriteLine($"Error: The following requested classes were not found in the input file:");
+                Console.Error.WriteLine($"  Missing: {string.Join(", ", expandedClasses.MissingClasses)}");
+                return 1;
+            }
+
+            var classesToGenerate = expandedClasses.Classes;
+            Console.WriteLine($"Generating for {classesToGenerate.Count} classes (including superclasses):");
+            Console.WriteLine($"  {string.Join(", ", classesToGenerate.Select(c => c.Name))}");
+            Console.WriteLine();
+
+            // Generate 1: Memory Layouts
+            Console.WriteLine("[1/3] Generating memory layouts...");
+            var layoutGenerator = new LayoutGenerator();
+            string layoutsCode = layoutGenerator.Generate(classesToGenerate);
+            string layoutsFile = Path.Combine(outputDir, "Layouts.cs");
+            File.WriteAllText(layoutsFile, layoutsCode);
+            Console.WriteLine($"      Written: {layoutsFile} ({new FileInfo(layoutsFile).Length:N0} bytes)");
+
+            // Generate 2: Initialization Data
+            Console.WriteLine("[2/3] Generating initialization data...");
+            var dataGenerator = new ColdStartDataGenerator();
+
+            // Create a filtered compilation result with only the cold start classes
+            var filteredResult = new CompilationResult
+            {
+                Classes = classesToGenerate,
+                InitializationExpressions = result.InitializationExpressions
+            };
+
+            dataGenerator.Analyze(filteredResult);
+            var (classCount, methodCount, bytecodeSize, literalCount) = dataGenerator.GetStatistics();
+            Console.WriteLine($"      Classes: {classCount}, Methods: {methodCount}");
+            Console.WriteLine($"      Bytecode: {bytecodeSize:N0} bytes, Literals: {literalCount:N0}");
+
+            string dataCode = dataGenerator.GenerateCSharpData();
+            string dataFile = Path.Combine(outputDir, "ColdStartData.cs");
+            File.WriteAllText(dataFile, dataCode);
+            Console.WriteLine($"      Written: {dataFile} ({new FileInfo(dataFile).Length:N0} bytes)");
+
+            // Generate 3: Symbol Literals
+            Console.WriteLine("[3/3] Generating symbol literals...");
+            var literalExtractor = new LiteralExtractor();
+            literalExtractor.Extract(filteredResult);
+            var (symbolCount, stringCount) = literalExtractor.GetStatistics();
+            Console.WriteLine($"      Symbols: {symbolCount:N0}, Strings: {stringCount:N0}");
+
+            string literalsCode = literalExtractor.GenerateCSharpCode();
+            string literalsFile = Path.Combine(outputDir, "ColdStartLiterals.cs");
+            File.WriteAllText(literalsFile, literalsCode);
+            Console.WriteLine($"      Written: {literalsFile} ({new FileInfo(literalsFile).Length:N0} bytes)");
+
+            Console.WriteLine();
+            Console.WriteLine($"Successfully generated all cold start artifacts to {outputDir}");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Executes the generate-literals command to extract all symbols and string literals.
+    /// </summary>
+    /// <param name="args">Command arguments.</param>
+    /// <returns>Exit code: 0 for success, non-zero for failure.</returns>
+    private static int ExecuteGenerateLiteralsCommand(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Error: generate-literals command requires <input.st> and <output.cs> arguments");
+            Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-literals <input.st> <output.cs>");
+            return 1;
+        }
+
+        string inputFile = args[0];
+        string outputFile = args[1];
+
         if (!File.Exists(inputFile))
         {
             Console.Error.WriteLine($"Error: Input file '{inputFile}' not found.");
@@ -202,46 +318,126 @@ file sealed class Program
 
         try
         {
-            Console.WriteLine($"Generating layouts from {inputFile}...");
+            Console.WriteLine($"Extracting literals from {inputFile}...");
 
             // Parse the Smalltalk source
             var result = ParseSmalltalkSource(inputFile);
 
-            // Filter classes if specified
-            List<ClassDefinitionNode> classesToGenerate = result.Classes;
-            if (classFilter?.Count > 0)
-            {
-                // Expand the filter to include all superclasses
-                var expandedClasses = ExpandClassFilterWithSuperclasses(classFilter, result.Classes);
+            // Extract literals
+            var extractor = new LiteralExtractor();
+            extractor.Extract(result);
 
-                if (expandedClasses.MissingClasses.Count > 0)
-                {
-                    Console.Error.WriteLine($"Error: The following requested classes were not found in the input file:");
-                    Console.Error.WriteLine($"  Missing: {string.Join(", ", expandedClasses.MissingClasses)}");
-                    Console.Error.WriteLine($"  Available: {string.Join(", ", result.Classes.Select(c => c.Name))}");
-                    return 1;
-                }
+            var (symbolCount, stringCount) = extractor.GetStatistics();
+            Console.WriteLine($"  Extracted {symbolCount} unique symbols");
+            Console.WriteLine($"  Extracted {stringCount} unique string literals");
 
-                classesToGenerate = expandedClasses.Classes;
-
-                // Show both requested and expanded class lists
-                Console.WriteLine($"  Requested: {string.Join(", ", classFilter)}");
-                Console.WriteLine($"  Generating {classesToGenerate.Count} classes (including superclasses): {string.Join(", ", classesToGenerate.Select(c => c.Name))}");
-            }
-
-            // Generate C# layout code
-            var layoutGenerator = new LayoutGenerator();
-            string generatedCode = layoutGenerator.Generate(classesToGenerate);
+            // Generate C# code
+            string generatedCode = extractor.GenerateCSharpCode();
             File.WriteAllText(outputFile, generatedCode);
 
-            Console.WriteLine($"Successfully generated layouts to {outputFile}");
-            Console.WriteLine($"  Classes generated: {classesToGenerate.Count}");
+            Console.WriteLine($"Successfully generated literals file to {outputFile}");
 
             return 0;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Executes the generate-coldstart-data command to create complete initialization data.
+    /// </summary>
+    /// <param name="args">Command arguments.</param>
+    /// <returns>Exit code: 0 for success, non-zero for failure.</returns>
+    private static int ExecuteGenerateColdStartDataCommand(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Error: generate-coldstart-data command requires <input.st> and <output-prefix> arguments");
+            Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-coldstart-data <input.st> <output-prefix> [--format json|csharp]");
+            return 1;
+        }
+
+        string inputFile = args[0];
+        string outputPrefix = args[1];
+        string format = "csharp"; // Default format
+
+        // Parse optional --format argument
+        for (int i = 2; i < args.Length; i++)
+        {
+            if (args[i].StartsWith("--format", StringComparison.OrdinalIgnoreCase))
+            {
+                if (args[i].Contains('='))
+                {
+                    format = args[i][(args[i].IndexOf('=') + 1)..].ToLowerInvariant();
+                }
+                else if (i + 1 < args.Length)
+                {
+                    format = args[++i].ToLowerInvariant();
+                }
+            }
+        }
+
+        if (format != "json" && format != "csharp")
+        {
+            Console.Error.WriteLine($"Error: Invalid format '{format}'. Must be 'json' or 'csharp'.");
+            return 1;
+        }
+
+        if (!File.Exists(inputFile))
+        {
+            Console.Error.WriteLine($"Error: Input file '{inputFile}' not found.");
+            return 1;
+        }
+
+        try
+        {
+            Console.WriteLine($"Analyzing cold start data from {inputFile}...");
+
+            // Parse the Smalltalk source
+            var result = ParseSmalltalkSource(inputFile);
+
+            // Analyze and generate cold start data
+            var generator = new ColdStartDataGenerator();
+            generator.Analyze(result);
+
+            var (classCount, methodCount, bytecodeSize, literalCount) = generator.GetStatistics();
+            Console.WriteLine($"  Classes: {classCount}");
+            Console.WriteLine($"  Methods: {methodCount}");
+            Console.WriteLine($"  Total bytecode size: {bytecodeSize} bytes");
+            Console.WriteLine($"  Total literals: {literalCount}");
+            Console.WriteLine();
+
+            // Generate output based on format
+            string outputFile;
+            string generatedData;
+
+            if (format == "json")
+            {
+                outputFile = outputPrefix.EndsWith(".json") ? outputPrefix : outputPrefix + ".json";
+                generatedData = generator.GenerateJsonData();
+                Console.WriteLine($"Generating JSON data...");
+            }
+            else // csharp
+            {
+                outputFile = outputPrefix.EndsWith(".cs") ? outputPrefix : outputPrefix + ".cs";
+                generatedData = generator.GenerateCSharpData();
+                Console.WriteLine($"Generating C# data structures...");
+            }
+
+            File.WriteAllText(outputFile, generatedData);
+
+            Console.WriteLine($"Successfully generated cold start data to {outputFile}");
+            Console.WriteLine($"  File size: {new FileInfo(outputFile).Length:N0} bytes");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
             return 1;
         }
     }

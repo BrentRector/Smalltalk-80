@@ -9,6 +9,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>CS8981</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,20 +25,55 @@
     <Compile Remove="**\*.OLD.cs" />
   </ItemGroup>
 
-  <!-- Auto-generate STObjectsLayout.cs from Smalltalk-80.st when source changes -->
+  <!-- Auto-generate cold start artifacts from Smalltalk-80.st when source changes -->
   <PropertyGroup>
     <SmalltalkSourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SmalltalkSourceFile>
-    <LayoutGeneratorOutput>$(MSBuildProjectDirectory)\Generated\STObjectsLayout.cs</LayoutGeneratorOutput>
-    <ColdStartClasses>Object,Behavior,ClassDescription,Class,Metaclass,Magnitude,Number,Integer,LookupKey,Association,Collection,SequenceableCollection,ArrayedCollection,Array,String,Symbol,ByteArray,CompiledMethod,InstructionStream,ContextPart,BlockContext,MethodContext,Link,LinkedList,Process,Semaphore,ProcessorScheduler,UndefinedObject,Boolean,True,False,SmallInteger,LargePositiveInteger,LargeNegativeInteger,Float,Fraction,Point,Rectangle,Character,Set,Dictionary,IdentityDictionary,MethodDictionary,SystemDictionary</ColdStartClasses>
+    <GeneratedOutputDir>$(MSBuildProjectDirectory)\Generated</GeneratedOutputDir>
+
+    <!-- Cold start classes: MINIMAL core system classes needed for bootstrap -->
+    <!-- REMOVED: StringHolder, TextCollector, Text (UI-related, not core) -->
+    <!-- REMOVED: All compiler classes (ParseNode, Scanner, Parser, Compiler, etc.) - not needed for minimal runtime -->
+    <ColdStartClasses>Object,Behavior,ClassDescription,Metaclass,Class,CompiledMethod,InstructionStream,ContextPart,MethodContext,BlockContext,Collection,SequenceableCollection,ArrayedCollection,OrderedCollection,Set,ByteArray,String,Symbol,Array,Magnitude,LookupKey,Association,Dictionary,IdentityDictionary,MethodDictionary,SystemDictionary,Number,Integer,SmallInteger,Float,LargePositiveInteger,LargeNegativeInteger,Character,Boolean,True,False,UndefinedObject,Link,Process,LinkedList,Semaphore,ProcessorScheduler,Stream,PositionableStream,WriteStream,ReadStream</ColdStartClasses>
+
+    <!-- Output file paths - all in Generated/ folder -->
+    <LayoutsOutput>$(GeneratedOutputDir)\Layouts.cs</LayoutsOutput>
+    <ColdStartDataOutput>$(GeneratedOutputDir)\ColdStartData.cs</ColdStartDataOutput>
+    <ColdStartLiteralsOutput>$(GeneratedOutputDir)\ColdStartLiterals.cs</ColdStartLiteralsOutput>
   </PropertyGroup>
 
-  <Target Name="GenerateSTObjectsLayout"
+  <Target Name="GenerateColdStartArtifacts"
           BeforeTargets="BeforeBuild"
           Inputs="$(SmalltalkSourceFile)"
-          Outputs="$(LayoutGeneratorOutput)">
-    <Message Text="Regenerating STObjectsLayout.cs from Smalltalk-80.st..." Importance="high" />
-    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; -- generate-layouts &quot;$(SmalltalkSourceFile)&quot; &quot;$(LayoutGeneratorOutput)&quot; --classes $(ColdStartClasses)"
+          Outputs="$(LayoutsOutput);$(ColdStartDataOutput);$(ColdStartLiteralsOutput)"
+          Condition="'$(SkipColdStartGeneration)' != 'true'">
+
+    <Message Text="Smalltalk source is newer than generated files - regenerating cold start artifacts..." Importance="high" />
+
+    <!-- Create temp output directory -->
+    <MakeDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
+
+    <!-- Run the compiler to generate all cold start artifacts -->
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; --configuration Release -- generate-coldstart &quot;$(SmalltalkSourceFile)&quot; &quot;$(MSBuildProjectDirectory)\GeneratedTemp&quot; --classes $(ColdStartClasses)"
           WorkingDirectory="$(MSBuildProjectDirectory)\.." />
+
+    <!-- Copy all generated files to Generated/ folder -->
+    <Message Text="Copying generated files to Generated/" Importance="high" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\Layouts.cs"
+          DestinationFiles="$(LayoutsOutput)"
+          SkipUnchangedFiles="false" />
+
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartData.cs"
+          DestinationFiles="$(ColdStartDataOutput)"
+          SkipUnchangedFiles="false" />
+
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartLiterals.cs"
+          DestinationFiles="$(ColdStartLiteralsOutput)"
+          SkipUnchangedFiles="false" />
+
+    <!-- Clean up temp directory -->
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
+
+    <Message Text="Cold start artifacts regenerated successfully" Importance="high" />
   </Target>
 
 </Project>

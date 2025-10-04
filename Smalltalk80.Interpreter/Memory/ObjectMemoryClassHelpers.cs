@@ -415,24 +415,7 @@ public static partial class ObjectMemoryNew
         if (compiledMethodClass.IsNil)
             throw new InvalidOperationException("CompiledMethod class not initialized. Call SystemDictionary.Initialize() first.");
 
-        // Create the compiled method object
-        // For CompiledMethod: instance variables hold the literals, indexed byte data holds bytecodes
-        var methodOop = AllocateObject(
-            compiledMethodClass,
-            ObjectFormat.CompiledMethod,
-            literals.Length, // Instance variables for literals
-            bytecodes.Length + 2); // Byte-indexed data for header + bytecodes
-
-        // Set literals in instance variables (only if there are any)
-        if (literals.Length > 0)
-        {
-            for (int i = 0; i < literals.Length; i++)
-            {
-                SetInstanceVariable(methodOop, i, literals[i]);
-            }
-        }
-
-        // Create and set header
+        // Create and set header FIRST to determine correct size
         // Header format: bits 0-2: arg count, bits 3-7: temp count, bits 8-14: literal count, bit 15: flag bit
         ushort header = 0;
         header |= (ushort)(numArgs & 0x07);                    // Bits 0-2: arg count
@@ -444,8 +427,27 @@ public static partial class ObjectMemoryNew
             header |= 0x8000; // Set bit 15 to indicate primitive/extended header
         }
 
-        // Set header as first two bytes
+        // Determine header size BEFORE allocation
         var headerSize = primitiveIndex > 0 ? 4 : 2; // Extended header has 4 bytes (header + primitive index)
+
+        // Create the compiled method object with CORRECT size including proper header
+        // For CompiledMethod: instance variables hold the literals, indexed byte data holds bytecodes
+        var methodOop = AllocateObject(
+            compiledMethodClass,
+            ObjectFormat.CompiledMethod,
+            literals.Length, // Instance variables for literals
+            bytecodes.Length + headerSize); // Byte-indexed data for header + bytecodes (FIXED: use headerSize not hardcoded 2)
+
+        // Set literals in instance variables (only if there are any)
+        if (literals.Length > 0)
+        {
+            for (int i = 0; i < literals.Length; i++)
+            {
+                SetInstanceVariable(methodOop, i, literals[i]);
+            }
+        }
+
+        // Set header as first two bytes (header already calculated above)
         var fullData = new byte[bytecodes.Length + headerSize];
         fullData[0] = (byte)(header & 0xFF);
         fullData[1] = (byte)((header >> 8) & 0xFF);

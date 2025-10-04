@@ -45,12 +45,12 @@ public static class BlueBookFactory
             indexedSize: 0
         );
 
-        STMethodContextCorrect context = SObjectRef.FromObjectPointer(oop);
+        STMethodContext context = SObjectRef.FromObjectPointer(oop);
 
         // Initialize fixed fields using type-safe layout struct
         context.Sender = SObjectRef.Nil;
-        context.InstructionPointer = SObjectRef.FromSmallInteger(0);
-        context.StackPointer = SObjectRef.FromSmallInteger(FixedFieldCount + tempCount);
+        context.Pc = SObjectRef.FromSmallInteger(0);
+        context.Stackp = SObjectRef.FromSmallInteger(FixedFieldCount + tempCount);
         context.Method = method;
         context.ReceiverMap = SObjectRef.Nil;
         context.Receiver = receiver;
@@ -93,14 +93,14 @@ public static class BlueBookFactory
             indexedSize: 0
         );
 
-        STBlockContextCorrect context = SObjectRef.FromObjectPointer(oop);
+        STBlockContext context = SObjectRef.FromObjectPointer(oop);
 
         // Initialize fixed fields using type-safe layout struct
         context.Sender = SObjectRef.Nil;
-        context.InstructionPointer = SObjectRef.FromSmallInteger(startpc);
-        context.StackPointer = SObjectRef.FromSmallInteger(FixedFieldCount);
+        context.Pc = SObjectRef.FromSmallInteger(startpc);
+        context.Stackp = SObjectRef.FromSmallInteger(FixedFieldCount);
         context.Nargs = SObjectRef.FromSmallInteger(nargs);
-        context.StartPC = SObjectRef.FromSmallInteger(startpc);
+        context.Startpc = SObjectRef.FromSmallInteger(startpc);
         context.Home = home;
 
         // Initialize stack to nil

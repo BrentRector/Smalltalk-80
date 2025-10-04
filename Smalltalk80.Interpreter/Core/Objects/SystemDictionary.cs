@@ -19,17 +19,17 @@ public static partial class SystemDictionary
     /// <summary>
     /// Gets the singleton True object.
     /// </summary>
-    public static SObjectRef TrueObject { get; private set; }
+    public static SObjectRef TrueObject { get; internal set; }
 
     /// <summary>
     /// Gets the singleton False object.
     /// </summary>
-    public static SObjectRef FalseObject { get; private set; }
+    public static SObjectRef FalseObject { get; internal set; }
 
     /// <summary>
     /// Gets the singleton nil object.
     /// </summary>
-    public static SObjectRef NilObject { get; private set; }
+    public static SObjectRef NilObject { get; internal set; }
 
     /// <summary>
     /// Gets the system dictionary instance itself as an SObjectRef.
@@ -173,348 +173,21 @@ public static partial class SystemDictionary
     {
         if (initialized) return;
 
-        LogColdStart("Starting cold start initialization with pure SObjectRef architecture...");
-        LogColdStart("Creating complete Smalltalk-80 class hierarchy (60 classes)");
-
-        // Phase 1: Core Object Model Classes (5 classes per Blue Book)
-        // Special handling for the bootstrap classes due to circular dependencies
-        // Note: CreateClassObject handles the case where MethodDictionary class doesn't exist yet
-
-        LogColdStart("Creating Object class");
-        ObjectClassRef = ObjectMemoryNew.CreateClassObject("Object", SObjectRef.Nil, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Object", ObjectClassRef);
-
-        LogColdStart("Creating Behavior class");
-        BehaviorClassRef = ObjectMemoryNew.CreateClassObject("Behavior", ObjectClassRef, ["superclass", "methodDict", "format"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Behavior", BehaviorClassRef);
-
-        LogColdStart("Creating ClassDescription class");
-        ClassDescriptionClassRef = ObjectMemoryNew.CreateClassObject("ClassDescription", BehaviorClassRef, ["instanceVariables", "organization"], ObjectFormat.FixedPointer);
-        RegisterClassRef("ClassDescription", ClassDescriptionClassRef);
-
-        LogColdStart("Creating Metaclass class");
-        MetaclassClassRef = ObjectMemoryNew.CreateClassObject("Metaclass", ClassDescriptionClassRef, ["thisClass"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Metaclass", MetaclassClassRef);
-
-        LogColdStart("Creating Class class");
-        ClassClassRef = ObjectMemoryNew.CreateClassObject("Class", ClassDescriptionClassRef, ["name", "classPool", "sharedPools"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Class", ClassClassRef);
-
-        // Phase 2: Method Storage Classes
-        LogColdStart("Creating CompiledMethod class");
-        // CompiledMethod instances have no named instance variables - literals are stored in indexed section
-        CompiledMethodClassRef = ObjectMemoryNew.CreateClassObject("CompiledMethod", ObjectClassRef, [], ObjectFormat.CompiledMethod);
-        RegisterClassRef("CompiledMethod", CompiledMethodClassRef);
-        ObjectMemoryNew.SetWellKnownClass("CompiledMethod", CompiledMethodClassRef);
-
-        // MethodDictionary will be created later after IdentityDictionary (Phase 4)
-
-        // Phase 3: Execution Context Classes
-        LogColdStart("Creating InstructionStream class");
-        InstructionStreamClassRef = ObjectMemoryNew.CreateClassObject("InstructionStream", ObjectClassRef, ["sender", "pc"], ObjectFormat.FixedPointer);
-        RegisterClassRef("InstructionStream", InstructionStreamClassRef);
-
-        LogColdStart("Creating ContextPart class");
-        ContextPartClassRef = ObjectMemoryNew.CreateClassObject("ContextPart", InstructionStreamClassRef, ["sender", "ip", "sp", "method", "receiverMap"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("ContextPart", ContextPartClassRef);
-
-        LogColdStart("Creating MethodContext class");
-        MethodContextClassRef = ObjectMemoryNew.CreateClassObject("MethodContext", ContextPartClassRef, ["receiver"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("MethodContext", MethodContextClassRef);
-
-        LogColdStart("Creating BlockContext class");
-        BlockContextClassRef = ObjectMemoryNew.CreateClassObject("BlockContext", ContextPartClassRef, ["nargs", "startpc", "home"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("BlockContext", BlockContextClassRef);
-
-        // Phase 4: Collection Classes
-        LogColdStart("Creating Collection class");
-        CollectionClassRef = ObjectMemoryNew.CreateClassObject("Collection", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Collection", CollectionClassRef);
-
-        LogColdStart("Creating SequenceableCollection class");
-        SequenceableCollectionClassRef = ObjectMemoryNew.CreateClassObject("SequenceableCollection", CollectionClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("SequenceableCollection", SequenceableCollectionClassRef);
-
-        LogColdStart("Creating OrderedCollection class");
-        OrderedCollectionClassRef = ObjectMemoryNew.CreateClassObject("OrderedCollection", SequenceableCollectionClassRef, ["firstIndex", "lastIndex"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("OrderedCollection", OrderedCollectionClassRef);
-
-        LogColdStart("Creating Set class");
-        SetClassRef = ObjectMemoryNew.CreateClassObject("Set", CollectionClassRef, ["tally"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("Set", SetClassRef);
-
-        LogColdStart("Creating ByteArray class");
-        ByteArrayClassRef = ObjectMemoryNew.CreateClassObject("ByteArray", SequenceableCollectionClassRef, [], ObjectFormat.ByteIndexed);
-        RegisterClassRef("ByteArray", ByteArrayClassRef);
-
-        LogColdStart("Creating String class");
-        StringClassRef = ObjectMemoryNew.CreateClassObject("String", ByteArrayClassRef, [], ObjectFormat.ByteIndexed);
-        RegisterClassRef("String", StringClassRef);
-
-        LogColdStart("Creating Symbol class");
-        SymbolClassRef = ObjectMemoryNew.CreateClassObject("Symbol", StringClassRef, [], ObjectFormat.ByteIndexed);
-        RegisterClassRef("Symbol", SymbolClassRef);
-        ObjectMemoryNew.SetWellKnownClass("Symbol", SymbolClassRef);
-
-        LogColdStart("Creating Array class");
-        ArrayClassRef = ObjectMemoryNew.CreateClassObject("Array", SequenceableCollectionClassRef, [], ObjectFormat.PointerIndexed);
-        RegisterClassRef("Array", ArrayClassRef);
-
-        // Phase 5: Numeric Class Hierarchy (moved before collections to provide Magnitude for LookupKey)
-        LogColdStart("Creating Magnitude class");
-        MagnitudeClassRef = ObjectMemoryNew.CreateClassObject("Magnitude", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Magnitude", MagnitudeClassRef);
-
-        LogColdStart("Creating LookupKey class");
-        LookupKeyClassRef = ObjectMemoryNew.CreateClassObject("LookupKey", MagnitudeClassRef, ["key"], ObjectFormat.FixedPointer);
-        RegisterClassRef("LookupKey", LookupKeyClassRef);
-
-        LogColdStart("Creating Association class");
-        AssociationClassRef = ObjectMemoryNew.CreateClassObject("Association", LookupKeyClassRef, ["value"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Association", AssociationClassRef);
-
-        LogColdStart("Creating Dictionary class");
-        DictionaryClassRef = ObjectMemoryNew.CreateClassObject("Dictionary", SetClassRef, [], ObjectFormat.PointerIndexed);
-
-        // Create SystemDictionary instance NOW, before registering any more classes
-        // This allows us to use it as the sole source of truth for class storage
-        LogColdStart("Creating SystemDictionary instance");
-        Instance = DictionaryClassRef.CreateInstance(100);
-
-        // Add all previously created classes to the Instance
-        // (These were created before Dictionary class existed)
-        var preDictionaryClasses = new[] {
-            ("Object", ObjectClassRef),
-            ("Behavior", BehaviorClassRef),
-            ("ClassDescription", ClassDescriptionClassRef),
-            ("Metaclass", MetaclassClassRef),
-            ("Class", ClassClassRef),
-            ("CompiledMethod", CompiledMethodClassRef),
-            ("InstructionStream", InstructionStreamClassRef),
-            ("ContextPart", ContextPartClassRef),
-            ("MethodContext", MethodContextClassRef),
-            ("BlockContext", BlockContextClassRef),
-            ("Collection", CollectionClassRef),
-            ("SequenceableCollection", SequenceableCollectionClassRef),
-            ("OrderedCollection", OrderedCollectionClassRef),
-            ("Set", SetClassRef),
-            ("ByteArray", ByteArrayClassRef),
-            ("String", StringClassRef),
-            ("Symbol", SymbolClassRef),
-            ("Array", ArrayClassRef),
-            ("Magnitude", MagnitudeClassRef),
-            ("LookupKey", LookupKeyClassRef),
-            ("Association", AssociationClassRef)
-        };
-
-        foreach (var (name, classRef) in preDictionaryClasses)
-        {
-            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
-            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, classRef);
-        }
-
-        // Now register Dictionary class and all subsequent classes will go directly into Instance
-        RegisterClassRef("Dictionary", DictionaryClassRef);
-
-        LogColdStart("Creating IdentityDictionary class");
-        IdentityDictionaryClassRef = ObjectMemoryNew.CreateClassObject("IdentityDictionary", DictionaryClassRef, ["valueArray"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("IdentityDictionary", IdentityDictionaryClassRef);
-
-        LogColdStart("Creating MethodDictionary class");
-        MethodDictionaryClassRef = ObjectMemoryNew.CreateClassObject("MethodDictionary", IdentityDictionaryClassRef, [], ObjectFormat.PointerIndexed);
-        RegisterClassRef("MethodDictionary", MethodDictionaryClassRef);
-
-        LogColdStart("Creating SystemDictionary class");
-        SystemDictionaryClassRef = ObjectMemoryNew.CreateClassObject("SystemDictionary", DictionaryClassRef, [], ObjectFormat.PointerIndexed);
-        RegisterClassRef("SystemDictionary", SystemDictionaryClassRef);
-
-        // Continue Numeric Class Hierarchy
-        LogColdStart("Creating Number class");
-        NumberClassRef = ObjectMemoryNew.CreateClassObject("Number", MagnitudeClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Number", NumberClassRef);
-
-        LogColdStart("Creating Integer class");
-        IntegerClassRef = ObjectMemoryNew.CreateClassObject("Integer", NumberClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Integer", IntegerClassRef);
-
-        LogColdStart("Creating SmallInteger class");
-        SmallIntegerClassRef = ObjectMemoryNew.CreateClassObject("SmallInteger", IntegerClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("SmallInteger", SmallIntegerClassRef);
-
-        LogColdStart("Creating Float class");
-        FloatClassRef = ObjectMemoryNew.CreateClassObject("Float", NumberClassRef, [], ObjectFormat.WordIndexed);
-        RegisterClassRef("Float", FloatClassRef);
-
-        LogColdStart("Creating LargePositiveInteger class");
-        LargePositiveIntegerClassRef = ObjectMemoryNew.CreateClassObject("LargePositiveInteger", IntegerClassRef, [], ObjectFormat.ByteIndexed);
-        RegisterClassRef("LargePositiveInteger", LargePositiveIntegerClassRef);
-
-        LogColdStart("Creating LargeNegativeInteger class");
-        LargeNegativeIntegerClassRef = ObjectMemoryNew.CreateClassObject("LargeNegativeInteger", IntegerClassRef, [], ObjectFormat.ByteIndexed);
-        RegisterClassRef("LargeNegativeInteger", LargeNegativeIntegerClassRef);
-
-        LogColdStart("Creating Character class");
-        CharacterClassRef = ObjectMemoryNew.CreateClassObject("Character", MagnitudeClassRef, ["value"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Character", CharacterClassRef);
-
-        // Phase 6: Boolean Classes
-        LogColdStart("Creating Boolean class");
-        BooleanClassRef = ObjectMemoryNew.CreateClassObject("Boolean", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Boolean", BooleanClassRef);
-
-        LogColdStart("Creating True class");
-        TrueClassRef = ObjectMemoryNew.CreateClassObject("True", BooleanClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("True", TrueClassRef);
-
-        LogColdStart("Creating False class");
-        FalseClassRef = ObjectMemoryNew.CreateClassObject("False", BooleanClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("False", FalseClassRef);
-
-        LogColdStart("Creating UndefinedObject class");
-        UndefinedObjectClassRef = ObjectMemoryNew.CreateClassObject("UndefinedObject", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("UndefinedObject", UndefinedObjectClassRef);
-
-        // Phase 7: Process-Related Classes
-        LogColdStart("Creating Link class");
-        LinkClassRef = ObjectMemoryNew.CreateClassObject("Link", ObjectClassRef, ["nextLink"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Link", LinkClassRef);
-
-        LogColdStart("Creating Process class");
-        ProcessClassRef = ObjectMemoryNew.CreateClassObject("Process", LinkClassRef, ["suspendedContext", "priority", "myList"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Process", ProcessClassRef);
-
-        LogColdStart("Creating LinkedList class");
-        LinkedListClassRef = ObjectMemoryNew.CreateClassObject("LinkedList", ObjectClassRef, ["firstLink", "lastLink"], ObjectFormat.FixedPointer);
-        RegisterClassRef("LinkedList", LinkedListClassRef);
-
-        LogColdStart("Creating Semaphore class");
-        SemaphoreClassRef = ObjectMemoryNew.CreateClassObject("Semaphore", LinkedListClassRef, ["excessSignals"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Semaphore", SemaphoreClassRef);
-
-        LogColdStart("Creating ProcessorScheduler class");
-        ProcessorSchedulerClassRef = ObjectMemoryNew.CreateClassObject("ProcessorScheduler", ObjectClassRef, ["quiescentProcessLists", "activeProcess"], ObjectFormat.FixedPointer);
-        RegisterClassRef("ProcessorScheduler", ProcessorSchedulerClassRef);
-
-        // Phase 8: I/O and Transcript Classes
-        LogColdStart("Creating Stream class");
-        StreamClassRef = ObjectMemoryNew.CreateClassObject("Stream", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("Stream", StreamClassRef);
-
-        LogColdStart("Creating PositionableStream class");
-        PositionableStreamClassRef = ObjectMemoryNew.CreateClassObject("PositionableStream", StreamClassRef, ["collection", "position", "readLimit"], ObjectFormat.FixedPointer);
-        RegisterClassRef("PositionableStream", PositionableStreamClassRef);
-
-        LogColdStart("Creating WriteStream class");
-        WriteStreamClassRef = ObjectMemoryNew.CreateClassObject("WriteStream", PositionableStreamClassRef, ["writeLimit"], ObjectFormat.FixedPointer);
-        RegisterClassRef("WriteStream", WriteStreamClassRef);
-
-        LogColdStart("Creating ReadStream class");
-        ReadStreamClassRef = ObjectMemoryNew.CreateClassObject("ReadStream", PositionableStreamClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("ReadStream", ReadStreamClassRef);
-
-        LogColdStart("Creating StringHolder class");
-        StringHolderClassRef = ObjectMemoryNew.CreateClassObject("StringHolder", ObjectClassRef, ["contents"], ObjectFormat.FixedPointer);
-        RegisterClassRef("StringHolder", StringHolderClassRef);
-
-        LogColdStart("Creating TextCollector class");
-        TextCollectorClassRef = ObjectMemoryNew.CreateClassObject("TextCollector", StringHolderClassRef, ["entryStream"], ObjectFormat.FixedPointer);
-        RegisterClassRef("TextCollector", TextCollectorClassRef);
-
-        LogColdStart("Creating Text class");
-        TextClassRef = ObjectMemoryNew.CreateClassObject("Text", ArrayClassRef, ["string", "runs"], ObjectFormat.PointerIndexed);
-        RegisterClassRef("Text", TextClassRef);
-
-        // Phase 9: Compilation Support Classes (15 classes)
-        LogColdStart("Creating ParseNode class");
-        ParseNodeClassRef = ObjectMemoryNew.CreateClassObject("ParseNode", ObjectClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("ParseNode", ParseNodeClassRef);
-
-        LogColdStart("Creating LeafNode class");
-        LeafNodeClassRef = ObjectMemoryNew.CreateClassObject("LeafNode", ParseNodeClassRef, ["key", "code"], ObjectFormat.FixedPointer);
-        RegisterClassRef("LeafNode", LeafNodeClassRef);
-
-        LogColdStart("Creating Scanner class");
-        ScannerClassRef = ObjectMemoryNew.CreateClassObject("Scanner", ObjectClassRef, ["source", "mark", "hereChar", "aheadChar", "token", "tokenType", "currentComment", "buffer", "typeTable"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Scanner", ScannerClassRef);
-
-        LogColdStart("Creating Parser class");
-        ParserClassRef = ObjectMemoryNew.CreateClassObject("Parser", ScannerClassRef, ["here", "hereType", "hereMark", "prevToken", "prevMark", "encoder", "requestor", "parseNode", "failBlock", "lastTempMark", "correctionDelta"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Parser", ParserClassRef);
-
-        LogColdStart("Creating Compiler class");
-        CompilerClassRef = ObjectMemoryNew.CreateClassObject("Compiler", ObjectClassRef, ["sourceStream", "requestor", "class", "context"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Compiler", CompilerClassRef);
-
-        LogColdStart("Creating Encoder class");
-        EncoderClassRef = ObjectMemoryNew.CreateClassObject("Encoder", ParseNodeClassRef, ["scopeTable", "nTemps", "supered", "requestor", "class", "literalStream", "selectorSet", "litIndSet", "litSet", "sourceRanges", "lastTempPos"], ObjectFormat.FixedPointer);
-        RegisterClassRef("Encoder", EncoderClassRef);
-
-        LogColdStart("Creating VariableNode class");
-        VariableNodeClassRef = ObjectMemoryNew.CreateClassObject("VariableNode", LeafNodeClassRef, ["name", "index"], ObjectFormat.FixedPointer);
-        RegisterClassRef("VariableNode", VariableNodeClassRef);
-
-        LogColdStart("Creating LiteralNode class");
-        LiteralNodeClassRef = ObjectMemoryNew.CreateClassObject("LiteralNode", LeafNodeClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("LiteralNode", LiteralNodeClassRef);
-
-        LogColdStart("Creating SelectorNode class");
-        SelectorNodeClassRef = ObjectMemoryNew.CreateClassObject("SelectorNode", LeafNodeClassRef, [], ObjectFormat.FixedPointer);
-        RegisterClassRef("SelectorNode", SelectorNodeClassRef);
-
-        LogColdStart("Creating MessageNode class");
-        MessageNodeClassRef = ObjectMemoryNew.CreateClassObject("MessageNode", ParseNodeClassRef, ["receiver", "selector", "precedence", "special", "arguments", "sizes", "pc"], ObjectFormat.FixedPointer);
-        RegisterClassRef("MessageNode", MessageNodeClassRef);
-
-        LogColdStart("Creating AssignmentNode class");
-        AssignmentNodeClassRef = ObjectMemoryNew.CreateClassObject("AssignmentNode", ParseNodeClassRef, ["variable", "value"], ObjectFormat.FixedPointer);
-        RegisterClassRef("AssignmentNode", AssignmentNodeClassRef);
-
-        LogColdStart("Creating ReturnNode class");
-        ReturnNodeClassRef = ObjectMemoryNew.CreateClassObject("ReturnNode", ParseNodeClassRef, ["expr", "pc"], ObjectFormat.FixedPointer);
-        RegisterClassRef("ReturnNode", ReturnNodeClassRef);
-
-        LogColdStart("Creating BlockNode class");
-        BlockNodeClassRef = ObjectMemoryNew.CreateClassObject("BlockNode", ParseNodeClassRef, ["arguments", "statements", "returns", "nArgsNode", "size", "remoteCopyNode", "sourceRange", "endPC"], ObjectFormat.FixedPointer);
-        RegisterClassRef("BlockNode", BlockNodeClassRef);
-
-        LogColdStart("Creating CascadeNode class");
-        CascadeNodeClassRef = ObjectMemoryNew.CreateClassObject("CascadeNode", ParseNodeClassRef, ["receiver", "messages"], ObjectFormat.FixedPointer);
-        RegisterClassRef("CascadeNode", CascadeNodeClassRef);
-
-        LogColdStart("Creating MethodNode class");
-        MethodNodeClassRef = ObjectMemoryNew.CreateClassObject("MethodNode", ParseNodeClassRef, ["selectorOrFalse", "precedence", "arguments", "block", "literals", "primitive", "encoder", "temporaries"], ObjectFormat.FixedPointer);
-        RegisterClassRef("MethodNode", MethodNodeClassRef);
-
-        // Phase 10: Create singleton objects as proper Smalltalk objects
-        LogColdStart("Creating singleton objects (nil, true, false)");
-
-        // Create nil as instance of UndefinedObject
-        NilObject = UndefinedObjectClassRef.CreateInstance();
-        // TODO: ObjectMemoryNew.SetWellKnownObject("nil", NilObject);
-
-        // Create true as instance of True
-        TrueObject = TrueClassRef.CreateInstance();
-        // TODO: ObjectMemoryNew.SetWellKnownObject("true", TrueObject);
-
-        // Create false as instance of False
-        FalseObject = FalseClassRef.CreateInstance();
-        // TODO: ObjectMemoryNew.SetWellKnownObject("false", FalseObject);
-
-        // Create USTable (Unique String Table) for Symbol class
-        // This MUST be done before any symbol interning that expects USTable to exist
-        LogColdStart("Creating Symbol class USTable (symbol hash table)");
-        var usTable = ColdStart.SymbolTableBuilder.CreateUSTable();
-        ColdStart.SymbolTableBuilder.InstallUSTable(usTable);
-
-        // Migrate all bootstrap symbols to USTable
-        LogColdStart("Migrating bootstrap symbols to USTable");
-        ObjectMemoryNew.MigrateBootstrapSymbolsToUSTable();
-
-        // SystemDictionary.Instance was already created when Dictionary class was created
-        // All classes have been stored directly in Instance via RegisterClassRef
-        LogColdStart($"SystemDictionary instance contains all 61 core classes");
-        // TODO: ObjectMemoryNew.SetWellKnownObject("Smalltalk", Instance);
-
+        LogColdStart("Starting Smalltalk-80 system initialization...");
+        LogColdStart($"Creating complete class hierarchy ({Generated.ColdStartData.ClassCount} classes)");
+
+        // Execute the new 4-pass + 2-phase bootstrap process
+        // This handles all class creation, singleton creation, method installation, and symbol migration
+        ColdStart.ColdStartBootstrap.Initialize();
+
+        // The bootstrap process has already:
+        // - Created all 128 class objects (64 classes + 64 metaclasses)
+        // - Created SystemDictionary instance and registered all classes
+        // - Created singleton objects (nil, true, false, ProcessorScheduler, ActiveProcess)
+        // - Installed all methods from compiler data
+        // - Created USTable and migrated all symbols
+
+        LogColdStart("System initialization complete!");
         initialized = true;
     }
 
@@ -530,6 +203,15 @@ public static partial class SystemDictionary
     }
 
     /// <summary>
+    /// Creates the SystemDictionary instance from the Dictionary class.
+    /// Called by ColdStartClassCreator when Dictionary class is created.
+    /// </summary>
+    internal static void CreateInstance(SObjectRef dictionaryClassRef, int initialCapacity)
+    {
+        Instance = dictionaryClassRef.CreateInstance(initialCapacity);
+    }
+
+    /// <summary>
     /// Registers a class in the SystemDictionary instance (sole source of truth).
     /// </summary>
     internal static void RegisterClassRef(string className, SObjectRef classRef)
@@ -538,7 +220,9 @@ public static partial class SystemDictionary
         // This is the ONLY storage - no C# dictionary duplication
         if (!Instance.IsNil)
         {
-            var nameSymbol = ObjectMemoryNew.InternSymbol(className);
+            // ALWAYS use bootstrap during registration to avoid infinite loops
+            // After USTable migration, we rebuild the Instance with USTable symbols
+            var nameSymbol = ObjectMemoryNew.InternSymbolBootstrap(className);
             ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, classRef);
         }
     }
@@ -551,6 +235,9 @@ public static partial class SystemDictionary
         if (Instance.IsNil)
             return null;
 
+        // After USTable migration, SystemDictionary uses USTable symbols
+        // Before migration, it uses bootstrap symbols
+        // RegisterClassRef handles this automatically
         var nameSymbol = ObjectMemoryNew.InternSymbol(name);
         return ObjectMemoryNew.DictionaryAt(Instance, nameSymbol);
     }
@@ -603,17 +290,51 @@ public static partial class SystemDictionary
     }
 
     /// <summary>
-    /// Gets all class names.
-    /// TODO: Implement by iterating through SystemDictionary.Instance
+    /// Gets all class names from SystemDictionary.Instance.
     /// </summary>
     public static IEnumerable<string> GetAllClassNames()
     {
-        // TODO: Implement by reading from SystemDictionary.Instance
-        // For now, return the class property names via reflection as a fallback
-        return typeof(SystemDictionary)
-            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-            .Where(p => p.Name.EndsWith("ClassRef") && p.PropertyType == typeof(SObjectRef))
-            .Select(p => p.Name.Replace("ClassRef", ""));
+        if (Instance.IsNil)
+            return Enumerable.Empty<string>();
+
+        var classNames = new List<string>();
+        var dictOop = Instance.AsObjectPointer();
+
+        // SystemDictionary stores associations as indexed elements
+        var size = Memory.ObjectMemoryNew.GetIndexedSize(dictOop);
+
+        for (int i = 0; i < size; i++)
+        {
+            var assocRef = Memory.ObjectMemoryNew.GetIndexedPointer(dictOop, i);
+            if (!assocRef.IsNil)
+            {
+                // Get the key (Symbol) from the Association
+                Generated.Layouts.STAssociation assoc = assocRef;
+                var keyRef = assoc.Key;
+
+                if (!keyRef.IsNil)
+                {
+                    var keyStr = Memory.ObjectMemoryNew.SymbolToString(keyRef);
+
+                    // Get the value to check if it's a class
+                    var valueRef = assoc.Value;
+                    if (!valueRef.IsNil && valueRef.IsHeapObject)
+                    {
+                        // Check if value is a class by seeing if it has a 'superclass' inst var (index 0 of Behavior)
+                        var valueOop = valueRef.AsObjectPointer();
+                        var instVarCount = Memory.ObjectMemoryNew.GetInstanceVariableCount(valueOop);
+
+                        // Classes (instances of Class/Metaclass) have at least 9 inst vars (Behavior:4 + ClassDescription:2 + Class:3)
+                        if (instVarCount >= 9)
+                        {
+                            classNames.Add(keyStr);
+                        }
+                    }
+                }
+            }
+        }
+
+        return classNames;
     }
 
     /// <summary>

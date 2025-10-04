@@ -32,6 +32,9 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     // Tag mask
     private const int TagMask = 0b1;            // Check bit 0 only
 
+    // Cached nil OOP value (set once during cold start, 0 before that)
+    private static nint _cachedNilOop = 0;
+
     // Private constructor - use factory methods
     private SObjectRef(nint value) => this.value = value;
     
@@ -56,12 +59,29 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     }
 
     /// <summary>
-    /// Returns true if this is nil (null pointer, value = 0).
+    /// Returns true if this reference points to nil.
+    /// During early cold start (before nil singleton is created): checks if value == 0 (temporary marker).
+    /// After cold start: checks if value matches the actual nil singleton OOP.
     /// </summary>
     public bool IsNil
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => value == 0;
+        get
+        {
+            // Before nil is created: check for temporary 0 marker
+            // After nil is created: check for actual nil OOP
+            // IMPORTANT: Use raw 'value' field, NOT AsObjectPointer() to avoid infinite recursion!
+            return value == 0 || (_cachedNilOop != 0 && value == _cachedNilOop);
+        }
+    }
+
+    /// <summary>
+    /// Sets the cached nil OOP value. Called once during cold start.
+    /// INTERNAL USE ONLY - called by SpecialObjectsArray.Initialize().
+    /// </summary>
+    internal static void SetNilOop(nint nilOop)
+    {
+        _cachedNilOop = nilOop;
     }
 
     /// <summary>
@@ -298,15 +318,12 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
 
     /// <summary>
     /// Gets the raw OOP (Object-Oriented Pointer) from this reference.
-    /// Returns the underlying pointer value for heap objects.
+    /// Returns the underlying pointer value for heap objects (including nil).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public nint AsObjectPointer()
     {
-        if (IsNil)
-            return 0;
-
-        if (!IsObject)
+        if (!IsObject && !IsNil)
             throw new InvalidOperationException("Not an object reference (might be SmallInteger)");
 
         return value;

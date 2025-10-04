@@ -15,7 +15,7 @@ public class VirtualMachine
 {
     private readonly ContextBasedInterpreterNew interpreter;
     private readonly ExecutionStatistics executionStatistics;
-    private readonly GarbageCollectorNew garbageCollector;
+    private readonly GarbageCollector garbageCollector;
     private readonly ILogger<VirtualMachine>? logger;
     private bool initialized = false;
 
@@ -27,7 +27,7 @@ public class VirtualMachine
         this.logger = logger;
         interpreter = new ContextBasedInterpreterNew();
         executionStatistics = new ExecutionStatistics();
-        garbageCollector = new GarbageCollectorNew(ObjectMemoryNew.ObjectTable);
+        garbageCollector = new GarbageCollector(ObjectMemoryNew.ObjectTable);
 
         // Wire up garbage collector to interpreter for primitive 133
         interpreter.GarbageCollector = garbageCollector;
@@ -45,7 +45,7 @@ public class VirtualMachine
     /// <summary>
     /// Gets the garbage collector.
     /// </summary>
-    public GarbageCollectorNew GarbageCollector => garbageCollector;
+    public GarbageCollector GarbageCollector => garbageCollector;
     
     /// <summary>
     /// Initializes the virtual machine with the full cold-start system.
@@ -54,25 +54,24 @@ public class VirtualMachine
     {
         if (!initialized)
         {
-            // Phase 1: Create all classes
+            // Initialize the Special Objects Array structure
+            SpecialObjectsArray.Initialize();
+
+            // Phase 1: Initialize the complete Smalltalk system
+            // This includes the new 4-pass + 2-phase bootstrap architecture
             SystemDictionary.Reset();
             SystemDictionary.Initialize();
-            
+
             if (Program.RuntimeOptions.EnableColdStartLogging)
             {
                 Console.WriteLine($"[COLD START] Created {SystemDictionary.GetAllClassNames().Count()} classes with instance variables");
             }
-            
-            // Phase 2: Install all kernel methods for core classes
-            KernelMethodsInstaller.InstallAll();
 
-            // Phase 3: Arithmetic methods are now installed by NumericMethodsInstaller in kernel methods
-            // No need to install them again here - removed duplicate installation
-
-            // Phase 4: Perform post-cold-start initialization
+            // Phase 2: Perform post-cold-start initialization
+            // (Methods have already been installed in the bootstrap Phase 2.3)
             ColdStartBootstrap.PostColdStartInitialization();
-            
-            // Phase 5: Initialize garbage collection with Special Objects Array
+
+            // Phase 4: Initialize garbage collection with Special Objects Array
             InitializeGarbageCollection();
             
             initialized = true;
@@ -108,6 +107,18 @@ public class VirtualMachine
                 else
                 {
                     Console.WriteLine("[COLD START] GC validation passed - all critical objects are reachable");
+
+                    // Run a second GC to verify everything is stable (should collect 0 objects)
+                    Console.WriteLine("[COLD START] Running second GC to verify stability...");
+                    var secondRun = garbageCollector.Collect();
+                    if (secondRun.ObjectsCollected == 0)
+                    {
+                        Console.WriteLine("[GC] SUCCESS: All objects are properly rooted - second GC collected 0 objects");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[GC] WARNING: Second GC collected {secondRun.ObjectsCollected} objects - some objects may not be properly rooted");
+                    }
                 }
             }
             
@@ -136,10 +147,25 @@ public class VirtualMachine
                 if (Program.RuntimeOptions.EnableGCLogging)
                 {
                     Console.WriteLine("\n" + "=".PadRight(60, '='));
-                    Console.WriteLine("Running Garbage Collection");
+                    Console.WriteLine("Running First Garbage Collection");
                     Console.WriteLine("=".PadRight(60, '=') + "\n");
 
-                    garbageCollector.Collect();
+                    var firstRun = garbageCollector.Collect();
+
+                    Console.WriteLine("\n" + "=".PadRight(60, '='));
+                    Console.WriteLine("Running Second Garbage Collection (Should collect 0)");
+                    Console.WriteLine("=".PadRight(60, '=') + "\n");
+
+                    var secondRun = garbageCollector.Collect();
+
+                    if (secondRun.ObjectsCollected == 0)
+                    {
+                        Console.WriteLine("[GC] SUCCESS: All objects are properly rooted - second GC collected 0 objects");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[GC] WARNING: Second GC collected {secondRun.ObjectsCollected} objects - some objects may not be properly rooted");
+                    }
                 }
             }
             
@@ -378,38 +404,77 @@ public class VirtualMachine
     }
 
     /// <summary>
-    /// Prints all classes in the system.
+    /// Prints all classes in the system in hierarchical order.
     /// </summary>
     public void PrintClasses()
     {
-        Console.WriteLine("\nSystem Classes:");
+        Console.WriteLine("\nClass Hierarchy:");
         Console.WriteLine("=".PadRight(60, '='));
 
-        var classes = SystemDictionary.GetAllClassNames().OrderBy(n => n).ToList();
-        Console.WriteLine($"Total Classes: {classes.Count}");
+        var allClasses = SystemDictionary.GetAllClassNames().ToList();
+        Console.WriteLine($"Total Classes: {allClasses.Count}");
         Console.WriteLine();
 
-        foreach (var className in classes)
-        {
-            var classRef = SystemDictionary.LookupClassRef(className);
-            if (classRef.HasValue && !classRef.Value.IsNil)
-            {
-                var classOop = classRef.Value.AsObjectPointer();
-                var superclassRef = ObjectMemoryNew.GetClassSuperclass(classOop);
-                var superName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
-                var methodCount = ObjectMemoryNew.GetClassMethodSelectors(classOop).Count;
+        // Build class hierarchy starting from Object (root class)
+        PrintClassHierarchy("Object", 0, new HashSet<string>());
+        Console.WriteLine();
+    }
 
-                if (DebugOptions.EnableEnhancedClassPrint)
+    /// <summary>
+    /// Recursively prints class hierarchy with indentation.
+    /// </summary>
+    private void PrintClassHierarchy(string className, int depth, HashSet<string> visited, bool isLastSibling = true)
+    {
+        if (visited.Contains(className))
+            return;
+
+        visited.Add(className);
+
+        var classRef = SystemDictionary.LookupClassRef(className);
+        if (!classRef.HasValue || classRef.Value.IsNil)
+            return;
+
+        // Draw tree structure with box-drawing characters
+        string indent = "";
+        if (depth > 0)
+        {
+            // Use └─ for last child, ├─ for other children
+            indent = new string(' ', (depth - 1) * 2);
+            indent += isLastSibling ? "└─" : "├─";
+        }
+
+        Console.WriteLine($"{indent}{className}");
+
+        // Find all direct subclasses
+        var allClasses = SystemDictionary.GetAllClassNames();
+        var subclasses = new List<string>();
+
+        foreach (var otherClass in allClasses)
+        {
+            var otherRef = SystemDictionary.LookupClassRef(otherClass);
+            if (otherRef.HasValue && !otherRef.Value.IsNil)
+            {
+                var superclassRef = ObjectMemoryNew.GetClassSuperclass(otherRef.Value.AsObjectPointer());
+                if (!superclassRef.IsNil)
                 {
-                    Console.WriteLine($"  {className,-30} extends {superName,-20} [{methodCount} methods]");
-                }
-                else
-                {
-                    Console.WriteLine($"  {className} -> {superName}");
+                    var superName = ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+                    if (superName == className)
+                    {
+                        subclasses.Add(otherClass);
+                    }
                 }
             }
         }
-        Console.WriteLine();
+
+        // Sort subclasses alphabetically
+        subclasses.Sort();
+
+        // Recursively print subclasses
+        for (int i = 0; i < subclasses.Count; i++)
+        {
+            bool isLast = (i == subclasses.Count - 1);
+            PrintClassHierarchy(subclasses[i], depth + 1, visited, isLast);
+        }
     }
     
     /// <summary>
@@ -755,82 +820,7 @@ public class VirtualMachine
         logger?.LogInformation("All VM statistics have been reset");
     }
     
-    /// <summary>
-    /// Initializes basic methods for core classes.
-    /// </summary>
-    private void InitializeBasicMethods()
-    {
-        // Add basic arithmetic methods to SmallInteger
-        var intClassRef = SystemDictionary.SmallIntegerClassRef;
-        if (intClassRef.IsNil) return;
-
-        var intClassOop = intClassRef.AsObjectPointer();
-
-        // + method with primitive 1
-        var plusMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "+",
-            [0xB0, 0x7C], // arithmetic +, return top
-            [],
-            1, 0, 1);
-        ObjectMemoryNew.AddMethod(intClassOop, "+", plusMethod);
-
-        // - method with primitive 2
-        var minusMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "-",
-            [0xB1, 0x7C], // arithmetic -, return top
-            [],
-            1, 0, 2);
-        ObjectMemoryNew.AddMethod(intClassOop, "-", minusMethod);
-
-        // < method with primitive 3
-        var ltMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "<",
-            [0xB2, 0x7C], // arithmetic <, return top
-            [],
-            1, 0, 3);
-        ObjectMemoryNew.AddMethod(intClassOop, "<", ltMethod);
-
-        // > method with primitive 4
-        var gtMethod = ObjectMemoryNew.CreateCompiledMethod(
-            ">",
-            [0xB3, 0x7C], // arithmetic >, return top
-            [],
-            1, 0, 4);
-        ObjectMemoryNew.AddMethod(intClassOop, ">", gtMethod);
-
-        // = method with primitive 7
-        var eqMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "=",
-            [0xB6, 0x7C], // arithmetic =, return top
-            [],
-            1, 0, 7);
-        ObjectMemoryNew.AddMethod(intClassOop, "=", eqMethod);
-
-        // * method with primitive 9
-        var multMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "*",
-            [0xB8, 0x7C], // arithmetic *, return top
-            [],
-            1, 0, 9);
-        ObjectMemoryNew.AddMethod(intClassOop, "*", multMethod);
-
-        // / method with primitive 10
-        var divMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "/",
-            [0xB9, 0x7C], // arithmetic /, return top
-            [],
-            1, 0, 10);
-        ObjectMemoryNew.AddMethod(intClassOop, "/", divMethod);
-
-        // asFloat method with primitive 40
-        var asFloatMethod = ObjectMemoryNew.CreateCompiledMethod(
-            "asFloat",
-            [0x8F, 0x28, 0x00, 0x7C], // Primitive 40 with 0 args, return top
-            [],
-            0, 0, 40);
-        ObjectMemoryNew.AddMethod(intClassOop, "asFloat", asFloatMethod);
-    }
-    
+    // REMOVED: InitializeBasicMethods() - all methods must come from compiler-generated cold start data
     /// <summary>
     /// Initializes the garbage collection system with the Special Objects Array.
     /// Per Blue Book specification: Only 5 roots are needed for complete reachability.
@@ -838,36 +828,15 @@ public class VirtualMachine
     /// </summary>
     private void InitializeGarbageCollection()
     {
-        // Create the Special Objects Array as a C# array with 5 fixed roots
-        var soa = new SObjectRef[Memory.SpecialObjectsArray.Count]; // 5 entries
+        // Get the GC roots from the SpecialObjectsArray (fixed struct, no heap allocation)
+        var soa = Memory.SpecialObjectsArray.GetRootsForGC();
 
-        // Index 0: nil
-        soa[Memory.SpecialObjectsArray.NilIndex] = SystemDictionary.NilObject;
-
-        // Index 1: false
-        soa[Memory.SpecialObjectsArray.FalseIndex] = SystemDictionary.FalseObject;
-
-        // Index 2: true
-        soa[Memory.SpecialObjectsArray.TrueIndex] = SystemDictionary.TrueObject;
-
-        // Index 3: SystemDictionary (Smalltalk global - contains ALL classes, symbols, globals)
-        if (SystemDictionary.Instance.IsNil)
-            throw new InvalidOperationException("SystemDictionary.Instance is nil during GC initialization");
-        soa[Memory.SpecialObjectsArray.SystemDictionaryIndex] = SystemDictionary.Instance;
-
-        // Index 4: ProcessorScheduler (contains ALL processes and execution contexts)
-        var processorSchedulerRef = ColdStart.ProcessSystemInitializer.GetProcessorScheduler();
-        if (processorSchedulerRef.IsNil)
-            throw new InvalidOperationException("ProcessorScheduler is nil during GC initialization");
-        soa[Memory.SpecialObjectsArray.ProcessorSchedulerIndex] = processorSchedulerRef;
-
-        // Give the GC the SOA C# array
+        // Give the GC the SOA array
         garbageCollector.SetSpecialObjectsArray(soa);
 
         if (Program.RuntimeOptions.EnableColdStartLogging || Program.RuntimeOptions.EnableGCLogging)
         {
             Console.WriteLine("[COLD START] Special Objects Array initialized (Blue Book minimal spec)");
-            Console.WriteLine($"[COLD START] SOA contains {soa.Length} root objects");
 
             if (Program.RuntimeOptions.EnableGCLogging)
             {
@@ -878,11 +847,6 @@ public class VirtualMachine
                 Console.WriteLine("  [3] SystemDictionary (ALL classes, methods, symbols, globals)");
                 Console.WriteLine("  [4] ProcessorScheduler (ALL processes and contexts)");
                 Console.WriteLine();
-                Console.WriteLine("[COLD START] Reachability verification:");
-                Console.WriteLine("  - Classes: via SystemDictionary");
-                Console.WriteLine("  - Methods: via Class -> methodDict");
-                Console.WriteLine("  - Symbols: via Symbol class -> classPool -> #USTable");
-                Console.WriteLine("  - Processes: via ProcessorScheduler -> process queues");
             }
         }
     }

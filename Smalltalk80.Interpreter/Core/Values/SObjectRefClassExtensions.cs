@@ -118,10 +118,17 @@ public static class SObjectRefClassExtensions
         var currentClass = classRef;
 
         // Walk up the class hierarchy counting instance variables
-        while (!currentClass.IsNil && currentClass.IsHeapObject)
+        // Stop when we reach nil (the singleton instance of UndefinedObject, which marks the root)
+        while (currentClass.IsHeapObject)
         {
+            // Stop if we've reached the nil singleton (sentinel at root of class hierarchy)
+            // NOTE: We compare against the SOA nil singleton, not SObjectRef.Nil (value=0)
+            if (currentClass == Memory.SpecialObjectsArray.Nil)
+                break;
+
+            // Access class layout information (only valid on class objects, not regular instances like nil)
             var instanceVarsRef = currentClass.GetInstanceVariable(ClassLayout.InstanceVariables);
-            if (!instanceVarsRef.IsNil)
+            if (instanceVarsRef.IsHeapObject)
             {
                 totalCount += instanceVarsRef.GetIndexedSize();
             }

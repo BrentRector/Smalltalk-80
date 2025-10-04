@@ -1,345 +1,349 @@
-# Contribution Guidelines
+# Claude Development Guidelines
 
-This project contains a prototype of a Smalltalk-80 interpreter written in C#. When making changes keep the following conventions in mind:
+**Last Updated**: 2025-10-04
+**Status**: Current Standing Guidance
 
-- **Grammar changes**: Never make any grammar changes that do not support the full Smalltalk-80 language. Do not sacrifice full Smalltalk language support. 
-- **Language version**: Target modern C# (v13 or later) where possible. Prefer features such as pattern matching enhancements, record types, and top-level statements when appropriate.
-- **Documentation**: Every public class, property, method, and enum member must include thorough XML documentation comments describing its purpose and usage.
-- **Generating the parser**: You can (re)generate the C# parser by running the GenerateIfNewer.ps1 Powershell script (located in the scripts folder) This script regenerates the parser when the grammar is newer than the generated code. You can always generate the parser by running the Invoke-Antlr4CSharp.ps1 script. Never allow warning during the ANTLR4 parser generation. A warning means the grammar must be adjusted to eliminate the warning.
-- **Script working directory**: Run PowerShell from the `Smalltalk80/scripts` directory when invoking GenerateIfNewer.ps1 or Invoke-Antlr4CSharp.ps1 because all paths inside these scripts are relative to that folder.
-- **Available tools**: You can use the 'dotnet script' functionality as necessary. However, you invoke the tool using the following command: dotnet-script. Powershell is also available. Use the 'pwsh' command to run Powershell
-- **Testing**: Run `dotnet build --no-restore` before every commit to verify that the code compiles. The compiler is automatically tested against the Smalltalk-80 system image after each build.
-- **Code style**: Follow the existing formatting conventions. Use expression-bodied members when they improve readability and avoid unnecessary verbosity.
-- **Repository structure**: Keep implementation code under the `Smalltalk80` directory and tests under `Smalltalk80.Tests`.
-- **Grammar validation**: The repository contains `Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st` with thousands of lines of valid Smalltalk code. Use this file to validate grammar or parser changes and confirm syntax assumptions. Note that the WS lexer rule drops whitespace so there is never any need to add a whitespace production in the parser.
+## Primary Documentation Reference
 
-## Recent Fixes and Improvements
+**📖 [Interpreter-Architecture.md](Interpreter-Architecture.md) is the canonical source of truth for all architectural decisions, design principles, and implementation details.**
 
-### Phase 2 Validation Achieved 100% (2025-01-10)
+All development work must align with the architecture documented in that file. Before making any significant changes:
 
-**Major Fixes Implemented:**
+1. Read Interpreter-Architecture.md to understand the current system state
+2. Verify your changes align with the documented design principles
+3. Update Interpreter-Architecture.md if your changes modify the architecture
 
-1. **Method Tracing Fixed**
-   - Implemented proper method exit tracing with correct indentation
-   - Added MethodTracer class to track method entry/exit
-   - Fixed interpreter to trigger traces for all method dispatches
+## Core Development Principles
 
-2. **Bytecode Dispatcher Corrected**
-   - Fixed bytecode ranges to match Blue Book specification:
-     - 176-191: Send literal selector with 0 args
-     - 192-207: Send literal selector with 1 arg
-     - 208-223: Send literal selector with 2 args
-   - Previously had argument counts swapped
+### 1. Blue Book Compliance
 
-3. **Method Lookup Implemented**
-   - Replaced stub Lookup method with full implementation
-   - Properly searches through class hierarchy's method dictionaries
-   - Critical for Phase 3 class creation via message sends
+**Every design decision MUST follow the Smalltalk-80 Blue Book specification (Goldberg & Robson, 1983):**
 
-4. **Pretty Printer Enhanced**
-   - Fixed ExtractMethodsFromDictionary to handle both formats:
-     - MethodDictionary format: `[keysArray, valuesArray]`
-     - Flat Dictionary format: `[tally, key1, value1, key2, value2, ...]`
-   - Now correctly displays all methods (was only showing ~10 of 37 for Dictionary)
+✅ **Correct:**
+- 5-element Special Objects Array (nil, false, true, Smalltalk, ProcessorScheduler)
+- ActiveProcess accessed via `ProcessorScheduler.activeProcess` (instance variable)
+- Table-based object memory with OOP indirection
+- Tagged pointers for SmallInteger only (Character, Symbol, etc. are heap objects)
+- Mark-and-sweep garbage collection
 
-5. **Validation Script PowerShell Bug Fixed**
-   - Discovered PowerShell quirk: `$hashtable.Keys` returns the value of entry "keys" if it exists
-   - Changed to use `GetEnumerator()` to properly iterate through all entries
-   - This fixed false positives about "missing" methods
+❌ **Incorrect:**
+- Adding a 6th SOA element for ActiveProcess (use instance variable instead)
+- Using tagged pointers for Character or other objects
+- Implementing generational or copying GC (Blue Book uses mark-and-sweep)
 
-**Bootstrap Status:**
-- ✅ All 8 core classes validate at 100%
-- ✅ 379 total methods match perfectly between bootstrap and system image
-- ✅ Ready for extended class implementation via bytecode execution
+### 2. Zero Garbage Requirement
 
-### Extended Class Implementation Notes
+**Cold start bootstrap MUST create exactly zero temporary objects:**
 
-**Bytecode-Based Class Creation:**
-- Extended classes should be created via bytecode execution in method contexts
-- This ensures all operations go through the interpreter and trigger proper method tracing
-- Avoids bypassing the VM which would miss important initialization steps
+✅ **Correct:**
+- Pre-intern ALL symbols before they are used
+- Pre-size ALL dictionaries to correct capacity
+- Deterministic OOP allocation (same objects get same OOPs every run)
+- Every object reachable from the 5 SOA roots
 
-**Extended JSON Structure:**
-The extended manifest should use this structure:
-```json
+❌ **Incorrect:**
+- Creating temporary arrays, strings, or symbols during bootstrap
+- Undersizing dictionaries (causes growth, creates garbage)
+- Using symbols before pre-interning them
+- Creating objects not reachable from SOA
+
+**Validation:** Run GC after cold start - must collect 0 objects on all runs.
+
+### 3. Object Reachability
+
+**Every object MUST be reachable from one of the 5 SOA roots:**
+
+```
+1. nil (root 0) - UndefinedObject singleton
+2. false (root 1) - False singleton
+3. true (root 2) - True singleton
+4. Smalltalk (root 3) - SystemDictionary → all classes → all methods → all symbols
+5. ProcessorScheduler (root 4) - all processes → all contexts → all execution state
+```
+
+**Reachability chains:**
+- Classes → `Smalltalk at: #ClassName`
+- Methods → `Class.methodDict`
+- Symbols → `(Smalltalk at: #Symbol) classPool at: #USTable`
+- Contexts → `ProcessorScheduler.activeProcess.suspendedContext.sender...`
+
+### 4. Per-VM Architecture
+
+**All VM state MUST be instance-based to support multiple independent VMs:**
+
+✅ **Per-VM (instance-based):**
+- ObjectTable (heap storage)
+- SpecialObjectsArray (GC roots)
+- GarbageCollector
+- Interpreter
+- SystemDictionary reference
+
+✅ **Shared (static):**
+- Generated layouts (ColdStartData.cs, Layouts.cs)
+- Bytecode constants
+- Blue Book specifications
+- Primitive implementations
+
+❌ **Never use static for VM state** - prevents running multiple VMs.
+
+### 5. Source File Immutability
+
+**NEVER modify the Smalltalk-80.st source file:**
+
+- This file is the master, canonical reference for Smalltalk-80
+- All cold start data comes from compiler analysis of this file
+- No hand-written method installers or hardcoded symbol lists
+- The compiler extracts all information (classes, methods, literals) from the AST
+
+## Code Quality Standards
+
+### Language and Style
+
+- **Target C# 13** with modern features (pattern matching, primary constructors, etc.)
+- **XML documentation** required for all public members
+- **Null safety** - use nullable reference types correctly
+- **Expression-bodied members** when they improve readability
+
+### File Organization
+
+```
+Smalltalk80.Interpreter/
+├── ColdStart/                # Bootstrap system
+│   ├── ColdStartBootstrap.cs # 4-pass + 2-phase orchestrator
+│   ├── SymbolTableBuilder.cs # USTable creation
+│   └── ...
+├── Core/
+│   ├── Objects/             # Object implementations
+│   ├── Values/              # SObjectRef, SmallInteger
+│   └── BlueBook/            # Blue Book compliance layer
+├── Memory/
+│   ├── ObjectMemory.cs      # Table-based storage
+│   ├── GarbageCollectorNew.cs # Mark-and-sweep GC
+│   └── SpecialObjectsArray.cs # 5-field struct
+├── Execution/               # Bytecode execution
+└── Primitives/              # VM primitives
+```
+
+### Testing and Validation
+
+**Before every commit:**
+
+```bash
+# 1. Build must succeed with no errors
+dotnet build --no-restore
+
+# 2. Run with GC validation
+dotnet run --project Smalltalk80.Interpreter -- repl --gc-log --validate-gc
+
+# 3. Verify zero garbage
+# Output must show: "0 objects collected" on all GC runs
+```
+
+## Common Pitfalls to Avoid
+
+### ❌ Mistake 1: Adding 6th SOA Element
+
+**Wrong:**
+```csharp
+public readonly struct SpecialObjectsArray
 {
-  "classes": [
-    {"name": "ClassName", "superclass": "SuperclassName", ...}
-  ],
-  "methods": [
-    {"class": "ClassName", "selector": "methodName", "bytecode": [...], ...}
-  ]
+    public readonly SObjectRef ActiveProcess; // NO!
 }
 ```
 
-## Bootstrap Process Overview
-
-The Smalltalk-80 system bootstraps in a unified process:
-
-### Bootstrap: Core System Classes
-- Creates the essential classes needed to bootstrap: Object, Behavior, Class, Metaclass, CompiledMethod, MethodDictionary, Symbol, String, Array, ByteArray, Collection, Dictionary, SystemDictionary
-- Establishes the class hierarchy and metaclass relationships
-- Creates method dictionaries with pre-allocated sizes for all bootstrap methods
-- Installs compiled methods with bytecode into all bootstrap classes
-- Creates additional classes (UndefinedObject, Boolean, True, False, Magnitude, LookupKey, Association)
-- Methods are separated into instance methods (installed on the class) and class methods (installed on the metaclass)
-- Registers all classes in the global Smalltalk SystemDictionary
-
-### Extended Classes: Additional System Classes
-- Adds remaining Smalltalk-80 classes with their complete method implementations
-- Enhances existing classes with additional methods
-- Uses flat structure with separate classes and methods arrays
-- Loaded via self-hosting message sends
-
-## Extracting Classes from System Image
-
-To extract a class from the Smalltalk-80 system image and update the bootstrap files:
-
-### 1. Extract the Class
-```powershell
-cd Smalltalk80.ExtractClass
-dotnet run -- --class ClassName
+**Right:**
+```csharp
+public readonly struct SpecialObjectsArray
+{
+    public SObjectRef ActiveProcess =>
+        ProcessorScheduler.GetInstanceVariable(
+            ProcessorSchedulerLayout.ActiveProcess);
+}
 ```
-This generates `extracted/ClassName.json` with:
-- Compiled bytecode for all methods
-- Proper argument and temporary counts
-- Literals array
-- Separation of instance and class methods
 
-### 2. Update Bootstrap
+### ❌ Mistake 2: Creating Temporary Objects
+
+**Wrong:**
+```csharp
+// During bootstrap - creates garbage!
+var tempSymbols = new List<string>();
+tempSymbols.Add("someSymbol");
+```
+
+**Right:**
+```csharp
+// Pre-intern before use
+ObjectMemoryNew.InternSymbolBootstrap("someSymbol");
+```
+
+### ❌ Mistake 3: Static VM State
+
+**Wrong:**
+```csharp
+public static class ObjectMemory
+{
+    private static ObjectTable _table; // NO!
+}
+```
+
+**Right:**
+```csharp
+public class SmalltalkVM
+{
+    public ObjectTable ObjectTable { get; } // Per-VM
+}
+```
+
+### ❌ Mistake 4: Breaking Reachability
+
+**Wrong:**
+```csharp
+// Creating object not reachable from SOA
+var orphan = ObjectMemoryNew.CreateInstance(...);
+// Not stored in SystemDictionary or any SOA-reachable structure
+```
+
+**Right:**
+```csharp
+var instance = ObjectMemoryNew.CreateInstance(...);
+// Store in class pool, method dict, or other SOA-reachable structure
+SystemDictionary.StoreGlobal("MyGlobal", instance);
+```
+
+## Grammar and Parser
+
+### ANTLR4 Generation
+
 ```powershell
+# Generate parser (from scripts directory)
 cd scripts
-pwsh -File UpdateBootstrapMethods.ps1
-```
-This script:
-- Reads all extracted class JSON files
-- Updates `bootstrap.json` with the latest bytecode
-- Ensures bytecode is always an array (even single-byte)
-- Handles literal conversion to proper format
+pwsh GenerateIfNewer.ps1
 
-### 3. Verify Dictionary Sizes
-```powershell
-cd scripts
-pwsh -File AnalyzeDictionarySizes.ps1
-```
-This checks that bootstrap pre-allocated dictionary sizes match requirements.
-Critical issues (TOO SMALL) must be fixed by updating bootstrap capacities.
-
-### 4. Clean Rebuild
-After significant changes:
-```powershell
-dotnet clean && dotnet build
-```
-This prevents issues with executable files being overwritten.
-
-## Important Bootstrap Constraints
-
-1. **Dictionary Sizing**: Method dictionaries cannot resize until after bootstrap completes. Bootstrap must pre-allocate sufficient capacity (typically actual * 1.5 for hash table efficiency).
-
-2. **Class Creation**: Bootstrap contains all core classes with their complete method implementations in a single unified step.
-
-3. **Method Installation**: Instance methods go on the class's method dictionary, class methods go on the metaclass's method dictionary. 
-   - See [selector-lookup.md](selector-lookup.md) for detailed explanation of the method lookup algorithm.
-   - See [execution-model.md](execution-model.md) for understanding stack architecture and method contexts.
-
-4. **Bytecode Format**: All bytecode must be arrays of integers, even single-byte bytecode.
-
-## Validating Bootstrap
-
-After any changes to bootstrap, validate the bootstrap is working correctly:
-
-### Run Validation
-```powershell
-cd scripts
-pwsh -File ValidateBootstrapSimple.ps1
+# Force regeneration
+pwsh Invoke-Antlr4CSharp.ps1
 ```
 
-This validates the 8 core bootstrap classes. Success criteria:
-- 100% method match rate (all 379 methods)
-- All bytecode sequences match exactly
-- No missing or extra methods
+**Requirements:**
+- NO warnings during ANTLR4 generation (fix grammar if warnings appear)
+- Grammar must support full Smalltalk-80 language
+- Never sacrifice language completeness for convenience
 
-### Fixing Common Issues
+### Validation
 
-If validation fails:
+Use `Smalltalk-80 Source/Smalltalk-80.st` (thousands of lines) to validate:
+- Grammar changes
+- Parser correctness
+- Syntax assumptions
 
-1. **PowerShell .Keys bug**: If you see bytecode strings as "missing" methods, the script may be hitting the PowerShell bug where `$hashtable.Keys` returns the value of key "keys". The script now uses `GetEnumerator()` to avoid this.
+Note: WS lexer rule drops whitespace - never add whitespace productions in parser.
 
-2. **Method dictionary display**: If the pretty printer shows fewer methods than expected, check that it handles both MethodDictionary formats:
-   - Parallel arrays: `[keysArray, valuesArray]`
-   - Flat format: `[tally, key1, value1, key2, value2, ...]`
+## Bootstrap Process
 
-3. **Bytecode mismatches**: Ensure bytecode is in hex format (e.g., "40 88 68 7C") and that the extractor and validator use consistent formatting.
+### 4-Pass Class Creation
 
-4. **Dictionary sizing**: Run `AnalyzeDictionarySizes.ps1` to ensure Phase 1 pre-allocates sufficient capacity for Phase 2 methods.
+1. **Pass 1**: Bootstrap classes (Object, UndefinedObject, Behavior, ClassDescription, Class, Metaclass)
+2. **Interlude**: Create nil singleton, fix Object.superclass
+3. **Pass 2**: Bootstrap metaclasses (6 metaclasses for bootstrap classes)
+4. **Pass 3**: Wire Metaclass.class = Metaclass (circular reference)
+5. **Pass 4**: Remaining classes + metaclasses (40 classes + 40 metaclasses)
 
-## System Image Regeneration and Field Offset Correction
+### 2-Phase Infrastructure
 
-When changes are made to the standalone compiler that affect field offset calculation or bytecode generation, the entire system must be regenerated to ensure correctness. This is a multi-step process that must be completed in full to achieve 100% validation.
+1. **Phase 2.1**: Create SystemDictionary, register all classes
+2. **Phase 2.2**: Create singletons (true, false, ProcessorScheduler)
+3. **Phase 2.3**: Install all methods (1,299 compiled methods)
+4. **Phase 2.4**: Create USTable, migrate bootstrap symbols
 
-### 1. Regenerate System Image JSON
+### Critical Constraints
 
-First, use the fixed standalone compiler to regenerate the system image JSON with corrected field offsets and bytecodes:
+1. **Metaclass Instance Variables**: All metaclasses have exactly 7 instance variables (Behavior:4 + ClassDescription:2 + Metaclass:1)
+2. **Symbol Pre-Interning**: Pre-intern symbols like "SymbolTable" before USTable creation
+3. **Dictionary Sizing**: Pre-size dictionaries correctly (no growth during bootstrap)
+4. **Deterministic OOPs**: Same objects get same OOPs on every run
+
+## Debugging and Diagnostics
+
+### GC Logging
 
 ```bash
-dotnet bin/Debug/net9.0/StandaloneCompiler.dll "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st" complete_system_final.json
+# Enable GC logging
+dotnet run -- repl --gc-log
+
+# Enable GC validation
+dotnet run -- repl --validate-gc
+
+# Enable cold start logging
+dotnet run -- repl --cold-start-log
+
+# All logging
+dotnet run -- repl --gc-log --validate-gc --cold-start-log
 ```
 
-This step:
-- Processes the original Smalltalk-80 source code with the corrected compiler
-- Generates bytecode with proper field offsets for inherited instance variables
-- Creates the canonical `complete_system_final.json` that all other processes depend on
-- Must complete without errors to proceed
-
-### 2. Update Bootstrap Configuration
-
-Extract the core bootstrap classes from the corrected system image and update bootstrap files:
-
-```powershell
-cd scripts
-pwsh UpdateBootstrapFromSystemImage.ps1
-```
-
-**Script: `UpdateBootstrapFromSystemImage.ps1`**
-- **Purpose**: Updates bootstrap.json with corrected class definitions and method bytecodes from system image
-- **Usage**: `pwsh UpdateBootstrapFromSystemImage.ps1 [-SystemImagePath "complete_system_final.json"] [-BootstrapPath "../Bootstrap/bootstrap.json"]`
-- **Function**: 
-  - Reads class definitions, instance variables, and method bytecodes from complete_system_final.json
-  - Updates class instance variable counts with complete inheritance chains
-  - Updates method dictionary sizes based on actual method counts  
-  - Updates bytecode arrays with corrected field access instructions
-  - Updates literal arrays with proper formatting
-  - Generates bootstrap_updated.json with timestamp and change comments
-
-Key classes that must be updated in bootstrap.json:
-- Object, Behavior, Class, Metaclass (core hierarchy)
-- CompiledMethod, MethodDictionary (method infrastructure) 
-- Symbol, String, Array, ByteArray (essential data types)
-- Collection, Dictionary, SystemDictionary (collection hierarchy)
-- UndefinedObject, Boolean, True, False (fundamental objects)
-- Magnitude, LookupKey, Association (supporting types)
-
-### 3. Update Low-Level Class Installation
-
-Process the system image JSON to update any low-level class installation data:
+### Class Hierarchy Display
 
 ```bash
-# Update extended class manifests and phase 3 data
-# Ensure all class hierarchies have correct field layouts
-# Verify that method bytecodes use proper field offsets
+# Show hierarchical class tree
+dotnet run -- repl --list-cold-start-classes
 ```
 
-### 4. Complete Verification Process
+Output shows inheritance with box-drawing characters (├─, └─).
 
-The update process is **NOT COMPLETE** until 100% verification is achieved:
+### Common Issues
 
-#### 4.1 Complete Verification Process
-```powershell
-cd scripts  
-pwsh VerifySystemImageMatches.ps1
-```
+**If GC collects objects during cold start:**
+1. Check which OOP was collected
+2. Trace when that OOP was allocated
+3. Verify it's reachable from SOA
+4. Check if symbol was pre-interned
 
-**Script: `VerifySystemImageMatches.ps1`**
-- **Purpose**: Performs complete verification between interpreter-loaded classes and system image reference
-- **Usage**: `pwsh VerifySystemImageMatches.ps1 [-SystemImagePath "complete_system_final.json"] [-DumpOutput "interpreter_class_dump.txt"]`
-- **Function**:
-  - Loads all classes in interpreter with `--list-bootstrap-classes`
-  - Dumps all loaded classes with `--dump-all-classes interpreter_class_dump.txt`
-  - Parses interpreter dump to extract class information
-  - Loads system image JSON as reference specification
-  - Compares interpreter state vs system image for all core classes
-  - Generates verification_report.txt with detailed analysis
-  - Returns exit code 0 for 100% match, 1 for any mismatches
+**If class hierarchy is incomplete:**
+1. Verify all superclasses are in ColdStartClasses list
+2. Check GetAllClassNames() iterates SystemDictionary correctly
+3. Ensure class was registered in SystemDictionary
 
-This creates a detailed comparison of:
-- Class hierarchies and superclass relationships
-- Instance variable counts and field layouts  
-- Method dictionary contents and counts
-- Inherited field offset calculations
-- Object memory layout verification
+## Git Workflow
 
-#### 4.4 Validation Success Criteria
+### Before Committing
 
-The update process is complete ONLY when:
-- ✅ All bootstrap classes load without errors
-- ✅ All extended classes load without errors  
-- ✅ Field access bytecodes use correct offsets
-- ✅ Instance sizes match calculated inheritance totals
-- ✅ Method dictionaries have proper capacity
-- ✅ 100% match between interpreter dump and system image JSON
-- ✅ No field offset mismatches in any class hierarchy
-- ✅ All bytecode sequences match reference specification
+1. **Build clean**: `dotnet build --no-restore` (0 errors)
+2. **Test zero garbage**: Run with `--gc-log --validate-gc`
+3. **Update docs**: Update Interpreter-Architecture.md if architecture changed
+4. **Run tests**: Verify all functionality works
 
-Any mismatch requires returning to step 1 and regenerating the system image.
-
-### Field Offset Calculation Details
-
-The corrected field offset calculation follows Smalltalk-80 Blue Book specification:
+### Commit Message Format
 
 ```
-For class hierarchy: Object -> A -> B -> C
-Where: A has fields [a1, a2]
-       B has fields [b1]  
-       C has fields [c1, c2]
+<type>: <short summary>
 
-Instance of C has layout:
-  Offset 0: a1 (inherited from A)
-  Offset 1: a2 (inherited from A)
-  Offset 2: b1 (inherited from B)  
-  Offset 3: c1 (declared in C)
-  Offset 4: c2 (declared in C)
+<detailed description of what changed and why>
+
+- Specific change 1
+- Specific change 2
+
+<any breaking changes or important notes>
 ```
 
-When compiling methods in class C:
-- `a1` access generates `pushInstVar: 0` 
-- `a2` access generates `pushInstVar: 1`
-- `b1` access generates `pushInstVar: 2`
-- `c1` access generates `pushInstVar: 3` 
-- `c2` access generates `pushInstVar: 4`
+**Types**: feat, fix, refactor, docs, test, perf
 
-The standalone compiler now correctly computes this full inheritance chain when generating bytecode.
+## Key Resources
 
-## Complete System Image Regeneration Workflow
+- **[Interpreter-Architecture.md](Interpreter-Architecture.md)** - Complete architectural documentation
+- **Smalltalk-80 Blue Book** - Goldberg & Robson (1983) - The specification
+- **Smalltalk-80.st** - Reference Smalltalk-80 source code
 
-### Full Process Summary
+## Summary Checklist
 
-When field offset corrections or compiler changes are made, follow this complete workflow:
+Before submitting any change, verify:
 
-```powershell
-# Step 1: Regenerate system image with corrected compiler
-dotnet bin/Debug/net9.0/StandaloneCompiler.dll "Smalltalk80/Smalltalk-80 Source/Smalltalk-80.st" complete_system_final.json
+- [ ] Follows Blue Book specification
+- [ ] Zero garbage during cold start
+- [ ] All objects reachable from 5 SOA roots
+- [ ] Per-VM architecture (no static VM state)
+- [ ] Build succeeds (0 errors)
+- [ ] GC validation passes (0 objects collected)
+- [ ] Documentation updated (if architecture changed)
+- [ ] No modification to Smalltalk-80.st source
 
-# Step 2: Update bootstrap from corrected system image  
-cd scripts
-pwsh UpdateBootstrapFromSystemImage.ps1
+---
 
-# Step 3: Copy updated bootstrap if verification succeeds
-cp ../Bootstrap/bootstrap_updated.json ../Bootstrap/bootstrap.json
-
-# Step 4: Rebuild with updated bootstrap
-cd ..
-dotnet build --no-restore
-
-# Step 5: Verify 100% compatibility 
-cd scripts
-pwsh ValidateFieldOffsets.ps1
-```
-
-### Required Scripts
-
-All scripts are located in the `scripts/` directory:
-
-1. **`UpdateBootstrapFromSystemImage.ps1`** - Updates bootstrap.json from system image
-2. **`VerifySystemImageMatches.ps1`** - Verifies 100% interpreter/system image match
-3. **`ValidateFieldOffsets.ps1`** - Validates field offset corrections are working correctly
-
-### Validation Requirements
-
-The process must achieve **100% verification** or the system is incomplete:
-- All bootstrap classes must load without errors
-- Field counts must match calculated inheritance totals  
-- Method counts must match system image specification
-- No field offset mismatches in any class hierarchy
-- Interpreter dump must match system image JSON exactly
-
-Any mismatch requires returning to Step 1 and regenerating the entire system.
+**Remember**: [Interpreter-Architecture.md](Interpreter-Architecture.md) is the canonical reference. When in doubt, check that document first.

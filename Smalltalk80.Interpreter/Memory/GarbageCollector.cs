@@ -8,7 +8,7 @@ using Smalltalk80.Interpreter.Config;
 /// Mark-and-sweep garbage collector for the new SObjectRef-based architecture.
 /// Works directly with ObjectTable and ObjectMemoryNew instead of SObject instances.
 /// </summary>
-public sealed class GarbageCollectorNew
+public sealed class GarbageCollector
 {
     private readonly ObjectTable objectTable;
     private readonly object gcLock = new();
@@ -21,7 +21,10 @@ public sealed class GarbageCollectorNew
     private long totalObjectsCollected;
     private long totalBytesFreed;
     private long lastCollectionDuration;
+    private long lastMarkDuration;
+    private long lastSweepDuration;
     private int lastLiveObjectCount;
+    private int lastObjectsVisited;
 
     /// <summary>
     /// Gets the total number of garbage collections performed.
@@ -49,10 +52,25 @@ public sealed class GarbageCollectorNew
     public int LastLiveObjectCount => lastLiveObjectCount;
 
     /// <summary>
-    /// Initializes a new instance of the GarbageCollectorNew class.
+    /// Gets the duration of the last mark phase in milliseconds.
+    /// </summary>
+    public long LastMarkDurationMs => lastMarkDuration;
+
+    /// <summary>
+    /// Gets the duration of the last sweep phase in milliseconds.
+    /// </summary>
+    public long LastSweepDurationMs => lastSweepDuration;
+
+    /// <summary>
+    /// Gets the number of objects visited during the last mark phase.
+    /// </summary>
+    public int LastObjectsVisited => lastObjectsVisited;
+
+    /// <summary>
+    /// Initializes a new instance of the GarbageCollector class.
     /// </summary>
     /// <param name="table">The object table to use for garbage collection.</param>
-    public GarbageCollectorNew(ObjectTable table)
+    public GarbageCollector(ObjectTable table)
     {
         objectTable = table ?? throw new ArgumentNullException(nameof(table));
     }
@@ -105,9 +123,10 @@ public sealed class GarbageCollectorNew
     /// <returns>Statistics about the collection.</returns>
     public GarbageCollectionStatistics Collect()
     {
-        var stopwatch = Stopwatch.StartNew();
+        var totalStopwatch = Stopwatch.StartNew();
         int objectsCollected;
         long bytesFreed = 0;
+        int objectsVisited;
 
         lock (gcLock)
         {
@@ -119,10 +138,10 @@ public sealed class GarbageCollectorNew
             // Phase 1: Mark all reachable objects
             var roots = new HashSet<nint>();
 
-            // Add Special Objects Array elements as roots
+            // Add Special Objects Array elements as roots (including nil!)
             foreach (var specialObj in specialObjectsArray)
             {
-                if (!specialObj.IsNil && specialObj.IsHeapObject)
+                if (specialObj.IsHeapObject)
                 {
                     roots.Add(specialObj.AsObjectPointer());
                 }
@@ -140,19 +159,27 @@ public sealed class GarbageCollectorNew
                 Console.WriteLine($"[GC] Starting mark phase with {roots.Count} root objects");
             }
 
-            // Perform mark phase
+            // Perform mark phase with timing
+            var markStopwatch = Stopwatch.StartNew();
             objectTable.MarkPhase(roots);
+            markStopwatch.Stop();
+            lastMarkDuration = markStopwatch.ElapsedMilliseconds;
 
             var stats = objectTable.GetStatistics();
             var liveBeforeSweep = stats.LiveObjects;
+            objectsVisited = liveBeforeSweep;
+            lastObjectsVisited = objectsVisited;
 
             if (Program.RuntimeOptions?.GCTraceLevel == GCTraceLevel.Deep)
             {
-                Console.WriteLine($"[GC] Mark phase complete, {liveBeforeSweep} objects marked as live");
+                Console.WriteLine($"[GC] Mark phase complete, {liveBeforeSweep} objects marked as live in {lastMarkDuration}ms");
             }
 
-            // Phase 2: Sweep unmarked objects
+            // Phase 2: Sweep unmarked objects with timing
+            var sweepStopwatch = Stopwatch.StartNew();
             objectsCollected = objectTable.SweepPhase();
+            sweepStopwatch.Stop();
+            lastSweepDuration = sweepStopwatch.ElapsedMilliseconds;
 
             // Estimate bytes freed (approximate)
             bytesFreed = objectsCollected * EstimateAverageObjectSize();
@@ -162,7 +189,7 @@ public sealed class GarbageCollectorNew
 
             if (Program.RuntimeOptions?.GCTraceLevel == GCTraceLevel.Deep)
             {
-                Console.WriteLine($"[GC] Sweep phase complete, {objectsCollected} objects collected");
+                Console.WriteLine($"[GC] Sweep phase complete, {objectsCollected} objects collected in {lastSweepDuration}ms");
                 Console.WriteLine($"[GC] Table statistics: {finalStats.LiveObjects} live objects, " +
                                   $"{finalStats.FreeListSize} free slots, " +
                                   $"{finalStats.Capacity} total capacity");
@@ -173,16 +200,17 @@ public sealed class GarbageCollectorNew
             totalBytesFreed += bytesFreed;
         }
 
-        stopwatch.Stop();
-        lastCollectionDuration = stopwatch.ElapsedMilliseconds;
+        totalStopwatch.Stop();
+        lastCollectionDuration = totalStopwatch.ElapsedMilliseconds;
 
         if (Program.RuntimeOptions?.EnableGCLogging ?? false)
         {
             Console.WriteLine($"[GC] Collection #{totalCollections} complete: " +
                             $"{objectsCollected} objects collected, " +
+                            $"{objectsVisited} objects visited, " +
                             $"{bytesFreed:N0} bytes freed (estimated), " +
                             $"{lastLiveObjectCount} objects remain, " +
-                            $"{lastCollectionDuration}ms");
+                            $"{lastCollectionDuration}ms total (mark: {lastMarkDuration}ms, sweep: {lastSweepDuration}ms)");
         }
 
         return new GarbageCollectionStatistics(
@@ -190,7 +218,10 @@ public sealed class GarbageCollectorNew
             objectsCollected,
             bytesFreed,
             lastCollectionDuration,
-            lastLiveObjectCount);
+            lastLiveObjectCount,
+            lastMarkDuration,
+            lastSweepDuration,
+            objectsVisited);
     }
 
     /// <summary>
@@ -213,9 +244,10 @@ public sealed class GarbageCollectorNew
     /// <returns>Statistics about the collection.</returns>
     public GarbageCollectionStatistics CollectWithContextRoots(IEnumerable<SObjectRef> contextRoots)
     {
-        var stopwatch = Stopwatch.StartNew();
+        var totalStopwatch = Stopwatch.StartNew();
         int objectsCollected;
         long bytesFreed = 0;
+        int objectsVisited;
 
         lock (gcLock)
         {
@@ -227,10 +259,10 @@ public sealed class GarbageCollectorNew
             // Phase 1: Mark all reachable objects
             var roots = new HashSet<nint>();
 
-            // Add Special Objects Array elements as roots
+            // Add Special Objects Array elements as roots (including nil!)
             foreach (var specialObj in specialObjectsArray)
             {
-                if (!specialObj.IsNil && specialObj.IsHeapObject)
+                if (specialObj.IsHeapObject)
                 {
                     roots.Add(specialObj.AsObjectPointer());
                 }
@@ -253,11 +285,21 @@ public sealed class GarbageCollectorNew
                 Console.WriteLine($"[GC] Starting mark phase with {roots.Count} root objects");
             }
 
-            // Perform mark phase
+            // Perform mark phase with timing
+            var markStopwatch = Stopwatch.StartNew();
             objectTable.MarkPhase(roots);
+            markStopwatch.Stop();
+            lastMarkDuration = markStopwatch.ElapsedMilliseconds;
 
-            // Phase 2: Sweep unmarked objects
+            var stats = objectTable.GetStatistics();
+            objectsVisited = stats.LiveObjects;
+            lastObjectsVisited = objectsVisited;
+
+            // Phase 2: Sweep unmarked objects with timing
+            var sweepStopwatch = Stopwatch.StartNew();
             objectsCollected = objectTable.SweepPhase();
+            sweepStopwatch.Stop();
+            lastSweepDuration = sweepStopwatch.ElapsedMilliseconds;
 
             // Estimate bytes freed
             bytesFreed = objectsCollected * EstimateAverageObjectSize();
@@ -270,16 +312,17 @@ public sealed class GarbageCollectorNew
             totalBytesFreed += bytesFreed;
         }
 
-        stopwatch.Stop();
-        lastCollectionDuration = stopwatch.ElapsedMilliseconds;
+        totalStopwatch.Stop();
+        lastCollectionDuration = totalStopwatch.ElapsedMilliseconds;
 
         if (Program.RuntimeOptions?.EnableGCLogging ?? false)
         {
             Console.WriteLine($"[GC] Collection #{totalCollections} complete: " +
                             $"{objectsCollected} objects collected, " +
+                            $"{objectsVisited} objects visited, " +
                             $"{bytesFreed:N0} bytes freed (estimated), " +
                             $"{lastLiveObjectCount} objects remain, " +
-                            $"{lastCollectionDuration}ms");
+                            $"{lastCollectionDuration}ms total (mark: {lastMarkDuration}ms, sweep: {lastSweepDuration}ms)");
         }
 
         return new GarbageCollectionStatistics(
@@ -287,7 +330,10 @@ public sealed class GarbageCollectorNew
             objectsCollected,
             bytesFreed,
             lastCollectionDuration,
-            lastLiveObjectCount);
+            lastLiveObjectCount,
+            lastMarkDuration,
+            lastSweepDuration,
+            objectsVisited);
     }
 
     /// <summary>
@@ -375,7 +421,10 @@ public sealed class GarbageCollectorNew
         totalObjectsCollected = 0;
         totalBytesFreed = 0;
         lastCollectionDuration = 0;
+        lastMarkDuration = 0;
+        lastSweepDuration = 0;
         lastLiveObjectCount = 0;
+        lastObjectsVisited = 0;
     }
 
     /// <summary>
@@ -403,16 +452,23 @@ public readonly record struct GarbageCollectionStatistics(
     long TotalObjectsCollected,
     long TotalBytesFreed,
     long CollectionDurationMs,
-    int LiveObjectsRemaining)
+    int LiveObjectsRemaining,
+    long MarkDurationMs,
+    long SweepDurationMs,
+    int ObjectsVisited)
 {
     /// <summary>
     /// Alias for TotalObjectsCollected (for backward compatibility).
     /// </summary>
     public long ObjectsCollected => TotalObjectsCollected;
 
+    /// <summary>
+    /// Returns a string representation of the garbage collection statistics.
+    /// </summary>
+    /// <returns>A formatted string with all statistics.</returns>
     public override string ToString() =>
-        $"Collections: {TotalCollections}, Objects Collected: {TotalObjectsCollected}, " +
-        $"Bytes Freed: {TotalBytesFreed}, Duration: {CollectionDurationMs}ms, Live: {LiveObjectsRemaining}";
+        $"Collections: {TotalCollections}, Objects Collected: {TotalObjectsCollected}, Objects Visited: {ObjectsVisited}, " +
+        $"Bytes Freed: {TotalBytesFreed}, Duration: {CollectionDurationMs}ms (mark: {MarkDurationMs}ms, sweep: {SweepDurationMs}ms), Live: {LiveObjectsRemaining}";
 }
 
 /// <summary>
@@ -425,6 +481,10 @@ public readonly record struct GarbageCollectorStatistics(
     long LastCollectionDurationMs,
     int LiveObjects)
 {
+    /// <summary>
+    /// Returns a string representation of the garbage collector statistics.
+    /// </summary>
+    /// <returns>A formatted string with all statistics.</returns>
     public override string ToString() =>
         $"Total Collections: {TotalCollections}, Total Collected: {TotalObjectsCollected}, " +
         $"Total Bytes Freed: {TotalBytesFreed}, Last Duration: {LastCollectionDurationMs}ms, Live: {LiveObjects}";

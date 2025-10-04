@@ -14,7 +14,7 @@ public static partial class ObjectMemoryNew
     private static readonly ObjectTable objectTableNew = new();
 
     // Replace the old garbage collector with the new one
-    private static readonly GarbageCollectorNew garbageCollector = new(objectTableNew);
+    private static readonly GarbageCollector garbageCollector = new(objectTableNew);
 
     // Constants for memory management
     private const int MinimumFreeSpaceThreshold = 1000; // Trigger GC if less than this many free slots
@@ -62,7 +62,9 @@ public static partial class ObjectMemoryNew
         int index = objectTableNew.Allocate(data);
 
         // Convert index to OOP
-        return ObjectTable.OopFromIndex(index);
+        var oop = ObjectTable.OopFromIndex(index);
+
+        return oop;
     }
 
     /// <summary>
@@ -100,7 +102,7 @@ public static partial class ObjectMemoryNew
     }
 
     /// <summary>
-    /// Performs garbage collection using the new GarbageCollectorNew.
+    /// Performs garbage collection using the new GarbageCollector.
     /// </summary>
     public static void CollectGarbageWithTable(SObjectRef[] roots)
     {

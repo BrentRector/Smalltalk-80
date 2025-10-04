@@ -1661,80 +1661,6 @@ public readonly struct STFloat : ISTFloat
 }
 
 /// <summary>
-/// Interface for Fraction memory layout.
-/// </summary>
-public interface ISTFraction : ISTNumber
-{
-    /// <summary>
-    /// Gets or sets the numerator instance variable.
-    /// </summary>
-    SObjectRef Numerator { get; set; }
-    /// <summary>
-    /// Gets or sets the denominator instance variable.
-    /// </summary>
-    SObjectRef Denominator { get; set; }
-}
-
-/// <summary>
-/// Memory layout for Fraction objects.
-/// </summary>
-public readonly struct STFraction : ISTFraction
-{
-    private readonly SObjectRef _ref;
-
-    /// <summary>
-    /// Gets the underlying object reference.
-    /// </summary>
-    public SObjectRef AsRef => _ref;
-
-    /// <summary>
-    /// Initializes a new instance of <see cref="STFraction"/>.
-    /// </summary>
-    /// <param name="objectRef">The object reference.</param>
-    public STFraction(SObjectRef objectRef) => _ref = objectRef;
-
-    /// <summary>
-    /// Implicitly converts a <see cref="STFraction"/> to <see cref="SObjectRef"/>.
-    /// </summary>
-    public static implicit operator SObjectRef(STFraction obj) => obj._ref;
-
-    /// <summary>
-    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STFraction"/>.
-    /// </summary>
-    public static implicit operator STFraction(SObjectRef r) => new(r);
-
-
-    // Own instance variables
-    /// <summary>
-    /// Gets or sets the numerator instance variable at offset 0.
-    /// </summary>
-    public SObjectRef Numerator
-    {
-        get => _ref.GetInstanceVariable(0);
-        set => _ref.SetInstanceVariable(0, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the denominator instance variable at offset 1.
-    /// </summary>
-    public SObjectRef Denominator
-    {
-        get => _ref.GetInstanceVariable(1);
-        set => _ref.SetInstanceVariable(1, value);
-    }
-
-    /// <summary>
-    /// The total number of instance variables for STFraction.
-    /// </summary>
-    public const int InstanceVarCount = 2;
-
-    /// <summary>
-    /// The object format for STFraction.
-    /// </summary>
-    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
-}
-
-/// <summary>
 /// Interface for IdentityDictionary memory layout.
 /// </summary>
 public interface ISTIdentityDictionary : ISTDictionary
@@ -2611,24 +2537,24 @@ public readonly struct STMethodDictionary : ISTMethodDictionary
 }
 
 /// <summary>
-/// Interface for Point memory layout.
+/// Interface for OrderedCollection memory layout.
 /// </summary>
-public interface ISTPoint : ISTObject
+public interface ISTOrderedCollection : ISTSequenceableCollection
 {
     /// <summary>
-    /// Gets or sets the x instance variable.
+    /// Gets or sets the firstIndex instance variable.
     /// </summary>
-    SObjectRef X { get; set; }
+    SObjectRef FirstIndex { get; set; }
     /// <summary>
-    /// Gets or sets the y instance variable.
+    /// Gets or sets the lastIndex instance variable.
     /// </summary>
-    SObjectRef Y { get; set; }
+    SObjectRef LastIndex { get; set; }
 }
 
 /// <summary>
-/// Memory layout for Point objects.
+/// Memory layout for OrderedCollection objects.
 /// </summary>
-public readonly struct STPoint : ISTPoint
+public readonly struct STOrderedCollection : ISTOrderedCollection
 {
     private readonly SObjectRef _ref;
 
@@ -2638,48 +2564,195 @@ public readonly struct STPoint : ISTPoint
     public SObjectRef AsRef => _ref;
 
     /// <summary>
-    /// Initializes a new instance of <see cref="STPoint"/>.
+    /// Initializes a new instance of <see cref="STOrderedCollection"/>.
     /// </summary>
     /// <param name="objectRef">The object reference.</param>
-    public STPoint(SObjectRef objectRef) => _ref = objectRef;
+    public STOrderedCollection(SObjectRef objectRef) => _ref = objectRef;
 
     /// <summary>
-    /// Implicitly converts a <see cref="STPoint"/> to <see cref="SObjectRef"/>.
+    /// Implicitly converts a <see cref="STOrderedCollection"/> to <see cref="SObjectRef"/>.
     /// </summary>
-    public static implicit operator SObjectRef(STPoint obj) => obj._ref;
+    public static implicit operator SObjectRef(STOrderedCollection obj) => obj._ref;
 
     /// <summary>
-    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STPoint"/>.
+    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STOrderedCollection"/>.
     /// </summary>
-    public static implicit operator STPoint(SObjectRef r) => new(r);
+    public static implicit operator STOrderedCollection(SObjectRef r) => new(r);
 
 
     // Own instance variables
     /// <summary>
-    /// Gets or sets the x instance variable at offset 0.
+    /// Gets or sets the firstIndex instance variable at offset 0.
     /// </summary>
-    public SObjectRef X
+    public SObjectRef FirstIndex
     {
         get => _ref.GetInstanceVariable(0);
         set => _ref.SetInstanceVariable(0, value);
     }
 
     /// <summary>
-    /// Gets or sets the y instance variable at offset 1.
+    /// Gets or sets the lastIndex instance variable at offset 1.
     /// </summary>
-    public SObjectRef Y
+    public SObjectRef LastIndex
     {
         get => _ref.GetInstanceVariable(1);
         set => _ref.SetInstanceVariable(1, value);
     }
 
     /// <summary>
-    /// The total number of instance variables for STPoint.
+    /// The total number of instance variables for STOrderedCollection.
     /// </summary>
     public const int InstanceVarCount = 2;
 
     /// <summary>
-    /// The object format for STPoint.
+    /// The object format for STOrderedCollection.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.PointerIndexed;
+
+    /// <summary>
+    /// Gets or sets the indexed pointer at the specified index.
+    /// </summary>
+    public SObjectRef this[int index]
+    {
+        get => _ref.GetIndexedPointer(index);
+        set => _ref.SetIndexedPointer(index, value);
+    }
+
+    /// <summary>
+    /// Gets the length of the indexed portion.
+    /// </summary>
+    public int Length => _ref.GetIndexedSize();
+}
+
+/// <summary>
+/// Interface for Stream memory layout.
+/// </summary>
+public interface ISTStream : ISTObject
+{
+}
+
+/// <summary>
+/// Memory layout for Stream objects.
+/// </summary>
+public readonly struct STStream : ISTStream
+{
+    private readonly SObjectRef _ref;
+
+    /// <summary>
+    /// Gets the underlying object reference.
+    /// </summary>
+    public SObjectRef AsRef => _ref;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="STStream"/>.
+    /// </summary>
+    /// <param name="objectRef">The object reference.</param>
+    public STStream(SObjectRef objectRef) => _ref = objectRef;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="STStream"/> to <see cref="SObjectRef"/>.
+    /// </summary>
+    public static implicit operator SObjectRef(STStream obj) => obj._ref;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STStream"/>.
+    /// </summary>
+    public static implicit operator STStream(SObjectRef r) => new(r);
+
+    /// <summary>
+    /// The total number of instance variables for STStream.
+    /// </summary>
+    public const int InstanceVarCount = 0;
+
+    /// <summary>
+    /// The object format for STStream.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
+}
+
+/// <summary>
+/// Interface for PositionableStream memory layout.
+/// </summary>
+public interface ISTPositionableStream : ISTStream
+{
+    /// <summary>
+    /// Gets or sets the collection instance variable.
+    /// </summary>
+    SObjectRef Collection { get; set; }
+    /// <summary>
+    /// Gets or sets the position instance variable.
+    /// </summary>
+    SObjectRef Position { get; set; }
+    /// <summary>
+    /// Gets or sets the readLimit instance variable.
+    /// </summary>
+    SObjectRef ReadLimit { get; set; }
+}
+
+/// <summary>
+/// Memory layout for PositionableStream objects.
+/// </summary>
+public readonly struct STPositionableStream : ISTPositionableStream
+{
+    private readonly SObjectRef _ref;
+
+    /// <summary>
+    /// Gets the underlying object reference.
+    /// </summary>
+    public SObjectRef AsRef => _ref;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="STPositionableStream"/>.
+    /// </summary>
+    /// <param name="objectRef">The object reference.</param>
+    public STPositionableStream(SObjectRef objectRef) => _ref = objectRef;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="STPositionableStream"/> to <see cref="SObjectRef"/>.
+    /// </summary>
+    public static implicit operator SObjectRef(STPositionableStream obj) => obj._ref;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STPositionableStream"/>.
+    /// </summary>
+    public static implicit operator STPositionableStream(SObjectRef r) => new(r);
+
+
+    // Own instance variables
+    /// <summary>
+    /// Gets or sets the collection instance variable at offset 0.
+    /// </summary>
+    public SObjectRef Collection
+    {
+        get => _ref.GetInstanceVariable(0);
+        set => _ref.SetInstanceVariable(0, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the position instance variable at offset 1.
+    /// </summary>
+    public SObjectRef Position
+    {
+        get => _ref.GetInstanceVariable(1);
+        set => _ref.SetInstanceVariable(1, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the readLimit instance variable at offset 2.
+    /// </summary>
+    public SObjectRef ReadLimit
+    {
+        get => _ref.GetInstanceVariable(2);
+        set => _ref.SetInstanceVariable(2, value);
+    }
+
+    /// <summary>
+    /// The total number of instance variables for STPositionableStream.
+    /// </summary>
+    public const int InstanceVarCount = 3;
+
+    /// <summary>
+    /// The object format for STPositionableStream.
     /// </summary>
     public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
@@ -2856,24 +2929,16 @@ public readonly struct STProcessorScheduler : ISTProcessorScheduler
 }
 
 /// <summary>
-/// Interface for Rectangle memory layout.
+/// Interface for ReadStream memory layout.
 /// </summary>
-public interface ISTRectangle : ISTObject
+public interface ISTReadStream : ISTPositionableStream
 {
-    /// <summary>
-    /// Gets or sets the origin instance variable.
-    /// </summary>
-    SObjectRef Origin { get; set; }
-    /// <summary>
-    /// Gets or sets the corner instance variable.
-    /// </summary>
-    SObjectRef Corner { get; set; }
 }
 
 /// <summary>
-/// Memory layout for Rectangle objects.
+/// Memory layout for ReadStream objects.
 /// </summary>
-public readonly struct STRectangle : ISTRectangle
+public readonly struct STReadStream : ISTReadStream
 {
     private readonly SObjectRef _ref;
 
@@ -2883,48 +2948,57 @@ public readonly struct STRectangle : ISTRectangle
     public SObjectRef AsRef => _ref;
 
     /// <summary>
-    /// Initializes a new instance of <see cref="STRectangle"/>.
+    /// Initializes a new instance of <see cref="STReadStream"/>.
     /// </summary>
     /// <param name="objectRef">The object reference.</param>
-    public STRectangle(SObjectRef objectRef) => _ref = objectRef;
+    public STReadStream(SObjectRef objectRef) => _ref = objectRef;
 
     /// <summary>
-    /// Implicitly converts a <see cref="STRectangle"/> to <see cref="SObjectRef"/>.
+    /// Implicitly converts a <see cref="STReadStream"/> to <see cref="SObjectRef"/>.
     /// </summary>
-    public static implicit operator SObjectRef(STRectangle obj) => obj._ref;
+    public static implicit operator SObjectRef(STReadStream obj) => obj._ref;
 
     /// <summary>
-    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STRectangle"/>.
+    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STReadStream"/>.
     /// </summary>
-    public static implicit operator STRectangle(SObjectRef r) => new(r);
+    public static implicit operator STReadStream(SObjectRef r) => new(r);
 
 
-    // Own instance variables
+    // Inherited instance variables
     /// <summary>
-    /// Gets or sets the origin instance variable at offset 0.
+    /// Gets or sets the collection instance variable at offset 0.
     /// </summary>
-    public SObjectRef Origin
+    public SObjectRef Collection
     {
         get => _ref.GetInstanceVariable(0);
         set => _ref.SetInstanceVariable(0, value);
     }
 
     /// <summary>
-    /// Gets or sets the corner instance variable at offset 1.
+    /// Gets or sets the position instance variable at offset 1.
     /// </summary>
-    public SObjectRef Corner
+    public SObjectRef Position
     {
         get => _ref.GetInstanceVariable(1);
         set => _ref.SetInstanceVariable(1, value);
     }
 
     /// <summary>
-    /// The total number of instance variables for STRectangle.
+    /// Gets or sets the readLimit instance variable at offset 2.
     /// </summary>
-    public const int InstanceVarCount = 2;
+    public SObjectRef ReadLimit
+    {
+        get => _ref.GetInstanceVariable(2);
+        set => _ref.SetInstanceVariable(2, value);
+    }
 
     /// <summary>
-    /// The object format for STRectangle.
+    /// The total number of instance variables for STReadStream.
+    /// </summary>
+    public const int InstanceVarCount = 3;
+
+    /// <summary>
+    /// The object format for STReadStream.
     /// </summary>
     public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
@@ -3339,6 +3413,95 @@ public readonly struct STUndefinedObject : ISTUndefinedObject
 
     /// <summary>
     /// The object format for STUndefinedObject.
+    /// </summary>
+    public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
+}
+
+/// <summary>
+/// Interface for WriteStream memory layout.
+/// </summary>
+public interface ISTWriteStream : ISTPositionableStream
+{
+    /// <summary>
+    /// Gets or sets the writeLimit instance variable.
+    /// </summary>
+    SObjectRef WriteLimit { get; set; }
+}
+
+/// <summary>
+/// Memory layout for WriteStream objects.
+/// </summary>
+public readonly struct STWriteStream : ISTWriteStream
+{
+    private readonly SObjectRef _ref;
+
+    /// <summary>
+    /// Gets the underlying object reference.
+    /// </summary>
+    public SObjectRef AsRef => _ref;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="STWriteStream"/>.
+    /// </summary>
+    /// <param name="objectRef">The object reference.</param>
+    public STWriteStream(SObjectRef objectRef) => _ref = objectRef;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="STWriteStream"/> to <see cref="SObjectRef"/>.
+    /// </summary>
+    public static implicit operator SObjectRef(STWriteStream obj) => obj._ref;
+
+    /// <summary>
+    /// Implicitly converts a <see cref="SObjectRef"/> to <see cref="STWriteStream"/>.
+    /// </summary>
+    public static implicit operator STWriteStream(SObjectRef r) => new(r);
+
+
+    // Inherited instance variables
+    /// <summary>
+    /// Gets or sets the collection instance variable at offset 0.
+    /// </summary>
+    public SObjectRef Collection
+    {
+        get => _ref.GetInstanceVariable(0);
+        set => _ref.SetInstanceVariable(0, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the position instance variable at offset 1.
+    /// </summary>
+    public SObjectRef Position
+    {
+        get => _ref.GetInstanceVariable(1);
+        set => _ref.SetInstanceVariable(1, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the readLimit instance variable at offset 2.
+    /// </summary>
+    public SObjectRef ReadLimit
+    {
+        get => _ref.GetInstanceVariable(2);
+        set => _ref.SetInstanceVariable(2, value);
+    }
+
+    // Own instance variables
+    /// <summary>
+    /// Gets or sets the writeLimit instance variable at offset 3.
+    /// </summary>
+    public SObjectRef WriteLimit
+    {
+        get => _ref.GetInstanceVariable(3);
+        set => _ref.SetInstanceVariable(3, value);
+    }
+
+    /// <summary>
+    /// The total number of instance variables for STWriteStream.
+    /// </summary>
+    public const int InstanceVarCount = 4;
+
+    /// <summary>
+    /// The object format for STWriteStream.
     /// </summary>
     public const ObjectFormat IndexedFormat = ObjectFormat.FixedPointer;
 }
