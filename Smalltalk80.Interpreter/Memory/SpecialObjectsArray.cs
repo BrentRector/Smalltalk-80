@@ -30,16 +30,11 @@ using Smalltalk80.Interpreter.Core.Values;
 /// - ActiveProcess is accessed via ProcessorScheduler.activeProcess (not a separate root)
 /// - All Smalltalk objects (including SystemDictionary) live in the VM's heap
 /// </summary>
-public readonly struct SpecialObjectsArray
+internal readonly struct SpecialObjectsArray
 {
     /// <summary>
-    /// Index constants for array-based access.
+    /// Total number of roots in the Special Objects Array (5).
     /// </summary>
-    public const int NilIndex = 0;
-    public const int FalseIndex = 1;
-    public const int TrueIndex = 2;
-    public const int SmalltalkIndex = 3;
-    public const int ProcessorSchedulerIndex = 4;
     public const int Count = 5;
 
     /// <summary>

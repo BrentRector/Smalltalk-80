@@ -7,6 +7,7 @@ using Smalltalk80.Interpreter.Config;
 using System.Reflection;
 using Smalltalk80.Interpreter.Generated;
 using Smalltalk80.Interpreter.Generated.Layouts;
+using Smalltalk80.Interpreter.Core.BlueBook;
 
 /// <summary>
 /// Main orchestrator for the Smalltalk-80 cold start initialization.
@@ -572,9 +573,43 @@ public static class ColdStartBootstrap
             processClass.AsObjectPointer(),
             ObjectMemoryNew.GetClassTotalInstanceVariableCount(processClass.AsObjectPointer())
         );
-        SpecialObjectsArray.SetActiveProcess(activeProcess);
+
+        // CRITICAL FIX: Link activeProcess to ProcessorScheduler to prevent GC collection
+        // The Process must be reachable via: SOA[4] -> ProcessorScheduler -> activeProcess
+        // Using the generated STProcessorScheduler layout for type-safe access
+        var scheduler = new STProcessorScheduler(processorScheduler);
+        scheduler.ActiveProcess = activeProcess;
+
+        // Create quiescentProcessLists - Array of 8 LinkedLists (one per priority level)
+        // This is required by Blue Book specification for ProcessorScheduler
+        var arrayClass = _createdClasses["Array"];
+        var linkedListClass = _createdClasses["LinkedList"];
+
+        // Create the array with 8 slots for priority levels
+        var quiescentLists = BlueBookFactory.CreateArray(arrayClass, 8);
+
+        // Initialize each priority list as an empty LinkedList
+        for (var i = 0; i < 8; i++)
+        {
+            var linkedList = ObjectMemoryNew.CreateInstance(
+                linkedListClass.AsObjectPointer(),
+                ObjectMemoryNew.GetClassTotalInstanceVariableCount(linkedListClass.AsObjectPointer())
+            );
+
+            // Initialize LinkedList with nil firstLink and lastLink (empty list)
+            var list = new STLinkedList(linkedList);
+            list.FirstLink = SObjectRef.Nil;
+            list.LastLink = SObjectRef.Nil;
+
+            // Store in the array
+            quiescentLists.SetIndexedPointer(i, linkedList);
+        }
+
+        // Link quiescentProcessLists to ProcessorScheduler
+        scheduler.QuiescentProcessLists = quiescentLists;
 
         LogColdStart("  Created singletons: nil, true, false, ProcessorScheduler, ActiveProcess");
+        LogColdStart("  ProcessorScheduler properly linked: quiescentProcessLists (Array[8] of LinkedLists) and activeProcess");
     }
 
     /// <summary>

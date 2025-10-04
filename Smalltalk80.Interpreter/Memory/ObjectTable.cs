@@ -280,20 +280,6 @@ public sealed class ObjectTable
                         {
                             class9withInstVars++;
                         }
-
-                        // Log first Class object's InstanceVariables[4]
-                        if (class9count == 1 && (Program.RuntimeOptions?.EnableGCLogging ?? false))
-                        {
-                            try
-                            {
-                                Console.WriteLine($"[GC] First Class object: OOP={oop:X}");
-                                Console.WriteLine($"[GC]   InstanceVariables[4] (instVarNames) = OOP {instVarNamesRef.AsObjectPointer():X}, nil={instVarNamesRef.IsNil}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[GC] Error accessing InstVarNames: {ex.Message}");
-                            }
-                        }
                     }
                     else if (data.InstanceVariables.Length == 7)
                     {
@@ -311,67 +297,10 @@ public sealed class ObjectTable
                 // Mark this object
                 data.Marked = true;
 
-                // Debug: Log if this is USTable
-                if (Program.RuntimeOptions?.EnableGCLogging ?? false)
-                {
-                    var className = "?";
-                    try
-                    {
-                        className = data.ClassRef.IsNil ? "?" : ObjectMemoryNew.GetClassName(data.ClassRef.AsObjectPointer()) ?? "?";
-                    }
-                    catch
-                    {
-                        // Ignore GetClassName errors during GC logging
-                    }
-
-                    // Log SystemDictionary (commented out - too noisy)
-                    // if (className == "SystemDictionary" || (data.Format == ObjectFormat.PointerIndexed && data.InstanceVariables != null && data.InstanceVariables.Length == 1))
-                    // {
-                    //     Console.WriteLine($"[GC] Marking SystemDictionary: OOP={oop:X} class={className} format={data.Format}");
-                    //     if (data.IndexedData is SObjectRef[] sysDictData)
-                    //     {
-                    //         int nonNilCount = sysDictData.Count(r => !r.IsNil && r.IsHeapObject);
-                    //         Console.WriteLine($"[GC]   SystemDictionary has {sysDictData.Length} slots, {nonNilCount} non-nil associations");
-                    //     }
-                    // }
-
-                    // Log USTable
-                    if (className == "Array" && ObjectMemoryNew.GetIndexedSize(oop) == 256)
-                    {
-                        Console.WriteLine($"[GC] Marking USTable: OOP={oop:X} class={className} size=256 format={data.Format}");
-                        // Log first few bucket OOPs
-                        if (data.IndexedData is SObjectRef[] buckets && buckets.Length > 0)
-                        {
-                            Console.WriteLine($"[GC]   USTable has {buckets.Length} entries in IndexedData");
-                            Console.WriteLine($"[GC]   Bucket[0]={buckets[0].AsObjectPointer():X} (nil={buckets[0].IsNil}), Bucket[1]={buckets[1].AsObjectPointer():X} (nil={buckets[1].IsNil}), Bucket[2]={buckets[2].AsObjectPointer():X} (nil={buckets[2].IsNil})");
-
-                            // Count non-nil buckets
-                            int nonNilCount = 0;
-                            for (int i = 0; i < buckets.Length; i++)
-                            {
-                                if (!buckets[i].IsNil && buckets[i].IsHeapObject)
-                                    nonNilCount++;
-                            }
-                            Console.WriteLine($"[GC]   USTable has {nonNilCount} non-nil bucket references out of {buckets.Length}");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[GC]   ERROR: USTable IndexedData is not SObjectRef[] or is null! Type={data.IndexedData?.GetType().Name ?? "null"}");
-                        }
-                    }
-                }
-
                 // Trace references
                 TraceReferences(data, workList);
             }
 
-            // Log class counts
-            if (Program.RuntimeOptions?.EnableGCLogging ?? false)
-            {
-                Console.WriteLine($"[GC] Marked {class9count} objects with 9 inst vars (Class objects), {class9withInstVars} have non-nil InstanceVariables[4]");
-                Console.WriteLine($"[GC] Marked {class7count} objects with 7 inst vars (Metaclass objects), {class7withInstVars} have non-nil InstanceVariables[4]");
-                Console.WriteLine($"[GC] Total inst var name arrays that should be traced: {class9withInstVars + class7withInstVars}");
-            }
         }
     }
 
@@ -412,35 +341,11 @@ public sealed class ObjectTable
         {
             if (data.IndexedData is SObjectRef[] indexedRefs)
             {
-                if (enableDetailedLogging && indexedRefs.Length == 256)
+                foreach (var indexedRef in indexedRefs)
                 {
-                    int enqueuedCount = 0;
-                    var uniqueOops = new HashSet<nint>();
-                    var oopList = new List<nint>();
-                    for (int i = 0; i < indexedRefs.Length; i++)
+                    if (!indexedRef.IsNil && indexedRef.IsHeapObject)
                     {
-                        var indexedRef = indexedRefs[i];
-                        if (!indexedRef.IsNil && indexedRef.IsHeapObject)
-                        {
-                            var bucketOop = indexedRef.AsObjectPointer();
-                            workList.Enqueue(bucketOop);
-                            uniqueOops.Add(bucketOop);
-                            oopList.Add(bucketOop);
-                            enqueuedCount++;
-                        }
-                    }
-                    Console.WriteLine($"[GC]   Enqueued {enqueuedCount} bucket references from USTable's IndexedData ({uniqueOops.Count} unique)");
-                    // Print first 10 bucket OOPs
-                    Console.WriteLine($"[GC]   First 10 buckets: {string.Join(", ", oopList.Take(10).Select(oop => $"{oop:X}"))}");
-                }
-                else
-                {
-                    foreach (var indexedRef in indexedRefs)
-                    {
-                        if (!indexedRef.IsNil && indexedRef.IsHeapObject)
-                        {
-                            workList.Enqueue(indexedRef.AsObjectPointer());
-                        }
+                        workList.Enqueue(indexedRef.AsObjectPointer());
                     }
                 }
             }

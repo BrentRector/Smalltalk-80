@@ -205,12 +205,7 @@ public sealed class GarbageCollector
 
         if (Program.RuntimeOptions?.EnableGCLogging ?? false)
         {
-            Console.WriteLine($"[GC] Collection #{totalCollections} complete: " +
-                            $"{objectsCollected} objects collected, " +
-                            $"{objectsVisited} objects visited, " +
-                            $"{bytesFreed:N0} bytes freed (estimated), " +
-                            $"{lastLiveObjectCount} objects remain, " +
-                            $"{lastCollectionDuration}ms total (mark: {lastMarkDuration}ms, sweep: {lastSweepDuration}ms)");
+            Console.WriteLine($"[GC] Collection #{totalCollections}: {objectsCollected} collected, {lastLiveObjectCount} live, {lastCollectionDuration}ms");
         }
 
         return new GarbageCollectionStatistics(
@@ -317,12 +312,7 @@ public sealed class GarbageCollector
 
         if (Program.RuntimeOptions?.EnableGCLogging ?? false)
         {
-            Console.WriteLine($"[GC] Collection #{totalCollections} complete: " +
-                            $"{objectsCollected} objects collected, " +
-                            $"{objectsVisited} objects visited, " +
-                            $"{bytesFreed:N0} bytes freed (estimated), " +
-                            $"{lastLiveObjectCount} objects remain, " +
-                            $"{lastCollectionDuration}ms total (mark: {lastMarkDuration}ms, sweep: {lastSweepDuration}ms)");
+            Console.WriteLine($"[GC] Collection #{totalCollections}: {objectsCollected} collected, {lastLiveObjectCount} live, {lastCollectionDuration}ms");
         }
 
         return new GarbageCollectionStatistics(
