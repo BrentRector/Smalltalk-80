@@ -115,8 +115,9 @@ public static class ColdStartMethodInstaller
             var bytecode = (byte[])bytecodeField!.GetValue(null)!;
 
             // Read literals array (if it exists)
+            // Note: Literals are stored as JSON-encoded strings in LiteralsJson field
             SObjectRef[] literals;
-            var literalsField = methodType.GetField("Literals");
+            var literalsField = methodType.GetField("LiteralsJson");
             if (literalsField != null)
             {
                 var literalStrings = (string[])literalsField.GetValue(null)!;
@@ -124,7 +125,24 @@ public static class ColdStartMethodInstaller
 
                 for (int i = 0; i < literalStrings.Length; i++)
                 {
-                    literals[i] = ParseLiteral(literalStrings[i]);
+                    // Deserialize JSON element then parse the literal
+                    // Note: Some literals (SmallIntegers) are stored as bare numbers in JSON
+                    var literalJson = literalStrings[i];
+
+                    // Try to deserialize as string first
+                    string literal;
+                    if (literalJson.StartsWith("\""))
+                    {
+                        // JSON string - deserialize it
+                        literal = System.Text.Json.JsonSerializer.Deserialize<string>(literalJson) ?? "";
+                    }
+                    else
+                    {
+                        // Bare number or other JSON value - use as-is
+                        literal = literalJson;
+                    }
+
+                    literals[i] = ParseLiteral(literal);
                 }
             }
             else
@@ -260,7 +278,16 @@ public static class ColdStartMethodInstaller
             return SObjectRef.Nil;
         }
 
-        // Unknown literal type - return nil
+        // Bare string (after JSON deserialization, strings don't have quotes)
+        // This handles string literals that were stored as plain JSON strings
+        // Any other literal type should have been caught by the patterns above
+        // If we reach here with a non-empty string, treat it as a String object
+        if (!string.IsNullOrEmpty(literal))
+        {
+            return ObjectMemory.CreateString(literal);
+        }
+
+        // Unknown/empty literal
         Console.Error.WriteLine($"[ColdStartMethodInstaller] WARNING: Unknown literal format: {literal}");
         return SObjectRef.Nil;
     }

@@ -759,9 +759,9 @@ public static class ColdStartBootstrap
                 var displaySource = source.Length > 80 ? source.Substring(0, 77) + "..." : source;
                 LogColdStart($"  ERROR [{index}]: {displaySource}");
                 LogColdStart($"    Error: {ex.GetType().Name}: {ex.Message}");
-                if (index == 0)
+                if (index < 3 && ex.Message.Contains("shortStack"))
                 {
-                    // Show stack trace for first error only
+                    // Show full stack trace for first few shortStack errors
                     LogColdStart($"    Stack: {ex.StackTrace}");
                 }
             }
