@@ -42,7 +42,7 @@ public sealed class ObjectTable
     /// </summary>
     internal sealed class ObjectTableEntry
     {
-        public ObjectMemoryNew.ObjectData? Data { get; set; }
+        public ObjectMemory.ObjectData? Data { get; set; }
         public bool IsFree { get; set; }
 
         public ObjectTableEntry()
@@ -103,7 +103,7 @@ public sealed class ObjectTable
     /// O(1) operation using free list or next available index.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int Allocate(ObjectMemoryNew.ObjectData data)
+    public int Allocate(ObjectMemory.ObjectData data)
     {
         lock (_tableLock)
         {
@@ -170,7 +170,7 @@ public sealed class ObjectTable
     /// O(1) lookup.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ObjectMemoryNew.ObjectData? Get(int index)
+    public ObjectMemory.ObjectData? Get(int index)
     {
         if (index < 0 || index >= _nextIndex)
             return null;
@@ -184,7 +184,7 @@ public sealed class ObjectTable
     /// O(1) operation.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Set(int index, ObjectMemoryNew.ObjectData data)
+    public void Set(int index, ObjectMemory.ObjectData data)
     {
         lock (_tableLock)
         {
@@ -307,7 +307,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Traces all object references in the given ObjectData.
     /// </summary>
-    private void TraceReferences(ObjectMemoryNew.ObjectData data, Queue<nint> workList)
+    private void TraceReferences(ObjectMemory.ObjectData data, Queue<nint> workList)
     {
         bool enableDetailedLogging = Program.RuntimeOptions?.EnableGCLogging ?? false;
 
@@ -380,7 +380,7 @@ public sealed class ObjectTable
                     if (Program.RuntimeOptions?.EnableGCLogging ?? false)
                     {
                         var className = entry.Data.ClassRef.IsNil ? "Unknown" :
-                            ObjectMemoryNew.GetClassName(entry.Data.ClassRef.AsObjectPointer()) ?? "Unknown";
+                            ObjectMemory.GetClassName(entry.Data.ClassRef.AsObjectPointer()) ?? "Unknown";
                         var indexedSize = entry.Data.Format == ObjectFormat.PointerIndexed && entry.Data.IndexedData is SObjectRef[] arr ? arr.Length : 0;
                         var instVarCount = entry.Data.InstanceVariables?.Length ?? 0;
                         Console.WriteLine($"[GC] Collecting unmarked object OOP={OopFromIndex(i):X} class={className} format={entry.Data.Format} instVars={instVarCount} indexedSize={indexedSize}");
@@ -468,7 +468,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Gets all values (ObjectData) in the table.
     /// </summary>
-    public IEnumerable<ObjectMemoryNew.ObjectData> Values
+    public IEnumerable<ObjectMemory.ObjectData> Values
     {
         get
         {
@@ -489,7 +489,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Enumerates live objects with their index and data.
     /// </summary>
-    public IEnumerable<(int index, ObjectMemoryNew.ObjectData data)> EnumerateLiveObjects()
+    public IEnumerable<(int index, ObjectMemory.ObjectData data)> EnumerateLiveObjects()
     {
         lock (_tableLock)
         {
@@ -507,7 +507,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Provides enumeration support for foreach.
     /// </summary>
-    public IEnumerator<KeyValuePair<int, ObjectMemoryNew.ObjectData>> GetEnumerator()
+    public IEnumerator<KeyValuePair<int, ObjectMemory.ObjectData>> GetEnumerator()
     {
         lock (_tableLock)
         {
@@ -516,7 +516,7 @@ public sealed class ObjectTable
                 var entry = GetEntry(i);
                 if (!entry.IsFree && entry.Data != null)
                 {
-                    yield return new KeyValuePair<int, ObjectMemoryNew.ObjectData>(i, entry.Data!);
+                    yield return new KeyValuePair<int, ObjectMemory.ObjectData>(i, entry.Data!);
                 }
             }
         }
@@ -525,7 +525,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Indexer to access ObjectData by index.
     /// </summary>
-    public ObjectMemoryNew.ObjectData? this[int index]
+    public ObjectMemory.ObjectData? this[int index]
     {
         get => Get(index);
         set
@@ -538,7 +538,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Tries to remove an object at the specified index.
     /// </summary>
-    public bool TryRemove(int index, out ObjectMemoryNew.ObjectData? data)
+    public bool TryRemove(int index, out ObjectMemory.ObjectData? data)
     {
         lock (_tableLock)
         {

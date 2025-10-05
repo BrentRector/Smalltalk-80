@@ -28,7 +28,7 @@ public static class SymbolTableBuilder
     {
         // First, pre-create the "USTable" symbol (without adding to any table yet)
         // so we can include it in bucket size calculations
-        var usTableSymbolOop = ObjectMemoryNew.InternSymbolBootstrap("USTable");
+        var usTableSymbolOop = ObjectMemory.InternSymbolBootstrap("USTable");
 
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
@@ -62,15 +62,15 @@ public static class SymbolTableBuilder
         // Use the auto-generated symbol list from the compiler
         foreach (var symbol in ColdStartLiterals.Symbols)
         {
-            ObjectMemoryNew.InternSymbolBootstrap(symbol);
+            ObjectMemory.InternSymbolBootstrap(symbol);
         }
 
         // CRITICAL: Pre-intern symbols used after USTable creation to avoid bucket growth
-        ObjectMemoryNew.InternSymbolBootstrap("SymbolTable");  // Used in Phase2_4_CreateUSTable
+        ObjectMemory.InternSymbolBootstrap("SymbolTable");  // Used in Phase2_4_CreateUSTable
 
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            int totalBootstrapSymbols = ObjectMemoryNew.GetBootstrapSymbolTable().Count;
+            int totalBootstrapSymbols = ObjectMemory.GetBootstrapSymbolTable().Count;
             Console.WriteLine($"[SymbolTableBuilder] Pre-interned {ColdStartLiterals.Symbols.Length} symbols from ColdStartLiterals");
             Console.WriteLine($"[SymbolTableBuilder] Total bootstrap symbols: {totalBootstrapSymbols}");
         }
@@ -94,9 +94,9 @@ public static class SymbolTableBuilder
         const int initialBucketCount = 256;
 
         // Compute bucket assignments using the same algorithm as migration
-        var buckets = ObjectMemoryNew.ComputeSymbolBuckets(initialBucketCount);
+        var buckets = ObjectMemory.ComputeSymbolBuckets(initialBucketCount);
 
-        nint tableOop = ObjectMemoryNew.AllocateObject(
+        nint tableOop = ObjectMemory.AllocateObject(
             arrayClassRef.Value,
             ObjectFormat.PointerIndexed,
             instanceVarCount: 0,
@@ -110,7 +110,7 @@ public static class SymbolTableBuilder
         {
             int bucketSize = buckets.ContainsKey(i) ? buckets[i].Count : 0;
 
-            var bucketOop = ObjectMemoryNew.AllocateObject(
+            var bucketOop = ObjectMemory.AllocateObject(
                 arrayClassRef.Value,
                 ObjectFormat.PointerIndexed,
                 instanceVarCount: 0,
@@ -153,7 +153,7 @@ public static class SymbolTableBuilder
         // Slot 8: sharedPools
 
         // Get or create the classPool Dictionary
-        var classPoolRef = ObjectMemoryNew.GetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool);
+        var classPoolRef = ObjectMemory.GetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool);
 
         if (classPoolRef.IsNil)
         {
@@ -162,7 +162,7 @@ public static class SymbolTableBuilder
             if (dictionaryClassRef.IsNil)
                 throw new InvalidOperationException("Dictionary class must exist");
 
-            var newClassPoolOop = ObjectMemoryNew.AllocateObject(
+            var newClassPoolOop = ObjectMemory.AllocateObject(
                 dictionaryClassRef,
                 ObjectFormat.PointerIndexed,
                 instanceVarCount: 1, // tally
@@ -174,7 +174,7 @@ public static class SymbolTableBuilder
             classPoolRef.SetInstanceVariable(0, SObjectRef.FromSmallInteger(0));
 
             // Set classPool in Symbol class
-            ObjectMemoryNew.SetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool, classPoolRef);
+            ObjectMemory.SetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool, classPoolRef);
         }
 
         // Add Association #USTable -> usTable to classPool
@@ -183,10 +183,10 @@ public static class SymbolTableBuilder
             throw new InvalidOperationException("Association class must exist");
 
         // Get #USTable symbol (already created by CreateAndInstallUSTable)
-        var usTableSymbol = ObjectMemoryNew.InternSymbolBootstrap("USTable");
+        var usTableSymbol = ObjectMemory.InternSymbolBootstrap("USTable");
 
         // Create Association: key=#USTable, value=usTable
-        var associationOop = ObjectMemoryNew.AllocateObject(
+        var associationOop = ObjectMemory.AllocateObject(
             associationClassRef.Value,
             ObjectFormat.FixedPointer,
             instanceVarCount: 2, // key, value
@@ -198,7 +198,7 @@ public static class SymbolTableBuilder
 
         // Add association to classPool Dictionary
         // Simple implementation: find nil slot and add
-        var indexedSize = ObjectMemoryNew.GetIndexedSize(classPoolRef.AsObjectPointer());
+        var indexedSize = ObjectMemory.GetIndexedSize(classPoolRef.AsObjectPointer());
 
         for (int i = 0; i < indexedSize; i++)
         {
@@ -235,14 +235,14 @@ public static class SymbolTableBuilder
             return null;
 
         var symbolClassOop = _symbolClassCache.Value.AsObjectPointer();
-        var classPoolRef = ObjectMemoryNew.GetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool);
+        var classPoolRef = ObjectMemory.GetInstanceVariable(symbolClassOop, Core.BlueBook.ClassLayout.ClassPool);
 
         if (classPoolRef.IsNil)
             return null;
 
         // Search classPool for #USTable association
         // IMPORTANT: Compare by string value, NOT by interning (which would cause infinite recursion)
-        var indexedSize = ObjectMemoryNew.GetIndexedSize(classPoolRef.AsObjectPointer());
+        var indexedSize = ObjectMemory.GetIndexedSize(classPoolRef.AsObjectPointer());
 
         for (int i = 0; i < indexedSize; i++)
         {
@@ -256,7 +256,7 @@ public static class SymbolTableBuilder
                 // Compare symbol string value
                 try
                 {
-                    var keyString = ObjectMemoryNew.SymbolToString(key);
+                    var keyString = ObjectMemory.SymbolToString(key);
                     if (keyString == "USTable")
                     {
                         return association.GetInstanceVariable(1); // value

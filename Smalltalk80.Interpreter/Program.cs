@@ -596,10 +596,10 @@ public static class Program
 
         // Post-test GC validation
         Console.WriteLine("[POST-TEST] Running final garbage collection...");
-        var beforeGC = ObjectMemoryNew.ObjectTable.Count;
+        var beforeGC = ObjectMemory.ObjectTable.Count;
         var gcStats = vm.GarbageCollector.ForceCollection();
         Console.WriteLine($"  Final GC: {gcStats.ObjectsCollected} objects collected");
-        Console.WriteLine($"  Objects before GC: {beforeGC}, after GC: {ObjectMemoryNew.ObjectTable.Count}");
+        Console.WriteLine($"  Objects before GC: {beforeGC}, after GC: {ObjectMemory.ObjectTable.Count}");
 
         // Dump all remaining classes
         Console.WriteLine();

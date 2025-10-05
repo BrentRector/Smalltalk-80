@@ -2,6 +2,7 @@
 
 **Last Updated**: 2025-10-04
 **Status**: Current Standing Guidance
+**Current Phase**: Graphics & UI Implementation Complete (80% primitive coverage)
 
 ## Primary Documentation Reference
 
@@ -331,9 +332,9 @@ Output shows inheritance with box-drawing characters (├─, └─).
 
 3. **Update documentation**: Update Interpreter-Architecture.md if architecture changed
 
-4. **Warnings acceptable**: Build warnings are acceptable but should be minimized
+4. **Clean build required**: Build must succeed with 0 errors and 0 warnings
 
-**DO NOT commit if either project has compilation errors.**
+**DO NOT commit if either project has compilation errors or warnings.**
 
 ### Commit Message Format
 
@@ -364,7 +365,7 @@ Before submitting any change, verify:
 - [ ] Zero garbage during cold start
 - [ ] All objects reachable from 5 SOA roots
 - [ ] Per-VM architecture (no static VM state)
-- [ ] Build succeeds (0 errors)
+- [ ] Build succeeds (0 errors, 0 warnings)
 - [ ] GC validation passes (0 objects collected)
 - [ ] Documentation updated (if architecture changed)
 - [ ] No modification to Smalltalk-80.st source

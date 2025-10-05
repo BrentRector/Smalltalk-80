@@ -222,8 +222,8 @@ public static partial class SystemDictionary
         {
             // ALWAYS use bootstrap during registration to avoid infinite loops
             // After USTable migration, we rebuild the Instance with USTable symbols
-            var nameSymbol = ObjectMemoryNew.InternSymbolBootstrap(className);
-            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, classRef);
+            var nameSymbol = ObjectMemory.InternSymbolBootstrap(className);
+            ObjectMemory.DictionaryAtPut(Instance, nameSymbol, classRef);
         }
     }
 
@@ -238,8 +238,8 @@ public static partial class SystemDictionary
         // After USTable migration, SystemDictionary uses USTable symbols
         // Before migration, it uses bootstrap symbols
         // RegisterClassRef handles this automatically
-        var nameSymbol = ObjectMemoryNew.InternSymbol(name);
-        return ObjectMemoryNew.DictionaryAt(Instance, nameSymbol);
+        var nameSymbol = ObjectMemory.InternSymbol(name);
+        return ObjectMemory.DictionaryAt(Instance, nameSymbol);
     }
 
     /// <summary>
@@ -259,8 +259,8 @@ public static partial class SystemDictionary
         // Store in SystemDictionary.Instance (sole source of truth)
         if (!Instance.IsNil)
         {
-            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
-            ObjectMemoryNew.DictionaryAtPut(Instance, nameSymbol, valueRef);
+            var nameSymbol = ObjectMemory.InternSymbol(name);
+            ObjectMemory.DictionaryAtPut(Instance, nameSymbol, valueRef);
         }
     }
 
@@ -272,8 +272,8 @@ public static partial class SystemDictionary
         if (Instance.IsNil)
             return null;
 
-        var nameSymbol = ObjectMemoryNew.InternSymbol(name);
-        return ObjectMemoryNew.DictionaryAt(Instance, nameSymbol);
+        var nameSymbol = ObjectMemory.InternSymbol(name);
+        return ObjectMemory.DictionaryAt(Instance, nameSymbol);
     }
 
     /// <summary>
@@ -284,8 +284,8 @@ public static partial class SystemDictionary
     {
         if (!Instance.IsNil)
         {
-            var nameSymbol = ObjectMemoryNew.InternSymbol(name);
-            ObjectMemoryNew.DictionaryRemoveKey(Instance, nameSymbol);
+            var nameSymbol = ObjectMemory.InternSymbol(name);
+            ObjectMemory.DictionaryRemoveKey(Instance, nameSymbol);
         }
     }
 
@@ -301,11 +301,11 @@ public static partial class SystemDictionary
         var dictOop = Instance.AsObjectPointer();
 
         // SystemDictionary stores associations as indexed elements
-        var size = Memory.ObjectMemoryNew.GetIndexedSize(dictOop);
+        var size = Memory.ObjectMemory.GetIndexedSize(dictOop);
 
         for (int i = 0; i < size; i++)
         {
-            var assocRef = Memory.ObjectMemoryNew.GetIndexedPointer(dictOop, i);
+            var assocRef = Memory.ObjectMemory.GetIndexedPointer(dictOop, i);
             if (!assocRef.IsNil)
             {
                 // Get the key (Symbol) from the Association
@@ -314,7 +314,7 @@ public static partial class SystemDictionary
 
                 if (!keyRef.IsNil)
                 {
-                    var keyStr = Memory.ObjectMemoryNew.SymbolToString(keyRef);
+                    var keyStr = Memory.ObjectMemory.SymbolToString(keyRef);
 
                     // Get the value to check if it's a class
                     var valueRef = assoc.Value;
@@ -322,7 +322,7 @@ public static partial class SystemDictionary
                     {
                         // Check if value is a class by seeing if it has a 'superclass' inst var (index 0 of Behavior)
                         var valueOop = valueRef.AsObjectPointer();
-                        var instVarCount = Memory.ObjectMemoryNew.GetInstanceVariableCount(valueOop);
+                        var instVarCount = Memory.ObjectMemory.GetInstanceVariableCount(valueOop);
 
                         // Classes (instances of Class/Metaclass) have at least 9 inst vars (Behavior:4 + ClassDescription:2 + Class:3)
                         if (instVarCount >= 9)

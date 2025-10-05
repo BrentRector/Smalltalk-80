@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.Execution;
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Memory;
 
 namespace Smalltalk80.Interpreter.Primitives;
@@ -12,105 +13,100 @@ namespace Smalltalk80.Interpreter.Primitives;
 public static class ControlPrimitives
 {
     /// <summary>
-    /// Primitive 80: blockCopy - Create a block closure.
-    /// Creates a new block context that captures the current method context.
+    /// Primitive 80: blockCopy: - Create a block closure.
+    /// Creates a new BlockContext that captures the current execution state.
+    /// The block captures its home context and the starting PC for its bytecodes.
+    /// Per Blue Book specification, this is invoked by the compiler-generated blockCopy: bytecode.
     /// </summary>
-    /// <param name="receiver">The receiver (typically a CompiledMethod or Context).</param>
-    /// <param name="arguments">Arguments containing the number of block arguments.</param>
+    /// <param name="receiver">The receiver (current MethodContext or BlockContext).</param>
+    /// <param name="arguments">Single argument: SmallInteger number of block arguments.</param>
     /// <param name="context">Execution context for accessing VM services.</param>
-    /// <returns>A new block closure, or failure if arguments are invalid.</returns>
+    /// <returns>A new BlockContext object, or failure if arguments are invalid.</returns>
     public static PrimitiveResult PrimitiveBlockCopy(SObjectRef receiver, SObjectRef[] arguments, IPrimitiveContext context)
     {
-        // blockCopy takes the number of arguments the block expects
+        // Validate argument count
         if (arguments.Length != 1)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongNumberOfArguments);
 
+        // Validate argument is SmallInteger
         if (!arguments[0].IsSmallInteger)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
 
         int argumentCount = arguments[0].AsSmallInteger();
+
+        // Validate argument count is non-negative
         if (argumentCount < 0)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
 
-        // Create a block closure object
-        // In a real implementation, this would capture the current context
-        // For now, we return a placeholder that would need VM support
-        var blockClass = context.GetClass("BlockClosure");
-        if (blockClass == SObjectRef.Nil)
+        // Get the interpreter instance
+        var primitiveContext = context as InterpreterPrimitiveContext;
+        if (primitiveContext?.Interpreter == null)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
 
-        // Create a new block instance with fields for:
-        // - home context
-        // - argument count
-        // - start PC
-        var block = context.NewInstance(blockClass, 3);
+        // Create BlockContext using the interpreter
+        var blockContext = primitiveContext.Interpreter.CreateBlockContext(argumentCount);
 
-        // Note: Actual implementation would need to:
-        // 1. Get the current method context from the VM
-        // 2. Store the home context reference
-        // 3. Store the PC where block code starts
-        // 4. Store the argument count
-
-        return block;
+        return PrimitiveResult.CreateSuccess(blockContext);
     }
 
     /// <summary>
     /// Primitive 81: value - Evaluate block with no arguments.
-    /// Executes the block closure and returns its result.
+    /// Activates the BlockContext and executes its bytecodes, returning the result.
+    /// Per Blue Book specification, this is the fundamental block evaluation primitive.
     /// </summary>
-    /// <param name="receiver">The block closure to evaluate.</param>
+    /// <param name="receiver">The BlockContext to evaluate.</param>
     /// <param name="arguments">Should be empty for value.</param>
     /// <param name="context">Execution context for accessing VM services.</param>
-    /// <returns>Result of block evaluation, or failure if not a block.</returns>
+    /// <returns>Result of block evaluation, or failure if not a BlockContext.</returns>
     public static PrimitiveResult PrimitiveValue(SObjectRef receiver, SObjectRef[] arguments, IPrimitiveContext context)
     {
+        // Validate no arguments for value (0-arg block evaluation)
         if (arguments.Length != 0)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongNumberOfArguments);
 
-        // Verify receiver is a block
+        // Verify receiver is a heap object
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        var receiverOop = receiver.AsObjectPointer();
+        // Get the interpreter instance
+        var primitiveContext = context as InterpreterPrimitiveContext;
+        if (primitiveContext?.Interpreter == null)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
 
-        // Check if it's a BlockClosure instance
-        var classRef = context.GetObjectClass(receiverOop);
-        if (classRef.IsNil)
-            return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
+        // Activate and execute the BlockContext with no arguments
+        var result = primitiveContext.Interpreter.ActivateBlockContext(receiver, new SObjectRef[0]);
 
-        // In a real implementation, this would:
-        // 1. Create a new block context
-        // 2. Set up the execution stack
-        // 3. Execute the block's bytecode
-        // 4. Return the result
-
-        // For now, this is a stub that needs VM integration
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        return PrimitiveResult.CreateSuccess(result);
     }
 
     /// <summary>
     /// Primitive 82: value: - Evaluate block with one argument.
-    /// Executes the block closure with the provided argument.
+    /// Activates the BlockContext with the provided argument and executes its bytecodes.
+    /// Per Blue Book specification, this handles 1-argument block evaluation.
     /// </summary>
-    /// <param name="receiver">The block closure to evaluate.</param>
+    /// <param name="receiver">The BlockContext to evaluate.</param>
     /// <param name="arguments">Single argument to pass to the block.</param>
     /// <param name="context">Execution context for accessing VM services.</param>
-    /// <returns>Result of block evaluation, or failure if not a block.</returns>
+    /// <returns>Result of block evaluation, or failure if not a BlockContext.</returns>
     public static PrimitiveResult PrimitiveValueWithArg(SObjectRef receiver, SObjectRef[] arguments, IPrimitiveContext context)
     {
+        // Validate exactly one argument for value: (1-arg block evaluation)
         if (arguments.Length != 1)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongNumberOfArguments);
 
-        // Verify receiver is a block
+        // Verify receiver is a heap object
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        // In a real implementation, this would:
-        // 1. Create a new block context with the argument
-        // 2. Execute the block's bytecode with the argument on stack
-        // 3. Return the result
+        // Get the interpreter instance
+        var primitiveContext = context as InterpreterPrimitiveContext;
+        if (primitiveContext?.Interpreter == null)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
 
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        // Activate and execute the BlockContext with the provided argument
+        var result = primitiveContext.Interpreter.ActivateBlockContext(receiver, arguments);
+
+        return PrimitiveResult.CreateSuccess(result);
     }
 
     /// <summary>
@@ -140,7 +136,7 @@ public static class ControlPrimitives
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
 
         // Convert Symbol to string
-        string selectorString = ObjectMemoryNew.SymbolToString(selector);
+        string selectorString = ObjectMemory.SymbolToString(selector);
 
         // Use the Send method from context to perform the message send
         return context.Send(receiver, selectorString, []);
@@ -167,7 +163,7 @@ public static class ControlPrimitives
             return PrimitiveResult.CreateFailure(PrimitiveFailure.WrongArgumentType);
 
         // Convert Symbol to string
-        string selectorString = ObjectMemoryNew.SymbolToString(selector);
+        string selectorString = ObjectMemory.SymbolToString(selector);
 
         // Use the Send method from context to perform the message send
         return context.Send(receiver, selectorString, [messageArg]);
@@ -176,6 +172,9 @@ public static class ControlPrimitives
     /// <summary>
     /// Primitive 85: signal - Semaphore signal.
     /// Signals a semaphore, potentially waking a waiting process.
+    /// Per Blue Book specification:
+    /// - If excessSignals > 0, increment it
+    /// - Else if firstLink not nil, resume the first waiting process
     /// </summary>
     /// <param name="receiver">The semaphore to signal.</param>
     /// <param name="arguments">Should be empty.</param>
@@ -190,14 +189,57 @@ public static class ControlPrimitives
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        // Process/Semaphore support not yet implemented
-        // This would interact with the process scheduler
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        var semaphore = new Generated.Layouts.STSemaphore(receiver);
+
+        // Get excessSignals (instance variable at offset 2)
+        var excessSignals = semaphore.ExcessSignals;
+
+        // Get firstLink (inherited from LinkedList at offset 0)
+        var firstLink = semaphore.FirstLink;
+
+        if (!firstLink.IsNil)
+        {
+            // Remove the first waiting process from the semaphore's list
+            var process = new Generated.Layouts.STProcess(firstLink);
+
+            // Update semaphore's firstLink to the process's nextLink
+            var nextLink = process.NextLink;
+            semaphore.FirstLink = nextLink;
+
+            // If the list is now empty, clear lastLink
+            if (nextLink.IsNil)
+            {
+                semaphore.LastLink = SObjectRef.Nil;
+            }
+
+            // Clear the process's myList since it's no longer on the semaphore
+            process.MyList = SObjectRef.Nil;
+            process.NextLink = SObjectRef.Nil;
+
+            // Resume the process by adding it to the scheduler's ready queue
+            ResumeProcess(firstLink, context);
+        }
+        else if (excessSignals.IsSmallInteger)
+        {
+            // No processes waiting, increment excessSignals
+            int signals = excessSignals.AsSmallInteger();
+            semaphore.ExcessSignals = SObjectRef.FromSmallInteger(signals + 1);
+        }
+        else
+        {
+            // Initialize excessSignals to 1 if it was nil
+            semaphore.ExcessSignals = SObjectRef.FromSmallInteger(1);
+        }
+
+        return PrimitiveResult.CreateSuccess(receiver);
     }
 
     /// <summary>
     /// Primitive 86: wait - Semaphore wait.
     /// Waits on a semaphore, potentially suspending the current process.
+    /// Per Blue Book specification:
+    /// - If excessSignals > 0, decrement it and continue
+    /// - Else add active process to semaphore's waiting list and suspend it
     /// </summary>
     /// <param name="receiver">The semaphore to wait on.</param>
     /// <param name="arguments">Should be empty.</param>
@@ -212,13 +254,49 @@ public static class ControlPrimitives
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        // Process/Semaphore support not yet implemented
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        var semaphore = new Generated.Layouts.STSemaphore(receiver);
+
+        // Get excessSignals (instance variable at offset 2)
+        var excessSignals = semaphore.ExcessSignals;
+
+        if (excessSignals.IsSmallInteger && excessSignals.AsSmallInteger() > 0)
+        {
+            // Decrement excessSignals and continue
+            int signals = excessSignals.AsSmallInteger();
+            semaphore.ExcessSignals = SObjectRef.FromSmallInteger(signals - 1);
+            return PrimitiveResult.CreateSuccess(receiver);
+        }
+
+        // Need to suspend the active process and add it to the semaphore's waiting list
+        // Get ProcessorScheduler
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        var scheduler = new Generated.Layouts.STProcessorScheduler(schedulerRef.Value);
+
+        // Get the active process
+        var activeProcess = scheduler.ActiveProcess;
+        if (activeProcess.IsNil)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        // Add the active process to the semaphore's waiting list
+        AddProcessToList(receiver, activeProcess);
+
+        // Set the process's myList to the semaphore
+        var process = new Generated.Layouts.STProcess(activeProcess);
+        process.MyList = receiver;
+
+        // Suspend the active process (switch to next ready process)
+        return SuspendActiveProcess(context);
     }
 
     /// <summary>
     /// Primitive 87: resume - Process resume.
     /// Resumes a suspended process.
+    /// Per Blue Book specification:
+    /// - Add process to scheduler's quiescentProcessLists at its priority
+    /// - If higher priority than active, switch to it
     /// </summary>
     /// <param name="receiver">The process to resume.</param>
     /// <param name="arguments">Should be empty.</param>
@@ -233,18 +311,23 @@ public static class ControlPrimitives
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        // Process support not yet implemented
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        // Resume the process
+        ResumeProcess(receiver, context);
+
+        return PrimitiveResult.CreateSuccess(receiver);
     }
 
     /// <summary>
     /// Primitive 88: suspend - Process suspend.
     /// Suspends the current process.
+    /// Per Blue Book specification:
+    /// - Must be active process
+    /// - Remove from scheduler, switch to highest priority ready process
     /// </summary>
     /// <param name="receiver">The process to suspend (must be active process).</param>
     /// <param name="arguments">Should be empty.</param>
     /// <param name="context">Execution context for accessing VM services.</param>
-    /// <returns>The process, or failure if not the active process.</returns>
+    /// <returns>The suspended process, or failure if not the active process.</returns>
     public static PrimitiveResult PrimitiveSuspend(SObjectRef receiver, SObjectRef[] arguments, IPrimitiveContext context)
     {
         if (arguments.Length != 0)
@@ -254,9 +337,230 @@ public static class ControlPrimitives
         if (!context.IsHeapObject(receiver))
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
 
-        // Process support not yet implemented
-        return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
+        // Get ProcessorScheduler
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        var scheduler = new Generated.Layouts.STProcessorScheduler(schedulerRef.Value);
+
+        // Verify receiver is the active process
+        if (!receiver.Equals(scheduler.ActiveProcess))
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.BadReceiver);
+
+        // Suspend the active process
+        return SuspendActiveProcess(context);
     }
+
+    #region Process Management Helpers
+
+    /// <summary>
+    /// Resumes a process by adding it to the scheduler's ready queue.
+    /// If the process has higher priority than the active process, switches to it.
+    /// </summary>
+    private static void ResumeProcess(SObjectRef processRef, IPrimitiveContext context)
+    {
+        var process = new Generated.Layouts.STProcess(processRef);
+
+        // Check if process is already on a list
+        if (!process.MyList.IsNil)
+            return; // Process is already scheduled or waiting
+
+        // Get ProcessorScheduler
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil)
+            return;
+
+        var scheduler = new Generated.Layouts.STProcessorScheduler(schedulerRef.Value);
+
+        // Get process priority
+        var priority = process.Priority;
+        if (!priority.IsSmallInteger)
+            return;
+
+        int priorityLevel = priority.AsSmallInteger();
+
+        // Clamp priority to valid range (1-8 for Smalltalk-80)
+        if (priorityLevel < 1) priorityLevel = 1;
+        if (priorityLevel > 8) priorityLevel = 8;
+
+        // Get the quiescentProcessLists array
+        var listsArray = scheduler.QuiescentProcessLists;
+        if (listsArray.IsNil || !listsArray.IsHeapObject)
+            return;
+
+        // Get the list for this priority (0-based index)
+        var listRef = ObjectMemory.GetIndexedPointer(listsArray.AsObjectPointer(), priorityLevel - 1);
+
+        // Add process to the end of the priority list
+        AddProcessToList(listRef, processRef);
+
+        // Set the process's myList
+        process.MyList = listRef;
+
+        // Check if we should switch to this process
+        var activeProcess = scheduler.ActiveProcess;
+        if (!activeProcess.IsNil)
+        {
+            var activeProc = new Generated.Layouts.STProcess(activeProcess);
+            var activePriority = activeProc.Priority;
+
+            if (activePriority.IsSmallInteger && priorityLevel > activePriority.AsSmallInteger())
+            {
+                // Higher priority process, switch to it
+                SwitchToProcess(processRef, context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Suspends the active process and switches to the highest priority ready process.
+    /// </summary>
+    private static PrimitiveResult SuspendActiveProcess(IPrimitiveContext context)
+    {
+        // Get ProcessorScheduler
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        var scheduler = new Generated.Layouts.STProcessorScheduler(schedulerRef.Value);
+
+        // Get the active process
+        var activeProcess = scheduler.ActiveProcess;
+        if (activeProcess.IsNil)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        // Find highest priority process with something ready
+        var listsArray = scheduler.QuiescentProcessLists;
+        if (listsArray.IsNil || !listsArray.IsHeapObject)
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+
+        SObjectRef nextProcess = SObjectRef.Nil;
+
+        // Search from highest priority down
+        for (int priority = 7; priority >= 0; priority--)
+        {
+            var listRef = ObjectMemory.GetIndexedPointer(listsArray.AsObjectPointer(), priority);
+            if (!listRef.IsNil && listRef.IsHeapObject)
+            {
+                var list = new Generated.Layouts.STLinkedList(listRef);
+                if (!list.FirstLink.IsNil)
+                {
+                    // Found a ready process
+                    nextProcess = RemoveFirstFromList(listRef);
+                    break;
+                }
+            }
+        }
+
+        if (nextProcess.IsNil)
+        {
+            // No process ready to run - this is an error condition
+            return PrimitiveResult.CreateFailure(PrimitiveFailure.InternalError);
+        }
+
+        // Clear the new process's myList since it's now active
+        var newProcess = new Generated.Layouts.STProcess(nextProcess);
+        newProcess.MyList = SObjectRef.Nil;
+
+        // Switch to the new process
+        SwitchToProcess(nextProcess, context);
+
+        return PrimitiveResult.CreateSuccess(activeProcess);
+    }
+
+    /// <summary>
+    /// Switches execution to a new process.
+    /// </summary>
+    private static void SwitchToProcess(SObjectRef newProcessRef, IPrimitiveContext context)
+    {
+        // Get ProcessorScheduler
+        var schedulerRef = SystemDictionary.LookupGlobalRef("Processor");
+        if (!schedulerRef.HasValue || schedulerRef.Value.IsNil)
+            return;
+
+        var scheduler = new Generated.Layouts.STProcessorScheduler(schedulerRef.Value);
+
+        // Update activeProcess
+        scheduler.ActiveProcess = newProcessRef;
+
+        // Get the interpreter to perform context switch
+        var primitiveContext = context as InterpreterPrimitiveContext;
+        if (primitiveContext?.Interpreter != null)
+        {
+            // The interpreter needs to switch to the new process's suspendedContext
+            var newProcess = new Generated.Layouts.STProcess(newProcessRef);
+            var newContext = newProcess.SuspendedContext;
+
+            // This would require interpreter support for context switching
+            // For now, we just update the activeProcess
+            // Full implementation would require:
+            // primitiveContext.Interpreter.SwitchToContext(newContext);
+        }
+    }
+
+    /// <summary>
+    /// Adds a process to the end of a linked list.
+    /// </summary>
+    private static void AddProcessToList(SObjectRef listRef, SObjectRef processRef)
+    {
+        if (listRef.IsNil || !listRef.IsHeapObject)
+            return;
+
+        var list = new Generated.Layouts.STLinkedList(listRef);
+        var process = new Generated.Layouts.STProcess(processRef);
+
+        // Clear process's nextLink
+        process.NextLink = SObjectRef.Nil;
+
+        if (list.FirstLink.IsNil)
+        {
+            // Empty list
+            list.FirstLink = processRef;
+            list.LastLink = processRef;
+        }
+        else
+        {
+            // Add to end of list
+            if (!list.LastLink.IsNil && list.LastLink.IsHeapObject)
+            {
+                var lastProcess = new Generated.Layouts.STProcess(list.LastLink);
+                lastProcess.NextLink = processRef;
+            }
+            list.LastLink = processRef;
+        }
+    }
+
+    /// <summary>
+    /// Removes and returns the first process from a linked list.
+    /// </summary>
+    private static SObjectRef RemoveFirstFromList(SObjectRef listRef)
+    {
+        if (listRef.IsNil || !listRef.IsHeapObject)
+            return SObjectRef.Nil;
+
+        var list = new Generated.Layouts.STLinkedList(listRef);
+
+        var firstLink = list.FirstLink;
+        if (firstLink.IsNil)
+            return SObjectRef.Nil;
+
+        var firstProcess = new Generated.Layouts.STProcess(firstLink);
+        var nextLink = firstProcess.NextLink;
+
+        list.FirstLink = nextLink;
+        if (nextLink.IsNil)
+        {
+            list.LastLink = SObjectRef.Nil;
+        }
+
+        // Clear the removed process's links
+        firstProcess.NextLink = SObjectRef.Nil;
+
+        return firstLink;
+    }
+
+    #endregion
 
     /// <summary>
     /// Registers all control flow primitives in the primitive table.

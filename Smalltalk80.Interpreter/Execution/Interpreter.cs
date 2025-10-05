@@ -7,6 +7,7 @@ using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Config;
 using Smalltalk80.Interpreter.Primitives;
+using Smalltalk80.Interpreter.Generated.Layouts;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -14,13 +15,13 @@ using Microsoft.Extensions.Logging;
 /// This interpreter uses MethodContext and BlockContext objects for execution,
 /// not C# stacks, making it fully compliant with the Smalltalk-80 specification.
 ///
-/// This is the NEW implementation that works entirely with SObjectRef and ObjectMemoryNew,
+/// This is the NEW implementation that works entirely with SObjectRef and ObjectMemory,
 /// eliminating all dependencies on SObject classes.
 /// </summary>
-public sealed class ContextBasedInterpreterNew
+public sealed class Interpreter
 {
     private SObjectRef activeContext = SObjectRef.Nil;
-    private readonly ILogger<ContextBasedInterpreterNew>? logger;
+    private readonly ILogger<Interpreter>? logger;
     private bool tracingEnabled = false;
     private int traceIndentLevel = 0;
     private GarbageCollector? garbageCollector;
@@ -56,9 +57,9 @@ public sealed class ContextBasedInterpreterNew
     }
 
     /// <summary>
-    /// Initializes a new instance of the ContextBasedInterpreterNew.
+    /// Initializes a new instance of the Interpreter.
     /// </summary>
-    public ContextBasedInterpreterNew(ILogger<ContextBasedInterpreterNew>? logger = null)
+    public Interpreter(ILogger<Interpreter>? logger = null)
     {
         this.logger = logger;
         this.primitiveTable = new PrimitiveTable();
@@ -87,12 +88,12 @@ public sealed class ContextBasedInterpreterNew
         if (TracingEnabled)
         {
             var indent = new string(' ', traceIndentLevel * 2);
-            var selector = ObjectMemoryNew.GetCompiledMethodSelector(methodRef.AsObjectPointer());
+            var selector = ObjectMemory.GetCompiledMethodSelector(methodRef.AsObjectPointer());
             Console.WriteLine($"{indent}==> EXECUTE SELECTOR: {selector}");
             Console.WriteLine($"{indent}    Receiver: {FormatRef(receiverRef)}");
             Console.WriteLine($"{indent}    Arguments: [{string.Join(", ", argumentRefs.Select(FormatRef))}]");
 
-            var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
+            var bytecodes = ObjectMemory.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
             Console.WriteLine($"{indent}    Bytecodes: {bytecodes.Length} bytes");
 
             traceIndentLevel++;
@@ -110,7 +111,8 @@ public sealed class ContextBasedInterpreterNew
         // Set the sender if we have an active context
         if (!activeContext.IsNil)
         {
-            ObjectMemoryNew.SetContextSender(newContext.AsObjectPointer(), activeContext);
+            var context = new STMethodContext(newContext);
+            context.Sender = activeContext;
         }
 
         // Make this the active context
@@ -123,8 +125,8 @@ public sealed class ContextBasedInterpreterNew
         try
         {
             // Check for primitive
-            var header = ObjectMemoryNew.GetCompiledMethodHeader(methodRef.AsObjectPointer());
-            var primitiveIndex = ObjectMemoryNew.CompiledMethodHeader.GetPrimitiveIndex(header);
+            var header = ObjectMemory.GetCompiledMethodHeader(methodRef.AsObjectPointer());
+            var primitiveIndex = ObjectMemory.CompiledMethodHeader.GetPrimitiveIndex(header);
 
             if (primitiveIndex > 0)
             {
@@ -168,7 +170,7 @@ public sealed class ContextBasedInterpreterNew
             {
                 traceIndentLevel--;
                 var indent = new string(' ', traceIndentLevel * 2);
-                var selector = ObjectMemoryNew.GetCompiledMethodSelector(methodRef.AsObjectPointer());
+                var selector = ObjectMemory.GetCompiledMethodSelector(methodRef.AsObjectPointer());
                 Console.WriteLine($"{indent}<== RETURN from {selector}: {FormatRef(result)}");
             }
 
@@ -188,8 +190,8 @@ public sealed class ContextBasedInterpreterNew
     {
         // Get method details
         var methodOop = methodRef.AsObjectPointer();
-        var numTemps = ObjectMemoryNew.GetCompiledMethodTemporaryCount(methodOop);
-        var numArgs = ObjectMemoryNew.GetCompiledMethodArgumentCount(methodOop);
+        var numTemps = ObjectMemory.GetCompiledMethodTemporaryCount(methodOop);
+        var numArgs = ObjectMemory.GetCompiledMethodArgumentCount(methodOop);
 
         // Calculate indexed size: args + temps + stack
         // MethodContext has 6 instance variables (fixed fields), indexed slots hold temp frame + stack
@@ -197,29 +199,31 @@ public sealed class ContextBasedInterpreterNew
         var indexedSize = numArgs + numTemps + stackSize;
 
         // Create the context object (PointerIndexed format)
-        var contextRef = ObjectMemoryNew.CreateInstance(
+        var contextRef = ObjectMemory.CreateInstance(
             SystemDictionary.MethodContextClassRef.AsObjectPointer(),
             indexedSize);
 
-        var contextOop = contextRef.AsObjectPointer();
+        // Use STMethodContext for type-safe access
+        var context = new STMethodContext(contextRef);
 
-        // Initialize fixed instance variables (indices 0-5)
-        ObjectMemoryNew.SetContextSender(contextOop, SObjectRef.Nil);
-        ObjectMemoryNew.SetContextInstructionPointer(contextOop, 0);
-        ObjectMemoryNew.SetContextStackPointer(contextOop, 6 + numArgs + numTemps); // Stack starts after instance vars + temp frame
-        ObjectMemoryNew.SetContextMethod(contextOop, methodRef);
-        ObjectMemoryNew.SetContextReceiver(contextOop, receiverRef);
+        // Initialize fixed instance variables using layout struct
+        context.Sender = SObjectRef.Nil;
+        context.Pc = SObjectRef.FromSmallInteger(0);
+        context.Stackp = SObjectRef.FromSmallInteger(STMethodContext.InstanceVarCount + numArgs + numTemps); // Stack starts after instance vars + temp frame
+        context.Method = methodRef;
+        context.ReceiverMap = SObjectRef.Nil; // Not used in interpreter
+        context.Receiver = receiverRef;
 
         // Copy arguments into temporaries area
         for (int i = 0; i < argumentRefs.Length && i < numArgs; i++)
         {
-            ObjectMemoryNew.SetContextTemporary(contextOop, i, argumentRefs[i]);
+            context.SetTemporary(i, argumentRefs[i]);
         }
 
         // Initialize remaining temporaries to nil
         for (int i = argumentRefs.Length; i < numArgs + numTemps; i++)
         {
-            ObjectMemoryNew.SetContextTemporary(contextOop, i, SObjectRef.Nil);
+            context.SetTemporary(i, SObjectRef.Nil);
         }
 
         return contextRef;
@@ -235,23 +239,74 @@ public sealed class ContextBasedInterpreterNew
             throw new InvalidOperationException("No active context");
         }
 
-        var contextOop = activeContext.AsObjectPointer();
-        var methodRef = ObjectMemoryNew.GetContextMethod(contextOop);
+        // Determine if this is a MethodContext or BlockContext
+        var contextClass = activeContext.GetClassRef();
+        var isMethodContext = contextClass == SystemDictionary.MethodContextClassRef;
+
+        SObjectRef methodRef;
+        if (isMethodContext)
+        {
+            var context = new STMethodContext(activeContext);
+            methodRef = context.Method;
+        }
+        else
+        {
+            // It's a BlockContext - get the method from its home context
+            var blockContext = new STBlockContext(activeContext);
+            var homeRef = blockContext.Home;
+
+            // The home must be a MethodContext
+            var homeContext = new STMethodContext(homeRef);
+            methodRef = homeContext.Method;
+        }
+
         var methodOop = methodRef.AsObjectPointer();
-        var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodOop);
+        var bytecodes = ObjectMemory.GetCompiledMethodBytecodes(methodOop);
+        var contextOop = activeContext.AsObjectPointer();
 
         while (true)
         {
-            var ip = ObjectMemoryNew.GetContextInstructionPointer(contextOop);
+            // Get IP using the appropriate layout struct
+            int ip;
+            if (isMethodContext)
+            {
+                var context = new STMethodContext(activeContext);
+                ip = context.Pc.AsSmallInteger();
+            }
+            else
+            {
+                var context = new STBlockContext(activeContext);
+                ip = context.Pc.AsSmallInteger();
+            }
 
             if (ip >= bytecodes.Length)
             {
                 // End of bytecodes without explicit return
-                return ObjectMemoryNew.GetContextReceiver(contextOop);
+                if (isMethodContext)
+                {
+                    var context = new STMethodContext(activeContext);
+                    return context.Receiver;
+                }
+                else
+                {
+                    // BlockContext returns top of stack
+                    return ContextTop(contextOop);
+                }
             }
 
             var bytecode = bytecodes[ip];
-            ObjectMemoryNew.SetContextInstructionPointer(contextOop, ip + 1);
+
+            // Update IP using the appropriate layout struct
+            if (isMethodContext)
+            {
+                var context = new STMethodContext(activeContext);
+                context.Pc = SObjectRef.FromSmallInteger(ip + 1);
+            }
+            else
+            {
+                var context = new STBlockContext(activeContext);
+                context.Pc = SObjectRef.FromSmallInteger(ip + 1);
+            }
 
             if (DebugOptions.EnableBytecodeTrace || tracingEnabled)
             {
@@ -272,7 +327,7 @@ public sealed class ContextBasedInterpreterNew
             if (shouldReturn)
             {
                 // Method or block returned
-                var returnValue = ObjectMemoryNew.ContextPop(contextOop);
+                var returnValue = ContextPop(contextOop);
                 if (TracingEnabled)
                 {
                     var indent = new string(' ', (traceIndentLevel + 1) * 2);
@@ -289,24 +344,44 @@ public sealed class ContextBasedInterpreterNew
     /// <returns>True if the method should return, false to continue.</returns>
     private bool ExecuteSingleBytecode(byte bytecode, nint contextOop)
     {
-        var methodRef = ObjectMemoryNew.GetContextMethod(contextOop);
+        // Determine context type and get method reference
+        var contextClass = activeContext.GetClassRef();
+        var isMethodContext = contextClass == SystemDictionary.MethodContextClassRef;
+
+        SObjectRef methodRef;
+        SObjectRef receiverRef;
+
+        if (isMethodContext)
+        {
+            var context = new STMethodContext(activeContext);
+            methodRef = context.Method;
+            receiverRef = context.Receiver;
+        }
+        else
+        {
+            // BlockContext - get method from home and receiver from home
+            var blockContext = new STBlockContext(activeContext);
+            var homeContext = new STMethodContext(blockContext.Home);
+            methodRef = homeContext.Method;
+            receiverRef = homeContext.Receiver;
+        }
+
         var methodOop = methodRef.AsObjectPointer();
 
         // Push receiver variable 0-15
         if (bytecode <= 0x0F)
         {
             var index = bytecode & 0x0F;
-            var receiverRef = ObjectMemoryNew.GetContextReceiver(contextOop);
 
             // Check if receiver has instance variables (not SmallInteger or nil)
             if (receiverRef.IsHeapObject)
             {
-                var instVar = ObjectMemoryNew.GetInstanceVariable(receiverRef.AsObjectPointer(), index);
-                ObjectMemoryNew.ContextPush(contextOop, instVar);
+                var instVar = ObjectMemory.GetInstanceVariable(receiverRef.AsObjectPointer(), index);
+                ContextPush(contextOop, instVar);
             }
             else
             {
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.Nil);
+                ContextPush(contextOop, SObjectRef.Nil);
             }
             return false;
         }
@@ -315,8 +390,20 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x10 && bytecode <= 0x1F)
         {
             var index = bytecode & 0x0F;
-            var temp = ObjectMemoryNew.GetContextTemporary(contextOop, index);
-            ObjectMemoryNew.ContextPush(contextOop, temp);
+
+            // Use layout struct to get temporary
+            if (isMethodContext)
+            {
+                var context = new STMethodContext(activeContext);
+                var temp = context.GetTemporary(index);
+                ContextPush(contextOop, temp);
+            }
+            else
+            {
+                var context = new STBlockContext(activeContext);
+                var temp = context.GetTemporary(index);
+                ContextPush(contextOop, temp);
+            }
             return false;
         }
 
@@ -324,8 +411,8 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x20 && bytecode <= 0x3F)
         {
             var index = bytecode & 0x1F;
-            var literal = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, index);
-            ObjectMemoryNew.ContextPush(contextOop, literal);
+            var literal = ObjectMemory.GetCompiledMethodLiteral(methodOop, index);
+            ContextPush(contextOop, literal);
             return false;
         }
 
@@ -333,28 +420,28 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x40 && bytecode <= 0x5F)
         {
             var index = bytecode & 0x1F;
-            var association = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, index);
+            var association = ObjectMemory.GetCompiledMethodLiteral(methodOop, index);
 
             // Association is an array with key at index 0, value at index 1
             if (!association.IsNil && association.IsHeapObject)
             {
                 var assocOop = association.AsObjectPointer();
-                var format = ObjectMemoryNew.GetFormat(assocOop);
+                var format = ObjectMemory.GetFormat(assocOop);
 
                 if (format == ObjectFormat.PointerIndexed || format == ObjectFormat.FixedPointer)
                 {
                     Generated.Layouts.STAssociation assoc = association;
                     var value = assoc.Value;
-                    ObjectMemoryNew.ContextPush(contextOop, value);
+                    ContextPush(contextOop, value);
                 }
                 else
                 {
-                    ObjectMemoryNew.ContextPush(contextOop, SObjectRef.Nil);
+                    ContextPush(contextOop, SObjectRef.Nil);
                 }
             }
             else
             {
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.Nil);
+                ContextPush(contextOop, SObjectRef.Nil);
             }
             return false;
         }
@@ -363,12 +450,11 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x60 && bytecode <= 0x67)
         {
             var index = bytecode & 0x07;
-            var value = ObjectMemoryNew.ContextPop(contextOop);
-            var receiverRef = ObjectMemoryNew.GetContextReceiver(contextOop);
+            var value = ContextPop(contextOop);
 
             if (receiverRef.IsHeapObject)
             {
-                ObjectMemoryNew.SetInstanceVariable(receiverRef.AsObjectPointer(), index, value);
+                ObjectMemory.SetInstanceVariable(receiverRef.AsObjectPointer(), index, value);
             }
             return false;
         }
@@ -377,8 +463,19 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x68 && bytecode <= 0x6F)
         {
             var index = bytecode & 0x07;
-            var value = ObjectMemoryNew.ContextPop(contextOop);
-            ObjectMemoryNew.SetContextTemporary(contextOop, index, value);
+            var value = ContextPop(contextOop);
+
+            // Use layout struct to set temporary
+            if (isMethodContext)
+            {
+                var context = new STMethodContext(activeContext);
+                context.SetTemporary(index, value);
+            }
+            else
+            {
+                var context = new STBlockContext(activeContext);
+                context.SetTemporary(index, value);
+            }
             return false;
         }
 
@@ -386,53 +483,51 @@ public sealed class ContextBasedInterpreterNew
         switch (bytecode)
         {
             case 0x70: // pushReceiver
-                var receiver = ObjectMemoryNew.GetContextReceiver(contextOop);
-                ObjectMemoryNew.ContextPush(contextOop, receiver);
+                ContextPush(contextOop, receiverRef);
                 return false;
 
             case 0x71: // pushTrue
-                ObjectMemoryNew.ContextPush(contextOop, GetTrueRef());
+                ContextPush(contextOop, GetTrueRef());
                 return false;
 
             case 0x72: // pushFalse
-                ObjectMemoryNew.ContextPush(contextOop, GetFalseRef());
+                ContextPush(contextOop, GetFalseRef());
                 return false;
 
             case 0x73: // pushNil
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.Nil);
+                ContextPush(contextOop, SObjectRef.Nil);
                 return false;
 
             case 0x74: // pushMinusOne
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.FromSmallInteger(-1));
+                ContextPush(contextOop, SObjectRef.FromSmallInteger(-1));
                 return false;
 
             case 0x75: // pushZero
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.FromSmallInteger(0));
+                ContextPush(contextOop, SObjectRef.FromSmallInteger(0));
                 return false;
 
             case 0x76: // pushOne
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.FromSmallInteger(1));
+                ContextPush(contextOop, SObjectRef.FromSmallInteger(1));
                 return false;
 
             case 0x77: // pushTwo
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.FromSmallInteger(2));
+                ContextPush(contextOop, SObjectRef.FromSmallInteger(2));
                 return false;
 
             case 0x78: // return receiver
-                var rcvr = ObjectMemoryNew.GetContextReceiver(contextOop);
-                ObjectMemoryNew.ContextPush(contextOop, rcvr);
+                ContextPush(contextOop, receiverRef);
                 return true;
 
             case 0x79: // return true
-                ObjectMemoryNew.ContextPush(contextOop, GetTrueRef());
+                ContextPush(contextOop, GetTrueRef());
                 return true;
 
             case 0x7A: // return false
-                ObjectMemoryNew.ContextPush(contextOop, GetFalseRef());
+                ContextPush(contextOop, GetFalseRef());
                 return true;
 
             case 0x7B: // return nil
-                ObjectMemoryNew.ContextPush(contextOop, SObjectRef.Nil);
+                ContextPush(contextOop, SObjectRef.Nil);
                 return true;
 
             case 0x7C: // return top
@@ -440,16 +535,16 @@ public sealed class ContextBasedInterpreterNew
                 return true;
 
             case 0x87: // pop
-                ObjectMemoryNew.ContextPop(contextOop);
+                ContextPop(contextOop);
                 return false;
 
             case 0x88: // dup
-                var top = ObjectMemoryNew.ContextTop(contextOop);
-                ObjectMemoryNew.ContextPush(contextOop, top);
+                var top = ContextTop(contextOop);
+                ContextPush(contextOop, top);
                 return false;
 
             case 0x89: // pushActiveContext (thisContext)
-                ObjectMemoryNew.ContextPush(contextOop, activeContext);
+                ContextPush(contextOop, activeContext);
                 return false;
         }
 
@@ -471,15 +566,15 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0xD0 && bytecode <= 0xDF)
         {
             var selectorIndex = bytecode & 0x0F;
-            var selectorRef = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, selectorIndex);
-            var selector = ObjectMemoryNew.SymbolToString(selectorRef);
+            var selectorRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, selectorIndex);
+            var selector = ObjectMemory.SymbolToString(selectorRef);
 
             // Pop receiver
-            var receiver = ObjectMemoryNew.ContextPop(contextOop);
+            var receiver = ContextPop(contextOop);
 
             // Perform message send with 0 arguments
             var result = SendMessage(receiver, selector, Array.Empty<SObjectRef>());
-            ObjectMemoryNew.ContextPush(contextOop, result);
+            ContextPush(contextOop, result);
             return false;
         }
 
@@ -487,8 +582,20 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x90 && bytecode <= 0x97)
         {
             var offset = (bytecode & 0x07) + 1;
-            var ip = ObjectMemoryNew.GetContextInstructionPointer(contextOop);
-            ObjectMemoryNew.SetContextInstructionPointer(contextOop, ip + offset);
+
+            // Update IP using layout struct
+            if (isMethodContext)
+            {
+                var context = new STMethodContext(activeContext);
+                var ip = context.Pc.AsSmallInteger();
+                context.Pc = SObjectRef.FromSmallInteger(ip + offset);
+            }
+            else
+            {
+                var context = new STBlockContext(activeContext);
+                var ip = context.Pc.AsSmallInteger();
+                context.Pc = SObjectRef.FromSmallInteger(ip + offset);
+            }
             return false;
         }
 
@@ -496,11 +603,22 @@ public sealed class ContextBasedInterpreterNew
         if (bytecode >= 0x98 && bytecode <= 0x9F)
         {
             var offset = (bytecode & 0x07) + 1;
-            var condition = ObjectMemoryNew.ContextPop(contextOop);
+            var condition = ContextPop(contextOop);
             if (condition == GetFalseRef())
             {
-                var ip = ObjectMemoryNew.GetContextInstructionPointer(contextOop);
-                ObjectMemoryNew.SetContextInstructionPointer(contextOop, ip + offset);
+                // Update IP using layout struct
+                if (isMethodContext)
+                {
+                    var context = new STMethodContext(activeContext);
+                    var ip = context.Pc.AsSmallInteger();
+                    context.Pc = SObjectRef.FromSmallInteger(ip + offset);
+                }
+                else
+                {
+                    var context = new STBlockContext(activeContext);
+                    var ip = context.Pc.AsSmallInteger();
+                    context.Pc = SObjectRef.FromSmallInteger(ip + offset);
+                }
             }
             return false;
         }
@@ -540,10 +658,10 @@ public sealed class ContextBasedInterpreterNew
         var args = new SObjectRef[numArgs];
         for (int i = numArgs - 1; i >= 0; i--)
         {
-            args[i] = ObjectMemoryNew.ContextPop(contextOop);
+            args[i] = ContextPop(contextOop);
         }
 
-        var receiver = ObjectMemoryNew.ContextPop(contextOop);
+        var receiver = ContextPop(contextOop);
 
         // Try primitive arithmetic for SmallIntegers
         if (receiver.IsSmallInteger && numArgs > 0 && args[0].IsSmallInteger)
@@ -551,14 +669,14 @@ public sealed class ContextBasedInterpreterNew
             var result = ExecuteIntegerArithmetic(receiver, selector, args[0]);
             if (!result.IsNil)
             {
-                ObjectMemoryNew.ContextPush(contextOop, result);
+                ContextPush(contextOop, result);
                 return;
             }
         }
 
         // Fall back to message send
         var sendResult = Send(selector, receiver, args);
-        ObjectMemoryNew.ContextPush(contextOop, sendResult);
+        ContextPush(contextOop, sendResult);
     }
 
     /// <summary>
@@ -585,10 +703,10 @@ public sealed class ContextBasedInterpreterNew
 
         for (int i = numArgs - 1; i >= 0; i--)
         {
-            args[i] = ObjectMemoryNew.ContextPop(contextOop);
+            args[i] = ContextPop(contextOop);
         }
 
-        var receiver = ObjectMemoryNew.ContextPop(contextOop);
+        var receiver = ContextPop(contextOop);
 
         // Handle special selectors with optimizations
         switch (selector)
@@ -596,19 +714,19 @@ public sealed class ContextBasedInterpreterNew
             case "==":
                 // Identity comparison
                 var isIdentical = numArgs > 0 && receiver.Equals(args[0]);
-                ObjectMemoryNew.ContextPush(contextOop, isIdentical ? GetTrueRef() : GetFalseRef());
+                ContextPush(contextOop, isIdentical ? GetTrueRef() : GetFalseRef());
                 return;
 
             case "class":
                 var classRef = receiver.GetClassRef();
-                ObjectMemoryNew.ContextPush(contextOop, classRef);
+                ContextPush(contextOop, classRef);
                 return;
 
             case "size":
                 if (receiver.IsHeapObject)
                 {
-                    var size = ObjectMemoryNew.GetIndexedSize(receiver.AsObjectPointer());
-                    ObjectMemoryNew.ContextPush(contextOop, SObjectRef.FromSmallInteger(size));
+                    var size = ObjectMemory.GetIndexedSize(receiver.AsObjectPointer());
+                    ContextPush(contextOop, SObjectRef.FromSmallInteger(size));
                     return;
                 }
                 break;
@@ -616,7 +734,7 @@ public sealed class ContextBasedInterpreterNew
 
         // Fall back to message send
         var result = Send(selector, receiver, args);
-        ObjectMemoryNew.ContextPush(contextOop, result);
+        ContextPush(contextOop, result);
     }
 
     /// <summary>
@@ -631,7 +749,7 @@ public sealed class ContextBasedInterpreterNew
         }
 
         // Look up the method
-        var methodRef = ObjectMemoryNew.LookupMethod(classRef.AsObjectPointer(), selector);
+        var methodRef = ObjectMemory.LookupMethod(classRef.AsObjectPointer(), selector);
         if (methodRef.IsNil)
         {
             // Method not found - should send doesNotUnderstand:
@@ -703,7 +821,7 @@ public sealed class ContextBasedInterpreterNew
                 if (TracingEnabled)
                 {
                     var indent = new string(' ', (traceIndentLevel + 2) * 2);
-                    var remaining = ObjectMemoryNew.ObjectTable.Count;
+                    var remaining = ObjectMemory.ObjectTable.Count;
                     Console.WriteLine($"{indent}[GC] Collected {stats.ObjectsCollected} objects, {remaining} remain");
                 }
             }
@@ -748,7 +866,7 @@ public sealed class ContextBasedInterpreterNew
         }
         else if (receiverRef.IsHeapObject)
         {
-            var receiverClass = ObjectMemoryNew.GetClass(receiverRef.AsObjectPointer());
+            var receiverClass = ObjectMemory.GetClass(receiverRef.AsObjectPointer());
             classOop = receiverClass.AsObjectPointer();
         }
         else
@@ -757,7 +875,7 @@ public sealed class ContextBasedInterpreterNew
         }
 
         // Look up method
-        var methodRef = ObjectMemoryNew.LookupMethod(classOop, selector);
+        var methodRef = ObjectMemory.LookupMethod(classOop, selector);
         if (methodRef.IsNil)
         {
             throw new InvalidOperationException($"Method not found: {selector}");
@@ -765,13 +883,13 @@ public sealed class ContextBasedInterpreterNew
 
         // Check for primitive (bit 15 of header indicates extended header with primitive)
         var methodOop = methodRef.AsObjectPointer();
-        var header = ObjectMemoryNew.GetCompiledMethodHeader(methodOop);
+        var header = ObjectMemory.GetCompiledMethodHeader(methodOop);
         var hasPrimitive = (header & 0x8000) != 0; // Bit 15 set means extended header
 
         if (hasPrimitive)
         {
             // Extended header: primitive index is in bytes 2-3 of the bytecode data
-            var bytecodeData = ObjectMemoryNew.GetByteIndexedData(methodOop);
+            var bytecodeData = ObjectMemory.GetByteIndexedData(methodOop);
             if (bytecodeData.Length >= 4)
             {
                 // Bytes 0-1: header, Bytes 2-3: primitive index, Bytes 4+: bytecodes
@@ -879,7 +997,7 @@ public sealed class ContextBasedInterpreterNew
             if (!SystemDictionary.TrueClassRef.IsNil)
             {
                 // Create true singleton instance
-                cachedTrueRef = ObjectMemoryNew.CreateInstance(
+                cachedTrueRef = ObjectMemory.CreateInstance(
                     SystemDictionary.TrueClassRef.AsObjectPointer(), 0);
             }
             else
@@ -909,7 +1027,7 @@ public sealed class ContextBasedInterpreterNew
         }
 
         // Get activeProcess from ProcessorScheduler (instance var 1)
-        var activeProcessRef = ObjectMemoryNew.GetInstanceVariable(schedulerRef.Value.AsObjectPointer(), 1);
+        var activeProcessRef = ObjectMemory.GetInstanceVariable(schedulerRef.Value.AsObjectPointer(), 1);
         if (activeProcessRef.IsNil || !activeProcessRef.IsHeapObject)
         {
             if (TracingEnabled)
@@ -919,7 +1037,7 @@ public sealed class ContextBasedInterpreterNew
 
         // Update Process.suspendedContext (instance var 1) to link to current context
         // This ensures the entire context chain (via sender field) remains reachable
-        ObjectMemoryNew.SetInstanceVariable(activeProcessRef.AsObjectPointer(), 1, contextRef);
+        ObjectMemory.SetInstanceVariable(activeProcessRef.AsObjectPointer(), 1, contextRef);
 
         if (TracingEnabled && DebugOptions.EnableBytecodeTrace)
         {
@@ -939,7 +1057,7 @@ public sealed class ContextBasedInterpreterNew
             if (!SystemDictionary.FalseClassRef.IsNil)
             {
                 // Create false singleton instance
-                cachedFalseRef = ObjectMemoryNew.CreateInstance(
+                cachedFalseRef = ObjectMemory.CreateInstance(
                     SystemDictionary.FalseClassRef.AsObjectPointer(), 0);
             }
             else
@@ -950,6 +1068,240 @@ public sealed class ContextBasedInterpreterNew
             }
         }
         return cachedFalseRef.Value;
+    }
+
+    /// <summary>
+    /// Creates a BlockContext for primitive 80 (blockCopy:).
+    /// The block captures the current execution state including home context and start PC.
+    /// </summary>
+    /// <param name="argumentCount">Number of arguments the block expects.</param>
+    /// <returns>A new BlockContext object.</returns>
+    public SObjectRef CreateBlockContext(int argumentCount)
+    {
+        // BlockContext needs enough indexed space for stack
+        var stackSize = 16; // Default stack size
+
+        // Create BlockContext instance (6 fixed fields + stack)
+        var blockRef = ObjectMemory.CreateInstance(
+            SystemDictionary.BlockContextClassRef.AsObjectPointer(),
+            stackSize);
+
+        // Get current context and PC
+        var currentContext = activeContext;
+        if (currentContext.IsNil)
+            throw new InvalidOperationException("Cannot create block without active context");
+
+        var currentOop = currentContext.AsObjectPointer();
+
+        // Determine current PC from context
+        int currentPC;
+        var contextClass = currentContext.GetClassRef();
+        if (contextClass == SystemDictionary.MethodContextClassRef)
+        {
+            var methodContext = new STMethodContext(currentContext);
+            currentPC = methodContext.Pc.AsSmallInteger();
+        }
+        else
+        {
+            var blockContext = new STBlockContext(currentContext);
+            currentPC = blockContext.Pc.AsSmallInteger();
+        }
+
+        // Determine home context
+        // If current context is a MethodContext, it's the home
+        // If current context is a BlockContext, use its home
+        var homeContext = currentContext;
+        if (contextClass == SystemDictionary.BlockContextClassRef)
+        {
+            // Current is a BlockContext, get its home
+            var currentBlock = new STBlockContext(currentContext);
+            homeContext = currentBlock.Home;
+        }
+
+        // Initialize BlockContext using layout struct
+        var block = new STBlockContext(blockRef);
+        block.Sender = SObjectRef.Nil;  // Set when block is activated
+        block.Pc = SObjectRef.FromSmallInteger(currentPC + 2);  // Skip jump bytecode
+        block.Stackp = SObjectRef.FromSmallInteger(STBlockContext.InstanceVarCount);  // Start of stack
+        block.Nargs = SObjectRef.FromSmallInteger(argumentCount);
+        block.Startpc = SObjectRef.FromSmallInteger(currentPC + 2);
+        block.Home = homeContext;
+
+        return blockRef;
+    }
+
+    /// <summary>
+    /// Activates a BlockContext for primitives 81-82 (value, value:).
+    /// Sets up the block's stack frame and executes its bytecodes.
+    /// </summary>
+    /// <param name="blockRef">The BlockContext to activate.</param>
+    /// <param name="arguments">Arguments to pass to the block.</param>
+    /// <returns>The result of block execution.</returns>
+    public SObjectRef ActivateBlockContext(SObjectRef blockRef, SObjectRef[] arguments)
+    {
+        if (!blockRef.IsHeapObject)
+            throw new ArgumentException("Block must be a heap object");
+
+        var blockOop = blockRef.AsObjectPointer();
+
+        // Verify it's a BlockContext
+        var blockClass = ObjectMemory.GetClass(blockOop);
+        if (blockClass != SystemDictionary.BlockContextClassRef)
+            throw new ArgumentException("Receiver must be a BlockContext");
+
+        // Use layout struct for type-safe access
+        var block = new STBlockContext(blockRef);
+
+        // Validate argument count
+        var nargs = block.Nargs.AsSmallInteger();
+        if (arguments.Length != nargs)
+            throw new InvalidOperationException(
+                $"Block expects {nargs} arguments, got {arguments.Length}");
+
+        // Set sender to current active context
+        block.Sender = activeContext;
+
+        // Reset PC to start position
+        var startPC = block.Startpc.AsSmallInteger();
+        block.Pc = SObjectRef.FromSmallInteger(startPC);
+
+        // Reset stack pointer (arguments will be on stack)
+        block.Stackp = SObjectRef.FromSmallInteger(STBlockContext.InstanceVarCount + arguments.Length);
+
+        // Push arguments onto block's stack
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            block.SetStackSlot(i, arguments[i]);
+        }
+
+        // Save previous context
+        var previousContext = activeContext;
+
+        // Make block the active context
+        activeContext = blockRef;
+
+        // Link to process for GC reachability
+        UpdateProcessSuspendedContext(blockRef);
+
+        try
+        {
+            // Execute block's bytecodes
+            var result = ExecuteBytecodes();
+            return result;
+        }
+        finally
+        {
+            // Restore previous context
+            activeContext = previousContext;
+        }
+    }
+
+    /// <summary>
+    /// Pushes a value onto the context's stack.
+    /// Works with both MethodContext and BlockContext.
+    /// </summary>
+    private void ContextPush(nint contextOop, SObjectRef value)
+    {
+        // Determine if this is a MethodContext or BlockContext by checking class
+        var contextClass = ObjectMemory.GetClass(contextOop);
+        var methodContextClass = SystemDictionary.MethodContextClassRef;
+        var blockContextClass = SystemDictionary.BlockContextClassRef;
+        var contextRef = SObjectRef.FromObjectPointer(contextOop);
+
+        if (contextClass.Equals(methodContextClass))
+        {
+            var context = new STMethodContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            context.SetStackSlot(stackp - STMethodContext.InstanceVarCount, value);
+            context.Stackp = SObjectRef.FromSmallInteger(stackp + 1);
+        }
+        else if (contextClass.Equals(blockContextClass))
+        {
+            var context = new STBlockContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            context.SetStackSlot(stackp - STBlockContext.InstanceVarCount, value);
+            context.Stackp = SObjectRef.FromSmallInteger(stackp + 1);
+        }
+        else
+        {
+            throw new InvalidOperationException($"ContextPush called on non-context object (class OOP={contextClass.AsObjectPointer()})");
+        }
+    }
+
+    /// <summary>
+    /// Pops a value from the context's stack.
+    /// Works with both MethodContext and BlockContext.
+    /// </summary>
+    private SObjectRef ContextPop(nint contextOop)
+    {
+        // Determine if this is a MethodContext or BlockContext by checking class
+        var contextClass = ObjectMemory.GetClass(contextOop);
+        var methodContextClass = SystemDictionary.MethodContextClassRef;
+        var blockContextClass = SystemDictionary.BlockContextClassRef;
+        var contextRef = SObjectRef.FromObjectPointer(contextOop);
+
+        if (contextClass.Equals(methodContextClass))
+        {
+            var context = new STMethodContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            if (stackp <= STMethodContext.InstanceVarCount)
+                throw new InvalidOperationException("Stack underflow in MethodContext");
+
+            var value = context.GetStackSlot(stackp - STMethodContext.InstanceVarCount - 1);
+            context.Stackp = SObjectRef.FromSmallInteger(stackp - 1);
+            return value;
+        }
+        else if (contextClass.Equals(blockContextClass))
+        {
+            var context = new STBlockContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            if (stackp <= STBlockContext.InstanceVarCount)
+                throw new InvalidOperationException("Stack underflow in BlockContext");
+
+            var value = context.GetStackSlot(stackp - STBlockContext.InstanceVarCount - 1);
+            context.Stackp = SObjectRef.FromSmallInteger(stackp - 1);
+            return value;
+        }
+        else
+        {
+            throw new InvalidOperationException($"ContextPop called on non-context object (class OOP={contextClass.AsObjectPointer()})");
+        }
+    }
+
+    /// <summary>
+    /// Returns the top value on the context's stack without popping it.
+    /// Works with both MethodContext and BlockContext.
+    /// </summary>
+    private SObjectRef ContextTop(nint contextOop)
+    {
+        // Determine if this is a MethodContext or BlockContext by checking class
+        var contextClass = ObjectMemory.GetClass(contextOop);
+        var methodContextClass = SystemDictionary.MethodContextClassRef;
+        var blockContextClass = SystemDictionary.BlockContextClassRef;
+        var contextRef = SObjectRef.FromObjectPointer(contextOop);
+
+        if (contextClass.Equals(methodContextClass))
+        {
+            var context = new STMethodContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            if (stackp <= STMethodContext.InstanceVarCount)
+                throw new InvalidOperationException("Stack empty in MethodContext");
+
+            return context.GetStackSlot(stackp - STMethodContext.InstanceVarCount - 1);
+        }
+        else if (contextClass.Equals(blockContextClass))
+        {
+            var context = new STBlockContext(contextRef);
+            var stackp = context.Stackp.AsSmallInteger();
+            if (stackp <= STBlockContext.InstanceVarCount)
+                throw new InvalidOperationException("Stack empty in BlockContext");
+
+            return context.GetStackSlot(stackp - STBlockContext.InstanceVarCount - 1);
+        }
+        else
+        {
+            throw new InvalidOperationException($"ContextTop called on non-context object (class OOP={contextClass.AsObjectPointer()})");
+        }
     }
 
     /// <summary>

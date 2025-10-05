@@ -9,13 +9,18 @@ namespace Smalltalk80.Interpreter.Primitives;
 /// </summary>
 public class InterpreterPrimitiveContext : IPrimitiveContext
 {
-    private readonly Execution.ContextBasedInterpreterNew interpreter;
+    private readonly Execution.Interpreter interpreter;
+
+    /// <summary>
+    /// Gets the interpreter instance for advanced primitive operations.
+    /// </summary>
+    public Execution.Interpreter Interpreter => interpreter;
 
     /// <summary>
     /// Initializes a new instance of the InterpreterPrimitiveContext class.
     /// </summary>
     /// <param name="interpreter">The interpreter instance.</param>
-    public InterpreterPrimitiveContext(Execution.ContextBasedInterpreterNew interpreter)
+    public InterpreterPrimitiveContext(Execution.Interpreter interpreter)
     {
         this.interpreter = interpreter;
     }
@@ -65,7 +70,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
 
         // For now, use a simplified implementation
         // Assume PointerIndexed format with 0 instance variables
-        var oop = ObjectMemoryNew.AllocateObject(classRef, ObjectFormat.PointerIndexed, 0, indexedSize);
+        var oop = ObjectMemory.AllocateObject(classRef, ObjectFormat.PointerIndexed, 0, indexedSize);
         return SObjectRef.FromObjectPointer(oop);
     }
 
@@ -90,7 +95,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <returns>The interned symbol.</returns>
     public SObjectRef InternSymbol(string value)
     {
-        return ObjectMemoryNew.InternSymbol(value);
+        return ObjectMemory.InternSymbol(value);
     }
 
     /// <summary>
@@ -120,7 +125,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <returns>The size of the indexed portion.</returns>
     public int GetIndexedSize(nint oop)
     {
-        return ObjectMemoryNew.GetIndexedSize(oop);
+        return ObjectMemory.GetIndexedSize(oop);
     }
 
     /// <summary>
@@ -131,7 +136,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <returns>The value at the specified index.</returns>
     public SObjectRef GetIndexedPointer(nint oop, int index)
     {
-        return ObjectMemoryNew.GetIndexedPointer(oop, index);
+        return ObjectMemory.GetIndexedPointer(oop, index);
     }
 
     /// <summary>
@@ -142,7 +147,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <param name="value">The value to set.</param>
     public void SetIndexedPointer(nint oop, int index, SObjectRef value)
     {
-        ObjectMemoryNew.SetIndexedPointer(oop, index, value);
+        ObjectMemory.SetIndexedPointer(oop, index, value);
     }
 
     /// <summary>
@@ -153,7 +158,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <returns>The value of the instance variable.</returns>
     public SObjectRef GetInstanceVariable(nint oop, int index)
     {
-        return ObjectMemoryNew.GetInstanceVariable(oop, index);
+        return ObjectMemory.GetInstanceVariable(oop, index);
     }
 
     /// <summary>
@@ -164,7 +169,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <param name="value">The value to set.</param>
     public void SetInstanceVariable(nint oop, int index, SObjectRef value)
     {
-        ObjectMemoryNew.SetInstanceVariable(oop, index, value);
+        ObjectMemory.SetInstanceVariable(oop, index, value);
     }
 
     /// <summary>
@@ -174,7 +179,7 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     /// <returns>The class of the object.</returns>
     public SObjectRef GetObjectClass(nint oop)
     {
-        return ObjectMemoryNew.GetClass(oop);
+        return ObjectMemory.GetClass(oop);
     }
 
     /// <summary>
@@ -187,6 +192,31 @@ public class InterpreterPrimitiveContext : IPrimitiveContext
     public nint AllocateObject(SObjectRef classRef, int instanceVarCount, int indexedSize)
     {
         // Use PointerIndexed format by default
-        return ObjectMemoryNew.AllocateObject(classRef, ObjectFormat.PointerIndexed, instanceVarCount, indexedSize);
+        return ObjectMemory.AllocateObject(classRef, ObjectFormat.PointerIndexed, instanceVarCount, indexedSize);
+    }
+
+    /// <summary>
+    /// Gets indexed byte data from an object (for byte arrays/bitmaps).
+    /// </summary>
+    /// <param name="oop">The object pointer.</param>
+    /// <returns>Byte data if available, otherwise null.</returns>
+    public Memory<byte>? GetIndexedBytes(nint oop)
+    {
+        var data = ObjectMemory.GetObjectData(oop);
+        if (data.IndexedData is byte[] byteArray)
+        {
+            return new Memory<byte>(byteArray);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Looks up a global variable by name.
+    /// </summary>
+    /// <param name="name">The global variable name.</param>
+    /// <returns>The global variable value, or null if not found.</returns>
+    public SObjectRef? LookupGlobal(string name)
+    {
+        return SystemDictionary.LookupGlobalRef(name);
     }
 }

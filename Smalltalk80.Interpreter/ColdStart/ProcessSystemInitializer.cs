@@ -63,7 +63,7 @@ public static class ProcessSystemInitializer
         }
 
         // Create ProcessorScheduler instance (2 instance variables)
-        var schedulerRef = ObjectMemoryNew.CreateInstance(
+        var schedulerRef = ObjectMemory.CreateInstance(
             schedulerClassRef.Value.AsObjectPointer(),
             0); // No indexed slots, just instance variables
 
@@ -73,13 +73,13 @@ public static class ProcessSystemInitializer
         {
             throw new InvalidOperationException("Array class not found");
         }
-        var priorityListsRef = ObjectMemoryNew.CreateInstance(
+        var priorityListsRef = ObjectMemory.CreateInstance(
             arrayClassRef.Value.AsObjectPointer(),
             8); // 8 priority levels as indexed slots
 
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
-            var arrayData = ObjectMemoryNew.GetObjectData(priorityListsRef.AsObjectPointer());
+            var arrayData = ObjectMemory.GetObjectData(priorityListsRef.AsObjectPointer());
             Console.WriteLine($"[DEBUG] Created Array with format: {arrayData.Format}");
         }
 
@@ -91,20 +91,20 @@ public static class ProcessSystemInitializer
         }
         for (int i = 0; i < 8; i++)
         {
-            var listRef = ObjectMemoryNew.CreateInstance(
+            var listRef = ObjectMemory.CreateInstance(
                 linkedListClassRef.Value.AsObjectPointer(),
                 0); // No indexed slots, just instance variables
 
             // Set firstLink and lastLink to nil
-            ObjectMemoryNew.SetInstanceVariable(listRef.AsObjectPointer(), 0, SObjectRef.Nil);
-            ObjectMemoryNew.SetInstanceVariable(listRef.AsObjectPointer(), 1, SObjectRef.Nil);
+            ObjectMemory.SetInstanceVariable(listRef.AsObjectPointer(), 0, SObjectRef.Nil);
+            ObjectMemory.SetInstanceVariable(listRef.AsObjectPointer(), 1, SObjectRef.Nil);
 
             // Add to array
-            ObjectMemoryNew.SetIndexedPointer(priorityListsRef.AsObjectPointer(), i, listRef);
+            ObjectMemory.SetIndexedPointer(priorityListsRef.AsObjectPointer(), i, listRef);
         }
 
         // Set quiescentProcessLists in ProcessorScheduler
-        ObjectMemoryNew.SetInstanceVariable(schedulerRef.AsObjectPointer(), 0, priorityListsRef);
+        ObjectMemory.SetInstanceVariable(schedulerRef.AsObjectPointer(), 0, priorityListsRef);
 
         // activeProcess will be set later (index 1)
 
@@ -124,22 +124,22 @@ public static class ProcessSystemInitializer
         }
 
         // Create Process instance (4 instance variables)
-        var processRef = ObjectMemoryNew.CreateInstance(
+        var processRef = ObjectMemory.CreateInstance(
             processClassRef.Value.AsObjectPointer(),
             0); // No indexed slots, just instance variables
 
         // Set nextLink to nil (not in a list)
-        ObjectMemoryNew.SetInstanceVariable(processRef.AsObjectPointer(), 0, SObjectRef.Nil);
+        ObjectMemory.SetInstanceVariable(processRef.AsObjectPointer(), 0, SObjectRef.Nil);
 
         // Create a dummy MethodContext for suspendedContext
         var contextRef = CreateDummyMethodContext();
-        ObjectMemoryNew.SetInstanceVariable(processRef.AsObjectPointer(), 1, contextRef);
+        ObjectMemory.SetInstanceVariable(processRef.AsObjectPointer(), 1, contextRef);
 
         // Set priority to 4 (UserSchedulingPriority)
-        ObjectMemoryNew.SetInstanceVariable(processRef.AsObjectPointer(), 2, SObjectRef.FromSmallInteger(4));
+        ObjectMemory.SetInstanceVariable(processRef.AsObjectPointer(), 2, SObjectRef.FromSmallInteger(4));
 
         // Set myList to nil (not on any waiting list)
-        ObjectMemoryNew.SetInstanceVariable(processRef.AsObjectPointer(), 3, SObjectRef.Nil);
+        ObjectMemory.SetInstanceVariable(processRef.AsObjectPointer(), 3, SObjectRef.Nil);
 
         return processRef;
     }
@@ -157,17 +157,17 @@ public static class ProcessSystemInitializer
         }
 
         // Create MethodContext with minimal size (6 fixed fields + some stack space)
-        var contextRef = ObjectMemoryNew.CreateInstance(
+        var contextRef = ObjectMemory.CreateInstance(
             contextClassRef.Value.AsObjectPointer(),
             10); // 10 indexed slots for stack space
 
         // Initialize fixed fields
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 0, SObjectRef.Nil); // sender
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 1, SObjectRef.FromSmallInteger(0)); // instructionPointer
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 2, SObjectRef.FromSmallInteger(6)); // stackPointer (after fixed fields)
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 3, SObjectRef.Nil); // method
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 4, SObjectRef.Nil); // closure/receiverMap
-        ObjectMemoryNew.SetInstanceVariable(contextRef.AsObjectPointer(), 5, SObjectRef.Nil); // receiver
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 0, SObjectRef.Nil); // sender
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 1, SObjectRef.FromSmallInteger(0)); // instructionPointer
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 2, SObjectRef.FromSmallInteger(6)); // stackPointer (after fixed fields)
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 3, SObjectRef.Nil); // method
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 4, SObjectRef.Nil); // closure/receiverMap
+        ObjectMemory.SetInstanceVariable(contextRef.AsObjectPointer(), 5, SObjectRef.Nil); // receiver
 
         return contextRef;
     }
@@ -178,6 +178,6 @@ public static class ProcessSystemInitializer
     private static void SetActiveProcess(SObjectRef schedulerRef, SObjectRef processRef)
     {
         // Set ProcessorScheduler.activeProcess (instance variable index 1)
-        ObjectMemoryNew.SetInstanceVariable(schedulerRef.AsObjectPointer(), 1, processRef);
+        ObjectMemory.SetInstanceVariable(schedulerRef.AsObjectPointer(), 1, processRef);
     }
 }

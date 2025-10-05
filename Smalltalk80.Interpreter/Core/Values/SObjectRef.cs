@@ -344,7 +344,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
             throw new InvalidOperationException("Not an object reference (might be SmallInteger)");
 
         // Use ObjectMemory to retrieve the object by its OOP
-        return ObjectMemoryNew.GetObject(value);
+        return ObjectMemory.GetObject(value);
     }
 
     /// <summary>
@@ -359,7 +359,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
             return Nil;
 
         // Use ObjectMemory to get the object's OOP
-        nint oop = ObjectMemoryNew.GetOop(obj);
+        nint oop = ObjectMemory.GetOop(obj);
 
         if ((oop & TagMask) != 0)
             throw new InvalidOperationException($"Object pointer not 4-byte aligned: 0x{oop:X}");
@@ -385,7 +385,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
             return SystemDictionary.SmallIntegerClassRef;
 
         // Heap object - get from ObjectMemory
-        return ObjectMemoryNew.GetClass(value);
+        return ObjectMemory.GetClass(value);
     }
 
     /// <summary>
@@ -397,7 +397,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have a format");
 
-        return ObjectMemoryNew.GetFormat(value);
+        return ObjectMemory.GetFormat(value);
     }
 
     /// <summary>
@@ -409,7 +409,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have instance variables");
 
-        return ObjectMemoryNew.GetInstanceVariable(value, index);
+        return ObjectMemory.GetInstanceVariable(value, index);
     }
 
     /// <summary>
@@ -421,7 +421,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have instance variables");
 
-        ObjectMemoryNew.SetInstanceVariable(value, index, refValue);
+        ObjectMemory.SetInstanceVariable(value, index, refValue);
     }
 
     /// <summary>
@@ -432,7 +432,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             return 0;
 
-        return ObjectMemoryNew.GetInstanceVariableCount(value);
+        return ObjectMemory.GetInstanceVariableCount(value);
     }
 
     /// <summary>
@@ -444,7 +444,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        return ObjectMemoryNew.GetIndexedByte(value, index);
+        return ObjectMemory.GetIndexedByte(value, index);
     }
 
     /// <summary>
@@ -456,7 +456,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        ObjectMemoryNew.SetIndexedByte(value, index, byteValue);
+        ObjectMemory.SetIndexedByte(value, index, byteValue);
     }
 
     /// <summary>
@@ -468,7 +468,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        return ObjectMemoryNew.GetIndexedWord(value, index);
+        return ObjectMemory.GetIndexedWord(value, index);
     }
 
     /// <summary>
@@ -480,7 +480,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        ObjectMemoryNew.SetIndexedWord(value, index, wordValue);
+        ObjectMemory.SetIndexedWord(value, index, wordValue);
     }
 
     /// <summary>
@@ -492,7 +492,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        return ObjectMemoryNew.GetIndexedPointer(value, index);
+        return ObjectMemory.GetIndexedPointer(value, index);
     }
 
     /// <summary>
@@ -504,7 +504,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             throw new InvalidOperationException("Only heap objects have indexed data");
 
-        ObjectMemoryNew.SetIndexedPointer(value, index, refValue);
+        ObjectMemory.SetIndexedPointer(value, index, refValue);
     }
 
     /// <summary>
@@ -515,7 +515,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
         if (!IsHeapObject)
             return 0;
 
-        return ObjectMemoryNew.GetIndexedSize(value);
+        return ObjectMemory.GetIndexedSize(value);
     }
 
     #endregion

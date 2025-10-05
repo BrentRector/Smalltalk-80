@@ -18,7 +18,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 ///
 /// All object access goes through SObjectRef extension methods that delegate to ObjectMemory.
 /// </summary>
-public static partial class ObjectMemoryNew
+public static partial class ObjectMemory
 {
     // Object table: Hybrid array-based table with O(1) allocation
     private static readonly ObjectTable objectTable = new();

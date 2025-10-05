@@ -239,7 +239,7 @@ public static class ArrayPrimitives
             return PrimitiveResult.CreateFailure(PrimitiveFailure.BadArgument);
 
         // Swap the objects in memory
-        // Note: The actual swapping would need to be implemented in ObjectMemoryNew
+        // Note: The actual swapping would need to be implemented in ObjectMemory
         // For now, return failure as the operation is not yet supported
         return PrimitiveResult.CreateFailure(PrimitiveFailure.NotImplemented);
     }

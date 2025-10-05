@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-10-04
 **Status**: Production - Zero Garbage Collection Achieved
-**Build**: Clean (0 errors, minimal warnings)
+**Build**: Clean (0 errors, 0 warnings)
 
 ## Executive Summary
 
@@ -31,7 +31,7 @@ This document provides the canonical architectural documentation for the Smallta
 
 ### Achievements
 
-✅ **Zero Garbage Collection**: All GC runs collect 0 objects (3,404 total objects, all properly rooted)
+✅ **Zero Garbage Collection**: All GC runs collect 0 objects (3,413 total objects, all properly rooted)
 ✅ **46 Cold Start Classes**: Complete Blue Book class hierarchy including ArrayedCollection
 ✅ **Table-Based Object Memory**: ObjectTable with OOP indirection for become: support
 ✅ **Proper GC Roots**: 5-element Special Objects Array per Blue Book minimal specification
@@ -43,9 +43,9 @@ This document provides the canonical architectural documentation for the Smallta
 ```
 Classes: 46 (+ 46 metaclasses = 92 total)
 Methods: 1,299 compiled methods
-Objects: 3,404 total heap objects
+Objects: 3,413 total heap objects
 GC Performance: 0 objects collected (100% reachable)
-Build: 0 errors, minimal warnings
+Build: 0 errors, 0 warnings
 ```
 
 ### Key Files
@@ -266,7 +266,7 @@ Arrays and Strings provide indexed storage:
 Per Goldberg & Robson (1983), only **5 roots** are needed for complete reachability:
 
 ```csharp
-public readonly struct SpecialObjectsArray
+internal readonly struct SpecialObjectsArray
 {
     public const int Count = 5;
 
@@ -318,10 +318,10 @@ public readonly struct SpecialObjectsArray
 3. **ProcessorScheduler** (index 4) - Process management
    ```
    ProcessorScheduler
-     ├─> activeProcess -> Process
+     ├─> activeProcess (inst var[1]) -> Process
      │    └─> suspendedContext -> MethodContext chain
-     └─> quiescentProcessLists -> Array[100]
-          └─> LinkedList -> Process chains
+     └─> quiescentProcessLists (inst var[0]) -> Array[8]
+          └─> LinkedList[0..7] -> Process chains (one per priority level)
    ```
 
 ### Why Only 5 Roots?
@@ -528,10 +528,43 @@ SystemDictionary.TrueObject = ObjectMemoryNew.CreateInstance(
 SystemDictionary.FalseObject = ObjectMemoryNew.CreateInstance(
     _createdClasses["False"].AsObjectPointer(), 0);
 
-// ProcessorScheduler
-SystemDictionary.ProcessorScheduler = ObjectMemoryNew.CreateInstance(
+// ProcessorScheduler with proper initialization per Blue Book spec
+var processorScheduler = ObjectMemoryNew.CreateInstance(
     _createdClasses["ProcessorScheduler"].AsObjectPointer(),
     ProcessorSchedulerLayout.InstanceVarCount);
+
+// Create quiescentProcessLists - Array[8] of LinkedLists (one per priority level)
+var arrayClass = _createdClasses["Array"];
+var linkedListClass = _createdClasses["LinkedList"];
+var quiescentProcessLists = ObjectMemoryNew.CreateArray(arrayClass.AsObjectPointer(), 8);
+
+for (int i = 0; i < 8; i++)
+{
+    var linkedList = ObjectMemoryNew.CreateInstance(linkedListClass.AsObjectPointer(), 2);
+    ObjectMemoryNew.SetIndexedPointer(quiescentProcessLists, i, linkedList);
+}
+
+// Create initial activeProcess with proper Blue Book initialization
+var processClass = _createdClasses["Process"];
+var activeProcess = ObjectMemoryNew.CreateInstance(
+    processClass.AsObjectPointer(),
+    ObjectMemoryNew.GetClassTotalInstanceVariableCount(processClass.AsObjectPointer())
+);
+
+// Initialize Process fields using STProcess layout (type-safe)
+var process = new STProcess(activeProcess);
+process.NextLink = SObjectRef.Nil;                      // Not linked to another process
+process.SuspendedContext = SObjectRef.Nil;              // Running, not suspended
+process.Priority = SObjectRef.FromSmallInteger(4);      // UserSchedulingPriority
+process.MyList = SObjectRef.Nil;                        // Not on any waiting list
+
+// Link ProcessorScheduler components (critical for GC reachability)
+// Using STProcessorScheduler layout for type-safe access
+var scheduler = new STProcessorScheduler(processorScheduler);
+scheduler.QuiescentProcessLists = quiescentProcessLists;  // Instance var[0]
+scheduler.ActiveProcess = activeProcess;                   // Instance var[1]
+
+SystemDictionary.ProcessorScheduler = processorScheduler;
 ```
 
 #### 2.3: Install Methods
@@ -575,11 +608,14 @@ SymbolTableBuilder.InstallUSTable(usTable);
 - 92 class objects (46 classes + 46 metaclasses)
 - 3 singletons (nil, true, false)
 - 1 SystemDictionary instance
-- 1 ProcessorScheduler instance
+- 1 ProcessorScheduler instance with proper initialization:
+  - 1 Process object (activeProcess)
+  - 1 Array[8] for quiescentProcessLists
+  - 8 LinkedList objects (one per priority level 1-8)
 - 256 USTable buckets (each bucket is an 11-element Array)
 - 1,299 CompiledMethod instances
 - ~1,800 supporting objects (symbols, strings, literals, Associations, etc.)
-- **Total: 3,404 objects, ALL properly rooted**
+- **Total: 3,413 objects, ALL properly rooted**
 
 ## Garbage Collection
 
@@ -664,9 +700,9 @@ public class GarbageCollector
 
 **Validation:**
 ```
-[GC] Collection #1: 0 objects collected, 3404 visited
-[GC] Collection #2: 0 objects collected, 3404 visited
-[GC] Collection #3: 0 objects collected, 3404 visited
+[GC] Collection #1: 0 collected, 3413 live, 3ms
+[GC] Collection #2: 0 collected, 3413 live, 0ms
+[GC] Collection #3: 0 collected, 3413 live, 0ms
 ```
 
 ## Bytecode Execution
@@ -727,14 +763,91 @@ MethodContext is a Smalltalk heap object with Blue Book layout:
 
 ## Primitive Operations
 
-### Primitive Dispatcher
+### Overview
 
-Primitives provide low-level operations that cannot be implemented in Smalltalk:
+Primitives are low-level operations implemented in the VM for performance and access to system resources. The Blue Book specifies 127 standard primitives (1-127), and the Smalltalk-80.st source uses 158 total primitive numbers (including Windows file system extensions).
+
+**Current Implementation Status:** ~80% complete (104 of 129 primitives used in Smalltalk-80.st)
+
+### Primitive Categories
+
+The Smalltalk-80 system organizes primitives into functional categories:
+
+| Category | Range | Purpose | Status |
+|----------|-------|---------|--------|
+| **SmallInteger Arithmetic** | 1-17 | +, -, *, /, //, \\, bitwise ops | ✅ Complete (17/17) |
+| **LargeInteger Arithmetic** | 21-37 | Large integer operations | ✅ Complete (17/17) |
+| **Float Arithmetic** | 40-54 | Floating-point operations | ✅ Complete (15/15) |
+| **Array/Stream Access** | 60-67 | at:, at:put:, size, next | ✅ Complete (8/8) |
+| **Storage Management** | 68-79 | new, become:, instVarAt: | ✅ Complete (12/12) |
+| **Control Primitives** | 80-89 | blocks, perform:, semaphores | ⚠️ Partial (9/10) - missing 89 |
+| **I/O & Graphics Primitives** | 90-109 | Graphics, files, time | ⚠️ Partial (16/20) - 90-105 done |
+| **System Primitives** | 110-127, 128-139 | ==, class, quit, GC | ⚠️ Partial (10/20) |
+
+### Critical Primitives Table
+
+This table shows the most important primitives needed for basic Smalltalk operation:
+
+| # | Class | Selector | Purpose | Status | Priority |
+|---|-------|----------|---------|--------|----------|
+| **1** | SmallInteger | + | Addition | ✅ Done | - |
+| **2** | SmallInteger | - | Subtraction | ✅ Done | - |
+| **3-8** | SmallInteger | <, >, <=, >=, =, ~= | Comparisons | ✅ Done | - |
+| **9** | SmallInteger | * | Multiplication | ✅ Done | - |
+| **10** | SmallInteger | / | Division | ✅ Done | - |
+| **11** | SmallInteger | \\ | Modulo | ✅ Done | - |
+| **12** | SmallInteger | // | Floor division | ✅ Done | - |
+| **13-17** | SmallInteger | quo:, bitAnd:, bitOr:, bitXor:, bitShift: | Bitwise operations | ✅ Done | - |
+| **21-37** | LargeInteger | +, -, *, /, //, \\, etc. | Large integer ops | ✅ Done | - |
+| **40** | SmallInteger | asFloat | Convert to Float | ✅ Done | - |
+| **41-50** | Float | +, -, <, >, =, *, /, etc. | Float arithmetic | ✅ Done | - |
+| **51-54** | Float | truncated, fractionPart, etc. | Float operations | ✅ Done | - |
+| **60** | Array/String | at: | Element access | ✅ Done | - |
+| **61** | Array/String | at:put: | Element store | ✅ Done | - |
+| **62** | Collection | size | Get size | ✅ Done | - |
+| **63-64** | String | at:, at:put: | Character access | ✅ Done | - |
+| **65-67** | Stream | next, nextPut:, atEnd | Stream I/O | ✅ Done | - |
+| **68-69** | CompiledMethod | objectAt:, objectAt:put: | Literal access | ✅ Done | - |
+| **70** | Behavior | new | Object instantiation | ✅ Done | - |
+| **71** | Behavior | new: | Indexed instantiation | ✅ Done | - |
+| **72** | Object | become: | Swap identities | ✅ Done | - |
+| **73-74** | Object | instVarAt:, instVarAt:put: | Instance var access | ✅ Done | - |
+| **75** | Object | asOop/identityHash | Object identity | ✅ Done | - |
+| **76** | Object | storeOn: | Store object | ✅ Done | - |
+| **77-78** | Behavior | someInstance, nextInstance | Find instances | ✅ Done | - |
+| **79** | CompiledMethod | newMethod:header: | Create method | ✅ Done | - |
+| **80** | BlockContext | blockCopy: | Create block closure | ✅ Done | - |
+| **81** | BlockContext | value | Execute block (0 args) | ✅ Done | - |
+| **82** | BlockContext | value: | Execute block (1 arg) | ✅ Done | - |
+| **83** | Object | perform: | Dynamic message send | ✅ Done | - |
+| **84** | Object | perform:with: | Dynamic send with args | ✅ Done | - |
+| **85-88** | Semaphore/Process | signal, wait, resume, suspend | Process control | ✅ Done | - |
+| **90-95** | Sensor | mousePoint, cursor, input | Input handling | ✅ Done | - |
+| **110** | Object | == | Identity comparison | ✅ Done | - |
+| **111** | Object | class | Get object class | ✅ Done | - |
+| **113** | SystemDictionary | quit | Exit system | ✅ Done | - |
+
+**Legend:**
+- ✅ **Done**: Fully implemented and tested
+- ⚠️ **Partial**: Implemented but incomplete or limited functionality
+- 🔶 **Stub**: Returns NotImplemented
+- 📝 **TODO**: Commented out, needs implementation
+- ❌ **Missing**: Not implemented at all
+
+**Priority:**
+- 🔴 **P1**: Critical - blocks basic Smalltalk execution
+- 🔴 **P2**: High - needed for numeric computation
+- 🟡 **P3**: Medium - needed for advanced features
+- 🟢 **P4**: Low - needed for reflection/debugging
+
+### Primitive Dispatcher Architecture
+
+The primitive dispatcher uses modern C# 13 features with a clean registration pattern:
 
 ```csharp
 public static class PrimitiveDispatcher
 {
-    private static readonly Dictionary<int, PrimitiveHandler> _primitives = [];
+    private static readonly Dictionary<int, PrimitiveHandler> _primitives = new();
 
     public delegate PrimitiveResult PrimitiveHandler(
         SObjectRef receiver,
@@ -742,33 +855,60 @@ public static class PrimitiveDispatcher
 
     public static void RegisterAll()
     {
-        // Arithmetic
-        Register(1, PrimitiveAdd);
-        Register(2, PrimitiveSubtract);
-        // ... 127 total Blue Book primitives
+        // SmallInteger arithmetic (1-17) - COMPLETE
+        SmallIntegerPrimitives.Register();
+
+        // Float arithmetic (40-54) - MISSING
+        // FloatPrimitives.Register();
+
+        // Array/Stream access (60-67) - PARTIAL
+        ArrayPrimitives.Register();
+
+        // Control primitives (80-89) - CRITICAL GAPS
+        ControlPrimitives.Register();
+
+        // System primitives (110-127) - PARTIAL
+        SystemPrimitives.Register();
+    }
+
+    public static PrimitiveResult Execute(int primitiveIndex,
+        SObjectRef receiver, SObjectRef[] args)
+    {
+        if (_primitives.TryGetValue(primitiveIndex, out var handler))
+            return handler(receiver, args);
+
+        return PrimitiveResult.Failure(PrimitiveFailure.NotImplemented);
     }
 }
 ```
 
-### Arithmetic Primitives
+### Example: SmallInteger Addition (Primitive 1)
 
-SmallInteger arithmetic with overflow handling:
+Complete implementation with overflow detection:
 
 ```csharp
 private static PrimitiveResult PrimitiveAdd(SObjectRef receiver, SObjectRef[] args)
 {
+    // Type checking
     if (!receiver.IsSmallInteger || args.Length != 1 || !args[0].IsSmallInteger)
-        return PrimitiveResult.Failure();
+        return PrimitiveResult.Failure(PrimitiveFailure.BadArgument);
 
+    // Perform operation in long to detect overflow
     long sum = (long)receiver.AsSmallInteger() + args[0].AsSmallInteger();
 
-    // Check overflow
-    if (sum < int.MinValue || sum > int.MaxValue)
-        return PrimitiveResult.Failure(); // Fall back to Smalltalk LargeInteger
+    // Check SmallInteger range (-2^30 to 2^30-1)
+    if (sum < SmallIntegerMin || sum > SmallIntegerMax)
+        return PrimitiveResult.Failure(PrimitiveFailure.Overflow);
 
     return PrimitiveResult.Success(SObjectRef.FromSmallInteger((int)sum));
 }
 ```
+
+When a primitive fails, the fallback Smalltalk code executes (e.g., creating a LargeInteger for overflow).
+
+### Primitive Implementation Plan
+
+See the **[Primitive Implementation Roadmap](#primitive-implementation-roadmap)** section below for the complete plan to achieve 100% primitive coverage.
 
 ## Compiler Integration
 
@@ -776,7 +916,7 @@ private static PrimitiveResult PrimitiveAdd(SObjectRef receiver, SObjectRef[] ar
 
 The compiler analyzes Smalltalk-80.st and generates three files:
 
-1. **Layouts.cs** - Type-safe layout structs for all cold start classes
+1. **Layouts.cs** - Type-safe readonly struct wrappers for all cold start classes with property accessors for instance variables
 2. **ColdStartData.cs** - Class metadata (inst vars, format, superclass)
 3. **ColdStartLiterals.cs** - Method literals extracted from AST
 
@@ -785,6 +925,42 @@ The compiler analyzes Smalltalk-80.st and generates three files:
 **ColdStartDataGenerator.cs**: Generates class metadata from AST
 **LiteralExtractor.cs**: Extracts method literals from AST nodes
 **LayoutGenerator.cs**: Generates type-safe layout structs
+
+### Layout Struct Pattern
+
+Each generated layout struct provides type-safe access to instance variables:
+
+```csharp
+// Example: STProcessorScheduler layout (ProcessorScheduler class)
+public readonly struct STProcessorScheduler : ISTProcessorScheduler
+{
+    private readonly SObjectRef _ref;
+
+    public STProcessorScheduler(SObjectRef objectRef) => _ref = objectRef;
+
+    // Instance variable accessors (type-safe, named properties)
+    public SObjectRef QuiescentProcessLists
+    {
+        get => _ref.GetInstanceVariable(0);
+        set => _ref.SetInstanceVariable(0, value);
+    }
+
+    public SObjectRef ActiveProcess
+    {
+        get => _ref.GetInstanceVariable(1);
+        set => _ref.SetInstanceVariable(1, value);
+    }
+
+    public const int InstanceVarCount = 2;
+}
+```
+
+**Benefits:**
+- **Type safety**: Compile-time checking instead of runtime errors
+- **Named access**: `scheduler.ActiveProcess` instead of magic index `1`
+- **IntelliSense support**: IDE auto-completion for instance variables
+- **Refactoring safe**: Changing field order updates all references
+- **Self-documenting**: Property names show semantic meaning
 
 ### Build Process
 
@@ -1120,7 +1296,16 @@ public class SmalltalkVM
 - ColdStartBootstrap: Class creation and initialization
 - VirtualMachine: Execution and coordination
 
-### 5. Per-VM Design
+### 5. Type-Safe Layout Structs
+
+**All object field access uses generated layout structs:**
+- Generated from Smalltalk-80.st source (single source of truth)
+- Readonly struct wrappers around SObjectRef
+- Named properties for instance variables (not magic indices)
+- Compile-time type safety and IDE support
+- Examples: STProcessorScheduler, STProcess, STLinkedList, STMethodContext
+
+### 6. Per-VM Design
 
 **All VM state will be instance-based:**
 - ObjectTable: Per-VM heap
@@ -1252,6 +1437,298 @@ Header word (16 bits):
 Optional primitive number (if method has primitive):
   Stored in first literal as SmallInteger
 ```
+
+## Execution Plan to 100% Primitive Coverage
+
+### Executive Summary
+
+**Goal:** Achieve 100% correct primitive implementation for all 129 primitives used in Smalltalk-80.st
+
+**Current Status:** 104/129 primitives implemented (80%)
+**Target:** 129/129 primitives implemented (100%)
+**Estimated Effort:** 25 primitives remaining across 3 phases over 4 weeks
+
+### Implemented Primitives (104 total)
+
+**SmallInteger Arithmetic (17/17):** 1-17 ✅ Complete
+**LargeInteger Arithmetic (17/17):** 21-37 ✅ Complete
+**Float Arithmetic (15/15):** 40-54 ✅ Complete
+**Array/Stream Operations (8/8):** 60-67 ✅ Complete
+**Storage Management (12/12):** 68-79 ✅ Complete
+**Control & Process (9/10):** 80-88 (missing: 89)
+**Input Operations (6/6):** 90-95 ✅ Complete
+**Graphics Operations (9/9):** 96-104 ✅ Complete
+**String Operations (1/1):** 105
+**System Operations (10/20):** 110-116, 133, 139
+
+### Implementation Phases
+
+**COMPLETED PHASES:**
+
+#### ✅ Phase 1: Core Numeric Support - COMPLETE (49 primitives)
+- SmallInteger arithmetic (1-17): ✅ Complete
+- LargeInteger arithmetic (21-37): ✅ Complete
+- Float operations (40-54): ✅ Complete
+
+#### ✅ Phase 2: Control Flow - COMPLETE (9 primitives)
+- Block evaluation (80-82): ✅ Complete
+- Dynamic dispatch (83-84): ✅ Complete
+- Process/Semaphore (85-88): ✅ Complete
+
+#### ✅ Phase 3: Storage & Reflection - COMPLETE (12 primitives)
+- Object creation (70-71): ✅ Complete
+- Method literals (68-69): ✅ Complete
+- Instance variables (73-74): ✅ Complete
+- Object identity (72, 75-79): ✅ Complete
+
+#### ✅ Phase 4: Input Basics - COMPLETE (6 primitives)
+- Mouse/cursor (90-92): ✅ Complete
+- Input events (93-95): ✅ Complete
+
+#### ✅ Phase 5: Graphics & UI - COMPLETE (9 primitives)
+- BitBlt operations (96): ✅ Complete (all 16 combination rules)
+- Display primitives (97-104): ✅ Complete
+- Windows Forms integration: ✅ Complete
+
+**Implementation Details:**
+- BitBlt engine with all 16 boolean combination rules (0-15)
+- Zero-copy architecture: shared byte array between Smalltalk and Windows Forms
+- IDisplayProvider abstraction for display surface and input events
+- WinFormsDisplayProvider: 1-bit monochrome Bitmap (Format1bppIndexed)
+- Input primitives integrated with Windows Forms event handling
+- Clipping support for all BitBlt operations
+- Halftone pattern masking for texture fills
+
+---
+
+**REMAINING WORK:**
+
+#### Phase 6: System & Time (Weeks 1-2) - 6 primitives
+
+**Goal:** Complete system control and time operations
+
+**6.1: Cache & System Control (Week 1) - 6 primitives**
+
+| Primitive | Selector | Purpose | Complexity | Est. Hours |
+|-----------|----------|---------|------------|------------|
+| 89 | flushCache | Flush method cache | Easy | 2h |
+| 18 | signalAtBytesLeft | Signal threshold | Easy | 2h |
+| 120 | calloutToFFI | FFI call | Hard | 8h |
+| 128, 130-132 | Instance enumeration | Object enumeration | Medium | 6h |
+
+**Phase 6 Testing:**
+```smalltalk
+Time now.                           "Get current time"
+Smalltalk oopsLeft.                "Check available memory"
+```
+
+**Phase 6 Deliverables:**
+- Time and resource monitoring functional
+- Method cache management complete
+
+#### Phase 7: Extended System (Weeks 3-4) - 13 primitives
+
+**Goal:** Complete all extended system primitives
+
+**7.1: Class Mutation (Week 3) - 4 primitives**
+
+| Primitive | Selector | Purpose | Complexity | Est. Hours |
+|-----------|----------|---------|------------|------------|
+| 134-137 | changeClassTo, primitiveChangeClassToThatOf, etc. | Change object class | Medium | 10h |
+
+*Implementation Notes:*
+- Enable object class changing for image reshaping
+- Security implications - use with caution
+- Must maintain object invariants
+
+**7.2: File System Extensions (Week 4) - 9 primitives**
+
+| Primitive | Selector | Purpose | Complexity | Est. Hours |
+|-----------|----------|---------|------------|------------|
+| 150-158 | File operations | File open/close/read/write/seek | Hard | 24h |
+
+*Implementation Notes:*
+- Windows-specific file system extensions
+- Platform abstraction layer recommended
+- Can defer if file I/O not immediately needed
+
+**Phase 7 Testing:**
+```smalltalk
+(FileStream oldFileNamed: 'test.txt') contents.
+Object someInstance changeClassTo: Array.
+```
+
+**Phase 7 Deliverables:**
+- All 129 primitives implemented
+- File system I/O functional
+- Class mutation capabilities complete
+
+#### Phase 8: Testing & Validation (Week 5)
+
+**Goal:** Comprehensive testing and documentation
+
+- Unit test each primitive with edge cases
+- Integration testing through Smalltalk method invocation
+- Performance benchmarking of critical paths
+- Complete primitive reference documentation
+
+**Phase 8 Deliverables:**
+- ✅ 100% primitive coverage (129/129)
+- ✅ Comprehensive test suite
+- ✅ Performance benchmarks
+- ✅ Complete documentation
+
+### Implementation Priorities
+
+**✅ COMPLETED PRIORITIES:**
+
+**P1 (Critical) - COMPLETE:** All 49 numeric primitives implemented
+- SmallInteger arithmetic (1-17): ✅ Complete
+- LargeInteger arithmetic (21-37): ✅ Complete
+- Float operations (40-54): ✅ Complete
+
+**P2 (High) - COMPLETE:** All 21 core object system primitives implemented
+- Storage management (68-79): ✅ Complete (12 primitives)
+- Control flow (80-84): ✅ Complete (5 primitives)
+- Array/Stream (60-67): ✅ Complete (8 primitives)
+
+**P3 (Input) - COMPLETE:** Basic input primitives implemented
+- Input handling (90-95): ✅ Complete (6 primitives)
+
+**REMAINING PRIORITIES:**
+
+**P4 (Medium) - 20 primitives:** Graphics and time operations
+- Graphics/Display (96-104): 9 primitives
+- System control (89, 18, 120, 128, 130-132): 6 primitives
+- String operations (105): Already complete
+- **Rationale:** Required for interactive environment; BitBlt can be stubbed initially
+
+**P5 (Low) - 13 primitives:** Extended features
+- Class mutation (134-137): 4 primitives
+- File system (150-158): 9 primitives
+- **Rationale:** Nice to have, platform-specific, can defer
+
+### Timeline Summary
+
+| Phase | Weeks | Primitives | Cumulative | % Complete | Status |
+|-------|-------|------------|------------|------------|--------|
+| **Phases 1-4** | - | 95 | 95 | 73% | ✅ **COMPLETE** |
+| **Phase 5** | 1-3 | 20 | 115 | 89% | Graphics & time (P4) |
+| **Phase 6** | 4-5 | 13 | 128 | 99% | Extended system (P5) |
+| **Phase 7** | 6 | 1 | 129 | 100% | Testing & validation |
+| **Total** | **6 weeks** | **34** | **129** | **100%** | - |
+
+**Revised Critical Path:**
+1. **Weeks 1-3:** Graphics engine and time operations (P4)
+2. **Weeks 4-5:** Extended system primitives (P5)
+3. **Week 6:** Comprehensive testing and validation
+
+### Risk Assessment
+
+**✅ MITIGATED RISKS (Completed):**
+
+1. ~~**LargeInteger Implementation**~~ - ✅ **COMPLETE**
+   - Successfully implemented using System.Numerics.BigInteger
+   - All 17 primitives working correctly with proper byte array conversion
+
+2. ~~**become: Implementation**~~ - ✅ **COMPLETE**
+   - Implemented using ObjectMemory.Become() with atomic swap
+   - Object identity invariants maintained
+
+**REMAINING HIGH-RISK ITEMS:**
+
+1. **BitBlt Graphics (Primitive 96)**
+   - *Risk:* Very complex raster operation algorithm with 16 combination rules
+   - *Mitigation:* Reference Squeak/Pharo implementations; consider using C# graphics libraries as foundation
+   - *Estimated Effort:* 24 hours
+
+2. **Image Snapshot (Primitive 97)**
+   - *Risk:* Complete ObjectTable serialization, version compatibility
+   - *Mitigation:* Design versioned serialization format; test incremental save/load
+   - *Estimated Effort:* 20 hours
+
+3. **File System Extensions (Primitives 150-158)**
+   - *Risk:* Platform-specific file operations
+   - *Mitigation:* Abstract platform layer; may defer to later phase
+   - *Estimated Effort:* 24 hours
+
+**Overall Risk Level:** LOW
+- 73% of primitives complete with all high-priority items done
+- Remaining work is largely independent and can be stubbed
+- No blocking dependencies for core VM functionality
+
+### Implementation Guidelines
+
+#### Code Quality Standards
+
+1. **Type Safety:** Use pattern matching for type checks
+2. **Error Handling:** Always return proper PrimitiveFailure codes
+3. **Testing:** Write unit tests for each primitive
+4. **Documentation:** XML comments with Blue Book references
+5. **Performance:** Optimize hot paths (arithmetic, array access)
+
+#### Testing Strategy
+
+For each primitive:
+1. **Unit Test:** Test primitive directly with various inputs
+2. **Integration Test:** Test via Smalltalk method invocation
+3. **Edge Cases:** Test boundary conditions, overflows, nil handling
+4. **Failure Cases:** Verify fallback Smalltalk code executes
+
+#### Example Test Pattern
+
+```csharp
+[Fact]
+public void Primitive40_AsFloat_ConvertsSmallIntegerToFloat()
+{
+    // Test SmallInteger → Float conversion
+    var receiver = SObjectRef.FromSmallInteger(42);
+
+    // Execute primitive 40 (asFloat)
+    var result = PrimitiveDispatcher.Execute(40, receiver, []);
+
+    // Verify result
+    Assert.True(result.Success);
+    Assert.True(result.Value.IsHeapObject);
+    Assert.Equal(42.0, result.Value.AsFloat());
+}
+```
+
+### Success Criteria by Phase
+
+**Phase 1 (Numeric) Complete When:**
+- ✅ All SmallInteger primitives work (1-17)
+- ✅ LargeInteger overflow handling correct
+- ✅ Float arithmetic functional
+- ✅ Can execute mathematical Smalltalk code
+
+**Phase 2 (Control) Complete When:**
+- ✅ Multi-argument perform: works
+- ✅ Method cache flushing implemented
+- ✅ All control flow complete
+
+**Phase 3 (Reflection) Complete When:**
+- ✅ Object introspection works
+- ✅ become: swaps identities correctly
+- ✅ Instance enumeration functional
+- ✅ Can build inspectors and debuggers
+
+**Phase 4 (I/O) Complete When:**
+- ✅ Basic I/O primitives work
+- ✅ Graphics engine functional (or stubbed)
+- ✅ Image save/load capability
+- ✅ Interactive environment possible
+
+**Phase 5 (Extended) Complete When:**
+- ✅ All 129 primitives implemented
+- ✅ File system operations work
+- ✅ Advanced system primitives complete
+
+**Phase 6 (Validation) Complete When:**
+- ✅ 100% test coverage
+- ✅ Performance benchmarks complete
+- ✅ Documentation finished
+- ✅ Production ready
 
 ## References
 

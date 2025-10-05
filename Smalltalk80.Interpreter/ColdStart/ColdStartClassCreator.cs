@@ -167,7 +167,7 @@ public static class ColdStartClassCreator
         var format = DetermineObjectFormat(metadata.SubclassKind, metadata.ClassName);
 
         // Create the class
-        var classRef = ObjectMemoryNew.CreateClassObject(
+        var classRef = ObjectMemory.CreateClassObject(
             metadata.ClassName,
             superclassRef,
             metadata.InstanceVariableNames,
@@ -180,11 +180,11 @@ public static class ColdStartClassCreator
         // Set well-known classes for ObjectMemory
         if (metadata.ClassName == "CompiledMethod")
         {
-            ObjectMemoryNew.SetWellKnownClass("CompiledMethod", classRef);
+            ObjectMemory.SetWellKnownClass("CompiledMethod", classRef);
         }
         else if (metadata.ClassName == "Symbol")
         {
-            ObjectMemoryNew.SetWellKnownClass("Symbol", classRef);
+            ObjectMemory.SetWellKnownClass("Symbol", classRef);
         }
 
         // Create SystemDictionary instance when Dictionary class is created

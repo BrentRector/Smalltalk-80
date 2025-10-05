@@ -256,11 +256,13 @@ public static class ArithmeticPrimitives
         if (divisor == 0)
             return PrimitiveResult.CreateFailure(PrimitiveFailure.DivideByZero);
 
-        // Smalltalk modulo has same sign as divisor
-        int remainder = dividend % divisor;
-        if ((remainder != 0) && ((dividend < 0) != (divisor < 0)))
-            remainder += divisor;
+        // Smalltalk modulo has same sign as divisor (Blue Book spec)
+        // Formula: a \\ b = a - (a // b * b)
+        int quotient = dividend / divisor;
+        if ((dividend < 0) != (divisor < 0) && dividend % divisor != 0)
+            quotient--;
 
+        int remainder = dividend - (quotient * divisor);
         return SObjectRef.FromSmallInteger(remainder);
     }
 

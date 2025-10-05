@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public class VirtualMachine
 {
-    private readonly ContextBasedInterpreterNew interpreter;
+    private readonly Interpreter interpreter;
     private readonly ExecutionStatistics executionStatistics;
     private readonly GarbageCollector garbageCollector;
     private readonly ILogger<VirtualMachine>? logger;
@@ -25,9 +25,9 @@ public class VirtualMachine
     public VirtualMachine(ILogger<VirtualMachine>? logger = null)
     {
         this.logger = logger;
-        interpreter = new ContextBasedInterpreterNew();
+        interpreter = new Interpreter();
         executionStatistics = new ExecutionStatistics();
-        garbageCollector = new GarbageCollector(ObjectMemoryNew.ObjectTable);
+        garbageCollector = new GarbageCollector(ObjectMemory.ObjectTable);
 
         // Wire up garbage collector to interpreter for primitive 133
         interpreter.GarbageCollector = garbageCollector;
@@ -88,7 +88,7 @@ public class VirtualMachine
                     var classRef = SystemDictionary.LookupClassRef(className);
                     if (classRef.HasValue && !classRef.Value.IsNil)
                     {
-                        var methodCount = ObjectMemoryNew.GetClassMethodSelectors(classRef.Value.AsObjectPointer()).Count;
+                        var methodCount = ObjectMemory.GetClassMethodSelectors(classRef.Value.AsObjectPointer()).Count;
                         totalInstanceMethods += methodCount;
                     }
                 }
@@ -341,7 +341,7 @@ public class VirtualMachine
         }
 
         // Look up the method
-        var methodRef = ObjectMemoryNew.LookupMethod(classRef.Value.AsObjectPointer(), selector);
+        var methodRef = ObjectMemory.LookupMethod(classRef.Value.AsObjectPointer(), selector);
         if (methodRef.IsNil)
         {
             throw new InvalidOperationException($"Method not found: {className}>>{selector}");
@@ -370,13 +370,13 @@ public class VirtualMachine
         // For test classes, create an instance
         if (className == "TestClass")
         {
-            var instVarCount = ObjectMemoryNew.GetClassTotalInstanceVariableCount(classRef.AsObjectPointer());
-            var instance = ObjectMemoryNew.CreateInstance(classRef.AsObjectPointer(), instVarCount);
+            var instVarCount = ObjectMemory.GetClassTotalInstanceVariableCount(classRef.AsObjectPointer());
+            var instance = ObjectMemory.CreateInstance(classRef.AsObjectPointer(), instVarCount);
 
             // Initialize the "value" instance variable to 100 for testing
             if (instVarCount > 0)
             {
-                ObjectMemoryNew.SetInstanceVariable(instance.AsObjectPointer(), 0, SObjectRef.FromSmallInteger(100));
+                ObjectMemory.SetInstanceVariable(instance.AsObjectPointer(), 0, SObjectRef.FromSmallInteger(100));
             }
 
             return instance;
@@ -454,10 +454,10 @@ public class VirtualMachine
             var otherRef = SystemDictionary.LookupClassRef(otherClass);
             if (otherRef.HasValue && !otherRef.Value.IsNil)
             {
-                var superclassRef = ObjectMemoryNew.GetClassSuperclass(otherRef.Value.AsObjectPointer());
+                var superclassRef = ObjectMemory.GetClassSuperclass(otherRef.Value.AsObjectPointer());
                 if (!superclassRef.IsNil)
                 {
-                    var superName = ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+                    var superName = ObjectMemory.GetClassName(superclassRef.AsObjectPointer());
                     if (superName == className)
                     {
                         subclasses.Add(otherClass);
@@ -492,14 +492,14 @@ public class VirtualMachine
         Console.WriteLine($"\nClass: {className}");
         Console.WriteLine("=".PadRight(60, '='));
 
-        var superclassRef = ObjectMemoryNew.GetClassSuperclass(classRef.Value.AsObjectPointer());
-        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+        var superclassRef = ObjectMemory.GetClassSuperclass(classRef.Value.AsObjectPointer());
+        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemory.GetClassName(superclassRef.AsObjectPointer());
         Console.WriteLine($"Superclass: {superclassName}");
 
-        var instanceVarNames = ObjectMemoryNew.GetClassInstanceVariableNames(classRef.Value.AsObjectPointer());
+        var instanceVarNames = ObjectMemory.GetClassInstanceVariableNames(classRef.Value.AsObjectPointer());
         Console.WriteLine($"Instance Variables: {string.Join(", ", instanceVarNames ?? [])}");
 
-        var methods = ObjectMemoryNew.GetClassMethodSelectors(classRef.Value.AsObjectPointer());
+        var methods = ObjectMemory.GetClassMethodSelectors(classRef.Value.AsObjectPointer());
         if (methods.Count > 0)
         {
             Console.WriteLine($"\nMethods ({methods.Count}):");
@@ -508,10 +508,10 @@ public class VirtualMachine
                 Console.WriteLine($"  {selector}");
                 if (DebugOptions.ShowBytecodeWithMnemonics)
                 {
-                    var methodRef = ObjectMemoryNew.LookupMethod(classRef.Value.AsObjectPointer(), selector);
+                    var methodRef = ObjectMemory.LookupMethod(classRef.Value.AsObjectPointer(), selector);
                     if (!methodRef.IsNil)
                     {
-                        var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
+                        var bytecodes = ObjectMemory.GetCompiledMethodBytecodes(methodRef.AsObjectPointer());
                         Console.WriteLine($"    Bytecodes: {BitConverter.ToString(bytecodes)}");
                     }
                 }
@@ -542,12 +542,12 @@ public class VirtualMachine
 
         // HIERARCHY section
         Console.WriteLine("\nHIERARCHY:");
-        var superclassRef = ObjectMemoryNew.GetClassSuperclass(classOop);
-        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(superclassRef.AsObjectPointer());
+        var superclassRef = ObjectMemory.GetClassSuperclass(classOop);
+        var superclassName = superclassRef.IsNil ? "nil" : ObjectMemory.GetClassName(superclassRef.AsObjectPointer());
         Console.WriteLine($"  Superclass: {superclassName}");
 
-        var metaclassRef = ObjectMemoryNew.GetObjectClass(classRef.Value);
-        var metaclassName = metaclassRef.IsNil ? "nil" : ObjectMemoryNew.GetClassName(metaclassRef.AsObjectPointer());
+        var metaclassRef = ObjectMemory.GetObjectClass(classRef.Value);
+        var metaclassName = metaclassRef.IsNil ? "nil" : ObjectMemory.GetClassName(metaclassRef.AsObjectPointer());
         Console.WriteLine($"  Metaclass: {metaclassName}");
 
         // Determine object format (if we can infer it from the class name)
@@ -555,7 +555,7 @@ public class VirtualMachine
         Console.WriteLine($"  Format: {objectFormat}");
 
         // INSTANCE VARIABLES section
-        var instanceVarNames = ObjectMemoryNew.GetClassInstanceVariableNames(classOop) ?? [];
+        var instanceVarNames = ObjectMemory.GetClassInstanceVariableNames(classOop) ?? [];
         Console.WriteLine($"\nINSTANCE VARIABLES ({instanceVarNames.Length}):");
         if (instanceVarNames.Length == 0)
         {
@@ -563,14 +563,14 @@ public class VirtualMachine
         }
         else
         {
-            var baseIndex = superclassRef.IsNil ? 0 : ObjectMemoryNew.GetClassTotalInstanceVariableCount(superclassRef.AsObjectPointer());
+            var baseIndex = superclassRef.IsNil ? 0 : ObjectMemory.GetClassTotalInstanceVariableCount(superclassRef.AsObjectPointer());
             for (var i = 0; i < instanceVarNames.Length; i++)
             {
                 Console.WriteLine($"  [{baseIndex + i}] {instanceVarNames[i]}");
             }
         }
 
-        var totalInstVars = ObjectMemoryNew.GetClassTotalInstanceVariableCount(classOop);
+        var totalInstVars = ObjectMemory.GetClassTotalInstanceVariableCount(classOop);
         Console.WriteLine($"\nTOTAL INSTANCE VARIABLES: {totalInstVars} (including inherited)");
 
         // CLASS VARIABLES section (placeholder)
@@ -581,11 +581,11 @@ public class VirtualMachine
         var classMethodCount = 0;
         if (!metaclassRef.IsNil && metaclassRef != classRef.Value)
         {
-            classMethodCount = ObjectMemoryNew.GetClassMethodSelectors(metaclassRef.AsObjectPointer()).Count;
+            classMethodCount = ObjectMemory.GetClassMethodSelectors(metaclassRef.AsObjectPointer()).Count;
         }
 
         // METHOD SUMMARY
-        var instanceMethods = ObjectMemoryNew.GetClassMethodSelectors(classOop);
+        var instanceMethods = ObjectMemory.GetClassMethodSelectors(classOop);
         Console.WriteLine($"\nCLASS METHODS: {classMethodCount}");
         Console.WriteLine($"INSTANCE METHODS: {instanceMethods.Count}");
 
@@ -599,31 +599,31 @@ public class VirtualMachine
                 Console.WriteLine("━".PadRight(80, '━'));
                 Console.WriteLine();
 
-                var methodRef = ObjectMemoryNew.LookupMethod(classOop, selector);
+                var methodRef = ObjectMemory.LookupMethod(classOop, selector);
                 if (!methodRef.IsNil)
                 {
                     var methodOop = methodRef.AsObjectPointer();
                     Console.WriteLine($"Method: {selector}");
-                    Console.WriteLine($"  Arguments: {ObjectMemoryNew.GetCompiledMethodArgumentCount(methodOop)}");
-                    Console.WriteLine($"  Temporaries: {ObjectMemoryNew.GetCompiledMethodTemporaryCount(methodOop)}");
+                    Console.WriteLine($"  Arguments: {ObjectMemory.GetCompiledMethodArgumentCount(methodOop)}");
+                    Console.WriteLine($"  Temporaries: {ObjectMemory.GetCompiledMethodTemporaryCount(methodOop)}");
 
-                    var primitiveIndex = ObjectMemoryNew.GetCompiledMethodPrimitiveIndex(methodOop);
+                    var primitiveIndex = ObjectMemory.GetCompiledMethodPrimitiveIndex(methodOop);
                     if (primitiveIndex > 0)
                     {
                         Console.WriteLine($"  Primitive: {primitiveIndex}");
                     }
 
-                    var bytecodes = ObjectMemoryNew.GetCompiledMethodBytecodes(methodOop);
+                    var bytecodes = ObjectMemory.GetCompiledMethodBytecodes(methodOop);
                     Console.WriteLine($"  Bytecode: [{BitConverter.ToString(bytecodes)}] ({bytecodes.Length} bytes)");
 
                     // Display literal array
-                    var literalCount = ObjectMemoryNew.GetCompiledMethodLiteralCount(methodOop);
+                    var literalCount = ObjectMemory.GetCompiledMethodLiteralCount(methodOop);
                     Console.WriteLine($"  Literals: ({literalCount})");
                     if (literalCount > 0)
                     {
                         for (int i = 0; i < literalCount; i++)
                         {
-                            var literalRef = ObjectMemoryNew.GetCompiledMethodLiteral(methodOop, i);
+                            var literalRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, i);
                             string literalDisplay;
 
                             if (literalRef.IsNil)
@@ -638,23 +638,23 @@ public class VirtualMachine
                             {
                                 // Try to get type information from the object
                                 var literalOop = literalRef.AsObjectPointer();
-                                var literalClassRef = ObjectMemoryNew.GetObjectClass(literalRef);
+                                var literalClassRef = ObjectMemory.GetObjectClass(literalRef);
                                 if (!literalClassRef.IsNil)
                                 {
-                                    var literalClassName = ObjectMemoryNew.GetClassName(literalClassRef.AsObjectPointer());
+                                    var literalClassName = ObjectMemory.GetClassName(literalClassRef.AsObjectPointer());
                                     if (literalClassName == "Symbol")
                                     {
-                                        var symbolValue = ObjectMemoryNew.GetSymbolValue(literalOop);
+                                        var symbolValue = ObjectMemory.GetSymbolValue(literalOop);
                                         literalDisplay = $"#{symbolValue}";
                                     }
                                     else if (literalClassName == "String")
                                     {
-                                        var stringValue = ObjectMemoryNew.GetStringValue(literalOop);
+                                        var stringValue = ObjectMemory.GetStringValue(literalOop);
                                         literalDisplay = $"'{stringValue}'";
                                     }
                                     else if (literalClassName == "Array")
                                     {
-                                        var size = ObjectMemoryNew.GetObjectSize(literalOop);
+                                        var size = ObjectMemory.GetObjectSize(literalOop);
                                         literalDisplay = $"Array({size} elements)";
                                     }
                                     else

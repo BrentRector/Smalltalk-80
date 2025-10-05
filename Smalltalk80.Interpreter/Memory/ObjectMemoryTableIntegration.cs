@@ -5,7 +5,7 @@ using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Core.Objects;
 
 /// <summary>
-/// Integration layer that modifies ObjectMemoryNew to use ObjectTable instead of ConcurrentDictionary.
+/// Integration layer that modifies ObjectMemory to use ObjectTable instead of ConcurrentDictionary.
 /// This file shows how to integrate the ObjectTable without breaking existing code.
 ///
 /// INTEGRATION STEPS:
@@ -29,7 +29,7 @@ public static class ObjectMemoryTableIntegration
         int indexedSize)
     {
         // Create object data
-        var data = new ObjectMemoryNew.ObjectData(classRef, format, instanceVarCount);
+        var data = new ObjectMemory.ObjectData(classRef, format, instanceVarCount);
 
         // Initialize indexed data based on format
         if (indexedSize > 0)
@@ -56,7 +56,7 @@ public static class ObjectMemoryTableIntegration
     /// Replace lines 141-153 with this implementation.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ObjectMemoryNew.ObjectData? GetObjectDataExample(ObjectTable objectTable, nint oop)
+    public static ObjectMemory.ObjectData? GetObjectDataExample(ObjectTable objectTable, nint oop)
     {
         if (oop == 0)
             throw new InvalidOperationException("Cannot access nil object data");

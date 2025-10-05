@@ -122,7 +122,7 @@ public static class ColdStartBootstrap
             }
 
             var format = DetermineObjectFormat(metadata.SubclassKind, className);
-            var classRef = ObjectMemoryNew.CreateClassObject(
+            var classRef = ObjectMemory.CreateClassObject(
                 className,
                 superclassRef,
                 metadata.InstanceVariableNames,
@@ -147,7 +147,7 @@ public static class ColdStartBootstrap
         var undefinedObjectClass = _createdClasses["UndefinedObject"];
 
         // 2. Create nil singleton instance
-        var nilObject = ObjectMemoryNew.CreateInstance(
+        var nilObject = ObjectMemory.CreateInstance(
             undefinedObjectClass.AsObjectPointer(),
             0  // No instance variables
         );
@@ -216,7 +216,7 @@ public static class ColdStartBootstrap
             // Create metaclass as instance of Metaclass
             // All metaclasses are instances of Metaclass, so they all have the same instance variable count
             var totalInstVars = CalculateTotalInstanceVariableCount("Metaclass");
-            var metaclassRef = ObjectMemoryNew.CreateInstance(
+            var metaclassRef = ObjectMemory.CreateInstance(
                 metaclassClass.AsObjectPointer(),
                 totalInstVars  // All metaclasses have same inst var count (Behavior:4 + ClassDescription:2 + Metaclass:1 = 7)
             );
@@ -253,7 +253,7 @@ public static class ColdStartBootstrap
         var metaclassMetaclassOop = metaclassMetaclass.AsObjectPointer();
 
         // Get the ObjectData and set its ClassRef to point to itself
-        var objectData = ObjectMemoryNew.GetObjectData(metaclassMetaclassOop);
+        var objectData = ObjectMemory.GetObjectData(metaclassMetaclassOop);
         objectData.ClassRef = metaclassMetaclass;  // Points to itself!
 
         LogColdStart("  Metaclass class.class now points to itself (circular reference complete)");
@@ -300,7 +300,7 @@ public static class ColdStartBootstrap
             }
 
             var format = DetermineObjectFormat(metadata.SubclassKind, metadata.ClassName);
-            var classRef = ObjectMemoryNew.CreateClassObject(
+            var classRef = ObjectMemory.CreateClassObject(
                 metadata.ClassName,
                 superclassRef,
                 metadata.InstanceVariableNames,
@@ -311,11 +311,11 @@ public static class ColdStartBootstrap
             // Set well-known classes for ObjectMemory
             if (metadata.ClassName == "CompiledMethod")
             {
-                ObjectMemoryNew.SetWellKnownClass("CompiledMethod", classRef);
+                ObjectMemory.SetWellKnownClass("CompiledMethod", classRef);
             }
             else if (metadata.ClassName == "Symbol")
             {
-                ObjectMemoryNew.SetWellKnownClass("Symbol", classRef);
+                ObjectMemory.SetWellKnownClass("Symbol", classRef);
             }
 
             // 2. Create its metaclass immediately
@@ -326,7 +326,7 @@ public static class ColdStartBootstrap
             var metaclassClass = _createdClasses["Metaclass"];
             // All metaclasses are instances of Metaclass, so they all have the same instance variable count
             var metaclassTotalInstVars = CalculateTotalInstanceVariableCount("Metaclass");
-            var metaclassRef = ObjectMemoryNew.CreateInstance(
+            var metaclassRef = ObjectMemory.CreateInstance(
                 metaclassClass.AsObjectPointer(),
                 metaclassTotalInstVars  // All metaclasses have same inst var count (Behavior:4 + ClassDescription:2 + Metaclass:1 = 7)
             );
@@ -412,7 +412,7 @@ public static class ColdStartBootstrap
         if (Program.RuntimeOptions?.EnableColdStartLogging ?? false)
         {
             var dictOop = dictionaryClass.AsObjectPointer();
-            var objectData = ObjectMemoryNew.GetObjectData(dictOop);
+            var objectData = ObjectMemory.GetObjectData(dictOop);
             Console.WriteLine($"[DEBUG] Dictionary class OOP: {dictOop}");
             Console.WriteLine($"[DEBUG] Dictionary class InstanceVars.Length: {objectData.InstanceVariables.Length}");
             Console.WriteLine($"[DEBUG] Dictionary class Format: {objectData.Format}");
@@ -423,7 +423,7 @@ public static class ColdStartBootstrap
             while (!currentClass.IsNil && currentClass.IsHeapObject && depth < 10)
             {
                 var currentOop = currentClass.AsObjectPointer();
-                var currentData = ObjectMemoryNew.GetObjectData(currentOop);
+                var currentData = ObjectMemory.GetObjectData(currentOop);
 
                 // Try to get the name safely
                 string nameStr = "unknown";
@@ -431,7 +431,7 @@ public static class ColdStartBootstrap
                 {
                     STClass currentClassStruct = currentClass;
                     var nameRef = currentClassStruct.Name;
-                    nameStr = nameRef.IsNil ? "nil" : ObjectMemoryNew.SymbolToString(nameRef);
+                    nameStr = nameRef.IsNil ? "nil" : ObjectMemory.SymbolToString(nameRef);
                 }
                 catch { }
 
@@ -456,8 +456,8 @@ public static class ColdStartBootstrap
         {
             if (!className.EndsWith(" class"))  // Only classes, not metaclasses
             {
-                var nameSymbol = ObjectMemoryNew.InternSymbolBootstrap(className);
-                ObjectMemoryNew.DictionaryAtPut(
+                var nameSymbol = ObjectMemory.InternSymbolBootstrap(className);
+                ObjectMemory.DictionaryAtPut(
                     SystemDictionary.Instance,
                     nameSymbol,
                     classRef
@@ -467,8 +467,8 @@ public static class ColdStartBootstrap
         }
 
         // Create "Smalltalk" global variable (self-reference)
-        var smalltalkSymbol = ObjectMemoryNew.InternSymbolBootstrap("Smalltalk");
-        ObjectMemoryNew.DictionaryAtPut(
+        var smalltalkSymbol = ObjectMemory.InternSymbolBootstrap("Smalltalk");
+        ObjectMemory.DictionaryAtPut(
             SystemDictionary.Instance,
             smalltalkSymbol,
             SystemDictionary.Instance
@@ -548,8 +548,8 @@ public static class ColdStartBootstrap
         // Create true and false singletons
         var trueClass = _createdClasses["True"];
         var falseClass = _createdClasses["False"];
-        var trueObject = ObjectMemoryNew.CreateInstance(trueClass.AsObjectPointer(), 0);
-        var falseObject = ObjectMemoryNew.CreateInstance(falseClass.AsObjectPointer(), 0);
+        var trueObject = ObjectMemory.CreateInstance(trueClass.AsObjectPointer(), 0);
+        var falseObject = ObjectMemory.CreateInstance(falseClass.AsObjectPointer(), 0);
 
         // Store in SpecialObjectsArray - these become the canonical references
         SpecialObjectsArray.SetTrue(trueObject);
@@ -561,20 +561,37 @@ public static class ColdStartBootstrap
 
         // Create ProcessorScheduler singleton
         var schedulerClass = _createdClasses["ProcessorScheduler"];
-        var processorScheduler = ObjectMemoryNew.CreateInstance(
+        var processorScheduler = ObjectMemory.CreateInstance(
             schedulerClass.AsObjectPointer(),
-            ObjectMemoryNew.GetClassTotalInstanceVariableCount(schedulerClass.AsObjectPointer())
+            ObjectMemory.GetClassTotalInstanceVariableCount(schedulerClass.AsObjectPointer())
         );
         SpecialObjectsArray.SetProcessorScheduler(processorScheduler);
 
         // Create initial Process instance (ActiveProcess)
         var processClass = _createdClasses["Process"];
-        var activeProcess = ObjectMemoryNew.CreateInstance(
+        var activeProcess = ObjectMemory.CreateInstance(
             processClass.AsObjectPointer(),
-            ObjectMemoryNew.GetClassTotalInstanceVariableCount(processClass.AsObjectPointer())
+            ObjectMemory.GetClassTotalInstanceVariableCount(processClass.AsObjectPointer())
         );
 
-        // CRITICAL FIX: Link activeProcess to ProcessorScheduler to prevent GC collection
+        // Initialize Process fields according to Blue Book specification
+        // The initial activeProcess represents the running system and has specific field values
+        var process = new STProcess(activeProcess);
+
+        // NextLink: nil (inherited from Link - not linked to another process)
+        process.NextLink = SObjectRef.Nil;
+
+        // SuspendedContext: nil (this is the currently running process, not suspended)
+        process.SuspendedContext = SObjectRef.Nil;
+
+        // Priority: SmallInteger 4 (UserSchedulingPriority per Blue Book)
+        // Priority levels in Smalltalk-80: 1-3 system, 4 user, 5-8 background
+        process.Priority = SObjectRef.FromSmallInteger(4);
+
+        // MyList: nil (not on any waiting list since it's the active process)
+        process.MyList = SObjectRef.Nil;
+
+        // CRITICAL: Link activeProcess to ProcessorScheduler to prevent GC collection
         // The Process must be reachable via: SOA[4] -> ProcessorScheduler -> activeProcess
         // Using the generated STProcessorScheduler layout for type-safe access
         var scheduler = new STProcessorScheduler(processorScheduler);
@@ -591,9 +608,9 @@ public static class ColdStartBootstrap
         // Initialize each priority list as an empty LinkedList
         for (var i = 0; i < 8; i++)
         {
-            var linkedList = ObjectMemoryNew.CreateInstance(
+            var linkedList = ObjectMemory.CreateInstance(
                 linkedListClass.AsObjectPointer(),
-                ObjectMemoryNew.GetClassTotalInstanceVariableCount(linkedListClass.AsObjectPointer())
+                ObjectMemory.GetClassTotalInstanceVariableCount(linkedListClass.AsObjectPointer())
             );
 
             // Initialize LinkedList with nil firstLink and lastLink (empty list)
@@ -638,14 +655,14 @@ public static class ColdStartBootstrap
         SymbolTableBuilder.CreateAndInstallUSTable();
 
         // Migrate all bootstrap symbols to USTable using Smalltalk uniqueness
-        ObjectMemoryNew.MigrateBootstrapSymbolsToUSTable();
+        ObjectMemory.MigrateBootstrapSymbolsToUSTable();
 
         // Store USTable in Smalltalk dictionary at #SymbolTable
         var usTableRef = SymbolTableBuilder.GetUSTable();
         if (usTableRef.HasValue && !usTableRef.Value.IsNil)
         {
-            var symbolTableKey = ObjectMemoryNew.InternSymbol("SymbolTable");
-            ObjectMemoryNew.DictionaryAtPut(
+            var symbolTableKey = ObjectMemory.InternSymbol("SymbolTable");
+            ObjectMemory.DictionaryAtPut(
                 SystemDictionary.Instance,
                 symbolTableKey,
                 usTableRef.Value
@@ -816,22 +833,22 @@ public static class ColdStartBootstrap
             _createdClasses["Array"] : SObjectRef.Nil;
 
         int capacity = 64; // Reasonable initial capacity
-        var methodDict = ObjectMemoryNew.AllocateObject(
+        var methodDict = ObjectMemory.AllocateObject(
             methodDictClass,  // May be nil during bootstrap - that's OK
             ObjectFormat.PointerIndexed,
             2,  // MethodDictionary has 2 instance variables: tally and valueArray
             capacity);  // indexed size for method storage
 
         // Initialize tally to 0
-        ObjectMemoryNew.SetInstanceVariable(methodDict, 0, SObjectRef.FromSmallInteger(0));
+        ObjectMemory.SetInstanceVariable(methodDict, 0, SObjectRef.FromSmallInteger(0));
 
         // Create valueArray for method storage
-        var valueArray = ObjectMemoryNew.AllocateObject(
+        var valueArray = ObjectMemory.AllocateObject(
             arrayClass,  // May be nil during bootstrap - that's OK
             ObjectFormat.PointerIndexed,
             0,  // Array has no instance variables
             capacity);
-        ObjectMemoryNew.SetInstanceVariable(methodDict, 1, SObjectRef.FromObjectPointer(valueArray));
+        ObjectMemory.SetInstanceVariable(methodDict, 1, SObjectRef.FromObjectPointer(valueArray));
 
         // Set method dictionary in the class/metaclass
         classStruct.MethodDict = SObjectRef.FromObjectPointer(methodDict);
@@ -846,13 +863,13 @@ public static class ColdStartBootstrap
             // Reuse arrayClass declared earlier in the method
             if (!arrayClass.IsNil)
             {
-                var instVarsArray = ObjectMemoryNew.CreateInstance(
+                var instVarsArray = ObjectMemory.CreateInstance(
                     arrayClass.AsObjectPointer(),
                     metadata.InstanceVariableNames.Length);  // indexedSize
 
                 for (int i = 0; i < metadata.InstanceVariableNames.Length; i++)
                 {
-                    var symbol = ObjectMemoryNew.InternSymbolBootstrap(metadata.InstanceVariableNames[i]);
+                    var symbol = ObjectMemory.InternSymbolBootstrap(metadata.InstanceVariableNames[i]);
                     instVarsArray.SetIndexedPointer(i, symbol);
                 }
 
@@ -865,7 +882,7 @@ public static class ColdStartBootstrap
         // Only set name if this is NOT a metaclass (metaclass names end with " class")
         if (!metadata.ClassName.EndsWith(" class"))
         {
-            var nameSymbol = ObjectMemoryNew.InternSymbolBootstrap(metadata.ClassName);
+            var nameSymbol = ObjectMemory.InternSymbolBootstrap(metadata.ClassName);
             classStruct.Name = nameSymbol;
         }
     }
@@ -877,7 +894,7 @@ public static class ColdStartBootstrap
     private static void WireClassMetaclassRelationship(SObjectRef classRef, SObjectRef metaclassRef)
     {
         // Set class.class = metaclass (by setting the ObjectData's ClassRef)
-        var classData = ObjectMemoryNew.GetObjectData(classRef.AsObjectPointer());
+        var classData = ObjectMemory.GetObjectData(classRef.AsObjectPointer());
         classData.ClassRef = metaclassRef;
 
         // Set metaclass.thisClass = class (this IS an instance variable)

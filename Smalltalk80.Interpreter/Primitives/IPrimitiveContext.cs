@@ -76,4 +76,15 @@ public interface IPrimitiveContext
     /// Allocates a new object with the given class and size.
     /// </summary>
     nint AllocateObject(SObjectRef classRef, int instanceVarCount, int indexedSize);
+
+    /// <summary>
+    /// Gets indexed byte data from an object (for byte arrays/bitmaps).
+    /// Returns null if the object doesn't contain byte data.
+    /// </summary>
+    Memory<byte>? GetIndexedBytes(nint oop);
+
+    /// <summary>
+    /// Looks up a global variable by name.
+    /// </summary>
+    SObjectRef? LookupGlobal(string name);
 }

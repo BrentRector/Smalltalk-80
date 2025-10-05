@@ -11,7 +11,7 @@ using Smalltalk80.Interpreter.Memory;
 /// <summary>
 /// Extension methods for SObjectRef to provide class-related operations.
 /// These methods allow an SObjectRef pointing to a Class object to act as a class.
-/// All operations go through ObjectMemoryNew - never exposing internal SObject instances.
+/// All operations go through ObjectMemory - never exposing internal SObject instances.
 /// </summary>
 public static class SObjectRefClassExtensions
 {
@@ -36,7 +36,7 @@ public static class SObjectRefClassExtensions
             return string.Empty;
 
         // Convert the Symbol to a string
-        return ObjectMemoryNew.SymbolToString(nameSymbolRef);
+        return ObjectMemory.SymbolToString(nameSymbolRef);
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public static class SObjectRefClassExtensions
             var symbolRef = instanceVarsRef.GetIndexedPointer(i);
             if (!symbolRef.IsNil)
             {
-                names[i] = ObjectMemoryNew.SymbolToString(symbolRef);
+                names[i] = ObjectMemory.SymbolToString(symbolRef);
             }
             else
             {
@@ -162,7 +162,7 @@ public static class SObjectRefClassExtensions
         // For now, we'll do direct lookup without caching
         // TODO: Consider creating a separate cache that works with SObjectRef
 
-        var selectorSymbol = ObjectMemoryNew.InternSymbol(selector);
+        var selectorSymbol = ObjectMemory.InternSymbol(selector);
         var currentClass = classRef;
 
         while (!currentClass.IsNil && currentClass.IsHeapObject)
@@ -216,7 +216,7 @@ public static class SObjectRefClassExtensions
         if (methodDict.IsNil)
             throw new InvalidOperationException("Method dictionary is nil");
 
-        var selectorSymbol = ObjectMemoryNew.InternSymbol(selector);
+        var selectorSymbol = ObjectMemory.InternSymbol(selector);
 
         // Get the tally and valueArray
         Generated.Layouts.STIdentityDictionary dict = methodDict;
@@ -324,7 +324,7 @@ public static class SObjectRefClassExtensions
             if (!key.IsNil)
             {
                 // Convert symbol to string
-                methods.Add(ObjectMemoryNew.SymbolToString(key));
+                methods.Add(ObjectMemory.SymbolToString(key));
             }
         }
 
@@ -378,7 +378,7 @@ public static class SObjectRefClassExtensions
         }
 
         // Allocate the object
-        var oop = ObjectMemoryNew.AllocateObject(classRef, objectFormat, instanceVarCount, indexedSize);
+        var oop = ObjectMemory.AllocateObject(classRef, objectFormat, instanceVarCount, indexedSize);
 
         return SObjectRef.FromObjectPointer(oop);
     }

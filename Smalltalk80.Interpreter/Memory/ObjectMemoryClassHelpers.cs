@@ -6,10 +6,10 @@ using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Generated.Layouts;
 
 /// <summary>
-/// Helper methods for working with classes and methods in ObjectMemoryNew.
+/// Helper methods for working with classes and methods in ObjectMemory.
 /// This is a temporary extension to add class manipulation helpers.
 /// </summary>
-public static partial class ObjectMemoryNew
+public static partial class ObjectMemory
 {
     #region Class Helpers
 

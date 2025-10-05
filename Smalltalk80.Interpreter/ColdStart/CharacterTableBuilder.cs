@@ -34,7 +34,7 @@ public static class CharacterTableBuilder
             throw new InvalidOperationException("Array class must be created before CharacterTable");
 
         // Create Array with 256 pointer slots
-        nint tableOop = ObjectMemoryNew.AllocateObject(
+        nint tableOop = ObjectMemory.AllocateObject(
             arrayClassRef,
             ObjectFormat.PointerIndexed,
             instanceVarCount: 0,

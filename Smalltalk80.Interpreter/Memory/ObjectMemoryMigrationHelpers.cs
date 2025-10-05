@@ -7,7 +7,7 @@ using Smalltalk80.Interpreter.Core.Values;
 /// Temporary helper methods to support migration from old SObject architecture to pure SObjectRef.
 /// These methods provide convenience wrappers and missing functionality.
 /// </summary>
-public static partial class ObjectMemoryNew
+public static partial class ObjectMemory
 {
     /// <summary>
     /// Creates a compiled method with a selector (convenience wrapper).

@@ -5,10 +5,10 @@ using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Core.Objects;
 
 /// <summary>
-/// Extension of ObjectMemoryNew that replaces ConcurrentDictionary with ObjectTable
+/// Extension of ObjectMemory that replaces ConcurrentDictionary with ObjectTable
 /// for efficient O(1) allocation and improved garbage collection.
 /// </summary>
-public static partial class ObjectMemoryNew
+public static partial class ObjectMemory
 {
     // Replace the concurrent dictionary with the ObjectTable
     private static readonly ObjectTable objectTableNew = new();

@@ -27,8 +27,8 @@ public static class TestClassBuilder
             throw new InvalidOperationException("Object class not found");
         }
 
-        // Create the class using ObjectMemoryNew.CreateClassObject
-        var testClassRef = ObjectMemoryNew.CreateClassObject(
+        // Create the class using ObjectMemory.CreateClassObject
+        var testClassRef = ObjectMemory.CreateClassObject(
             "TestClass",
             objectClassRef,
             new[] { "value" },
@@ -80,7 +80,7 @@ public static class TestClassBuilder
             // Selector "testReturnConstant" will be added as literal #1 by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testReturnConstant",
             bytecodes,
             literals,
@@ -88,7 +88,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testReturnConstant", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testReturnConstant", method);
     }
 
     /// <summary>
@@ -115,7 +115,7 @@ public static class TestClassBuilder
             // Selector "testAddition" will be added as literal #2 by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testAddition",
             bytecodes,
             literals,
@@ -123,7 +123,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testAddition", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testAddition", method);
     }
 
     /// <summary>
@@ -140,7 +140,7 @@ public static class TestClassBuilder
             0x7C   // return top
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testGetValue",
             bytecodes,
             Array.Empty<SObjectRef>(),
@@ -148,7 +148,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testGetValue", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testGetValue", method);
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public static class TestClassBuilder
             // Selector "testMultiplication" will be added as literal #2 by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testMultiplication",
             bytecodes,
             literals,
@@ -183,7 +183,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testMultiplication", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testMultiplication", method);
     }
 
     /// <summary>
@@ -211,7 +211,7 @@ public static class TestClassBuilder
             // Selector "testTemporary" will be added by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testTemporary",
             bytecodes,
             literals,
@@ -219,7 +219,7 @@ public static class TestClassBuilder
             1, // 1 temporary
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testTemporary", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testTemporary", method);
     }
 
     /// <summary>
@@ -240,11 +240,11 @@ public static class TestClassBuilder
 
         var literals = new SObjectRef[]
         {
-            ObjectMemoryNew.InternSymbol("testNestedLevel2")
+            ObjectMemory.InternSymbol("testNestedLevel2")
             // Selector "testNestedLevel3" will be added by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testNestedLevel3",
             bytecodes,
             literals,
@@ -252,7 +252,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testNestedLevel3", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testNestedLevel3", method);
     }
 
     /// <summary>
@@ -272,11 +272,11 @@ public static class TestClassBuilder
 
         var literals = new SObjectRef[]
         {
-            ObjectMemoryNew.InternSymbol("testNestedLevel1")
+            ObjectMemory.InternSymbol("testNestedLevel1")
             // Selector "testNestedLevel2" will be added by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testNestedLevel2",
             bytecodes,
             literals,
@@ -284,7 +284,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testNestedLevel2", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testNestedLevel2", method);
     }
 
     /// <summary>
@@ -304,11 +304,11 @@ public static class TestClassBuilder
 
         var literals = new SObjectRef[]
         {
-            ObjectMemoryNew.InternSymbol("testNestedLevel0")
+            ObjectMemory.InternSymbol("testNestedLevel0")
             // Selector "testNestedLevel1" will be added by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testNestedLevel1",
             bytecodes,
             literals,
@@ -316,7 +316,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testNestedLevel1", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testNestedLevel1", method);
     }
 
     /// <summary>
@@ -339,12 +339,12 @@ public static class TestClassBuilder
 
         var literals = new SObjectRef[]
         {
-            ObjectMemoryNew.InternSymbol("forceGC"),  // Selector for GC call
+            ObjectMemory.InternSymbol("forceGC"),  // Selector for GC call
             SObjectRef.FromSmallInteger(88)
             // Selector "testNestedLevel0" will be added by CreateCompiledMethod
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "testNestedLevel0",
             bytecodes,
             literals,
@@ -352,7 +352,7 @@ public static class TestClassBuilder
             0, // no temporaries
             0); // no primitive
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "testNestedLevel0", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "testNestedLevel0", method);
     }
 
     /// <summary>
@@ -370,7 +370,7 @@ public static class TestClassBuilder
             0x7C   // return top
         };
 
-        var method = ObjectMemoryNew.CreateCompiledMethod(
+        var method = ObjectMemory.CreateCompiledMethod(
             "forceGC",
             bytecodes,
             Array.Empty<SObjectRef>(),
@@ -378,7 +378,7 @@ public static class TestClassBuilder
             0, // no temporaries
             133); // primitive 133 = force GC
 
-        ObjectMemoryNew.AddMethod(classRef.AsObjectPointer(), "forceGC", method);
+        ObjectMemory.AddMethod(classRef.AsObjectPointer(), "forceGC", method);
     }
 
     /// <summary>
@@ -386,12 +386,12 @@ public static class TestClassBuilder
     /// </summary>
     public static SObjectRef CreateTestInstance(SObjectRef testClassRef)
     {
-        var instance = ObjectMemoryNew.CreateInstance(
+        var instance = ObjectMemory.CreateInstance(
             testClassRef.AsObjectPointer(),
             0); // No indexed slots, just instance variables
 
         // Set value to 100
-        ObjectMemoryNew.SetInstanceVariable(instance.AsObjectPointer(), 0, SObjectRef.FromSmallInteger(100));
+        ObjectMemory.SetInstanceVariable(instance.AsObjectPointer(), 0, SObjectRef.FromSmallInteger(100));
 
         return instance;
     }

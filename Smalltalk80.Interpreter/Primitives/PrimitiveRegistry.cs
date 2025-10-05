@@ -11,11 +11,15 @@ public static class PrimitiveRegistry
     public static void RegisterAll(PrimitiveTable table)
     {
         RegisterArithmeticPrimitives(table);
+        RegisterLargeIntegerPrimitives(table);
+        RegisterFloatPrimitives(table);
         RegisterComparisonPrimitives(table);
         RegisterArrayPrimitives(table);
         RegisterObjectPrimitives(table);
         RegisterControlPrimitives(table);
         RegisterProcessPrimitives(table);
+        RegisterInputPrimitives(table);
+        RegisterGraphicsPrimitives(table);
         RegisterStringPrimitives(table);
         RegisterSystemPrimitives(table);
     }
@@ -42,6 +46,18 @@ public static class PrimitiveRegistry
         table.Register(17, "SmallInteger bitShift:", ArithmeticPrimitives.PrimitiveBitShift);
     }
 
+    private static void RegisterLargeIntegerPrimitives(PrimitiveTable table)
+    {
+        // Primitives 21-37: LargeInteger arithmetic
+        LargeIntegerPrimitives.RegisterAll(table);
+    }
+
+    private static void RegisterFloatPrimitives(PrimitiveTable table)
+    {
+        // Primitives 40-54: Float arithmetic
+        FloatPrimitives.RegisterAll(table);
+    }
+
     private static void RegisterComparisonPrimitives(PrimitiveTable table)
     {
         // Comparison primitives are registered in ArithmeticPrimitives (3-8)
@@ -64,19 +80,7 @@ public static class PrimitiveRegistry
     private static void RegisterObjectPrimitives(PrimitiveTable table)
     {
         // Primitives 68-79: Storage management
-        // TODO: Many of these need further adaptation
-        // table.Register(68, "objectAt:", ObjectPrimitives.PrimitiveObjectAt);
-        // table.Register(69, "objectAt:put:", ObjectPrimitives.PrimitiveObjectAtPut);
-        table.Register(70, "new", ObjectPrimitives.PrimitiveNew);
-        table.Register(71, "new:", ObjectPrimitives.PrimitiveNewWithSize);
-        // table.Register(72, "become:", ObjectPrimitives.PrimitiveBecome);
-        // table.Register(73, "instVarAt:", ObjectPrimitives.PrimitiveInstVarAt);
-        // table.Register(74, "instVarAt:put:", ObjectPrimitives.PrimitiveInstVarAtPut);
-        // table.Register(75, "asOop", ObjectPrimitives.PrimitiveAsOop);
-        // table.Register(76, "asObject", ObjectPrimitives.PrimitiveAsObject);
-        // table.Register(77, "someInstance", ObjectPrimitives.PrimitiveSomeInstance);
-        // table.Register(78, "nextInstance", ObjectPrimitives.PrimitiveNextInstance);
-        // table.Register(79, "newMethod:header:", ObjectPrimitives.PrimitiveNewMethod);
+        ObjectPrimitives.RegisterAll(table);
 
         // Primitives 110-111: Object identity
         table.Register(110, "==", ObjectPrimitives.PrimitiveIdentical);
@@ -86,22 +90,25 @@ public static class PrimitiveRegistry
     private static void RegisterControlPrimitives(PrimitiveTable table)
     {
         // Primitives 80-89: Control structures
-        table.Register(80, "blockCopy:", ControlPrimitives.PrimitiveBlockCopy);
-        table.Register(81, "value", ControlPrimitives.PrimitiveValue);
-        table.Register(82, "value:", ControlPrimitives.PrimitiveValueWithArg);
-        table.Register(83, "perform:", ControlPrimitives.PrimitivePerform);
-        // table.Register(84, "perform:with:", ControlPrimitives.PrimitivePerformWithArgs); // TODO: Not ported yet
-        table.Register(85, "signal", ControlPrimitives.PrimitiveSignal);
-        table.Register(86, "wait", ControlPrimitives.PrimitiveWait);
-        table.Register(87, "resume", ControlPrimitives.PrimitiveResume);
-        table.Register(88, "suspend", ControlPrimitives.PrimitiveSuspend);
-        // table.Register(89, "flushCache", ControlPrimitives.PrimitiveFlushCache); // TODO: Not ported yet
+        ControlPrimitives.RegisterAll(table);
     }
 
     private static void RegisterProcessPrimitives(PrimitiveTable table)
     {
         // Process primitives are handled in ControlPrimitives (85-88)
         // ProcessPrimitives.cs contains more detailed implementations
+    }
+
+    private static void RegisterInputPrimitives(PrimitiveTable table)
+    {
+        // Primitives 90-95: Input/output primitives
+        InputPrimitives.RegisterAll(table);
+    }
+
+    private static void RegisterGraphicsPrimitives(PrimitiveTable table)
+    {
+        // Primitives 96-104: Graphics and display primitives
+        GraphicsPrimitives.RegisterAll(table);
     }
 
     private static void RegisterStringPrimitives(PrimitiveTable table)

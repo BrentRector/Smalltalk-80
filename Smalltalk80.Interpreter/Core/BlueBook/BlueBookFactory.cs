@@ -13,7 +13,7 @@ using Smalltalk80.Interpreter.Generated.Layouts;
 /// CRITICAL: These are the ONLY correct way to create Blue Book objects during cold start.
 /// Do not use specialized C# classes directly - they may have incorrect layouts.
 ///
-/// NEW ARCHITECTURE: All methods now return SObjectRef and use ObjectMemoryNew.AllocateObject.
+/// NEW ARCHITECTURE: All methods now return SObjectRef and use ObjectMemory.AllocateObject.
 /// </summary>
 public static class BlueBookFactory
 {
@@ -38,7 +38,7 @@ public static class BlueBookFactory
         const int FixedFieldCount = 6;
         var totalSize = FixedFieldCount + tempCount + stackSize;
 
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             methodContextClass,
             ObjectFormat.FixedPointer,  // MethodContext is variableSubclass but stores in inst vars
             instanceVarCount: totalSize,
@@ -86,7 +86,7 @@ public static class BlueBookFactory
         const int FixedFieldCount = 6;
         var totalSize = FixedFieldCount + stackSize;
 
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             blockContextClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: totalSize,
@@ -126,7 +126,7 @@ public static class BlueBookFactory
         SObjectRef suspendedContext,
         int priority)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             processClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STProcess.InstanceVarCount,
@@ -156,7 +156,7 @@ public static class BlueBookFactory
         SObjectRef semaphoreClass,
         int initialSignals = 0)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             semaphoreClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STSemaphore.InstanceVarCount,
@@ -201,7 +201,7 @@ public static class BlueBookFactory
         SObjectRef dictionaryClass,
         int initialCapacity = 16)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             dictionaryClass,
             ObjectFormat.PointerIndexed,
             instanceVarCount: STDictionary.InstanceVarCount,
@@ -237,7 +237,7 @@ public static class BlueBookFactory
         SObjectRef key,
         SObjectRef value)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             associationClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STAssociation.InstanceVarCount,
@@ -263,7 +263,7 @@ public static class BlueBookFactory
         SObjectRef characterClass,
         int asciiValue)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             characterClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STCharacter.InstanceVarCount,
@@ -288,7 +288,7 @@ public static class BlueBookFactory
         SObjectRef arrayClass,
         int size)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             arrayClass,
             ObjectFormat.PointerIndexed,
             instanceVarCount: STArray.InstanceVarCount,  // 0
@@ -317,7 +317,7 @@ public static class BlueBookFactory
         SObjectRef stringClass,
         int length)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             stringClass,
             ObjectFormat.ByteIndexed,
             instanceVarCount: STString.InstanceVarCount,  // 0
@@ -358,7 +358,7 @@ public static class BlueBookFactory
         SObjectRef symbolClass,
         string symbolString)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             symbolClass,
             ObjectFormat.ByteIndexed,
             instanceVarCount: STSymbol.InstanceVarCount,  // 0
@@ -386,7 +386,7 @@ public static class BlueBookFactory
         SObjectRef byteArrayClass,
         int size)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             byteArrayClass,
             ObjectFormat.ByteIndexed,
             instanceVarCount: STByteArray.InstanceVarCount,  // 0
@@ -411,7 +411,7 @@ public static class BlueBookFactory
         SObjectRef methodDict,
         SObjectRef format)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             behaviorClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STBehavior.InstanceVarCount,
@@ -444,7 +444,7 @@ public static class BlueBookFactory
         SObjectRef name,
         SObjectRef instanceVariables)
     {
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             classClass,
             ObjectFormat.FixedPointer,
             instanceVarCount: STClass.InstanceVarCount,
@@ -489,7 +489,7 @@ public static class BlueBookFactory
         byte[] bytecodes)
     {
         // CompiledMethod stores literals as instance variables and bytecodes as indexed bytes
-        var oop = ObjectMemoryNew.AllocateObject(
+        var oop = ObjectMemory.AllocateObject(
             compiledMethodClass,
             ObjectFormat.CompiledMethod,
             instanceVarCount: literals.Length,  // Literals are stored as instance variables

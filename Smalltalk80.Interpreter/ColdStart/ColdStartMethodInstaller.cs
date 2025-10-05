@@ -72,7 +72,7 @@ public static class ColdStartMethodInstaller
 
         // For class methods, we need the metaclass
         nint targetClassOop = isClassSide
-            ? ObjectMemoryNew.GetClass(classRef.AsObjectPointer()).AsObjectPointer()
+            ? ObjectMemory.GetClass(classRef.AsObjectPointer()).AsObjectPointer()
             : classRef.AsObjectPointer();
 
         // Iterate through all method types (each nested type represents one method)
@@ -118,7 +118,7 @@ public static class ColdStartMethodInstaller
             }
 
             // Create the compiled method
-            var methodOop = ObjectMemoryNew.CreateCompiledMethod(
+            var methodOop = ObjectMemory.CreateCompiledMethod(
                 selector,
                 bytecode,
                 literals,
@@ -128,7 +128,7 @@ public static class ColdStartMethodInstaller
             );
 
             // Install the method in the class's method dictionary
-            ObjectMemoryNew.AddMethod(targetClassOop, selector, methodOop);
+            ObjectMemory.AddMethod(targetClassOop, selector, methodOop);
 
             if ((Program.RuntimeOptions?.EnableColdStartLogging ?? false) &&
                 (selector == "hash" || selector == "=" || selector == "new"))
@@ -152,7 +152,7 @@ public static class ColdStartMethodInstaller
         // Symbol: starts with #
         if (literal.StartsWith("#"))
         {
-            return ObjectMemoryNew.InternSymbol(literal.Substring(1));
+            return ObjectMemory.InternSymbol(literal.Substring(1));
         }
 
         // SmallInteger: numeric value
@@ -165,7 +165,7 @@ public static class ColdStartMethodInstaller
         if (literal.StartsWith("'") && literal.EndsWith("'"))
         {
             var stringValue = literal.Substring(1, literal.Length - 2);
-            return ObjectMemoryNew.CreateString(stringValue);
+            return ObjectMemory.CreateString(stringValue);
         }
 
         // Character: $X format

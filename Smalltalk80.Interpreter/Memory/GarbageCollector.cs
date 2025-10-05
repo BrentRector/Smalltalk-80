@@ -6,7 +6,7 @@ using Smalltalk80.Interpreter.Config;
 
 /// <summary>
 /// Mark-and-sweep garbage collector for the new SObjectRef-based architecture.
-/// Works directly with ObjectTable and ObjectMemoryNew instead of SObject instances.
+/// Works directly with ObjectTable and ObjectMemory instead of SObject instances.
 /// </summary>
 public sealed class GarbageCollector
 {
