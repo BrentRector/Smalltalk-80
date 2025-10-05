@@ -14,6 +14,7 @@ public sealed class ColdStartDataGenerator
 {
     private readonly Dictionary<string, ClassInitializationData> _classData = new();
     private readonly Dictionary<string, ClassDefinitionNode> _classDefinitions = new();
+    private readonly List<AST.InitializationExpression> _initExpressions = new();
 
     /// <summary>
     /// Represents all data needed to initialize a single Smalltalk class during cold start.
@@ -86,6 +87,13 @@ public sealed class ColdStartDataGenerator
         foreach (var classDef in result.Classes)
         {
             AnalyzeClass(classDef);
+        }
+
+        // Third pass: store initialization expressions in file order
+        _initExpressions.Clear();
+        if (result.InitializationExpressions != null)
+        {
+            _initExpressions.AddRange(result.InitializationExpressions);
         }
     }
 
@@ -235,6 +243,9 @@ public sealed class ColdStartDataGenerator
 
         // Generate detailed class data
         GenerateClassDataStructures(output);
+
+        // Generate initialization expressions
+        GenerateInitializationExpressions(output);
 
         output.AppendLine("}");
 
@@ -469,12 +480,13 @@ public sealed class ColdStartDataGenerator
 
     /// <summary>
     /// C# keywords that need to be prefixed with @ if used as identifiers.
+    /// Includes C# 13 contextual keywords like 'file'.
     /// </summary>
     private static readonly HashSet<string> CSharpKeywords = new(StringComparer.Ordinal)
     {
         "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked",
         "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else",
-        "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for",
+        "enum", "event", "explicit", "extern", "false", "file", "finally", "fixed", "float", "for",
         "foreach", "goto", "if", "implicit", "in", "int", "interface", "internal", "is", "lock",
         "long", "namespace", "new", "null", "object", "operator", "out", "override", "params",
         "private", "protected", "public", "readonly", "ref", "return", "sbyte", "sealed", "short",
@@ -570,13 +582,26 @@ public sealed class ColdStartDataGenerator
 
     /// <summary>
     /// Escapes a string for use in XML comments.
+    /// Truncates long strings and removes newlines since XML comments must be single-line.
     /// </summary>
     private static string EscapeXmlComment(string input)
     {
         if (string.IsNullOrEmpty(input))
             return "";
 
-        return input
+        // Replace newlines with spaces
+        var cleaned = input
+            .Replace("\r\n", " ")
+            .Replace("\n", " ")
+            .Replace("\r", " ");
+
+        // Truncate if too long (over 200 characters)
+        if (cleaned.Length > 200)
+        {
+            cleaned = cleaned.Substring(0, 197) + "...";
+        }
+
+        return cleaned
             .Replace("&", "&amp;")
             .Replace("<", "&lt;")
             .Replace(">", "&gt;")
@@ -599,5 +624,88 @@ public sealed class ColdStartDataGenerator
             .Sum(m => m.LiteralsSize);
 
         return (classCount, methodCount, bytecodeSize, literals);
+    }
+
+    /// <summary>
+    /// Generates C# code for initialization expressions that should be executed after cold start.
+    /// These expressions are executed in file order and typically initialize class-side state.
+    /// </summary>
+    private void GenerateInitializationExpressions(StringBuilder output)
+    {
+        output.AppendLine("    /// <summary>");
+        output.AppendLine("    /// Initialization expressions to execute after cold start completes.");
+        output.AppendLine($"    /// Total expressions: {_initExpressions.Count}");
+        output.AppendLine("    /// These are executed in file order to initialize class-side state.");
+        output.AppendLine("    /// </summary>");
+        output.AppendLine("    public static class InitializationExpressions");
+        output.AppendLine("    {");
+        output.AppendLine($"        /// <summary>Total number of initialization expressions.</summary>");
+        output.AppendLine($"        public const int Count = {_initExpressions.Count};");
+        output.AppendLine();
+
+        // Generate array of source text for display/debugging
+        output.AppendLine("        /// <summary>Source text of each initialization expression for display.</summary>");
+        output.AppendLine("        public static readonly string[] Sources = new string[]");
+        output.AppendLine("        {");
+        foreach (var expr in _initExpressions)
+        {
+            output.AppendLine($"            \"{EscapeCSharpString(expr.Source)}\",");
+        }
+        output.AppendLine("        };");
+        output.AppendLine();
+
+        // Generate each expression's data
+        for (int i = 0; i < _initExpressions.Count; i++)
+        {
+            var expr = _initExpressions[i];
+            output.AppendLine($"        /// <summary>");
+            output.AppendLine($"        /// Expression {i}: {EscapeXmlComment(expr.Source)}");
+            output.AppendLine($"        /// </summary>");
+            output.AppendLine($"        public static class Expr{i}");
+            output.AppendLine("        {");
+
+            // Source
+            output.AppendLine($"            public const string Source = \"{EscapeCSharpString(expr.Source)}\";");
+
+            // Metadata
+            output.AppendLine($"            public const int NumTemps = {expr.NumTemps};");
+            output.AppendLine($"            public const int StackDepth = {expr.StackDepth};");
+
+            // Bytecode array
+            output.AppendLine("            public static readonly byte[] Bytecode = new byte[]");
+            output.AppendLine("            {");
+            output.Append("                ");
+            for (int j = 0; j < expr.Bytecode.Count; j++)
+            {
+                output.Append($"{expr.Bytecode[j]}");
+                if (j < expr.Bytecode.Count - 1)
+                {
+                    output.Append(", ");
+                    if ((j + 1) % 16 == 0)
+                    {
+                        output.AppendLine();
+                        output.Append("                ");
+                    }
+                }
+            }
+            output.AppendLine();
+            output.AppendLine("            };");
+
+            // Literals array (as JSON)
+            output.AppendLine($"            public static readonly string[] LiteralsJson = new string[]");
+            output.AppendLine("            {");
+            foreach (var literal in expr.Literals)
+            {
+                var literalJson = JsonSerializer.Serialize(literal);
+                output.AppendLine($"                {EscapeCSharpStringLiteral(literalJson)},");
+            }
+            output.AppendLine("            };");
+
+            output.AppendLine("        }");
+            output.AppendLine();
+        }
+
+        output.AppendLine("    }");
+        output.AppendLine();
     }
 }

@@ -61,7 +61,8 @@ file sealed class Program
         Console.WriteLine("      - Initialization data with exact sizes (ColdStartData.cs)");
         Console.WriteLine("      - Pre-intern symbol list (ColdStartLiterals.cs)");
         Console.WriteLine("    Options:");
-        Console.WriteLine("      --classes    REQUIRED: Comma-separated list of cold start classes");
+        Console.WriteLine("      --classes    REQUIRED: Comma-separated list of cold start classes,");
+        Console.WriteLine("                   or 'ALL' to include all classes from the source file");
         Console.WriteLine();
         Console.WriteLine("  --help, -h, /?");
         Console.WriteLine("    Shows this help message.");
@@ -202,6 +203,7 @@ file sealed class Program
         {
             Console.Error.WriteLine("Error: --classes option is required");
             Console.Error.WriteLine("Usage: Smalltalk80.Compiler generate-coldstart <input.st> <output-dir> --classes Class1,Class2,...");
+            Console.Error.WriteLine("       Use --classes ALL to generate cold start for all classes in the source file");
             return 1;
         }
 
@@ -223,6 +225,13 @@ file sealed class Program
 
             // Parse the Smalltalk source
             var result = ParseSmalltalkSource(inputFile);
+
+            // Check if "ALL" was specified
+            if (classFilter.Count == 1 && classFilter.First().Equals("ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Generating cold start for ALL classes in source file");
+                classFilter = result.Classes.Select(c => c.Name).ToHashSet();
+            }
 
             // Expand the filter to include all superclasses
             var expandedClasses = ExpandClassFilterWithSuperclasses(classFilter, result.Classes);

@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>13</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS8981</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
+    <AssemblyName>Smalltalk80.FullInterpreter</AssemblyName>
+    <RootNamespace>Smalltalk80.Interpreter</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude old architecture files from compilation -->
+    <Compile Remove="**\*.OLD.cs" />
+  </ItemGroup>
+
+  <!-- Auto-generate cold start artifacts from Smalltalk-80.st when source changes -->
+  <PropertyGroup>
+    <SmalltalkSourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SmalltalkSourceFile>
+    <GeneratedOutputDir>$(MSBuildProjectDirectory)\Generated</GeneratedOutputDir>
+
+    <!-- Cold start classes: ALL classes from Smalltalk-80.st (Full System) -->
+    <!-- This FullInterpreter includes the complete Smalltalk-80 system including: -->
+    <!--   - All core classes (Object, Behavior, Class, etc.) -->
+    <!--   - All collection classes (Array, Dictionary, Set, OrderedCollection, etc.) -->
+    <!--   - All compiler classes (Parser, Scanner, Compiler, ParseNode, etc.) -->
+    <!--   - All UI/graphics classes (View, Controller, Form, BitBlt, etc.) -->
+    <!--   - All numerical classes (Integer, Float, Fraction, Point, Rectangle, etc.) -->
+    <!--   - All process/concurrency classes (Process, Semaphore, ProcessorScheduler, etc.) -->
+    <ColdStartClasses>ALL</ColdStartClasses>
+
+    <!-- Output file paths - all in Generated/ folder -->
+    <LayoutsOutput>$(GeneratedOutputDir)\Layouts.cs</LayoutsOutput>
+    <ColdStartDataOutput>$(GeneratedOutputDir)\ColdStartData.cs</ColdStartDataOutput>
+    <ColdStartLiteralsOutput>$(GeneratedOutputDir)\ColdStartLiterals.cs</ColdStartLiteralsOutput>
+  </PropertyGroup>
+
+  <Target Name="GenerateColdStartArtifacts"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(SmalltalkSourceFile)"
+          Outputs="$(LayoutsOutput);$(ColdStartDataOutput);$(ColdStartLiteralsOutput)"
+          Condition="'$(SkipColdStartGeneration)' != 'true'">
+
+    <Message Text="Smalltalk source is newer than generated files - regenerating cold start artifacts..." Importance="high" />
+
+    <!-- Create temp output directory -->
+    <MakeDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
+
+    <!-- Run the compiler to generate all cold start artifacts -->
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; --configuration Release -- generate-coldstart &quot;$(SmalltalkSourceFile)&quot; &quot;$(MSBuildProjectDirectory)\GeneratedTemp&quot; --classes $(ColdStartClasses)"
+          WorkingDirectory="$(MSBuildProjectDirectory)\.." />
+
+    <!-- Copy all generated files to Generated/ folder -->
+    <Message Text="Copying generated files to Generated/" Importance="high" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\Layouts.cs"
+          DestinationFiles="$(LayoutsOutput)"
+          SkipUnchangedFiles="false" />
+
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartData.cs"
+          DestinationFiles="$(ColdStartDataOutput)"
+          SkipUnchangedFiles="false" />
+
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartLiterals.cs"
+          DestinationFiles="$(ColdStartLiteralsOutput)"
+          SkipUnchangedFiles="false" />
+
+    <!-- Clean up temp directory -->
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
+
+    <Message Text="Cold start artifacts regenerated successfully" Importance="high" />
+  </Target>
+
+</Project>

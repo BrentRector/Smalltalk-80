@@ -95,8 +95,11 @@ namespace Smalltalk80.Compiler
     public class BytecodeEmitter
     {
         private readonly List<byte> bytecodes = new();
-        private readonly List<object> literals = new();
-        
+
+        // Separate collections for selectors and other literals
+        private readonly List<Symbol> selectors = new();
+        private readonly List<object> otherLiterals = new();
+
         private readonly Dictionary<object, int> literalIndex = new();
         
         /// <summary>
@@ -105,10 +108,25 @@ namespace Smalltalk80.Compiler
         public byte[] GetBytecodes() => bytecodes.ToArray();
         
         /// <summary>
-        /// Gets the literal frame.
+        /// Gets the literal frame with selectors first for optimal bytecode generation.
+        /// Blue Book convention: Selectors should be at low indices (0-15) to enable
+        /// efficient bytecode encoding (208-255 range for sends with 0-2 args).
         /// </summary>
-        public object[] GetLiterals() => literals.ToArray();
-        
+        public object[] GetLiterals()
+        {
+            // Build literal array: selectors first, then other literals
+            var result = new object[selectors.Count + otherLiterals.Count];
+            int index = 0;
+
+            foreach (var selector in selectors)
+                result[index++] = selector;
+
+            foreach (var literal in otherLiterals)
+                result[index++] = literal;
+
+            return result;
+        }
+
         /// <summary>
         /// Gets the current instruction pointer.
         /// </summary>
@@ -302,7 +320,8 @@ namespace Smalltalk80.Compiler
         }
         
         /// <summary>
-        /// Adds a literal to the frame and returns its index.
+        /// Adds a literal to the frame and returns its final index.
+        /// Selectors are placed first (indices 0-N), other literals follow.
         /// </summary>
         public int AddLiteral(object literal)
         {
@@ -312,9 +331,21 @@ namespace Smalltalk80.Compiler
                 if (LiteralsEqual(kvp.Key, literal))
                     return kvp.Value;
             }
-            
-            var index = literals.Count;
-            literals.Add(literal);
+
+            int index;
+            if (literal is Symbol symbol)
+            {
+                // Add to selectors list (will be at beginning of literal frame)
+                index = selectors.Count;
+                selectors.Add(symbol);
+            }
+            else
+            {
+                // Add to other literals (will come after selectors in literal frame)
+                index = selectors.Count + otherLiterals.Count;
+                otherLiterals.Add(literal);
+            }
+
             literalIndex[literal] = index;
             return index;
         }
@@ -434,24 +465,27 @@ namespace Smalltalk80.Compiler
         
         public void PushLiteralVariable(string name)
         {
-            // The Association for this variable should have already been added
-            // during the literal collection phase. Find its index.
+            // Find or add the Association for this variable
             int index = -1;
-            for (int i = 0; i < literals.Count; i++)
+
+            // Search in otherLiterals for existing Association
+            for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (literals[i] is Association assoc && assoc.Key.Value == name)
+                if (otherLiterals[i] is Association assoc && assoc.Key.Value == name)
                 {
-                    index = i;
+                    // Found - calculate final index (after selectors)
+                    index = selectors.Count + i;
                     break;
                 }
             }
-            
+
             if (index == -1)
             {
-                throw new InvalidOperationException($"Association for variable '{name}' not found in literals. " +
-                    "This should have been added during the literal collection phase.");
+                // Not found - add new Association
+                var association = new Association(new Symbol(name), new NilObject());
+                index = AddLiteral(association);
             }
-            
+
             if (index <= 31)
             {
                 // Bytecodes 64-95: Push Literal Variable #0 to #31
@@ -542,24 +576,27 @@ namespace Smalltalk80.Compiler
         
         public void StoreLiteralVariable(string name)
         {
-            // The Association for this variable should have already been added
-            // during the literal collection phase. Find its index.
+            // Find or add the Association for this variable
             int index = -1;
-            for (int i = 0; i < literals.Count; i++)
+
+            // Search in otherLiterals for existing Association
+            for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (literals[i] is Association assoc && assoc.Key.Value == name)
+                if (otherLiterals[i] is Association assoc && assoc.Key.Value == name)
                 {
-                    index = i;
+                    // Found - calculate final index (after selectors)
+                    index = selectors.Count + i;
                     break;
                 }
             }
-            
+
             if (index == -1)
             {
-                throw new InvalidOperationException($"Association for variable '{name}' not found in literals. " +
-                    "This should have been added during the literal collection phase.");
+                // Not found - add new Association
+                var association = new Association(new Symbol(name), new NilObject());
+                index = AddLiteral(association);
             }
-            
+
             Emit(130); // Extended pop and store (bytecode 130 pops the value after storing)
             Emit((byte)(0xC0 | index));  // Store literal variable: 11xxxxxx (top 2 bits = 11 for literal var, bottom 6 bits = index)
             // NO Pop() here - bytecode 130 already pops the stack!
