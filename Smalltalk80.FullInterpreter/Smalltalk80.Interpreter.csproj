@@ -32,60 +32,43 @@
     <Compile Remove="**\*.OLD.cs" />
   </ItemGroup>
 
-  <!-- Auto-generate cold start artifacts from Smalltalk-80.st when source changes -->
+  <!-- Auto-generate cold start JSON from Smalltalk-80.st when source changes -->
   <PropertyGroup>
     <SmalltalkSourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SmalltalkSourceFile>
-    <GeneratedOutputDir>$(MSBuildProjectDirectory)\Generated</GeneratedOutputDir>
-
-    <!-- Cold start classes: ALL classes from Smalltalk-80.st (Full System) -->
-    <!-- This FullInterpreter includes the complete Smalltalk-80 system including: -->
-    <!--   - All core classes (Object, Behavior, Class, etc.) -->
-    <!--   - All collection classes (Array, Dictionary, Set, OrderedCollection, etc.) -->
-    <!--   - All compiler classes (Parser, Scanner, Compiler, ParseNode, etc.) -->
-    <!--   - All UI/graphics classes (View, Controller, Form, BitBlt, etc.) -->
-    <!--   - All numerical classes (Integer, Float, Fraction, Point, Rectangle, etc.) -->
-    <!--   - All process/concurrency classes (Process, Semaphore, ProcessorScheduler, etc.) -->
-    <ColdStartClasses>ALL</ColdStartClasses>
-
-    <!-- Output file paths - all in Generated/ folder -->
-    <LayoutsOutput>$(GeneratedOutputDir)\Layouts.cs</LayoutsOutput>
-    <ColdStartDataOutput>$(GeneratedOutputDir)\ColdStartData.cs</ColdStartDataOutput>
-    <ColdStartLiteralsOutput>$(GeneratedOutputDir)\ColdStartLiterals.cs</ColdStartLiteralsOutput>
+    <ColdStartJsonOutput>$(MSBuildProjectDirectory)\Generated\coldstart.json</ColdStartJsonOutput>
   </PropertyGroup>
 
-  <Target Name="GenerateColdStartArtifacts"
+  <Target Name="GenerateColdStartJson"
           BeforeTargets="BeforeBuild"
           Inputs="$(SmalltalkSourceFile)"
-          Outputs="$(LayoutsOutput);$(ColdStartDataOutput);$(ColdStartLiteralsOutput)"
+          Outputs="$(ColdStartJsonOutput)"
           Condition="'$(SkipColdStartGeneration)' != 'true'">
 
-    <Message Text="Smalltalk source is newer than generated files - regenerating cold start artifacts..." Importance="high" />
+    <Message Text="Smalltalk source is newer than coldstart.json - regenerating..." Importance="high" />
 
-    <!-- Create temp output directory -->
-    <MakeDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
+    <!-- Create Generated directory if it doesn't exist -->
+    <MakeDir Directories="$(MSBuildProjectDirectory)\Generated" />
 
-    <!-- Run the compiler to generate all cold start artifacts -->
-    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; --configuration Release -- generate-coldstart &quot;$(SmalltalkSourceFile)&quot; &quot;$(MSBuildProjectDirectory)\GeneratedTemp&quot; --classes $(ColdStartClasses)"
-          WorkingDirectory="$(MSBuildProjectDirectory)\.." />
+    <!-- Run compiler to generate JSON -->
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj&quot; --configuration Release -- &quot;$(SmalltalkSourceFile)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)\..\Smalltalk-80 Source" />
 
-    <!-- Copy all generated files to Generated/ folder -->
-    <Message Text="Copying generated files to Generated/" Importance="high" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\Layouts.cs"
-          DestinationFiles="$(LayoutsOutput)"
+    <!-- Copy generated JSON to Generated folder -->
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.json"
+          DestinationFiles="$(ColdStartJsonOutput)"
           SkipUnchangedFiles="false" />
 
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartData.cs"
-          DestinationFiles="$(ColdStartDataOutput)"
-          SkipUnchangedFiles="false" />
-
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\GeneratedTemp\ColdStartLiterals.cs"
-          DestinationFiles="$(ColdStartLiteralsOutput)"
-          SkipUnchangedFiles="false" />
-
-    <!-- Clean up temp directory -->
-    <RemoveDir Directories="$(MSBuildProjectDirectory)\GeneratedTemp" />
-
-    <Message Text="Cold start artifacts regenerated successfully" Importance="high" />
+    <Message Text="Cold start JSON regenerated: $(ColdStartJsonOutput)" Importance="high" />
   </Target>
+
+  <!-- Mark old generated C# as content (not compiled) for reference only -->
+  <ItemGroup>
+    <Compile Remove="Generated\*.cs" />
+    <Content Include="Generated\*.cs">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <!-- Ensure coldstart.json is copied to output directory -->
+    <None Include="Generated\coldstart.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-10-04
+**Last Updated**: 2025-10-05
 **Status**: Current Standing Guidance
-**Current Phase**: Graphics & UI Implementation Complete (80% primitive coverage)
+**Current Phase**: JSON Cold Start Migration - ST* Struct Removal In Progress
 
 ## Primary Documentation Reference
 
@@ -80,12 +80,27 @@ All development work must align with the architecture documented in that file. B
 - SystemDictionary reference
 
 ✅ **Shared (static):**
-- Generated layouts (ColdStartData.cs, Layouts.cs)
+- JSON cold-start schema (coldstart-v1.0.0.schema.json)
 - Bytecode constants
 - Blue Book specifications
 - Primitive implementations
 
 ❌ **Never use static for VM state** - prevents running multiple VMs.
+
+### 6. JSON Cold Start Format
+
+**All cold-start data is now in JSON format:**
+
+✅ **Correct:**
+- Compiler generates `Smalltalk-80.json` from source (11MB, compresses to 1.2MB)
+- Schema-validated JSON conforming to `docs/schemas/coldstart-v1.0.0.schema.json`
+- LocalId-based references resolved by interpreter loader
+- Deterministic install order phases
+
+❌ **Incorrect:**
+- Using generated C# code (ColdStartData.cs, Layouts.cs) - these are deprecated
+- Hardcoding object IDs in compiler - use stable localIds instead
+- Skipping schema validation
 
 ### 5. Source File Immutability
 
@@ -109,21 +124,37 @@ All development work must align with the architecture documented in that file. B
 
 ```
 Smalltalk80.Interpreter/
-├── ColdStart/                # Bootstrap system
-│   ├── ColdStartBootstrap.cs # 4-pass + 2-phase orchestrator
-│   ├── SymbolTableBuilder.cs # USTable creation
-│   └── ...
+├── ColdStart/                # JSON-based bootstrap system
+│   ├── JsonColdStartBootstrap.cs # 10-phase orchestrator
+│   ├── ColdStartLoader.cs        # JSON deserialization + LocalId registry
+│   ├── SymbolInterning.cs        # Two-phase symbol creation
+│   ├── ClassAllocator.cs         # Bootstrap/core class allocation
+│   ├── ClassPopulator.cs         # Populate class fields
+│   ├── ObjectAllocator.cs        # Pool dictionaries, arrays, etc.
+│   ├── MethodInstaller.cs        # CompiledMethod creation
+│   ├── SystemDictionaryCreator.cs # Smalltalk global dictionary
+│   └── PatchApplicator.cs        # Forward reference resolution
 ├── Core/
 │   ├── Objects/             # Object implementations
 │   ├── Values/              # SObjectRef, SmallInteger
-│   └── BlueBook/            # Blue Book compliance layer
+│   └── BlueBook/            # Blue Book compliance layer (LayoutManagement)
 ├── Memory/
 │   ├── ObjectMemory.cs      # Table-based storage
 │   ├── GarbageCollectorNew.cs # Mark-and-sweep GC
 │   └── SpecialObjectsArray.cs # 5-field struct
-├── Execution/               # Bytecode execution
-└── Primitives/              # VM primitives
+├── Execution/               # Bytecode execution (MIGRATING)
+│   └── Interpreter.cs       # 268 ST* references remain
+└── Primitives/              # VM primitives (MIGRATING)
+    └── ControlPrimitives.cs # 54 Generated namespace references remain
 ```
+
+**Migration Status**:
+- ✅ ColdStart/ - Fully migrated to JSON + LayoutManagement
+- ✅ Memory/SpecialObjectsArray.cs - Fixed to use LayoutManagement
+- ✅ Core/BlueBook/SObjectRefClassExtensions.cs - All 6 ST* references converted
+- ⏳ Execution/Interpreter.cs - 68 ST* references (STMethodContext, STBlockContext)
+- ⏳ Primitives/ControlPrimitives.cs - 54 Generated namespace references
+- ⏳ Core/BlueBook/BlueBookFactory.cs - Various ST* type references
 
 ### Testing and Validation
 
@@ -211,7 +242,93 @@ var instance = ObjectMemoryNew.CreateInstance(...);
 SystemDictionary.StoreGlobal("MyGlobal", instance);
 ```
 
-## Grammar and Parser
+### ❌ Mistake 5: Using ST* Structs After Migration
+
+**Wrong:**
+```csharp
+// ST* structs are DELETED - do not use them!
+STClass classStruct = classRef;
+var superclassRef = classStruct.Superclass;
+```
+
+**Right:**
+```csharp
+// Use LayoutManagement pattern for field access
+var classOop = classRef.AsObjectPointer();
+var superclassIndex = LayoutManagement.Layout.Class_Superclass;
+var superclassRef = ObjectMemory.GetInstanceVariable(classOop, superclassIndex);
+```
+
+### ❌ Mistake 6: Creating Symbols Before Symbol Class Exists
+
+**Wrong:**
+```csharp
+// Phase 2 bootstrap - Symbol class doesn't exist yet!
+public void InternAll()
+{
+    foreach (var symbolText in symbols)
+    {
+        var symbolRef = ObjectMemory.CreateSymbol(symbolText); // CRASH!
+        _symbolMap[symbolText] = symbolRef;
+    }
+}
+```
+
+**Right:**
+```csharp
+// Phase 2: Use temporary C# storage
+public void CreateTemporaryStorage()
+{
+    foreach (var symbolText in symbols)
+    {
+        var placeholderOop = AllocateTemporaryPlaceholder(symbolText);
+        _tempSymbolMap[symbolText] = placeholderOop;
+    }
+}
+
+// Phase 7: Migrate to real Symbol objects after Symbol class exists
+public void MigrateToUSTable()
+{
+    var symbolClassRef = _loader.ResolveLocalId("class:Symbol");
+    foreach (var kvp in _tempSymbolMap)
+    {
+        var symbolRef = CreateRealSymbol(kvp.Key, symbolClassRef);
+        AddToUSTable(symbolRef);
+    }
+}
+```
+
+## Compiler
+
+### Generating Cold Start JSON
+
+The compiler reads Smalltalk-80 file-out format and generates JSON cold-start images:
+
+```bash
+# Generate JSON from Smalltalk source
+cd "Smalltalk-80 Source"
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- Smalltalk-80.st
+
+# Output
+Compiling Smalltalk-80.st...
+Generated Smalltalk-80.json
+  Symbols: 3914
+  Strings: 6532
+  Classes: 474
+  Methods: 4640
+  Init expressions: 285
+```
+
+**Compiler output:**
+- Input: `Smalltalk-80.st` (file-out format)
+- Output: `Smalltalk-80.json` (11MB uncompressed, 1.2MB gzipped)
+- Schema: Conforms to `docs/schemas/coldstart-v1.0.0.schema.json`
+
+**Key files:**
+- `Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs` - Main JSON generator
+- `Smalltalk80.Compiler/AST/FileInFormatAstBuilder.cs` - ANTLR4 AST builder
+- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Bytecode generation
+- `Smalltalk80.Compiler/Program.cs` - CLI entry point
 
 ### ANTLR4 Generation
 
@@ -235,32 +352,58 @@ Use `Smalltalk-80 Source/Smalltalk-80.st` (thousands of lines) to validate:
 - Grammar changes
 - Parser correctness
 - Syntax assumptions
+- Compiler JSON generation
 
 Note: WS lexer rule drops whitespace - never add whitespace productions in parser.
 
 ## Bootstrap Process
 
-### 4-Pass Class Creation
+### JSON-Based Cold Start
 
-1. **Pass 1**: Bootstrap classes (Object, UndefinedObject, Behavior, ClassDescription, Class, Metaclass)
-2. **Interlude**: Create nil singleton, fix Object.superclass
-3. **Pass 2**: Bootstrap metaclasses (6 metaclasses for bootstrap classes)
-4. **Pass 3**: Wire Metaclass.class = Metaclass (circular reference)
-5. **Pass 4**: Remaining classes + metaclasses (40 classes + 40 metaclasses)
+The interpreter loads cold-start data from `Smalltalk-80.json` (or `coldstart.json`) following a deterministic 10-phase bootstrap process:
 
-### 2-Phase Infrastructure
+**Critical Constraint**: Symbol and String classes don't exist until Phase 3-5, so symbols must be stored in temporary C# storage first, then migrated to USTable after Symbol class is created.
 
-1. **Phase 2.1**: Create SystemDictionary, register all classes
-2. **Phase 2.2**: Create singletons (true, false, ProcessorScheduler)
-3. **Phase 2.3**: Install all methods (1,299 compiled methods)
-4. **Phase 2.4**: Create USTable, migrate bootstrap symbols
+**Bootstrap Algorithm (10 Phases):**
+
+1. **Parse & Validate**: Load JSON, validate against schema (docs/schemas/coldstart-v1.0.0.schema.json)
+2. **Create Temporary Storage**: Allocate placeholder OOPs for symbols/strings in C# Dictionary (Symbol class doesn't exist yet!)
+3. **Allocate Objects**: Process install order phases sequentially
+   - Bootstrap classes (Object, Behavior, Class, Metaclass, etc.)
+   - Core classes (all remaining classes + metaclasses)
+   - Pool dictionaries
+   - Methods (grouped by class for locality)
+4. **Create SystemDictionary**: Allocate Smalltalk global dictionary and populate with all classes, pools, system globals
+5. **Migrate Symbols to USTable**: Now Symbol class exists - create real Symbol objects, migrate from temp storage to USTable using Smalltalk hash algorithm
+6. **Apply Patches**: Resolve forward references (Association values, metaclass wiring)
+7. **Execute Init Expressions**: Run global expressions (class initialize, comments, etc.)
+8. **Create Special Objects Array**: Build 5-element SOA structure (nil, false, true, Smalltalk, ProcessorScheduler)
+9. **Verify Reachability**: Ensure all objects reachable from SOA roots
+10. **Finalize**: Initialize GC and complete bootstrap
+
+### Install Order Phases
+
+The JSON file specifies exact installation sequence:
+
+```json
+{
+  "phases": [
+    { "name": "Bootstrap Classes", "kind": "classes", "localIds": [...] },
+    { "name": "Core Classes", "kind": "classes", "localIds": [...] },
+    { "name": "Pool Dictionaries", "kind": "objects", "localIds": [...] },
+    { "name": "Methods", "kind": "methods", "localIds": [...] },
+    { "name": "Init Expressions", "kind": "initExpressions", "localIds": [...] }
+  ]
+}
+```
 
 ### Critical Constraints
 
-1. **Metaclass Instance Variables**: All metaclasses have exactly 7 instance variables (Behavior:4 + ClassDescription:2 + Metaclass:1)
-2. **Symbol Pre-Interning**: Pre-intern symbols like "SymbolTable" before USTable creation
-3. **Dictionary Sizing**: Pre-size dictionaries correctly (no growth during bootstrap)
-4. **Deterministic OOPs**: Same objects get same OOPs on every run
+1. **LocalId Resolution**: Compiler emits stable localIds (e.g., `class:Object`), loader maps to runtime OOPs
+2. **Symbol Pre-Interning**: All symbols interned before use (from JSON symbols array)
+3. **Dictionary Sizing**: Dictionaries pre-sized correctly based on JSON metadata
+4. **Deterministic OOPs**: Same objects get same OOPs on every run (from install order)
+5. **Zero Garbage**: No temporary objects created during bootstrap
 
 ## Debugging and Diagnostics
 
@@ -357,6 +500,81 @@ Output shows inheritance with box-drawing characters (├─, └─).
 - **Smalltalk-80 Blue Book** - Goldberg & Robson (1983) - The specification
 - **Smalltalk-80.st** - Reference Smalltalk-80 source code
 
+## Current Migration Status
+
+### Completed Work (Previous Session)
+
+✅ **JSON Schema & Compiler**:
+- Created `docs/schemas/coldstart-v1.0.0.schema.json` with complete specification
+- Implemented `ColdStartJsonGenerator.cs` to emit schema-compliant JSON
+- Compiler successfully generates `Smalltalk-80.json` (11MB, compresses to 1.2MB)
+
+✅ **Cold Start Bootstrap System**:
+- Implemented 10-phase `JsonColdStartBootstrap.cs` with correct sequencing
+- Fixed bootstrap chicken-and-egg: temporary C# storage → class creation → USTable migration
+- Created `SymbolInterning.cs` with two-phase approach (CreateTemporaryStorage + MigrateToUSTable)
+- Implemented `SystemDictionaryCreator.cs` for Smalltalk global dictionary population
+- Fixed all JSON schema property mismatches (Format, Bytecodes, Literals, HomeClassLocalId, etc.)
+
+✅ **Legacy Code Removal**:
+- Deleted 8 legacy ST* struct-based cold start files (~50KB removed)
+- Fixed `SpecialObjectsArray.cs` to use LayoutManagement pattern
+- Converted `SObjectRefClassExtensions.cs` (6 ST* references → LayoutManagement)
+- Added `ObjectMemory.SetClass()` method for metaclass wiring
+- Updated `VirtualMachine.cs` to use `JsonColdStartBootstrap`
+
+### Remaining Work (Current Session)
+
+⏳ **Fix Compilation Errors** (268 total across 3 files):
+
+1. **Interpreter.cs** (68 errors):
+   - 36 `STMethodContext` references
+   - 32 `STBlockContext` references
+   - Pattern: Convert to `LayoutManagement.Layout.MethodContext_*` field access
+
+2. **ControlPrimitives.cs** (54 errors):
+   - Generated namespace references (old ST* structs)
+   - Convert to LayoutManagement pattern
+
+3. **BlueBookFactory.cs** (various errors):
+   - ST* type references (Process, Semaphore, Dictionary, etc.)
+   - Convert to LayoutManagement pattern
+
+4. **SystemDictionary.cs** (references to deleted ColdStartBootstrap):
+   - Remove old bootstrap references
+   - Update to use JsonColdStartBootstrap
+
+### Next Steps
+
+1. **Systematic ST* Conversion**:
+   ```csharp
+   // Pattern to apply throughout codebase:
+
+   // BEFORE (ST* struct):
+   STMethodContext ctx = contextRef;
+   var senderRef = ctx.Sender;
+
+   // AFTER (LayoutManagement):
+   var ctxOop = contextRef.AsObjectPointer();
+   var senderIndex = LayoutManagement.Layout.MethodContext_Sender;
+   var senderRef = ObjectMemory.GetInstanceVariable(ctxOop, senderIndex);
+   ```
+
+2. **Build Verification**:
+   - Achieve 0 compilation errors
+   - Verify 0 warnings
+   - Test cold start bootstrap with GC validation
+
+3. **Runtime Testing**:
+   - Run: `dotnet run -- repl --gc-log --validate-gc`
+   - Verify: "0 objects collected" on all GC runs
+   - Test: Basic REPL functionality
+
+4. **Documentation Update**:
+   - Update Interpreter-Architecture.md with final migration details
+   - Document LayoutManagement conversion patterns
+   - Update file organization diagrams
+
 ## Summary Checklist
 
 Before submitting any change, verify:
@@ -365,6 +583,9 @@ Before submitting any change, verify:
 - [ ] Zero garbage during cold start
 - [ ] All objects reachable from 5 SOA roots
 - [ ] Per-VM architecture (no static VM state)
+- [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.0.schema.json)
+- [ ] Compiler builds and generates valid JSON
+- [ ] Interpreter builds and loads JSON successfully
 - [ ] Build succeeds (0 errors, 0 warnings)
 - [ ] GC validation passes (0 objects collected)
 - [ ] Documentation updated (if architecture changed)

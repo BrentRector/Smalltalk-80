@@ -54,24 +54,21 @@ public class VirtualMachine
     {
         if (!initialized)
         {
-            // Initialize the Special Objects Array structure
-            SpecialObjectsArray.Initialize();
+            // Phase 1: Execute JSON-based cold start bootstrap
+            // This creates the complete Smalltalk system from coldstart.json
+            var jsonPath = Path.Combine(AppContext.BaseDirectory, "Generated", "coldstart.json");
+            var bootstrap = new JsonColdStartBootstrap(jsonPath);
+            var specialObjectsArray = bootstrap.Execute();
 
-            // Phase 1: Initialize the complete Smalltalk system
-            // This includes the new 4-pass + 2-phase bootstrap architecture
-            SystemDictionary.Reset();
-            SystemDictionary.Initialize();
+            // Initialize the Special Objects Array structure with the bootstrap result
+            SpecialObjectsArray.Initialize(specialObjectsArray);
 
             if (Program.RuntimeOptions.EnableColdStartLogging)
             {
-                Console.WriteLine($"[COLD START] Created {SystemDictionary.GetAllClassNames().Count()} classes with instance variables");
+                Console.WriteLine($"[COLD START] JSON cold start complete");
             }
 
-            // Phase 2: Perform post-cold-start initialization
-            // (Methods have already been installed in the bootstrap Phase 2.3)
-            ColdStartBootstrap.PostColdStartInitialization();
-
-            // Phase 4: Initialize garbage collection with Special Objects Array
+            // Phase 2: Initialize garbage collection with Special Objects Array
             InitializeGarbageCollection();
             
             initialized = true;

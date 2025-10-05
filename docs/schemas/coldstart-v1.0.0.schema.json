@@ -1,0 +1,758 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.0",
+  "title": "Smalltalk-80 ColdStart Image Schema",
+  "description": "Comprehensive schema for emitting a deterministic Smalltalk-80 cold-start bundle. Compiler emits localIds; loader allocates interpreter-native object IDs and resolves localId references.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "symbols",
+    "strings",
+    "optimizedSelectors",
+    "classes",
+    "objects",
+    "methods",
+    "initExpressions",
+    "installOrder",
+    "patches"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "generator", "generatedAt", "sourceChecksum"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Schema version, e.g. 1.0.0",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "generator": {
+          "type": "string",
+          "description": "Compiler tool name and version"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of generation"
+        },
+        "sourceFile": {
+          "type": ["string","null"],
+          "description": "Canonical source file or bundle name"
+        },
+        "sourceChecksum": {
+          "type": "string",
+          "description": "sha256:<hex> of input source for traceability",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "symbolCount": { "type": "integer", "minimum": 0 },
+        "stringCount": { "type": "integer", "minimum": 0 },
+        "classCount": { "type": "integer", "minimum": 0 },
+        "methodCount": { "type": "integer", "minimum": 0 },
+        "objectCount": { "type": "integer", "minimum": 0 },
+        "initExpressionCount": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "symbols": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Canonical interned symbol names; indexable by integer indices used throughout file. Must be unique.",
+      "minItems": 1
+    },
+
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "String literal pool; indexable. Strings may be duplicated (not interned).",
+      "minItems": 0
+    },
+
+    "optimizedSelectors": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 },
+      "description": "Indices into symbols[] that the loader should arrange at low indices for single-byte send encodings (typically reserved for indices 0..15). Loader must ensure these symbols occupy the first N symbol table slots in order.",
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+
+    "primitives": {
+      "type": "object",
+      "description": "Optional table describing primitives (index -> name/signature) for documentation and validation",
+      "properties": {
+        "byIndex": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index","name"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1, "maximum": 255 },
+              "name": { "type": "string" },
+              "signature": { "type": ["string","null"] },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "classes": {
+      "type": "array",
+      "description": "Class and metaclass descriptors. Compiler supplies localId values; loader allocates concrete objects and maps localIds to objectIds.",
+      "items": {
+        "type": "object",
+        "required": [
+          "localId",
+          "nameIndex",
+          "isMetaclass",
+          "format",
+          "instVarNames",
+          "classVarNames",
+          "poolLocalIds",
+          "category"
+        ],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Compiler-provided stable id for this class (e.g., 'class:Object', 'meta:Object'). Must be unique across all localIds in the bundle."
+          },
+          "nameIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for class name"
+          },
+          "isMetaclass": {
+            "type": "boolean",
+            "description": "True if this descriptor is a metaclass"
+          },
+          "metaclassOfLocalId": {
+            "type": ["string","null"],
+            "description": "If isMetaclass=true, localId of the class this is the metaclass of. Null for instance-side classes."
+          },
+          "format": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Blue Book format word (16-bit). Encodes: instance specification (0-4), fixed fields count, indexability, pointer/word/byte kind. See Blue Book Chapter 16 for encoding details."
+          },
+          "instVarNames": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Indices into symbols[] for instance variable names declared by THIS class only (not inherited). Listed in declaration order."
+          },
+          "classVarNames": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Indices into symbols[] for class variable names"
+          },
+          "poolLocalIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "localIds of pool dictionaries (shared pools) used by this class. Each referenced localId must appear in objects[] as a Dictionary."
+          },
+          "superNameIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Index into symbols[] for immediate superclass name. Null means superclass is nil (e.g., Object has no superclass)."
+          },
+          "category": {
+            "type": "string",
+            "description": "Class organization category (e.g., 'Kernel-Objects'). Empty string allowed."
+          },
+          "commentStringIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Index into strings[] for class comment, or null if no comment"
+          },
+          "classSideInitMethodLocalId": {
+            "type": ["string","null"],
+            "description": "Optional localId of a class-side #initialize method to run during cold start after this class is installed. Null if no initializer."
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "objects": {
+      "type": "array",
+      "description": "Concrete object shapes emitted by the compiler (pool dictionaries, global associations, etc.). Compiler provides localId placeholders; loader allocates concrete runtime objects and maps localId -> objectId.",
+      "items": {
+        "type": "object",
+        "required": ["localId","classNameIndex","fields","indexedFields","formatHint"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId for this object (e.g., 'pool:TextConstants', 'assoc:Smalltalk')"
+          },
+          "classNameIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for the object's class name. Loader will resolve to the class object."
+          },
+          "formatHint": {
+            "type": "string",
+            "enum": ["pointers","words","bytes","compiledMethod","custom"],
+            "description": "Hint for loader memory allocation strategy"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Named/fixed fields (non-indexed part). Each field is a discriminated value.",
+            "items": { "$ref": "#/definitions/fieldValue" }
+          },
+          "indexedFields": {
+            "type": "array",
+            "description": "Indexed part (e.g., for Array elements, ByteArray bytes, Dictionary entries). Each value is discriminated.",
+            "items": { "$ref": "#/definitions/fieldValue" }
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "methods": {
+      "type": "array",
+      "description": "All compiled methods (both class and instance methods). Compiler provides method localId; loader creates CompiledMethod objects and installs in method dictionaries.",
+      "items": {
+        "type": "object",
+        "required": ["localId","homeClassLocalId","selectorIndex","header","literals","bytecodes"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId (e.g., 'method:Object>>hash', 'method:Object_class>>new')"
+          },
+          "homeClassLocalId": {
+            "type": "string",
+            "description": "localId of the class or metaclass that owns this method"
+          },
+          "selectorIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for selector"
+          },
+          "header": {
+            "type": "object",
+            "required": ["word"],
+            "description": "Blue Book method header (16-bit word). Can be encoded as single word or expanded fields for clarity.",
+            "properties": {
+              "word": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535,
+                "description": "Canonical 16-bit header word encoding: [7 bits literal count | 5 bits temp count | 1 bit large context | 3 bits arg count OR 8 bits primitive index]"
+              },
+              "literalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127,
+                "description": "Optional: derived from header word, included for validation/readability"
+              },
+              "tempCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31,
+                "description": "Optional: derived from header word"
+              },
+              "argCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7,
+                "description": "Optional: derived from header word if not primitive"
+              },
+              "primitiveIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255,
+                "description": "Optional: 0 if no primitive, 1-255 otherwise"
+              },
+              "largeContext": {
+                "type": "boolean",
+                "description": "Optional: true if method needs extended stack (>32 slots)"
+              }
+            },
+            "additionalProperties": false
+          },
+          "literals": {
+            "type": "array",
+            "description": "Literal frame for this method. Each entry is a discriminated literal. Order matters: selectors and associations typically come first.",
+            "items": { "$ref": "#/definitions/literalValue" }
+          },
+          "bytecodes": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+                "description": "Bytecode array as integer sequence"
+              },
+              {
+                "type": "string",
+                "description": "Base64-encoded bytecode for compactness. Loader must decode."
+              }
+            ]
+          },
+          "source": {
+            "type": ["string","null"],
+            "description": "Optional Smalltalk source text for this method"
+          },
+          "fileIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Optional index into sourceFiles[] manifest"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "initExpressions": {
+      "type": "array",
+      "description": "Top-level initialization expressions (DoIts) to execute during cold start. Each is compiled like a method but has no home class. Executed in initOrder sequence.",
+      "items": {
+        "type": "object",
+        "required": ["localId","header","literals","bytecodes"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId (e.g., 'init:000', 'init:Character-initialize')"
+          },
+          "header": { "$ref": "#/properties/methods/items/properties/header" },
+          "literals": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/literalValue" }
+          },
+          "bytecodes": { "$ref": "#/properties/methods/items/properties/bytecodes" },
+          "source": {
+            "type": ["string","null"],
+            "description": "Original Smalltalk expression source"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "installOrder": {
+      "type": "object",
+      "required": ["phases"],
+      "description": "Deterministic installation sequence. Loader must process in this order to avoid forward-reference issues.",
+      "properties": {
+        "phases": {
+          "type": "array",
+          "description": "Sequential installation phases. Each phase lists localIds to process.",
+          "items": {
+            "type": "object",
+            "required": ["name","kind","localIds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Human-readable phase name (e.g., 'Bootstrap Classes', 'Pool Dictionaries', 'Methods')"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["classes","objects","methods","initExpressions","patches"],
+                "description": "Type of entities in this phase"
+              },
+              "localIds": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Ordered list of localIds to install in this phase"
+              },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "patches": {
+      "type": "array",
+      "description": "Explicit patch operations the loader must apply after allocation. Resolves forward references, circular structures, and Association values.",
+      "items": {
+        "type": "object",
+        "required": ["patchId","target","operation","value"],
+        "properties": {
+          "patchId": {
+            "type": "string",
+            "description": "Unique identifier for this patch (e.g., 'patch:Object-assoc-value')"
+          },
+          "target": {
+            "type": "object",
+            "required": ["kind"],
+            "description": "Describes what to patch",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "methodLiteral",
+                  "objectField",
+                  "objectIndexed",
+                  "classSlot",
+                  "metaclassWiring",
+                  "systemDictionary",
+                  "custom"
+                ]
+              },
+              "methodLocalId": {
+                "type": "string",
+                "description": "For methodLiteral: which method"
+              },
+              "literalIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For methodLiteral: which literal slot"
+              },
+              "objectLocalId": {
+                "type": "string",
+                "description": "For objectField/objectIndexed: which object"
+              },
+              "fieldIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For objectField: which fixed field (0-based)"
+              },
+              "indexedSlot": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For objectIndexed: which indexed slot"
+              },
+              "classLocalId": {
+                "type": "string",
+                "description": "For classSlot/metaclassWiring: which class"
+              },
+              "slotName": {
+                "type": "string",
+                "description": "For classSlot: name of class field (e.g., 'superclass', 'methodDictionary')"
+              }
+            },
+            "additionalProperties": false
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["setValue","setAssociationValue","wireMetaclass","addToSystemDictionary","custom"],
+            "description": "Patch operation semantics"
+          },
+          "value": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": { "enum": ["objectRef","symbolRef","smallInt","nil"] },
+                  "localId": { "type": "string" },
+                  "symbolIndex": { "type": "integer" },
+                  "intValue": { "type": "integer" }
+                }
+              }
+            ],
+            "description": "Value to set. Loader resolves localId references to objectIds."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this patch does"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "sourceFiles": {
+      "type": "array",
+      "description": "Optional manifest of source files referenced by methods/initExpressions via fileIndex",
+      "items": {
+        "type": "object",
+        "required": ["index","path"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "path": { "type": "string" },
+          "checksum": {
+            "type": "string",
+            "pattern": "^(sha256|md5):[0-9a-f]+$"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "partitionManifest": {
+      "type": "array",
+      "description": "Optional: describes file partitions if bundle is split across multiple JSON files for streaming/parallel loading",
+      "items": {
+        "type": "object",
+        "required": ["filename","contains"],
+        "properties": {
+          "filename": { "type": "string" },
+          "contains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["symbols","strings","classes","objects","methods","initExpressions","patches"]
+            },
+            "description": "Which top-level sections are in this file"
+          },
+          "checksum": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "validationRules": {
+      "type": "object",
+      "description": "Optional validation constraints the loader should check",
+      "properties": {
+        "allLocalIdsUnique": { "type": "boolean", "default": true },
+        "allSymbolIndicesValid": { "type": "boolean", "default": true },
+        "allStringIndicesValid": { "type": "boolean", "default": true },
+        "allObjectRefsResolvable": { "type": "boolean", "default": true },
+        "associationKeysMustBeSymbols": { "type": "boolean", "default": true },
+        "installOrderCoversAllEntities": { "type": "boolean", "default": true }
+      }
+    }
+  },
+
+  "definitions": {
+    "fieldValue": {
+      "type": "object",
+      "required": ["type"],
+      "description": "Discriminated union for object field/indexed values",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "nil" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "true" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "false" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "smallInt" },
+            "value": { "type": "integer" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largePositiveInteger" },
+            "value": { "type": "string", "pattern": "^[0-9]+$" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largeNegativeInteger" },
+            "value": { "type": "string", "pattern": "^-[0-9]+$" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "float" },
+            "value": { "type": "number" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "symbolRef" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "stringRef" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "objectRef" },
+            "localId": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type","localId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "character" },
+            "codePoint": { "type": "integer", "minimum": 0, "maximum": 255 }
+          },
+          "required": ["type","codePoint"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "bytes" },
+            "encoding": { "type": "string", "enum": ["hex","base64"] },
+            "data": { "type": "string" }
+          },
+          "required": ["type","encoding","data"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "literalValue": {
+      "type": "object",
+      "required": ["type"],
+      "description": "Discriminated union for method literal frame entries",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "symbol" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "string" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "smallInt" },
+            "value": { "type": "integer" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largePositiveInteger" },
+            "value": { "type": "string" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largeNegativeInteger" },
+            "value": { "type": "string" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "float" },
+            "value": { "type": "number" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "association" },
+            "association": {
+              "type": "object",
+              "required": ["keyType","keyIndex","valueRef"],
+              "properties": {
+                "keyType": {
+                  "type": "string",
+                  "enum": ["symbol"],
+                  "description": "Blue Book requires Association keys in literal frames to be Symbols"
+                },
+                "keyIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Index into symbols[] array"
+                },
+                "valueRef": {
+                  "oneOf": [
+                    { "type": "null", "description": "Unresolved; will be patched" },
+                    {
+                      "type": "object",
+                      "required": ["type","localId"],
+                      "properties": {
+                        "type": { "const": "objectRef" },
+                        "localId": { "type": "string" }
+                      }
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["type","association"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "array" },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/literalValue" }
+            }
+          },
+          "required": ["type","elements"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "objectRef" },
+            "localId": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type","localId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "character" },
+            "codePoint": { "type": "integer", "minimum": 0, "maximum": 255 }
+          },
+          "required": ["type","codePoint"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "bytes" },
+            "encoding": { "type": "string", "enum": ["hex","base64"] },
+            "data": { "type": "string" }
+          },
+          "required": ["type","encoding","data"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

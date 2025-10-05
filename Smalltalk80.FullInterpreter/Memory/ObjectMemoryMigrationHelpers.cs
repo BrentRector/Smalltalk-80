@@ -2,6 +2,7 @@ namespace Smalltalk80.Interpreter.Memory;
 
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.BlueBook;
 
 /// <summary>
 /// Temporary helper methods to support migration from old SObject architecture to pure SObjectRef.
@@ -78,8 +79,8 @@ public static partial class ObjectMemory
                     if (!assoc.IsNil)
                     {
                         // Association has key at index 0
-                        Generated.Layouts.STAssociation assocStruct = assoc;
-                        var key = assocStruct.Key;
+                        var assocOop = assoc.AsObjectPointer();
+                        var key = GetInstanceVariable(assocOop, 0); // Key is first instance variable
                         if (!key.IsNil)
                         {
                             selectors.Add(SymbolToString(key));
@@ -97,7 +98,7 @@ public static partial class ObjectMemory
     /// </summary>
     public static string[] GetClassInstanceVariableNames(nint classOop)
     {
-        var instanceVars = GetInstanceVariable(classOop, ClassLayout.InstanceVariablesIndex);
+        var instanceVars = GetInstanceVariable(classOop, ClassLayoutStatic.InstanceVariables);
 
         if (instanceVars.IsNil)
             return [];
@@ -132,7 +133,7 @@ public static partial class ObjectMemory
     /// </summary>
     public static int GetClassTotalInstanceVariableCount(nint classOop)
     {
-        var instSpec = GetInstanceVariable(classOop, ClassLayout.InstanceSpecificationIndex);
+        var instSpec = GetInstanceVariable(classOop, ClassLayoutStatic.Format);
 
         if (instSpec.IsSmallInteger)
         {

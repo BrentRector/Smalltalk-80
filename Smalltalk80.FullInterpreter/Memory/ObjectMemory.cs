@@ -387,6 +387,19 @@ public static partial class ObjectMemory
         return data.Format;
     }
 
+    /// <summary>
+    /// Sets the class of an object.
+    /// Used during bootstrap to wire class-metaclass relationships.
+    /// </summary>
+    public static void SetClass(nint oop, SObjectRef classRef)
+    {
+        lock (allocationLock)
+        {
+            var data = GetObjectData(oop);
+            data.ClassRef = classRef;
+        }
+    }
+
     #endregion
 
     #region Garbage Collection
@@ -718,7 +731,8 @@ public static partial class ObjectMemory
     public static SObjectRef InternSymbol(string str)
     {
         // Try to get USTable from Symbol class classPool
-        var usTableRef = ColdStart.SymbolTableBuilder.GetUSTable();
+        // TODO: Old SymbolTableBuilder removed - use JSON cold start SymbolInterning instead
+        SObjectRef? usTableRef = null; // ColdStart.SymbolTableBuilder.GetUSTable();
 
         if (usTableRef.HasValue && !usTableRef.Value.IsNil)
         {
@@ -963,7 +977,8 @@ public static partial class ObjectMemory
     /// </summary>
     public static void MigrateBootstrapSymbolsToUSTable()
     {
-        var usTableRef = ColdStart.SymbolTableBuilder.GetUSTable();
+        // TODO: Old SymbolTableBuilder removed - use JSON cold start SymbolInterning instead
+        SObjectRef? usTableRef = null; // ColdStart.SymbolTableBuilder.GetUSTable();
         if (!usTableRef.HasValue || usTableRef.Value.IsNil)
         {
             throw new InvalidOperationException("USTable must exist before migrating bootstrap symbols");
@@ -1182,13 +1197,14 @@ public static partial class ObjectMemory
                 continue;
 
             // Association has two instance variables: key and value
-            Generated.Layouts.STAssociation assoc = association;
-            var assocKey = assoc.Key;
+            // TODO: Old Generated.Layouts.STAssociation removed - use direct field access
+            var assocOop = association.AsObjectPointer();
+            var assocKey = GetInstanceVariable(assocOop, 0); // Key is first field
 
             // Check for key equality (identity comparison for now, should use = in real implementation)
             if (SObjectRef.AreIdentical(assocKey, key))
             {
-                return assoc.Value;
+                return GetInstanceVariable(assocOop, 1); // Value is second field
             }
         }
 
@@ -1216,8 +1232,9 @@ public static partial class ObjectMemory
                 continue;
 
             // Association has two instance variables: key and value
-            Generated.Layouts.STAssociation assoc = association;
-            var assocKey = assoc.Key;
+            // TODO: Old Generated.Layouts.STAssociation removed - use direct field access
+            var assocOop = association.AsObjectPointer();
+            var assocKey = GetInstanceVariable(assocOop, 0); // Key is first field
 
             // Check for key equality (identity comparison for now, should use = in real implementation)
             if (SObjectRef.AreIdentical(assocKey, key))
@@ -1250,25 +1267,27 @@ public static partial class ObjectMemory
             if (association.IsNil)
             {
                 // Found empty slot, create new association
+                // TODO: Old Generated.Layouts.STAssociation removed - use direct field access
                 var newAssoc = AllocateObject(
                     GetAssociationClass(),
                     ObjectFormat.FixedPointer,
-                    Generated.Layouts.STAssociation.InstanceVarCount,
+                    2, // Association has 2 instance variables: key and value
                     0);
 
-                Generated.Layouts.STAssociation newAssocStruct = SObjectRef.FromObjectPointer(newAssoc);
-                newAssocStruct.Key = key;
-                newAssocStruct.Value = value;
+                SetInstanceVariable(newAssoc, 0, key); // Key is first field
+                SetInstanceVariable(newAssoc, 1, value); // Value is second field
                 SetIndexedPointer(dictionaryRef.AsObjectPointer(), i, SObjectRef.FromObjectPointer(newAssoc));
                 return;
             }
 
             // Check if this association has matching key
-            Generated.Layouts.STAssociation assoc = association;
-            if (SObjectRef.AreIdentical(assoc.Key, key))
+            // TODO: Old Generated.Layouts.STAssociation removed - use direct field access
+            var assocOop = association.AsObjectPointer();
+            var assocKey = GetInstanceVariable(assocOop, 0); // Key is first field
+            if (SObjectRef.AreIdentical(assocKey, key))
             {
                 // Update existing association
-                assoc.Value = value;
+                SetInstanceVariable(assocOop, 1, value); // Value is second field
                 return;
             }
         }
@@ -1300,8 +1319,10 @@ public static partial class ObjectMemory
                 continue;
 
             // Check if this association has matching key
-            Generated.Layouts.STAssociation assoc = association;
-            if (SObjectRef.AreIdentical(assoc.Key, key))
+            // TODO: Old Generated.Layouts.STAssociation removed - use direct field access
+            var assocOop = association.AsObjectPointer();
+            var assocKey = GetInstanceVariable(assocOop, 0); // Key is first field
+            if (SObjectRef.AreIdentical(assocKey, key))
             {
                 // Found it - set slot to nil to remove
                 SetIndexedPointer(dictionaryRef.AsObjectPointer(), i, SObjectRef.Nil);
@@ -1345,13 +1366,13 @@ public static partial class ObjectMemory
         var classOop = AllocateObject(
             classClass,
             ObjectFormat.FixedPointer,
-            Core.BlueBook.ClassLayout.InstanceVariableCount,
+            Core.BlueBook.ClassLayoutStatic.InstanceVariableCount,
             0);
 
         var classRef = SObjectRef.FromObjectPointer(classOop);
 
         // Set superclass
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Superclass, superclassRef);
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.Superclass, superclassRef);
 
         // Create and set method dictionary (empty initially)
         var methodDictClass = GetMethodDictionaryClass();
@@ -1387,14 +1408,14 @@ public static partial class ObjectMemory
             capacity);  // Same capacity as method dictionary
         SetInstanceVariable(methodDict, 1, SObjectRef.FromObjectPointer(valueArray));  // valueArray
 
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.MethodDictionary, SObjectRef.FromObjectPointer(methodDict));
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.MethodDictionary, SObjectRef.FromObjectPointer(methodDict));
 
         // Calculate and set format
         int instVarCount = instanceVariableNames.Length;
         if (!superclassRef.IsNil)
         {
             // Add superclass instance variable count
-            var superFormat = GetInstanceVariable(superclassRef.AsObjectPointer(), Core.BlueBook.ClassLayout.Format);
+            var superFormat = GetInstanceVariable(superclassRef.AsObjectPointer(), Core.BlueBook.ClassLayoutStatic.Format);
             if (superFormat.IsSmallInteger)
             {
                 int superInstVars = superFormat.AsSmallInteger() & 0x3F; // Extract inst var count (bits 0-5)
@@ -1403,7 +1424,7 @@ public static partial class ObjectMemory
         }
 
         // Set subclasses to nil (will be populated when subclasses are created)
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Subclasses, SObjectRef.Nil);
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.Subclasses, SObjectRef.Nil);
 
         // Encode format as SmallInteger
         // Format encoding: bits 0-5 = inst var count, bits 6-7 = indexability, bit 8 = pointers flag
@@ -1414,7 +1435,7 @@ public static partial class ObjectMemory
             if (instanceFormat == ObjectFormat.ByteIndexed)
                 formatValue |= 0x80;  // Set byte-indexed bit
         }
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Format, SObjectRef.FromSmallInteger(formatValue));
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.Format, SObjectRef.FromSmallInteger(formatValue));
 
         // Create instance variables array
         var arrayClass = GetArrayClass();
@@ -1434,14 +1455,14 @@ public static partial class ObjectMemory
             var symbolRef = InternSymbol(instanceVariableNames[i]);
             SetIndexedPointer(instVarArray, i, symbolRef);
         }
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.InstanceVariables, SObjectRef.FromObjectPointer(instVarArray));
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.InstanceVariables, SObjectRef.FromObjectPointer(instVarArray));
 
         // Set organization to nil (will be set later if needed)
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Organization, SObjectRef.Nil);
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.Organization, SObjectRef.Nil);
 
         // Set name
         var nameSymbol = InternSymbol(name);
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.Name, nameSymbol);
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.Name, nameSymbol);
 
         // Create empty class pool dictionary
         var dictionaryClass = GetDictionaryClass();
@@ -1460,7 +1481,7 @@ public static partial class ObjectMemory
         // Initialize dictionary: set tally to 0
         SetInstanceVariable(classPool, 0, SObjectRef.FromSmallInteger(0));  // tally = 0
 
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.ClassPool, SObjectRef.FromObjectPointer(classPool));
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.ClassPool, SObjectRef.FromObjectPointer(classPool));
 
         // Set shared pools to empty array
         // Reuse arrayClass from above
@@ -1469,7 +1490,7 @@ public static partial class ObjectMemory
             ObjectFormat.PointerIndexed,
             0,
             0);
-        SetInstanceVariable(classOop, Core.BlueBook.ClassLayout.SharedPools, SObjectRef.FromObjectPointer(sharedPools));
+        SetInstanceVariable(classOop, Core.BlueBook.ClassLayoutStatic.SharedPools, SObjectRef.FromObjectPointer(sharedPools));
 
         return classRef;
     }
@@ -1486,14 +1507,14 @@ public static partial class ObjectMemory
         var metaclassOop = AllocateObject(
             GetMetaclassClass(),
             ObjectFormat.FixedPointer,
-            Core.BlueBook.MetaclassLayout.InstanceVariableCount,
+            Core.BlueBook.MetaclassLayoutStatic.InstanceVariableCount,
             0);
 
         var metaclassRef = SObjectRef.FromObjectPointer(metaclassOop);
 
         // Copy all Class instance variables from the Metaclass class
         // Then set the additional thisClass instance variable
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Superclass, superMetaclassRef);
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.Superclass, superMetaclassRef);
 
         // Create empty method dictionary for metaclass
         var methodDict = AllocateObject(
@@ -1501,25 +1522,25 @@ public static partial class ObjectMemory
             ObjectFormat.PointerIndexed,
             0,
             8);  // Start with smaller capacity for class methods
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.MethodDictionary, SObjectRef.FromObjectPointer(methodDict));
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.MethodDictionary, SObjectRef.FromObjectPointer(methodDict));
 
         // Set format (metaclasses have 0 instance variables)
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Format, SObjectRef.Zero);
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.Format, SObjectRef.Zero);
 
         // Set subclasses to nil
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Subclasses, SObjectRef.Nil);
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.Subclasses, SObjectRef.Nil);
 
         // Set empty instance variables array (Metaclass doesn't define any instance variables for its instances)
         var emptyArray = AllocateObject(GetArrayClass(), ObjectFormat.PointerIndexed, 0, 0);
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.InstanceVariables, SObjectRef.FromObjectPointer(emptyArray));
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.InstanceVariables, SObjectRef.FromObjectPointer(emptyArray));
 
         // Set organization to nil
-        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayout.Organization, SObjectRef.Nil);
+        SetInstanceVariable(metaclassOop, Core.BlueBook.ClassLayoutStatic.Organization, SObjectRef.Nil);
 
         // Set the thisClass instance variable (field 6 in Metaclass)
         // NOTE: Metaclass does NOT have name, classPool, or sharedPools fields!
         // Metaclass inherits from ClassDescription (6 fields), not Class (9 fields)
-        SetInstanceVariable(metaclassOop, Core.BlueBook.MetaclassLayout.ThisClass, classRef);
+        SetInstanceVariable(metaclassOop, Core.BlueBook.MetaclassLayoutStatic.ThisClass, classRef);
 
         return metaclassRef;
     }

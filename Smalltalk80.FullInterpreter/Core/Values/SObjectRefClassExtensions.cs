@@ -3,9 +3,9 @@ namespace Smalltalk80.Interpreter.Core.Values;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Smalltalk80.Interpreter.Core.BlueBook;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Execution;
-using Smalltalk80.Interpreter.Generated.Layouts;
 using Smalltalk80.Interpreter.Memory;
 
 /// <summary>
@@ -28,9 +28,10 @@ public static class SObjectRefClassExtensions
         if (!classRef.IsHeapObject)
             throw new InvalidOperationException("GetClassName requires a heap object (class)");
 
-        // Get the name instance variable (at index 6 for Class)
-        STClass classStruct = classRef;
-        var nameSymbolRef = classStruct.Name;
+        // Get the name instance variable using LayoutManagement
+        var classOop = classRef.AsObjectPointer();
+        var nameIndex = LayoutManagement.Layout.Class_Name;
+        var nameSymbolRef = ObjectMemory.GetInstanceVariable(classOop, nameIndex);
 
         if (nameSymbolRef.IsNil)
             return string.Empty;
@@ -50,8 +51,9 @@ public static class SObjectRefClassExtensions
         if (!classRef.IsHeapObject)
             throw new InvalidOperationException("GetSuperclass requires a heap object (class)");
 
-        STClass classStruct = classRef;
-        return classStruct.Superclass;
+        var classOop = classRef.AsObjectPointer();
+        var superclassIndex = LayoutManagement.Layout.Class_Superclass;
+        return ObjectMemory.GetInstanceVariable(classOop, superclassIndex);
     }
 
     /// <summary>
@@ -65,8 +67,9 @@ public static class SObjectRefClassExtensions
         if (!classRef.IsHeapObject)
             throw new InvalidOperationException("GetMethodDictionary requires a heap object (class)");
 
-        STClass classStruct = classRef;
-        return classStruct.MethodDict;
+        var classOop = classRef.AsObjectPointer();
+        var methodDictIndex = LayoutManagement.Layout.Class_MethodDict;
+        return ObjectMemory.GetInstanceVariable(classOop, methodDictIndex);
     }
 
     /// <summary>
@@ -80,11 +83,12 @@ public static class SObjectRefClassExtensions
         if (!classRef.IsHeapObject)
             throw new InvalidOperationException("GetInstanceVariableNames requires a heap object (class)");
 
-        STClass classStruct = classRef;
-        var instanceVarsRef = classStruct.InstanceVariables;
+        var classOop = classRef.AsObjectPointer();
+        var instanceVarsIndex = LayoutManagement.Layout.Class_InstanceVariables;
+        var instanceVarsRef = ObjectMemory.GetInstanceVariable(classOop, instanceVarsIndex);
 
         if (instanceVarsRef.IsNil)
-            return Array.Empty<string>();
+            return System.Array.Empty<string>();
 
         // The instance variables field is an Array of Symbols
         var count = instanceVarsRef.GetIndexedSize();
@@ -131,15 +135,17 @@ public static class SObjectRefClassExtensions
                 break;
 
             // Access class layout information (only valid on class objects, not regular instances like nil)
-            STClass currentClassStruct = currentClass;
-            var instanceVarsRef = currentClassStruct.InstanceVariables;
+            var currentClassOop = currentClass.AsObjectPointer();
+            var instanceVarsIndex = LayoutManagement.Layout.Class_InstanceVariables;
+            var instanceVarsRef = ObjectMemory.GetInstanceVariable(currentClassOop, instanceVarsIndex);
             if (instanceVarsRef.IsHeapObject)
             {
                 totalCount += instanceVarsRef.GetIndexedSize();
             }
 
             // Move to superclass
-            currentClass = currentClassStruct.Superclass;
+            var superclassIndex = LayoutManagement.Layout.Class_Superclass;
+            currentClass = ObjectMemory.GetInstanceVariable(currentClassOop, superclassIndex);
         }
 
         return totalCount;
@@ -173,8 +179,8 @@ public static class SObjectRefClassExtensions
             {
                 // MethodDictionary is an IdentityDictionary
                 // It has tally (index 0), valueArray (index 1), and indexed part contains keys
-                Generated.Layouts.STIdentityDictionary dict = methodDict;
-                var valueArray = dict.ValueArray;
+                var methodDictOop = methodDict.AsObjectPointer();
+                var valueArray = ObjectMemory.GetInstanceVariable(methodDictOop, 1); // valueArray at index 1
                 var keyCount = methodDict.GetIndexedSize();
 
                 // Search for the selector in the keys
@@ -219,9 +225,9 @@ public static class SObjectRefClassExtensions
         var selectorSymbol = ObjectMemory.InternSymbol(selector);
 
         // Get the tally and valueArray
-        Generated.Layouts.STIdentityDictionary dict = methodDict;
-        var tallyRef = dict.Tally;
-        var valueArray = dict.ValueArray;
+        var methodDictOop = methodDict.AsObjectPointer();
+        var tallyRef = ObjectMemory.GetInstanceVariable(methodDictOop, 0); // tally at index 0
+        var valueArray = ObjectMemory.GetInstanceVariable(methodDictOop, 1); // valueArray at index 1
 
         if (!tallyRef.IsSmallInteger || valueArray.IsNil)
             throw new InvalidOperationException("Invalid method dictionary structure");
@@ -265,7 +271,7 @@ public static class SObjectRefClassExtensions
         // Update tally if we added a new method (not replacing)
         if (!replacing)
         {
-            dict.Tally = SObjectRef.FromSmallInteger(tally + 1);
+            ObjectMemory.SetInstanceVariable(methodDictOop, 0, SObjectRef.FromSmallInteger(tally + 1));
         }
 
         // Invalidate any cached entries for this class
@@ -289,8 +295,8 @@ public static class SObjectRefClassExtensions
         if (methodDict.IsNil)
             return 0;
 
-        Generated.Layouts.STIdentityDictionary dict = methodDict;
-        var tallyRef = dict.Tally;
+        var methodDictOop = methodDict.AsObjectPointer();
+        var tallyRef = ObjectMemory.GetInstanceVariable(methodDictOop, 0); // tally at index 0
 
         if (!tallyRef.IsSmallInteger)
             return 0;
@@ -344,8 +350,9 @@ public static class SObjectRefClassExtensions
             throw new InvalidOperationException("CreateInstance requires a heap object (class)");
 
         // Get the format from the class
-        STClass classStruct = classRef;
-        var formatRef = classStruct.Format;
+        var classOop = classRef.AsObjectPointer();
+        var formatIndex = LayoutManagement.Layout.Class_Format;
+        var formatRef = ObjectMemory.GetInstanceVariable(classOop, formatIndex);
 
         if (!formatRef.IsSmallInteger)
             throw new InvalidOperationException("Invalid class format field");

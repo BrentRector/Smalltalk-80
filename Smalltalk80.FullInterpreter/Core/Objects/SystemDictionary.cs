@@ -174,11 +174,13 @@ public static partial class SystemDictionary
         if (initialized) return;
 
         LogColdStart("Starting Smalltalk-80 system initialization...");
-        LogColdStart($"Creating complete class hierarchy ({Generated.ColdStartData.ClassCount} classes)");
+        // TODO: Old Generated.ColdStartData removed - use JSON cold start instead
+        // LogColdStart($"Creating complete class hierarchy ({Generated.ColdStartData.ClassCount} classes)");
 
         // Execute the new 4-pass + 2-phase bootstrap process
         // This handles all class creation, singleton creation, method installation, and symbol migration
-        ColdStart.ColdStartBootstrap.Initialize();
+        // TODO: Old ColdStartBootstrap removed - use JsonColdStartBootstrap instead
+        // ColdStart.ColdStartBootstrap.Initialize();
 
         // The bootstrap process has already:
         // - Created all 128 class objects (64 classes + 64 metaclasses)
@@ -309,15 +311,16 @@ public static partial class SystemDictionary
             if (!assocRef.IsNil)
             {
                 // Get the key (Symbol) from the Association
-                Generated.Layouts.STAssociation assoc = assocRef;
-                var keyRef = assoc.Key;
+                // TODO: Old Generated.Layouts.STAssociation removed - use LayoutManagement instead
+                var assocOop = assocRef.AsObjectPointer();
+                var keyRef = Memory.ObjectMemory.GetInstanceVariable(assocOop, 0); // Key is first field
 
                 if (!keyRef.IsNil)
                 {
                     var keyStr = Memory.ObjectMemory.SymbolToString(keyRef);
 
                     // Get the value to check if it's a class
-                    var valueRef = assoc.Value;
+                    var valueRef = Memory.ObjectMemory.GetInstanceVariable(assocOop, 1); // Value is second field
                     if (!valueRef.IsNil && valueRef.IsHeapObject)
                     {
                         // Check if value is a class by seeing if it has a 'superclass' inst var (index 0 of Behavior)

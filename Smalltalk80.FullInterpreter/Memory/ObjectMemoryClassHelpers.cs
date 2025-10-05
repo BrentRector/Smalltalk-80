@@ -3,7 +3,7 @@ namespace Smalltalk80.Interpreter.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
-using Smalltalk80.Interpreter.Generated.Layouts;
+using Smalltalk80.Interpreter.Core.BlueBook;
 
 /// <summary>
 /// Helper methods for working with classes and methods in ObjectMemory.
@@ -42,8 +42,8 @@ public static partial class ObjectMemory
     /// </summary>
     public static SObjectRef GetClassSuperclass(nint classOop)
     {
-        STClass cls = SObjectRef.FromObjectPointer(classOop);
-        return cls.Superclass;
+        var classRef = SObjectRef.FromObjectPointer(classOop);
+        return GetInstanceVariable(classOop, LayoutManagement.Layout.Class_Superclass);
     }
 
     /// <summary>
@@ -51,8 +51,7 @@ public static partial class ObjectMemory
     /// </summary>
     public static SObjectRef GetClassMethodDictionary(nint classOop)
     {
-        STClass cls = SObjectRef.FromObjectPointer(classOop);
-        return cls.MethodDict;
+        return GetInstanceVariable(classOop, LayoutManagement.Layout.Class_MethodDict);
     }
 
     /// <summary>
@@ -60,8 +59,7 @@ public static partial class ObjectMemory
     /// </summary>
     public static string GetClassName(nint classOop)
     {
-        STClass cls = SObjectRef.FromObjectPointer(classOop);
-        var nameRef = cls.Name;
+        var nameRef = GetInstanceVariable(classOop, LayoutManagement.Layout.Class_Name);
         if (nameRef.IsNil)
             return "Unknown";
 
@@ -102,8 +100,7 @@ public static partial class ObjectMemory
     public static SObjectRef CreateInstance(nint classOop, int indexedSize = 0)
     {
         // Get instance specification to determine format and variable count
-        STClass cls = SObjectRef.FromObjectPointer(classOop);
-        var instSpec = cls.Format; // Format field contains instance specification
+        var instSpec = GetInstanceVariable(classOop, LayoutManagement.Layout.Class_Format); // Format field contains instance specification
 
         // Default format and instance variable count
         var format = ObjectFormat.FixedPointer;
@@ -278,8 +275,7 @@ public static partial class ObjectMemory
         // Debug: check if Association class is properly initialized
         if (!assocClass.IsNil)
         {
-            STClass cls = assocClass;
-            var assocFormat = cls.Format;
+            var assocFormat = GetInstanceVariable(assocClass.AsObjectPointer(), LayoutManagement.Layout.Class_Format);
             if (assocFormat.IsSmallInteger)
             {
                 int assocInstVars = assocFormat.AsSmallInteger() & 0x3F;
@@ -297,10 +293,9 @@ public static partial class ObjectMemory
             2,
             0);
 
-        // Use type-safe wrapper
-        STAssociation assoc = SObjectRef.FromObjectPointer(assocOop);
-        assoc.Key = keyRef;
-        assoc.Value = valueRef;
+        // Set key and value using direct field access
+        SetInstanceVariable(assocOop, 0, keyRef);  // Key is first field
+        SetInstanceVariable(assocOop, 1, valueRef); // Value is second field
 
         return assocOop;
     }
@@ -457,11 +452,11 @@ public static partial class ObjectMemory
             // Extended header: bytes 2-3 contain primitive index
             fullData[2] = (byte)(primitiveIndex & 0xFF);
             fullData[3] = (byte)((primitiveIndex >> 8) & 0xFF);
-            Array.Copy(bytecodes, 0, fullData, 4, bytecodes.Length);
+            System.Array.Copy(bytecodes, 0, fullData, 4, bytecodes.Length);
         }
         else
         {
-            Array.Copy(bytecodes, 0, fullData, 2, bytecodes.Length);
+            System.Array.Copy(bytecodes, 0, fullData, 2, bytecodes.Length);
         }
 
         // Set the bytecode data
