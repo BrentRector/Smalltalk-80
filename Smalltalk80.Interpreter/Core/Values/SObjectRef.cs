@@ -15,15 +15,16 @@ using Smalltalk80.Interpreter.Memory;
 ///
 /// Tagging scheme (32-bit, Blue Book compliant):
 /// - SmallInteger: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1 (LSB = 1, 31-bit signed value)
-/// - Object ptr:   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0 (LSB = 0, 4-byte aligned pointer)
+/// - Object Table Index: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0 (LSB = 0, 31-bit index)
 ///
 /// SmallInteger range: -2^30 to 2^30-1 (31-bit signed)
+/// Object Table capacity: 2^31 entries (2,147,483,648 objects)
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct SObjectRef : IEquatable<SObjectRef>
 {
-    // The tagged value - either an object pointer or SmallInteger immediate value
-    private readonly nint value;
+    // The tagged 32-bit value - either an object table index or SmallInteger immediate value
+    private readonly int value;
 
     // Tag bit pattern (Blue Book: only SmallInteger is immediate)
     private const int SmallIntegerTag = 0b1;    // Bit 0 = 1
@@ -33,10 +34,10 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     private const int TagMask = 0b1;            // Check bit 0 only
 
     // Cached nil OOP value (set once during cold start, 0 before that)
-    private static nint _cachedNilOop = 0;
+    private static int _cachedNilOop = 0;
 
     // Private constructor - use factory methods
-    private SObjectRef(nint value) => this.value = value;
+    private SObjectRef(int value) => this.value = value;
     
     #region Tag Checking
 
@@ -79,7 +80,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     /// Sets the cached nil OOP value. Called once during cold start.
     /// INTERNAL USE ONLY - called by SpecialObjectsArray.Initialize().
     /// </summary>
-    internal static void SetNilOop(nint nilOop)
+    internal static void SetNilOop(int nilOop)
     {
         _cachedNilOop = nilOop;
     }
@@ -113,7 +114,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     public static SObjectRef FromSmallInteger(int val)
     {
         // Shift left by 1 and set low bit
-        nint tagged = ((nint)val << 1) | SmallIntegerTag;
+        int tagged = ((int)val << 1) | SmallIntegerTag;
         return new SObjectRef(tagged);
     }
     
@@ -304,7 +305,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     /// Creates an object reference from an OOP (Object-Oriented Pointer).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SObjectRef FromObjectPointer(nint oop)
+    public static SObjectRef FromObjectPointer(int oop)
     {
         if (oop == 0)
             return Nil;
@@ -321,7 +322,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
     /// Returns the underlying pointer value for heap objects (including nil).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public nint AsObjectPointer()
+    public int AsObjectPointer()
     {
         if (!IsObject && !IsNil)
             throw new InvalidOperationException("Not an object reference (might be SmallInteger)");
@@ -359,7 +360,7 @@ public readonly struct SObjectRef : IEquatable<SObjectRef>
             return Nil;
 
         // Use ObjectMemory to get the object's OOP
-        nint oop = ObjectMemory.GetOop(obj);
+        int oop = ObjectMemory.GetOop(obj);
 
         if ((oop & TagMask) != 0)
             throw new InvalidOperationException($"Object pointer not 4-byte aligned: 0x{oop:X}");

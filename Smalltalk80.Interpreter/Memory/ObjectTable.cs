@@ -199,29 +199,29 @@ public sealed class ObjectTable
 
     /// <summary>
     /// Converts an OOP (object-oriented pointer) to a table index.
-    /// OOP encoding: index shifted left 2 bits (ensures 4-byte alignment, LSB=0).
+    /// OOP encoding: index shifted left 1 bit with LSB=0 (31-bit index in 32-bit OOP).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int IndexFromOop(nint oop)
+    public static int IndexFromOop(int oop)
     {
-        return (int)(oop >> 2);
+        return oop >> 1;
     }
 
     /// <summary>
     /// Converts a table index to an OOP (object-oriented pointer).
-    /// OOP encoding: index shifted left 2 bits (ensures 4-byte alignment, LSB=0).
+    /// OOP encoding: index shifted left 1 bit with LSB=0 (31-bit index in 32-bit OOP).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static nint OopFromIndex(int index)
+    public static int OopFromIndex(int index)
     {
-        return (nint)index << 2;
+        return index << 1;
     }
 
     /// <summary>
     /// Mark phase of garbage collection.
     /// Clears all mark bits, then marks reachable objects from roots.
     /// </summary>
-    public void MarkPhase(IEnumerable<nint> roots)
+    public void MarkPhase(IEnumerable<int> roots)
     {
         lock (_tableLock)
         {
@@ -236,8 +236,8 @@ public sealed class ObjectTable
             }
 
             // Phase 2: Mark from roots using worklist algorithm
-            var workList = new Queue<nint>();
-            var marked = new HashSet<nint>();
+            var workList = new Queue<int>();
+            var marked = new HashSet<int>();
 
             foreach (var root in roots)
             {
@@ -307,9 +307,9 @@ public sealed class ObjectTable
     /// <summary>
     /// Traces all object references in the given ObjectData.
     /// </summary>
-    private void TraceReferences(ObjectMemory.ObjectData data, Queue<nint> workList)
+    private void TraceReferences(ObjectMemory.ObjectData data, Queue<int> workList)
     {
-        bool enableDetailedLogging = Program.RuntimeOptions?.EnableGCLogging ?? false;
+        bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
         if (!data.ClassRef.IsNil && data.ClassRef.IsHeapObject)
@@ -377,7 +377,7 @@ public sealed class ObjectTable
                 // If not marked, free it
                 if (!entry.Data.Marked)
                 {
-                    if (Program.RuntimeOptions?.EnableGCLogging ?? false)
+                    if (false) // TODO: Re-enable when RuntimeOptions is added
                     {
                         var className = entry.Data.ClassRef.IsNil ? "Unknown" :
                             ObjectMemory.GetClassName(entry.Data.ClassRef.AsObjectPointer()) ?? "Unknown";

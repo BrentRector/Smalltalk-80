@@ -44,6 +44,18 @@ public class ColdStartJsonLoader
     }
 
     /// <summary>
+    /// Initializes a new instance of the ColdStartJsonLoader class from an already-loaded bundle.
+    /// </summary>
+    /// <param name="bundle">Pre-loaded cold start bundle.</param>
+    public ColdStartJsonLoader(ColdStartBundle bundle)
+    {
+        _bundle = bundle;
+        _jsonOptions = new JsonSerializerOptions(); // Not used in this case
+        ValidateSchema();
+        ValidateCounts();
+    }
+
+    /// <summary>
     /// Gets the loaded cold start bundle.
     /// </summary>
     public ColdStartBundle Bundle => _bundle;

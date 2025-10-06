@@ -619,6 +619,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     {
         int patchId = 0;
 
+        // Build set of valid class names for filtering
+        var validClassNames = new HashSet<string>(_classes.Select(c => GetClassNameFromLocalId(c.LocalId)));
+
         // Generate patches for Association values in method literals
         foreach (var method in _methods)
         {
@@ -631,29 +634,36 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     var assoc = literal["association"] as Dictionary<string, object>;
                     if (assoc != null && assoc["valueRef"] == null)
                     {
-                        // Need to patch this association's value
+                        // Get the association key name
                         var keyIndex = Convert.ToInt32(assoc["keyIndex"]);
                         var keyName = keyIndex >= 0 && keyIndex < _symbols.Count ? _symbols[keyIndex] : "";
 
-                        _patches.Add(new JsonPatch
+                        // Only generate patches for associations that reference actual classes
+                        // Skip temp variables, method args, and other non-class symbols
+                        if (!string.IsNullOrEmpty(keyName) && validClassNames.Contains(keyName))
                         {
-                            PatchId = $"patch:{patchId:D3}",
-                            Target = new PatchTarget
+                            _patches.Add(new JsonPatch
                             {
-                                Kind = "methodLiteral",
-                                MethodLocalId = method.LocalId,
-                                LiteralIndex = i
-                            },
-                            Operation = "setAssociationValue",
-                            Value = new Dictionary<string, object>
-                            {
-                                ["type"] = "objectRef",
-                                ["localId"] = $"class:{keyName}" // Assuming association refers to a class
-                            },
-                            Description = $"Patch association value for {keyName}"
-                        });
+                                PatchId = $"patch:{patchId:D3}",
+                                Target = new PatchTarget
+                                {
+                                    Kind = "methodLiteral",
+                                    MethodLocalId = method.LocalId,
+                                    LiteralIndex = i
+                                },
+                                Operation = "setAssociationValue",
+                                Value = new Dictionary<string, object>
+                                {
+                                    ["type"] = "objectRef",
+                                    ["localId"] = $"class:{keyName}"
+                                },
+                                Description = $"Patch association value for class {keyName}"
+                            });
 
-                        patchId++;
+                            patchId++;
+                        }
+                        // For non-class associations (temps, args, etc.), leave value as nil
+                        // These will be resolved at runtime by the compiler/interpreter
                     }
                 }
             }

@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-10-05
 **Status**: Current Standing Guidance
-**Current Phase**: JSON Cold Start Migration - ST* Struct Removal In Progress
+**Current Phase**: VM Implementation - Primitives Complete, Infrastructure Needed
 
 ## Primary Documentation Reference
 
@@ -76,18 +76,18 @@ All development work must align with the architecture documented in that file. B
 - ObjectTable (heap storage)
 - SpecialObjectsArray (GC roots)
 - GarbageCollector
-- Interpreter
+- VirtualMachine (bytecode executor)
 - SystemDictionary reference
 
 ✅ **Shared (static):**
 - JSON cold-start schema (coldstart-v1.0.0.schema.json)
 - Bytecode constants
 - Blue Book specifications
-- Primitive implementations
+- Primitive implementations (delegates)
 
 ❌ **Never use static for VM state** - prevents running multiple VMs.
 
-### 6. JSON Cold Start Format
+### 5. JSON Cold Start Format
 
 **All cold-start data is now in JSON format:**
 
@@ -102,7 +102,7 @@ All development work must align with the architecture documented in that file. B
 - Hardcoding object IDs in compiler - use stable localIds instead
 - Skipping schema validation
 
-### 5. Source File Immutability
+### 6. Source File Immutability
 
 **NEVER modify the Smalltalk-80.st source file:**
 
@@ -120,41 +120,165 @@ All development work must align with the architecture documented in that file. B
 - **Null safety** - use nullable reference types correctly
 - **Expression-bodied members** when they improve readability
 
-### File Organization
+### Project Structure
 
 ```
-Smalltalk80.Interpreter/
-├── ColdStart/                # JSON-based bootstrap system
-│   ├── JsonColdStartBootstrap.cs # 10-phase orchestrator
-│   ├── ColdStartLoader.cs        # JSON deserialization + LocalId registry
-│   ├── SymbolInterning.cs        # Two-phase symbol creation
-│   ├── ClassAllocator.cs         # Bootstrap/core class allocation
-│   ├── ClassPopulator.cs         # Populate class fields
-│   ├── ObjectAllocator.cs        # Pool dictionaries, arrays, etc.
-│   ├── MethodInstaller.cs        # CompiledMethod creation
-│   ├── SystemDictionaryCreator.cs # Smalltalk global dictionary
-│   └── PatchApplicator.cs        # Forward reference resolution
-├── Core/
-│   ├── Objects/             # Object implementations
-│   ├── Values/              # SObjectRef, SmallInteger
-│   └── BlueBook/            # Blue Book compliance layer (LayoutManagement)
-├── Memory/
-│   ├── ObjectMemory.cs      # Table-based storage
-│   ├── GarbageCollectorNew.cs # Mark-and-sweep GC
-│   └── SpecialObjectsArray.cs # 5-field struct
-├── Execution/               # Bytecode execution (MIGRATING)
-│   └── Interpreter.cs       # 268 ST* references remain
-└── Primitives/              # VM primitives (MIGRATING)
-    └── ControlPrimitives.cs # 54 Generated namespace references remain
+Smalltalk-80/
+├── Smalltalk80.Compiler/              # Parses Smalltalk-80.st → generates JSON
+│   ├── AST/                           # ANTLR4 parser integration
+│   ├── CodeGen/
+│   │   └── ColdStartJsonGenerator.cs # JSON generation
+│   ├── BytecodeCompiler.cs            # Bytecode emission
+│   └── Program.cs                     # CLI entry point
+│
+├── Smalltalk80.Interpreter/           # VM runtime (NEW - actively developed)
+│   ├── VM/
+│   │   ├── VirtualMachine.cs          # ✅ Bytecode interpreter (all 256 opcodes)
+│   │   ├── SmalltalkHeap.cs           # ✅ Object storage with field access
+│   │   ├── LayoutResolver.cs          # ✅ Dynamic field lookup by name
+│   │   └── Primitives/                # ✅ All primitives migrated
+│   │       ├── PrimitiveTable.cs      # 111 primitives registered
+│   │       ├── ArithmeticPrimitives.cs    # 1-17 (SmallInteger)
+│   │       ├── LargeIntegerPrimitives.cs  # 21-37 (BigInteger)
+│   │       ├── FloatPrimitives.cs         # 40-54 (IEEE 754)
+│   │       ├── ObjectPrimitives.cs        # 60-75, 110-111 (arrays, objects)
+│   │       ├── ControlPrimitives.cs       # 80-88 (blocks, processes - stubs)
+│   │       ├── InputPrimitives.cs         # 90-95 (mouse, keyboard - stubs)
+│   │       ├── GraphicsPrimitives.cs      # 96-104 (BitBlt, display - stubs)
+│   │       ├── StringPrimitives.cs        # 103-106 (string ops)
+│   │       └── SystemPrimitives.cs        # 112-139 (GC, system - partial)
+│   ├── ColdStart/                     # ✅ JSON-based bootstrap system
+│   │   ├── JsonColdStartBootstrap.cs  # 10-phase orchestrator
+│   │   ├── ColdStartJsonLoader.cs     # JSON deserialization
+│   │   ├── SymbolInterning.cs         # Two-phase symbol creation
+│   │   ├── ClassAllocator.cs          # Bootstrap/core class allocation
+│   │   ├── ClassPopulator.cs          # Populate class fields
+│   │   ├── ObjectAllocator.cs         # Pool dictionaries, arrays
+│   │   ├── MethodInstaller.cs         # CompiledMethod creation
+│   │   ├── SystemDictionaryCreator.cs # Smalltalk global dictionary
+│   │   └── PatchApplicator.cs         # Forward reference resolution
+│   ├── Core/
+│   │   ├── Objects/                   # Object implementations
+│   │   ├── Values/                    # SObjectRef, SmallInteger
+│   │   ├── Bytecodes/                 # ✅ Bytecode enums and utilities
+│   │   └── BlueBook/                  # LayoutManagement, ClassLayout
+│   ├── Memory/
+│   │   ├── ObjectTable.cs             # Table-based storage
+│   │   ├── ObjectMemory.cs            # Legacy compatibility layer
+│   │   ├── GarbageCollector.cs        # Mark-and-sweep GC
+│   │   └── SpecialObjectsArray.cs     # 5-field struct
+│   └── Config/
+│       ├── DebugOptions.cs            # Runtime debugging flags
+│       └── RuntimeOptions.cs          # VM configuration
+│
+└── Smalltalk80.FullInterpreter/       # OLD reference implementation (deprecated)
+    └── [Legacy code - use for reference only]
 ```
 
-**Migration Status**:
-- ✅ ColdStart/ - Fully migrated to JSON + LayoutManagement
-- ✅ Memory/SpecialObjectsArray.cs - Fixed to use LayoutManagement
-- ✅ Core/BlueBook/SObjectRefClassExtensions.cs - All 6 ST* references converted
-- ⏳ Execution/Interpreter.cs - 68 ST* references (STMethodContext, STBlockContext)
-- ⏳ Primitives/ControlPrimitives.cs - 54 Generated namespace references
-- ⏳ Core/BlueBook/BlueBookFactory.cs - Various ST* type references
+## Current Implementation Status
+
+### ✅ Completed Components
+
+**Compiler (Smalltalk80.Compiler)**:
+- ✅ ANTLR4 grammar for Smalltalk-80 file-out format
+- ✅ AST builder with full language support
+- ✅ Bytecode compiler with stack analysis
+- ✅ JSON generator conforming to coldstart-v1.0.0.schema.json
+- ✅ Clean bytecode enums (Bytecode, ExtendedSubOp) with helper methods
+- ✅ Generates Smalltalk-80.json (11MB, compresses to 1.2MB)
+
+**Cold Start Bootstrap**:
+- ✅ 10-phase JSON loader
+- ✅ Two-phase symbol interning (temporary storage → USTable migration)
+- ✅ SystemDictionary creation and population
+- ✅ All install phases working with **zero garbage collection**
+- ✅ Deterministic OOP allocation (same objects get same IDs every run)
+
+**SmalltalkHeap (VM/SmalltalkHeap.cs)**:
+- ✅ GetField/SetField for instance variables
+- ✅ GetIndexedField/SetIndexedField for arrays
+- ✅ GetClass for object class lookup
+- ✅ GetMethodBytecodes for method execution
+- ✅ GetMethodLiteral for literal access (header at index 0)
+- ✅ Correct +1 literal offset throughout
+
+**VirtualMachine (VM/VirtualMachine.cs)**:
+- ✅ Complete bytecode interpreter (all 256 opcodes 0x00-0xFF)
+- ✅ Primitive integration (checks method header, executes primitives)
+- ✅ Message sending with method lookup
+- ✅ SmallInteger arithmetic built-in
+- ✅ Context management (MethodContext creation)
+- ✅ Implements IPrimitiveContext interface
+- ✅ All literal accesses use +1 offset
+
+**Primitives (VM/Primitives/)**:
+- ✅ **111 primitives registered** in PrimitiveTable
+- ✅ **72 fully implemented**:
+  - SmallInteger arithmetic (1-17): All operations
+  - LargeInteger arithmetic (21-37): BigInteger support
+  - Float arithmetic (40-54): IEEE 754 operations
+  - Array/Object operations (60-75, 110-111): Array access, object ops
+  - String operations (105-106): Compare, asSymbol (stub)
+  - System operations (112-113, 133, 98-100, 103): Memory, time, beep
+- ✅ **39 stub implementations** (documented TODOs):
+  - Control/Block (80-88): Requires BlockContext, Process infrastructure
+  - Input (90-95): Requires IDisplayProvider
+  - Graphics (96-97, 101-102, 104): Requires BitBlt engine
+  - System (114-116, 128-131, 139): Requires object enumeration, become:
+
+### ⏳ Infrastructure Gaps (TODO)
+
+**Critical Missing Components**:
+
+1. **Class Lookup by Name** (HIGH PRIORITY)
+   - Need: `GetClassByName(string className)` → int classId
+   - Used by: Float primitives, LargeInteger primitives, Symbol creation
+   - Workaround: Currently throws NotImplementedException
+
+2. **Special Objects Array Access** (HIGH PRIORITY)
+   - Need: Access to nil, true, false object IDs
+   - Used by: Comparison primitives (should return true/false, not 0/1)
+   - Workaround: Currently returns SmallInteger 0/1
+
+3. **GetIndexedSize API** (HIGH PRIORITY)
+   - Need: `SmalltalkHeap.GetIndexedSize(int objectId)` → int count
+   - Used by: Size primitives, string operations, array bounds checking
+   - Workaround: Try-catch probing (inefficient)
+
+4. **Symbol Interning Infrastructure** (MEDIUM PRIORITY)
+   - Need: Symbol table lookup and insertion
+   - Used by: String asSymbol primitive (106)
+   - Status: Cold start has symbol interning, needs runtime API
+
+5. **BlockContext Support** (MEDIUM PRIORITY)
+   - Need: Block closure creation, activation, home context linking
+   - Used by: Primitives 80-82 (blockCopy:, value, value:)
+   - Status: VirtualMachine has skeleton, needs implementation
+
+6. **Process Scheduler** (MEDIUM PRIORITY)
+   - Need: Process management, semaphore signaling, context switching
+   - Used by: Primitives 85-88 (signal, wait, resume, suspend)
+   - Status: Not started
+
+7. **IDisplayProvider Interface** (LOW PRIORITY)
+   - Need: Mouse, keyboard, display abstraction layer
+   - Used by: Input primitives (90-95), Graphics primitives (96-104)
+   - Status: Not started
+
+8. **BitBlt Graphics Engine** (LOW PRIORITY)
+   - Need: Pixel manipulation, all 16 combination rules
+   - Used by: Primitive 96 (copyBits)
+   - Status: Full implementation exists in FullInterpreter (can migrate)
+
+9. **Object Enumeration** (LOW PRIORITY)
+   - Need: Iterate all objects or instances of a class
+   - Used by: Primitives 128-129, 139 (someInstance, nextInstance, nextObject)
+   - Status: Not started
+
+10. **become: Operation** (LOW PRIORITY)
+    - Need: Swap object identities in memory
+    - Used by: Primitives 68, 130 (become, becomeForward)
+    - Status: Requires deep memory manipulation
 
 ### Testing and Validation
 
@@ -242,60 +366,18 @@ var instance = ObjectMemoryNew.CreateInstance(...);
 SystemDictionary.StoreGlobal("MyGlobal", instance);
 ```
 
-### ❌ Mistake 5: Using ST* Structs After Migration
+### ❌ Mistake 5: Forgetting +1 Literal Offset
 
 **Wrong:**
 ```csharp
-// ST* structs are DELETED - do not use them!
-STClass classStruct = classRef;
-var superclassRef = classStruct.Superclass;
+// WRONG - off by one!
+var literal = _heap.GetMethodLiteral(methodId, index);
 ```
 
 **Right:**
 ```csharp
-// Use LayoutManagement pattern for field access
-var classOop = classRef.AsObjectPointer();
-var superclassIndex = LayoutManagement.Layout.Class_Superclass;
-var superclassRef = ObjectMemory.GetInstanceVariable(classOop, superclassIndex);
-```
-
-### ❌ Mistake 6: Creating Symbols Before Symbol Class Exists
-
-**Wrong:**
-```csharp
-// Phase 2 bootstrap - Symbol class doesn't exist yet!
-public void InternAll()
-{
-    foreach (var symbolText in symbols)
-    {
-        var symbolRef = ObjectMemory.CreateSymbol(symbolText); // CRASH!
-        _symbolMap[symbolText] = symbolRef;
-    }
-}
-```
-
-**Right:**
-```csharp
-// Phase 2: Use temporary C# storage
-public void CreateTemporaryStorage()
-{
-    foreach (var symbolText in symbols)
-    {
-        var placeholderOop = AllocateTemporaryPlaceholder(symbolText);
-        _tempSymbolMap[symbolText] = placeholderOop;
-    }
-}
-
-// Phase 7: Migrate to real Symbol objects after Symbol class exists
-public void MigrateToUSTable()
-{
-    var symbolClassRef = _loader.ResolveLocalId("class:Symbol");
-    foreach (var kvp in _tempSymbolMap)
-    {
-        var symbolRef = CreateRealSymbol(kvp.Key, symbolClassRef);
-        AddToUSTable(symbolRef);
-    }
-}
+// CORRECT - +1 skips header at lit[0]
+var literalId = _heap.GetMethodLiteral(methodId, index + 1);
 ```
 
 ## Compiler
@@ -500,81 +582,6 @@ Output shows inheritance with box-drawing characters (├─, └─).
 - **Smalltalk-80 Blue Book** - Goldberg & Robson (1983) - The specification
 - **Smalltalk-80.st** - Reference Smalltalk-80 source code
 
-## Current Migration Status
-
-### Completed Work (Previous Session)
-
-✅ **JSON Schema & Compiler**:
-- Created `docs/schemas/coldstart-v1.0.0.schema.json` with complete specification
-- Implemented `ColdStartJsonGenerator.cs` to emit schema-compliant JSON
-- Compiler successfully generates `Smalltalk-80.json` (11MB, compresses to 1.2MB)
-
-✅ **Cold Start Bootstrap System**:
-- Implemented 10-phase `JsonColdStartBootstrap.cs` with correct sequencing
-- Fixed bootstrap chicken-and-egg: temporary C# storage → class creation → USTable migration
-- Created `SymbolInterning.cs` with two-phase approach (CreateTemporaryStorage + MigrateToUSTable)
-- Implemented `SystemDictionaryCreator.cs` for Smalltalk global dictionary population
-- Fixed all JSON schema property mismatches (Format, Bytecodes, Literals, HomeClassLocalId, etc.)
-
-✅ **Legacy Code Removal**:
-- Deleted 8 legacy ST* struct-based cold start files (~50KB removed)
-- Fixed `SpecialObjectsArray.cs` to use LayoutManagement pattern
-- Converted `SObjectRefClassExtensions.cs` (6 ST* references → LayoutManagement)
-- Added `ObjectMemory.SetClass()` method for metaclass wiring
-- Updated `VirtualMachine.cs` to use `JsonColdStartBootstrap`
-
-### Remaining Work (Current Session)
-
-⏳ **Fix Compilation Errors** (268 total across 3 files):
-
-1. **Interpreter.cs** (68 errors):
-   - 36 `STMethodContext` references
-   - 32 `STBlockContext` references
-   - Pattern: Convert to `LayoutManagement.Layout.MethodContext_*` field access
-
-2. **ControlPrimitives.cs** (54 errors):
-   - Generated namespace references (old ST* structs)
-   - Convert to LayoutManagement pattern
-
-3. **BlueBookFactory.cs** (various errors):
-   - ST* type references (Process, Semaphore, Dictionary, etc.)
-   - Convert to LayoutManagement pattern
-
-4. **SystemDictionary.cs** (references to deleted ColdStartBootstrap):
-   - Remove old bootstrap references
-   - Update to use JsonColdStartBootstrap
-
-### Next Steps
-
-1. **Systematic ST* Conversion**:
-   ```csharp
-   // Pattern to apply throughout codebase:
-
-   // BEFORE (ST* struct):
-   STMethodContext ctx = contextRef;
-   var senderRef = ctx.Sender;
-
-   // AFTER (LayoutManagement):
-   var ctxOop = contextRef.AsObjectPointer();
-   var senderIndex = LayoutManagement.Layout.MethodContext_Sender;
-   var senderRef = ObjectMemory.GetInstanceVariable(ctxOop, senderIndex);
-   ```
-
-2. **Build Verification**:
-   - Achieve 0 compilation errors
-   - Verify 0 warnings
-   - Test cold start bootstrap with GC validation
-
-3. **Runtime Testing**:
-   - Run: `dotnet run -- repl --gc-log --validate-gc`
-   - Verify: "0 objects collected" on all GC runs
-   - Test: Basic REPL functionality
-
-4. **Documentation Update**:
-   - Update Interpreter-Architecture.md with final migration details
-   - Document LayoutManagement conversion patterns
-   - Update file organization diagrams
-
 ## Summary Checklist
 
 Before submitting any change, verify:
@@ -585,7 +592,7 @@ Before submitting any change, verify:
 - [ ] Per-VM architecture (no static VM state)
 - [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.0.schema.json)
 - [ ] Compiler builds and generates valid JSON
-- [ ] Interpreter builds and loads JSON successfully
+- [ ] Interpreter builds successfully
 - [ ] Build succeeds (0 errors, 0 warnings)
 - [ ] GC validation passes (0 objects collected)
 - [ ] Documentation updated (if architecture changed)

@@ -5,6 +5,7 @@ using System.IO;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Core.Bytecodes;
 
 namespace Smalltalk80.Compiler
 {
@@ -392,7 +393,23 @@ namespace Smalltalk80.Compiler
         {
             bytecodes.Add(bytecode);
         }
-        
+
+        /// <summary>
+        /// Emits a bytecode enum value.
+        /// </summary>
+        public void Emit(Bytecode bytecode)
+        {
+            bytecodes.Add((byte)bytecode);
+        }
+
+        /// <summary>
+        /// Emits an extended sub-operation enum value.
+        /// </summary>
+        public void Emit(ExtendedSubOp subOp)
+        {
+            bytecodes.Add((byte)subOp);
+        }
+
         /// <summary>
         /// Emits multiple bytecodes.
         /// </summary>
@@ -400,7 +417,15 @@ namespace Smalltalk80.Compiler
         {
             bytecodes.AddRange(bytes);
         }
-        
+
+        /// <summary>
+        /// Helper for emitting a bytecode with an offset (e.g., PUSH_IVAR_0 + index).
+        /// </summary>
+        private void EmitWithOffset(Bytecode baseCode, int offset)
+        {
+            Emit((byte)((byte)baseCode + offset));
+        }
+
         /// <summary>
         /// Patches a bytecode at the given position.
         /// </summary>
@@ -416,26 +441,26 @@ namespace Smalltalk80.Compiler
         {
             if (index <= 15)
             {
-                Emit((byte)(0 + index)); // 0-15
+                EmitWithOffset(Bytecode.PUSH_IVAR_0, index); // 0x00-0x0F
             }
             else
             {
-                Emit(128); // Extended push
-                Emit(0);   // Receiver variable
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.PUSH_IVAR);
                 Emit((byte)index);
             }
         }
-        
+
         public void PushTemporary(int index)
         {
             if (index <= 15)
             {
-                Emit((byte)(16 + index)); // 16-31
+                EmitWithOffset(Bytecode.PUSH_TEMP_0, index); // 0x10-0x1F
             }
             else
             {
-                Emit(128); // Extended push
-                Emit(16);  // Temporary variable
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.PUSH_TEMP);
                 Emit((byte)index);
             }
         }
@@ -445,14 +470,14 @@ namespace Smalltalk80.Compiler
             var index = AddLiteral(literal);
             if (index <= 31)
             {
-                // Bytecodes 32-63: Push Literal Constant #0 to #31
-                Emit((byte)(32 + index));
+                // Bytecodes 0x20-0x3F: Push Literal Constant #0 to #31
+                EmitWithOffset(Bytecode.PUSH_LITERAL_CONST_0, index);
             }
             else
             {
                 // Use extended push for indices > 31
-                Emit(128); // Extended push
-                Emit(32);  // Push literal constant (type = 2)
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.PUSH_LITERAL);
                 Emit((byte)index);
             }
         }
@@ -488,56 +513,56 @@ namespace Smalltalk80.Compiler
 
             if (index <= 31)
             {
-                // Bytecodes 64-95: Push Literal Variable #0 to #31
-                Emit((byte)(64 + index));
+                // Bytecodes 0x40-0x5F: Push Literal Variable #0 to #31
+                EmitWithOffset(Bytecode.PUSH_LITERAL_VAR_0, index);
             }
             else
             {
                 // Use extended push for indices > 31
-                Emit(128); // Extended push
-                Emit(64);  // Push literal variable (type = 4)
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.PUSH_LITERAL_VAR);
                 Emit((byte)index);
             }
         }
         
         public void PushSelf()
         {
-            Emit(112); // Push receiver
+            Emit(Bytecode.PUSH_SELF); // 0x70
         }
-        
+
         public void PushNil()
         {
-            Emit(115); // Push nil
+            Emit(Bytecode.PUSH_NIL); // 0x73
         }
-        
+
         public void PushTrue()
         {
-            Emit(113); // Push true
+            Emit(Bytecode.PUSH_TRUE); // 0x71
         }
-        
+
         public void PushFalse()
         {
-            Emit(114); // Push false
+            Emit(Bytecode.PUSH_FALSE); // 0x72
         }
-        
+
         public void PushMinusOne()
         {
-            Emit(116); // Push -1
+            Emit(Bytecode.PUSH_MINUS_ONE); // 0x74
         }
-        
+
         public void PushZero()
         {
-            Emit(117); // Push 0
+            Emit(Bytecode.PUSH_ZERO); // 0x75
         }
-        
+
         public void PushOne()
         {
-            Emit(118); // Push 1
+            Emit(Bytecode.PUSH_ONE); // 0x76
         }
-        
+
         public void PushTwo()
         {
-            Emit(119); // Push 2
+            Emit(Bytecode.PUSH_TWO); // 0x77
         }
         
         // Store operations
@@ -546,31 +571,29 @@ namespace Smalltalk80.Compiler
         {
             if (index <= 7)
             {
-                // Store and pop: 96-103
-                Emit((byte)(96 + index));
+                // Store and pop: 0x60-0x67
+                EmitWithOffset(Bytecode.POP_STORE_IVAR_0, index);
             }
             else
             {
-                Emit(129); // Extended store
-                Emit(96);  // Store receiver variable
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.POP_STORE_IVAR);
                 Emit((byte)index);
-                Pop();     // Explicit pop
             }
         }
-        
+
         public void StoreTemporary(int index)
         {
             if (index <= 7)
             {
-                // Store and pop: 104-111
-                Emit((byte)(104 + index));
+                // Store and pop: 0x68-0x6F
+                EmitWithOffset(Bytecode.POP_STORE_TEMP_0, index);
             }
             else
             {
-                Emit(129); // Extended store
-                Emit(104); // Store temporary
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.POP_STORE_TEMP);
                 Emit((byte)index);
-                Pop();     // Explicit pop
             }
         }
         
@@ -597,38 +620,40 @@ namespace Smalltalk80.Compiler
                 index = AddLiteral(association);
             }
 
-            Emit(130); // Extended pop and store (bytecode 130 pops the value after storing)
-            Emit((byte)(0xC0 | index));  // Store literal variable: 11xxxxxx (top 2 bits = 11 for literal var, bottom 6 bits = index)
-            // NO Pop() here - bytecode 130 already pops the stack!
+            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+            Emit(ExtendedSubOp.POP_STORE_LITERAL_VAR);
+            Emit((byte)index);
         }
-        
+
         // Stack operations
-        
+
         public void Pop()
         {
-            Emit(135); // Pop stack
+            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+            Emit(ExtendedSubOp.POP);
         }
-        
+
         public void Dup()
         {
-            Emit(136); // Duplicate top
+            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+            Emit(ExtendedSubOp.DUP);
         }
-        
+
         // Return operations
-        
+
         public void ReturnSelf()
         {
-            Emit(120); // Return self
+            Emit(Bytecode.RETURN_SELF); // 0x79
         }
-        
+
         public void ReturnTop()
         {
-            Emit(124); // Return top from method
+            Emit(Bytecode.RETURN_TOP); // 0x78
         }
-        
+
         public void ReturnTopFromBlock()
         {
-            Emit(125); // Return top from block
+            Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
         }
         
         // Jump operations
@@ -784,9 +809,9 @@ namespace Smalltalk80.Compiler
             // 4. Jump around block body
             // We emit a 2-byte placeholder that we'll patch later
             var jumpPosition = CurrentIP;
-            Emit(0);   // Placeholder for jump opcode
-            Emit(0);   // Placeholder for jump distance/parameter
-            
+            Emit((byte)0);   // Placeholder for jump opcode
+            Emit((byte)0);   // Placeholder for jump distance/parameter
+
             return jumpPosition;
         }
         
@@ -929,53 +954,54 @@ namespace Smalltalk80.Compiler
         
         /// <summary>
         /// Emits a send bytecode according to Blue Book specification.
-        /// Bytecodes 176-191: Arithmetic messages
-        /// Bytecodes 192-207: Special messages
-        /// Bytecodes 208-223: Send Literal Selector With No Arguments
-        /// Bytecodes 224-239: Send Literal Selector With 1 Argument
-        /// Bytecodes 240-255: Send Literal Selector With 2 Arguments
+        /// Bytecodes 0xB0-0xBF: Arithmetic messages
+        /// Bytecodes 0xC0-0xCF: Special messages
+        /// Bytecodes 0xD0-0xDF: Send Literal Selector With 0 Arguments
+        /// Bytecodes 0xE0-0xEF: Send Literal Selector With 1 Argument
+        /// Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
         /// </summary>
         public void EmitSend(string selector, int argCount)
         {
-            // Check if this is a special selector
+            // Check if this is a special selector (arithmetic or special)
             if (SpecialSelectors.TryGetValue(selector, out var special))
             {
                 // Use the special bytecode directly
                 Emit((byte)special.bytecode);
                 return;
             }
-            
+
             // Regular send: add selector to literal frame
             var selectorIndex = AddLiteral(new Symbol(selector));
-            
+
             // Check for optimized bytecode ranges for 0, 1, 2 arguments
             if (argCount == 0 && selectorIndex <= 15)
             {
-                // Bytecodes 208-223: Send Literal Selector With No Arguments
-                Emit((byte)(208 + selectorIndex));
+                // Bytecodes 0xD0-0xDF: Send Literal Selector With 0 Arguments
+                EmitWithOffset(Bytecode.SEND_LITERAL_0_BASE, selectorIndex);
             }
             else if (argCount == 1 && selectorIndex <= 15)
             {
-                // Bytecodes 224-239: Send Literal Selector With 1 Argument
-                Emit((byte)(224 + selectorIndex));
+                // Bytecodes 0xE0-0xEF: Send Literal Selector With 1 Argument
+                EmitWithOffset(Bytecode.SEND_LITERAL_1_BASE, selectorIndex);
             }
             else if (argCount == 2 && selectorIndex <= 15)
             {
-                // Bytecodes 240-255: Send Literal Selector With 2 Arguments
-                Emit((byte)(240 + selectorIndex));
+                // Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
+                EmitWithOffset(Bytecode.SEND_LITERAL_2_BASE, selectorIndex);
             }
             else if (argCount <= 7 && selectorIndex <= 31)
             {
-                // Use single extended send (131)
+                // Use single extended send
                 // Format: jjjkkkkk where jjj = arg count, kkkkk = selector index
-                Emit(131); // Single extended send  
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.SEND_N);
                 Emit((byte)((argCount << 5) | selectorIndex));
             }
             else
             {
-                // Use double extended send (132) for large selector indices or arg counts
-                // Format: First byte = selector index, Second byte = arg count
-                Emit(132); // Double extended send
+                // Use double extended send for large selector indices or arg counts
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.SEND_N);
                 Emit((byte)selectorIndex);  // Selector first
                 Emit((byte)argCount);        // Then arg count
             }
@@ -991,22 +1017,23 @@ namespace Smalltalk80.Compiler
         
         /// <summary>
         /// Emits a super send bytecode according to Blue Book specification.
-        /// Uses extended bytecodes 133 (single) and 134 (double).
+        /// Uses extended bytecodes with SEND_SUPER_N sub-op.
         /// </summary>
         public void EmitSuperSend(string selector, int argCount)
         {
             var index = AddLiteral(new Symbol(selector));
-            
+
             if (argCount <= 7 && index <= 31)
             {
-                Emit(133); // Single extended super send
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.SEND_SUPER_N);
                 Emit((byte)((argCount << 5) | index));
             }
             else
             {
-                // Double extended super send
-                // Format: First byte = selector index, Second byte = arg count
-                Emit(134); // Double extended super send
+                // Extended super send for large indices or arg counts
+                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
+                Emit(ExtendedSubOp.SEND_SUPER_N);
                 Emit((byte)index);      // Selector index first
                 Emit((byte)argCount);   // Then arg count
             }

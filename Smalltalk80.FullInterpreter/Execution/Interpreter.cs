@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.BlueBook;
+using Smalltalk80.Interpreter.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Memory;
@@ -235,65 +236,253 @@ public sealed class Interpreter
 
     /// <summary>
     /// Executes a single bytecode instruction.
+    /// Returns true to continue execution, false to return from method.
     /// </summary>
     private bool ExecuteBytecode(byte bytecode, byte[] bytecodes, ref int ip)
     {
-        // Simplified bytecode dispatch - a real implementation would handle all bytecodes
-        // For now, just implement enough to make it compile
+        var contextOop = activeContext.AsObjectPointer();
+        var methodRef = ObjectMemory.GetInstanceVariable(contextOop, LayoutManagement.Layout.MethodContext_Method);
+        var methodOop = methodRef.AsObjectPointer();
+        var receiverRef = GetSelf();
 
-        // Push constants
-        if (bytecode >= 0 && bytecode <= 15)
+        // Push receiver variable 0-15 (0x00-0x0F)
+        if (BytecodeUtil.IsPushIvar(bytecode))
         {
-            // Push receiver instance variable
-            PushReceiverVariable(bytecode & 0x0F);
+            var index = BytecodeUtil.PushIvarIndex(bytecode);
+            if (receiverRef.IsHeapObject)
+            {
+                var instVar = ObjectMemory.GetInstanceVariable(receiverRef.AsObjectPointer(), index);
+                Push(instVar);
+            }
+            else
+            {
+                Push(SObjectRef.Nil);
+            }
             return true;
         }
-        else if (bytecode >= 16 && bytecode <= 31)
+
+        // Push temporary variable 0-15 (0x10-0x1F)
+        if (BytecodeUtil.IsPushTemp(bytecode))
         {
-            // Push temporary variable
-            PushTemporaryVariable(bytecode & 0x0F);
+            var index = BytecodeUtil.PushTempIndex(bytecode);
+            var value = ObjectMemory.GetIndexedPointer(contextOop, LayoutManagement.Layout.MethodContext_InstanceVarCount + index);
+            Push(value);
             return true;
         }
-        else if (bytecode == 112)
+
+        // Push literal constant 0-31 (0x20-0x3F)
+        // FIXED: Add +1 to skip header at literal[0]
+        if (BytecodeUtil.IsPushLiteralConst(bytecode))
         {
-            // Push self
-            PushSelf();
+            var index = BytecodeUtil.PushLiteralConstIndex(bytecode);
+            var literal = ObjectMemory.GetCompiledMethodLiteral(methodOop, index + 1); // +1 to skip header
+            Push(literal);
             return true;
         }
-        else if (bytecode == 113)
+
+        // Push literal variable 0-31 (0x40-0x5F)
+        // FIXED: Add +1 to skip header at literal[0]
+        if (BytecodeUtil.IsPushLiteralVar(bytecode))
         {
-            // Push true
-            Push(GetTrue());
+            var index = BytecodeUtil.PushLiteralVarIndex(bytecode);
+            var associationRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, index + 1); // +1 to skip header
+
+            // Association is a 2-element object: [key, value]
+            // Get the value at instance variable index 1
+            if (!associationRef.IsNil && associationRef.IsHeapObject)
+            {
+                var assocOop = associationRef.AsObjectPointer();
+                // Assuming Association has layout: [key at index 0, value at index 1]
+                var value = ObjectMemory.GetInstanceVariable(assocOop, 1);
+                Push(value);
+            }
+            else
+            {
+                Push(SObjectRef.Nil);
+            }
             return true;
         }
-        else if (bytecode == 114)
+
+        // Pop and store receiver variable 0-7 (0x60-0x67)
+        if (BytecodeUtil.IsPopStoreIvar(bytecode))
         {
-            // Push false
-            Push(GetFalse());
-            return true;
-        }
-        else if (bytecode == 115)
-        {
-            // Push nil
-            Push(SObjectRef.Nil);
-            return true;
-        }
-        else if (bytecode == 120)
-        {
-            // Return self from method
-            ReturnValueTo(GetSelf(), GetSender());
-            return false;
-        }
-        else if (bytecode == 124)
-        {
-            // Return top of stack from method
+            var index = BytecodeUtil.PopStoreIvarIndex(bytecode);
             var value = Pop();
-            ReturnValueTo(value, GetSender());
-            return false;
+
+            if (receiverRef.IsHeapObject)
+            {
+                ObjectMemory.SetInstanceVariable(receiverRef.AsObjectPointer(), index, value);
+            }
+            return true;
         }
 
-        // TODO: Implement remaining bytecodes
-        throw new NotImplementedException($"Bytecode {bytecode:X2} not yet implemented");
+        // Pop and store temporary variable 0-7 (0x68-0x6F)
+        if (BytecodeUtil.IsPopStoreTemp(bytecode))
+        {
+            var index = BytecodeUtil.PopStoreTempIndex(bytecode);
+            var value = Pop();
+            ObjectMemory.SetIndexedPointer(contextOop, LayoutManagement.Layout.MethodContext_InstanceVarCount + index, value);
+            return true;
+        }
+
+        // Push special constants & returns (0x70-0x7F)
+        switch ((Bytecode)bytecode)
+        {
+            case Bytecode.PUSH_SELF:
+                Push(receiverRef);
+                return true;
+
+            case Bytecode.PUSH_TRUE:
+                Push(GetTrue());
+                return true;
+
+            case Bytecode.PUSH_FALSE:
+                Push(GetFalse());
+                return true;
+
+            case Bytecode.PUSH_NIL:
+                Push(SObjectRef.Nil);
+                return true;
+
+            case Bytecode.PUSH_MINUS_ONE:
+                Push(SObjectRef.FromSmallInteger(-1));
+                return true;
+
+            case Bytecode.PUSH_ZERO:
+                Push(SObjectRef.FromSmallInteger(0));
+                return true;
+
+            case Bytecode.PUSH_ONE:
+                Push(SObjectRef.FromSmallInteger(1));
+                return true;
+
+            case Bytecode.PUSH_TWO:
+                Push(SObjectRef.FromSmallInteger(2));
+                return true;
+
+            case Bytecode.RETURN_SELF:
+                ReturnValueTo(receiverRef, GetSender());
+                return false;
+
+            case Bytecode.RETURN_TRUE:
+                ReturnValueTo(GetTrue(), GetSender());
+                return false;
+
+            case Bytecode.RETURN_FALSE:
+                ReturnValueTo(GetFalse(), GetSender());
+                return false;
+
+            case Bytecode.RETURN_NIL:
+                ReturnValueTo(SObjectRef.Nil, GetSender());
+                return false;
+
+            case Bytecode.RETURN_TOP:
+                var topValue = Pop();
+                ReturnValueTo(topValue, GetSender());
+                return false;
+
+            case (Bytecode)0x87: // POP
+                Pop();
+                return true;
+
+            case (Bytecode)0x88: // DUP
+                var top = Pop();
+                Push(top);
+                Push(top);
+                return true;
+
+            case (Bytecode)0x89: // PUSH_ACTIVE_CONTEXT
+                Push(activeContext);
+                return true;
+        }
+
+        // Unconditional jumps (0x90-0x97)
+        if (bytecode >= 0x90 && bytecode <= 0x97)
+        {
+            var offset = (bytecode & 0x07) + 1;
+            var ipRef = ObjectMemory.GetInstanceVariable(contextOop, LayoutManagement.Layout.MethodContext_InstructionPointer);
+            var currentIp = ipRef.AsSmallInteger();
+            ObjectMemory.SetInstanceVariable(contextOop, LayoutManagement.Layout.MethodContext_InstructionPointer,
+                SObjectRef.FromSmallInteger(currentIp + offset));
+            return true;
+        }
+
+        // Conditional jump on false (0x98-0x9F)
+        if (bytecode >= 0x98 && bytecode <= 0x9F)
+        {
+            var offset = (bytecode & 0x07) + 1;
+            var condition = Pop();
+            if (condition.Equals(GetFalse()))
+            {
+                var ipRef = ObjectMemory.GetInstanceVariable(contextOop, LayoutManagement.Layout.MethodContext_InstructionPointer);
+                var currentIp = ipRef.AsSmallInteger();
+                ObjectMemory.SetInstanceVariable(contextOop, LayoutManagement.Layout.MethodContext_InstructionPointer,
+                    SObjectRef.FromSmallInteger(currentIp + offset));
+            }
+            return true;
+        }
+
+        // Send arithmetic messages (0xB0-0xBF)
+        if (BytecodeUtil.IsSendArithmetic(bytecode))
+        {
+            ExecuteSendArithmetic(bytecode);
+            return true;
+        }
+
+        // Send special messages (0xC0-0xCF)
+        if (BytecodeUtil.IsSendSpecial(bytecode))
+        {
+            ExecuteSendSpecial(bytecode);
+            return true;
+        }
+
+        // Send literal selector with 0 args (0xD0-0xDF)
+        // FIXED: Add +1 to skip header at literal[0]
+        if (BytecodeUtil.IsSend0(bytecode))
+        {
+            var selectorIndex = BytecodeUtil.Send0Index(bytecode);
+            var selectorRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, selectorIndex + 1); // +1 to skip header
+            var selector = ObjectMemory.SymbolToString(selectorRef);
+
+            var receiver = Pop();
+            var result = SendMessage(receiver, selector, Array.Empty<SObjectRef>());
+            Push(result);
+            return true;
+        }
+
+        // Send literal selector with 1 arg (0xE0-0xEF)
+        // FIXED: Add +1 to skip header at literal[0]
+        if (BytecodeUtil.IsSend1(bytecode))
+        {
+            var selectorIndex = BytecodeUtil.Send1Index(bytecode);
+            var selectorRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, selectorIndex + 1); // +1 to skip header
+            var selector = ObjectMemory.SymbolToString(selectorRef);
+
+            var arg = Pop();
+            var receiver = Pop();
+            var result = SendMessage(receiver, selector, new[] { arg });
+            Push(result);
+            return true;
+        }
+
+        // Send literal selector with 2 args (0xF0-0xFF)
+        // FIXED: Add +1 to skip header at literal[0]
+        if (BytecodeUtil.IsSend2(bytecode))
+        {
+            var selectorIndex = BytecodeUtil.Send2Index(bytecode);
+            var selectorRef = ObjectMemory.GetCompiledMethodLiteral(methodOop, selectorIndex + 1); // +1 to skip header
+            var selector = ObjectMemory.SymbolToString(selectorRef);
+
+            var arg2 = Pop();
+            var arg1 = Pop();
+            var receiver = Pop();
+            var result = SendMessage(receiver, selector, new[] { arg1, arg2 });
+            Push(result);
+            return true;
+        }
+
+        // TODO: Extended bytecodes (0x80-0x86, 0x8A-0x8F, 0xA0-0xAF)
+        throw new NotImplementedException($"Bytecode 0x{bytecode:X2} not yet implemented");
     }
 
     // Stack manipulation helpers
@@ -399,6 +588,188 @@ public sealed class Interpreter
             cachedFalseRef = SObjectRef.Nil;
         }
         return cachedFalseRef ?? SObjectRef.Nil;
+    }
+
+    // Message send helpers
+
+    private void ExecuteSendArithmetic(byte bytecode)
+    {
+        var selector = (bytecode & 0x0F) switch
+        {
+            0x00 => "+",
+            0x01 => "-",
+            0x02 => "<",
+            0x03 => ">",
+            0x04 => "<=",
+            0x05 => ">=",
+            0x06 => "=",
+            0x07 => "~=",
+            0x08 => "*",
+            0x09 => "/",
+            0x0A => "\\\\",
+            0x0B => "@",
+            0x0C => "bitShift:",
+            0x0D => "//",
+            0x0E => "bitAnd:",
+            0x0F => "bitOr:",
+            _ => throw new InvalidOperationException($"Unknown arithmetic bytecode: 0x{bytecode:X2}")
+        };
+
+        var numArgs = selector.Count(c => c == ':');
+        if (numArgs == 0 && selector != "@") numArgs = 1; // Binary selectors have 1 arg
+
+        var args = new SObjectRef[numArgs];
+        for (int i = numArgs - 1; i >= 0; i--)
+        {
+            args[i] = Pop();
+        }
+
+        var receiver = Pop();
+
+        // Try primitive arithmetic for SmallIntegers
+        if (receiver.IsSmallInteger && numArgs > 0 && args[0].IsSmallInteger)
+        {
+            var result = ExecuteIntegerArithmetic(receiver, selector, args[0]);
+            if (!result.IsNil || selector == "=" || selector == "~=" || selector == "<" || selector == ">" || selector == "<=" || selector == ">=")
+            {
+                Push(result);
+                return;
+            }
+        }
+
+        // Fall back to message send
+        var sendResult = SendMessage(receiver, selector, args);
+        Push(sendResult);
+    }
+
+    private void ExecuteSendSpecial(byte bytecode)
+    {
+        var selectorIndex = bytecode & 0x0F;
+        var specialSelectors = new[]
+        {
+            "at:", "at:put:", "size", "next", "nextPut:", "atEnd",
+            "==", "class", "blockCopy:", "value", "value:", "do:",
+            "new", "new:", "x", "y"
+        };
+
+        if (selectorIndex >= specialSelectors.Length)
+        {
+            throw new InvalidOperationException($"Invalid special selector index: {selectorIndex}");
+        }
+
+        var selector = specialSelectors[selectorIndex];
+        var numArgs = selector.Count(c => c == ':');
+        var args = new SObjectRef[numArgs];
+
+        for (int i = numArgs - 1; i >= 0; i--)
+        {
+            args[i] = Pop();
+        }
+
+        var receiver = Pop();
+
+        // Handle special selectors with optimizations
+        switch (selector)
+        {
+            case "==":
+                // Identity comparison
+                var isIdentical = numArgs > 0 && receiver.Equals(args[0]);
+                Push(isIdentical ? GetTrue() : GetFalse());
+                return;
+
+            case "class":
+                var classRef = receiver.IsSmallInteger ? SObjectRef.Nil :
+                               receiver.IsNil ? SObjectRef.Nil :
+                               ObjectMemory.GetClass(receiver.AsObjectPointer());
+                Push(classRef);
+                return;
+
+            case "size":
+                if (receiver.IsHeapObject)
+                {
+                    var size = ObjectMemory.GetIndexedSize(receiver.AsObjectPointer());
+                    Push(SObjectRef.FromSmallInteger(size));
+                    return;
+                }
+                break;
+        }
+
+        // Fall back to message send
+        var result = SendMessage(receiver, selector, args);
+        Push(result);
+    }
+
+    private SObjectRef ExecuteIntegerArithmetic(SObjectRef receiver, string selector, SObjectRef arg)
+    {
+        if (!receiver.IsSmallInteger || !arg.IsSmallInteger)
+            return SObjectRef.Nil;
+
+        var a = receiver.AsSmallInteger();
+        var b = arg.AsSmallInteger();
+
+        try
+        {
+            return selector switch
+            {
+                "+" => SObjectRef.FromSmallInteger(a + b),
+                "-" => SObjectRef.FromSmallInteger(a - b),
+                "*" => SObjectRef.FromSmallInteger(a * b),
+                "/" => b != 0 ? SObjectRef.FromSmallInteger(a / b) : SObjectRef.Nil,
+                "\\\\" => b != 0 ? SObjectRef.FromSmallInteger(a % b) : SObjectRef.Nil,
+                "//" => b != 0 ? SObjectRef.FromSmallInteger(a / b) : SObjectRef.Nil,
+                "<" => a < b ? GetTrue() : GetFalse(),
+                ">" => a > b ? GetTrue() : GetFalse(),
+                "<=" => a <= b ? GetTrue() : GetFalse(),
+                ">=" => a >= b ? GetTrue() : GetFalse(),
+                "=" => a == b ? GetTrue() : GetFalse(),
+                "~=" => a != b ? GetTrue() : GetFalse(),
+                "bitAnd:" => SObjectRef.FromSmallInteger(a & b),
+                "bitOr:" => SObjectRef.FromSmallInteger(a | b),
+                "bitShift:" => b >= 0 ? SObjectRef.FromSmallInteger(a << b) : SObjectRef.FromSmallInteger(a >> (-b)),
+                _ => SObjectRef.Nil
+            };
+        }
+        catch
+        {
+            return SObjectRef.Nil;
+        }
+    }
+
+    private SObjectRef SendMessage(SObjectRef receiverRef, string selector, SObjectRef[] args)
+    {
+        // Look up receiver's class
+        nint classOop;
+        if (receiverRef.IsSmallInteger)
+        {
+            // TODO: Get SmallInteger class from special objects or SystemDictionary
+            throw new NotImplementedException("SmallInteger class lookup not yet implemented");
+        }
+        else if (receiverRef.IsNil)
+        {
+            // TODO: Get UndefinedObject class from special objects or SystemDictionary
+            throw new NotImplementedException("UndefinedObject class lookup not yet implemented");
+        }
+        else if (receiverRef.IsHeapObject)
+        {
+            var receiverClass = ObjectMemory.GetClass(receiverRef.AsObjectPointer());
+            classOop = receiverClass.AsObjectPointer();
+        }
+        else
+        {
+            throw new InvalidOperationException($"Cannot send message to {receiverRef}");
+        }
+
+        // Look up method
+        var methodRef = ObjectMemory.LookupMethod(classOop, selector);
+        if (methodRef.IsNil)
+        {
+            throw new InvalidOperationException($"Method not found: {selector}");
+        }
+
+        // TODO: Check for primitives and execute them
+
+        // Execute method in new context
+        return Execute(methodRef, receiverRef, args);
     }
 
     // Formatting helpers

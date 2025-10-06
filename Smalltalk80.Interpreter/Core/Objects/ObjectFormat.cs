@@ -1,45 +1,37 @@
 namespace Smalltalk80.Interpreter.Core.Objects;
 
 /// <summary>
-/// Defines the format of an object's indexed data per Blue Book specification.
-/// The VM must understand these format types to provide generic access.
+/// Object format enumeration matching Smalltalk-80 Blue Book specification.
+/// Determines how an object's indexed portion is stored and accessed.
 /// </summary>
-public enum ObjectFormat : byte
+public enum ObjectFormat
 {
     /// <summary>
-    /// Object has only named instance variables, no indexed data.
-    /// Example: Point, Character, most user-defined classes
+    /// Object with named instance variables only (no indexed portion).
     /// </summary>
-    FixedPointer = 0,
+    Pointer = 0,
 
     /// <summary>
-    /// Object has named instance variables + indexed pointer fields.
-    /// Indexed fields contain SObjectRef values (objects or SmallIntegers).
-    /// Example: Array, OrderedCollection, Dictionary
-    /// Blue Book formats 0-4 (varying number of fixed fields)
+    /// Object with both named instance variables and indexed pointer fields.
+    /// Used for Array, OrderedCollection, etc.
     /// </summary>
     PointerIndexed = 1,
 
     /// <summary>
-    /// Object has named instance variables + indexed 16-bit word fields.
-    /// Indexed fields contain unsigned 16-bit integers.
-    /// Example: WordArray
-    /// Blue Book format 5
+    /// Object with indexed byte fields (8-bit).
+    /// Used for String, ByteArray, etc.
     /// </summary>
-    WordIndexed = 2,
+    ByteIndexed = 2,
 
     /// <summary>
-    /// Object has named instance variables + indexed byte fields.
-    /// Indexed fields contain unsigned 8-bit bytes.
-    /// Example: String, ByteArray, Symbol
-    /// Blue Book formats 6-7
+    /// Object with indexed word fields (16-bit).
+    /// Used for WordArray, etc.
     /// </summary>
-    ByteIndexed = 3,
+    WordIndexed = 3,
 
     /// <summary>
-    /// Special format for CompiledMethod objects.
-    /// Contains both literal pointers and bytecode bytes.
-    /// Blue Book formats 8-11 (varying number of literal fields)
+    /// CompiledMethod object with special format.
+    /// Header, literals (pointers), and bytecode (bytes).
     /// </summary>
     CompiledMethod = 4
 }

@@ -30,7 +30,7 @@ using Smalltalk80.Interpreter.Core.Values;
 /// - ActiveProcess is accessed via ProcessorScheduler.activeProcess (not a separate root)
 /// - All Smalltalk objects (including SystemDictionary) live in the VM's heap
 /// </summary>
-internal readonly struct SpecialObjectsArray
+public readonly struct SpecialObjectsArray
 {
     /// <summary>
     /// Total number of roots in the Special Objects Array (5).
@@ -95,9 +95,11 @@ internal readonly struct SpecialObjectsArray
             if (ProcessorScheduler.IsNil)
                 return SObjectRef.Nil;
 
-            // ProcessorScheduler has 2 instance variables: [0]=quiescentProcessLists, [1]=activeProcess
-            Generated.Layouts.STProcessorScheduler scheduler = ProcessorScheduler;
-            return scheduler.ActiveProcess;
+            // ProcessorScheduler.activeProcess is field index 1
+            var schedulerOop = ProcessorScheduler.AsObjectPointer();
+            // TODO: Get actual field index from layout when LayoutManagement is implemented
+            const int activeProcessIndex = 1;
+            return ObjectMemory.GetInstanceVariable(schedulerOop, activeProcessIndex);
         }
     }
 
@@ -172,6 +174,16 @@ internal readonly struct SpecialObjectsArray
             SObjectRef.Nil,
             SObjectRef.Nil
         );
+    }
+
+    /// <summary>
+    /// Initializes the Special Objects Array with a fully populated instance from JSON cold start.
+    /// </summary>
+    public static void Initialize(SpecialObjectsArray soa)
+    {
+        _instance = soa;
+        // Cache nil OOP in SObjectRef for fast nil comparisons
+        Core.Values.SObjectRef.SetNilOop(soa.Nil.AsObjectPointer());
     }
 
     /// <summary>
