@@ -1,8 +1,8 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-10-05
+**Last Updated**: 2025-10-06
 **Status**: Current Standing Guidance
-**Current Phase**: VM Implementation - Primitives Complete, Infrastructure Needed
+**Current Phase**: VM Implementation - Primitive Failure Signaling Refactoring In Progress
 
 ## Primary Documentation Reference
 
@@ -226,24 +226,57 @@ Smalltalk-80/
   - Graphics (96-97, 101-102, 104): Requires BitBlt engine
   - System (114-116, 128-131, 139): Requires object enumeration, become:
 
-### ⏳ Infrastructure Gaps (TODO)
+### ⏳ Current Work (IN PROGRESS)
 
-**Critical Missing Components**:
+**Primitive Failure Signaling Refactoring** (ACTIVE - 2025-10-06):
 
-1. **Class Lookup by Name** (HIGH PRIORITY)
-   - Need: `GetClassByName(string className)` → int classId
-   - Used by: Float primitives, LargeInteger primitives, Symbol creation
-   - Workaround: Currently throws NotImplementedException
+The primitives are being refactored to implement Blue Book-compliant failure signaling using a `PrimitiveSuccess` flag instead of nullable returns.
 
-2. **Special Objects Array Access** (HIGH PRIORITY)
-   - Need: Access to nil, true, false object IDs
-   - Used by: Comparison primitives (should return true/false, not 0/1)
-   - Workaround: Currently returns SmallInteger 0/1
+**Status**:
+- ✅ Added `PrimitiveSuccess` flag to IPrimitiveContext interface
+- ✅ Implemented flag in VirtualMachine class
+- ✅ Updated PrimitiveTable.Execute() to set flag before calling primitives
+- ✅ Updated PrimitiveFunction delegate from `SObjectRef?` to `SObjectRef`
+- ⏳ **TODO**: Update all 111 primitives across 9 files (see instructions below)
+- ⏳ **TODO**: Update VirtualMachine.SendMessage to check PrimitiveSuccess flag
+- ⏳ **TODO**: Implement SmallInteger overflow promotion to LargeInteger
 
-3. **GetIndexedSize API** (HIGH PRIORITY)
-   - Need: `SmalltalkHeap.GetIndexedSize(int objectId)` → int count
-   - Used by: Size primitives, string operations, array bounds checking
-   - Workaround: Try-catch probing (inefficient)
+**Transformation Pattern**:
+```csharp
+// OLD (WRONG):
+public static SObjectRef? Primitive(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+{
+    if (args.Length != 1) return null;  // WRONG
+    // ... logic ...
+}
+
+// NEW (CORRECT):
+public static SObjectRef Primitive(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+{
+    if (args.Length != 1)
+    {
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
+    }
+    // ... logic ...
+}
+```
+
+### ⏳ Infrastructure Gaps (COMPLETED)
+
+**Previously Critical - Now Complete**:
+
+1. ✅ **Class Lookup by Name** - DONE
+   - Implemented: `GetClassByName(string className)` → int classId
+   - Location: SmalltalkHeap.cs
+
+2. ✅ **Special Objects Array Access** - DONE
+   - Direct access: `SpecialObjectsArray.Instance.True/False/Nil`
+   - Removed unnecessary wrapper methods per user feedback
+
+3. ✅ **GetIndexedSize API** - DONE
+   - Implemented: `SmalltalkHeap.GetIndexedSize(int objectId)` → int count
+   - Location: SmalltalkHeap.cs
 
 4. **Symbol Interning Infrastructure** (MEDIUM PRIORITY)
    - Need: Symbol table lookup and insertion

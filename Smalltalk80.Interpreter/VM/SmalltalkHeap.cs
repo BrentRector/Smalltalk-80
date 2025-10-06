@@ -910,4 +910,42 @@ public class SmalltalkHeap : ISmalltalkHeap
     {
         return _optimizedSelectorNames;
     }
+
+    // ========== Infrastructure APIs for Primitives ==========
+
+    /// <summary>
+    /// Gets a class object ID by class name.
+    /// Used by primitives that need to instantiate specific classes (Float, LargeInteger, etc.).
+    /// </summary>
+    public int GetClassByName(string className)
+    {
+        if (!GlobalRegistry.TryGet($"class:{className}", out int classId))
+        {
+            throw new ArgumentException($"Class not found: {className}");
+        }
+        return classId;
+    }
+
+    /// <summary>
+    /// Gets the size of the indexed portion of an object.
+    /// Returns 0 if the object has no indexed portion.
+    /// </summary>
+    public int GetIndexedSize(int objectId)
+    {
+        if (IsSmallInteger(objectId))
+            return 0; // SmallIntegers have no indexed portion
+
+        int tableIndex = GetTableIndex(objectId);
+
+        if (!_objectTable.TryGetValue(tableIndex, out var objectData))
+            throw new ArgumentException($"Invalid object ID: {objectId}");
+
+        return objectData.IndexedData switch
+        {
+            int[] pointerArray => pointerArray.Length,
+            byte[] byteArray => byteArray.Length,
+            ushort[] wordArray => wordArray.Length,
+            _ => 0
+        };
+    }
 }

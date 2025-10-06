@@ -1,3 +1,5 @@
+using Smalltalk80.Interpreter.Core.Values;
+
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
 /// <summary>
@@ -17,17 +19,9 @@ public interface IPrimitiveContext
     LayoutResolver LayoutResolver { get; }
 
     /// <summary>
-    /// Checks if an object ID is a SmallInteger.
+    /// Gets or sets the primitive success flag.
+    /// Primitives set this to false to signal failure, causing the VM to execute fallback bytecodes.
+    /// The VM sets this to true before calling each primitive.
     /// </summary>
-    bool IsSmallInteger(int objectId);
-
-    /// <summary>
-    /// Encodes an integer as a SmallInteger object ID.
-    /// </summary>
-    int EncodeSmallInteger(int value);
-
-    /// <summary>
-    /// Decodes a SmallInteger object ID to an integer.
-    /// </summary>
-    int DecodeSmallInteger(int objectId);
+    bool PrimitiveSuccess { get; set; }
 }

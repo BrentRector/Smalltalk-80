@@ -1,3 +1,5 @@
+using Smalltalk80.Interpreter.Core.Values;
+
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
 /// <summary>
@@ -9,77 +11,77 @@ public static class InputPrimitives
     /// <summary>
     /// Primitive 90: mousePoint - Get current mouse position as Point.
     /// </summary>
-    public static PrimitiveResult MousePoint(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? MousePoint(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement when IDisplayProvider is added
         // Should return Point object with x and y coordinates
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     /// <summary>
     /// Primitive 91: cursorLocPut: - Set cursor position.
     /// </summary>
-    public static PrimitiveResult CursorLocPut(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? CursorLocPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement cursor positioning
         // Requires: IDisplayProvider, Point extraction
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     /// <summary>
     /// Primitive 92: cursorLink: - Link cursor to Form.
     /// </summary>
-    public static PrimitiveResult CursorLink(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? CursorLink(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement cursor linking
         // Requires: IDisplayProvider, Form support
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     /// <summary>
     /// Primitive 93: inputSemaphore: - Set input event semaphore.
     /// </summary>
-    public static PrimitiveResult InputSemaphore(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? InputSemaphore(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement input semaphore registration
         // Requires: Event system, Semaphore support
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     /// <summary>
     /// Primitive 94: sampleInterval: - Set input sampling interval.
     /// </summary>
-    public static PrimitiveResult SampleInterval(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? SampleInterval(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement sampling interval setting
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     /// <summary>
     /// Primitive 95: inputWord - Read raw input event word.
     /// </summary>
-    public static PrimitiveResult InputWord(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? InputWord(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return PrimitiveResult.Failed();
+            return null;
 
         // TODO: Implement input word reading
         // Requires: IDisplayProvider.GetInputWord()
-        return PrimitiveResult.Failed();
+        return null;
     }
 }

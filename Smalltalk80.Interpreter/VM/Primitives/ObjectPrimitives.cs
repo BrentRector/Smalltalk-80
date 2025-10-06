@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Memory;
 
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
@@ -9,253 +11,259 @@ namespace Smalltalk80.Interpreter.VM.Primitives;
 public static class ObjectPrimitives
 {
     // Primitive 60: Array at:
-    public static PrimitiveResult At(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? At(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed(); // Smalltalk arrays are 1-indexed
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null; // Smalltalk arrays are 1-indexed
 
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetIndexedField(receiver, index - 1);
-            return PrimitiveResult.Succeeded(value);
+            int value = ctx.Heap.GetIndexedField((int)receiver.AsObjectPointer(), index - 1);
+            return SObjectRef.FromObjectPointer(value);
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 61: Array at:put:
-    public static PrimitiveResult AtPut(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? AtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 2) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 2) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed();
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null;
 
-        int value = args[1];
+        SObjectRef value = args[1];
 
         try
         {
             // Convert to 0-based index
-            ctx.Heap.SetIndexedField(receiver, index - 1, value);
-            return PrimitiveResult.Succeeded(value);
+            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
+            ctx.Heap.SetIndexedField((int)receiver.AsObjectPointer(), index - 1, valueAsInt);
+            return value;
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 62: Object size
-    public static PrimitiveResult Size(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Size(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
 
-        // For now, this requires heap support - return failed
-        // TODO: Add GetIndexedSize to heap interface
-        return PrimitiveResult.Failed();
+        if (receiver.IsSmallInteger)
+            return null; // SmallIntegers don't have a size
+
+        int indexedSize = ctx.Heap.GetIndexedSize((int)receiver.AsObjectPointer());
+        return SObjectRef.FromSmallInteger(indexedSize);
     }
 
     // Primitive 70: Object new
-    public static PrimitiveResult New(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? New(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
 
         // Receiver is the class
         // Need to allocate new instance with appropriate size
         // TODO: Implement when we have class metadata access
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 71: Object new:
-    public static PrimitiveResult NewWithSize(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? NewWithSize(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int size = ctx.DecodeSmallInteger(args[0]);
-        if (size < 0) return PrimitiveResult.Failed();
+        int size = args[0].AsSmallInteger();
+        if (size < 0) return null;
 
         // Allocate indexed object of given size
         // TODO: Implement when we have proper class allocation
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 110: Object ==
-    public static PrimitiveResult IdentityEquals(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? IdentityEquals(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
 
-        bool identical = receiver == args[0];
-        return PrimitiveResult.Succeeded(identical ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId);
+        return receiver == args[0]
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 111: Object class
-    public static PrimitiveResult Class(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Class(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
 
         try
         {
-            int classId = ctx.Heap.GetClass(receiver);
-            return PrimitiveResult.Succeeded(classId);
+            int classId = ctx.Heap.GetClass((int)receiver.AsObjectPointer());
+            return SObjectRef.FromObjectPointer(classId);
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 70-77: Instance variable access
     // These are optimized for getting/setting instance variables
 
-    public static PrimitiveResult InstVarAt(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? InstVarAt(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed();
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null;
 
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetField(receiver, index - 1);
-            return PrimitiveResult.Succeeded(value);
+            int value = ctx.Heap.GetField((int)receiver.AsObjectPointer(), index - 1);
+            return SObjectRef.FromObjectPointer(value);
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
-    public static PrimitiveResult InstVarAtPut(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? InstVarAtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 2) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 2) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed();
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null;
 
-        int value = args[1];
+        SObjectRef value = args[1];
 
         try
         {
             // Convert to 0-based index
-            ctx.Heap.SetField(receiver, index - 1, value);
-            return PrimitiveResult.Succeeded(value);
+            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
+            ctx.Heap.SetField((int)receiver.AsObjectPointer(), index - 1, valueAsInt);
+            return value;
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 63: String at: (character access for byte-indexed objects)
-    public static PrimitiveResult StringAt(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? StringAt(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0])) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
+        if (!args[0].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed(); // Smalltalk arrays are 1-indexed
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null; // Smalltalk arrays are 1-indexed
 
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetIndexedField(receiver, index - 1);
-            return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(value & 0xFF)); // Ensure byte range
+            int value = ctx.Heap.GetIndexedField((int)receiver.AsObjectPointer(), index - 1);
+            return SObjectRef.FromSmallInteger(value & 0xFF); // Ensure byte range
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 64: String at:put: (character store for byte-indexed objects)
-    public static PrimitiveResult StringAtPut(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? StringAtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 2) return PrimitiveResult.Failed();
-        if (!ctx.IsSmallInteger(args[0]) || !ctx.IsSmallInteger(args[1])) return PrimitiveResult.Failed();
+        if (args.Length != 2) return null;
+        if (!args[0].IsSmallInteger || !args[1].IsSmallInteger) return null;
 
-        int index = ctx.DecodeSmallInteger(args[0]);
-        if (index < 1) return PrimitiveResult.Failed();
+        int index = args[0].AsSmallInteger();
+        if (index < 1) return null;
 
-        int charValue = ctx.DecodeSmallInteger(args[1]);
-        if (charValue < 0 || charValue > 255) return PrimitiveResult.Failed();
+        int charValue = args[1].AsSmallInteger();
+        if (charValue < 0 || charValue > 255) return null;
 
         try
         {
             // Convert to 0-based index
-            ctx.Heap.SetIndexedField(receiver, index - 1, charValue);
-            return PrimitiveResult.Succeeded(args[1]);
+            ctx.Heap.SetIndexedField((int)receiver.AsObjectPointer(), index - 1, charValue);
+            return args[1];
         }
         catch
         {
-            return PrimitiveResult.Failed();
+            return null;
         }
     }
 
     // Primitive 65: Stream next (stub - requires Stream support)
-    public static PrimitiveResult Next(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Next(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
         // TODO: Implement when Stream support is added
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 66: Stream nextPut: (stub - requires Stream support)
-    public static PrimitiveResult NextPut(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? NextPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
         // TODO: Implement when Stream support is added
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 67: Stream atEnd (stub - requires Stream support)
-    public static PrimitiveResult AtEnd(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? AtEnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
         // TODO: Implement when Stream support is added
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 68: Object become: (object swapping - stub)
-    public static PrimitiveResult Become(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Become(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 1) return PrimitiveResult.Failed();
+        if (args.Length != 1) return null;
 
         // Cannot become with SmallIntegers
-        if (ctx.IsSmallInteger(receiver) || ctx.IsSmallInteger(args[0]))
-            return PrimitiveResult.Failed();
+        if (receiver.IsSmallInteger || args[0].IsSmallInteger)
+            return null;
 
         // TODO: Implement object swapping in heap
         // This requires deep memory manipulation
-        return PrimitiveResult.Failed();
+        return null;
     }
 
     // Primitive 75: Object hash
-    public static PrimitiveResult Hash(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Hash(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
-        if (args.Length != 0) return PrimitiveResult.Failed();
+        if (args.Length != 0) return null;
 
         // Use object ID as hash for heap objects
         // For SmallIntegers, use the value itself
-        if (ctx.IsSmallInteger(receiver))
+        if (receiver.IsSmallInteger)
         {
-            return PrimitiveResult.Succeeded(receiver);
+            return receiver;
         }
         else
         {
             // Object ID is already a good hash
-            int hash = receiver >> 1; // Remove pointer tag
-            return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(hash & 0x1FFFFFFF));
+            int oop = (int)receiver.AsObjectPointer();
+            int hash = oop >> 1; // Remove pointer tag
+            return SObjectRef.FromSmallInteger(hash & 0x1FFFFFFF);
         }
     }
 }

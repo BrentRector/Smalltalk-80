@@ -1,9 +1,13 @@
+using Smalltalk80.Interpreter.Core.Values;
+
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
 /// <summary>
 /// Delegate type for primitive operations.
+/// Primitives always return an SObjectRef. On success, they return the result.
+/// On failure, they set ctx.PrimitiveSuccess = false and return Nil (value is ignored by VM).
 /// </summary>
-public delegate PrimitiveResult PrimitiveFunction(IPrimitiveContext ctx, int receiver, int[] args);
+public delegate SObjectRef PrimitiveFunction(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args);
 
 /// <summary>
 /// Central table mapping primitive numbers to their implementations.
@@ -20,15 +24,20 @@ public static class PrimitiveTable
 
     /// <summary>
     /// Executes a primitive by number.
-    /// Returns null if primitive doesn't exist or fails.
+    /// Sets ctx.PrimitiveSuccess = true before calling, primitives set it to false on failure.
+    /// Returns the primitive result (or Nil if primitive not found - with PrimitiveSuccess=false).
     /// </summary>
-    public static PrimitiveResult? Execute(int primitiveNumber, IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef Execute(int primitiveNumber, IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
+            ctx.PrimitiveSuccess = true; // Set success flag before calling primitive
             return primitive(ctx, receiver, args);
         }
-        return null; // Primitive not found
+
+        // Primitive not found - signal failure
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     private static void RegisterPrimitives()

@@ -1,6 +1,6 @@
 # Smalltalk-80 Interpreter Architecture
 
-**Last Updated**: 2025-10-05
+**Last Updated**: 2025-10-06
 **Status**: ✅ VM Implementation Complete - Bytecode Interpreter & Primitives Operational
 **Build**: ✅ Smalltalk80.Interpreter Compiles Successfully
 **Cold Start Format**: JSON-based (Schema v1.0.0) - ✅ Complete & Working
@@ -2278,6 +2278,116 @@ The Smalltalk-80 system organizes primitives into functional categories:
 | **Control Primitives** | 80-89 | blocks, perform:, semaphores | ⚠️ Partial (9/10) - missing 89 |
 | **I/O & Graphics Primitives** | 90-109 | Graphics, files, time | ⚠️ Partial (16/20) - 90-105 done |
 | **System Primitives** | 110-127, 128-139 | ==, class, quit, GC | ⚠️ Partial (10/20) |
+
+### Primitive Failure Signaling Mechanism
+
+**Blue Book Specification**: Primitives signal failure by clearing the VM's primitive-success flag before returning.
+
+#### Architecture
+
+The interpreter maintains a **primitive-success flag** (boolean state) that controls primitive execution flow:
+
+1. **Before Primitive Execution**:
+   - VM sets `primitiveSuccess = true`
+   - VM calls the primitive function
+
+2. **During Primitive Execution**:
+   - If primitive **succeeds**: Returns result (flag remains `true`)
+   - If primitive **fails**: Sets `primitiveSuccess = false` and returns
+
+3. **After Primitive Returns**:
+   - VM checks `primitiveSuccess` flag
+   - If `true`: Uses primitive result, method execution completes
+   - If `false`: Ignores primitive result, executes method's fallback bytecodes
+
+#### Implementation Pattern
+
+**STATUS (2025-10-06)**: ⏳ Refactoring in progress to use PrimitiveSuccess flag
+
+**Target C# Implementation** (Blue Book compliant with PrimitiveSuccess flag):
+
+```csharp
+// Primitive ALWAYS returns SObjectRef (non-nullable)
+// - Success: return SObjectRef result (PrimitiveSuccess remains true)
+// - Failure: set ctx.PrimitiveSuccess = false, return Nil (value ignored by VM)
+public static SObjectRef PrimitiveAdd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+{
+    // Type check
+    if (!receiver.IsSmallInteger || args.Length != 1 || !args[0].IsSmallInteger)
+    {
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil; // Value ignored by VM
+    }
+
+    // Overflow check
+    long sum = (long)receiver.AsSmallInteger() + args[0].AsSmallInteger();
+    if (sum < SmallIntegerMin || sum > SmallIntegerMax)
+    {
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil; // Value ignored by VM
+    }
+
+    // SUCCESS - return result (PrimitiveSuccess remains true)
+    return SObjectRef.FromSmallInteger((int)sum);
+}
+```
+
+**VM Dispatcher Pattern**:
+
+```csharp
+// In VirtualMachine.cs bytecode interpreter
+if (primitiveNumber > 0)
+{
+    // PrimitiveTable.Execute sets ctx.PrimitiveSuccess = true before calling primitive
+    SObjectRef primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiver, args);
+
+    if (this.PrimitiveSuccess) // Check the flag (set by primitive)
+    {
+        // Primitive succeeded - use result and return
+        Push(primitiveResult);
+        return;
+    }
+
+    // Primitive failed (PrimitiveSuccess = false) - ignore result, execute method bytecodes as fallback
+}
+
+// Execute method bytecodes (primitive fallback or no primitive)
+ExecuteBytecodes(method);
+```
+
+**Implementation Status**:
+- ✅ `IPrimitiveContext.PrimitiveSuccess` property added
+- ✅ `VirtualMachine._primitiveSuccess` field implemented
+- ✅ `PrimitiveTable.Execute()` sets flag before calling primitives
+- ✅ `PrimitiveFunction` delegate changed to return `SObjectRef` (non-nullable)
+- ⏳ TODO: Update all 111 primitives to use new pattern
+- ⏳ TODO: Update VirtualMachine.SendMessage to check PrimitiveSuccess flag
+
+#### Fallback Execution Example
+
+**Smalltalk Method with Primitive**:
+```smalltalk
+SmallInteger>>+ aNumber
+    <primitive: 1>
+    "Fallback: if primitive fails (overflow), use LargeInteger arithmetic"
+    ^ self + aNumber asLargeInteger
+```
+
+**Execution Flow**:
+1. VM executes primitive 1 (SmallInteger addition)
+2. If no overflow: Primitive returns result → method completes
+3. If overflow: Primitive returns `null` → VM executes fallback bytecodes → creates LargeInteger
+
+#### Failure Reasons
+
+Primitives fail for several reasons:
+- **Type mismatch**: Receiver or arguments wrong type
+- **Argument count**: Wrong number of arguments
+- **Overflow**: Result exceeds SmallInteger range
+- **Resource unavailable**: File not found, semaphore timeout, etc.
+- **Unimplemented**: Primitive stub (returns `null`)
+
+The fallback bytecodes handle all failure cases, ensuring Smalltalk code always produces correct results even when primitives cannot execute.
 
 ### Primitive Dispatcher Architecture
 

@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.VM.Primitives;
 
 namespace Smalltalk80.Interpreter.VM;
@@ -15,6 +16,9 @@ public class VirtualMachine : IPrimitiveContext
 
     // Active context (current MethodContext being executed)
     private int _activeContextId;
+
+    // Primitive success flag (Blue Book specification)
+    private bool _primitiveSuccess;
 
     public VirtualMachine(SmalltalkHeap heap, LayoutResolver layoutResolver)
     {
@@ -472,16 +476,27 @@ public class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodId);
         if (primitiveNumber > 0)
         {
-            // Try to execute the primitive
-            var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverId, args);
-
-            if (primitiveResult.HasValue && primitiveResult.Value.Success)
+            // Convert receiver and args to SObjectRef for primitive execution
+            SObjectRef receiver = SObjectRef.FromObjectPointer(receiverId);
+            SObjectRef[] sobjectArgs = new SObjectRef[args.Length];
+            for (int i = 0; i < args.Length; i++)
             {
-                // Primitive succeeded, return its result
-                return primitiveResult.Value.ReturnValue;
+                sobjectArgs[i] = SObjectRef.FromObjectPointer(args[i]);
             }
 
-            // Primitive failed, fall through to execute the method's bytecode
+            // Try to execute the primitive
+            SObjectRef? primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiver, sobjectArgs);
+
+            if (primitiveResult.HasValue)
+            {
+                // Primitive succeeded - convert result back to int
+                SObjectRef result = primitiveResult.Value;
+                return result.IsSmallInteger
+                    ? (int)result.AsSmallInteger()
+                    : (int)result.AsObjectPointer();
+            }
+
+            // Primitive failed - execute method bytecodes as fallback
         }
 
         // Execute the method
@@ -547,7 +562,5 @@ public class VirtualMachine : IPrimitiveContext
     // IPrimitiveContext implementation
     SmalltalkHeap IPrimitiveContext.Heap => _heap;
     LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
-    bool IPrimitiveContext.IsSmallInteger(int objectId) => IsSmallInteger(objectId);
-    int IPrimitiveContext.EncodeSmallInteger(int value) => EncodeSmallInteger(value);
-    int IPrimitiveContext.DecodeSmallInteger(int objectId) => DecodeSmallInteger(objectId);
+    bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 }

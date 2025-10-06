@@ -1,4 +1,6 @@
 using System.Numerics;
+using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Memory;
 
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
@@ -11,9 +13,10 @@ public static class LargeIntegerPrimitives
     /// <summary>
     /// Converts a LargeInteger object to a BigInteger.
     /// </summary>
-    private static BigInteger ToBigInteger(IPrimitiveContext ctx, int largeIntId)
+    private static BigInteger ToBigInteger(IPrimitiveContext ctx, SObjectRef largeIntRef)
     {
         // Get the byte array from the LargeInteger object
+        int largeIntId = (int)largeIntRef.AsObjectPointer();
         int size = GetIndexedSize(ctx, largeIntId);
         byte[] bytes = new byte[size];
 
@@ -28,7 +31,7 @@ public static class LargeIntegerPrimitives
     /// <summary>
     /// Creates a LargeInteger object from a BigInteger.
     /// </summary>
-    private static int FromBigInteger(IPrimitiveContext ctx, BigInteger value)
+    private static SObjectRef FromBigInteger(IPrimitiveContext ctx, BigInteger value)
     {
         byte[] bytes = value.ToByteArray();
 
@@ -48,18 +51,18 @@ public static class LargeIntegerPrimitives
             ctx.Heap.SetIndexedField(largeIntId, i, bytes[i]);
         }
 
-        return largeIntId;
+        return SObjectRef.FromObjectPointer(largeIntId);
     }
 
     /// <summary>
     /// Checks if an object is a LargeInteger.
     /// </summary>
-    private static bool IsLargeInteger(IPrimitiveContext ctx, int objectId)
+    private static bool IsLargeInteger(IPrimitiveContext ctx, SObjectRef objectRef)
     {
-        if (ctx.IsSmallInteger(objectId))
+        if (objectRef.IsSmallInteger)
             return false;
 
-        int classId = ctx.Heap.GetClass(objectId);
+        int classId = ctx.Heap.GetClass((int)objectRef.AsObjectPointer());
         // TODO: Check if classId is LargePositiveInteger or LargeNegativeInteger
         // For now, assume any non-SmallInteger numeric type might be LargeInteger
         return true; // Temporary - needs proper class checking
@@ -67,316 +70,319 @@ public static class LargeIntegerPrimitives
 
     /// <summary>
     /// Gets indexed size of an object.
-    /// TODO: This should be in SmalltalkHeap API
     /// </summary>
     private static int GetIndexedSize(IPrimitiveContext ctx, int objectId)
     {
-        // TODO: Need SmalltalkHeap.GetIndexedSize() method
-        // For now, we'll have to probe until we hit an exception
-        throw new NotImplementedException("GetIndexedSize not yet implemented in SmalltalkHeap");
+        return ctx.Heap.GetIndexedSize(objectId);
     }
 
     /// <summary>
     /// Gets the LargeInteger class ID.
-    /// TODO: This should use class lookup by name.
     /// </summary>
     private static int GetLargeIntegerClass(IPrimitiveContext ctx, bool isPositive)
     {
-        // TODO: Need class lookup infrastructure
-        throw new NotImplementedException("LargeInteger class lookup not yet implemented");
+        // In Smalltalk-80, there are two classes: LargePositiveInteger and LargeNegativeInteger
+        return isPositive
+            ? ctx.Heap.GetClassByName("LargePositiveInteger")
+            : ctx.Heap.GetClassByName("LargeNegativeInteger");
     }
 
     // Primitive 21: LargeInteger + (addition)
-    public static PrimitiveResult Add(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left + right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 22: LargeInteger - (subtraction)
-    public static PrimitiveResult Subtract(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left - right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 23: LargeInteger < (less than)
-    public static PrimitiveResult LessThan(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isLess = left < right;
 
-        // TODO: Should return true/false objects from special objects array
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isLess ? 1 : 0));
+        return left < right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 24: LargeInteger > (greater than)
-    public static PrimitiveResult GreaterThan(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isGreater = left > right;
 
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isGreater ? 1 : 0));
+        return left > right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 25: LargeInteger <= (less than or equal)
-    public static PrimitiveResult LessOrEqual(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isLessOrEqual = left <= right;
 
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isLessOrEqual ? 1 : 0));
+        return left <= right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 26: LargeInteger >= (greater than or equal)
-    public static PrimitiveResult GreaterOrEqual(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isGreaterOrEqual = left >= right;
 
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isGreaterOrEqual ? 1 : 0));
+        return left >= right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 27: LargeInteger = (equality)
-    public static PrimitiveResult Equal(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isEqual = left == right;
 
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isEqual ? 1 : 0));
+        return left == right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 28: LargeInteger ~= (not equal)
-    public static PrimitiveResult NotEqual(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
-        bool isNotEqual = left != right;
 
-        return PrimitiveResult.Succeeded(ctx.EncodeSmallInteger(isNotEqual ? 1 : 0));
+        return left != right
+            ? SpecialObjectsArray.Instance.True
+            : SpecialObjectsArray.Instance.False;
     }
 
     // Primitive 29: LargeInteger * (multiplication)
-    public static PrimitiveResult Multiply(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left * right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 30: LargeInteger / (division - fails if not exact)
-    public static PrimitiveResult Divide(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger quotient = BigInteger.DivRem(dividend, divisor, out BigInteger remainder);
 
         if (remainder != BigInteger.Zero)
-            return PrimitiveResult.Failed(); // Let Smalltalk create Fraction
+            return null; // Let Smalltalk create Fraction
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, quotient));
+        return FromBigInteger(ctx, quotient);
     }
 
     // Primitive 31: LargeInteger \\ (modulo)
-    public static PrimitiveResult Mod(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Mod(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger remainder = dividend % divisor;
         if (remainder != BigInteger.Zero && (dividend < BigInteger.Zero) != (divisor < BigInteger.Zero))
             remainder += divisor;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, remainder));
+        return FromBigInteger(ctx, remainder);
     }
 
     // Primitive 32: LargeInteger // (integer division)
-    public static PrimitiveResult Div(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Div(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger quotient = dividend / divisor;
         if ((dividend < BigInteger.Zero) != (divisor < BigInteger.Zero) && dividend % divisor != BigInteger.Zero)
             quotient--;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, quotient));
+        return FromBigInteger(ctx, quotient);
     }
 
     // Primitive 33: LargeInteger quo: (truncated division)
-    public static PrimitiveResult Quo(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? Quo(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger quotient = dividend / divisor;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, quotient));
+        return FromBigInteger(ctx, quotient);
     }
 
     // Primitive 34: LargeInteger bitAnd:
-    public static PrimitiveResult BitAnd(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? BitAnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left & right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 35: LargeInteger bitOr:
-    public static PrimitiveResult BitOr(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? BitOr(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left | right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 36: LargeInteger bitXor:
-    public static PrimitiveResult BitXor(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? BitXor(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return PrimitiveResult.Failed();
+            return null;
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
         BigInteger result = left ^ right;
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 
     // Primitive 37: LargeInteger bitShift:
-    public static PrimitiveResult BitShift(IPrimitiveContext ctx, int receiver, int[] args)
+    public static SObjectRef? BitShift(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return PrimitiveResult.Failed();
+            return null;
 
-        if (!IsLargeInteger(ctx, receiver) || !ctx.IsSmallInteger(args[0]))
-            return PrimitiveResult.Failed();
+        if (!IsLargeInteger(ctx, receiver) || !args[0].IsSmallInteger)
+            return null;
 
         BigInteger value = ToBigInteger(ctx, receiver);
-        int shiftCount = ctx.DecodeSmallInteger(args[0]);
+        int shiftCount = args[0].AsSmallInteger();
 
         BigInteger result = shiftCount switch
         {
@@ -385,6 +391,6 @@ public static class LargeIntegerPrimitives
             < 0 => value >> -shiftCount
         };
 
-        return PrimitiveResult.Succeeded(FromBigInteger(ctx, result));
+        return FromBigInteger(ctx, result);
     }
 }
