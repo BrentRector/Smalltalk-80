@@ -279,6 +279,18 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMessageExpr([NotNull] Smalltalk80Parser.MessageExprContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.binaryExpr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitBinaryExpr([NotNull] Smalltalk80Parser.BinaryExprContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.unaryExpr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitUnaryExpr([NotNull] Smalltalk80Parser.UnaryExprContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.messageBase"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

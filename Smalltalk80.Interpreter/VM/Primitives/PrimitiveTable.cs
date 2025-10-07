@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Memory;
 
 namespace Smalltalk80.Interpreter.VM.Primitives;
 

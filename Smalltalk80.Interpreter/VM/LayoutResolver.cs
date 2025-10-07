@@ -55,6 +55,16 @@ public class LayoutResolver
     }
 
     /// <summary>
+    /// Gets the total number of instance variables (including inherited) for a class.
+    /// </summary>
+    /// <param name="classLocalId">Local ID of the class</param>
+    /// <returns>Total instance variable count, or 0 if class not found</returns>
+    public int GetInstanceVariableCount(string classLocalId)
+    {
+        return _fieldMap.TryGetValue(classLocalId, out var fields) ? fields.Count : 0;
+    }
+
+    /// <summary>
     /// Topologically sorts classes so that superclasses appear before subclasses.
     /// This ensures we process parent layouts before child layouts.
     /// </summary>

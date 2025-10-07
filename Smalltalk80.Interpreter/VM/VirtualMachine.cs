@@ -485,15 +485,14 @@ public class VirtualMachine : IPrimitiveContext
             }
 
             // Try to execute the primitive
-            SObjectRef? primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiver, sobjectArgs);
+            SObjectRef primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiver, sobjectArgs);
 
-            if (primitiveResult.HasValue)
+            if (_primitiveSuccess)
             {
                 // Primitive succeeded - convert result back to int
-                SObjectRef result = primitiveResult.Value;
-                return result.IsSmallInteger
-                    ? (int)result.AsSmallInteger()
-                    : (int)result.AsObjectPointer();
+                return primitiveResult.IsSmallInteger
+                    ? (int)primitiveResult.AsSmallInteger()
+                    : (int)primitiveResult.AsObjectPointer();
             }
 
             // Primitive failed - execute method bytecodes as fallback
@@ -563,4 +562,207 @@ public class VirtualMachine : IPrimitiveContext
     SmalltalkHeap IPrimitiveContext.Heap => _heap;
     LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
+
+    int IPrimitiveContext.GetFieldValue(int oop, string className, string fieldName)
+    {
+        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        return _heap.GetField(oop, fieldIndex);
+    }
+
+    void IPrimitiveContext.SetFieldValue(int oop, string className, string fieldName, int value)
+    {
+        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        _heap.SetField(oop, fieldIndex, value);
+    }
+
+    Memory<byte> IPrimitiveContext.GetByteArray(int oop)
+    {
+        // Get indexed size to verify it's a byte array
+        int size = _heap.GetIndexedSize(oop);
+        if (size == 0)
+            return Memory<byte>.Empty;
+
+        // For now, return empty - need to implement byte array access in heap
+        // TODO: Add GetIndexedBytes method to SmalltalkHeap
+        return Memory<byte>.Empty;
+    }
+
+    int IPrimitiveContext.AllocateObject(string className, int indexedSize)
+    {
+        // Look up class ID using layout resolver
+        // For now, use a simple approach - this needs proper class lookup
+        // TODO: Add class name to class ID mapping in heap or layout resolver
+
+        // Get format from class name
+        var format = indexedSize > 0
+            ? SmalltalkHeap.ObjectFormat.ByteIndexed  // Default for indexed objects (bytes)
+            : SmalltalkHeap.ObjectFormat.FixedPointer;
+
+        // Count fields in the class layout
+        int fixedSize = 0;
+        try
+        {
+            // Try to count fields - this will fail if class not in layout
+            var fieldNames = new System.Collections.Generic.List<string>();
+            int index = 0;
+            while (true)
+            {
+                try
+                {
+                    _layoutResolver.GetFieldIndex(className, $"field{index}");
+                    index++;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+            fixedSize = index;
+        }
+        catch
+        {
+            fixedSize = 0;  // No fixed fields
+        }
+
+        // Allocate using heap
+        return _heap.AllocateRawObject(
+            classId: 0, // TODO: Proper class ID lookup
+            format: format,
+            fixedSize: fixedSize,
+            indexedSize: indexedSize
+        );
+    }
+
+    int IPrimitiveContext.SendMessage(int receiverOop, int selectorOop, int argumentsArray)
+    {
+        // Extract arguments from the array
+        int argCount = _heap.GetIndexedSize(argumentsArray);
+        int[] args = new int[argCount];
+        for (int i = 0; i < argCount; i++)
+        {
+            args[i] = _heap.GetIndexedField(argumentsArray, i);
+        }
+
+        // Call the private SendMessage method
+        return SendMessage(receiverOop, selectorOop, args);
+    }
+
+    int IPrimitiveContext.GetActiveContext()
+    {
+        return _activeContextId;
+    }
+
+    int IPrimitiveContext.GetInstructionPointer()
+    {
+        // Get the instruction pointer from the active context
+        int ipIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
+        int ipOop = _heap.GetField(_activeContextId, ipIndex);
+        return DecodeSmallInteger(ipOop);
+    }
+
+    int IPrimitiveContext.CreateBlockContext(int homeContextOop, int startPC, int argCount)
+    {
+        // Determine the home context (if current context is already a BlockContext, use its home)
+        int actualHome = homeContextOop;
+
+        // Check if homeContextOop is a BlockContext - if so, get its home field
+        // For simplicity, we'll use the passed homeContextOop directly for now
+        // TODO: Implement proper home context resolution for nested blocks
+
+        // Calculate stack size (args + some execution stack space)
+        int stackSize = argCount + 16; // 16 slots for execution stack
+
+        // Allocate BlockContext with indexed fields for stack
+        int blockContextOop = _heap.AllocateRawObject(
+            classId: 0, // TODO: Get BlockContext class ID
+            format: SmalltalkHeap.ObjectFormat.PointerIndexed,
+            fixedSize: 3, // home, startpc, nargs (inherited fields from ContextPart are handled by superclass)
+            indexedSize: stackSize
+        );
+
+        // Get field indices using LayoutResolver
+        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+        int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
+        int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
+        int stackpIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "stackp");
+
+        // Initialize BlockContext fields
+        _heap.SetField(blockContextOop, homeIndex, actualHome);
+        _heap.SetField(blockContextOop, startpcIndex, EncodeSmallInteger(startPC));
+        _heap.SetField(blockContextOop, nargsIndex, EncodeSmallInteger(argCount));
+        _heap.SetField(blockContextOop, stackpIndex, EncodeSmallInteger(0)); // Stack starts empty
+
+        // Initialize indexed fields to nil
+        for (int i = 0; i < stackSize; i++)
+        {
+            _heap.SetIndexedField(blockContextOop, i, GlobalRegistry.NilObjectId);
+        }
+
+        return blockContextOop;
+    }
+
+    int IPrimitiveContext.ActivateBlockContext(int blockContextOop, int argumentsArray)
+    {
+        // Get block context fields
+        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+        int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
+        int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
+        int stackpIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "stackp");
+        int senderIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "sender");
+        int pcIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
+
+        int homeOop = _heap.GetField(blockContextOop, homeIndex);
+        int startPcOop = _heap.GetField(blockContextOop, startpcIndex);
+        int nargsOop = _heap.GetField(blockContextOop, nargsIndex);
+
+        int startPC = DecodeSmallInteger(startPcOop);
+        int expectedArgCount = DecodeSmallInteger(nargsOop);
+
+        // Verify argument count matches
+        int providedArgCount = _heap.GetIndexedSize(argumentsArray);
+        if (providedArgCount != expectedArgCount)
+        {
+            // Argument count mismatch - this will cause primitive to fail
+            return GlobalRegistry.NilObjectId;
+        }
+
+        // Copy arguments into the block context's indexed fields
+        for (int i = 0; i < providedArgCount; i++)
+        {
+            int argOop = _heap.GetIndexedField(argumentsArray, i);
+            _heap.SetIndexedField(blockContextOop, i, argOop);
+        }
+
+        // Set up the block context for execution
+        _heap.SetField(blockContextOop, senderIndex, _activeContextId); // Current context becomes sender
+        _heap.SetField(blockContextOop, pcIndex, EncodeSmallInteger(startPC)); // Set PC to start of block
+        _heap.SetField(blockContextOop, stackpIndex, EncodeSmallInteger(expectedArgCount)); // Stack pointer after args
+
+        // Save current context and switch to block context
+        int previousContext = _activeContextId;
+        _activeContextId = blockContextOop;
+
+        // Execute the block
+        int result = ExecuteBytecodeLoop();
+
+        // Restore previous context
+        _activeContextId = previousContext;
+
+        return result;
+    }
+
+    IEnumerable<int> IPrimitiveContext.GetAllObjects()
+    {
+        return _heap.GetAllObjects();
+    }
+
+    void IPrimitiveContext.BecomeOneWay(int fromOop, int toOop)
+    {
+        _heap.BecomeOneWay(fromOop, toOop);
+    }
+
+    void IPrimitiveContext.BecomeTwoWay(int oop1, int oop2)
+    {
+        _heap.BecomeTwoWay(oop1, oop2);
+    }
 }

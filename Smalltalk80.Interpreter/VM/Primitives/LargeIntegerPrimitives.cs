@@ -88,13 +88,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 21: LargeInteger + (addition)
-    public static SObjectRef? Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -104,13 +110,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 22: LargeInteger - (subtraction)
-    public static SObjectRef? Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -120,13 +132,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 23: LargeInteger < (less than)
-    public static SObjectRef? LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -137,13 +155,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 24: LargeInteger > (greater than)
-    public static SObjectRef? GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -154,13 +178,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 25: LargeInteger <= (less than or equal)
-    public static SObjectRef? LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -171,13 +201,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 26: LargeInteger >= (greater than or equal)
-    public static SObjectRef? GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -188,13 +224,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 27: LargeInteger = (equality)
-    public static SObjectRef? Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -205,13 +247,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 28: LargeInteger ~= (not equal)
-    public static SObjectRef? NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -222,13 +270,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 29: LargeInteger * (multiplication)
-    public static SObjectRef? Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -238,42 +292,63 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 30: LargeInteger / (division - fails if not exact)
-    public static SObjectRef? Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger quotient = BigInteger.DivRem(dividend, divisor, out BigInteger remainder);
 
         if (remainder != BigInteger.Zero)
-            return null; // Let Smalltalk create Fraction
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil; // Let Smalltalk create Fraction
+        }
 
         return FromBigInteger(ctx, quotient);
     }
 
     // Primitive 31: LargeInteger \\ (modulo)
-    public static SObjectRef? Mod(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Mod(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger remainder = dividend % divisor;
         if (remainder != BigInteger.Zero && (dividend < BigInteger.Zero) != (divisor < BigInteger.Zero))
@@ -283,19 +358,28 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 32: LargeInteger // (integer division)
-    public static SObjectRef? Div(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Div(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger quotient = dividend / divisor;
         if ((dividend < BigInteger.Zero) != (divisor < BigInteger.Zero) && dividend % divisor != BigInteger.Zero)
@@ -305,19 +389,28 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 33: LargeInteger quo: (truncated division)
-    public static SObjectRef? Quo(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Quo(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger dividend = ToBigInteger(ctx, receiver);
         BigInteger divisor = ToBigInteger(ctx, args[0]);
 
         if (divisor == BigInteger.Zero)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger quotient = dividend / divisor;
 
@@ -325,13 +418,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 34: LargeInteger bitAnd:
-    public static SObjectRef? BitAnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef BitAnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -341,13 +440,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 35: LargeInteger bitOr:
-    public static SObjectRef? BitOr(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef BitOr(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -357,13 +462,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 36: LargeInteger bitXor:
-    public static SObjectRef? BitXor(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef BitXor(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !IsLargeInteger(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger left = ToBigInteger(ctx, receiver);
         BigInteger right = ToBigInteger(ctx, args[0]);
@@ -373,13 +484,19 @@ public static class LargeIntegerPrimitives
     }
 
     // Primitive 37: LargeInteger bitShift:
-    public static SObjectRef? BitShift(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef BitShift(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsLargeInteger(ctx, receiver) || !args[0].IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         BigInteger value = ToBigInteger(ctx, receiver);
         int shiftCount = args[0].AsSmallInteger();

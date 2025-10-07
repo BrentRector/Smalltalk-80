@@ -989,17 +989,22 @@ namespace Smalltalk80.Compiler
                 // Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
                 EmitWithOffset(Bytecode.SEND_LITERAL_2_BASE, selectorIndex);
             }
-            else if (argCount <= 7 && selectorIndex <= 31)
+            else if (argCount >= 0 && argCount <= 2)
             {
-                // Use single extended send
-                // Format: jjjkkkkk where jjj = arg count, kkkkk = selector index
+                // Use extended SEND_0/1/2 for common arg counts with large selector indices
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_N);
-                Emit((byte)((argCount << 5) | selectorIndex));
+                Emit(argCount switch
+                {
+                    0 => ExtendedSubOp.SEND_0,
+                    1 => ExtendedSubOp.SEND_1,
+                    2 => ExtendedSubOp.SEND_2,
+                    _ => throw new InvalidOperationException()
+                });
+                Emit((byte)selectorIndex);  // Selector index
             }
             else
             {
-                // Use double extended send for large selector indices or arg counts
+                // Use SEND_N for 3+ arguments or any other case
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
                 Emit(ExtendedSubOp.SEND_N);
                 Emit((byte)selectorIndex);  // Selector first
@@ -1016,22 +1021,29 @@ namespace Smalltalk80.Compiler
         }
         
         /// <summary>
-        /// Emits a super send bytecode according to Blue Book specification.
-        /// Uses extended bytecodes with SEND_SUPER_N sub-op.
+        /// Emits a super send bytecode using ExtendedSubOp.
+        /// Uses SEND_SUPER_0/1/2 for common cases, SEND_SUPER_N for others.
         /// </summary>
         public void EmitSuperSend(string selector, int argCount)
         {
             var index = AddLiteral(new Symbol(selector));
 
-            if (argCount <= 7 && index <= 31)
+            // Use optimized SEND_SUPER_0/1/2 for common arg counts
+            if (argCount >= 0 && argCount <= 2)
             {
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_SUPER_N);
-                Emit((byte)((argCount << 5) | index));
+                Emit(argCount switch
+                {
+                    0 => ExtendedSubOp.SEND_SUPER_0,
+                    1 => ExtendedSubOp.SEND_SUPER_1,
+                    2 => ExtendedSubOp.SEND_SUPER_2,
+                    _ => throw new InvalidOperationException()
+                });
+                Emit((byte)index);  // Selector index
             }
             else
             {
-                // Extended super send for large indices or arg counts
+                // Use SEND_SUPER_N for 3+ args
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
                 Emit(ExtendedSubOp.SEND_SUPER_N);
                 Emit((byte)index);      // Selector index first
@@ -1726,13 +1738,22 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             {
 //Console.WriteLine($"[BYTECODE] CompileAssignmentExpr: Processing assignment to {variable.GetText()}");
                 // Assignment: compile RHS first
-                // IMPORTANT: RHS must ALWAYS leave value on stack for the store operation
-                CompileAssignmentExpr(expr.assignmentExpr(), leaveOnStack: true);
-                
+                // RHS must ALWAYS leave value on stack for the store operation
+                var rhsAssignExpr = expr.assignmentExpr();
+                if (rhsAssignExpr == null)
+                {
+                    throw new InvalidOperationException("Assignment expression has no RHS");
+                }
+
+                CompileAssignmentExpr(rhsAssignExpr, leaveOnStack: true);
+
                 // Store the value
-                // Assignment statements in method bodies should NOT leave values on stack
-                // The leaveOnStack parameter should only apply to the final non-assignment expression
-                StoreVariable(variable.GetText(), leaveOnStack: false);
+                // Use leaveOnStack directly - the caller knows if the result is needed
+                // Examples:
+                //   - "a _ b _ c" → inner assignment (b_c) must leave value for outer assignment
+                //   - "(position _ x) bitShift: -8" → assignment must leave value for bitShift:
+                //   - "x _ y. z" → final store in sequence doesn't need to leave value
+                StoreVariable(variable.GetText(), leaveOnStack: leaveOnStack);
             }
             else
             {
@@ -1853,62 +1874,89 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             // Check if this message expression is just a receiver without any messages
             if (expr == null) return false;
             
-            // A messageExpr is just a receiver if it has no unary, binary, or keyword messages
-            return expr.unaryMessage() == null &&
-                   expr.binaryMessage() == null &&
-                   expr.keywordMessage() == null;
+            // A messageExpr is just a receiver if it has only a base with no messages
+            // New grammar: messageExpr = binaryExpr keywordMessage?
+            // binaryExpr = unaryExpr (binaryMessage)*
+            // unaryExpr = messageBase unaryMessage*
+            var binaryExpr = expr.binaryExpr();
+            if (binaryExpr == null) return true;
+
+            var unaryExpr = binaryExpr.unaryExpr();
+            if (unaryExpr == null) return true;
+
+            // Check if there are no messages at all
+            bool hasUnaryMsgs = unaryExpr.unaryMessage() != null && unaryExpr.unaryMessage().Length > 0;
+            bool hasBinaryMsgs = binaryExpr.binaryMessage() != null && binaryExpr.binaryMessage().Length > 0;
+            bool hasKeywordMsg = expr.keywordMessage() != null;
+
+            return !hasUnaryMsgs && !hasBinaryMsgs && !hasKeywordMsg;
         }
         
         private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, bool isCascadeBase = false, int totalCascadeMessages = 0)
         {
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr called, isCascadeBase={isCascadeBase}, totalCascadeMessages={totalCascadeMessages}");
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: Current bytecode count: {emitter.GetBytecodes().Length}");
-            
-            // Compile receiver and check if it's super
-            var messageBase = expr.messageBase();
-            bool receiverIsSuper = IsReceiverSuper(messageBase);
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: receiverIsSuper={receiverIsSuper}");
-            CompileMessageBase(messageBase);
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: After CompileMessageBase, bytecode count: {emitter.GetBytecodes().Length}");
-            
-            // For cascades with more than one message, dup the receiver after pushing it
-            // (we need a copy for each message except the last)
+            // New grammar structure: messageExpr = binaryExpr keywordMessage?
+            var binaryExpr = expr.binaryExpr();
+
+            if (binaryExpr != null)
+            {
+                // Check if receiver is super (look at the unaryExpr's messageBase)
+                var unaryExpr = binaryExpr.unaryExpr();
+                bool receiverIsSuper = false;
+                if (unaryExpr != null)
+                {
+                    var messageBase = unaryExpr.messageBase();
+                    receiverIsSuper = IsReceiverSuper(messageBase);
+                }
+
+                // Compile the binary expression
+                CompileBinaryExpr(binaryExpr, receiverIsSuper, isCascadeBase, totalCascadeMessages);
+            }
+
+            // Process keyword message if present
+            var keywordMessage = expr.keywordMessage();
+            if (keywordMessage != null)
+            {
+                CompileKeywordMessage(keywordMessage, false); // Super handling done in binaryExpr
+            }
+        }
+
+        private void CompileBinaryExpr(Smalltalk80Parser.BinaryExprContext expr, bool receiverIsSuper, bool isCascadeBase = false, int totalCascadeMessages = 0)
+        {
+            // Grammar: unaryExpr (binaryMessage)*
+            var unaryExpr = expr.unaryExpr();
+            var binaryMessages = expr.binaryMessage();
+
+            if (unaryExpr == null)
+                return;
+
+            // Compile first unary expression (the receiver)
+            CompileUnaryExpr(unaryExpr, receiverIsSuper);
+
+            // For cascades, dup the receiver after pushing it
             if (isCascadeBase && totalCascadeMessages > 1)
             {
-                emitter.Dup(); // bytecode 136 - duplicate receiver for first cascade message
+                emitter.Dup();
             }
-            
-            // Process unary messages
-            var unaryMessages = expr.unaryMessage();
-            if (unaryMessages != null)
-            {
-                foreach (var msg in unaryMessages)
-                {
-                    var selector = msg.unarySelector().GetText();
-                    if (receiverIsSuper)
-                    {
-                        emitter.EmitSuperSend(selector, 0);
-                        receiverIsSuper = false; // Only the first message is a super send
-                    }
-                    else
-                    {
-                        emitter.EmitSend(selector, 0);
-                    }
-                }
-            }
-            
+
             // Process binary messages
-            var binaryMessages = expr.binaryMessage();
             if (binaryMessages != null)
             {
-                foreach (var msg in binaryMessages)
+                for (int i = 0; i < binaryMessages.Length; i++)
                 {
+                    var msg = binaryMessages[i];
                     var selector = msg.binarySelector().GetText();
-                    CompileMessageBase(msg.messageBase());
-                    if (receiverIsSuper)
+
+                    // Compile the argument (unaryExpr)
+                    var argExpr = msg.unaryExpr();
+                    if (argExpr != null)
+                    {
+                        CompileUnaryExpr(argExpr, false); // Arguments are never super sends
+                    }
+
+                    // Emit the send
+                    if (i == 0 && receiverIsSuper)
                     {
                         emitter.EmitSuperSend(selector, 1);
-                        receiverIsSuper = false; // Only the first message is a super send
                     }
                     else
                     {
@@ -1916,19 +1964,34 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     }
                 }
             }
-            
-            // Process keyword message
-            var keywordMessage = expr.keywordMessage();
-            if (keywordMessage != null)
+        }
+
+        private void CompileUnaryExpr(Smalltalk80Parser.UnaryExprContext expr, bool receiverIsSuper)
+        {
+            // Grammar: messageBase unaryMessage*
+            var messageBase = expr.messageBase();
+            var unaryMessages = expr.unaryMessage();
+
+            // Compile the base
+            CompileMessageBase(messageBase);
+
+            // Process unary messages
+            if (unaryMessages != null)
             {
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: Found keyword message");
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: Before CompileKeywordMessage, bytecode count: {emitter.GetBytecodes().Length}");
-                CompileKeywordMessage(keywordMessage, receiverIsSuper);
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: After CompileKeywordMessage, bytecode count: {emitter.GetBytecodes().Length}");
-            }
-            else
-            {
-//Console.WriteLine($"[BYTECODE] CompileMessageExpr: No keyword message");
+                for (int i = 0; i < unaryMessages.Length; i++)
+                {
+                    var msg = unaryMessages[i];
+                    var selector = msg.unarySelector().GetText();
+
+                    if (i == 0 && receiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 0);
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 0);
+                    }
+                }
             }
         }
         
@@ -1946,7 +2009,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             if (binaryMessage != null)
             {
                 var selector = binaryMessage.binarySelector().GetText();
-                CompileMessageBase(binaryMessage.messageBase());
+                // Binary message argument is a unaryExpr
+                CompileUnaryExpr(binaryMessage.unaryExpr(), false);
                 emitter.SendMessage(selector, 1);
                 return;
             }
@@ -1984,7 +2048,12 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             // Not a conditional or couldn't inline - compile arguments normally
             foreach (var part in keywordParts)
             {
-                CompileNonKeywordExpr(part.nonKeywordExpr());
+                // New grammar: keywordPart uses binaryExpr directly
+                var argExpr = part.binaryExpr();
+                if (argExpr != null)
+                {
+                    CompileBinaryExpr(argExpr, false); // Arguments are never super sends
+                }
             }
             
             // Send the message
@@ -2055,21 +2124,28 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         /// - No non-local returns (^)
         /// - Compile-time determinable size
         /// </summary>
-        private bool CanInlineBlock(Smalltalk80Parser.NonKeywordExprContext expr, out Smalltalk80Parser.BlockContext? block)
+        private bool CanInlineBlock(Smalltalk80Parser.BinaryExprContext expr, out Smalltalk80Parser.BlockContext? block)
         {
             block = null;
-            
+
 //Console.WriteLine($"[BYTECODE] CanInlineBlock: Checking if expression can be inlined");
-            
-            // Check if the expression is just a message base
-            var messageBase = expr.messageBase();
+
+            // Grammar: binaryExpr = unaryExpr (binaryMessage)*
+            var unaryExpr = expr.unaryExpr();
+            if (unaryExpr == null)
+            {
+//Console.WriteLine($"[BYTECODE] CanInlineBlock: No unaryExpr, cannot inline");
+                return false;
+            }
+
+            // Check if the message base is a block
+            var messageBase = unaryExpr.messageBase();
             if (messageBase == null)
             {
 //Console.WriteLine($"[BYTECODE] CanInlineBlock: No messageBase, cannot inline");
                 return false;
             }
-            
-            // Check if the message base is a block
+
             block = messageBase.block();
             if (block == null)
             {
@@ -2078,16 +2154,16 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 // or it might be something else entirely (variable, literal, etc.)
                 return false; // Not a block
             }
-            
+
 //Console.WriteLine($"[BYTECODE] CanInlineBlock: Found a block");
-            
+
             // IMPORTANT: At this point we have a block. We only care if messages are sent
             // TO the block itself (e.g., [x + 1] value), not what's INSIDE the block.
-            // The unaryMessage() and binaryMessage() on expr would be messages sent AFTER
+            // The unaryMessage() on unaryExpr and binaryMessage() on expr would be messages sent AFTER
             // the messageBase, so if we have a block and no following messages, it's good.
-            
+
             // Check if there are messages sent TO the block (not allowed for inlining)
-            var unaryMsgs = expr.unaryMessage();
+            var unaryMsgs = unaryExpr.unaryMessage();
             var binaryMsgs = expr.binaryMessage();
 //Console.WriteLine($"[BYTECODE] CanInlineBlock: unaryMessage count = {unaryMsgs.Length}, binaryMessage count = {binaryMsgs.Length}");
             
@@ -2182,7 +2258,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
 //Console.WriteLine($"[BYTECODE] TryInlineIfTrue called");
             
             // Check if the block can be inlined
-            if (!CanInlineBlock(truePart.nonKeywordExpr(), out var trueBlock) || trueBlock == null)
+            if (!CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null)
             {
 //Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Block cannot be inlined");
                 return false;
@@ -2238,7 +2314,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
 //Console.WriteLine($"[BYTECODE] TryInlineIfFalse called");
             
             // Check if the block can be inlined
-            if (!CanInlineBlock(falsePart.nonKeywordExpr(), out var falseBlock) || falseBlock == null)
+            if (!CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null)
             {
 //Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Block cannot be inlined");
                 return false;
@@ -2333,8 +2409,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
 //Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse called");
             
             // Check if both blocks can be inlined
-            if (!CanInlineBlock(truePart.nonKeywordExpr(), out var trueBlock) || trueBlock == null ||
-                !CanInlineBlock(falsePart.nonKeywordExpr(), out var falseBlock) || falseBlock == null)
+            if (!CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null ||
+                !CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null)
             {
 //Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: One or both blocks cannot be inlined");
                 return false;
@@ -2413,8 +2489,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
 //Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue called");
             
             // Check if both blocks can be inlined
-            if (!CanInlineBlock(falsePart.nonKeywordExpr(), out var falseBlock) || falseBlock == null ||
-                !CanInlineBlock(truePart.nonKeywordExpr(), out var trueBlock) || trueBlock == null)
+            if (!CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null ||
+                !CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null)
             {
 //Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: One or both blocks cannot be inlined");
                 return false;
@@ -2539,31 +2615,19 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
         
-        private void CompileNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext expr)
+        private void CompileNonKeywordExpr(Smalltalk80Parser.BinaryExprContext expr)
         {
-            var messageBase = expr.messageBase();
+            // Grammar: nonKeywordExpr = binaryExpr
+            // So this method now takes BinaryExprContext directly
+            var unaryExpr = expr.unaryExpr();
+            if (unaryExpr == null) return;
+
+            var messageBase = unaryExpr.messageBase();
             bool receiverIsSuper = IsReceiverSuper(messageBase);
-            CompileMessageBase(messageBase);
-            
-            // Process unary messages
-            var unaryMessages = expr.unaryMessage();
-            if (unaryMessages != null)
-            {
-                foreach (var msg in unaryMessages)
-                {
-                    var selector = msg.unarySelector().GetText();
-                    if (receiverIsSuper)
-                    {
-                        emitter.EmitSuperSend(selector, 0);
-                        receiverIsSuper = false; // Only the first message is a super send
-                    }
-                    else
-                    {
-                        emitter.EmitSend(selector, 0);
-                    }
-                }
-            }
-            
+
+            // Compile the unary expression
+            CompileUnaryExpr(unaryExpr, receiverIsSuper);
+
             // Process binary messages
             var binaryMessages = expr.binaryMessage();
             if (binaryMessages != null)
@@ -2571,16 +2635,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 foreach (var msg in binaryMessages)
                 {
                     var selector = msg.binarySelector().GetText();
-                    CompileMessageBase(msg.messageBase());
-                    if (receiverIsSuper)
-                    {
-                        emitter.EmitSuperSend(selector, 1);
-                        receiverIsSuper = false; // Only the first message is a super send
-                    }
-                    else
-                    {
-                        emitter.EmitSend(selector, 1);
-                    }
+                    CompileUnaryExpr(msg.unaryExpr(), false);
+                    emitter.EmitSend(selector, 1);
                 }
             }
         }
@@ -2688,37 +2744,104 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             // Restore environment
             environment.ScopeDepth = savedScopeDepth;
         }
-        
+
+        /// <summary>
+        /// Parses a Smalltalk number literal, supporting radix notation (e.g., 8r377, 16rFF),
+        /// decimal notation, floating point, and scaled decimals.
+        /// </summary>
+        private bool TryParseSmalltalkNumber(string text, out object? value)
+        {
+            value = null;
+
+            // Check for radix notation: <radix>r<digits>
+            var rIndex = text.IndexOfAny(new[] { 'r', 'R' });
+            if (rIndex > 0 && rIndex < text.Length - 1)
+            {
+                // Extract radix and digits
+                var radixPart = text.Substring(0, rIndex);
+                var digitsPart = text.Substring(rIndex + 1);
+
+                if (int.TryParse(radixPart, out int radix) && radix >= 2 && radix <= 36)
+                {
+                    try
+                    {
+                        // Convert from specified radix to decimal
+                        int result = Convert.ToInt32(digitsPart, radix);
+                        value = result;
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            // Check for scaled decimal: <digits>s<scale>
+            var sIndex = text.IndexOf('s');
+            if (sIndex > 0 && sIndex < text.Length - 1)
+            {
+                // For now, treat scaled decimals as regular doubles
+                // In a full implementation, you'd preserve the scale
+                var intPart = text.Substring(0, sIndex);
+                var scalePart = text.Substring(sIndex + 1);
+                if (double.TryParse(intPart, out double intVal) && int.TryParse(scalePart, out int scale))
+                {
+                    value = intVal / Math.Pow(10, scale);
+                    return true;
+                }
+            }
+
+            // Try parsing as regular integer
+            if (int.TryParse(text, out int intResult))
+            {
+                value = intResult;
+                return true;
+            }
+
+            // Try parsing as floating point
+            if (double.TryParse(text, out double floatResult))
+            {
+                value = floatResult;
+                return true;
+            }
+
+            return false;
+        }
+
         private void CompileLiteral(Smalltalk80Parser.LiteralContext literal)
         {
             if (literal.numberLiteral() != null)
             {
                 var text = literal.numberLiteral().GetText();
-                if (int.TryParse(text, out int intVal))
+                if (TryParseSmalltalkNumber(text, out object? numValue))
                 {
-                    // Use special bytecodes for small integers
-                    switch (intVal)
+                    if (numValue is int intVal)
                     {
-                        case -1:
-                            emitter.PushMinusOne();
-                            break;
-                        case 0:
-                            emitter.PushZero();
-                            break;
-                        case 1:
-                            emitter.PushOne();
-                            break;
-                        case 2:
-                            emitter.PushTwo();
-                            break;
-                        default:
-                            emitter.PushLiteralConstant(intVal);
-                            break;
+                        // Use special bytecodes for small integers
+                        switch (intVal)
+                        {
+                            case -1:
+                                emitter.PushMinusOne();
+                                break;
+                            case 0:
+                                emitter.PushZero();
+                                break;
+                            case 1:
+                                emitter.PushOne();
+                                break;
+                            case 2:
+                                emitter.PushTwo();
+                                break;
+                            default:
+                                emitter.PushLiteralConstant(intVal);
+                                break;
+                        }
                     }
-                }
-                else if (double.TryParse(text, out double floatVal))
-                {
-                    emitter.PushLiteralConstant(floatVal);
+                    else if (numValue is double floatVal)
+                    {
+                        emitter.PushLiteralConstant(floatVal);
+                    }
                 }
             }
             // Note: negativeNumber handling removed - grammar may not support it
@@ -3171,17 +3294,20 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 if (context.numberLiteral() != null)
                 {
                     var text = context.numberLiteral().GetText();
-                    if (int.TryParse(text, out int intVal))
+                    if (compiler.TryParseSmalltalkNumber(text, out object? numValue))
                     {
-                        // Only add to literals if not a special small integer
-                        if (intVal != -1 && intVal != 0 && intVal != 1 && intVal != 2)
+                        if (numValue is int intVal)
                         {
-                            emitter.AddLiteral(intVal);
+                            // Only add to literals if not a special small integer
+                            if (intVal != -1 && intVal != 0 && intVal != 1 && intVal != 2)
+                            {
+                                emitter.AddLiteral(intVal);
+                            }
                         }
-                    }
-                    else if (double.TryParse(text, out double floatVal))
-                    {
-                        emitter.AddLiteral(floatVal);
+                        else if (numValue is double floatVal)
+                        {
+                            emitter.AddLiteral(floatVal);
+                        }
                     }
                 }
                 else if (context.stringConst() != null)

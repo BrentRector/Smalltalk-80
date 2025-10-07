@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Memory;
 
 namespace Smalltalk80.Interpreter.VM.Primitives;
 
@@ -13,13 +14,19 @@ public static class StringPrimitives
     /// Primitive 103: replaceFrom:to:with:startingAt:
     /// Efficiently copies a range of elements from one collection to another.
     /// </summary>
-    public static SObjectRef? StringReplace(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef StringReplace(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 4)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!args[0].IsSmallInteger || !args[1].IsSmallInteger || !args[3].IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         int startIndex = args[0].AsSmallInteger() - 1; // Convert to 0-based
         int stopIndex = args[1].AsSmallInteger() - 1;
@@ -28,10 +35,16 @@ public static class StringPrimitives
 
         // Validate indices
         if (startIndex < 0 || stopIndex < startIndex || sourceStart < 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (receiver.IsSmallInteger || sourceRef.IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         int copyCount = stopIndex - startIndex + 1;
 
@@ -42,7 +55,10 @@ public static class StringPrimitives
         int sourceSize = ctx.Heap.GetIndexedSize(sourceId);
 
         if (stopIndex >= receiverSize || sourceStart + copyCount > sourceSize)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Copy elements
         try
@@ -56,7 +72,8 @@ public static class StringPrimitives
         }
         catch
         {
-            return null;
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
         }
     }
 
@@ -64,13 +81,19 @@ public static class StringPrimitives
     /// Primitive 104: String hash
     /// Computes a hash value for a string.
     /// </summary>
-    public static SObjectRef? StringHash(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef StringHash(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (receiver.IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         try
         {
@@ -91,7 +114,8 @@ public static class StringPrimitives
         }
         catch
         {
-            return null;
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
         }
     }
 
@@ -100,13 +124,19 @@ public static class StringPrimitives
     /// Compares two strings lexicographically.
     /// Returns -1, 0, or 1 for less than, equal, or greater than.
     /// </summary>
-    public static SObjectRef? StringCompare(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef StringCompare(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (receiver.IsSmallInteger || args[0].IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         try
         {
@@ -141,7 +171,8 @@ public static class StringPrimitives
         }
         catch
         {
-            return null;
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
         }
     }
 
@@ -149,16 +180,23 @@ public static class StringPrimitives
     /// Primitive 106: String asSymbol
     /// Converts a string to a unique symbol.
     /// </summary>
-    public static SObjectRef? AsSymbol(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef AsSymbol(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (receiver.IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // TODO: Need symbol interning infrastructure
         // For now, fail - will implement when symbol table is added
-        return null;
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
     }
 }

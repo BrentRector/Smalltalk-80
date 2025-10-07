@@ -50,4 +50,14 @@
     <Delete Files="@(GeneratedFiles)" TreatErrorsAsWarnings="true" />
     <RemoveDir Directories="$(MSBuildProjectDirectory)\Generated" ContinueOnError="true" />
   </Target>
+
+  <!-- Post-build: Run compiler to generate coldstart.json -->
+  <Target Name="GenerateColdStart" AfterTargets="Build">
+    <Message Text="Running compiler to generate coldstart.json..." Importance="high" />
+    <Exec Command="dotnet &quot;$(TargetPath)&quot;"
+          WorkingDirectory="$(OutDir)"
+          ContinueOnError="false" />
+    <Message Text="coldstart.json generated successfully" Importance="high"
+             Condition="Exists('$(OutDir)coldstart.json')" />
+  </Target>
 </Project>

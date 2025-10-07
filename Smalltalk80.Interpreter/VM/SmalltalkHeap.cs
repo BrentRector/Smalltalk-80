@@ -948,4 +948,92 @@ public class SmalltalkHeap : ISmalltalkHeap
             _ => 0
         };
     }
+
+    /// <summary>
+    /// Enumerates all object pointers in the heap (excluding SmallIntegers).
+    /// Used by object enumeration primitives (128, 129, 139).
+    /// </summary>
+    public IEnumerable<int> GetAllObjects()
+    {
+        // Return all table indices as object pointers (already shifted left by 1, even numbers)
+        return _objectTable.Keys.OrderBy(k => k);
+    }
+
+    /// <summary>
+    /// One-way become: All references to fromOop become references to toOop.
+    /// Used by primitive 130 (becomeForward:).
+    /// </summary>
+    public void BecomeOneWay(int fromOop, int toOop)
+    {
+        // Cannot become with SmallIntegers
+        if (IsSmallInteger(fromOop) || IsSmallInteger(toOop))
+            throw new ArgumentException("Cannot become with SmallIntegers");
+
+        int fromIndex = GetTableIndex(fromOop);
+        int toIndex = GetTableIndex(toOop);
+
+        // Verify both objects exist
+        if (!_objectTable.ContainsKey(fromIndex))
+            throw new ArgumentException($"Source object {fromOop} does not exist");
+        if (!_objectTable.ContainsKey(toIndex))
+            throw new ArgumentException($"Target object {toOop} does not exist");
+
+        // Forward all references from fromOop to toOop
+        // Scan all objects and replace references
+        foreach (var entry in _objectTable.Values)
+        {
+            // Update instance variables
+            for (int i = 0; i < entry.InstanceVariables.Length; i++)
+            {
+                if (entry.InstanceVariables[i] == fromOop)
+                    entry.InstanceVariables[i] = toOop;
+            }
+
+            // Update indexed pointer fields
+            if (entry.IndexedData is int[] pointerArray)
+            {
+                for (int i = 0; i < pointerArray.Length; i++)
+                {
+                    if (pointerArray[i] == fromOop)
+                        pointerArray[i] = toOop;
+                }
+            }
+        }
+
+        // Update special objects array
+        for (int i = 0; i < _specialObjectsArray.Length; i++)
+        {
+            if (_specialObjectsArray[i] == fromOop)
+                _specialObjectsArray[i] = toOop;
+        }
+    }
+
+    /// <summary>
+    /// Two-way become: Swaps identities of two objects.
+    /// Used by primitive 68 (become:).
+    /// </summary>
+    public void BecomeTwoWay(int oop1, int oop2)
+    {
+        // Cannot become with SmallIntegers
+        if (IsSmallInteger(oop1) || IsSmallInteger(oop2))
+            throw new ArgumentException("Cannot become with SmallIntegers");
+
+        int index1 = GetTableIndex(oop1);
+        int index2 = GetTableIndex(oop2);
+
+        // Verify both objects exist
+        if (!_objectTable.ContainsKey(index1))
+            throw new ArgumentException($"Object {oop1} does not exist");
+        if (!_objectTable.ContainsKey(index2))
+            throw new ArgumentException($"Object {oop2} does not exist");
+
+        // Swap the object data in the table
+        var temp = _objectTable[index1];
+        _objectTable[index1] = _objectTable[index2];
+        _objectTable[index2] = temp;
+
+        // Note: We swap the data, not the references, so all existing references
+        // to oop1 now point to what was oop2's data, and vice versa.
+        // This is the correct Blue Book semantics for become:.
+    }
 }

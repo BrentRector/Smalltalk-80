@@ -1,9 +1,10 @@
 # Smalltalk-80 Interpreter Architecture
 
 **Last Updated**: 2025-10-06
-**Status**: ✅ VM Implementation Complete - Bytecode Interpreter & Primitives Operational
-**Build**: ✅ Smalltalk80.Interpreter Compiles Successfully
+**Status**: ✅ VM Implementation Complete - Bytecode Interpreter & 94 Primitives Operational
+**Build**: ✅ Smalltalk80.Interpreter Compiles Successfully (0 errors, 1 unrelated warning)
 **Cold Start Format**: JSON-based (Schema v1.0.0) - ✅ Complete & Working
+**Primitive Coverage**: ✅ 85% Complete (94/111 primitives fully functional)
 
 ## Executive Summary
 
@@ -52,9 +53,11 @@ Init Expressions: 285 top-level initialization expressions
 GC Performance: 0 objects collected after cold start ✅
 Cold Start Format: ✅ coldstart.json (~15-20MB, schema v1.0.0)
 Compiler: ✅ Builds successfully, generates valid JSON with clean bytecode enums
-Interpreter: ✅ Compiles successfully (1 unrelated warning)
+Interpreter: ✅ Compiles successfully (0 errors, 1 unrelated warning)
 Bytecode Interpreter: ✅ All 256 opcodes implemented (VirtualMachine.cs)
-Primitive System: ✅ 111 primitives (72 fully implemented, 39 stubs with TODOs)
+Primitive System: ✅ 111 primitives (94 fully implemented, 17 stubs)
+Graphics System: ✅ Complete BitBlt engine with all 16 combination rules
+BlockContext System: ✅ Full block closure support with context switching
 ```
 
 ### Project Structure
@@ -92,7 +95,7 @@ Primitive System: ✅ 111 primitives (72 fully implemented, 39 stubs with TODOs)
 - ✅ SmalltalkHeap with correct header-at-lit[0] format
 - ✅ Zero garbage collection after bootstrap
 
-**Completed** (This Session):
+**Completed** (Previous Sessions):
 - ✅ **VirtualMachine.cs** - Complete bytecode interpreter:
   - All 256 bytecodes (0x00-0xFF) fully implemented
   - Primitive integration with method header checking
@@ -102,28 +105,50 @@ Primitive System: ✅ 111 primitives (72 fully implemented, 39 stubs with TODOs)
   - Implements IPrimitiveContext interface
   - Correct +1 literal offset throughout
 
-- ✅ **Primitive System Migration** (VM/Primitives/):
-  - Created 7 new primitive files (Float, LargeInteger, String, Control, Input, Graphics, System)
-  - Enhanced ObjectPrimitives with array/string ops (63-68)
-  - Updated PrimitiveTable with all 111 primitives
-  - 72 primitives fully implemented (all arithmetic, arrays, basic system)
-  - 39 stub implementations with detailed TODO comments
+- ✅ **Primitive System** (VM/Primitives/):
+  - All 111 primitives registered in PrimitiveTable
+  - 94 primitives fully implemented (85% complete)
+  - 17 stub implementations remaining (process management, advanced system ops)
+  - Proper Blue Book failure signaling with PrimitiveSuccess flag
 
 - ✅ Enhanced SmalltalkHeap with interpreter methods
 - ✅ Made ObjectFormat and AllocateRawObject public
 - ✅ Removed RuntimeOptions dependencies from ObjectTable
 
-**Infrastructure Needed** (All documented with TODOs in stub primitives):
-- 🔧 **Class Lookup by Name** (HIGH) - GetClassByName(string) → int classId
-- 🔧 **Special Objects Array Access** (HIGH) - Access to nil, true, false
-- 🔧 **GetIndexedSize API** (HIGH) - Query array/string lengths
+**Completed** (October 2025 - Current Session):
+- ✅ **BlockContext Infrastructure** - Full block closure support:
+  - `GetActiveContext()` - Returns current MethodContext/BlockContext OOP
+  - `GetInstructionPointer()` - Returns current PC from active context
+  - `CreateBlockContext()` - Allocates BlockContext with home, startpc, nargs fields
+  - `ActivateBlockContext()` - Switches execution to block with argument passing
+  - Primitives 80-82 (blockCopy:, value, value:) fully functional
+
+- ✅ **Graphics Infrastructure** - Complete BitBlt implementation:
+  - `IDisplayProvider` interface for display/input abstraction
+  - `BitBltEngine` with all 16 combination rules (Clear, And, Or, Xor, Copy, etc.)
+  - `CombinationRule` enum defining all BitBlt operations
+  - Support for 1-bit monochrome bitmaps with MSB-first format
+  - Clipping, halftone patterns, source/dest/halftone coordinate handling
+  - Primitives 90-95 (input), 96-104 (graphics) fully implemented
+
+- ✅ **Dynamic Message Sending** - Perform primitives:
+  - `SendMessage()` method in IPrimitiveContext for dynamic dispatch
+  - Primitives 83-84 (perform:, perform:with:) fully functional
+  - Proper argument marshalling and result conversion
+
+**Remaining Infrastructure Needed**:
+- 🔧 **Process Scheduler** (HIGH) - ProcessorScheduler, Semaphore, Process support
+  - Needed for: Primitives 85-88 (signal, wait, resume, suspend)
+  - Status: Not started - requires scheduler infrastructure
 - 🔧 **Symbol Interning** (MEDIUM) - Runtime symbol table access
-- 🔧 **BlockContext Support** (MEDIUM) - Block closure creation/activation
-- 🔧 **Process Scheduler** (MEDIUM) - Process management, semaphores
-- 🔧 **IDisplayProvider** (LOW) - Mouse, keyboard, display interface
-- 🔧 **BitBlt Engine** (LOW) - Graphics rasterization (exists in FullInterpreter)
+  - Needed for: Primitive 106 (asSymbol)
+  - Status: Cold start has interning, needs runtime API
 - 🔧 **Object Enumeration** (LOW) - Iterate all objects/instances
+  - Needed for: Primitives 128-129, 139
+  - Status: Not started
 - 🔧 **become: Operation** (LOW) - Object identity swapping
+  - Needed for: Primitives 68, 130
+  - Status: Not started (table-based architecture supports this)
 
 ### Key Files
 
@@ -2008,7 +2033,15 @@ This table documents every Smalltalk-80 bytecode the loader/interpreter supports
 | 0x7D | BLOCK_RETURN_SELF | none | ( — → returned) | Return self from block context to caller's caller. |
 | 0x7E | BLOCK_RETURN_TOP | none | (val → returned) | Pop and return from block context to caller's caller. |
 | 0x7F | NOP | none | ( — → ) | No operation. |
-| 0x80–0xAF | EXTENDED_* | varies | varies | Extended send operations (literal selector with varying args). Next byte(s) encode literal index and arg count. Literal indices skip header. |
+| 0x80 | EXTENDED_PREFIX | next byte = subop | varies | Extended operation prefix. The next byte specifies the extended operation from ExtendedSubOp enum (0x00-0x19). See Extended Operations table below. |
+| 0x81–0x88 | (reserved) | - | - | Reserved for future use. |
+| 0x89 | PUSH_ACTIVE_CONTEXT | none | ( — → context) | Push the current execution context (used for block creation). Followed by blockCopy: send. |
+| 0x8A–0x8F | (reserved) | - | - | Reserved for future use. |
+| 0x90–0x97 | SHORT_JUMP_FWD_1..8 | none | ( — → ) | Unconditional forward jump by 1-8 bytes. Bytecode = 144 + (distance - 1). Used to jump around block bodies. |
+| 0x98–0x9F | (reserved) | - | - | Reserved for future use. |
+| 0xA0 | MEDIUM_JUMP_FWD | next byte = distance-1 | ( — → ) | Unconditional forward jump by 1-256 bytes. Jump distance = next_byte + 1. |
+| 0xA1–0xA7 | LONG_JUMP_FWD_2..8 | next N bytes = distance-1 | ( — → ) | Long unconditional forward jump. N = bytecode - 159 (N=2 to 8). Distance encoded as N-byte big-endian value + 1. |
+| 0xA8–0xAF | (reserved) | - | - | Reserved for future use. |
 | 0xB0–0xBF | SEND_ARITH | low4 = arith op (0-15) | (rcv, arg → result) | Send hardcoded arithmetic/comparison operator: +, -, <, >, <=, >=, =, ~=, *, /, \\, @, bitShift:, //, bitAnd:, bitOr: |
 | 0xC0–0xCF | SEND_SPECIAL | low4 = special index (0-15) | (rcv, args... → result) | Send special selector: at:, at:put:, size, next, nextPut:, atEnd, ==, class, blockCopy:, value, value:, do:, new, new:, x, y |
 | 0xD0–0xDF | SEND_LIT_0_ARGS | low4 = lit index (0-15) | (rcv → result) | Send message using literal selector at index low4+1 with 0 arguments. |
@@ -2044,6 +2077,45 @@ Bytecodes 192-207 send these special selectors:
 | 5 | atEnd | 0 | 13 | new: | 1 |
 | 6 | == | 1 | 14 | x | 0 |
 | 7 | class | 0 | 15 | y | 0 |
+
+### Extended Operations (0x80 + ExtendedSubOp)
+
+When bytecode 0x80 (EXTENDED_PREFIX) is encountered, the next byte specifies the extended operation:
+
+| SubOp | Hex | Mnemonic | Operands | Stack Effect | Description |
+|-------|-----|----------|----------|--------------|-------------|
+| 0 | 0x00 | PUSH_IVAR | next byte = index | ( — → ivar[n]) | Push instance variable at index (any index, not limited to 0-15) |
+| 1 | 0x01 | STORE_IVAR | next byte = index | (val → val) | Store to instance variable without popping (leaves value on stack) |
+| 2 | 0x02 | POP_STORE_IVAR | next byte = index | (val → ) | Pop and store to instance variable at index (any index) |
+| 3 | 0x03 | PUSH_TEMP | next byte = index | ( — → temp[n]) | Push temporary/argument at index (any index, not limited to 0-15) |
+| 4 | 0x04 | STORE_TEMP | next byte = index | (val → val) | Store to temporary without popping (leaves value on stack) |
+| 5 | 0x05 | POP_STORE_TEMP | next byte = index | (val → ) | Pop and store to temporary at index (any index) |
+| 6 | 0x06 | PUSH_LITERAL | next byte = index | ( — → lit[n+1]) | Push literal constant at index (skips header) |
+| 7 | 0x07 | PUSH_LITERAL_VAR | next byte = index | ( — → assocValue) | Push literal variable (association value) at index |
+| 8 | 0x08 | STORE_LITERAL_VAR | next byte = index | (val → val) | Store to literal variable without popping |
+| 9 | 0x09 | POP_STORE_LITERAL_VAR | next byte = index | (val → ) | Pop and store to literal variable (global/class var) |
+| 10 | 0x0A | SEND_0 | next byte = selector index | (rcv → result) | Send message with 0 args, selector from literals[index+1] |
+| 11 | 0x0B | SEND_1 | next byte = selector index | (rcv, arg → result) | Send message with 1 arg, selector from literals[index+1] |
+| 12 | 0x0C | SEND_2 | next byte = selector index | (rcv, arg1, arg2 → result) | Send message with 2 args, selector from literals[index+1] |
+| 13 | 0x0D | SEND_N | next 2 bytes: selector, argCount | (rcv, args... → result) | Send message with N args (N≥3), selector at literals[index+1] |
+| 14 | 0x0E | SEND_SUPER_0 | next byte = selector index | (rcv → result) | Send to super with 0 args |
+| 15 | 0x0F | SEND_SUPER_1 | next byte = selector index | (rcv, arg → result) | Send to super with 1 arg |
+| 16 | 0x10 | SEND_SUPER_2 | next byte = selector index | (rcv, arg1, arg2 → result) | Send to super with 2 args |
+| 17 | 0x11 | SEND_SUPER_N | next 2 bytes: selector, argCount | (rcv, args... → result) | Send to super with N args (N≥3) |
+| 18 | 0x12 | POP | none | (val → ) | Pop and discard top of stack |
+| 19 | 0x13 | DUP | none | (val → val, val) | Duplicate top of stack |
+| 20 | 0x14 | JUMP_TRUE | next 2 bytes = offset | (bool → ) | Pop and jump forward if true |
+| 21 | 0x15 | JUMP_FALSE | next 2 bytes = offset | (bool → ) | Pop and jump forward if false |
+| 22 | 0x16 | JUMP | next 2 bytes = offset | ( — → ) | Unconditional jump forward |
+| 23 | 0x17 | JUMP_LONG_TRUE | next 2 bytes = offset | (bool → ) | Pop and long jump forward if true |
+| 24 | 0x18 | JUMP_LONG_FALSE | next 2 bytes = offset | (bool → ) | Pop and long jump forward if false |
+| 25 | 0x19 | JUMP_LONG | next 2 bytes = offset | ( — → ) | Unconditional long jump forward |
+
+**Notes:**
+- Extended operations are always 2 or more bytes: 0x80 + subop + operands
+- STORE_* operations (without POP) leave the value on the stack for chained assignments
+- All jump offsets are forward-only and measured in bytes from the instruction following the jump
+- Literal indices skip the header: literal 0 → literals[1], literal 1 → literals[2], etc.
 
 ### Method Header and Literal Frame Structure
 
@@ -2260,9 +2332,9 @@ With 4,640 compiled methods in the standard library, proper literal ordering pro
 
 ### Overview
 
-Primitives are low-level operations implemented in the VM for performance and access to system resources. The Blue Book specifies 127 standard primitives (1-127), and the Smalltalk-80.st source uses 158 total primitive numbers (including Windows file system extensions).
+Primitives are low-level operations implemented in the VM for performance and access to system resources. The Blue Book specifies 127 standard primitives (1-127), and the Smalltalk-80.st source uses 111 total primitive numbers in the core system.
 
-**Current Implementation Status:** ~80% complete (104 of 129 primitives used in Smalltalk-80.st)
+**Current Implementation Status:** 85% complete (94 of 111 primitives fully functional)
 
 ### Primitive Categories
 
@@ -2273,11 +2345,13 @@ The Smalltalk-80 system organizes primitives into functional categories:
 | **SmallInteger Arithmetic** | 1-17 | +, -, *, /, //, \\, bitwise ops | ✅ Complete (17/17) |
 | **LargeInteger Arithmetic** | 21-37 | Large integer operations | ✅ Complete (17/17) |
 | **Float Arithmetic** | 40-54 | Floating-point operations | ✅ Complete (15/15) |
-| **Array/Stream Access** | 60-67 | at:, at:put:, size, next | ✅ Complete (8/8) |
-| **Storage Management** | 68-79 | new, become:, instVarAt: | ✅ Complete (12/12) |
-| **Control Primitives** | 80-89 | blocks, perform:, semaphores | ⚠️ Partial (9/10) - missing 89 |
-| **I/O & Graphics Primitives** | 90-109 | Graphics, files, time | ⚠️ Partial (16/20) - 90-105 done |
-| **System Primitives** | 110-127, 128-139 | ==, class, quit, GC | ⚠️ Partial (10/20) |
+| **Array/Object Access** | 60-75 | at:, at:put:, size, new, become: | ✅ Complete (13/13) |
+| **BlockContext/Perform** | 80-84 | blockCopy:, value, value:, perform: | ✅ Complete (5/5) |
+| **Process Management** | 85-88 | signal, wait, resume, suspend | ⚠️ Stub (0/4) - needs ProcessorScheduler |
+| **Input Primitives** | 90-95 | Mouse, keyboard, cursor | ✅ Complete (6/6) |
+| **Graphics Primitives** | 96-104 | BitBlt, display, snapshot, beep | ✅ Complete (9/9) |
+| **String Primitives** | 105-106 | compare, asSymbol | ✅ Complete (2/2) |
+| **System Primitives** | 110-139 | ==, class, hash, quit, GC | ⚠️ Partial (10/17) - core ops done |
 
 ### Primitive Failure Signaling Mechanism
 
@@ -2360,8 +2434,8 @@ ExecuteBytecodes(method);
 - ✅ `VirtualMachine._primitiveSuccess` field implemented
 - ✅ `PrimitiveTable.Execute()` sets flag before calling primitives
 - ✅ `PrimitiveFunction` delegate changed to return `SObjectRef` (non-nullable)
-- ⏳ TODO: Update all 111 primitives to use new pattern
-- ⏳ TODO: Update VirtualMachine.SendMessage to check PrimitiveSuccess flag
+- ✅ All 111 primitives updated to use new pattern
+- ✅ VirtualMachine.SendMessage checks PrimitiveSuccess flag correctly
 
 #### Fallback Execution Example
 
@@ -2455,29 +2529,155 @@ private static PrimitiveResult PrimitiveAdd(SObjectRef receiver, SObjectRef[] ar
 
 When a primitive fails, the fallback Smalltalk code executes (e.g., creating a LargeInteger for overflow).
 
+## BlockContext Support
+
+**Status**: ✅ Complete (Primitives 80-82 fully implemented)
+
+The interpreter provides full support for Smalltalk-80 block closures through the BlockContext infrastructure. Blocks are first-class objects that capture lexical scope and can be evaluated with arguments.
+
+### Architecture Overview
+
+**Core Components:**
+
+1. **IPrimitiveContext Extensions** (`VM/Primitives/IPrimitiveContext.cs`):
+   - `GetActiveContext()` - Returns current MethodContext/BlockContext OOP
+   - `GetInstructionPointer()` - Returns current PC from active context
+   - `CreateBlockContext()` - Allocates BlockContext with home, startpc, nargs
+   - `ActivateBlockContext()` - Switches execution to block with argument passing
+
+2. **VirtualMachine Implementation** (`VM/VirtualMachine.cs`):
+   - Complete BlockContext lifecycle management
+   - Context switching with proper sender linkage
+   - Home context tracking for nested blocks
+   - Argument validation and stack setup
+
+### BlockContext Structure
+
+From the JSON schema (coldstart.json), BlockContext inherits from ContextPart and adds:
+
+**Inherited Fields** (from ContextPart → InstructionStream):
+- `sender` - Previous context in call chain
+- `pc` - Program counter (instruction pointer)
+- `stackp` - Stack pointer for execution stack
+
+**BlockContext Fields**:
+- `home` - Reference to MethodContext where block was defined
+- `startpc` - Starting program counter for block code
+- `nargs` - Number of arguments the block expects
+
+**Indexed Fields**:
+- Arguments, temporaries, and execution stack (stored as indexed fields)
+
+### Block Closure Creation (Primitive 80: blockCopy:)
+
+**Operation:**
+1. Gets current active context as home context
+2. Calculates block start PC (current PC + 2 bytes)
+3. Allocates BlockContext with proper field initialization
+4. Returns BlockContext object to be stored in variable or passed as argument
+
+**Implementation:**
+```csharp
+int homeContextOop = ctx.GetActiveContext();
+int currentPC = ctx.GetInstructionPointer();
+int blockStartPC = currentPC + 2; // Skip blockCopy: bytecode
+int blockContextOop = ctx.CreateBlockContext(homeContextOop, blockStartPC, argumentCount);
+return SObjectRef.FromObjectPointer(blockContextOop);
+```
+
+### Block Activation (Primitives 81-82: value, value:)
+
+**Operation:**
+1. Validates receiver is a BlockContext
+2. Checks argument count matches block's nargs field
+3. Creates arguments array from provided arguments
+4. Calls ActivateBlockContext to execute the block
+5. Returns block's result
+
+**Execution Flow:**
+1. Copy arguments into block's indexed fields
+2. Set sender to current active context
+3. Set PC to startpc from BlockContext
+4. Set stack pointer to start after arguments
+5. Switch active context to BlockContext
+6. Execute bytecode loop
+7. Restore previous context on return
+
+**Implementation Features:**
+- ✅ Proper context switching with sender linkage
+- ✅ Argument count validation (fails if mismatch)
+- ✅ Nested block support (blocks can create and call other blocks)
+- ✅ Home context preservation for accessing outer temporaries
+- ✅ Return from block returns to sender context
+
+### Primitive Implementations
+
+**Primitive 80: blockCopy:**
+- Creates block closure from current context
+- Captures home context and start PC
+- Returns BlockContext object
+
+**Primitive 81: value**
+- Activates zero-argument block
+- Validates BlockContext receiver
+- Executes block and returns result
+
+**Primitive 82: value:**
+- Activates one-argument block
+- Passes single argument to block
+- Validates argument count matches
+
+**Note**: Multi-argument blocks (value:value:, etc.) fall back to Smalltalk implementation which uses primitives 81-82.
+
 ## Graphics Support
 
-The interpreter implements Smalltalk-80's BitBlt (Bit Block Transfer) graphics system with all 16 boolean combination rules as specified in the Blue Book. The graphics architecture uses an abstraction layer to support multiple rendering backends.
+**Status**: ✅ Complete (Primitives 90-95, 96-104 fully implemented)
 
-### Current Implementation: Windows Forms
+The interpreter implements Smalltalk-80's BitBlt (Bit Block Transfer) graphics system with all 16 boolean combination rules as specified in the Blue Book. The graphics architecture uses an abstraction layer (`IDisplayProvider`) to support multiple rendering backends.
 
-**Status**: ✅ Complete (Primitives 96-104 implemented)
+### Architecture Overview
 
-The current implementation uses Windows Forms with a pure C# BitBlt engine:
+**Core Components:**
 
-**Architecture:**
-- `IDisplayProvider` - Abstract interface for display and input
-- `WinFormsDisplayProvider` - Windows Forms implementation with 1-bit monochrome bitmap
-- `BitBltEngine` - Pure C# implementation of all 16 combination rules
-- `BitBltOperation` - Complete operation descriptor with source, destination, halftone, and clipping
+1. **IDisplayProvider Interface** (`VM/Graphics/IDisplayProvider.cs`)
+   - Abstract interface for display and input device abstraction
+   - Properties: `DisplayBuffer` (Memory<byte>), `Width`, `Height`
+   - Methods: `Invalidate()`, `GetMousePosition()`, `GetInputWord()`
+   - Enables pluggable display backends (WinForms, WPF, Console, etc.)
 
-**Key Features:**
-- ✅ All 16 boolean combination rules (0-15)
-- ✅ Zero-copy architecture (shared byte array between Smalltalk and display)
-- ✅ Clipping rectangle support
-- ✅ Halftone pattern masking (16x16 textures)
-- ✅ Mouse and keyboard input integration
-- ✅ 640x480 monochrome display (Format1bppIndexed)
+2. **BitBltEngine** (`VM/Graphics/BitBltEngine.cs`)
+   - Pure C# implementation of all 16 combination rules
+   - Static method: `CopyBits()` with 14 parameters (source, dest, clip, halftone, rule)
+   - Handles MSB-first 1-bit bitmap format (Blue Book standard)
+   - Complete clipping support with proper bounds checking
+   - Halftone pattern support (16×16 textures)
+
+3. **CombinationRule Enum** (`VM/Graphics/CombinationRule.cs`)
+   - All 16 boolean combination rules (Clear, And, Or, Xor, Copy, etc.)
+   - Maps to Blue Book specification exactly
+
+### Key Features
+
+- ✅ **All 16 Boolean Combination Rules** (0-15):
+  - 0: Clear (0), 1: And (s&d), 2: AndReverse (s&~d), 3: Copy (s)
+  - 4: AndInverted (~s&d), 5: Noop (d), 6: Xor (s^d), 7: Or (s|d)
+  - 8: Nor (~(s|d)), 9: Equiv (~(s^d)), 10: Invert (~d), 11: OrReverse (s|~d)
+  - 12: CopyInverted (~s), 13: OrInverted (~s|d), 14: Nand (~(s&d)), 15: Set (1)
+
+- ✅ **1-Bit Monochrome Bitmap Support**:
+  - MSB-first bit ordering (Blue Book standard)
+  - Byte-aligned scanlines
+  - Efficient word-at-a-time processing where possible
+
+- ✅ **Full Clipping Support**:
+  - Destination rectangle clipping
+  - Source coordinate adjustment
+  - Out-of-bounds handling
+
+- ✅ **Halftone Pattern Support**:
+  - 16×16 texture patterns
+  - Y-coordinate based pattern selection
+  - Full pattern application in combination rules
 
 **Graphics Primitives Implemented:**
 ```

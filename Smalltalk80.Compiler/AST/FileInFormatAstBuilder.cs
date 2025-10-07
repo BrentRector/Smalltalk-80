@@ -441,20 +441,29 @@ namespace Smalltalk80.Compiler.AST
 
         private ExpressionNode ProcessMessageExpression(Smalltalk80Parser.MessageExprContext context)
         {
-            var baseExpr = ProcessMessageBase(context.messageBase());
-            
-            // Process unary messages
-            foreach (var unaryMsg in context.unaryMessage())
+            // New grammar: messageExpr = binaryExpr keywordMessage?
+            var binaryExpr = context.binaryExpr();
+            if (binaryExpr == null) throw new InvalidOperationException("MessageExpr must have binaryExpr");
+
+            var baseExpr = ProcessBinaryExpression(binaryExpr);
+
+            // Process keyword message if present
+            var keywordMsg = context.keywordMessage();
+            if (keywordMsg != null)
             {
-                baseExpr = new MessageExpressionNode
-                {
-                    Receiver = baseExpr,
-                    Message = new UnaryMessageNode
-                    {
-                        Selector = unaryMsg.unarySelector().IDENTIFIER().GetText()
-                    }
-                };
+                baseExpr = ProcessKeywordMessage(baseExpr, keywordMsg);
             }
+
+            return baseExpr;
+        }
+
+        private ExpressionNode ProcessBinaryExpression(Smalltalk80Parser.BinaryExprContext context)
+        {
+            // Grammar: binaryExpr = unaryExpr (binaryMessage)*
+            var unaryExpr = context.unaryExpr();
+            if (unaryExpr == null) throw new InvalidOperationException("BinaryExpr must have unaryExpr");
+
+            var baseExpr = ProcessUnaryExpression(unaryExpr);
 
             // Process binary messages
             foreach (var binaryMsg in context.binaryMessage())
@@ -465,19 +474,33 @@ namespace Smalltalk80.Compiler.AST
                     Message = new BinaryMessageNode
                     {
                         Selector = binaryMsg.binarySelector().GetText(),
-                        // Use messageBase() for binary message argument
-                        Argument = ProcessMessageBase(binaryMsg.messageBase())
+                        // Binary message argument is a unaryExpr
+                        Argument = ProcessUnaryExpression(binaryMsg.unaryExpr())
                     }
                 };
             }
 
-            // Process keyword message
-            if (context.keywordMessage() != null)
+            return baseExpr;
+        }
+
+        private ExpressionNode ProcessUnaryExpression(Smalltalk80Parser.UnaryExprContext context)
+        {
+            // Grammar: unaryExpr = messageBase unaryMessage*
+            var messageBase = context.messageBase();
+            if (messageBase == null) throw new InvalidOperationException("UnaryExpr must have messageBase");
+
+            var baseExpr = ProcessMessageBase(messageBase);
+
+            // Process unary messages
+            foreach (var unaryMsg in context.unaryMessage())
             {
                 baseExpr = new MessageExpressionNode
                 {
                     Receiver = baseExpr,
-                    Message = ProcessKeywordMessage(context.keywordMessage())
+                    Message = new UnaryMessageNode
+                    {
+                        Selector = unaryMsg.unarySelector().IDENTIFIER().GetText()
+                    }
                 };
             }
 
@@ -776,19 +799,19 @@ namespace Smalltalk80.Compiler.AST
                 return new BinaryMessageNode
                 {
                     Selector = binary.binarySelector().GetText(),
-                    // Use messageBase() for binary message argument
-                    Argument = ProcessMessageBase(binary.messageBase())
+                    // Binary message argument is a unaryExpr
+                    Argument = ProcessUnaryExpression(binary.unaryExpr())
                 };
             }
             else if (context.keywordMessage() != null)
             {
-                return ProcessKeywordMessage(context.keywordMessage());
+                return ProcessKeywordMessageNode(context.keywordMessage());
             }
 
             throw new InvalidOperationException("Unknown message type");
         }
 
-        private KeywordMessageNode ProcessKeywordMessage(Smalltalk80Parser.KeywordMessageContext context)
+        private KeywordMessageNode ProcessKeywordMessageNode(Smalltalk80Parser.KeywordMessageContext context)
         {
             var selectorParts = new List<string>();
             var arguments = new List<ExpressionNode>();
@@ -797,8 +820,8 @@ namespace Smalltalk80.Compiler.AST
             {
                 // Combine IDENTIFIER and COLON tokens
                 selectorParts.Add(part.IDENTIFIER().GetText() + part.COLON().GetText());
-                // Use nonKeywordExpr() for keyword arguments
-                arguments.Add(ProcessNonKeywordExpression(part.nonKeywordExpr()));
+                // Keyword arguments use binaryExpr (not nonKeywordExpr anymore)
+                arguments.Add(ProcessBinaryExpression(part.binaryExpr()));
             }
 
             return new KeywordMessageNode
@@ -808,39 +831,21 @@ namespace Smalltalk80.Compiler.AST
             };
         }
 
+        private ExpressionNode ProcessKeywordMessage(ExpressionNode receiver, Smalltalk80Parser.KeywordMessageContext context)
+        {
+            return new MessageExpressionNode
+            {
+                Receiver = receiver,
+                Message = ProcessKeywordMessageNode(context)
+            };
+        }
+
         private ExpressionNode ProcessNonKeywordExpression(Smalltalk80Parser.NonKeywordExprContext context)
         {
-            var baseExpr = ProcessMessageBase(context.messageBase());
-            
-            // Process unary messages
-            foreach (var unaryMsg in context.unaryMessage())
-            {
-                baseExpr = new MessageExpressionNode
-                {
-                    Receiver = baseExpr,
-                    Message = new UnaryMessageNode
-                    {
-                        Selector = unaryMsg.unarySelector().IDENTIFIER().GetText()
-                    }
-                };
-            }
-
-            // Process binary messages
-            foreach (var binaryMsg in context.binaryMessage())
-            {
-                baseExpr = new MessageExpressionNode
-                {
-                    Receiver = baseExpr,
-                    Message = new BinaryMessageNode
-                    {
-                        Selector = binaryMsg.binarySelector().GetText(),
-                        Argument = ProcessMessageBase(binaryMsg.messageBase())
-                    }
-                };
-            }
-
-            return baseExpr;
+            // Grammar: nonKeywordExpr = binaryExpr
+            return ProcessBinaryExpression(context.binaryExpr());
         }
+
 
         private string ExtractSymbolValue(Smalltalk80Parser.SymbolConstContext symbolContext)
         {
@@ -991,25 +996,49 @@ namespace Smalltalk80.Compiler.AST
         {
             string? receiver = null;
             string? selector = null;
-            
-            // Get the receiver from the message base
-            if (messageExpr.messageBase() != null)
+
+            // New grammar: messageExpr = binaryExpr keywordMessage?
+            var binaryExpr = messageExpr.binaryExpr();
+            if (binaryExpr == null) return (receiver, selector);
+
+            // Get receiver from unaryExpr -> messageBase
+            var unaryExpr = binaryExpr.unaryExpr();
+            if (unaryExpr != null)
             {
-                var baseExpr = messageExpr.messageBase();
-                if (baseExpr.variable() != null)
+                var baseExpr = unaryExpr.messageBase();
+                if (baseExpr != null)
                 {
-                    receiver = baseExpr.variable().IDENTIFIER().GetText();
+                    if (baseExpr.variable() != null)
+                    {
+                        receiver = baseExpr.variable().IDENTIFIER().GetText();
+                    }
+                    else if (baseExpr.literal() != null && baseExpr.literal().symbolConst() != null)
+                    {
+                        receiver = ExtractSymbolValue(baseExpr.literal().symbolConst());
+                    }
                 }
-                else if (baseExpr.literal() != null && baseExpr.literal().symbolConst() != null)
+
+                // Check for unary messages
+                var unaryMessages = unaryExpr.unaryMessage();
+                if (unaryMessages != null && unaryMessages.Length > 0)
                 {
-                    receiver = ExtractSymbolValue(baseExpr.literal().symbolConst());
+                    var lastUnary = unaryMessages[^1];
+                    selector = lastUnary.unarySelector().IDENTIFIER().GetText();
                 }
             }
-            
-            // Get the selector - check for keyword message first (most common for initialization)
-            if (messageExpr.keywordMessage() != null)
+
+            // Check for binary messages
+            var binaryMessages = binaryExpr.binaryMessage();
+            if (binaryMessages != null && binaryMessages.Length > 0)
             {
-                var keywordMsg = messageExpr.keywordMessage();
+                var lastBinary = binaryMessages[^1];
+                selector = lastBinary.binarySelector().GetText();
+            }
+
+            // Get the selector from keyword message (overrides unary/binary)
+            var keywordMsg = messageExpr.keywordMessage();
+            if (keywordMsg != null)
+            {
                 var parts = new List<string>();
                 foreach (var part in keywordMsg.keywordPart())
                 {
@@ -1017,19 +1046,7 @@ namespace Smalltalk80.Compiler.AST
                 }
                 selector = string.Join("", parts);
             }
-            // Then check for unary messages
-            else if (messageExpr.unaryMessage() != null && messageExpr.unaryMessage().Length > 0)
-            {
-                var lastUnary = messageExpr.unaryMessage()[^1];
-                selector = lastUnary.unarySelector().IDENTIFIER().GetText();
-            }
-            // Finally check for binary messages
-            else if (messageExpr.binaryMessage() != null && messageExpr.binaryMessage().Length > 0)
-            {
-                var lastBinary = messageExpr.binaryMessage()[^1];
-                selector = lastBinary.binarySelector().GetText();
-            }
-            
+
             return (receiver, selector);
         }
 

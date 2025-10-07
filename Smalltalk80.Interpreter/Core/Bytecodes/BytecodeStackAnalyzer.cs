@@ -134,6 +134,31 @@ public static class BytecodeStackAnalyzer
         if (BytecodeUtil.IsReturn(b))
             return 0; // Returns consume the stack but pass value to caller
 
+        // Push active context (0x89 = 137) - used for block creation
+        if (b == 137)
+            return +1;
+
+        // Short jumps (0x90-0x97 = 144-151): Jump forward 1-8 bytes
+        if (b >= 144 && b <= 151)
+            return 0; // Unconditional forward jump, no stack effect
+
+        // Medium jump (0xA0 = 160): Jump forward with parameter
+        if (b == 160)
+        {
+            if (pc < bytecodes.Length)
+                pc++; // Skip distance parameter
+            return 0;
+        }
+
+        // Long jumps (0xA1-0xA7 = 161-167): Jump forward with multi-byte distance
+        if (b >= 161 && b <= 167)
+        {
+            int bytesNeeded = b - 159; // N = 2 to 8
+            for (int i = 0; i < bytesNeeded && pc < bytecodes.Length; i++)
+                pc++;
+            return 0;
+        }
+
         // Extended prefix (0x80)
         if (BytecodeUtil.IsExtended(b))
             return GetExtendedStackEffect(bytecodes, ref pc);
@@ -179,70 +204,83 @@ public static class BytecodeStackAnalyzer
 
         byte subOp = bytecodes[pc++];
 
-        // For now, treat all extended ops conservatively
-        // The issue is that 0x80 in the actual Blue Book has a different encoding
-        // than what we've defined in ExtendedSubOp enum
-
-        // Blue Book extended bytecodes (0x80-0xAF) have specific formats:
-        // 128-143: variable operations (push/store receiver, temp, literal, literal var)
-        // 144-151: send literal selector (various arg counts)
-        // 152-159: jump operations
-
-        // The subOp byte itself may be the actual opcode, not a sub-operation
-        // Let's decode based on the Blue Book format instead
-
-        if (subOp >= 0x00 && subOp <= 0x0F)
+        // Decode based on ExtendedSubOp enum (from BytecodeDefinitions.cs)
+        // This matches what the compiler emits
+        return subOp switch
         {
-            // Extended push/store/pop operations - all have one operand byte
-            if (pc < bytecodes.Length)
-                pc++; // Skip index operand
+            // Push operations - all have one operand byte (index)
+            0x00 => SkipByte(bytecodes, ref pc, +1),  // PUSH_IVAR
+            0x03 => SkipByte(bytecodes, ref pc, +1),  // PUSH_TEMP
+            0x06 => SkipByte(bytecodes, ref pc, +1),  // PUSH_LITERAL
+            0x07 => SkipByte(bytecodes, ref pc, +1),  // PUSH_LITERAL_VAR
 
-            // Decode based on low nibble
-            int operation = (subOp >> 1) & 0x07;
-            return operation switch
-            {
-                0 => +1,  // Push receiver variable
-                1 => +1,  // Push temporary
-                2 => +1,  // Push literal constant
-                3 => +1,  // Push literal variable
-                4 => 0,   // Store receiver variable (no pop)
-                5 => 0,   // Store temporary (no pop)
-                6 => -1,  // Pop and store receiver variable
-                7 => -1,  // Pop and store temporary
-                _ => 0
-            };
-        }
-        else if (subOp >= 0x10 && subOp <= 0x1F)
-        {
-            // Send operations - format varies
-            if (pc < bytecodes.Length)
-            {
-                byte operand = bytecodes[pc++];
-                // Parse jjjkkkkk format where jjj = arg count, kkkkk = selector
-                int argCount = (operand >> 5) & 0x07;
-                return -(argCount + 1) + 1; // Pop receiver + args, push result = -argCount
-            }
-            return 0;
-        }
-        else if (subOp >= 0x20 && subOp <= 0x2F)
-        {
-            // Jump operations - 2-byte offset
-            if (pc + 1 < bytecodes.Length)
-                pc += 2;
+            // Store without pop - all have one operand byte (index)
+            0x01 => SkipByte(bytecodes, ref pc, 0),   // STORE_IVAR (no pop)
+            0x04 => SkipByte(bytecodes, ref pc, 0),   // STORE_TEMP (no pop)
+            0x08 => SkipByte(bytecodes, ref pc, 0),   // STORE_LITERAL_VAR (no pop)
 
-            // Conditional jumps pop the condition
-            if ((subOp & 0x07) <= 0x03)
-                return -1;
-            else
-                return 0;
-        }
-        else
+            // Pop and store - all have one operand byte (index)
+            0x02 => SkipByte(bytecodes, ref pc, -1),  // POP_STORE_IVAR
+            0x05 => SkipByte(bytecodes, ref pc, -1),  // POP_STORE_TEMP
+            0x09 => SkipByte(bytecodes, ref pc, -1),  // POP_STORE_LITERAL_VAR
+
+            // Send operations - one operand byte (selector index)
+            0x0A => SkipByte(bytecodes, ref pc, 0),   // SEND_0: -1 rcv, +1 result = 0
+            0x0B => SkipByte(bytecodes, ref pc, -1),  // SEND_1: -2 (rcv+arg), +1 result = -1
+            0x0C => SkipByte(bytecodes, ref pc, -2),  // SEND_2: -3 (rcv+2args), +1 result = -2
+
+            // Send with arg count - two operand bytes (selector index, arg count)
+            0x0D => SkipTwoBytes(bytecodes, ref pc, GetSendNEffect(bytecodes, pc)),  // SEND_N
+
+            // Super sends
+            0x0E => SkipByte(bytecodes, ref pc, 0),   // SEND_SUPER_0
+            0x0F => SkipByte(bytecodes, ref pc, -1),  // SEND_SUPER_1
+            0x10 => SkipByte(bytecodes, ref pc, -2),  // SEND_SUPER_2
+            0x11 => SkipTwoBytes(bytecodes, ref pc, GetSendNEffect(bytecodes, pc)),  // SEND_SUPER_N
+
+            // Stack operations
+            0x12 => -1,  // POP: -1
+            0x13 => +1,  // DUP: +1
+
+            // Control flow - all have 2-byte offset
+            0x14 => SkipTwoBytes(bytecodes, ref pc, -1),  // JUMP_TRUE (pops condition)
+            0x15 => SkipTwoBytes(bytecodes, ref pc, -1),  // JUMP_FALSE (pops condition)
+            0x16 => SkipTwoBytes(bytecodes, ref pc, 0),   // JUMP (unconditional)
+            0x17 => SkipTwoBytes(bytecodes, ref pc, -1),  // JUMP_LONG_TRUE
+            0x18 => SkipTwoBytes(bytecodes, ref pc, -1),  // JUMP_LONG_FALSE
+            0x19 => SkipTwoBytes(bytecodes, ref pc, 0),   // JUMP_LONG
+
+            // Unknown extended operation
+            _ => 0
+        };
+    }
+
+    private static int SkipByte(byte[] bytecodes, ref int pc, int effect)
+    {
+        if (pc < bytecodes.Length)
+            pc++;
+        return effect;
+    }
+
+    private static int SkipTwoBytes(byte[] bytecodes, ref int pc, int effect)
+    {
+        if (pc < bytecodes.Length)
+            pc++;
+        if (pc < bytecodes.Length)
+            pc++;
+        return effect;
+    }
+
+    private static int GetSendNEffect(byte[] bytecodes, int pc)
+    {
+        // SEND_N and SEND_SUPER_N have format: [selector_index, arg_count]
+        // Effect = -(receiver + args) + result = -(1 + argCount) + 1 = -argCount
+        if (pc + 1 < bytecodes.Length)
         {
-            // Unknown extended operation - assume neutral and skip one byte
-            if (pc < bytecodes.Length)
-                pc++;
-            return 0;
+            int argCount = bytecodes[pc + 1];
+            return -argCount;
         }
+        return 0;
     }
 
     private static int GetSpecialSelectorArgCount(int specialIndex)

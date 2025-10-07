@@ -374,10 +374,21 @@ cascadeExpr
 // MESSAGE EXPRESSIONS
 // =============================================================================
 // Smalltalk precedence: unary > binary > keyword
+// Grammar structure enforces precedence: unaryExpr contains binaryExpr contains keywordExpr
 
-// Complete message expression
+// Complete message expression (may include keyword message)
 messageExpr
-    : messageBase (unaryMessage | binaryMessage)* keywordMessage?
+    : binaryExpr keywordMessage?
+    ;
+
+// Binary expression: unary expressions connected by binary messages
+binaryExpr
+    : unaryExpr (binaryMessage)*
+    ;
+
+// Unary expression: message base with unary messages
+unaryExpr
+    : messageBase unaryMessage*
     ;
 
 // Message base (receiver)
@@ -397,8 +408,8 @@ negativeNumber
 
 // Message parts for cascades
 messagePart
-    : unaryMessage 
-    | binaryMessage 
+    : unaryMessage
+    | binaryMessage
     | keywordMessage
     ;
 
@@ -414,8 +425,9 @@ unaryMessage
 
 // Binary message
 // Example: + 5, = true
+// Argument is a unaryExpr to enforce precedence
 binaryMessage
-    : binarySelector messageBase
+    : binarySelector unaryExpr
     ;
 
 // Keyword message
@@ -426,12 +438,12 @@ keywordMessage
 
 // Keyword part with argument
 keywordPart
-    : IDENTIFIER COLON nonKeywordExpr
+    : IDENTIFIER COLON binaryExpr
     ;
 
-// Non-keyword expression (prevents keyword nesting)
+// Non-keyword expression (prevents keyword nesting) - now uses binaryExpr
 nonKeywordExpr
-    : messageBase (unaryMessage | binaryMessage)*
+    : binaryExpr
     ;
 
 // =============================================================================

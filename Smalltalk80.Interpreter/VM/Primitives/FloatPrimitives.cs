@@ -80,13 +80,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 40: SmallInteger asFloat (convert SmallInteger to Float).
     /// </summary>
-    public static SObjectRef? AsFloat(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef AsFloat(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!receiver.IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         int value = receiver.AsSmallInteger();
         double floatValue = (double)value;
@@ -97,13 +103,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 41: Float + (addition).
     /// </summary>
-    public static SObjectRef? Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -115,13 +127,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 42: Float - (subtraction).
     /// </summary>
-    public static SObjectRef? Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -133,13 +151,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 43: Float &lt; (less than).
     /// </summary>
-    public static SObjectRef? LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -152,13 +176,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 44: Float &gt; (greater than).
     /// </summary>
-    public static SObjectRef? GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -171,13 +201,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 45: Float &lt;= (less than or equal).
     /// </summary>
-    public static SObjectRef? LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -190,13 +226,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 46: Float &gt;= (greater than or equal).
     /// </summary>
-    public static SObjectRef? GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -209,13 +251,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 47: Float = (equality).
     /// </summary>
-    public static SObjectRef? Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -228,13 +276,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 48: Float ~= (not equal).
     /// </summary>
-    public static SObjectRef? NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -247,13 +301,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 49: Float * (multiplication).
     /// </summary>
-    public static SObjectRef? Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -265,13 +325,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 50: Float / (division).
     /// </summary>
-    public static SObjectRef? Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !IsFloat(ctx, args[0]))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double left = ToDouble(ctx, receiver);
         double right = ToDouble(ctx, args[0]);
@@ -285,19 +351,28 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 51: Float truncated (convert to integer, truncate towards zero).
     /// </summary>
-    public static SObjectRef? Truncated(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Truncated(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double value = ToDouble(ctx, receiver);
 
         // Check for special cases
         if (double.IsNaN(value) || double.IsInfinity(value))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Truncate towards zero
         double truncated = Math.Truncate(value);
@@ -313,19 +388,26 @@ public static class FloatPrimitives
 
         // TODO: Create LargeInteger for values outside SmallInteger range
         // For now, fail if too large
-        return null;
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     /// <summary>
     /// Primitive 52: Float fractionPart (get the fractional part).
     /// </summary>
-    public static SObjectRef? FractionPart(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef FractionPart(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double value = ToDouble(ctx, receiver);
         double fractionPart = value - Math.Truncate(value);
@@ -336,13 +418,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 53: Float exponent (get the binary exponent).
     /// </summary>
-    public static SObjectRef? Exponent(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef Exponent(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 0)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double value = ToDouble(ctx, receiver);
 
@@ -351,7 +439,10 @@ public static class FloatPrimitives
             return SObjectRef.FromSmallInteger(0);
 
         if (double.IsNaN(value) || double.IsInfinity(value))
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Get the IEEE 754 representation
         long bits = BitConverter.DoubleToInt64Bits(value);
@@ -368,13 +459,19 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 54: Float timesTwoPower: (multiply by power of 2).
     /// </summary>
-    public static SObjectRef? TimesTwoPower(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SObjectRef TimesTwoPower(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
     {
         if (args.Length != 1)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         if (!IsFloat(ctx, receiver) || !args[0].IsSmallInteger)
-            return null;
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         double value = ToDouble(ctx, receiver);
         int power = args[0].AsSmallInteger();
