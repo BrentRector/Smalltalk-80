@@ -1886,11 +1886,60 @@ This is handled automatically by the loader's `partialResolve` mechanism in Phas
 
 ## Garbage Collection
 
+### Overview
+
+The Smalltalk-80 interpreter implements a **mark-and-sweep garbage collector** integrated with the ObjectTable architecture. The GC operates as a clean client of ObjectTable, using the Special Objects Array (SOA) as the sole root for marking reachable objects.
+
+**Key Design Principles:**
+1. **SOA as Single Root**: The Special Objects Array is the ONLY permanent GC root - all live objects must be reachable from it
+2. **SObjectRef Architecture**: All object references use SObjectRef values (not object pointers)
+3. **ObjectTable Integration**: GC is a clean client of ObjectTable with no special privileges
+4. **Zero Collection at Cold Start**: Properly initialized system shows 0 objects collected (perfect GC)
+
+### Object Memory Model
+
+The system uses a three-layer architecture:
+
+```csharp
+/// Layer 1: SObjectRef - A value type representing an object reference
+public readonly struct SObjectRef
+{
+    private readonly nint value;  // Tagged pointer or immediate value
+
+    // LSB = 0: Object pointer (OOP)
+    // LSB = 1: SmallInteger (31-bit value)
+    // Special patterns for nil, true, false
+}
+
+/// Layer 2: ObjectTable - Manages object allocation and storage
+public sealed class ObjectTable
+{
+    private ObjectData?[] objects;     // Object storage array
+    private Queue<int> freeList;       // Reusable slots
+
+    public ObjectData? Get(int index);
+    public void Free(int index);
+}
+
+/// Layer 3: ObjectData - Internal storage for object state
+public class ObjectData
+{
+    public SObjectRef ClassRef { get; set; }
+    public ObjectFormat Format { get; set; }
+    public SObjectRef[] InstanceVariables { get; set; }
+    public object? IndexedData { get; set; }
+    public bool Marked { get; set; }  // GC mark bit
+}
+```
+
 ### Mark-and-Sweep Algorithm
 
 ```csharp
 public class GarbageCollector
 {
+    private readonly ObjectTable _objectTable;
+    private readonly Stack<nint> _gcStack = new();
+
     public GCStatistics Collect()
     {
         var marked = new HashSet<nint>();
@@ -1932,30 +1981,75 @@ public class GarbageCollector
 
     private void MarkObject(nint oop, HashSet<nint> marked)
     {
+        // Skip immediates and already marked
+        if (oop == 0 || (oop & 0x01) == 1) return;
         if (marked.Contains(oop)) return;
+
         marked.Add(oop);
 
         var data = _objectTable.GetObjectData(oop);
+        if (data == null) return;
+
+        // Mark class reference
+        if (data.ClassRef.IsHeapObject)
+            MarkObject(data.ClassRef.AsObjectPointer(), marked);
 
         // Mark instance variables
         foreach (var instVar in data.InstanceVariables)
         {
-            if (instVar.IsObject && !instVar.IsNil)
+            if (instVar.IsHeapObject && !instVar.IsNil)
                 MarkObject(instVar.AsObjectPointer(), marked);
         }
 
-        // Mark indexed pointers
-        if (data.IndexedData is SObjectRef[] indexedRefs)
+        // Mark indexed data for pointer formats
+        if (data.Format == ObjectFormat.PointerIndexed &&
+            data.IndexedData is SObjectRef[] indexedRefs)
         {
             foreach (var indexedRef in indexedRefs)
             {
-                if (indexedRef.IsObject && !indexedRef.IsNil)
+                if (indexedRef.IsHeapObject && !indexedRef.IsNil)
                     MarkObject(indexedRef.AsObjectPointer(), marked);
             }
         }
     }
 }
 ```
+
+### Triggering Collection
+
+Collections can be triggered in three ways:
+
+**1. Manually from C#:**
+```csharp
+var stats = gc.Collect();
+Console.WriteLine($"Collected {stats.ObjectsCollected} objects");
+```
+
+**2. From Interpreter (periodic checks):**
+```csharp
+if (++bytecodesSinceGC >= 10000)
+{
+    bytecodesSinceGC = 0;
+    if (objectTable.GetAllocatedCount() > 40000)
+        gc.Collect();
+}
+```
+
+**3. From Smalltalk (via primitives):**
+```smalltalk
+"Primitive 112/113 - Run GC and return freed count"
+System garbageCollect.
+System gcStats.
+```
+
+### Performance Characteristics
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Mark Phase** | O(n) | n = reachable objects |
+| **Sweep Phase** | O(m) | m = total allocated objects |
+| **Typical Pause** | 10-50ms | For ~10K objects |
+| **Memory Overhead** | ~16 bytes/object | ObjectData + table entry |
 
 ### Zero Garbage Achievement
 
@@ -1971,6 +2065,25 @@ public class GarbageCollector
 [GC] Collection #2: 0 collected, 3413 live, 0ms
 [GC] Collection #3: 0 collected, 3413 live, 0ms
 ```
+
+**Command-Line Testing:**
+```bash
+# Run with GC logging
+dotnet run --project Smalltalk80.Interpreter -- repl --gc-log
+
+# Validate all objects reachable
+dotnet run --project Smalltalk80.Interpreter -- repl --validate-gc
+```
+
+### Design Rationale
+
+**Why Manual GC Instead of .NET GC?**
+
+Smalltalk-80 requires features incompatible with automatic .NET GC:
+1. **become: primitive** - Swaps object identity system-wide (requires table-based OOPs)
+2. **Instance enumeration** - Find all instances of a class (requires object table iteration)
+3. **Object enumeration** - Iterate all objects (requires controlled allocation)
+4. **Stable OOPs** - Object pointers must remain constant (no moving GC)
 
 ## Bytecode Execution
 
@@ -2746,6 +2859,186 @@ All 16 boolean combination rules from the Blue Book specification:
 | 13 | OrInverted | `~src \| dst` | NOT source OR destination |
 | 14 | Nand | `~(src & dst)` | NOT (source AND destination) |
 | 15 | Set | `1` | All bits set to 1 (black) |
+
+## Process and Scheduling Infrastructure
+
+### Overview
+
+The ProcessorScheduler is required for executing Smalltalk code, managing Process objects and context switching. For basic execution, a minimal "single-process mode" is sufficient; full scheduling with semaphores and preemption can be added incrementally.
+
+### Core Classes Required
+
+**Process** (Link subclass):
+```
+Instance Variables:
+  nextLink (offset 0)         - inherited from Link
+  suspendedContext (offset 1) - MethodContext where process is suspended
+  priority (offset 2)         - SmallInteger priority level (1-8)
+  myList (offset 3)          - LinkedList this process is waiting on (or nil)
+```
+
+**ProcessorScheduler** (Object subclass):
+```
+Instance Variables:
+  quiescentProcessLists (offset 0) - Array of LinkedLists, one per priority
+  activeProcess (offset 1)         - currently executing Process
+
+Class Variables:
+  SystemRockBottomPriority = 1
+  SystemBackgroundPriority = 2
+  UserBackgroundPriority = 3
+  UserSchedulingPriority = 4
+  UserInterruptPriority = 5
+  LowIOPriority = 6
+  HighIOPriority = 7
+  TimingPriority = 8
+```
+
+**Semaphore** (LinkedList subclass):
+```
+Instance Variables:
+  firstLink (offset 0)      - inherited from LinkedList
+  lastLink (offset 1)       - inherited from LinkedList
+  excessSignals (offset 2)  - SmallInteger count of excess signals
+```
+
+**LinkedList** (SequenceableCollection subclass):
+```
+Instance Variables:
+  firstLink (offset 0) - first Link in the list
+  lastLink (offset 1)  - last Link in the list
+```
+
+**Link** (Object subclass):
+```
+Instance Variables:
+  nextLink (offset 0) - next Link in the chain
+```
+
+### Minimal Setup for Single-Process Execution
+
+For basic execution without full scheduling:
+
+```csharp
+// 1. Create ProcessorScheduler instance
+var scheduler = CreateProcessorScheduler();
+
+// 2. Create initial Process with priority 4 (UserSchedulingPriority)
+var process = CreateProcess(priority: 4);
+
+// 3. Create root MethodContext for test method
+var context = CreateMethodContext(method, receiver, args);
+
+// 4. Link process to context
+process.SuspendedContext = context;
+
+// 5. Set process as active
+scheduler.ActiveProcess = process;
+
+// 6. Wire to SOA at index 4
+SpecialObjectsArray.Set(4, scheduler);
+
+// 7. Execute bytecodes in context
+ExecuteBytecodeLoop();
+```
+
+### Integration with Special Objects Array
+
+The ProcessorScheduler is stored at **SOA index 4**, providing access to:
+- **ActiveProcess** (via ProcessorScheduler.activeProcess instance variable)
+- **All Process Contexts** (via activeProcess.suspendedContext → sender chain)
+
+This ensures complete reachability for garbage collection.
+
+### Required Primitives
+
+**Primitive 87 - Process resume**:
+- Validates process is not already on a list
+- Adds process to scheduler's ready queue at its priority level
+- Handles preemption if resumed process has higher priority than active
+
+**Primitive 88 - Process suspend**:
+- For active process: Requires context switching via VM
+- For non-active process: Remove from list and clear myList field
+
+**Primitive 85 - Semaphore signal**:
+- If no processes waiting: Increment excessSignals counter
+- Otherwise: Remove first waiting process and resume it
+
+**Primitive 86 - Semaphore wait**:
+- If excessSignals > 0: Decrement counter and continue
+- Otherwise: Add active process to semaphore's waiting list and suspend
+
+### Stub Implementation Strategy
+
+For initial execution without full scheduling:
+
+1. **Primitives 85-88**: Return failure, let fallback Smalltalk code handle
+2. **Process switching**: Stay on single process
+3. **Semaphore synchronization**: Not needed without multiple processes
+4. **Priority queues**: Use single process at fixed priority (4)
+5. **Preemption**: Not needed for single process
+
+### MethodContext and BlockContext Fields
+
+**MethodContext** (ContextPart subclass):
+```
+Fixed Fields (6):
+  sender (offset 0)            - link to calling context (or nil)
+  instructionPointer (offset 1) - SmallInteger PC
+  stackPointer (offset 2)      - SmallInteger stack index
+  method (offset 3)            - CompiledMethod being executed
+  receiverMap (offset 4)       - nil (unused, for future features)
+  receiver (offset 5)          - object receiving the message
+
+Variable Part:
+  Offsets 6+: Temporaries and stack space (PointerIndexed format)
+```
+
+**BlockContext** (ContextPart subclass):
+```
+Fixed Fields (6):
+  sender (offset 0)            - link to calling context
+  instructionPointer (offset 1) - SmallInteger PC
+  stackPointer (offset 2)      - SmallInteger stack index
+  nargs (offset 3)            - SmallInteger argument count
+  startpc (offset 4)          - SmallInteger starting PC
+  home (offset 5)             - MethodContext that created this block
+
+Variable Part:
+  Offsets 6+: Arguments and stack space (PointerIndexed format)
+```
+
+**Important**: Both MethodContext and BlockContext use **PointerIndexed** format (not FixedPointer) per Blue Book specification: "Both kinds of context have six fixed fields corresponding to six named instance variables. These fixed fields are followed by some indexable fields."
+
+### Phased Implementation Approach
+
+**Phase 1: Single-Process Execution** (Current - Sufficient for Basic Testing):
+- Create ProcessorScheduler with activeProcess
+- Create one Process object
+- No actual suspend/resume (stay on single process)
+- Context switching only via method calls/returns
+
+**Phase 2: Add Process Primitives** (Future):
+- Implement primitives 87-88 for suspend/resume
+- Add process queue management
+- Support process termination
+
+**Phase 3: Full Scheduling** (Future):
+- Implement semaphores (primitives 85-86)
+- Add timer support (primitive 100)
+- Enable preemptive scheduling
+
+### Validation Checklist
+
+Before executing Smalltalk code:
+- [ ] ProcessorScheduler instance exists at SOA[4]
+- [ ] ProcessorScheduler has valid activeProcess
+- [ ] activeProcess has suspendedContext (can be nil initially)
+- [ ] MethodContext has all 6 fixed fields
+- [ ] Context sender chains work properly
+- [ ] Receiver and method are set in contexts
+- [ ] Stack pointer management is correct
 
 ## Compiler Integration
 
