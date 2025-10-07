@@ -5,7 +5,7 @@ using System.IO;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
-using Smalltalk80.Compiler.Core.Bytecodes;
+using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Compiler
 {
@@ -190,9 +190,9 @@ namespace Smalltalk80.Compiler
                     currentDepth++;
                     pc++;
                 }
-                else if (bytecode <= 125) // Returns
+                else if (bytecode >= 120 && bytecode <= 127) // Returns (0x78-0x7F)
                 {
-                    // Returns don't affect max calculation
+                    // Returns don't affect max calculation (stack cleaned up by return)
                     pc++;
                 }
                 else if (bytecode == 128) // Extended Push
@@ -247,23 +247,18 @@ namespace Smalltalk80.Compiler
                     currentDepth++;
                     pc++;
                 }
-                else if (bytecode >= 144 && bytecode <= 151) // Jump
+                else if (bytecode >= 144 && bytecode <= 151) // SHORT_JUMP_FWD (0x90-0x97)
                 {
-                    pc += 2; // Jump has 1 extension byte
+                    pc++; // Single byte, no operands
                 }
-                else if (bytecode >= 152 && bytecode <= 159) // Pop and Jump On False
+                else if (bytecode == 160) // MEDIUM_JUMP_FWD (0xA0)
                 {
-                    currentDepth--; // Pop condition
-                    pc += 2;
+                    pc += 2; // 1-byte offset
                 }
-                else if (bytecode >= 160 && bytecode <= 167) // Long Jump
+                else if (bytecode >= 161 && bytecode <= 167) // LONG_JUMP_FWD (0xA1-0xA7)
                 {
-                    pc += 2;
-                }
-                else if (bytecode >= 168 && bytecode <= 175) // Pop and Long Jump
-                {
-                    currentDepth--; // Pop condition
-                    pc += 2;
+                    int numBytes = bytecode - 159; // 0xA1 => 2, 0xA2 => 3, etc.
+                    pc += numBytes + 1; // Skip opcode + N offset bytes
                 }
                 else if (bytecode >= 176 && bytecode <= 191) // Send Arithmetic Message
                 {
@@ -643,19 +638,39 @@ namespace Smalltalk80.Compiler
 
         public void ReturnSelf()
         {
-            Emit(Bytecode.RETURN_SELF); // 0x79
+            Emit(Bytecode.RETURN_SELF); // 0x78
+        }
+
+        public void ReturnTrue()
+        {
+            Emit(Bytecode.RETURN_TRUE); // 0x79
+        }
+
+        public void ReturnFalse()
+        {
+            Emit(Bytecode.RETURN_FALSE); // 0x7A
+        }
+
+        public void ReturnNil()
+        {
+            Emit(Bytecode.RETURN_NIL); // 0x7B
         }
 
         public void ReturnTop()
         {
-            Emit(Bytecode.RETURN_TOP); // 0x78
+            Emit(Bytecode.RETURN_TOP); // 0x7C
         }
 
         public void ReturnTopFromBlock()
         {
             Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
         }
-        
+
+        public void ReturnSelfFromBlock()
+        {
+            Emit(Bytecode.RETURN_SELF_POP); // 0x7D - block return self
+        }
+
         // Jump operations
         
         public int EmitJumpPlaceholder()
@@ -709,8 +724,11 @@ namespace Smalltalk80.Compiler
         
         /// <summary>
         /// Patches a conditional jump instruction following Blue Book specification.
-        /// - Short conditional jumps (152-159): Pop and jump on false, 1-8 bytes
-        /// - Long conditional jumps (168-175): Pop and jump on true/false, > 8 bytes
+        /// Uses extended bytecodes (0x80 + subop) for all conditional jumps.
+        /// - JUMP_FALSE (0x80 0x15): Pop and jump forward if false (2-byte offset)
+        /// - JUMP_TRUE (0x80 0x14): Pop and jump forward if true (2-byte offset)
+        /// - JUMP_LONG_FALSE (0x80 0x18): Pop and long jump if false (2-byte offset)
+        /// - JUMP_LONG_TRUE (0x80 0x17): Pop and long jump if true (2-byte offset)
         /// </summary>
         public void PatchConditionalJump(int position, int offset, bool jumpOnFalse = true)
         {
@@ -719,68 +737,42 @@ namespace Smalltalk80.Compiler
                 throw new InvalidOperationException($"Invalid jump offset: {offset}. Must be positive.");
             }
 
-            // Blue Book specification: ALL conditional jumps test for FALSE
-            // Short conditional jumps (152-159): Pop and jump on false, 1-8 bytes
-            // Medium conditional jump (168): Pop and jump on false, 1-256 bytes (1 operand byte)
-            // Long conditional jumps (169-175): Pop and jump on false, >256 bytes (2-8 operand bytes)
-            
-            if (!jumpOnFalse)
+            // All conditional jumps use extended bytecodes (0x80 + subop)
+            // Extended bytecode format: 0x80, subop, offsetHigh, offsetLow
+            // Offset is 2 bytes (big-endian), allowing jumps up to 65535 bytes
+
+            if (offset > 0xFFFF)
             {
-                throw new InvalidOperationException("Smalltalk-80 only has jump-on-false conditionals. Use jumpOnFalse=true.");
+                throw new InvalidOperationException($"Jump offset {offset} too large (max 65535). Consider restructuring method.");
             }
 
-            if (offset >= 1 && offset <= 8)
+            // Choose subop based on condition and distance
+            byte subOp;
+            if (jumpOnFalse)
             {
-                // Short conditional jump on false: 152-159
-                // Bytecode = 152 + (offset - 1)
-                bytecodes[position] = (byte)(152 + (offset - 1));
-                bytecodes.RemoveAt(position + 1); // Remove placeholder
-            }
-            else if (offset >= 9 && offset <= 256)
-            {
-                // Medium conditional jump on false: bytecode 168
-                // Uses 1 operand byte: nextByte + 1 = offset
-                bytecodes[position] = 168;
-                bytecodes[position + 1] = (byte)(offset - 1);
+                if (offset <= 0xFF)
+                    subOp = 0x15; // JUMP_FALSE (regular)
+                else
+                    subOp = 0x18; // JUMP_LONG_FALSE (long)
             }
             else
             {
-                // Long conditional jumps on false: bytecodes 169-175
-                // Use 2-8 operand bytes for distances > 256
-                var value = offset - 1;
-                int operandBytes;
-                
-                // Determine minimal bytes needed
-                if (value <= 0xFFFF)
-                    operandBytes = 2;
-                else if (value <= 0xFFFFFF)
-                    operandBytes = 3;
-                else if (value <= 0x7FFFFFFF)  // Max positive int
-                    operandBytes = 4;
+                if (offset <= 0xFF)
+                    subOp = 0x14; // JUMP_TRUE (regular)
                 else
-                    throw new NotSupportedException($"Conditional jump distance {offset} is too large.");
-                
-                // Adjust bytecode array size if needed (we have 2-byte placeholder)
-                if (operandBytes > 2)
-                {
-                    for (int i = 2; i < operandBytes; i++)
-                    {
-                        bytecodes.Insert(position + 2, 0);
-                    }
-                }
-                
-                // Set the opcode: 169-175 based on operand byte count
-                // 169 = 2 bytes, 170 = 3 bytes, ..., 175 = 8 bytes
-                // So bytecode = 167 + operandBytes
-                bytecodes[position] = (byte)(167 + operandBytes);
-                
-                // Encode value as big-endian
-                for (int i = operandBytes - 1; i >= 0; i--)
-                {
-                    bytecodes[position + 1 + i] = (byte)(value & 0xFF);
-                    value >>= 8;
-                }
+                    subOp = 0x17; // JUMP_LONG_TRUE (long)
             }
+
+            // Extended conditional jumps are 4 bytes: 0x80, subop, offsetHigh, offsetLow
+            // We have a 2-byte placeholder at position, need to insert 2 more bytes
+            bytecodes.Insert(position + 2, 0); // Placeholder for offsetHigh
+            bytecodes.Insert(position + 3, 0); // Placeholder for offsetLow
+
+            // Now set the actual bytecode values
+            bytecodes[position] = 0x80;                             // Extended prefix
+            bytecodes[position + 1] = subOp;                         // Subopcode
+            bytecodes[position + 2] = (byte)((offset >> 8) & 0xFF); // Offset high byte
+            bytecodes[position + 3] = (byte)(offset & 0xFF);        // Offset low byte
         }
         
         // Block operations
@@ -1304,7 +1296,12 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter = new BytecodeEmitter();
                 emitter.ReturnSelf();
             }
-            
+
+            // Detect quick-return patterns (flags=5 or flags=6)
+            var (isQuickReturnSelf, quickReturnFieldIndex) = DetectQuickReturn(
+                methodDef.methodBody(),
+                null);
+
             return new CompiledMethodData
             {
                 Selector = selector,
@@ -1315,7 +1312,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 Bytecode = emitter.GetBytecodes(),
                 Literals = emitter.GetLiterals(),
                 ArgumentNames = new List<string>(argumentNames),
-                TemporaryNames = new List<string>(temporaryNames)
+                TemporaryNames = new List<string>(temporaryNames),
+                IsQuickReturnSelf = isQuickReturnSelf,
+                QuickReturnFieldIndex = quickReturnFieldIndex
             };
         }
         
@@ -1365,7 +1364,11 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     environment.PoolVariables[kvp.Key] = kvp.Value;
                 }
             }
-            
+
+            // Declare parse tree nodes outside try block so they're available for quick-return detection
+            Smalltalk80Parser.MethodBodyContext? methodBody = null;
+            Smalltalk80Parser.MethodBodyNoBangContext? methodBodyNoBang = null;
+
             try
             {
                 // Parse the method
@@ -1374,14 +1377,12 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 var tokenStream = new Antlr4.Runtime.CommonTokenStream(lexer);
                 var parser = new Smalltalk80Parser(tokenStream);
                 parser.RemoveErrorListeners();
-                
+
                 // Determine if this is a methodDef (with BANG) or methodEntry (without BANG)
                 // Try methodEntry first (for single methods without BANG)
                 Smalltalk80Parser.MethodHeaderContext? methodHeader = null;
                 Smalltalk80Parser.TemporariesContext? temporaries = null;
                 Smalltalk80Parser.PrimitiveDeclContext? primitiveDecl = null;
-                Smalltalk80Parser.MethodBodyContext? methodBody = null;
-                Smalltalk80Parser.MethodBodyNoBangContext? methodBodyNoBang = null;
                 
                 if (!methodSource.Contains('!'))
                 {
@@ -1497,7 +1498,12 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter = new BytecodeEmitter();
                 emitter.ReturnSelf();
             }
-            
+
+            // Detect quick-return patterns (flags=5 or flags=6)
+            var (isQuickReturnSelf, quickReturnFieldIndex) = DetectQuickReturn(
+                methodBody,
+                methodBodyNoBang);
+
             return new CompiledMethodData
             {
                 Selector = selector,
@@ -1508,7 +1514,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 Literals = emitter.GetLiterals(),
                 Bytecode = emitter.GetBytecodes(),
                 ArgumentNames = new List<string>(argumentNames),
-                TemporaryNames = new List<string>(temporaryNames)
+                TemporaryNames = new List<string>(temporaryNames),
+                IsQuickReturnSelf = isQuickReturnSelf,
+                QuickReturnFieldIndex = quickReturnFieldIndex
             };
         }
 
@@ -3149,8 +3157,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         
         private bool IsReturnBytecode(byte bytecode)
         {
-            // Blue Book return bytecodes: 120-125
-            return bytecode >= 120 && bytecode <= 125;
+            // Blue Book return bytecodes: 0x78-0x7F (120-127)
+            // RETURN_SELF, RETURN_TRUE, RETURN_FALSE, RETURN_NIL, RETURN_TOP,
+            // RETURN_SELF_POP (block), RETURN_TOP_POP (block), NOP
+            return bytecode >= 120 && bytecode <= 127;
         }
         
         private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext baseCtx)
@@ -3163,7 +3173,294 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
             return false;
         }
-        
+
+        /// <summary>
+        /// Detects if a method is a quick-return pattern (flags=5 or flags=6).
+        ///
+        /// Quick-return methods are a Blue Book optimization that allows the VM to bypass
+        /// full activation creation and directly return a value. This is safe ONLY when ALL
+        /// of the following eligibility constraints are satisfied:
+        ///
+        /// 1. Deterministic single-value result (returns self or instance variable)
+        /// 2. Tail-position single send or trivial body (single return statement)
+        /// 3. No local temporaries that affect the return
+        /// 4. No required stack/frame side-effects
+        /// 5. Safe for subclassing/overriding semantics
+        /// 6. No interaction with non-local returns or continuations
+        /// 7. Bytecode/primitive compatibility (VM supports flags=5/6)
+        /// 8. Side-effect free or side-effects irrelevant to return
+        ///
+        /// See docs/Interpreter-Architecture.md "Quick-Return Flag Eligibility Constraints"
+        /// for complete constraint documentation.
+        ///
+        /// This method implements the detection by analyzing the AST for the canonical patterns:
+        /// - flags=5 (quick-return-self): Method body is exactly "^self"
+        /// - flags=6 (quick-return-field): Method body is exactly "^instanceVariableName"
+        /// </summary>
+        /// <returns>
+        /// Tuple of (isQuickReturnSelf, quickReturnFieldIndex):
+        /// - (true, -1): Method is quick-return-self (flags=5)
+        /// - (false, N where N >= 0): Method is quick-return-field (flags=6), returns ivar at index N
+        /// - (false, -1): Method is not a quick-return pattern
+        /// </returns>
+        private (bool isQuickReturnSelf, int quickReturnFieldIndex) DetectQuickReturn(
+            Smalltalk80Parser.MethodBodyContext? methodBody,
+            Smalltalk80Parser.MethodBodyNoBangContext? methodBodyNoBang)
+        {
+            // ========================================================================
+            // CONSTRAINT ENFORCEMENT: Zero Arguments and Zero Temporaries
+            // ========================================================================
+            // WHY: Quick-return methods must have no arguments or temporaries because:
+            //   - Constraint #3: No local temporaries that affect the return
+            //   - Constraint #4: No required stack/frame side-effects
+            //   - The VM skips activation record creation for quick-returns
+            //   - Any arguments or temps would require a frame, violating the optimization
+            //
+            // HOW: We reject any method with ArgumentCount != 0 or TemporaryCount != 0
+            //
+            // EXAMPLES:
+            //   ✓ position  ^position      (0 args, 0 temps)
+            //   ✗ at: index  ^array at: index    (1 arg - not eligible)
+            //   ✗ compute  | temp |  temp := x. ^temp   (1 temp - not eligible)
+
+            if (environment.ArgumentCount != 0 || environment.TemporaryCount != 0)
+            {
+                return (false, -1);
+            }
+
+            // ========================================================================
+            // CONSTRAINT ENFORCEMENT: Tail-Position Single Send or Trivial Body
+            // ========================================================================
+            // WHY: Quick-return methods must have exactly one statement (the return) because:
+            //   - Constraint #2: Tail-position single send or trivial body
+            //   - Constraint #6: No interaction with non-local returns or continuations
+            //   - Constraint #8: Side-effect free or side-effects irrelevant to return
+            //   - Multiple statements could involve side-effects, blocks, or complex control flow
+            //   - The VM needs to safely skip all bytecode execution
+            //
+            // HOW: We extract the return statement from the method body AST and verify:
+            //   1. If methodBody has a direct returnStatement, use it
+            //   2. If methodBody has a statements block, ensure it contains exactly 1 statement
+            //   3. That single statement must be a returnStatement
+            //
+            // ANTLR4 GRAMMAR STRUCTURE:
+            //   methodBody: statements? returnStatement?
+            //   methodBodyNoBang: statements? returnStatement?
+            //   statements: statement ('.' statement)*
+            //
+            // The grammar allows either:
+            //   - Direct return: "^self" (returnStatement directly on methodBody)
+            //   - Statement block: "^self" (statements block with one statement containing returnStatement)
+            //
+            // EXAMPLES:
+            //   ✓ ^self                              (direct return)
+            //   ✓ "comment" ^position                (statement block with 1 return)
+            //   ✗ x := 1. ^x                         (2 statements - not eligible)
+            //   ✗ self doSomething. ^self            (2 statements - side effect, not eligible)
+
+            Smalltalk80Parser.ReturnStatementContext? returnStmt = null;
+
+            if (methodBody != null)
+            {
+                // Try direct return statement first (e.g., "^self")
+                returnStmt = methodBody.returnStatement();
+
+                if (returnStmt == null)
+                {
+                    // Check if there's a statements block with a single return statement
+                    // This handles cases like: "comment" ^position
+                    var statements = methodBody.statements();
+                    if (statements != null)
+                    {
+                        var statementList = statements.statement();
+                        // CRITICAL: Must be exactly 1 statement (Constraint #2)
+                        if (statementList != null && statementList.Length == 1)
+                        {
+                            returnStmt = statementList[0].returnStatement();
+                        }
+                        // If statementList.Length > 1, reject (multiple statements = not eligible)
+                    }
+                }
+            }
+            else if (methodBodyNoBang != null)
+            {
+                // Same logic for methodBodyNoBang variant (methods without trailing '!')
+                returnStmt = methodBodyNoBang.returnStatement();
+
+                if (returnStmt == null)
+                {
+                    var statements = methodBodyNoBang.statements();
+                    if (statements != null)
+                    {
+                        var statementList = statements.statement();
+                        // CRITICAL: Must be exactly 1 statement (Constraint #2)
+                        if (statementList != null && statementList.Length == 1)
+                        {
+                            returnStmt = statementList[0].returnStatement();
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // No method body at all - not a valid method
+                return (false, -1);
+            }
+
+            if (returnStmt == null)
+            {
+                // No return statement found, or multiple statements found
+                // Either case violates quick-return constraints
+                return (false, -1);
+            }
+
+            // ========================================================================
+            // CONSTRAINT ENFORCEMENT: Deterministic Single-Value Result
+            // ========================================================================
+            // WHY: Quick-return methods must return a deterministic value that the VM can
+            //      emit directly without executing bytecode:
+            //   - Constraint #1: Deterministic single-value result
+            //   - Constraint #7: Bytecode/primitive compatibility
+            //   - Constraint #8: Side-effect free
+            //   - The VM supports only two quick-return types:
+            //     * flags=5: Return receiver (self) immediately
+            //     * flags=6: Return instance variable at known index immediately
+            //
+            // HOW: We analyze the return expression to ensure it's one of:
+            //   1. No expression ("^" alone) → implicit "^self" (flags=5)
+            //   2. Simple variable reference that is "self" (flags=5)
+            //   3. Simple variable reference that is an instance variable (flags=6)
+            //
+            // We REJECT any return expression that involves:
+            //   - Assignments (^x := y)
+            //   - Message sends (^self doSomething, ^x + 1)
+            //   - Cascades (^x ; doSomething)
+            //   - Literals (^nil, ^42, ^'string')
+            //   - Blocks (^[x])
+            //   - Temporaries or arguments (not possible here - already checked)
+            //
+            // This ensures the return value is:
+            //   - Deterministic (always the same for same receiver state)
+            //   - Side-effect free (no computation, just a read)
+            //   - VM-compatible (matches flags=5 or flags=6 semantics)
+
+            var expr = returnStmt.expression();
+            if (expr == null)
+            {
+                // "^" with no expression is syntactic sugar for "^self"
+                // This is the canonical flags=5 pattern
+                return (true, -1);
+            }
+
+            // ========================================================================
+            // AST Navigation: Verify Simple Variable Reference
+            // ========================================================================
+            // The ANTLR4 grammar structures expressions as:
+            //   expression → assignmentExpr → cascadeExpr → messageExpr → binaryExpr → unaryExpr → messageBase
+            //
+            // For a simple variable reference like "^position", the tree is:
+            //   returnStatement
+            //     expression
+            //       assignmentExpr (no ASSIGN token)
+            //         cascadeExpr (no SEMICOLON tokens)
+            //           messageExpr (no keywordMessage)
+            //             binaryExpr (no binaryMessage nodes)
+            //               unaryExpr (no unaryMessage nodes)
+            //                 messageBase
+            //                   variable → "position"
+            //
+            // We navigate down this tree and reject at any level where we find:
+            //   - Assignment operators (violates constraint #8 - not side-effect free)
+            //   - Message sends (violates constraint #1 - not deterministic without execution)
+            //   - Cascades (violates constraint #2 - multiple sends)
+            //
+            // This ensures we only accept the trivial case: ^variableName
+
+            var assignExpr = expr.assignmentExpr();
+            if (assignExpr == null || assignExpr.ASSIGN() != null)
+            {
+                // Reject: Assignment in return expression (e.g., "^x := 5")
+                // Violates constraint #8: Side-effect free
+                return (false, -1);
+            }
+
+            var cascadeExpr = assignExpr.cascadeExpr();
+            if (cascadeExpr == null || cascadeExpr.SEMICOLON().Length > 0)
+            {
+                // Reject: Cascade in return (e.g., "^x doThis; doThat")
+                // Violates constraint #2: Tail-position single send
+                return (false, -1);
+            }
+
+            var messageExpr = cascadeExpr.messageExpr();
+            if (messageExpr == null || messageExpr.keywordMessage() != null)
+            {
+                // Reject: Keyword message send (e.g., "^array at: 1")
+                // Violates constraint #1: Not deterministic without frame/execution
+                return (false, -1);
+            }
+
+            var binaryExpr = messageExpr.binaryExpr();
+            if (binaryExpr == null || binaryExpr.binaryMessage().Length > 0)
+            {
+                // Reject: Binary message send (e.g., "^x + 1")
+                // Violates constraint #1: Not deterministic without execution
+                return (false, -1);
+            }
+
+            var unaryExpr = binaryExpr.unaryExpr();
+            if (unaryExpr == null || unaryExpr.unaryMessage().Length > 0)
+            {
+                // Reject: Unary message send (e.g., "^x negated")
+                // Violates constraint #1: Not deterministic without execution
+                return (false, -1);
+            }
+
+            var messageBase = unaryExpr.messageBase();
+            if (messageBase == null)
+            {
+                // Malformed expression tree
+                return (false, -1);
+            }
+
+            // Must be a simple variable reference (not a literal, block, or parenthesized expression)
+            var variable = messageBase.variable();
+            if (variable == null)
+            {
+                // Reject: Literals (^nil, ^42, ^'string'), blocks (^[]), parenthesized expressions (^(x))
+                // Violates constraint #7: VM has no quick-return encoding for these
+                return (false, -1);
+            }
+
+            var varName = variable.GetText();
+
+            // ========================================================================
+            // FINAL VALIDATION: Self or Instance Variable
+            // ========================================================================
+            // At this point we have a simple variable reference. Now determine which kind:
+
+            if (varName == "self")
+            {
+                // Quick-return-self (flags=5)
+                // Returns: (isQuickReturnSelf=true, quickReturnFieldIndex=-1)
+                return (true, -1);
+            }
+
+            if (environment.InstanceVariables.TryGetValue(varName, out int ivarIndex))
+            {
+                // Quick-return-field (flags=6)
+                // Returns: (isQuickReturnSelf=false, quickReturnFieldIndex=N)
+                // The ivar index will be stored in the method header's numTemps field
+                return (false, ivarIndex);
+            }
+
+            // Variable is not "self" or an instance variable
+            // Could be a class variable, global, pool variable, or undefined
+            // These are not supported by quick-return opcodes (Constraint #7)
+            // Reject: Not a quick-return pattern
+            return (false, -1);
+        }
+
         /// <summary>
         /// Helper class to collect literals in first pass.
         /// </summary>

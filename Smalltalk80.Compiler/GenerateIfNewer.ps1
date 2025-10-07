@@ -5,7 +5,7 @@
   Checks if Smalltalk80.g4 is newer than generated files and regenerates if needed.
 #>
 
-$GrammarFile = Join-Path $PSScriptRoot 'Smalltalk80.g4'
+$GrammarFile = Join-Path $PSScriptRoot 'Grammar' 'Smalltalk80.g4'
 $GeneratedDir = Join-Path $PSScriptRoot 'Generated'
 $ParserFile = Join-Path $GeneratedDir 'Smalltalk80Parser.cs'
 
@@ -15,7 +15,8 @@ $needsRegeneration = $false
 if (-not (Test-Path $ParserFile)) {
     Write-Host "Parser files not found. Generating..." -ForegroundColor Yellow
     $needsRegeneration = $true
-} else {
+}
+else {
     $grammarTime = (Get-Item $GrammarFile).LastWriteTime
     $parserTime = (Get-Item $ParserFile).LastWriteTime
     
@@ -29,6 +30,7 @@ if ($needsRegeneration) {
     # Import and run the ANTLR generation script
     . (Join-Path $PSScriptRoot 'Invoke-Antlr4CSharp.ps1')
     Invoke-Antlr4CSharp
-} else {
+}
+else {
     Write-Host "Parser files are up to date." -ForegroundColor Green
 }

@@ -1,4 +1,4 @@
-namespace Smalltalk80.Compiler.Core.Bytecodes;
+namespace Smalltalk80.Core.Bytecodes;
 
 /// <summary>
 /// Bytecode opcodes for the Smalltalk-80 VM.
@@ -143,14 +143,14 @@ public enum Bytecode : byte
     PUSH_TWO       = 0x77,
 
     // 0x78 - 0x7F  Return variants
-    RETURN_TOP         = 0x78, // pop top and return it
-    RETURN_SELF        = 0x79, // return receiver
-    RETURN_FALSE       = 0x7A,
-    RETURN_TRUE        = 0x7B,
-    RETURN_NIL         = 0x7C,
-    RETURN_SELF_POP    = 0x7D, // variant; treat as alias of RETURN_SELF
-    RETURN_TOP_POP     = 0x7E, // variant; treat as alias of RETURN_TOP
-    RESERVED_RETURN    = 0x7F,
+    RETURN_SELF        = 0x78, // return receiver (self)
+    RETURN_TRUE        = 0x79, // return true singleton
+    RETURN_FALSE       = 0x7A, // return false singleton
+    RETURN_NIL         = 0x7B, // return nil
+    RETURN_TOP         = 0x7C, // pop top and return it
+    RETURN_SELF_POP    = 0x7D, // return self from block context (block return)
+    RETURN_TOP_POP     = 0x7E, // pop and return from block context (block return)
+    RESERVED_RETURN    = 0x7F, // NOP
 
     // 0x80 - 0xAF  Extended operations (prefix 0x80 + sub-op bytes)
     EXTENDED_PREFIX   = 0x80,

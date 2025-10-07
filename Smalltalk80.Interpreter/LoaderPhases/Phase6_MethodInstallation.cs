@@ -78,8 +78,6 @@ public class Phase6_MethodInstallation
 
             _localIdToObjectId[method.LocalId] = methodId;
         }
-
-        Console.WriteLine($"  Methods installed: {totalMethods}");
     }
 
 

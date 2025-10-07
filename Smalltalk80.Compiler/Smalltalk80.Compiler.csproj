@@ -17,29 +17,42 @@
   
   <!-- Grammar file included for reference -->
   <ItemGroup>
-    <None Include="Smalltalk80.g4" />
+    <None Include="Grammar\Smalltalk80.g4" />
     <None Include="ANTLR4\antlr-4.13.2-complete.jar" />
   </ItemGroup>
-  
-  <!-- Exclude Generated folder from default compilation -->
+
+  <!-- Exclude Generated folder from automatic inclusion, we'll add it explicitly after generation -->
   <ItemGroup>
     <Compile Remove="Generated\**" />
   </ItemGroup>
-  
+
+  <!-- Explicitly include generated files after they're created -->
+  <ItemGroup>
+    <Compile Include="Generated\*.cs" />
+  </ItemGroup>
+
+  <!-- Link to shared bytecode definitions -->
+  <ItemGroup>
+    <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+  </ItemGroup>
+
   <!-- Ensure Generated folder exists and regenerate parser if needed -->
-  <Target Name="EnsureGeneratedFiles" BeforeTargets="CoreCompile">
+  <Target Name="EnsureGeneratedFiles"
+          BeforeTargets="BeforeCompile"
+          Inputs="Grammar\Smalltalk80.g4"
+          Outputs="Generated\Smalltalk80Parser.cs">
+
+    <Message Text="Parser files not found. Generating..." Importance="high"
+             Condition="!Exists('Generated\Smalltalk80Parser.cs')" />
+    <Message Text="Grammar file is newer than parser. Regenerating..." Importance="high"
+             Condition="Exists('Generated\Smalltalk80Parser.cs')" />
+
     <!-- Create Generated folder if it doesn't exist -->
     <MakeDir Directories="$(MSBuildProjectDirectory)\Generated" Condition="!Exists('$(MSBuildProjectDirectory)\Generated')" />
-    
+
     <!-- Run parser generation -->
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\GenerateIfNewer.ps1&quot;" 
-          WorkingDirectory="$(MSBuildProjectDirectory)" 
-          ContinueOnError="true" />
-    
-    <!-- Dynamically include generated files for compilation -->
-    <ItemGroup>
-      <Compile Include="Generated\*.cs" />
-    </ItemGroup>
+    <Exec Command="pwsh -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\GenerateIfNewer.ps1&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
   
   <!-- Clean target to remove generated files -->

@@ -366,7 +366,9 @@ namespace Smalltalk80.Compiler.AST
                 StackDepth = stackDepth,
                 IsClassMethod = _isMetaclass,
                 ArgNames = compiledData.ArgumentNames,
-                TempNames = compiledData.TemporaryNames
+                TempNames = compiledData.TemporaryNames,
+                IsQuickReturnSelf = compiledData.IsQuickReturnSelf,
+                QuickReturnFieldIndex = compiledData.QuickReturnFieldIndex
             };
 
             // Check for primitive declaration
@@ -1197,6 +1199,12 @@ namespace Smalltalk80.Compiler.AST
 
         [JsonPropertyName("tempNames")]
         public List<string> TempNames { get; set; } = new();
+
+        [JsonPropertyName("isQuickReturnSelf")]
+        public bool IsQuickReturnSelf { get; set; }
+
+        [JsonPropertyName("quickReturnFieldIndex")]
+        public int QuickReturnFieldIndex { get; set; } = -1;
     }
 
     public class InitializationExpression

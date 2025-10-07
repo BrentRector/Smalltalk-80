@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Bytecodes;
+using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Interpreter.Core.Bytecodes;
 
@@ -55,40 +55,74 @@ public static class BytecodeOperandValidator
             int startPc = pc;
             byte b = bytecodes[pc++];
 
-            // Validate based on bytecode type
+            // Validate based on bytecode type per Interpreter-Architecture.md specification
             var error = b switch
             {
-                // Push receiver variable 0-15
+                // 0x00-0x0F: PUSH_IVAR_0..15
                 >= 0 and < 16 => ValidateInstVar(b, instVarCount, startPc),
 
-                // Push temp 0-15
+                // 0x10-0x1F: PUSH_TEMP_0..15
                 >= 16 and < 32 => ValidateTemp(b - 16, totalTempSlots, startPc),
 
-                // Push literal constant 0-31
+                // 0x20-0x3F: PUSH_LITERAL_CONST_0..31
                 >= 32 and < 64 => ValidateLiteral(b - 32, literalCount, startPc),
 
-                // Push literal variable 0-31
+                // 0x40-0x5F: PUSH_LITERAL_VAR_0..31
                 >= 64 and < 96 => ValidateLiteral(b - 64, literalCount, startPc),
 
-                // Store receiver variable 96-103
+                // 0x60-0x67: POP_STORE_IVAR_0..7
                 >= 96 and < 104 => ValidateInstVar(b - 96, instVarCount, startPc),
 
-                // Store temp variable 104-111
+                // 0x68-0x6F: POP_STORE_TEMP_0..7
                 >= 104 and < 112 => ValidateTemp(b - 104, totalTempSlots, startPc),
 
-                // Extended bytecodes
-                0x80 => ValidateExtended(bytecodes, ref pc, literalCount, totalTempSlots, instVarCount, startPc),
+                // 0x70-0x77: Push special constants (self, true, false, nil, -1, 0, 1, 2)
+                >= 112 and < 120 => null,
 
-                // Send literal selector 0-15 with 0 args (208-223)
+                // 0x78-0x7F: Return variants (self, true, false, nil, top, block returns, NOP)
+                >= 120 and < 128 => null,
+
+                // 0x80: EXTENDED_PREFIX
+                128 => ValidateExtended(bytecodes, ref pc, literalCount, totalTempSlots, instVarCount, startPc),
+
+                // 0x81-0x88: Reserved
+                >= 129 and < 137 => null,
+
+                // 0x89: PUSH_ACTIVE_CONTEXT (for block creation)
+                137 => null,
+
+                // 0x8A-0x8F: Reserved
+                >= 138 and < 144 => null,
+
+                // 0x90-0x97: SHORT_JUMP_FWD_1..8 (single byte, no operands)
+                >= 144 and < 152 => null,
+
+                // 0x98-0x9F: Reserved
+                >= 152 and < 160 => null,
+
+                // 0xA0: MEDIUM_JUMP_FWD (1 byte offset)
+                160 => SkipOneByte(bytecodes, ref pc, startPc),
+
+                // 0xA1-0xA7: LONG_JUMP_FWD_2..8 (multi-byte offset)
+                >= 161 and < 168 => SkipLongJump(bytecodes, ref pc, b - 159, startPc),
+
+                // 0xA8-0xAF: Reserved
+                >= 168 and < 176 => null,
+
+                // 0xB0-0xBF: SEND_ARITH (arithmetic operators)
+                >= 176 and < 192 => null,
+
+                // 0xC0-0xCF: SEND_SPECIAL (special selectors)
+                >= 192 and < 208 => null,
+
+                // 0xD0-0xDF: SEND_LIT_0_ARGS (send literal selector 0-15 with 0 args)
                 >= 208 and < 224 => ValidateLiteral(b - 208, literalCount, startPc),
 
-                // Send literal selector 0-15 with 1 arg (224-239)
+                // 0xE0-0xEF: SEND_LIT_1_ARG (send literal selector 0-15 with 1 arg)
                 >= 224 and < 240 => ValidateLiteral(b - 224, literalCount, startPc),
 
-                // Send literal selector 0-15 with 2 args (240-255)
-                >= 240 and <= 255 => ValidateLiteral(b - 240, literalCount, startPc),
-
-                _ => null // All other bytecodes don't reference method metadata
+                // 0xF0-0xFF: SEND_LIT_2_ARGS (send literal selector 0-15 with 2 args)
+                >= 240 and <= 255 => ValidateLiteral(b - 240, literalCount, startPc)
             };
 
             if (error != null)
@@ -268,6 +302,40 @@ public static class BytecodeOperandValidator
         }
 
         pc++; // Skip arg count
+        return null;
+    }
+
+    private static ValidationResult? SkipOneByte(byte[] bytecodes, ref int pc, int startPc)
+    {
+        if (pc >= bytecodes.Length)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "Truncated jump bytecode (missing offset byte)",
+                ErrorOffset = startPc
+            };
+        }
+
+        pc++; // Skip the offset byte
+        return null;
+    }
+
+    private static ValidationResult? SkipLongJump(byte[] bytecodes, ref int pc, int numBytes, int startPc)
+    {
+        // Long jumps (0xA1-0xA7) have N-byte offsets where N = bytecode - 159
+        // N ranges from 2 to 8
+        if (pc + numBytes - 1 >= bytecodes.Length)
+        {
+            return new ValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = $"Truncated long jump bytecode (missing {numBytes} offset bytes)",
+                ErrorOffset = startPc
+            };
+        }
+
+        pc += numBytes; // Skip N offset bytes
         return null;
     }
 

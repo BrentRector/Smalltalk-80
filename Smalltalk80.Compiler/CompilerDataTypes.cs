@@ -52,6 +52,19 @@ namespace Smalltalk80.Compiler
         /// Ordered list of temporary variable names.
         /// </summary>
         public List<string> TemporaryNames { get; set; } = new();
+
+        /// <summary>
+        /// Whether this method is a quick-return-self (flags=5) optimization.
+        /// True if the method body is exactly: ^self
+        /// </summary>
+        public bool IsQuickReturnSelf { get; set; }
+
+        /// <summary>
+        /// For quick-return-field methods (flags=6), the instance variable index to return.
+        /// -1 if this is not a quick-return-field method.
+        /// True if the method body is exactly: ^instanceVariableName
+        /// </summary>
+        public int QuickReturnFieldIndex { get; set; } = -1;
     }
     
     /// <summary>

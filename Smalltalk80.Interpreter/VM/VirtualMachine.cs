@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Bytecodes;
+using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.VM.Primitives;

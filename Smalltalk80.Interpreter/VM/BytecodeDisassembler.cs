@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Bytecodes;
+using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Interpreter.VM;
 

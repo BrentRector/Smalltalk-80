@@ -1,8 +1,18 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-10-06
+**Last Updated**: 2025-10-07
 **Status**: Current Standing Guidance
 **Current Phase**: Bytecode Interpreter Complete (256/256 opcodes), Compiler Debugging In Progress
+
+## Session Initialization
+
+**When starting a new session, always run:**
+
+```bash
+pwsh -Command "chcp 65001"
+```
+
+This sets the console code page to UTF-8 (65001) to ensure Unicode characters (box-drawing, special symbols, emoji) display correctly in terminal output.
 
 ## Primary Documentation Reference
 
@@ -120,10 +130,60 @@ All development work must align with the architecture documented in that file. B
 - **Null safety** - use nullable reference types correctly
 - **Expression-bodied members** when they improve readability
 
+### Shared Source Files
+
+**Critical files that must be identical across projects are maintained in the `Shared/` directory and linked into projects via MSBuild.**
+
+**Location**: `Shared/Core/Bytecodes/BytecodeDefinitions.cs`
+
+**Purpose**: This file contains the complete Smalltalk-80 bytecode specification as C# enums:
+- `Bytecode` enum - All 256 bytecode opcodes (0x00-0xFF) per Blue Book specification
+- `ExtendedSubOp` enum - 26 extended sub-operations for 0x80 prefix bytecodes
+- Helper methods for bytecode analysis and validation
+
+**Why Shared?**
+- The compiler emits bytecode using these enums
+- The interpreter executes bytecode using these enums
+- Any mismatch causes catastrophic runtime failures (VM executes wrong operations)
+- Example: If compiler emits 0x78 meaning RETURN_SELF but interpreter thinks 0x78 means RETURN_TOP, methods returning `self` will return top of stack instead
+
+**How It Works**:
+```xml
+<!-- Both .csproj files contain this link -->
+<ItemGroup>
+  <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs"
+           Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+</ItemGroup>
+```
+
+**Namespace**: `Smalltalk80.Core.Bytecodes` (neutral, not project-specific)
+
+**Maintenance Guidelines**:
+1. **Never** create project-specific copies of this file
+2. **Always** edit the file in `Shared/Core/Bytecodes/` directly
+3. Changes automatically apply to both Compiler and Interpreter on next build
+4. Any bytecode changes MUST match Interpreter-Architecture.md specification exactly
+5. After editing, rebuild both projects to verify no errors
+
+**Benefits**:
+- Zero duplication - impossible to have version mismatch
+- Single point of truth for all 256 bytecode definitions
+- Automatic synchronization across projects
+- Compiler and interpreter guaranteed to use identical bytecode mappings
+
+**Files That Should Be Shared**:
+- ✅ BytecodeDefinitions.cs - Already shared
+- ⏳ Consider: Other Blue Book specifications that must remain synchronized
+
 ### Project Structure
 
 ```
 Smalltalk-80/
+├── Shared/                            # Shared source files (linked by multiple projects)
+│   └── Core/
+│       └── Bytecodes/
+│           └── BytecodeDefinitions.cs # ✅ Single source of truth for bytecode enums
+│
 ├── Smalltalk80.Compiler/              # Parses Smalltalk-80.st → generates JSON
 │   ├── AST/                           # ANTLR4 parser integration
 │   ├── CodeGen/

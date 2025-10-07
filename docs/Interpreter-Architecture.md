@@ -2828,59 +2828,130 @@ Generated Smalltalk-80.json
 ### Directory Structure
 
 ```
-Smalltalk80.Interpreter/
-├── ColdStart/                      # Bootstrap system
-│   ├── ColdStartBootstrap.cs       # Multi-phase orchestrator
-│   ├── ColdStartLoader.cs          # JSON deserialization & allocation
-│   ├── LocalIdResolver.cs          # LocalId → OOP mapping
-│   ├── PatchApplicator.cs          # Forward reference patching
-│   ├── SymbolTableBuilder.cs       # USTable creation and migration
-│   └── CharacterTableBuilder.cs    # Character table (256 chars)
-├── Core/                           # Core object model
-│   ├── Objects/
-│   │   ├── SystemDictionary.cs     # Global class registry
-│   │   └── ...
-│   ├── Values/
-│   │   ├── SObjectRef.cs           # Tagged pointer implementation
-│   │   └── ...
-│   └── BlueBook/
-│       └── BlueBookFactory.cs      # Factory for Blue Book objects
-├── Memory/                         # Memory management
-│   ├── ObjectMemory.cs             # Table-based storage
-│   ├── ObjectTable.cs              # OOP table implementation
-│   ├── GarbageCollector.cs         # Mark-and-sweep GC
-│   └── SpecialObjectsArray.cs      # 5-field readonly struct
-├── Execution/                      # Bytecode execution
-│   ├── ContextBasedInterpreter.cs  # Context-based interpreter
-│   └── BytecodeDecoder.cs          # Bytecode dispatch
-├── Primitives/                     # Primitive operations
-│   └── PrimitiveDispatcher.cs      # Primitive dispatch
-└── VirtualMachine.cs               # VM orchestration
-
-Smalltalk80.Compiler/
-├── CodeGen/                        # JSON generation
-│   ├── ColdStartJsonGenerator.cs   # Main JSON generator (all-in-one)
-│   ├── ColdStartDataGenerator.cs   # Legacy C# generator (deprecated)
-│   ├── LayoutGenerator.cs          # Legacy layout generator (deprecated)
-│   └── LiteralExtractor.cs         # Legacy literal extractor (deprecated)
-├── AST/                            # Abstract syntax tree
-│   └── FileInFormatAstBuilder.cs   # ANTLR4 visitor
-├── Generated/                      # ANTLR4 generated files
-│   ├── Smalltalk80Lexer.cs         # Lexer
-│   ├── Smalltalk80Parser.cs        # Parser
-│   ├── Smalltalk80Visitor.cs       # Visitor interface
-│   └── Smalltalk80BaseVisitor.cs   # Base visitor
-├── BytecodeCompiler.cs             # Bytecode compilation
-├── CompilerDataTypes.cs            # Symbol, Association types
-├── Program.cs                      # Single-purpose CLI
-└── Smalltalk80.g4                  # ANTLR4 grammar
-
-docs/
-├── schemas/
-│   └── coldstart-v1.0.0.schema.json # Canonical JSON schema
-├── Interpreter-Architecture.md      # This document
-└── BOOTSTRAP_ARCHITECTURE.md        # (deprecated, to be merged)
+Smalltalk-80/
+├── Shared/                         # Shared source files (linked by projects)
+│   └── Core/
+│       └── Bytecodes/
+│           └── BytecodeDefinitions.cs  # Single source of truth for bytecode enums
+│
+├── Smalltalk80.Interpreter/
+│   ├── ColdStart/                      # Bootstrap system
+│   │   ├── ColdStartBootstrap.cs       # Multi-phase orchestrator
+│   │   ├── ColdStartLoader.cs          # JSON deserialization & allocation
+│   │   ├── LocalIdResolver.cs          # LocalId → OOP mapping
+│   │   ├── PatchApplicator.cs          # Forward reference patching
+│   │   ├── SymbolTableBuilder.cs       # USTable creation and migration
+│   │   └── CharacterTableBuilder.cs    # Character table (256 chars)
+│   ├── Core/                           # Core object model
+│   │   ├── Objects/
+│   │   │   ├── SystemDictionary.cs     # Global class registry
+│   │   │   └── ...
+│   │   ├── Values/
+│   │   │   ├── SObjectRef.cs           # Tagged pointer implementation
+│   │   │   └── ...
+│   │   └── BlueBook/
+│   │       └── BlueBookFactory.cs      # Factory for Blue Book objects
+│   ├── Memory/                         # Memory management
+│   │   ├── ObjectMemory.cs             # Table-based storage
+│   │   ├── ObjectTable.cs              # OOP table implementation
+│   │   ├── GarbageCollector.cs         # Mark-and-sweep GC
+│   │   └── SpecialObjectsArray.cs      # 5-field readonly struct
+│   ├── Execution/                      # Bytecode execution
+│   │   ├── ContextBasedInterpreter.cs  # Context-based interpreter
+│   │   └── BytecodeDecoder.cs          # Bytecode dispatch
+│   ├── Primitives/                     # Primitive operations
+│   │   └── PrimitiveDispatcher.cs      # Primitive dispatch
+│   └── VirtualMachine.cs               # VM orchestration
+│
+├── Smalltalk80.Compiler/
+│   ├── CodeGen/                        # JSON generation
+│   │   ├── ColdStartJsonGenerator.cs   # Main JSON generator (all-in-one)
+│   │   ├── ColdStartDataGenerator.cs   # Legacy C# generator (deprecated)
+│   │   ├── LayoutGenerator.cs          # Legacy layout generator (deprecated)
+│   │   └── LiteralExtractor.cs         # Legacy literal extractor (deprecated)
+│   ├── AST/                            # Abstract syntax tree
+│   │   └── FileInFormatAstBuilder.cs   # ANTLR4 visitor
+│   ├── Generated/                      # ANTLR4 generated files
+│   │   ├── Smalltalk80Lexer.cs         # Lexer
+│   │   ├── Smalltalk80Parser.cs        # Parser
+│   │   ├── Smalltalk80Visitor.cs       # Visitor interface
+│   │   └── Smalltalk80BaseVisitor.cs   # Base visitor
+│   ├── BytecodeCompiler.cs             # Bytecode compilation
+│   ├── CompilerDataTypes.cs            # Symbol, Association types
+│   ├── Program.cs                      # Single-purpose CLI
+│   └── Smalltalk80.g4                  # ANTLR4 grammar
+│
+└── docs/
+    ├── schemas/
+    │   └── coldstart-v1.0.0.schema.json # Canonical JSON schema
+    ├── Interpreter-Architecture.md      # This document
+    └── BOOTSTRAP_ARCHITECTURE.md        # (deprecated, to be merged)
 ```
+
+### Shared Source Files
+
+**Critical Requirement**: Certain files must be **absolutely identical** between the Compiler and Interpreter projects. Any mismatch causes catastrophic runtime failures.
+
+#### BytecodeDefinitions.cs - Single Source of Truth
+
+**Location**: `Shared/Core/Bytecodes/BytecodeDefinitions.cs`
+
+**Contains**:
+- `Bytecode` enum - All 256 bytecode opcodes (0x00-0xFF) per Blue Book specification
+- `ExtendedSubOp` enum - 26 extended sub-operations for 0x80 prefix bytecodes
+- `BytecodeUtil` static class - Helper methods for bytecode analysis and classification
+
+**Why This Must Be Shared**:
+The compiler emits bytecode using these enum values, and the interpreter executes bytecode by switching on these enum values. If the definitions diverge:
+
+```csharp
+// Example of catastrophic failure if definitions mismatch:
+
+// Compiler has:                    // Interpreter has:
+RETURN_SELF = 0x78                  RETURN_TOP = 0x78
+
+// Result: Method "^ self" compiles to 0x78
+// But interpreter executes 0x78 as "return top of stack"
+// Every method returning self will return wrong value!
+```
+
+**Actual Bug History**: During October 2025, the return bytecode mappings (0x78-0x7C) were discovered to be completely wrong in BytecodeDefinitions.cs. The compiler had RETURN_TOP=0x78, but the Blue Book specification says 0x78=RETURN_SELF. This would have caused every method returning `self` to return the top of stack instead - a catastrophic failure affecting the entire system.
+
+**MSBuild Linking**:
+Both `.csproj` files contain this link directive:
+```xml
+<!-- Link to shared bytecode definitions -->
+<ItemGroup>
+  <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs"
+           Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+</ItemGroup>
+```
+
+This creates a **hard link** - the file appears in both projects' virtual directory structure, but physically exists only once in `Shared/`. Any edit to the shared file automatically affects both projects on next build.
+
+**Namespace**: `Smalltalk80.Core.Bytecodes` (neutral, not project-specific)
+
+**Maintenance Rules**:
+1. ✅ **DO**: Edit `Shared/Core/Bytecodes/BytecodeDefinitions.cs` directly
+2. ❌ **NEVER**: Create project-specific copies of this file
+3. ❌ **NEVER**: Modify bytecode values without referencing Blue Book specification
+4. ✅ **DO**: Rebuild both projects after any changes to verify no errors
+5. ✅ **DO**: Cross-reference all bytecode changes with Interpreter-Architecture.md bytecode table (lines 1990-2189)
+
+**Validation**: If bytecode definitions are correct, both projects will build successfully. If they diverge (which is now impossible), the compiler will emit bytecodes the interpreter doesn't understand, causing NotImplementedException at runtime.
+
+**Benefits**:
+- Zero duplication - impossible to have version mismatch between projects
+- Single point of truth for all 256 bytecode opcodes
+- Automatic synchronization across Compiler and Interpreter
+- Edit once, applies everywhere on next build
+- Prevents catastrophic runtime failures from definition mismatches
+
+**Future Considerations**:
+Other Blue Book specifications that must remain synchronized could follow this pattern:
+- Primitive operation numbers (currently in separate files)
+- Special object indices (nil=0, false=1, true=2, etc.)
+- Object format flags and field layouts
 
 ### Key Modules
 
@@ -3446,6 +3517,72 @@ returnField
     self flags = 6 ifTrue: [^self numTempsField].
     ^nil
 ```
+
+#### Quick-Return Flag Eligibility Constraints
+
+A selector can be marked with a quick-return flag (flags=5 or flags=6) in a Smalltalk-80 method header **only when ALL** of the following conditions are true:
+
+1. **Deterministic single-value result**: The selector always yields the same kind of return value that the VM can emit directly: the receiver (`self`), a literal (`nil`, `true`, `false`), or an immediate small-integer constant. The result must **not** depend on mutable external state or side-effects.
+
+2. **Tail-position single send or trivial body**: The method's observable effect reduces to a single message send whose value is immediately returned (tail call), or to a trivially constant expression (literal return). There must be **no additional computation** after the send that changes the returned value.
+
+3. **No local temporaries that affect the return**: The return value must **not** be computed via temporary variables whose state is required to be preserved across method-call bookkeeping; the compiler/VM must be able to bypass ordinary stack/frame bookkeeping and produce the value directly.
+
+4. **No required stack/frame side-effects**: The method must **not** rely on frame layout, stack slots, or activation-record side-effects (for example, setting up temporaries for debugging, activation snapshots, or bytecode-instrumentation hooks) that would be skipped by a quick-return path.
+
+5. **Safe for subclassing/overriding semantics**: The quick-return must preserve the language semantics under subclassing and dynamic method replacement. If marking the selector would change dispatch observable behavior (for example because subclasses must run additional code or because method-not-found hooks would be bypassed), the flag is **not allowed**.
+
+6. **No interaction with non-local returns or continuations**: The method must **not** participate in non-local returns (return-from-block semantics that depend on a full frame being present), block-closure captures that inspect the frame, or other control-flow semantics that require a full activation record.
+
+7. **Bytecode/primitive compatibility**: The selector's implementation must be representable by the VM's quick-return opcode(s) or be implementable as a primitive with an equivalent direct-return behavior. If the VM has no direct-return encoding for the required return kind, the flag is inapplicable.
+
+8. **Side-effect free or side-effects irrelevant to return**: Any side-effects (if present) must be either absent or provably irrelevant to observable program behavior beyond producing the return value. If the side-effect ordering relative to other operations matters, the quick-return cannot be used.
+
+**Examples (illustrative):**
+
+- ✅ **Eligible**: A method that simply returns `self`:
+  ```smalltalk
+  asArray
+      ^self
+  ```
+
+- ✅ **Eligible**: A method that returns an instance variable:
+  ```smalltalk
+  position
+      "Answer the current position."
+      ^position
+  ```
+
+- ❌ **Not eligible**: A method that does arithmetic and then returns the computed value (requires full frame for computation):
+  ```smalltalk
+  nextValue
+      | temp |
+      temp := x + y.
+      ^temp
+  ```
+
+- ❌ **Not eligible**: A method that must create or update temporaries before returning:
+  ```smalltalk
+  compute
+      | result |
+      result := self calculate.
+      ^result
+  ```
+
+- ❌ **Not eligible**: A method with arguments (quick-return forms require 0 arguments):
+  ```smalltalk
+  at: index
+      ^array at: index
+  ```
+
+**Summary**: Quick-return flags are an optimization that lets the compiler/VM bypass full activation creation and emit a direct-return code path. Marking a selector is safe **only when the semantics above hold exactly**; if any condition is violated, the full-call path must be used.
+
+**Current Implementation**: The Smalltalk80.Compiler detects quick-return patterns during bytecode compilation by analyzing the AST for methods with:
+- Zero arguments
+- Zero temporaries
+- A single return statement that returns either `self` (flags=5) or a simple instance variable reference (flags=6)
+
+This ensures all quick-return methods satisfy the eligibility constraints above.
 
 #### Flags 7: Extended Form — Complete Specification
 

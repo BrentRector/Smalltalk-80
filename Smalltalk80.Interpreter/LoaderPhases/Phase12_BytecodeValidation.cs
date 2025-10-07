@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Bytecodes;
 using Smalltalk80.Interpreter.Schema;
 using Smalltalk80.Interpreter.VM;
@@ -168,8 +169,8 @@ public class Phase12_BytecodeValidation
             }
         }
 
-        // Report stack analysis results
-        Console.WriteLine($"  Methods analyzed: {methodsAnalyzed}/{totalMethods}");
+        // Report stack analysis results (print checkmark inline first, then details on next line)
+        Console.WriteLine($"✓\n  Methods analyzed: {methodsAnalyzed}/{totalMethods}");
         Console.WriteLine($"  Max stack depth: {maxStackDepthSeen}");
 
         if (stackIssues.Count > 0)

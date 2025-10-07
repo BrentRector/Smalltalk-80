@@ -138,36 +138,46 @@ public class Loader
         });
 
         // Run GC to verify all objects are reachable
-        RunPhase("Garbage Collection Verification", () =>
+        Console.Write("Garbage Collection Verification... ");
         {
             int collected = _heap.GarbageCollect();
             var stats = _heap.GetGCStatistics();
 
-            Console.WriteLine($"\n  Objects: {stats.TotalObjects} total, {stats.LiveObjects} marked, {collected} collected");
-
             if (collected > 0)
             {
+                Console.WriteLine("✗ FAILED");
                 throw new InvalidOperationException(
                     $"COLD START BUG: {collected} objects were collected during GC! " +
                     $"All {stats.TotalObjects} objects should be reachable from special objects array.");
             }
             else
             {
+                Console.WriteLine("✓");
+                Console.WriteLine($"  Objects: {stats.TotalObjects} total, {stats.LiveObjects} marked, {collected} collected");
                 Console.WriteLine("  ✓ All objects reachable - no garbage collected");
             }
-        });
+        }
 
         // Phase 12: Bytecode Validation (Optional - runs after GC verification)
         // This phase may allocate temporary objects for validation, so it runs after GC check
+        // Note: Phase 12 prints its own checkmark inline with detailed output
         bool runValidation = Environment.GetEnvironmentVariable("SKIP_BYTECODE_VALIDATION") != "1";
         if (runValidation)
         {
             Console.WriteLine("\n=== Optional Bytecode Validation ===\n");
-            RunPhase("Phase 12: Bytecode Validation", () =>
+            Console.Write("Phase 12: Bytecode Validation... ");
+            try
             {
                 var phase = new Phase12_BytecodeValidation(_bundle, _heap, _localIdToObjectId, _bundle.Symbols.ToArray(), _layoutResolver!);
                 phase.Run();
-            });
+                // Note: Phase 12 prints ✓ itself at the start of its output
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("✗ FAILED");
+                Console.WriteLine($"  Error: {ex.Message}");
+                throw new InvalidOperationException("Cold start failed at Phase 12: Bytecode Validation", ex);
+            }
         }
     }
 

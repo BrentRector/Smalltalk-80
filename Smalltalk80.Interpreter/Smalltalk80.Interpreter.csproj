@@ -21,6 +21,11 @@
     </ProjectReference>
   </ItemGroup>
 
+  <!-- Link to shared bytecode definitions -->
+  <ItemGroup>
+    <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+  </ItemGroup>
+
   <!-- Copy coldstart.json from Compiler output to Interpreter output after Compiler builds -->
   <Target Name="CopyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
