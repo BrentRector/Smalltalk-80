@@ -11153,7 +11153,9 @@ with: firstObject with: secondObject with: thirdObject with: fourthObject
 	newCollection add: secondObject.
 	newCollection add: thirdObject.
 	newCollection add: fourthObject.
-	^newCollection! !ByteArray variableByteSubclass: #CompiledMethod
+	^newCollection! !
+	
+ByteArray variableByteSubclass: #CompiledMethod
 	instanceVariableNames: ''
 	classVariableNames: 'BytesForHeader BytesPerLiteral LargeFrame SmallFrame SpecialConstants TempNameCache '
 	poolDictionaries: ''
@@ -11616,7 +11618,8 @@ toReturnSelf
 		nLits: 0! !
 
 CompiledMethod initialize!
-Object subclass: #Compiler
+
+Object subclass: #Compiler
 	instanceVariableNames: 'sourceStream requestor class context '
 	classVariableNames: ''
 	poolDictionaries: ''

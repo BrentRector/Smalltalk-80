@@ -1,25 +1,21 @@
 using System.Text.Json;
 using Smalltalk80.Interpreter.Schema;
 using Smalltalk80.Interpreter.VM;
-using Smalltalk80.Interpreter.Core.Bytecodes;
 
 namespace Smalltalk80.Interpreter.LoaderPhases;
 
 /// <summary>
 /// Phase 6: Method Installation
 /// Reads each method descriptor, resolves its selector and literals, decodes bytecodes,
-/// analyzes bytecode stack balance, and installs the resulting CompiledMethod into the
-/// owning class's method dictionary.
+/// and installs the resulting CompiledMethod into the owning class's method dictionary.
 ///
 /// Literal value types supported:
 /// - symbol, string, smallInt, objectRef, character, bytes
 /// - association (with optional patching)
 /// - array (nested literals)
 ///
-/// Stack Analysis:
-/// - Validates that bytecodes don't cause stack underflow
-/// - Reports maximum stack depth across all methods
-/// - Identifies any methods with stack balance issues
+/// Note: Bytecode validation (stack analysis, operand validation, decompilation)
+/// has been moved to Phase 12 (optional).
 /// </summary>
 public class Phase6_MethodInstallation
 {
@@ -28,7 +24,6 @@ public class Phase6_MethodInstallation
     private readonly Dictionary<string, int> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
-    private readonly LayoutResolver _layoutResolver;
 
     public Phase6_MethodInstallation(
         ColdStartBundle bundle,
@@ -42,10 +37,6 @@ public class Phase6_MethodInstallation
         _localIdToObjectId = localIdToObjectId;
         _symbols = symbols;
         _strings = strings;
-
-        // Initialize layout resolver with computed layouts from Phase 4
-        _layoutResolver = new LayoutResolver();
-        _layoutResolver.ComputeLayouts(_bundle.Classes, _symbols);
     }
 
     public void Run()
@@ -71,14 +62,8 @@ public class Phase6_MethodInstallation
             _heap.SetNamedSlot(classId, "methodDictionary", methodDictId);
         }
 
-        // Stack analysis statistics
+        // Create and install all methods
         int totalMethods = 0;
-        int methodsAnalyzed = 0;
-        int maxStackDepthSeen = 0;
-        var stackIssues = new List<(string className, string selector, string message, int bytecodeLength)>();
-        var operandIssues = new List<(string className, string selector, string message, int bytecodeLength)>();
-
-        // NOW: Create and install all methods (no dictionary expansion!)
         foreach (var method in _bundle.Methods)
         {
             totalMethods++;
@@ -88,116 +73,15 @@ public class Phase6_MethodInstallation
             var literalIds = method.Literals.Select(ResolveLiteralValue).ToArray();
             var bytecodes = DecodeBytecodes(method.Bytecodes);
 
-            // Analyze bytecode stack balance
-            var analysis = BytecodeStackAnalyzer.Analyze(bytecodes);
-            methodsAnalyzed++;
-
-            if (analysis.MaxStackDepth > maxStackDepthSeen)
-            {
-                maxStackDepthSeen = analysis.MaxStackDepth;
-            }
-
-            if (!analysis.IsBalanced && analysis.ErrorMessage != null)
-            {
-                string className = GetClassNameForLocalId(method.HomeClassLocalId);
-                string selector = _symbols[method.SelectorIndex];
-                stackIssues.Add((className, selector, analysis.ErrorMessage, bytecodes.Length));
-            }
-
-            // Validate bytecode operands (only if stack is balanced)
-            if (analysis.IsBalanced)
-            {
-                // Get instance variable count for this class
-                int instVarCount = GetInstanceVariableCount(homeClassId);
-
-                var validation = BytecodeOperandValidator.Validate(
-                    bytecodes,
-                    literalIds.Length,
-                    method.Header.TempCount ?? 0,
-                    method.Header.ArgCount ?? 0,
-                    instVarCount);
-
-                if (!validation.IsValid && validation.ErrorMessage != null)
-                {
-                    string className = GetClassNameForLocalId(method.HomeClassLocalId);
-                    string selector = _symbols[method.SelectorIndex];
-                    operandIssues.Add((className, selector, validation.ErrorMessage, bytecodes.Length));
-                }
-            }
-
             int methodId = _heap.CreateCompiledMethod(method, literalIds, bytecodes);
             _heap.InstallMethod(homeClassId, selectorId, methodId);
 
             _localIdToObjectId[method.LocalId] = methodId;
         }
 
-        // Report stack analysis results
-        Console.WriteLine($"  Methods analyzed: {methodsAnalyzed}/{totalMethods}");
-        Console.WriteLine($"  Max stack depth: {maxStackDepthSeen}");
-
-        if (stackIssues.Count > 0)
-        {
-            Console.WriteLine($"  ⚠ Stack issues found: {stackIssues.Count}");
-            Console.WriteLine($"  Showing simplest methods (by bytecode length):");
-            foreach (var (className, selector, message, bytecodeLength) in stackIssues.OrderBy(x => x.bytecodeLength).Take(10))
-            {
-                Console.WriteLine($"    {className}>>{selector} ({bytecodeLength} bytes): {message}");
-            }
-            if (stackIssues.Count > 10)
-            {
-                Console.WriteLine($"    ... and {stackIssues.Count - 10} more");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"  ✓ All methods have balanced stacks");
-        }
-
-        // Report operand validation results
-        if (operandIssues.Count > 0)
-        {
-            Console.WriteLine($"  ⚠ Operand validation issues found: {operandIssues.Count}");
-            Console.WriteLine($"  Showing first 10 methods:");
-            foreach (var (className, selector, message, bytecodeLength) in operandIssues.Take(10))
-            {
-                Console.WriteLine($"    {className}>>{selector} ({bytecodeLength} bytes): {message}");
-            }
-            if (operandIssues.Count > 10)
-            {
-                Console.WriteLine($"    ... and {operandIssues.Count - 10} more");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"  ✓ All bytecode operands reference valid indices");
-        }
+        Console.WriteLine($"  Methods installed: {totalMethods}");
     }
 
-    private int GetInstanceVariableCount(int classId)
-    {
-        // Find the class descriptor using the class ID
-        var classDesc = _bundle.Classes.FirstOrDefault(c =>
-            _localIdToObjectId.TryGetValue(c.LocalId, out int id) && id == classId);
-
-        if (classDesc == null)
-        {
-            return 0;
-        }
-
-        // Use the layout resolver which already computed total instance variable count
-        // (including inherited) in Phase 4
-        return _layoutResolver.GetInstanceVariableCount(classDesc.LocalId);
-    }
-
-    private string GetClassNameForLocalId(string localId)
-    {
-        var classDesc = _bundle.Classes.FirstOrDefault(c => c.LocalId == localId);
-        if (classDesc != null)
-        {
-            return _symbols[classDesc.NameIndex];
-        }
-        return localId; // Fallback to local ID
-    }
 
     /// <summary>
     /// Resolves a literal value from the discriminated union to an object ID.

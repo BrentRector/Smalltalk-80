@@ -32,6 +32,21 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     public int Execute(int methodId, int receiverId, int[] arguments)
     {
+        // Parse method header to check for quick forms
+        var header = ParseMethodHeader(methodId);
+
+        // Quick-return-self optimization (flags=5)
+        if (header.IsQuickReturnSelf)
+        {
+            return receiverId;
+        }
+
+        // Quick-return-field optimization (flags=6)
+        if (header.IsQuickReturnField)
+        {
+            return _heap.GetField(receiverId, header.QuickReturnFieldIndex);
+        }
+
         // Create a MethodContext for this execution
         _activeContextId = CreateMethodContext(methodId, receiverId, arguments);
 
@@ -44,18 +59,13 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private int CreateMethodContext(int methodId, int receiverId, int[] arguments)
     {
-        // Get MethodContext class
-        var methodContextClassId = _heap.GetClass(methodId); // TODO: Get actual MethodContext class
-
-        // Get method header to determine temps/args
-        int headerOop = _heap.GetMethodLiteral(methodId, 0);
-        int header = DecodeSmallInteger(headerOop);
-
-        int argCount = (header >> 1) & 0x1F;      // bits 1-5
-        int tempCount = (header >> 6) & 0x3F;     // bits 6-11
+        // Parse method header using correct Smalltalk-80 format
+        var header = ParseMethodHeader(methodId);
 
         // Calculate stack size (args + temps + execution stack)
-        int stackSize = argCount + tempCount + 32; // 32 slots for execution stack
+        // Use large frame (48) or small frame (16) based on needsLargeFrame flag
+        int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
+        int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
 
         // Allocate MethodContext with indexed fields for stack
         int contextId = _heap.AllocateRawObject(
@@ -75,18 +85,18 @@ public class VirtualMachine : IPrimitiveContext
         // Initialize MethodContext fields
         _heap.SetField(contextId, senderIndex, GlobalRegistry.NilObjectId);
         _heap.SetField(contextId, ipIndex, EncodeSmallInteger(0)); // Start at PC 0
-        _heap.SetField(contextId, spIndex, EncodeSmallInteger(argCount + tempCount)); // Stack starts after args+temps
+        _heap.SetField(contextId, spIndex, EncodeSmallInteger(header.NumArgs + header.NumTemps)); // Stack starts after args+temps
         _heap.SetField(contextId, methodIndex, methodId);
         _heap.SetField(contextId, receiverIndex, receiverId);
 
         // Store arguments in indexed fields
-        for (int i = 0; i < arguments.Length && i < argCount; i++)
+        for (int i = 0; i < arguments.Length && i < header.NumArgs; i++)
         {
             _heap.SetIndexedField(contextId, i, arguments[i]);
         }
 
         // Initialize temps to nil
-        for (int i = argCount; i < argCount + tempCount; i++)
+        for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
             _heap.SetIndexedField(contextId, i, GlobalRegistry.NilObjectId);
         }
@@ -255,6 +265,78 @@ public class VirtualMachine : IPrimitiveContext
             case Bytecode.RETURN_TOP:
                 // Value already on stack
                 return false;
+
+            case Bytecode.RETURN_SELF_POP:
+                // Return self from block context to caller's caller (0x7D)
+                // Variant of RETURN_SELF for block contexts
+                Push(receiverId);
+                return false; // TODO: Implement proper block return (non-local return)
+
+            case Bytecode.RETURN_TOP_POP:
+                // Pop and return from block context to caller's caller (0x7E)
+                // Variant of RETURN_TOP for block contexts
+                // Value already on stack
+                return false; // TODO: Implement proper block return (non-local return)
+
+            case Bytecode.RESERVED_RETURN:
+                // No operation / reserved (0x7F)
+                return true;
+        }
+
+        // Extended bytecodes (0x80)
+        if (bytecode == 0x80)
+        {
+            return ExecuteExtendedBytecode(methodId);
+        }
+
+        // Push active context (0x89) - used for block creation
+        if (bytecode == 0x89)
+        {
+            Push(_activeContextId);
+            return true;
+        }
+
+        // Short jump forward (0x90-0x97)
+        if (bytecode >= 0x90 && bytecode <= 0x97)
+        {
+            int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            return true;
+        }
+
+        // Medium jump forward (0xA0)
+        if (bytecode == 0xA0)
+        {
+            byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+
+            byte distanceByte = bytecodes[currentIp++];
+            int distance = distanceByte + 1; // Distance is encoded as (distance - 1)
+
+            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            return true;
+        }
+
+        // Long jump forward (0xA1-0xA7)
+        if (bytecode >= 0xA1 && bytecode <= 0xA7)
+        {
+            byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+
+            int numBytes = bytecode - 0x9F; // 0xA1 => 2 bytes, 0xA2 => 3 bytes, etc.
+            int distance = 0;
+            for (int i = 0; i < numBytes; i++)
+            {
+                distance = (distance << 8) | bytecodes[currentIp++];
+            }
+            distance += 1; // Distance is encoded as (distance - 1)
+
+            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            return true;
         }
 
         // Send arithmetic messages (0xB0-0xBF)
@@ -317,6 +399,340 @@ public class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
+    /// Executes extended bytecode operations (0x80 + sub-operation byte).
+    /// </summary>
+    private bool ExecuteExtendedBytecode(int methodId)
+    {
+        byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+
+        int ip = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+        byte subOp = bytecodes[ip++];
+        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+
+        int receiverId = _heap.GetField(_activeContextId, receiverIndex);
+
+        switch (subOp)
+        {
+            case 0x00: // PUSH_IVAR - Push instance variable at any index
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = _heap.GetField(receiverId, index);
+                    Push(value);
+                    return true;
+                }
+
+            case 0x01: // STORE_IVAR - Store to instance variable without popping
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    _heap.SetField(receiverId, index, value);
+                    Push(value); // Leave value on stack
+                    return true;
+                }
+
+            case 0x02: // POP_STORE_IVAR - Pop and store to instance variable
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    _heap.SetField(receiverId, index, value);
+                    return true;
+                }
+
+            case 0x03: // PUSH_TEMP - Push temporary at any index
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = _heap.GetIndexedField(_activeContextId, index);
+                    Push(value);
+                    return true;
+                }
+
+            case 0x04: // STORE_TEMP - Store to temporary without popping
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    _heap.SetIndexedField(_activeContextId, index, value);
+                    Push(value); // Leave value on stack
+                    return true;
+                }
+
+            case 0x05: // POP_STORE_TEMP - Pop and store to temporary
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    _heap.SetIndexedField(_activeContextId, index, value);
+                    return true;
+                }
+
+            case 0x06: // PUSH_LITERAL - Push literal constant at any index
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int literal = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    Push(literal);
+                    return true;
+                }
+
+            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value)
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+                    int value = _heap.GetField(associationId, valueIndex);
+                    Push(value);
+                    return true;
+                }
+
+            case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+                    _heap.SetField(associationId, valueIndex, value);
+                    Push(value); // Leave value on stack
+                    return true;
+                }
+
+            case 0x09: // POP_STORE_LITERAL_VAR - Pop and store to literal variable
+                {
+                    byte index = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int value = Pop();
+                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+                    _heap.SetField(associationId, valueIndex, value);
+                    return true;
+                }
+
+            case 0x0A: // SEND_0 - Send with 0 args
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int receiver = Pop();
+                    int result = SendMessage(receiver, selectorId, Array.Empty<int>());
+                    Push(result);
+                    return true;
+                }
+
+            case 0x0B: // SEND_1 - Send with 1 arg
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int arg = Pop();
+                    int receiver = Pop();
+                    int result = SendMessage(receiver, selectorId, new[] { arg });
+                    Push(result);
+                    return true;
+                }
+
+            case 0x0C: // SEND_2 - Send with 2 args
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int arg2 = Pop();
+                    int arg1 = Pop();
+                    int receiver = Pop();
+                    int result = SendMessage(receiver, selectorId, new[] { arg1, arg2 });
+                    Push(result);
+                    return true;
+                }
+
+            case 0x0D: // SEND_N - Send with N args (N >= 3)
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    byte argCount = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+
+                    int[] args = new int[argCount];
+                    for (int i = argCount - 1; i >= 0; i--)
+                    {
+                        args[i] = Pop();
+                    }
+                    int receiver = Pop();
+                    int result = SendMessage(receiver, selectorId, args);
+                    Push(result);
+                    return true;
+                }
+
+            case 0x0E: // SEND_SUPER_0 - Send to super with 0 args
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int receiver = Pop();
+                    // TODO: Implement super send (lookup in superclass)
+                    int result = SendMessage(receiver, selectorId, Array.Empty<int>());
+                    Push(result);
+                    return true;
+                }
+
+            case 0x0F: // SEND_SUPER_1 - Send to super with 1 arg
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int arg = Pop();
+                    int receiver = Pop();
+                    // TODO: Implement super send (lookup in superclass)
+                    int result = SendMessage(receiver, selectorId, new[] { arg });
+                    Push(result);
+                    return true;
+                }
+
+            case 0x10: // SEND_SUPER_2 - Send to super with 2 args
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    int arg2 = Pop();
+                    int arg1 = Pop();
+                    int receiver = Pop();
+                    // TODO: Implement super send (lookup in superclass)
+                    int result = SendMessage(receiver, selectorId, new[] { arg1, arg2 });
+                    Push(result);
+                    return true;
+                }
+
+            case 0x11: // SEND_SUPER_N - Send to super with N args (N >= 3)
+                {
+                    byte selectorIndex = bytecodes[ip++];
+                    byte argCount = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+
+                    int[] args = new int[argCount];
+                    for (int i = argCount - 1; i >= 0; i--)
+                    {
+                        args[i] = Pop();
+                    }
+                    int receiver = Pop();
+                    // TODO: Implement super send (lookup in superclass)
+                    int result = SendMessage(receiver, selectorId, args);
+                    Push(result);
+                    return true;
+                }
+
+            case 0x12: // POP - Pop and discard top of stack
+                {
+                    Pop();
+                    return true;
+                }
+
+            case 0x13: // DUP - Duplicate top of stack
+                {
+                    int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackPointer");
+                    int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
+                    if (sp <= 0)
+                    {
+                        throw new InvalidOperationException("Stack underflow on DUP");
+                    }
+                    int value = _heap.GetIndexedField(_activeContextId, sp - 1);
+                    Push(value);
+                    return true;
+                }
+
+            case 0x14: // JUMP_TRUE - Pop and jump forward if true
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    int value = Pop();
+
+                    if (value == GlobalRegistry.TrueObjectId)
+                    {
+                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    }
+                    return true;
+                }
+
+            case 0x15: // JUMP_FALSE - Pop and jump forward if false
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    int value = Pop();
+
+                    if (value == GlobalRegistry.FalseObjectId)
+                    {
+                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    }
+                    return true;
+                }
+
+            case 0x16: // JUMP - Unconditional jump forward
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    return true;
+                }
+
+            case 0x17: // JUMP_LONG_TRUE - Pop and long jump forward if true
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    int value = Pop();
+
+                    if (value == GlobalRegistry.TrueObjectId)
+                    {
+                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    }
+                    return true;
+                }
+
+            case 0x18: // JUMP_LONG_FALSE - Pop and long jump forward if false
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    int value = Pop();
+
+                    if (value == GlobalRegistry.FalseObjectId)
+                    {
+                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    }
+                    return true;
+                }
+
+            case 0x19: // JUMP_LONG - Unconditional long jump forward
+                {
+                    byte offsetHigh = bytecodes[ip++];
+                    byte offsetLow = bytecodes[ip++];
+                    int offset = (offsetHigh << 8) | offsetLow;
+                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    return true;
+                }
+
+            default:
+                throw new NotImplementedException($"Extended bytecode 0x80 0x{subOp:X2} not implemented");
+        }
+    }
+
+    /// <summary>
     /// Executes arithmetic message send (0xB0-0xBF).
     /// </summary>
     private void ExecuteSendArithmetic(byte bytecode)
@@ -333,7 +749,7 @@ public class VirtualMachine : IPrimitiveContext
             0x07 => "~=",
             0x08 => "*",
             0x09 => "/",
-            0x0A => "\\\\",
+            0x0A => "\\",
             0x0B => "@",
             0x0C => "bitShift:",
             0x0D => "//",
@@ -503,24 +919,113 @@ public class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Extracts the primitive number from a method's header.
-    /// Returns 0 if the method has no primitive.
-    /// Method header format (from Blue Book):
-    /// - bits 1-5: argument count
-    /// - bits 6-11: temporary count
-    /// - bit 12: large context flag
-    /// - bits 13-15: literal count (if flag clear) OR primitive index high bits
-    /// - bits 16-23: primitive number (if non-zero)
+    /// Parses a CompiledMethod header word according to the Smalltalk-80 specification.
+    ///
+    /// Header format (16 bits):
+    ///   Bits 0-5   (6 bits): numLiterals (0-63)
+    ///   Bit  6     (1 bit):  needsLargeFrame flag
+    ///   Bits 7-11  (5 bits): numTemps (0-31)
+    ///   Bits 12-14 (3 bits): flags field
+    ///
+    /// Flags field interpretation:
+    ///   0-4: Simple method, flags = numArgs (0-4 args, no primitive)
+    ///   5:   Quick-return-self (returns receiver without bytecode execution)
+    ///   6:   Quick-return-field (returns instance variable at index numTemps)
+    ///   7:   Extended form (numArgs and primitive in last literal)
     /// </summary>
-    private int GetPrimitiveNumber(int methodId)
+    private record MethodHeaderInfo(
+        int NumLiterals,
+        bool NeedsLargeFrame,
+        int NumTemps,
+        int Flags,
+        int NumArgs,
+        int Primitive,
+        bool IsQuickReturnSelf,
+        bool IsQuickReturnField,
+        int QuickReturnFieldIndex
+    );
+
+    private MethodHeaderInfo ParseMethodHeader(int methodId)
     {
         int headerOop = _heap.GetMethodLiteral(methodId, 0);
         int header = DecodeSmallInteger(headerOop);
 
-        // Primitive number is in bits 16-23 (upper byte of lower 24 bits)
-        int primitiveNumber = (header >> 16) & 0xFF;
+        // Extract fields from header word
+        int numLiterals = header & 0x3F;              // Bits 0-5
+        bool needsLargeFrame = (header & 0x40) != 0;  // Bit 6
+        int numTempsField = (header >> 7) & 0x1F;     // Bits 7-11
+        int flags = (header >> 12) & 0x7;             // Bits 12-14
 
-        return primitiveNumber;
+        int numArgs;
+        int primitive = 0;
+        bool isQuickReturnSelf = false;
+        bool isQuickReturnField = false;
+        int quickReturnFieldIndex = 0;
+        int numTemps = numTempsField;
+
+        // Interpret flags field
+        if (flags < 5)
+        {
+            // Simple method: flags 0-4 encode numArgs directly
+            numArgs = flags;
+            primitive = 0;
+        }
+        else if (flags == 5)
+        {
+            // Quick-return-self: return receiver immediately
+            numArgs = 0;
+            primitive = 0;
+            isQuickReturnSelf = true;
+        }
+        else if (flags == 6)
+        {
+            // Quick-return-field: return instance variable
+            numArgs = 0;
+            primitive = 0;
+            isQuickReturnField = true;
+            quickReturnFieldIndex = numTempsField;  // numTemps field repurposed as ivar index
+            numTemps = 0;  // No temps for quick-return-field
+        }
+        else // flags >= 7
+        {
+            // Extended form: numArgs and primitive in last literal
+            if (numLiterals > 0)
+            {
+                int lastLiteralOop = _heap.GetMethodLiteral(methodId, numLiterals);  // No +1, last literal
+                int lastLiteral = DecodeSmallInteger(lastLiteralOop);
+
+                primitive = lastLiteral & 0xFF;           // Low byte
+                numArgs = (lastLiteral >> 8) & 0x1F;     // High bits
+            }
+            else
+            {
+                // Extended form but no literals - shouldn't happen in valid code
+                numArgs = 0;
+                primitive = 0;
+            }
+        }
+
+        return new MethodHeaderInfo(
+            NumLiterals: numLiterals,
+            NeedsLargeFrame: needsLargeFrame,
+            NumTemps: numTemps,
+            Flags: flags,
+            NumArgs: numArgs,
+            Primitive: primitive,
+            IsQuickReturnSelf: isQuickReturnSelf,
+            IsQuickReturnField: isQuickReturnField,
+            QuickReturnFieldIndex: quickReturnFieldIndex
+        );
+    }
+
+    /// <summary>
+    /// Extracts the primitive number from a method's header.
+    /// Returns 0 if the method has no primitive.
+    /// </summary>
+    private int GetPrimitiveNumber(int methodId)
+    {
+        var headerInfo = ParseMethodHeader(methodId);
+        return headerInfo.Primitive;
     }
 
     /// <summary>

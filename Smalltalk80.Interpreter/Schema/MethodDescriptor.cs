@@ -15,4 +15,6 @@ public class MethodDescriptor
     public string? Source { get; init; }
     public int? FileIndex { get; init; }
     public string? Notes { get; init; }
+    public string[]? ArgNames { get; init; }  // Ordered argument names
+    public string[]? TempNames { get; init; }  // Ordered temporary variable names
 }

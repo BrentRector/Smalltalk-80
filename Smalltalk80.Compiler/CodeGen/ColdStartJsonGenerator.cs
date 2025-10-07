@@ -396,6 +396,23 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // Convert instance methods
             foreach (var methodNode in classNode.Methods)
             {
+                // For extended form (flags=7), add encoded argCount+primitive as last literal
+                var literals = ConvertLiterals(methodNode.Literals);
+                int literalCount = methodNode.Literals.Count;
+
+                bool isExtendedForm = methodNode.PrimitiveIndex > 0 || methodNode.NumArgs > 4;
+                if (isExtendedForm)
+                {
+                    // Encode argCount (high 5 bits) and primitive (low 8 bits) into SmallInteger
+                    int encoded = (methodNode.NumArgs << 8) | methodNode.PrimitiveIndex;
+                    literals.Add(new Dictionary<string, object>
+                    {
+                        ["type"] = "smallInt",
+                        ["value"] = encoded
+                    });
+                    literalCount++;
+                }
+
                 var method = new JsonMethod
                 {
                     LocalId = $"method:{classNode.Name}>>{methodNode.Selector}",
@@ -404,21 +421,23 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
-                            methodNode.Literals.Count,
+                            literalCount,  // Use updated count including extended literal
                             methodNode.NumTemps,
                             methodNode.NumArgs,
                             methodNode.PrimitiveIndex,
                             methodNode.StackDepth > 32
                         ),
-                        LiteralCount = methodNode.Literals.Count,
+                        LiteralCount = literalCount,
                         TempCount = methodNode.NumTemps,
                         ArgCount = methodNode.NumArgs,
                         PrimitiveIndex = methodNode.PrimitiveIndex,
                         LargeContext = methodNode.StackDepth > 32
                     },
-                    Literals = ConvertLiterals(methodNode.Literals),
+                    Literals = literals,
                     Bytecodes = methodNode.Bytecode,
-                    Source = methodNode.Source
+                    Source = methodNode.Source,
+                    ArgNames = methodNode.ArgNames.ToArray(),
+                    TempNames = methodNode.TempNames.ToArray()
                 };
 
                 _methods.Add(method);
@@ -427,6 +446,23 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // Convert class methods
             foreach (var methodNode in classNode.ClassMethods)
             {
+                // For extended form (flags=7), add encoded argCount+primitive as last literal
+                var literals = ConvertLiterals(methodNode.Literals);
+                int literalCount = methodNode.Literals.Count;
+
+                bool isExtendedForm = methodNode.PrimitiveIndex > 0 || methodNode.NumArgs > 4;
+                if (isExtendedForm)
+                {
+                    // Encode argCount (high 5 bits) and primitive (low 8 bits) into SmallInteger
+                    int encoded = (methodNode.NumArgs << 8) | methodNode.PrimitiveIndex;
+                    literals.Add(new Dictionary<string, object>
+                    {
+                        ["type"] = "smallInt",
+                        ["value"] = encoded
+                    });
+                    literalCount++;
+                }
+
                 var method = new JsonMethod
                 {
                     LocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}",
@@ -435,21 +471,23 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
-                            methodNode.Literals.Count,
+                            literalCount,  // Use updated count including extended literal
                             methodNode.NumTemps,
                             methodNode.NumArgs,
                             methodNode.PrimitiveIndex,
                             methodNode.StackDepth > 32
                         ),
-                        LiteralCount = methodNode.Literals.Count,
+                        LiteralCount = literalCount,
                         TempCount = methodNode.NumTemps,
                         ArgCount = methodNode.NumArgs,
                         PrimitiveIndex = methodNode.PrimitiveIndex,
                         LargeContext = methodNode.StackDepth > 32
                     },
-                    Literals = ConvertLiterals(methodNode.Literals),
+                    Literals = literals,
                     Bytecodes = methodNode.Bytecode,
-                    Source = methodNode.Source
+                    Source = methodNode.Source,
+                    ArgNames = methodNode.ArgNames.ToArray(),
+                    TempNames = methodNode.TempNames.ToArray()
                 };
 
                 _methods.Add(method);
@@ -462,21 +500,45 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     /// </summary>
     private static int CalculateMethodHeaderWord(int literalCount, int tempCount, int argCount, int primitiveIndex, bool largeContext)
     {
-        // Blue Book header: [7 bits literal | 5 bits temp | 1 bit large | 3 bits arg OR 8 bits prim]
+        // Smalltalk-80 Blue Book header word format:
+        // Bits 0-5 (6 bits): numLiterals (header bitAnd: 63)
+        // Bit 6: needsLargeFrame (header allMask: 64)
+        // Bits 7-11 (5 bits): numTemps (header // 128 bitAnd: 31)
+        // Bits 12-14 (3 bits): flags ((header bitShift: -12) bitAnd: 7)
+        //   flags 0-4: numArgs (for methods with 0-4 args, no primitive)
+        //   flags 5: quick-return-self
+        //   flags 6: quick-return-field
+        //   flags 7: extended form (numArgs and primitive in literals)
+
         int header = 0;
 
-        header |= (literalCount & 0x7F) << 9;  // Bits 9-15: literal count (7 bits)
-        header |= (tempCount & 0x1F) << 4;      // Bits 4-8: temp count (5 bits)
-        header |= (largeContext ? 1 : 0) << 3;  // Bit 3: large context flag
+        // Bits 0-5: numLiterals (6 bits, max 63)
+        header |= (literalCount & 0x3F);
 
-        if (primitiveIndex > 0)
+        // Bit 6: needsLargeFrame
+        if (largeContext)
         {
-            header |= primitiveIndex & 0xFF;    // Bits 0-7: primitive index (8 bits)
+            header |= 0x40; // Set bit 6
+        }
+
+        // Bits 7-11: numTemps (5 bits, max 31)
+        header |= (tempCount & 0x1F) << 7;
+
+        // Bits 12-14: flags (3 bits)
+        int flags;
+        if (primitiveIndex > 0 || argCount > 4)
+        {
+            // Extended form (flags = 7)
+            flags = 7;
+            // NOTE: In extended form, numArgs and primitive index must be encoded
+            // in the last literal (handled elsewhere in the compiler)
         }
         else
         {
-            header |= argCount & 0x07;          // Bits 0-2: arg count (3 bits)
+            // Simple form: flags = argCount (0-4)
+            flags = argCount;
         }
+        header |= (flags & 0x7) << 12;
 
         return header;
     }
@@ -897,6 +959,8 @@ internal sealed record JsonMethod
     public required List<object> Literals { get; init; }
     public required List<int> Bytecodes { get; init; }
     public string? Source { get; init; }
+    public string[]? ArgNames { get; init; }
+    public string[]? TempNames { get; init; }
 }
 
 internal sealed record JsonInitExpr

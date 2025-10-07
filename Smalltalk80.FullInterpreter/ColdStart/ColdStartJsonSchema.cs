@@ -395,6 +395,18 @@ public record JsonMethod
     /// </summary>
     [JsonPropertyName("notes")]
     public string? Notes { get; init; }
+
+    /// <summary>
+    /// Ordered list of argument names.
+    /// </summary>
+    [JsonPropertyName("argNames")]
+    public string[]? ArgNames { get; init; }
+
+    /// <summary>
+    /// Ordered list of temporary variable names.
+    /// </summary>
+    [JsonPropertyName("tempNames")]
+    public string[]? TempNames { get; init; }
 }
 
 /// <summary>

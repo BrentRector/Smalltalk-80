@@ -42,6 +42,16 @@ namespace Smalltalk80.Compiler
         /// The primitive number if this is a primitive method.
         /// </summary>
         public int PrimitiveNumber { get; set; }
+
+        /// <summary>
+        /// Ordered list of argument names.
+        /// </summary>
+        public List<string> ArgumentNames { get; set; } = new();
+
+        /// <summary>
+        /// Ordered list of temporary variable names.
+        /// </summary>
+        public List<string> TemporaryNames { get; set; } = new();
     }
     
     /// <summary>

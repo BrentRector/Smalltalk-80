@@ -1159,7 +1159,9 @@ namespace Smalltalk80.Compiler
                 IsPrimitive = false,
                 PrimitiveNumber = 0,
                 Literals = emitter.GetLiterals(),
-                Bytecode = emitter.GetBytecodes()
+                Bytecode = emitter.GetBytecodes(),
+                ArgumentNames = new List<string>(),
+                TemporaryNames = new List<string>(temporaryNames)
             };
         }
         
@@ -1218,10 +1220,12 @@ namespace Smalltalk80.Compiler
                 IsPrimitive = false,
                 PrimitiveNumber = 0,
                 Bytecode = emitter.GetBytecodes(),
-                Literals = emitter.GetLiterals()
+                Literals = emitter.GetLiterals(),
+                ArgumentNames = new List<string>(),
+                TemporaryNames = new List<string>(temporaryNames)
             };
         }
-        
+
         /// <summary>
         /// Compiles a Smalltalk method from a parse tree to Blue Book bytecode.
         /// </summary>
@@ -1309,7 +1313,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
                 Bytecode = emitter.GetBytecodes(),
-                Literals = emitter.GetLiterals()
+                Literals = emitter.GetLiterals(),
+                ArgumentNames = new List<string>(argumentNames),
+                TemporaryNames = new List<string>(temporaryNames)
             };
         }
         
@@ -1500,12 +1506,18 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
                 Literals = emitter.GetLiterals(),
-                Bytecode = emitter.GetBytecodes()
+                Bytecode = emitter.GetBytecodes(),
+                ArgumentNames = new List<string>(argumentNames),
+                TemporaryNames = new List<string>(temporaryNames)
             };
         }
-        
+
+        private List<string> argumentNames = new();
+
         private void ProcessMethodHeader(Smalltalk80Parser.MethodHeaderContext header)
         {
+            argumentNames.Clear();
+
             if (header.unarySelector() != null)
             {
                 selector = header.unarySelector().GetText();
@@ -1517,7 +1529,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 var arg = header.formalArg(0);
                 if (arg != null)
                 {
-                    environment.Arguments[arg.GetText()] = 0;
+                    var argName = arg.GetText();
+                    argumentNames.Add(argName);
+                    environment.Arguments[argName] = 0;
                     environment.ArgumentCount = 1;
                 }
             }
@@ -1527,7 +1541,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 var keywords = header.identifierColon();
                 var parts = new List<string>();
                 var args = header.formalArg();
-                
+
                 for (int i = 0; i < keywords.Length; i++)
                 {
                     var keywordText = keywords[i].GetText();
@@ -1535,21 +1549,26 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     if (i < args.Length)
                     {
                         var argText = args[i].GetText();
+                        argumentNames.Add(argText);
                         environment.Arguments[argText] = i;
                     }
                 }
-                
+
                 selector = string.Join("", parts);
                 environment.ArgumentCount = args.Length;
             }
         }
         
+        private List<string> temporaryNames = new();
+
         private void ProcessTemporaries(Smalltalk80Parser.TemporariesContext temps)
         {
+            temporaryNames.Clear();
             var tempNames = temps.temporaryName();
             for (int i = 0; i < tempNames.Length; i++)
             {
                 var name = tempNames[i].GetText();
+                temporaryNames.Add(name);
                 environment.Temporaries[name] = environment.ArgumentCount + i;
             }
             environment.TemporaryCount = tempNames.Length;
@@ -1671,9 +1690,11 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             var exprStmt = stmt.expressionStatement();
             if (exprStmt != null)
             {
-//Console.WriteLine($"[BYTECODE] CompileStatement: Found expression statement, compiling with leaveOnStack={isLast}");
-                // Only leave value on stack if it's the last statement
-                CompileExpression(exprStmt.expression(), leaveOnStack: isLast);
+//Console.WriteLine($"[BYTECODE] CompileStatement: Found expression statement, compiling with leaveOnStack=false");
+                // In Smalltalk, statements don't leave values on the stack
+                // Methods without explicit returns will have ReturnSelf added by EnsureMethodReturn()
+                // Assignments return self, not the assigned value
+                CompileExpression(exprStmt.expression(), leaveOnStack: false);
 //Console.WriteLine($"[BYTECODE] CompileStatement: After CompileExpression, bytecode count: {emitter.GetBytecodes().Length}");
             }
             else

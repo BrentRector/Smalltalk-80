@@ -377,14 +377,6 @@ public sealed class ObjectTable
                 // If not marked, free it
                 if (!entry.Data.Marked)
                 {
-                    if (false) // TODO: Re-enable when RuntimeOptions is added
-                    {
-                        var className = entry.Data.ClassRef.IsNil ? "Unknown" :
-                            ObjectMemory.GetClassName(entry.Data.ClassRef.AsObjectPointer()) ?? "Unknown";
-                        var indexedSize = entry.Data.Format == ObjectFormat.PointerIndexed && entry.Data.IndexedData is SObjectRef[] arr ? arr.Length : 0;
-                        var instVarCount = entry.Data.InstanceVariables?.Length ?? 0;
-                        Console.WriteLine($"[GC] Collecting unmarked object OOP={OopFromIndex(i):X} class={className} format={entry.Data.Format} instVars={instVarCount} indexedSize={indexedSize}");
-                    }
                     Free(i);
                     freedCount++;
                 }

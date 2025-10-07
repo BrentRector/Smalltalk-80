@@ -5,14 +5,16 @@ using Smalltalk80.Interpreter.VM;
 namespace Smalltalk80.Interpreter;
 
 /// <summary>
-/// Orchestrates the 10-phase cold start loader.
+/// Orchestrates the cold start loader.
 /// Executes phases in order to build up the Smalltalk-80 object memory from the JSON bundle.
+/// Bytecode Validation is optional and runs after GC verification; can be skipped by setting SKIP_BYTECODE_VALIDATION=1.
 /// </summary>
 public class Loader
 {
     private readonly ColdStartBundle _bundle;
     private readonly ISmalltalkHeap _heap;
     private readonly Dictionary<string, int> _localIdToObjectId = new();
+    private LayoutResolver? _layoutResolver;
 
     public Loader(ColdStartBundle bundle, ISmalltalkHeap heap)
     {
@@ -21,7 +23,7 @@ public class Loader
     }
 
     /// <summary>
-    /// Executes all 10 cold start phases in order.
+    /// Executes all cold start phases in order.
     /// </summary>
     public void Run()
     {
@@ -71,8 +73,8 @@ public class Loader
         // Phase 5: Layout Computation
         RunPhase("Phase 5: Layout Computation", () =>
         {
-            var phase = new Phase4_LayoutComputation(_bundle, _bundle.Symbols);
-            phase.Run();
+            _layoutResolver = new LayoutResolver();
+            _layoutResolver.ComputeLayouts(_bundle.Classes, _bundle.Symbols);
         });
 
         // Phase 6: Object Allocation
@@ -154,6 +156,19 @@ public class Loader
                 Console.WriteLine("  ✓ All objects reachable - no garbage collected");
             }
         });
+
+        // Phase 12: Bytecode Validation (Optional - runs after GC verification)
+        // This phase may allocate temporary objects for validation, so it runs after GC check
+        bool runValidation = Environment.GetEnvironmentVariable("SKIP_BYTECODE_VALIDATION") != "1";
+        if (runValidation)
+        {
+            Console.WriteLine("\n=== Optional Bytecode Validation ===\n");
+            RunPhase("Phase 12: Bytecode Validation", () =>
+            {
+                var phase = new Phase12_BytecodeValidation(_bundle, _heap, _localIdToObjectId, _bundle.Symbols.ToArray(), _layoutResolver!);
+                phase.Run();
+            });
+        }
     }
 
     private void RunPhase(string phaseName, Action phaseAction)

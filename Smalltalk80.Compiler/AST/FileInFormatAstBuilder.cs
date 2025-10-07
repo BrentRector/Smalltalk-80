@@ -364,7 +364,9 @@ namespace Smalltalk80.Compiler.AST
                 NumArgs = compiledData.ArgumentCount,
                 NumTemps = compiledData.TemporaryCount,
                 StackDepth = stackDepth,
-                IsClassMethod = _isMetaclass
+                IsClassMethod = _isMetaclass,
+                ArgNames = compiledData.ArgumentNames,
+                TempNames = compiledData.TemporaryNames
             };
 
             // Check for primitive declaration
@@ -908,18 +910,25 @@ namespace Smalltalk80.Compiler.AST
 
         /// <summary>
         /// Computes all inherited instance variables including those from superclasses.
+        /// Superclass instance variables come FIRST, then subclass variables.
         /// </summary>
         private List<string> ComputeInheritedInstanceVariables(string className)
         {
             var instanceVars = new List<string>();
             var currentClass = className;
 
+            // Walk up the inheritance chain and collect all instance variables
+            var classChain = new List<ClassDefinitionNode>();
             while (currentClass != null && _classes.ContainsKey(currentClass))
             {
-                var classNode = _classes[currentClass];
-                // Add instance variables at the beginning to maintain proper ordering
-                instanceVars.InsertRange(0, classNode.InstanceVariables);
-                currentClass = classNode.Superclass;
+                classChain.Add(_classes[currentClass]);
+                currentClass = _classes[currentClass].Superclass;
+            }
+
+            // Add instance variables in reverse order (superclass first, subclass last)
+            for (int i = classChain.Count - 1; i >= 0; i--)
+            {
+                instanceVars.AddRange(classChain[i].InstanceVariables);
             }
 
             return instanceVars;
@@ -1182,6 +1191,12 @@ namespace Smalltalk80.Compiler.AST
 
         [JsonPropertyName("isClassMethod")]
         public bool IsClassMethod { get; set; }
+
+        [JsonPropertyName("argNames")]
+        public List<string> ArgNames { get; set; } = new();
+
+        [JsonPropertyName("tempNames")]
+        public List<string> TempNames { get; set; } = new();
     }
 
     public class InitializationExpression
