@@ -60,39 +60,41 @@ public class Phase12_BytecodeValidation
             var bytecodes = DecodeBytecodes(method.Bytecodes);
             int homeClassId = _localIdToObjectId[method.HomeClassLocalId];
 
-            // 1. Stack balance analysis
-            var analysis = BytecodeStackAnalyzer.Analyze(bytecodes);
+            // 1. Stack balance analysis (CFG-based)
+            var stackValidation = BytecodeStackValidator.Validate(bytecodes);
             methodsAnalyzed++;
 
-            if (analysis.MaxStackDepth > maxStackDepthSeen)
+            if (stackValidation.MaxStackDepth > maxStackDepthSeen)
             {
-                maxStackDepthSeen = analysis.MaxStackDepth;
+                maxStackDepthSeen = stackValidation.MaxStackDepth;
             }
 
-            if (!analysis.IsBalanced && analysis.ErrorMessage != null)
+            if (!stackValidation.IsValid && stackValidation.Errors.Count > 0)
             {
                 string className = GetClassNameForLocalId(method.HomeClassLocalId);
                 string selector = _symbols[method.SelectorIndex];
-                stackIssues.Add((className, selector, analysis.ErrorMessage, bytecodes.Length));
+                // Combine all errors for this method into one message
+                string allErrors = string.Join("; ", stackValidation.Errors);
+                stackIssues.Add((className, selector, allErrors, bytecodes.Length));
             }
 
-            // 2. Operand validation (only if stack is balanced)
-            if (analysis.IsBalanced)
+            // 2. Operand validation (only if stack is valid)
+            if (stackValidation.IsValid)
             {
                 int instVarCount = GetInstanceVariableCount(homeClassId);
 
-                var validation = BytecodeOperandValidator.Validate(
+                var operandValidation = BytecodeOperandValidator.Validate(
                     bytecodes,
                     literalIds.Length,
                     method.Header.TempCount ?? 0,
                     method.Header.ArgCount ?? 0,
                     instVarCount);
 
-                if (!validation.IsValid && validation.ErrorMessage != null)
+                if (!operandValidation.IsValid && operandValidation.ErrorMessage != null)
                 {
                     string className = GetClassNameForLocalId(method.HomeClassLocalId);
                     string selector = _symbols[method.SelectorIndex];
-                    operandIssues.Add((className, selector, validation.ErrorMessage, bytecodes.Length));
+                    operandIssues.Add((className, selector, operandValidation.ErrorMessage, bytecodes.Length));
                 }
             }
 

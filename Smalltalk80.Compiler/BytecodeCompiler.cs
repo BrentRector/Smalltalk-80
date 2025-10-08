@@ -421,15 +421,6 @@ namespace Smalltalk80.Compiler
             Emit((byte)((byte)baseCode + offset));
         }
 
-        /// <summary>
-        /// Patches a bytecode at the given position.
-        /// </summary>
-        public void PatchByte(int position, byte value)
-        {
-            if (position < bytecodes.Count)
-                bytecodes[position] = value;
-        }
-        
         // Push operations
         
         public void PushReceiverVariable(int index)
@@ -666,11 +657,6 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
         }
 
-        public void ReturnSelfFromBlock()
-        {
-            Emit(Bytecode.RETURN_SELF_POP); // 0x7D - block return self
-        }
-
         // Jump operations
         
         public int EmitJumpPlaceholder()
@@ -682,29 +668,21 @@ namespace Smalltalk80.Compiler
         
         public void PatchJump(int position, int offset)
         {
-            // Unconditional jumps use the same bytecode format as block jumps
-            // Blue Book specification:
-            // - Short jumps (144-151): For distances 1-8 bytes
-            // - Medium jump (160): For distances 9-256 bytes
-            // - Long jumps (161-167): For distances > 256 bytes
-            
+            // IMPORTANT: We always use 2-byte encoding (medium or long) to avoid the
+            // address-shifting bug. Short jumps would require RemoveAt(), which breaks
+            // all subsequent address calculations.
+            //
+            // Blue Book allows medium jump (0xA0) for distances 1-256 bytes.
+
             if (offset <= 0)
             {
                 throw new InvalidOperationException($"Invalid jump offset: {offset}. Must be positive.");
             }
 
-            if (offset >= 1 && offset <= 8)
+            if (offset >= 1 && offset <= 256)
             {
-                // Short jumps: bytecodes 144-151 jump 1-8 bytes
-                // Bytecode = 144 + (offset - 1)
-                bytecodes[position] = (byte)(144 + (offset - 1));
-                // Remove the placeholder parameter byte
-                bytecodes.RemoveAt(position + 1);
-            }
-            else if (offset >= 9 && offset <= 256)
-            {
-                // Medium jump: bytecode 160 with parameter
-                // For distances 9-256, parameter = offset - 1
+                // Use medium jump (0xA0) for all small jumps
+                // Bytecode 160 with 1-byte parameter
                 bytecodes[position] = 160;
                 bytecodes[position + 1] = (byte)(offset - 1);
             }
@@ -824,24 +802,18 @@ namespace Smalltalk80.Compiler
                 throw new InvalidOperationException($"Invalid block size: {blockSize}. Must be positive.");
             }
 
-            // Blue Book specification:
-            // 1. Short jumps (144-151): For distances 1-8 bytes
-            // 2. Medium jump (160): For distances 9-256 bytes  
-            // 3. Long jumps (161-167): For distances > 256 bytes
+            // IMPORTANT: We always use 2-byte jump encoding (medium or long) to avoid
+            // the address-shifting bug caused by RemoveAt(). Short jumps (1-byte) would
+            // require removing the placeholder byte, which shifts all subsequent addresses
+            // and breaks jump distance calculations in nested ifTrue:/ifFalse: expressions.
+            //
+            // Blue Book allows medium jump (0xA0) for distances 1-256 bytes.
 
             switch (blockSize)
             {
-                case >= 1 and <= 8:
-                    // Short jumps: bytecodes 144-151 jump 1-8 bytes
-                    // Bytecode = 144 + (distance - 1)
-                    bytecodes[blockCopyJumpPosition] = (byte)(144 + (blockSize - 1));
-                    // Remove the placeholder parameter byte
-                    bytecodes.RemoveAt(blockCopyJumpPosition + 1);
-                    break;
-
-                case >= 9 and <= 256:
-                    // Medium jump: bytecode 160 with parameter
-                    // For distances 9-256, parameter = distance - 1
+                case >= 1 and <= 256:
+                    // Use medium jump (0xA0) for all small blocks
+                    // Bytecode 160 (0xA0) with 1-byte parameter
                     bytecodes[blockCopyJumpPosition] = 160;
                     bytecodes[blockCopyJumpPosition + 1] = (byte)(blockSize - 1);
                     break;
@@ -1046,6 +1018,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Backward compatibility wrapper.
         /// </summary>
+        [Obsolete("Use EmitSuperSend() instead. This wrapper method is deprecated and will be removed in a future version.")]
         public void SendSuperMessage(string selector, int argCount)
         {
             EmitSuperSend(selector, argCount);
@@ -1082,81 +1055,7 @@ namespace Smalltalk80.Compiler
         private string selector = "";
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
-        // Note: scratchTempIndex kept for potential future use, though not currently used
-        private int scratchTempIndex = -1;
-        
-        /// <summary>
-        /// Compiles a standalone expression (not a full method) to bytecode.
-        /// </summary>
-        public CompiledMethodData CompileExpressionSource(string expressionSource)
-        {
-            // Initialize compilation state
-            environment = new CompilationEnvironment();
-            emitter = new BytecodeEmitter();
-            selector = "doIt"; // Standard selector for expressions
-            primitiveNumber = 0;
-            hasPrimitive = false;
-            scratchTempIndex = -1;
-            
-            // Parse the expression
-            var inputStream = new Antlr4.Runtime.AntlrInputStream(expressionSource);
-            var lexer = new Smalltalk80Lexer(inputStream);
-            var tokenStream = new Antlr4.Runtime.CommonTokenStream(lexer);
-            var parser = new Smalltalk80Parser(tokenStream);
-            parser.RemoveErrorListeners();
-            
-            // Parse as expressionEntry
-            var exprContext = parser.expressionEntry();
-            if (parser.NumberOfSyntaxErrors > 0)
-            {
-                throw new InvalidOperationException($"Expression parse errors: {parser.NumberOfSyntaxErrors}");
-            }
-            
-            if (exprContext.expression() == null)
-            {
-                // Empty expression - return nil
-                emitter.PushNil();
-                emitter.ReturnTop();
-            }
-            else
-            {
-                // No arguments or temporaries for standalone expressions
-                environment.ArgumentCount = 0;
-                environment.TemporaryCount = 0;
-                
-                // CRITICAL: Collect literals first (just like CompileExpressionFromTree does)
-                // This ensures globals like Transcript are properly registered as literals
-                var visitor = new LiteralCollector(this, emitter, environment);
-                visitor.Visit(exprContext.expression());
-                
-                // Compile the expression (with literals already collected)
-                CompileExpression(exprContext.expression(), leaveOnStack: true);
-                
-                // Expression should leave its result on the stack
-                // Add return if not already present
-                var bytecodes = emitter.GetBytecodes();
-                if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
-                {
-                    // For standalone expressions, return the top of stack
-                    // (The expression result should be on the stack)
-                    emitter.ReturnTop();
-                }
-            }
-            
-            return new CompiledMethodData
-            {
-                Selector = selector,
-                ArgumentCount = 0,
-                TemporaryCount = environment.TemporaryCount,
-                IsPrimitive = false,
-                PrimitiveNumber = 0,
-                Literals = emitter.GetLiterals(),
-                Bytecode = emitter.GetBytecodes(),
-                ArgumentNames = new List<string>(),
-                TemporaryNames = new List<string>(temporaryNames)
-            };
-        }
-        
+
         /// <summary>
         /// Compiles a file-scope expression to bytecode.
         /// The expression will be compiled as if it were a method with no arguments.
@@ -1170,7 +1069,6 @@ namespace Smalltalk80.Compiler
             selector = "doIt"; // Standard selector for expressions
             primitiveNumber = 0;
             hasPrimitive = false;
-            scratchTempIndex = -1;
             
             try
             {
@@ -1233,7 +1131,6 @@ namespace Smalltalk80.Compiler
             selector = "";
             primitiveNumber = 0;
             hasPrimitive = false;
-            scratchTempIndex = -1;
             
             // Set up instance variables with correct offsets
             for (int i = 0; i < instanceVars.Count; i++)
@@ -1311,208 +1208,6 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 PrimitiveNumber = primitiveNumber,
                 Bytecode = emitter.GetBytecodes(),
                 Literals = emitter.GetLiterals(),
-                ArgumentNames = new List<string>(argumentNames),
-                TemporaryNames = new List<string>(temporaryNames),
-                IsQuickReturnSelf = isQuickReturnSelf,
-                QuickReturnFieldIndex = quickReturnFieldIndex
-            };
-        }
-        
-        /// <summary>
-        /// Compiles a Smalltalk method from source text to Blue Book bytecode.
-        /// (Kept for backwards compatibility)
-        /// </summary>
-        public CompiledMethodData CompileMethod(
-            string methodSource,
-            List<string> instanceVars,
-            Dictionary<string, object>? classVars = null,
-            Dictionary<string, object>? poolVars = null)
-        {
-//Console.WriteLine($"[BYTECODE] CompileMethod called with source: {methodSource}");
-            
-            // Initialize compilation state
-            environment = new CompilationEnvironment();
-            emitter = new BytecodeEmitter();
-            selector = "";
-            primitiveNumber = 0;
-            hasPrimitive = false;
-            scratchTempIndex = -1;
-            
-            // Set up instance variables with correct offsets
-            // IMPORTANT: The instanceVars list must contain ALL instance variables,
-            // including inherited ones, in the correct order (superclass vars first).
-            // The caller (SimpleCompiler) is responsible for computing the full list.
-            for (int i = 0; i < instanceVars.Count; i++)
-            {
-                environment.InstanceVariables[instanceVars[i]] = i;
-            }
-            
-            // Set up class variables
-            if (classVars != null)
-            {
-                foreach (var kvp in classVars)
-                {
-                    environment.ClassVariables[kvp.Key] = kvp.Value;
-                }
-            }
-            
-            // Set up pool variables
-            if (poolVars != null)
-            {
-                foreach (var kvp in poolVars)
-                {
-                    environment.PoolVariables[kvp.Key] = kvp.Value;
-                }
-            }
-
-            // Declare parse tree nodes outside try block so they're available for quick-return detection
-            Smalltalk80Parser.MethodBodyContext? methodBody = null;
-            Smalltalk80Parser.MethodBodyNoBangContext? methodBodyNoBang = null;
-
-            try
-            {
-                // Parse the method
-                var inputStream = new Antlr4.Runtime.AntlrInputStream(methodSource);
-                var lexer = new Smalltalk80Lexer(inputStream);
-                var tokenStream = new Antlr4.Runtime.CommonTokenStream(lexer);
-                var parser = new Smalltalk80Parser(tokenStream);
-                parser.RemoveErrorListeners();
-
-                // Determine if this is a methodDef (with BANG) or methodEntry (without BANG)
-                // Try methodEntry first (for single methods without BANG)
-                Smalltalk80Parser.MethodHeaderContext? methodHeader = null;
-                Smalltalk80Parser.TemporariesContext? temporaries = null;
-                Smalltalk80Parser.PrimitiveDeclContext? primitiveDecl = null;
-                
-                if (!methodSource.Contains('!'))
-                {
-                    // Add custom error listener to capture parse errors
-                    var errorListener = new CollectingErrorListener();
-                    parser.RemoveErrorListeners();
-                    parser.AddErrorListener(errorListener);
-                    
-                    // Try parsing as methodEntry (no BANG required)
-                    var methodEntry = parser.methodEntry();
-                    if (parser.NumberOfSyntaxErrors == 0)
-                    {
-                        methodHeader = methodEntry.methodHeader();
-                        temporaries = methodEntry.temporaries();
-                        primitiveDecl = methodEntry.primitiveDecl();
-                        methodBodyNoBang = methodEntry.methodBodyNoBang();
-                        
-//Console.WriteLine($"[BYTECODE] Parsed as methodEntry:");
-//Console.WriteLine($"[BYTECODE]   methodHeader: {(methodHeader != null ? methodHeader.GetText() : "null")}");
-//Console.WriteLine($"[BYTECODE]   temporaries: {(temporaries != null ? temporaries.GetText() : "null")}");
-//Console.WriteLine($"[BYTECODE]   methodBodyNoBang: {(methodBodyNoBang != null ? methodBodyNoBang.GetText() : "null")}");
-                    }
-                    else
-                    {
-//Console.WriteLine($"[BYTECODE] methodEntry parse failed with {parser.NumberOfSyntaxErrors} errors");
-                        foreach (var error in errorListener.Errors)
-                        {
-//Console.WriteLine($"[BYTECODE]   Parse error: {error}");
-                        }
-                        
-                        // For methods without BANG, we should not fall back to methodDef
-                        // Instead, try to recover by forcing the parse
-                        methodHeader = methodEntry.methodHeader();
-                        temporaries = methodEntry.temporaries();
-                        primitiveDecl = methodEntry.primitiveDecl();
-                        methodBodyNoBang = methodEntry.methodBodyNoBang();
-                        
-//Console.WriteLine($"[BYTECODE] Forcing methodEntry parse despite errors:");
-//Console.WriteLine($"[BYTECODE]   methodHeader: {(methodHeader != null ? methodHeader.GetText() : "null")}");
-//Console.WriteLine($"[BYTECODE]   temporaries: {(temporaries != null ? temporaries.GetText() : "null")}");
-//Console.WriteLine($"[BYTECODE]   methodBodyNoBang: {(methodBodyNoBang != null ? methodBodyNoBang.GetText() : "null")}");
-                    }
-                }
-                else
-                {
-                    // Has BANG, parse as methodDef
-                    var methodDef = parser.methodDef();
-                    methodHeader = methodDef.methodHeader();
-                    temporaries = methodDef.temporaries();
-                    primitiveDecl = methodDef.primitiveDecl();
-                    methodBody = methodDef.methodBody();
-                }
-                
-                // Process method header
-                if (methodHeader != null)
-                {
-                    ProcessMethodHeader(methodHeader);
-                }
-                
-                // Process temporaries
-                if (temporaries != null)
-                {
-                    ProcessTemporaries(temporaries);
-                }
-                
-                // Process primitive declaration
-                if (primitiveDecl != null)
-                {
-                    ProcessPrimitive(primitiveDecl);
-                }
-                
-                // Collect literals from method body first
-                // This walks the entire AST to find all literals
-                if (methodBody != null)
-                {
-                    CollectLiterals(methodBody);
-                }
-                else if (methodBodyNoBang != null)
-                {
-                    // For methodBodyNoBang, we need to create a temporary MethodBodyContext wrapper
-                    // or visit it directly with the LiteralCollector
-                    var visitor = new LiteralCollector(this, emitter, environment);
-                    visitor.Visit(methodBodyNoBang);
-                }
-                
-                // Generate bytecode
-//Console.WriteLine($"[BYTECODE] About to compile method body");
-                if (methodBodyNoBang != null)
-                {
-                    // Handle methodBodyNoBang (single method without BANG)
-                    CompileMethodBodyNoBang(methodBodyNoBang);
-                }
-                else if (methodBody != null)
-                {
-                    // Handle regular methodBody (with BANG)
-                    CompileMethodBody(methodBody);
-                }
-                else
-                {
-                    // No body, push self
-                    emitter.PushSelf();
-                }
-//Console.WriteLine($"[BYTECODE] After compiling method body, bytecode count: {emitter.GetBytecodes().Length}");
-                
-                // Ensure method has a return
-                EnsureMethodReturn();
-            }
-            catch (Exception ex)
-            {
-Console.WriteLine($"Error compiling method: {ex.Message}");
-Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                // Return minimal stub method
-                emitter = new BytecodeEmitter();
-                emitter.ReturnSelf();
-            }
-
-            // Detect quick-return patterns (flags=5 or flags=6)
-            var (isQuickReturnSelf, quickReturnFieldIndex) = DetectQuickReturn(
-                methodBody,
-                methodBodyNoBang);
-
-            return new CompiledMethodData
-            {
-                Selector = selector,
-                ArgumentCount = environment.ArgumentCount,
-                TemporaryCount = environment.TemporaryCount,
-                IsPrimitive = hasPrimitive,
-                PrimitiveNumber = primitiveNumber,
-                Literals = emitter.GetLiterals(),
-                Bytecode = emitter.GetBytecodes(),
                 ArgumentNames = new List<string>(argumentNames),
                 TemporaryNames = new List<string>(temporaryNames),
                 IsQuickReturnSelf = isQuickReturnSelf,
@@ -1673,20 +1368,20 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
         
-        private void CompileStatements(Smalltalk80Parser.StatementsContext stmts)
+        private void CompileStatements(Smalltalk80Parser.StatementsContext stmts, bool inBlock = false)
         {
             var statements = stmts.statement();
-            
+
             for (int i = 0; i < statements.Length; i++)
             {
                 bool isLast = (i == statements.Length - 1);
-                CompileStatement(statements[i], isLast);
+                CompileStatement(statements[i], isLast, inBlock);
             }
         }
-        
-        private void CompileStatement(Smalltalk80Parser.StatementContext stmt, bool isLast)
+
+        private void CompileStatement(Smalltalk80Parser.StatementContext stmt, bool isLast, bool inBlock)
         {
-//Console.WriteLine($"[BYTECODE] CompileStatement called, isLast={isLast}");
+//Console.WriteLine($"[BYTECODE] CompileStatement called, isLast={isLast}, inBlock={inBlock}");
             var returnStmt = stmt.returnStatement();
             if (returnStmt != null)
             {
@@ -1694,15 +1389,15 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 CompileReturnStatement(returnStmt);
                 return;
             }
-            
+
             var exprStmt = stmt.expressionStatement();
             if (exprStmt != null)
             {
-//Console.WriteLine($"[BYTECODE] CompileStatement: Found expression statement, compiling with leaveOnStack=false");
-                // In Smalltalk, statements don't leave values on the stack
-                // Methods without explicit returns will have ReturnSelf added by EnsureMethodReturn()
-                // Assignments return self, not the assigned value
-                CompileExpression(exprStmt.expression(), leaveOnStack: false);
+                // In blocks: last statement must leave value (for block return)
+                // In methods: statements don't leave values (consumed by implicit ReturnSelf)
+                bool leaveOnStack = inBlock && isLast;
+//Console.WriteLine($"[BYTECODE] CompileStatement: Found expression statement, compiling with leaveOnStack={leaveOnStack}");
+                CompileExpression(exprStmt.expression(), leaveOnStack);
 //Console.WriteLine($"[BYTECODE] CompileStatement: After CompileExpression, bytecode count: {emitter.GetBytecodes().Length}");
             }
             else
@@ -2099,551 +1794,24 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         /// <summary>
         /// Attempts to inline conditional message patterns (ifTrue:, ifFalse:, ifTrue:ifFalse:).
         /// Returns true if successfully inlined, false otherwise.
+        ///
+        /// DISABLED (2025-10-07): Blue Book Smalltalk-80 does NOT inline conditionals!
+        /// Control structures like ifTrue: and ifFalse: are ordinary message sends.
+        /// Blocks are compiled as literals and control flow happens via polymorphic
+        /// dispatch on True/False classes. See docs/Interpreter-Architecture.md
+        /// "Block Compilation and Control Flow" for complete explanation.
+        ///
+        /// Future optimization: Inlining code removed (550 lines). See IA documentation
+        /// section "Future Optimization: Inlined Control Flow" for how to implement
+        /// this as an optional optimization.
         /// </summary>
         private bool TryInlineConditional(string selector, Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-//Console.WriteLine($"[BYTECODE] TryInlineConditional called, selector='{selector}'");
-            
-            // Check if this is a conditional selector
-            if (!IsConditionalSelector(selector))
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineConditional: Not a conditional selector");
-                return false;
-            }
-            
-//Console.WriteLine($"[BYTECODE] TryInlineConditional: Is a conditional selector, attempting to inline");
-            
-            // Analyze the blocks to see if they can be inlined
-            if (selector == "ifTrue:")
-            {
-                return TryInlineIfTrue(keywordParts[0]);
-            }
-            else if (selector == "ifFalse:")
-            {
-                return TryInlineIfFalse(keywordParts[0]);
-            }
-            else if (selector == "ifTrue:ifFalse:")
-            {
-                return TryInlineIfTrueIfFalse(keywordParts[0], keywordParts[1]);
-            }
-            else if (selector == "ifFalse:ifTrue:")
-            {
-                return TryInlineIfFalseIfTrue(keywordParts[0], keywordParts[1]);
-            }
-            
+            // ALWAYS return false - disable inlining optimization
+            // ifTrue:, ifFalse:, ifTrue:ifFalse: are ORDINARY MESSAGE SENDS
             return false;
         }
-        
-        /// <summary>
-        /// Checks if the selector is eligible for conditional inlining.
-        /// </summary>
-        private bool IsConditionalSelector(string selector)
-        {
-            return selector == "ifTrue:" || 
-                   selector == "ifFalse:" || 
-                   selector == "ifTrue:ifFalse:" || 
-                   selector == "ifFalse:ifTrue:";
-        }
-        
-        /// <summary>
-        /// Checks if a block can be inlined for conditional jumps.
-        /// Requirements:
-        /// - Must be a literal block (not computed or stored in temps)
-        /// - Zero-argument block (no parameters)
-        /// - No non-local returns (^)
-        /// - Compile-time determinable size
-        /// </summary>
-        private bool CanInlineBlock(Smalltalk80Parser.BinaryExprContext expr, out Smalltalk80Parser.BlockContext? block)
-        {
-            block = null;
 
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Checking if expression can be inlined");
-
-            // Grammar: binaryExpr = unaryExpr (binaryMessage)*
-            var unaryExpr = expr.unaryExpr();
-            if (unaryExpr == null)
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: No unaryExpr, cannot inline");
-                return false;
-            }
-
-            // Check if the message base is a block
-            var messageBase = unaryExpr.messageBase();
-            if (messageBase == null)
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: No messageBase, cannot inline");
-                return false;
-            }
-
-            block = messageBase.block();
-            if (block == null)
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: MessageBase is not a block, cannot inline");
-                // The messageBase might be a parenthesized expression containing a block
-                // or it might be something else entirely (variable, literal, etc.)
-                return false; // Not a block
-            }
-
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Found a block");
-
-            // IMPORTANT: At this point we have a block. We only care if messages are sent
-            // TO the block itself (e.g., [x + 1] value), not what's INSIDE the block.
-            // The unaryMessage() on unaryExpr and binaryMessage() on expr would be messages sent AFTER
-            // the messageBase, so if we have a block and no following messages, it's good.
-
-            // Check if there are messages sent TO the block (not allowed for inlining)
-            var unaryMsgs = unaryExpr.unaryMessage();
-            var binaryMsgs = expr.binaryMessage();
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: unaryMessage count = {unaryMsgs.Length}, binaryMessage count = {binaryMsgs.Length}");
-            
-            // WORKAROUND: Due to parser issues with block temporaries, we might get false positives
-            // where parts of the block's internal code (like := assignments) are misinterpreted as
-            // messages sent TO the block. Check if this looks like a parser error.
-            bool looksLikeParserError = false;
-            
-            if (binaryMsgs.Length > 0)
-            {
-                foreach (var msg in binaryMsgs)
-                {
-                    var msgText = msg.GetText();
-//Console.WriteLine($"[BYTECODE] CanInlineBlock:   binary message: {msgText}");
-                    
-                    // If we see something that looks like part of an assignment (=number),
-                    // it's likely a parser error from block temporaries
-                    if (msgText.StartsWith("=") && msgText.Length > 1)
-                    {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Detected likely parser error (assignment fragment)");
-                        looksLikeParserError = true;
-                    }
-                }
-            }
-            
-            if (!looksLikeParserError && (unaryMsgs.Length > 0 || binaryMsgs.Length > 0))
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Block has messages sent to it, cannot inline");
-                return false; // Block has messages sent to it (e.g., block value)
-            }
-            else if (looksLikeParserError)
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Ignoring apparent parser error, continuing with inline check");
-            }
-            
-            // Check for zero arguments (no colons in blockArgs)
-            var blockArgs = block.blockArgs();
-            if (blockArgs != null)
-            {
-                var colonTokens = blockArgs.GetTokens(Smalltalk80Lexer.COLON);
-                if (colonTokens.Count() > 0)
-                {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Block has arguments ({colonTokens.Count()} colons), cannot inline");
-                    return false; // Block has arguments
-                }
-            }
-            
-            // Note: Blocks with temporaries CAN be inlined - the temporaries just become part of the method
-            // We don't check for blockTemps here
-            
-            // Check for non-local returns (^) - would need to walk the AST
-            if (ContainsNonLocalReturn(block))
-            {
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Block contains non-local return, cannot inline");
-                return false; // Contains non-local return
-            }
-            
-//Console.WriteLine($"[BYTECODE] CanInlineBlock: Block CAN be inlined");
-            return true;
-        }
-        
-        /// <summary>
-        /// Checks if a block contains a non-local return (^).
-        /// </summary>
-        private bool ContainsNonLocalReturn(Smalltalk80Parser.BlockContext block)
-        {
-            // Walk the block's statements looking for return statements
-            var statements = block.statements();
-            if (statements == null)
-            {
-                return false;
-            }
-            
-            foreach (var statement in statements.statement())
-            {
-                if (statement.returnStatement() != null)
-                {
-                    return true; // Found a return statement
-                }
-            }
-            
-            return false;
-        }
-        
-        /// <summary>
-        /// Inlines the ifTrue: pattern.
-        /// Compiles: test ifTrue: [block]
-        /// As: compile test, jump-if-false over block, inline block body
-        /// </summary>
-        private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext truePart)
-        {
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue called");
-            
-            // Check if the block can be inlined
-            if (!CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null)
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Block cannot be inlined");
-                return false;
-            }
-            
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Block can be inlined, proceeding with inlining");
-            
-            // Test value is already on stack (compiled by caller)
-            // Emit conditional jump on false over the true block
-            // IMPORTANT: The placeholder is 2 bytes, but after patching for short jumps it becomes 1 byte
-            // This means we need to account for the removed byte when calculating distances
-            var jumpPosition = emitter.EmitConditionalJumpPlaceholder(jumpOnTrue: false);
-            var jumpStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Emitted conditional jump placeholder at position {jumpPosition}, jumpStart={jumpStart}");
-            
-            // Inline the true block body (without BlockCopy)
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Compiling inlined block body");
-            CompileInlinedBlock(trueBlock);
-            
-            // For ifTrue:, we need to jump to after the true block body
-            // The nil push happens AFTER the jump target
-            var jumpEnd = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: jumpEnd={jumpEnd} (after true block)");
-            
-            // Push nil for when test is false (this is where we jump to)
-            emitter.PushNil();
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Added nil for false case");
-            
-            // Calculate jump distance
-            // The distance is from after the jump instruction to the target
-            // Since the placeholder is 2 bytes but will become 1 byte for short jumps,
-            // we need to add 1 to the distance to account for the removed byte
-            var jumpDistance = jumpEnd - jumpStart;
-            if (jumpDistance <= 8)
-            {
-                // For short jumps, one placeholder byte will be removed, shifting everything back by 1
-                // So we need to increase the jump distance by 1 to compensate
-                jumpDistance += 1;
-            }
-            emitter.PatchConditionalJump(jumpPosition, jumpDistance, jumpOnFalse: true);
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrue: Patched conditional jump with distance {jumpDistance}");
-            
-            return true;
-        }
-        
-        /// <summary>
-        /// Inlines the ifFalse: pattern.
-        /// Compiles: test ifFalse: [block]
-        /// As: compile test, jump-if-false to false block, push nil, jump over block, inline block body
-        /// </summary>
-        private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext falsePart)
-        {
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse called");
-            
-            // Check if the block can be inlined
-            if (!CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null)
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Block cannot be inlined");
-                return false;
-            }
-            
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Block can be inlined, proceeding with inlining");
-            
-            // Pattern for ifFalse:
-            // - Test value is already on stack
-            // - Jump-on-false to the false block (skipping the nil push)
-            // - Push nil (for true case) 
-            // - Jump over the false block
-            // - False block body
-            
-            // Emit conditional jump on false to the false block
-            var jumpToFalsePosition = emitter.EmitConditionalJumpPlaceholder(jumpOnTrue: false);
-            var jumpToFalseStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Emitted conditional jump placeholder at position {jumpToFalsePosition}");
-            
-            // If test was true, push nil and jump over the false block
-            emitter.PushNil();
-            var skipBlockPosition = emitter.EmitJumpPlaceholder();
-            var skipBlockStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Added nil for true case and jump placeholder");
-            
-            // Calculate the conditional jump distance BEFORE patching
-            // (because patching will shift subsequent positions)
-            var jumpToFalseDistance = skipBlockStart - jumpToFalseStart;
-            bool isShortConditionalJump = jumpToFalseDistance <= 8;
-            
-            // Account for the placeholder byte removal for short jumps
-            if (isShortConditionalJump)
-            {
-                jumpToFalseDistance += 1;
-            }
-            emitter.PatchConditionalJump(jumpToFalsePosition, jumpToFalseDistance, jumpOnFalse: true);
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Patched conditional jump with distance {jumpToFalseDistance}");
-            
-            // After patching a short conditional jump, positions are shifted back by 1
-            if (isShortConditionalJump)
-            {
-                skipBlockPosition -= 1;  // Adjust position of unconditional jump placeholder
-                skipBlockStart -= 1;      // Adjust start position after unconditional jump
-            }
-            
-            // Inline the false block body
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Compiling inlined block body");
-            CompileInlinedBlock(falseBlock);
-            
-            // Patch the unconditional jump over the block
-            var skipBlockDistance = emitter.CurrentIP - skipBlockStart;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: skipBlockStart={skipBlockStart}, CurrentIP={emitter.CurrentIP}, raw distance={skipBlockDistance}");
-            
-            // Account for the placeholder byte removal for this unconditional jump
-            if (skipBlockDistance <= 8)
-            {
-                skipBlockDistance += 1; // Account for this jump's placeholder byte removal
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Adjusted distance for short jump: {skipBlockDistance}");
-            }
-            if (skipBlockDistance > 0)
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: About to patch jump at position {skipBlockPosition} with distance {skipBlockDistance}");
-                emitter.PatchJump(skipBlockPosition, skipBlockDistance);
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Patched skip jump with distance {skipBlockDistance}");
-            }
-            else
-            {
-                // If block body is empty, we don't need the jump
-                // Remove the jump placeholder bytes
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalse: Block body empty, removing unnecessary jump");
-                // This is tricky - we'd need to track and remove the bytes
-                // For now, just patch with minimal jump
-                if (skipBlockDistance == 0)
-                {
-                    skipBlockDistance = 1; // Minimal jump distance
-                    emitter.PushNil(); // Add a dummy instruction to jump over
-                }
-                emitter.PatchJump(skipBlockPosition, skipBlockDistance);
-            }
-            
-            return true;
-        }
-        
-        /// <summary>
-        /// Inlines the ifTrue:ifFalse: pattern.
-        /// Compiles: test ifTrue: [trueBlock] ifFalse: [falseBlock]
-        /// As: compile test, jump-if-false to else block, inline then block, jump over else, inline else block
-        /// </summary>
-        private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext truePart, 
-                                            Smalltalk80Parser.KeywordPartContext falsePart)
-        {
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse called");
-            
-            // Check if both blocks can be inlined
-            if (!CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null ||
-                !CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null)
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: One or both blocks cannot be inlined");
-                return false;
-            }
-            
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Both blocks can be inlined, proceeding");
-            
-            // Test value is already on stack
-            // Emit conditional jump on false to the false block
-            var jumpToFalsePosition = emitter.EmitConditionalJumpPlaceholder(jumpOnTrue: false);
-            var jumpToFalseStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Emitted conditional jump at position {jumpToFalsePosition}");
-            
-            // Inline the true block body
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Compiling true block");
-            CompileInlinedBlock(trueBlock);
-            
-            // Emit unconditional jump over the false block
-            var jumpOverFalsePosition = emitter.EmitJumpPlaceholder();
-            var jumpOverFalseStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Added jump over false block");
-            
-            // Calculate the conditional jump distance BEFORE patching
-            var jumpToFalseDistance = jumpOverFalseStart - jumpToFalseStart;
-            bool isShortConditionalJump = jumpToFalseDistance <= 8;
-            
-            // Account for the placeholder byte removal for short jumps
-            if (isShortConditionalJump)
-            {
-                jumpToFalseDistance += 1;
-            }
-            emitter.PatchConditionalJump(jumpToFalsePosition, jumpToFalseDistance, jumpOnFalse: true);
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Patched conditional jump with distance {jumpToFalseDistance}");
-            
-            // After patching a short conditional jump, positions are shifted back by 1
-            if (isShortConditionalJump)
-            {
-                jumpOverFalsePosition -= 1;  // Adjust position of unconditional jump
-                jumpOverFalseStart -= 1;      // Adjust start position after unconditional jump
-            }
-            
-            // Inline the false block body
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Compiling false block");
-            CompileInlinedBlock(falseBlock);
-            
-            // Patch the unconditional jump
-            var jumpOverFalseDistance = emitter.CurrentIP - jumpOverFalseStart;
-            // Account for the placeholder byte removal for short jumps
-            if (jumpOverFalseDistance <= 8)
-            {
-                jumpOverFalseDistance += 1;
-            }
-            if (jumpOverFalseDistance > 0)
-            {
-                emitter.PatchJump(jumpOverFalsePosition, jumpOverFalseDistance);
-//Console.WriteLine($"[BYTECODE] TryInlineIfTrueIfFalse: Patched jump over false with distance {jumpOverFalseDistance}");
-            }
-            else
-            {
-                // Empty false block - still need minimal jump
-                emitter.PushNil();
-                emitter.PatchJump(jumpOverFalsePosition, 1);
-            }
-            
-            return true;
-        }
-        
-        /// <summary>
-        /// Inlines the ifFalse:ifTrue: pattern.
-        /// Compiles: test ifFalse: [falseBlock] ifTrue: [trueBlock]
-        /// As: compile test, jump-if-false to false block, inline true block, jump over false, inline false block
-        /// </summary>
-        private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext falsePart, 
-                                            Smalltalk80Parser.KeywordPartContext truePart)
-        {
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue called");
-            
-            // Check if both blocks can be inlined
-            if (!CanInlineBlock(falsePart.binaryExpr(), out var falseBlock) || falseBlock == null ||
-                !CanInlineBlock(truePart.binaryExpr(), out var trueBlock) || trueBlock == null)
-            {
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: One or both blocks cannot be inlined");
-                return false;
-            }
-            
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Both blocks can be inlined, proceeding");
-            
-            // Test value is already on stack
-            // For ifFalse:ifTrue:, we want to execute false block when test is false
-            // Since conditional jumps test for FALSE:
-            // - If test is false, jump to false block
-            // - If test is true, fall through to true block
-            
-            // Jump-on-false to the false block
-            var jumpToFalsePosition = emitter.EmitConditionalJumpPlaceholder(jumpOnTrue: false);
-            var jumpToFalseStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Emitted conditional jump at position {jumpToFalsePosition}");
-            
-            // Inline the true block body (executed when test is true)
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Compiling true block");
-            CompileInlinedBlock(trueBlock);
-            
-            // Emit unconditional jump over the false block
-            var jumpOverFalsePosition = emitter.EmitJumpPlaceholder();
-            var jumpOverFalseStart = emitter.CurrentIP;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Added jump over false block");
-            
-            // Calculate the conditional jump distance BEFORE patching
-            var jumpToFalseDistance = jumpOverFalseStart - jumpToFalseStart;
-            bool isShortConditionalJump = jumpToFalseDistance <= 8;
-            
-            // Account for the placeholder byte removal for short jumps
-            if (isShortConditionalJump)
-            {
-                jumpToFalseDistance += 1;
-            }
-            emitter.PatchConditionalJump(jumpToFalsePosition, jumpToFalseDistance, jumpOnFalse: true);
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Patched conditional jump with distance {jumpToFalseDistance}");
-            
-            // After patching a short conditional jump, positions are shifted back by 1
-            if (isShortConditionalJump)
-            {
-                jumpOverFalsePosition -= 1;  // Adjust position of unconditional jump
-                jumpOverFalseStart -= 1;      // Adjust start position after unconditional jump
-            }
-            
-            // Inline the false block body (executed when test is false)
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Compiling false block");
-            CompileInlinedBlock(falseBlock);
-            
-            // Patch the unconditional jump
-            var jumpOverFalseDistance = emitter.CurrentIP - jumpOverFalseStart;
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Jump over false distance = {jumpOverFalseDistance}");
-            // Account for the placeholder byte removal for short jumps
-            if (jumpOverFalseDistance <= 8)
-            {
-                jumpOverFalseDistance += 1;
-            }
-            if (jumpOverFalseDistance > 0)
-            {
-                emitter.PatchJump(jumpOverFalsePosition, jumpOverFalseDistance);
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Patched jump over false with distance {jumpOverFalseDistance}");
-            }
-            else
-            {
-                // Empty false block - still need minimal jump
-                emitter.PushNil();
-                emitter.PatchJump(jumpOverFalsePosition, 1);
-//Console.WriteLine($"[BYTECODE] TryInlineIfFalseIfTrue: Empty false block, added dummy nil");
-            }
-            
-            return true;
-        }
-        
-        /// <summary>
-        /// Compiles an inlined block body (without BlockCopy or block return).
-        /// </summary>
-        private void CompileInlinedBlock(Smalltalk80Parser.BlockContext block)
-        {
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock called");
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Block text = '{block.GetText()}'");
-            
-            // Handle block temporaries if present (they become method temporaries)
-            var blockTemps = block.blockTemps();
-            if (blockTemps != null)
-            {
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Block has temporaries");
-                var tempNames = blockTemps.temporaryName();
-                foreach (var tempName in tempNames)
-                {
-                    var name = tempName.GetText();
-                    if (!environment.Temporaries.ContainsKey(name))
-                    {
-                        var index = environment.ArgumentCount + environment.TemporaryCount;
-                        environment.Temporaries[name] = index;
-                        environment.TemporaryCount++;
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Added block temp '{name}' at index {index}");
-                    }
-                }
-            }
-            
-            // Compile block body inline (no BlockCopy, no block return)
-            var statements = block.statements();
-            if (statements != null)
-            {
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Found statements");
-                // Compile statements but don't add block return
-                var stmts = statements.statement();
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Number of statements: {stmts.Length}");
-                for (int i = 0; i < stmts.Length; i++)
-                {
-                    bool isLast = (i == stmts.Length - 1);
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: Compiling statement {i}, isLast={isLast}");
-                    CompileStatement(stmts[i], isLast);
-                }
-            }
-            else
-            {
-//Console.WriteLine($"[BYTECODE] CompileInlinedBlock: No statements, pushing nil");
-                // Empty block evaluates to nil
-                emitter.PushNil();
-            }
-        }
-        
         private void CompileNonKeywordExpr(Smalltalk80Parser.BinaryExprContext expr)
         {
             // Grammar: nonKeywordExpr = binaryExpr
@@ -2756,16 +1924,18 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             var statements = block.statements();
             if (statements != null)
             {
-                CompileStatements(statements);
+                CompileStatements(statements, inBlock: true);
             }
             else
             {
                 emitter.PushNil();
             }
-            
-            // Ensure block returns
-            emitter.ReturnTopFromBlock();
-            
+
+            // IMPORTANT: Blocks do NOT emit return bytecode at the end!
+            // The block naturally completes with the top-of-stack value as its result.
+            // Only explicit ^expr in blocks emits BLOCK_RETURN_TOP (non-local return).
+            // See docs/Interpreter-Architecture.md "Block Return Semantics"
+
             // Calculate and patch jump distance
             var blockSize = emitter.CurrentIP - blockStartIP;
             emitter.PatchBlockSize(jumpPosition, blockSize);
@@ -3130,18 +2300,6 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter.Dup();
             }
             emitter.StoreLiteralVariable(name);
-        }
-        
-        private void SpillResult()
-        {
-            // Allocate scratch temp if needed
-            if (scratchTempIndex < 0)
-            {
-                scratchTempIndex = environment.AllocateHiddenTemp("scratch");
-            }
-            
-            // Store and pop to discard result
-            emitter.StoreTemporary(scratchTempIndex);
         }
         
         private void EnsureMethodReturn()

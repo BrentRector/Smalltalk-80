@@ -421,7 +421,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
-                            literalCount,  // Use updated count including extended literal
+                            Math.Min(literalCount, 63),  // Cap at 63 for header encoding
                             methodNode.NumTemps,
                             methodNode.NumArgs,
                             methodNode.PrimitiveIndex,
@@ -429,8 +429,12 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                             methodNode.IsQuickReturnSelf,
                             methodNode.QuickReturnFieldIndex
                         ),
-                        LiteralCount = literalCount,
+                        // LiteralCount: Capped at 63 (6-bit header limit)
+                        // Actual literal count available via literals.Length
+                        LiteralCount = Math.Min(literalCount, 63),
+                        // TempCount: Always matches what's encoded in Word
                         TempCount = methodNode.NumTemps,
+                        // ArgCount: For extended form (primitives, >4 args), decoded from last literal
                         ArgCount = methodNode.NumArgs,
                         PrimitiveIndex = methodNode.PrimitiveIndex,
                         LargeContext = methodNode.StackDepth > 32
@@ -473,7 +477,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
-                            literalCount,  // Use updated count including extended literal
+                            Math.Min(literalCount, 63),  // Cap at 63 for header encoding
                             methodNode.NumTemps,
                             methodNode.NumArgs,
                             methodNode.PrimitiveIndex,
@@ -481,8 +485,12 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                             methodNode.IsQuickReturnSelf,
                             methodNode.QuickReturnFieldIndex
                         ),
-                        LiteralCount = literalCount,
+                        // LiteralCount: Capped at 63 (6-bit header limit)
+                        // Actual literal count available via literals.Length
+                        LiteralCount = Math.Min(literalCount, 63),
+                        // TempCount: Always matches what's encoded in Word
                         TempCount = methodNode.NumTemps,
+                        // ArgCount: For extended form (primitives, >4 args), decoded from last literal
                         ArgCount = methodNode.NumArgs,
                         PrimitiveIndex = methodNode.PrimitiveIndex,
                         LargeContext = methodNode.StackDepth > 32
@@ -528,14 +536,19 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     /// the mutual exclusivity constraint.
     ///
     /// EXAMPLES:
-    ///   position                        → flags=6 (quick-return-field, ivar 2)
-    ///   position <primitive: 153> ^pos  → flags=7 (primitive takes precedence)
-    ///   asArray ^self                   → flags=5 (quick-return-self)
-    ///   at: index ^array at: index      → flags=7 (5+ args not eligible for quick-return)
+    ///   position                              → flags=6 (quick-return-field, ivar 2)
+    ///   position &lt;primitive: 153&gt; ^pos  → flags=7 (primitive takes precedence)
+    ///   asArray ^self                         → flags=5 (quick-return-self)
+    ///   at: index ^array at: index            → flags=7 (5+ args not eligible for quick-return)
     ///
     /// See docs/Interpreter-Architecture.md "Quick-Return Flag Eligibility Constraints"
     /// for complete documentation of the 8 constraints enforced by DetectQuickReturn().
     /// </summary>
+    /// <param name="literalCount">Number of literals in the method's literal frame</param>
+    /// <param name="tempCount">Number of temporary variables (including arguments)</param>
+    /// <param name="argCount">Number of method arguments</param>
+    /// <param name="primitiveIndex">Primitive number (0 if none)</param>
+    /// <param name="largeContext">True if method needs large context (unused in Blue Book)</param>
     /// <param name="isQuickReturnSelf">True if method body is exactly "^self" (detected by DetectQuickReturn)</param>
     /// <param name="quickReturnFieldIndex">Instance variable index if method is "^ivar", or -1 if not quick-return-field</param>
     /// <returns>15-bit header word encoding method metadata per Blue Book format</returns>
@@ -548,15 +561,12 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
         bool isQuickReturnSelf,
         int quickReturnFieldIndex)
     {
-        // Smalltalk-80 Blue Book header word format:
-        // Bits 0-5 (6 bits): numLiterals (header bitAnd: 63)
-        // Bit 6: needsLargeFrame (header allMask: 64)
-        // Bits 7-11 (5 bits): numTemps (header // 128 bitAnd: 31)
-        // Bits 12-14 (3 bits): flags ((header bitShift: -12) bitAnd: 7)
-        //   flags 0-4: numArgs (for methods with 0-4 args, no primitive)
-        //   flags 5: quick-return-self
-        //   flags 6: quick-return-field
-        //   flags 7: extended form (numArgs and primitive in literals)
+        // Method header word format per docs/Interpreter-Architecture.md lines 5015-5020:
+        // Bits 0-5:   numLiterals (6 bits, 0-63)
+        // Bit 6:      needsLargeFrame flag
+        // Bits 7-11:  numTemps (5 bits, 0-31)
+        // Bits 12-14: flags field (3 bits)
+        // Bit 15:     Reserved/unused
 
         int header = 0;
 
@@ -565,170 +575,17 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         // Bit 6: needsLargeFrame
         if (largeContext)
-        {
-            header |= 0x40; // Set bit 6
-        }
+            header |= 0x40;
 
-        // ========================================================================
-        // Bits 7-11: numTemps Field - DUAL PURPOSE ENCODING
-        // ========================================================================
-        // This 5-bit field has different semantics depending on the flags value:
-        //
-        // For flags=0-5, flags=7 (normal methods):
-        //   - Stores the number of temporary variables (0-31)
-        //
-        // For flags=6 (quick-return-field):
-        //   - REPURPOSED to store the instance variable index to return (0-31)
-        //   - This allows the VM to execute: return receiver.instanceVariables[numTempsField]
-        //   - The actual temporary count is implicitly 0 (quick-return constraint #3)
-        //
-        // WHY REPURPOSE: The Blue Book design reuses this field because:
-        //   - Quick-return methods always have 0 temporaries (constraint #3)
-        //   - The field would otherwise be wasted (always 0)
-        //   - We need to encode the ivar index somewhere
-        //   - This avoids adding another header bit
-        //
-        // EXAMPLE:
-        //   Method: position  ^position
-        //   If 'position' is instance variable at index 2:
-        //     flags = 6 (quick-return-field)
-        //     numTempsField = 2 (the ivar index, not a temp count)
-        //     VM executes: return receiver.instanceVariables[2]
+        // Bits 7-11: numTemps (5 bits, max 31)
+        header |= (tempCount & 0x1F) << 7;
 
-        int numTempsField = quickReturnFieldIndex >= 0 ? quickReturnFieldIndex : tempCount;
-        header |= (numTempsField & 0x1F) << 7;
-
-        // ========================================================================
-        // Bits 12-14: Flags - METHOD FORM SELECTOR
-        // ========================================================================
-        // The 3-bit flags field determines how the VM interprets and executes the method.
-        //
-        // CRITICAL: The order of these checks enforces the constraint that
-        // "quick-return forms and primitives are mutually exclusive"
-        //
-        // PRIORITY ORDER (MUST BE MAINTAINED):
-        //   1. Primitives / 5+ args → flags=7 (HIGHEST PRIORITY)
-        //   2. Quick-return-self    → flags=5
-        //   3. Quick-return-field   → flags=6
-        //   4. Simple form          → flags=argCount (0-4)
-        //
-        // WHY THIS ORDER MATTERS:
-        //   - A method like "position <primitive: 153> ^position" passes BOTH:
-        //     * Quick-return detection (^ivar pattern)
-        //     * Primitive check (has primitive 153)
-        //   - If we checked quick-return FIRST, we'd set flags=6
-        //   - But primitives REQUIRE flags=7 for correct VM semantics
-        //   - By checking primitives FIRST, we ensure flags=7 takes precedence
-        //   - This guarantees the mutual exclusivity constraint is maintained
-
+        // Bits 12-14: flags (3 bits)
         int flags;
-
         if (primitiveIndex > 0 || argCount > 4)
-        {
-            // ================================================================
-            // FLAGS=7: EXTENDED FORM
-            // ================================================================
-            // USE WHEN:
-            //   - Method has a primitive (primitiveIndex > 0), OR
-            //   - Method has 5 or more arguments (argCount > 4)
-            //
-            // WHY EXTENDED FORM NEEDED:
-            //   - The flags field (3 bits) can only encode 0-4 arguments directly
-            //   - Primitives need to store an 8-bit primitive index somewhere
-            //   - Extended form uses the LAST LITERAL to encode both:
-            //     * Bits 0-7: primitive index (0-255)
-            //     * Bits 8-12: argument count (0-31)
-            //
-            // CONSTRAINT ENFORCEMENT:
-            //   This check has HIGHEST PRIORITY to ensure that methods with
-            //   primitives ALWAYS use flags=7, even if they also match the
-            //   quick-return pattern (which would suggest flags=5 or flags=6).
-            //
-            // EXAMPLE:
-            //   position <primitive: 153> ^position
-            //     - Matches quick-return-field pattern (^ivar)
-            //     - BUT has primitive 153
-            //     - MUST use flags=7 (not flags=6)
-            //     - Last literal encodes: argCount=0, primitive=153
-
-            flags = 7;
-            // NOTE: The caller (ConvertMethods) handles adding the encoded
-            // argCount+primitive SmallInteger to the literals array
-        }
-        else if (isQuickReturnSelf)
-        {
-            // ================================================================
-            // FLAGS=5: QUICK-RETURN-SELF
-            // ================================================================
-            // USE WHEN: Method body is exactly "^self" or "^" (implicit self)
-            //
-            // VM BEHAVIOR: Skip bytecode execution, return receiver immediately
-            //
-            // CONSTRAINTS SATISFIED:
-            //   ✓ Zero arguments (checked by DetectQuickReturn)
-            //   ✓ Zero temporaries (checked by DetectQuickReturn)
-            //   ✓ No primitive (ensured by primitiveIndex check above)
-            //   ✓ Single return statement (checked by DetectQuickReturn)
-            //   ✓ Deterministic result (always returns self)
-            //   ✓ Side-effect free (no computation, just return receiver)
-            //
-            // EXAMPLE:
-            //   asArray
-            //       ^self
-
-            flags = 5;
-        }
-        else if (quickReturnFieldIndex >= 0)
-        {
-            // ================================================================
-            // FLAGS=6: QUICK-RETURN-FIELD
-            // ================================================================
-            // USE WHEN: Method body is exactly "^instanceVariableName"
-            //
-            // VM BEHAVIOR: Skip bytecode execution, return:
-            //   receiver.instanceVariables[numTempsField]
-            //
-            // SPECIAL ENCODING:
-            //   - numTempsField (bits 7-11) stores the ivar index (not temp count)
-            //   - This repurposing is safe because quick-return methods have 0 temps
-            //
-            // CONSTRAINTS SATISFIED:
-            //   ✓ Zero arguments (checked by DetectQuickReturn)
-            //   ✓ Zero temporaries (checked by DetectQuickReturn)
-            //   ✓ No primitive (ensured by primitiveIndex check above)
-            //   ✓ Single return statement (checked by DetectQuickReturn)
-            //   ✓ Deterministic result (always returns same ivar)
-            //   ✓ Side-effect free (just reads ivar, no computation)
-            //
-            // EXAMPLE:
-            //   position
-            //       "Answer the current position."
-            //       ^position
-            //
-            // If 'position' is ivar index 2:
-            //   flags = 6
-            //   numTempsField = 2
-
-            flags = 6;
-        }
+            flags = 7;  // Extended form - args/primitive in last literal
         else
-        {
-            // ================================================================
-            // FLAGS=0-4: SIMPLE FORM
-            // ================================================================
-            // USE WHEN: Method has 0-4 arguments and no primitive
-            //
-            // The flags field directly encodes the argument count:
-            //   flags=0 → 0 arguments
-            //   flags=1 → 1 argument
-            //   flags=2 → 2 arguments
-            //   flags=3 → 3 arguments
-            //   flags=4 → 4 arguments
-            //
-            // This is the most common case and most memory-efficient encoding
-
-            flags = argCount;
-        }
+            flags = argCount;  // Simple form (0-4) - flags encode argCount directly
 
         header |= (flags & 0x7) << 12;
 
@@ -844,7 +701,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 Header = new MethodHeader
                 {
                     Word = CalculateMethodHeaderWord(
-                        initExpr.Literals.Count,
+                        Math.Min(initExpr.Literals.Count, 63),
                         initExpr.NumTemps,
                         0, // No arguments for init expressions
                         0, // No primitive
@@ -852,7 +709,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                         false, // Init expressions are never quick-return-self
                         -1     // Init expressions are never quick-return-field
                     ),
-                    LiteralCount = initExpr.Literals.Count,
+                    LiteralCount = Math.Min(initExpr.Literals.Count, 63),
                     TempCount = initExpr.NumTemps,
                     ArgCount = 0,
                     PrimitiveIndex = 0,

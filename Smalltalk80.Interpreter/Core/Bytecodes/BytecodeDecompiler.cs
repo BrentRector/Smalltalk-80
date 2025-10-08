@@ -97,16 +97,20 @@ public class BytecodeDecompiler
             {
                 int index = BytecodeUtil.PopStoreIvarIndex(b);
                 string varName = index < _instVarNames.Length ? _instVarNames[index] : $"instVar{index}";
+                if (stack.Count < 1)
+                    throw new InvalidOperationException(DecompilerStackError(pc - 1, b, 1, stack.Count));
                 string value = stack.Pop();
                 statements.Add($"{varName} := {value}");
                 continue;
             }
 
-            // Pop and store temporary variable 0-68-0x6F)
+            // Pop and store temporary variable 0-7 (0x68-0x6F)
             if (BytecodeUtil.IsPopStoreTemp(b))
             {
                 int index = BytecodeUtil.PopStoreTempIndex(b);
                 string varName = index < _tempNames.Length ? _tempNames[index] : $"temp{index}";
+                if (stack.Count < 1)
+                    throw new InvalidOperationException(DecompilerStackError(pc - 1, b, 1, stack.Count));
                 string value = stack.Pop();
                 statements.Add($"{varName} := {value}");
                 continue;
@@ -157,11 +161,10 @@ public class BytecodeDecompiler
                     statements.Add("^ nil");
                     continue;
                 case Bytecode.RETURN_TOP:
-                    if (stack.Count > 0)
-                    {
-                        string value = stack.Pop();
-                        statements.Add($"^ {value}");
-                    }
+                    if (stack.Count < 1)
+                        throw new InvalidOperationException(DecompilerStackError(pc - 1, b, 1, stack.Count));
+                    string returnValue = stack.Pop();
+                    statements.Add($"^ {returnValue}");
                     continue;
             }
 
@@ -189,6 +192,8 @@ public class BytecodeDecompiler
                     _ => "???"
                 };
 
+                if (stack.Count < 2)
+                    throw new InvalidOperationException(DecompilerStackError(pc - 1, b, 2, stack.Count));
                 string arg = stack.Pop();
                 string receiver = stack.Pop();
 
@@ -217,6 +222,10 @@ public class BytecodeDecompiler
                 int selectorIndex = b & 0x0F;
                 string selector = specialSelectors[selectorIndex];
                 int argCount = selector.Count(c => c == ':');
+                int totalPops = argCount + 1; // args + receiver
+
+                if (stack.Count < totalPops)
+                    throw new InvalidOperationException(DecompilerStackError(pc - 1, b, totalPops, stack.Count));
 
                 List<string> args = new List<string>();
                 for (int i = 0; i < argCount; i++)
@@ -817,5 +826,17 @@ public class BytecodeDecompiler
 
         // For other objects, show OOP
         return $"<oop:{oop}>";
+    }
+
+    /// <summary>
+    /// Generates a detailed error message for stack underflow during decompilation.
+    /// </summary>
+    private static string DecompilerStackError(int pc, byte bytecode, int required, int actual)
+    {
+        return $"Decompiler stack underflow at PC {pc}: bytecode 0x{bytecode:X2} requires {required} stack item(s), " +
+               $"but only {actual} available. This likely indicates unreachable code after an unconditional jump, " +
+               $"or incorrect control flow in the bytecode. The decompiler uses linear scanning and does not " +
+               $"follow jump targets, which can cause stack simulation to diverge from actual execution. " +
+               $"See docs/Decompiler-Jump-Handling-Bug.md for details.";
     }
 }

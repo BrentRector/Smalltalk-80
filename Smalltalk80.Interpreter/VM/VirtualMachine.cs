@@ -950,43 +950,28 @@ public class VirtualMachine : IPrimitiveContext
         int headerOop = _heap.GetMethodLiteral(methodId, 0);
         int header = DecodeSmallInteger(headerOop);
 
-        // Extract fields from header word
+        // Method header word format per docs/Interpreter-Architecture.md lines 5015-5020:
+        // Bits 0-5:   numLiterals (6 bits, 0-63)
+        // Bit 6:      needsLargeFrame flag
+        // Bits 7-11:  numTemps (5 bits, 0-31)
+        // Bits 12-14: flags field (3 bits)
+        // Bit 15:     Reserved/unused
+
         int numLiterals = header & 0x3F;              // Bits 0-5
         bool needsLargeFrame = (header & 0x40) != 0;  // Bit 6
-        int numTempsField = (header >> 7) & 0x1F;     // Bits 7-11
+        int numTemps = (header >> 7) & 0x1F;          // Bits 7-11
         int flags = (header >> 12) & 0x7;             // Bits 12-14
 
         int numArgs;
         int primitive = 0;
-        bool isQuickReturnSelf = false;
-        bool isQuickReturnField = false;
-        int quickReturnFieldIndex = 0;
-        int numTemps = numTempsField;
 
         // Interpret flags field
         if (flags < 5)
         {
-            // Simple method: flags 0-4 encode numArgs directly
+            // Simple form: flags 0-4 encode numArgs directly
             numArgs = flags;
-            primitive = 0;
         }
-        else if (flags == 5)
-        {
-            // Quick-return-self: return receiver immediately
-            numArgs = 0;
-            primitive = 0;
-            isQuickReturnSelf = true;
-        }
-        else if (flags == 6)
-        {
-            // Quick-return-field: return instance variable
-            numArgs = 0;
-            primitive = 0;
-            isQuickReturnField = true;
-            quickReturnFieldIndex = numTempsField;  // numTemps field repurposed as ivar index
-            numTemps = 0;  // No temps for quick-return-field
-        }
-        else // flags >= 7
+        else if (flags == 7)
         {
             // Extended form: numArgs and primitive in last literal
             if (numLiterals > 0)
@@ -999,10 +984,14 @@ public class VirtualMachine : IPrimitiveContext
             }
             else
             {
-                // Extended form but no literals - shouldn't happen in valid code
                 numArgs = 0;
                 primitive = 0;
             }
+        }
+        else
+        {
+            // Flags 5-6: Quick-return forms (not supported yet)
+            numArgs = 0;
         }
 
         return new MethodHeaderInfo(
@@ -1012,9 +1001,9 @@ public class VirtualMachine : IPrimitiveContext
             Flags: flags,
             NumArgs: numArgs,
             Primitive: primitive,
-            IsQuickReturnSelf: isQuickReturnSelf,
-            IsQuickReturnField: isQuickReturnField,
-            QuickReturnFieldIndex: quickReturnFieldIndex
+            IsQuickReturnSelf: flags == 5,
+            IsQuickReturnField: flags == 6,
+            QuickReturnFieldIndex: flags == 6 ? numTemps : 0  // numTemps repurposed for flags=6
         );
     }
 
