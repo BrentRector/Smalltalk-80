@@ -930,7 +930,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         return new Metadata
         {
-            Version = "1.0.0",
+            Version = "1.0.2",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = Path.GetFileName(_sourceFilePath),

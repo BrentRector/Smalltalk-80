@@ -306,7 +306,7 @@ dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj -- bin/D
 
 **Success Criteria**: 99.98% validation rate (4,639/4,640 methods pass)
 
-**Known Issue**: 1 method (`Explainer>>explain:for:`) has complex nested block edge case (0.02% of codebase, acceptable)
+**Known Issue**: 1 method (`Explainer>>explain:for:`) has complex nested block edge case (0.02% of codebase, **needs fixing**)
 
 ### Interpreter Phase 12 Validation
 
@@ -392,7 +392,7 @@ The interpreter runs **runtime validation** after loading the heap. This validat
   - Handles jumps, conditionals, returns correctly
   - **Bug fixes applied**: SEND_N argCount offset (pc+3), jump target +1
   - Result: **4,639/4,640 methods pass** (99.98%)
-  - Only error: Explainer>>explain:for: (complex nested blocks - acceptable)
+  - Only error: Explainer>>explain:for: (complex nested blocks - **needs fixing**)
 - ✅ **Operand Index Validation** - Static analysis of all operand references
   - Validates literal indices are in range
   - Validates temporary variable indices (args + temps)
@@ -411,7 +411,7 @@ The interpreter runs **runtime validation** after loading the heap. This validat
   - Compile → Generate JSON → Validate → Report
   - CI/CD ready with proper exit codes
   - ~5 second feedback loop (vs ~30 seconds before)
-  - **Overall result: 1 acceptable error (Explainer), all other validators pass**
+  - **Overall result: 1 error requiring fix (Explainer>>explain:for:), all other validators pass**
 
 ### ✅ Completed Work (October 2025)
 
@@ -571,7 +571,7 @@ The BytecodeDecompiler (validation tool only) fails to decompile 1 out of 4,640 
 **Impact**:
 - **None on runtime** - decompiler is only used for validation/debugging
 - 99.98% success rate (4639/4640 methods decompile correctly)
-- Acceptable for current use case
+- **Needs fixing** - will be addressed in future work
 
 **Error Message**:
 ```
