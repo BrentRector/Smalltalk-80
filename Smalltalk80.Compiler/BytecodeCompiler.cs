@@ -689,7 +689,7 @@ namespace Smalltalk80.Compiler
             else
             {
                 // Long jumps: bytecodes 161-167
-                PatchLongJump(position, offset);
+                PatchLongJumpInternal(position, offset);
             }
         }
         
@@ -755,75 +755,9 @@ namespace Smalltalk80.Compiler
         
         // Block operations
         
-        public int EmitBlockCopy(int argCount)
-        {
-            // Proper block creation following Blue Book specification:
-            // 1. Push active context
-            Emit(137); // pushActiveContext
-            
-            // 2. Push argument count as SmallInteger
-            if (argCount >= 0 && argCount <= 2)
-            {
-                // Use special small integer bytecodes
-                Emit((byte)(117 + argCount)); // 117=0, 118=1, 119=2
-            }
-            else
-            {
-                // Push as literal if > 2
-                PushLiteralConstant(argCount);
-            }
-            
-            // 3. Send blockCopy: (special selector #24)
-            Emit(200); // blockCopy: is bytecode 200
-            
-            // 4. Jump around block body
-            // We emit a 2-byte placeholder that we'll patch later
-            var jumpPosition = CurrentIP;
-            Emit((byte)0);   // Placeholder for jump opcode
-            Emit((byte)0);   // Placeholder for jump distance/parameter
-
-            return jumpPosition;
-        }
-        
-        /// <summary>
-        /// Patches a jump instruction to skip over a block body.
-        /// Implements the Blue Book specification exactly:
-        /// - Short jumps (144-151): For distances 1-8 bytes
-        /// - Medium jump (160): For distances 9-256 bytes
-        /// - Long jumps (161-167): For distances > 256 bytes
-        /// </summary>
-        /// <param name="blockCopyJumpPosition">The position of the jump instruction to patch.</param>
-        /// <param name="blockSize">The number of bytes to jump forward.</param>
-        public void PatchBlockSize(int blockCopyJumpPosition, int blockSize)
-        {
-            // Validate input
-            if (blockSize <= 0)
-            {
-                throw new InvalidOperationException($"Invalid block size: {blockSize}. Must be positive.");
-            }
-
-            // IMPORTANT: We always use 2-byte jump encoding (medium or long) to avoid
-            // the address-shifting bug caused by RemoveAt(). Short jumps (1-byte) would
-            // require removing the placeholder byte, which shifts all subsequent addresses
-            // and breaks jump distance calculations in nested ifTrue:/ifFalse: expressions.
-            //
-            // Blue Book allows medium jump (0xA0) for distances 1-256 bytes.
-
-            switch (blockSize)
-            {
-                case >= 1 and <= 256:
-                    // Use medium jump (0xA0) for all small blocks
-                    // Bytecode 160 (0xA0) with 1-byte parameter
-                    bytecodes[blockCopyJumpPosition] = 160;
-                    bytecodes[blockCopyJumpPosition + 1] = (byte)(blockSize - 1);
-                    break;
-
-                case > 256:
-                    // Long jumps: bytecodes 161-167
-                    PatchLongJump(blockCopyJumpPosition, blockSize);
-                    break;
-            }
-        }
+        // NOTE: EmitBlockCopy and PatchBlockSize have been removed.
+        // Blocks are now compiled as separate CompiledMethodData objects per Blue Book spec.
+        // The inline block compilation with jumps was incorrect for the Blue Book specification.
 
         /// <summary>
         /// Handles patching of long jumps (greater than 256 bytes).
@@ -831,7 +765,7 @@ namespace Smalltalk80.Compiler
         /// such that distance - 1 fits in N bytes, then emit [159 + N, followed by
         /// distance - 1 encoded as N-byte big-endian].
         /// </summary>
-        private void PatchLongJump(int position, int distance)
+        private void PatchLongJumpInternal(int position, int distance)
         {
             // Blue Book specification for long jumps:
             // - Bytecodes 161-167 represent N = 2 to 8 bytes
@@ -855,10 +789,10 @@ namespace Smalltalk80.Compiler
             // We need to extend the bytecodes list if necessary
             // Currently we have a placeholder at position + 1
             // We need bytesNeeded bytes total for the distance encoding
-            
+
             // Remove the single placeholder byte first
             bytecodes.RemoveAt(position + 1);
-            
+
             // Insert the big-endian encoding of adjustedDistance
             byte[] distanceBytes = new byte[bytesNeeded];
             for (int i = bytesNeeded - 1; i >= 0; i--)
@@ -866,11 +800,11 @@ namespace Smalltalk80.Compiler
                 distanceBytes[i] = (byte)(adjustedDistance & 0xFF);
                 adjustedDistance >>= 8;
             }
-            
+
             // Insert all bytes at once
             bytecodes.InsertRange(position + 1, distanceBytes);
         }
-        
+
         // Send operations - Following Blue Book specification
         
         /// <summary>
@@ -1902,46 +1836,150 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         
         private void CompileBlock(Smalltalk80Parser.BlockContext block)
         {
-            // Save current environment state
-            var savedScopeDepth = environment.ScopeDepth;
-            environment.ScopeDepth++;
-            
-            // Count block arguments
-            int argCount = 0;
+            // Blue Book Specification: Blocks are compiled as separate CompiledMethod objects
+            // stored as literals in the enclosing method's literal frame.
+            // This allows blocks to be first-class objects that can be stored, passed around,
+            // and executed in different contexts.
+
+            var blockMethod = CompileBlockAsLiteral(block);
+
+            // Add the block CompiledMethod as a literal and push it onto the stack
+            emitter.PushLiteralConstant(blockMethod);
+        }
+
+        /// <summary>
+        /// Compiles a block into a separate CompiledMethodData object per Blue Book spec.
+        /// Blocks are CompiledMethods with selector = null and primitiveNumber = 0.
+        /// </summary>
+        private CompiledMethodData CompileBlockAsLiteral(Smalltalk80Parser.BlockContext block)
+        {
+            // Create a new compilation environment for the block
+            var savedEnvironment = environment;
+            var savedEmitter = emitter;
+
+            // Create new environment and emitter for the block
+            environment = new CompilationEnvironment();
+            emitter = new BytecodeEmitter();
+
+            // Process block arguments
             var blockArgs = block.blockArgs();
+            var argumentNames = new List<string>();
             if (blockArgs != null)
             {
-                // Each COLON token represents one argument
-                var colonTokens = blockArgs.GetTokens(Smalltalk80Lexer.COLON);
-                argCount = colonTokens.Count();
+                var argNodes = blockArgs.children
+                    .Where(c => c is ITerminalNode term && term.Symbol.Type == Smalltalk80Lexer.IDENTIFIER)
+                    .Cast<ITerminalNode>()
+                    .ToList();
+
+                for (int i = 0; i < argNodes.Count; i++)
+                {
+                    var argName = argNodes[i].GetText();
+                    argumentNames.Add(argName);
+                    environment.Arguments[argName] = i;
+                }
+                environment.ArgumentCount = argNodes.Count;
             }
-            
-            // Emit BlockCopy - returns position of jump to patch
-            var jumpPosition = emitter.EmitBlockCopy(argCount);
-            var blockStartIP = emitter.CurrentIP;
-            
-            // Compile block body
+
+            // Process block temporaries
+            var blockTemps = block.blockTemps();
+            var temporaryNames = new List<string>();
+            if (blockTemps != null)
+            {
+                var tempNodes = blockTemps.children
+                    .Where(c => c is ITerminalNode term && term.Symbol.Type == Smalltalk80Lexer.IDENTIFIER)
+                    .Cast<ITerminalNode>()
+                    .ToList();
+
+                int tempBase = environment.ArgumentCount;
+                for (int i = 0; i < tempNodes.Count; i++)
+                {
+                    var tempName = tempNodes[i].GetText();
+                    temporaryNames.Add(tempName);
+                    environment.Temporaries[tempName] = tempBase + i;
+                }
+                environment.TemporaryCount = tempNodes.Count;
+            }
+
+            // IMPORTANT: Block variable access in Blue Book specification:
+            // Blocks access outer variables through their "home context" at runtime.
+            // The block's CompiledMethod contains bytecodes that reference:
+            // - Block's own arguments and temps (indices 0..N)
+            // - Outer context variables via special bytecodes (push from outer context)
+            //
+            // For now, we compile blocks with access to:
+            // - Instance variables (these are per-object, not per-context)
+            // - Class variables and pool variables (these are global)
+            //
+            // TODO: Implement proper outer context variable access for blocks
+            // This requires special bytecodes to access variables from the home context
+
+            // Copy instance variables - available to all methods/blocks in the class
+            foreach (var kvp in savedEnvironment.InstanceVariables)
+            {
+                environment.InstanceVariables[kvp.Key] = kvp.Value;
+            }
+
+            // Copy class variables - shared across all instances
+            foreach (var kvp in savedEnvironment.ClassVariables)
+            {
+                environment.ClassVariables[kvp.Key] = kvp.Value;
+            }
+
+            // Copy pool variables - imported shared dictionaries
+            foreach (var kvp in savedEnvironment.PoolVariables)
+            {
+                environment.PoolVariables[kvp.Key] = kvp.Value;
+            }
+
+            // Set scope depth to indicate we're in a block
+            environment.ScopeDepth = savedEnvironment.ScopeDepth + 1;
+
+            // Compile the block body
             var statements = block.statements();
             if (statements != null)
             {
                 CompileStatements(statements, inBlock: true);
+
+                // If the last statement didn't leave a value on the stack,
+                // or if there were no statements, blocks should return top of stack
+                // The last statement in CompileStatements with inBlock=true leaves value on stack
+
+                // Emit RETURN_TOP to return the top stack value
+                emitter.Emit(Bytecode.RETURN_TOP);
             }
             else
             {
+                // Empty block returns nil
                 emitter.PushNil();
+                emitter.Emit(Bytecode.RETURN_TOP);
             }
 
-            // IMPORTANT: Blocks do NOT emit return bytecode at the end!
-            // The block naturally completes with the top-of-stack value as its result.
-            // Only explicit ^expr in blocks emits BLOCK_RETURN_TOP (non-local return).
-            // See docs/Interpreter-Architecture.md "Block Return Semantics"
+            // Get the bytecode and literals from the block's emitter
+            var blockBytecode = emitter.GetBytecodes();
+            var blockLiterals = emitter.GetLiterals();
 
-            // Calculate and patch jump distance
-            var blockSize = emitter.CurrentIP - blockStartIP;
-            emitter.PatchBlockSize(jumpPosition, blockSize);
-            
-            // Restore environment
-            environment.ScopeDepth = savedScopeDepth;
+            // Create the CompiledMethodData for the block
+            var blockMethod = new CompiledMethodData
+            {
+                Selector = null,  // Blocks have no selector per Blue Book
+                PrimitiveNumber = 0,  // Blocks never have primitives
+                IsPrimitive = false,
+                ArgumentCount = environment.ArgumentCount,
+                TemporaryCount = environment.TemporaryCount,
+                ArgumentNames = argumentNames,
+                TemporaryNames = temporaryNames,
+                Bytecode = blockBytecode,
+                Literals = blockLiterals,
+                MaxStackDepth = emitter.CalculateMaxStackDepth(),  // Calculate the max stack depth
+                IsQuickReturnSelf = false,  // Blocks cannot be quick-return-self
+                QuickReturnFieldIndex = -1  // Blocks cannot be quick-return-field
+            };
+
+            // Restore the parent environment and emitter
+            environment = savedEnvironment;
+            emitter = savedEmitter;
+
+            return blockMethod;
         }
 
         /// <summary>

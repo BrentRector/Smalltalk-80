@@ -218,7 +218,8 @@ public class MethodHeaderValidator
         }
 
         // Validate selector index
-        if (method.SelectorIndex < 0 || method.SelectorIndex >= coldStartBundle.Symbols.Length)
+        // Note: -1 is valid for blocks (blocks have no selector)
+        if (method.SelectorIndex < -1 || method.SelectorIndex >= coldStartBundle.Symbols.Length)
         {
             result.AddError("MethodHeader",
                 $"Selector index {method.SelectorIndex} out of bounds (symbols.length = {coldStartBundle.Symbols.Length})",

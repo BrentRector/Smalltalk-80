@@ -662,7 +662,20 @@ public class BytecodeValidator
     private void ValidateOperandIndices(byte[] bytecodes, MethodDefinition method, ColdStartBundle bundle, string location, ValidationResult result)
     {
         // Get instance variable count for the method's home class
-        int instVarCount = GetInstanceVariableCount(method.HomeClassLocalId, bundle);
+        // NOTE: For blocks (selectorIndex == -1), we skip instance variable validation
+        // because blocks access instance variables through their home context at runtime,
+        // not through their own class. Set instVarCount to Int32.MaxValue to disable validation.
+        int instVarCount;
+        if (method.SelectorIndex == -1)
+        {
+            // Block: disable instance variable index validation
+            instVarCount = Int32.MaxValue;
+        }
+        else
+        {
+            // Regular method: validate against class instance variables
+            instVarCount = GetInstanceVariableCount(method.HomeClassLocalId, bundle);
+        }
 
         int tempCount = method.Header.TempCount ?? 0;
         int argCount = method.Header.ArgCount ?? 0;

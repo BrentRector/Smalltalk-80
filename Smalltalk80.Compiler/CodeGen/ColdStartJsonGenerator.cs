@@ -614,6 +614,10 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     {
         return literal switch
         {
+            // Block (CompiledMethodData with null selector)
+            // Blocks are stored as separate CompiledMethod objects per Blue Book spec
+            CompiledMethodData block when block.IsBlock => ConvertBlockToMethod(block),
+
             // Symbol literal in "#symbolName" format
             string str when str.StartsWith("#") => new Dictionary<string, object>
             {
@@ -661,6 +665,59 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
             // Nil or unknown
             _ => new Dictionary<string, object> { ["type"] = "nil" }
+        };
+    }
+
+    /// <summary>
+    /// Converts a block (CompiledMethodData with null selector) to a method reference.
+    /// Blocks are added to the methods collection and referenced as compiledMethod literals.
+    /// </summary>
+    private object ConvertBlockToMethod(CompiledMethodData block)
+    {
+        // Generate a unique localId for the block
+        var blockLocalId = $"block:{Guid.NewGuid():N}";
+
+        // Convert block's literals recursively (blocks can contain blocks)
+        var convertedLiterals = ConvertLiterals(block.Literals.ToList());
+
+        // Create the JSON method object for the block
+        var jsonMethod = new JsonMethod
+        {
+            LocalId = blockLocalId,
+            HomeClassLocalId = "", // Empty string for blocks (no home class)
+            SelectorIndex = -1, // Blocks have no selector
+            Header = new MethodHeader
+            {
+                Word = CalculateMethodHeaderWord(
+                    block.Literals.Length,
+                    block.TemporaryCount,
+                    block.ArgumentCount,
+                    0, // Blocks never have primitives
+                    block.MaxStackDepth > 16,
+                    false, // Blocks are never quick-return-self
+                    -1     // Blocks are never quick-return-field
+                ),
+                LiteralCount = block.Literals.Length,
+                TempCount = block.TemporaryCount,
+                ArgCount = block.ArgumentCount,
+                PrimitiveIndex = 0, // Blocks never have primitives
+                LargeContext = block.MaxStackDepth > 16
+            },
+            Literals = convertedLiterals,
+            Bytecodes = block.Bytecode.Select(b => (int)b).ToList(),
+            Source = null, // Blocks don't have source in this context
+            ArgNames = block.ArgumentNames.ToArray(),
+            TempNames = block.TemporaryNames.ToArray()
+        };
+
+        // Add the block to the methods collection
+        _methods.Add(jsonMethod);
+
+        // Return a reference to the block as a compiledMethod literal
+        return new Dictionary<string, object>
+        {
+            ["type"] = "compiledMethod",
+            ["localId"] = blockLocalId
         };
     }
 
