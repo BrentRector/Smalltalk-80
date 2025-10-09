@@ -1,10 +1,11 @@
 # Smalltalk-80 Interpreter Architecture
 
-**Last Updated**: 2025-10-06
+**Last Updated**: 2025-10-09
 **Status**: ✅ VM Implementation Complete - Bytecode Interpreter & 94 Primitives Operational
 **Build**: ✅ Smalltalk80.Interpreter Compiles Successfully (0 errors, 1 unrelated warning)
-**Cold Start Format**: JSON-based (Schema v1.0.0) - ✅ Complete & Working
+**Cold Start Format**: JSON-based (Schema v1.0.2) - ✅ Complete & Working - Blue Book Block Compilation Implemented
 **Primitive Coverage**: ✅ 85% Complete (94/111 primitives fully functional)
+**Schema Version**: v1.0.2 (Enhanced validation, required header fields, source mapping support)
 
 ## Executive Summary
 
@@ -51,7 +52,7 @@ Methods: 4,640 compiled methods
 Objects: 3,413 total heap objects
 Init Expressions: 285 top-level initialization expressions
 GC Performance: 0 objects collected after cold start ✅
-Cold Start Format: ✅ coldstart.json (~15-20MB, schema v1.0.0)
+Cold Start Format: ✅ coldstart.json (~15-20MB, schema v1.0.2)
 Compiler: ✅ Builds successfully, generates valid JSON with clean bytecode enums
 Interpreter: ✅ Compiles successfully (0 errors, 1 unrelated warning)
 Bytecode Interpreter: ✅ All 256 opcodes implemented (VirtualMachine.cs)
@@ -67,7 +68,7 @@ BlockContext System: ✅ Full block closure support with context switching
 1. **Smalltalk80.Compiler** (✅ Complete & Working):
    - Parses Smalltalk-80.st source
    - Generates bytecode using clean enums (Bytecode, ExtendedSubOp)
-   - Outputs coldstart.json (schema v1.0.0)
+   - Outputs coldstart.json (schema v1.0.2)
    - All literal indexing correctly uses +1 offset
 
 2. **Smalltalk80.Interpreter** (✅ Complete & Working):
@@ -87,7 +88,7 @@ BlockContext System: ✅ Full block closure support with context switching
 ### Migration Status
 
 **Completed** (Previous Sessions):
-- ✅ JSON schema definition (docs/schemas/coldstart-v1.0.0.schema.json)
+- ✅ JSON schema definition (docs/schemas/coldstart-v1.0.2.schema.json)
 - ✅ Compiler JSON generation with clean bytecode enums
 - ✅ 10-phase bootstrap loader in Smalltalk80.Interpreter
 - ✅ Two-phase symbol interning (SymbolInterning.cs)
@@ -184,7 +185,7 @@ BlockContext System: ✅ Full block closure support with context switching
 - **SystemPrimitives.cs** - System utilities (112-139)
 
 **Cold Start Data:**
-- **docs/schemas/coldstart-v1.0.0.schema.json** - Canonical JSON schema
+- **docs/schemas/coldstart-v1.0.2.schema.json** - Canonical JSON schema
 - **coldstart.json** - Generated cold-start image (15-20MB, not in repo)
 - **coldstart.json.gz** - Compressed format (~2-3MB, production)
 
@@ -542,8 +543,8 @@ The interpreter uses a **JSON-based cold-start format** that eliminates the need
 ### Schema Location and Versioning
 
 **Canonical Schema:**
-- **Path**: `docs/schemas/coldstart-v1.0.0.schema.json`
-- **Schema ID**: `https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.0`
+- **Path**: `docs/schemas/coldstart-v1.0.2.schema.json`
+- **Schema ID**: `https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.2`
 - **Standard**: JSON Schema Draft-07
 - **Validation**: Tools can validate generated JSON against schema
 
@@ -551,6 +552,172 @@ The interpreter uses a **JSON-based cold-start format** that eliminates the need
 - **Major version** (v1.0.0 → v2.0.0): Breaking changes to schema structure
 - **Minor version** (v1.0.0 → v1.1.0): Backward-compatible additions
 - **Patch version** (v1.0.0 → v1.0.1): Clarifications, bug fixes
+
+**Version History:**
+- **v1.0.0**: Initial schema with optional header fields
+- **v1.0.1**: Added Blue Book block compilation support (blocks as separate CompiledMethods with selector=null), removed base64 bytecode encoding
+- **v1.0.2**: Enhanced validation rules, required header fields, source mapping support (current)
+
+### Schema v1.0.2 Changes (2025-10-09)
+
+**Breaking Changes:**
+
+1. **Required Header Fields** - All method and block headers now REQUIRE all expanded fields:
+   ```json
+   {
+     "header": {
+       "word": 32770,
+       "literalCount": 2,      // REQUIRED (was optional)
+       "tempCount": 0,         // REQUIRED (was optional)
+       "argCount": 1,          // REQUIRED (was optional)
+       "primitiveIndex": 0,    // REQUIRED (was optional)
+       "largeContext": false   // REQUIRED (was optional)
+     }
+   }
+   ```
+   - **Rationale**: Enables loader validation of header consistency (expanded fields must match encoded word bits)
+   - **Impact**: Old JSON with incomplete headers will fail schema validation
+
+2. **Removed Base64 Bytecode Encoding** - Bytecodes must be integer arrays only:
+   ```json
+   {
+     "bytecodes": [124, 0, 32, 78, 120]  // Integer array ONLY
+   }
+   ```
+   - **Rationale**: Simplifies schema and eliminates decoding complexity
+   - **Impact**: Any base64-encoded bytecode strings will fail validation
+
+**New Features:**
+
+3. **BlockContext Object Type** - Added `"blockContext"` to `formatHint` enum:
+   ```json
+   {
+     "formatHint": "blockContext",  // For runtime block closure objects
+     "classNameIndex": 42,           // BlockContext class
+     "fields": [...]                 // home, startpc, nargs
+   }
+   ```
+   - **Purpose**: Enables full heap fidelity for snapshots containing active block closures
+   - **Usage**: Runtime-only (cold start doesn't create BlockContext objects)
+
+4. **Source Mapping Support** (optional) - For IDE/debugger integration:
+   ```json
+   {
+     "sourceRange": {
+       "startOffset": 1234,
+       "endOffset": 1567,
+       "startLine": 42,
+       "endLine": 48
+     },
+     "sourceLineMap": [
+       { "pc": 0, "line": 1, "columnStart": 5, "columnEnd": 20 },
+       { "pc": 3, "line": 2, "columnStart": 5, "columnEnd": 15 }
+     ]
+   }
+   ```
+   - **sourceRange**: Precise navigation from bytecode → source text
+   - **sourceLineMap**: Debugger step-through (PC → source line mapping)
+   - **Status**: Schema supports these fields, compiler doesn't populate them yet
+
+5. **Enhanced Validation Rules** - Four new validation rules:
+   ```json
+   {
+     "validationRules": {
+       "headerFieldsMatchWord": true,              // NEW: Verify header consistency
+       "blockLiteralsMustHaveNullSelector": true,  // NEW: Verify blocks have selector=null
+       "blocksMustHaveZeroPrimitive": true,        // NEW: Verify blocks have primitiveIndex=0
+       "literalCountMatchesArrayLength": true      // NEW: Verify header.literalCount == literals.length
+     }
+   }
+   ```
+   - **headerFieldsMatchWord**: Validates expanded header fields match bit encoding in `header.word`
+   - **blockLiteralsMustHaveNullSelector**: Ensures all `compiledMethod` literals have `selector=null`
+   - **blocksMustHaveZeroPrimitive**: Ensures blocks cannot have primitives (Blue Book requirement)
+   - **literalCountMatchesArrayLength**: Catches header encoding errors
+
+**Blue Book Block Compilation:**
+
+6. **Blocks as Separate CompiledMethods** (added in v1.0.1, enhanced in v1.0.2):
+   - Blocks are first-class CompiledMethod objects stored in parent method's literal frame
+   - Distinguished by `selector = null` (regular methods have string selector)
+   - Support recursive nesting (blocks can contain blocks in their literals)
+   - Empty blocks contain only `RETURN_TOP` (0x7C) bytecode
+   - Example:
+   ```json
+   {
+     "type": "compiledMethod",
+     "selector": null,
+     "numArgs": 2,
+     "numTemps": 1,
+     "maxStack": 3,
+     "header": {
+       "word": 2178,
+       "literalCount": 1,
+       "tempCount": 1,
+       "argCount": 2,
+       "primitiveIndex": 0,
+       "largeContext": false
+     },
+     "literals": [
+       { "type": "symbol", "index": 456 }
+     ],
+     "bytecodes": [16, 17, 176, 124],
+     "argNames": ["x", "y"],
+     "tempNames": ["result"]
+   }
+   ```
+
+**Enhanced Features (v1.0.2):**
+
+7. **BlockContext Object Modeling** - Full heap fidelity for runtime block closures:
+   ```json
+   {
+     "localId": "blockctx:000",
+     "classNameIndex": 42,
+     "formatHint": "blockContext",
+     "fields": [
+       { "type": "smallInt", "value": 2 },      // blockArgumentCount
+       { "type": "smallInt", "value": 0 },      // initialIP
+       { "type": "objectRef", "localId": "ctx:parent" }  // home
+     ],
+     "blockContextStructure": {
+       "blockArgumentCount": 2,
+       "initialIP": 0,
+       "homeContextRef": "ctx:parent"
+     }
+   }
+   ```
+   - **Purpose**: Enables snapshots containing active block closures
+   - **Structure**: blockArgumentCount (SmallInt), initialIP (SmallInt), home (MethodContext)
+   - **Usage**: Runtime-only (cold start doesn't create BlockContext objects initially)
+
+8. **Symbol Table Partitioning** - Optimization for single-byte sends:
+   ```json
+   {
+     "symbolTablePartitioning": {
+       "lowSendRange": [0, 15],
+       "reservedSelectors": [0, 1, 2],
+       "partitionStrategy": "frequency"
+     }
+   }
+   ```
+   - **lowSendRange**: Indices reserved for optimized single-byte sends (typically 0-15 or 0-31)
+   - **reservedSelectors**: Critical selectors that MUST occupy specific indices (#new, #at:, #value)
+   - **partitionStrategy**: "frequency" (most-sent first), "manual" (compiler-specified), "hybrid"
+
+9. **Additional Validation Rules** (3 new):
+   - `methodDictionaryMustContainSelector`: Verify method selectors present in class method dictionaries
+   - `blockContextStructureValid`: Verify BlockContext objects have valid structure when formatHint='blockContext'
+   - `optimizedSelectorsPacked`: Verify optimizedSelectors[] contains contiguous low indices
+
+**Migration from v1.0.1 to v1.0.2:**
+
+1. **Update compiler** to emit all required header fields
+2. **Implement header encoding** - ensure expanded fields match `word` bit encoding
+3. **Recompile all source** with updated compiler
+4. **Update loader** to validate header consistency per new validation rules
+5. **Optional**: Implement BlockContext object generation for heap snapshots
+6. **Optional**: Implement symbol table partitioning for optimized sends
 
 ### Schema Architecture
 
@@ -1736,7 +1903,7 @@ dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj -- bin/D
 
 ```bash
 # Validate generated JSON against schema
-jsonschema -i coldstart.json docs/schemas/coldstart-v1.0.0.schema.json
+jsonschema -i coldstart.json docs/schemas/coldstart-v1.0.2.schema.json
 ```
 
 #### Loader Unit Tests
@@ -2033,7 +2200,7 @@ dotnet run --project Smalltalk80.Validator -- coldstart.json
 
 **Output**:
 ```
-✓ Schema validation passed (coldstart-v1.0.0.schema.json)
+✓ Schema validation passed (coldstart-v1.0.2.schema.json)
 ✓ Bytecode validation: 4640/4640 methods have balanced stacks
 ✓ Literal validation: All literal types match usage
 ⚠ Warning: Method "Foo>>bar" has unreachable bytecode at offset 15
@@ -2107,7 +2274,7 @@ The bootstrap process reads the JSON cold-start file and creates all objects det
 
 **10-Phase Bootstrap Algorithm:**
 
-1. **Parse & Validate** - Load JSON, validate against schema (docs/schemas/coldstart-v1.0.0.schema.json)
+1. **Parse & Validate** - Load JSON, validate against schema (docs/schemas/coldstart-v1.0.2.schema.json)
 2. **Create Temporary Storage** - Allocate placeholder OOPs for symbols/strings in C# Dictionary (Symbol class doesn't exist yet!)
 3. **Allocate Bootstrap Classes** - Create Object, Behavior, Class, Metaclass, etc.
 4. **Allocate Core Classes** - Create remaining 470 classes (Symbol, String, Array, etc.)
@@ -3255,6 +3422,258 @@ Bytecodes:
 - Emit conditional jump over false block
 - Inline block bodies directly (no literals)
 - Discard unused block
+
+## Blue Book Block Compilation: Implementation Guide
+
+### Block as CompiledMethod Object
+
+Every block `[...]` is compiled into a **separate CompiledMethod object** with the following structure:
+
+**CompiledMethod Structure for Blocks**:
+```json
+{
+  "selector": null,              // Blocks have no selector
+  "numArgs": <arg count>,        // Number of block arguments
+  "numTemps": <temp count>,      // Number of block temporaries
+  "maxStack": <stack size>,      // Maximum stack depth
+  "bytecodes": [...],            // Block's bytecode array
+  "literals": [...]              // Block's literal frame (can contain nested blocks!)
+}
+```
+
+### Empty Block: `[]`
+
+**Source**: `1 = 0 ifTrue: []`
+
+**Enclosing Method Bytecodes**:
+```
+PUSH_CONSTANT 1              ; Push 1
+PUSH_CONSTANT 0              ; Push 0
+SEND #=                      ; Send = message
+PUSH_LITERAL <block index>   ; Push empty block CompiledMethod
+SEND #ifTrue:                ; Send ifTrue: message
+```
+
+**Empty Block CompiledMethod** (stored in literal frame):
+```json
+{
+  "selector": null,
+  "numArgs": 0,
+  "numTemps": 0,
+  "maxStack": 1,
+  "bytecodes": ["RETURN_TOP"],  // Only bytecode: return nil
+  "literals": []                 // No literals needed
+}
+```
+
+**Key Point**: Empty blocks contain **only `RETURN_TOP`** (0x7C). When the block is activated via `value`, the VM ensures `nil` is on the stack, and `RETURN_TOP` returns it.
+
+### Block with Arguments: `[:x | x + 1]`
+
+**Block CompiledMethod**:
+```json
+{
+  "selector": null,
+  "numArgs": 1,               // One argument: x
+  "numTemps": 0,
+  "maxStack": 2,
+  "bytecodes": [
+    "PUSH_ARG 0",             // Push x (first argument)
+    "PUSH_CONSTANT 1",        // Push 1
+    "SEND #+",                // Send + message
+    "RETURN_TOP"              // Return result (implicit for blocks)
+  ],
+  "literals": ["+"]
+}
+```
+
+### Block with Temporaries: `[| temp | temp := 42. temp]`
+
+**Block CompiledMethod**:
+```json
+{
+  "selector": null,
+  "numArgs": 0,
+  "numTemps": 1,              // One temporary: temp
+  "maxStack": 2,
+  "bytecodes": [
+    "PUSH_CONSTANT 42",       // Push 42
+    "STORE_TEMP 0",           // Store to temp
+    "PUSH_TEMP 0",            // Push temp
+    "RETURN_TOP"              // Return temp value
+  ],
+  "literals": [42]
+}
+```
+
+### Nested Blocks: `[:x | x > 0 ifTrue: ['positive']]`
+
+**Outer Block CompiledMethod**:
+```json
+{
+  "selector": null,
+  "numArgs": 1,
+  "numTemps": 0,
+  "maxStack": 2,
+  "bytecodes": [
+    "PUSH_ARG 0",             // Push x
+    "PUSH_CONSTANT 0",        // Push 0
+    "SEND #>",                // Send >
+    "PUSH_LITERAL 2",         // Push nested block (literal index 2)
+    "SEND #ifTrue:"           // Send ifTrue:
+  ],
+  "literals": [
+    ">",
+    "ifTrue:",
+    {                         // Nested block as literal
+      "selector": null,
+      "numArgs": 0,
+      "numTemps": 0,
+      "maxStack": 1,
+      "bytecodes": [
+        "PUSH_LITERAL 0",     // Push 'positive'
+        "RETURN_TOP"
+      ],
+      "literals": ["positive"]
+    }
+  ]
+}
+```
+
+**Key Point**: Nested blocks are **recursively stored as CompiledMethod objects** in the parent block's literal frame!
+
+### Compiler Implementation Requirements
+
+**Phase 1: Block Discovery** (during AST traversal)
+1. When encountering a block node `[...]`, create a new CompiledMethod object
+2. Compile block body **separately** with its own bytecode array and literal frame
+3. Add block CompiledMethod to **parent's literal frame**
+4. Emit `PUSH_LITERAL <block index>` in parent's bytecode
+
+**Phase 2: Block Compilation** (recursive)
+1. Parse block arguments (`:arg1 :arg2 ...`)
+2. Parse block temporaries (`| temp1 temp2 |`)
+3. Compile block body statements
+4. **Do NOT emit return bytecode** at end (blocks return implicitly)
+5. Only emit `BLOCK_RETURN_TOP` for explicit `^expr` in block
+
+**Phase 3: Nested Block Handling**
+1. If block body contains another block, recursively compile it
+2. Store nested block in current block's literal frame
+3. Emit `PUSH_LITERAL <nested block index>` in current block's bytecode
+
+### JSON Schema Requirements
+
+**Block Validation Rules**:
+```json
+{
+  "type": "object",
+  "required": ["selector", "numArgs", "numTemps", "maxStack", "bytecodes", "literals"],
+  "properties": {
+    "selector": { "type": "null" },                    // Blocks have no selector!
+    "numArgs": { "type": "integer", "minimum": 0 },
+    "numTemps": { "type": "integer", "minimum": 0 },
+    "maxStack": { "type": "integer", "minimum": 1 },
+    "bytecodes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1                                     // At least RETURN_TOP
+    },
+    "literals": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "type": "string" },
+          { "type": "number" },
+          { "$ref": "#/definitions/CompiledMethod" }    // Recursive for nested blocks!
+        ]
+      }
+    }
+  }
+}
+```
+
+### Incorrect Implementations to Avoid
+
+**❌ WRONG: Inline Block Bytecode with `blockCopy:` and Jumps**
+```
+// DO NOT DO THIS!
+PUSH_ACTIVE_CONTEXT
+PUSH_ARG_COUNT
+SEND #blockCopy:
+JUMP <over block body>        // ❌ Not Blue Book!
+[inline block bytecode]       // ❌ Should be separate CompiledMethod
+<jump target>
+```
+
+This approach:
+- Violates separation of concerns (blocks are not separate methods)
+- Requires jump optimization (adds complexity)
+- Does not match Blue Book semantics
+- Cannot be properly represented in cold-start JSON
+- Breaks round-trip decompilation
+
+**✅ CORRECT: Block as Literal CompiledMethod**
+```
+PUSH_LITERAL <block index>    // Block is in literal frame
+SEND #ifTrue:                 // Standard message send
+```
+
+### Interpreter Requirements
+
+**Block Activation** (Primitive 81-82: `value`, `value:`):
+1. Receiver must be a BlockContext (or CompiledMethod acting as block)
+2. Validate argument count matches block's `numArgs`
+3. Create new execution context with:
+   - PC = 0 (start of block bytecode)
+   - Temporaries initialized to nil
+   - Arguments copied from provided array
+4. Execute bytecode loop until return
+5. Return top of stack (blocks implicitly return)
+
+**Block Return Semantics**:
+- **Normal completion**: Block ends without explicit return → return top of stack
+- **Explicit `^expr`**: Emit `BLOCK_RETURN_TOP` (0x7E) → non-local return to home context's sender
+- **Never emit return at end of block** unless explicit `^`
+
+### Cold-Start JSON Example
+
+**Source**: `1 = 0 ifTrue: []`
+
+**JSON Representation**:
+```json
+{
+  "methods": [
+    {
+      "localId": "method:testMethod",
+      "selector": "testMethod",
+      "numArgs": 0,
+      "numTemps": 0,
+      "maxStack": 2,
+      "bytecodes": [116, 117, 0xB0, 0x??, 0x??],  // Push 1, 0, send =, push literal, send ifTrue:
+      "literals": [
+        "=",
+        {
+          "localId": "block:emptyBlock",
+          "selector": null,
+          "numArgs": 0,
+          "numTemps": 0,
+          "maxStack": 1,
+          "bytecodes": [0x7C],                    // RETURN_TOP
+          "literals": []
+        },
+        "ifTrue:"
+      ]
+    }
+  ]
+}
+```
+
+**Key Points**:
+- Block is embedded in `literals` array
+- Block has `selector: null` to distinguish from methods
+- Block bytecode is separate from parent bytecode
+- No jumps needed!
 - Requires special compiler support
 - Breaks uniform message-send model
 
@@ -4049,7 +4468,7 @@ The compiler (**Smalltalk80.Compiler**) and interpreter communicate exclusively 
 2. Build AST (classes, methods, init expressions)
 3. Compile methods to bytecode
 4. Generate stable localIds for all objects
-5. Emit JSON conforming to schema v1.0.0
+5. Emit JSON conforming to schema v1.0.2
 6. Validate JSON against schema before writing
 
 **Interpreter Responsibilities:**
@@ -4490,7 +4909,7 @@ Smalltalk-80/
 │
 └── docs/
     ├── schemas/
-    │   └── coldstart-v1.0.0.schema.json # Canonical JSON schema
+    │   └── coldstart-v1.0.2.schema.json # Canonical JSON schema
     ├── Interpreter-Architecture.md      # This document
     └── BOOTSTRAP_ARCHITECTURE.md        # (deprecated, to be merged)
 ```
@@ -5693,7 +6112,7 @@ The interpreter is currently being migrated from **generated C# cold start code*
 
 1. **JSON Infrastructure** (100% Complete)
    - ✅ `coldstart.json` generated (11MB uncompressed, 1.2MB gzipped)
-   - ✅ JSON Schema v1.0.0 at `docs/schemas/coldstart-v1.0.0.schema.json`
+   - ✅ JSON Schema v1.0.2 at `docs/schemas/coldstart-v1.0.2.schema.json`
    - ✅ `ColdStartJsonSchema.cs` - C# record types matching schema
    - ✅ `ColdStartJsonLoader.cs` - Loads and validates JSON
    - ✅ `LayoutManager.cs` - Dynamic field index computation with caching
@@ -5860,7 +6279,7 @@ The new approach:
 **Last Updated**: 2025-10-05
 **Build Status**: ✅ Compiles Successfully (1 unrelated warning)
 **Zero Garbage**: ✅ Achieved (0 objects collected after cold start)
-**JSON Schema Version**: v1.0.0 ✅
+**JSON Schema Version**: v1.0.2 ✅
 **Compiler Status**: ✅ Builds Successfully, Generates Valid JSON
 **Cold Start Bootstrap**: ✅ 10-Phase System Implemented
 **Bytecode Interpreter**: ✅ All 256 opcodes implemented and tested (VirtualMachine.cs)

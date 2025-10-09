@@ -9,6 +9,9 @@
     <LangVersion>13</LangVersion>
     <!-- Suppress CS3021 warnings from ANTLR-generated files -->
     <NoWarn>$(NoWarn);CS3021</NoWarn>
+    <!--  Fix duplicate assembly attribute errors - disable auto-generation entirely -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
   
   <ItemGroup>

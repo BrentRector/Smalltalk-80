@@ -1,8 +1,8 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-10-08
+**Last Updated**: 2025-10-09
 **Status**: Current Standing Guidance
-**Current Phase**: Bytecode Interpreter Complete (256/256 opcodes), Standalone Validator 100% Complete (All Bugs Fixed), Ready for First Execution
+**Current Phase**: Schema v1.0.2 Complete, Blue Book Block Compilation Implemented, Bytecode Interpreter Complete (256/256 opcodes), Standalone Validator 100% Complete (All Bugs Fixed), Ready for First Execution
 
 ## Session Initialization
 
@@ -90,7 +90,7 @@ All development work must align with the architecture documented in that file. B
 - SystemDictionary reference
 
 ✅ **Shared (static):**
-- JSON cold-start schema (coldstart-v1.0.0.schema.json)
+- JSON cold-start schema (coldstart-v1.0.2.schema.json)
 - Bytecode constants
 - Blue Book specifications
 - Primitive implementations (delegates)
@@ -103,14 +103,31 @@ All development work must align with the architecture documented in that file. B
 
 ✅ **Correct:**
 - Compiler generates `Smalltalk-80.json` from source (11MB, compresses to 1.2MB)
-- Schema-validated JSON conforming to `docs/schemas/coldstart-v1.0.0.schema.json`
+- Schema-validated JSON conforming to `docs/schemas/coldstart-v1.0.2.schema.json`
 - LocalId-based references resolved by interpreter loader
 - Deterministic install order phases
+- Blue Book block compilation (blocks as separate CompiledMethods with selector=null)
+- All method headers include required fields (literalCount, tempCount, argCount, primitiveIndex, largeContext)
+- Bytecodes as integer arrays only (no base64 encoding)
 
 ❌ **Incorrect:**
 - Using generated C# code (ColdStartData.cs, Layouts.cs) - these are deprecated
 - Hardcoding object IDs in compiler - use stable localIds instead
 - Skipping schema validation
+- Incomplete method headers (all fields are required in v1.0.2)
+- Using base64-encoded bytecode strings (removed in v1.0.1)
+
+**Schema Version History:**
+- **v1.0.0**: Initial schema with optional header fields
+- **v1.0.1**: Added Blue Book block compilation, removed base64 bytecode encoding
+- **v1.0.2**: Required header fields, enhanced validation rules, source mapping support (current)
+
+**Key v1.0.2 Requirements:**
+- All method/block headers MUST include: word, literalCount, tempCount, argCount, primitiveIndex, largeContext
+- Expanded header fields MUST match bit encoding in header.word
+- Blocks (compiledMethod literals) MUST have selector=null
+- Blocks MUST have primitiveIndex=0 (no primitives allowed)
+- header.literalCount MUST match actual literals.length
 
 ### 6. Source File Immutability
 
@@ -309,7 +326,7 @@ The interpreter runs **runtime validation** after loading the heap. This validat
 - ✅ ANTLR4 grammar for Smalltalk-80 file-out format
 - ✅ AST builder with full language support
 - ✅ Bytecode compiler with stack analysis
-- ✅ JSON generator conforming to coldstart-v1.0.0.schema.json
+- ✅ JSON generator conforming to coldstart-v1.0.2.schema.json
 - ✅ Clean bytecode enums (Bytecode, ExtendedSubOp) with helper methods
 - ✅ Generates Smalltalk-80.json (11MB, compresses to 1.2MB)
 
@@ -741,7 +758,7 @@ Generated Smalltalk-80.json
 **Compiler output:**
 - Input: `Smalltalk-80.st` (file-out format)
 - Output: `Smalltalk-80.json` (11MB uncompressed, 1.2MB gzipped)
-- Schema: Conforms to `docs/schemas/coldstart-v1.0.0.schema.json`
+- Schema: Conforms to `docs/schemas/coldstart-v1.0.2.schema.json`
 
 **Key files:**
 - `Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs` - Main JSON generator
@@ -785,7 +802,7 @@ The interpreter loads cold-start data from `Smalltalk-80.json` (or `coldstart.js
 
 **Bootstrap Algorithm (10 Phases):**
 
-1. **Parse & Validate**: Load JSON, validate against schema (docs/schemas/coldstart-v1.0.0.schema.json)
+1. **Parse & Validate**: Load JSON, validate against schema (docs/schemas/coldstart-v1.0.2.schema.json)
 2. **Create Temporary Storage**: Allocate placeholder OOPs for symbols/strings in C# Dictionary (Symbol class doesn't exist yet!)
 3. **Allocate Objects**: Process install order phases sequentially
    - Bootstrap classes (Object, Behavior, Class, Metaclass, etc.)
@@ -927,7 +944,7 @@ Before submitting any change, verify:
 - [ ] Zero garbage during cold start
 - [ ] All objects reachable from 5 SOA roots
 - [ ] Per-VM architecture (no static VM state)
-- [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.0.schema.json)
+- [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.2.schema.json)
 - [ ] Compiler builds and generates valid JSON
 - [ ] Interpreter builds successfully
 - [ ] Build succeeds (0 errors, 0 warnings)
