@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Patch value descriptor.
-/// Matches coldstart-v1.0.0.schema.json patch value structure.
+/// Matches coldstart-v1.0.2.schema.json patch value structure.
 /// </summary>
 public class PatchValue
 {

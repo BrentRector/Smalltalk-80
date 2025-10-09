@@ -356,7 +356,7 @@ namespace Smalltalk80.Compiler.AST
             var method = new MethodDefinitionNode
             {
                 Class = _isMetaclass ? $"{_currentClass} class" : _currentClass,
-                Selector = compiledData.Selector,
+                Selector = compiledData.Selector ?? string.Empty,
                 Source = sourceText,
                 Bytecode = compiledData.Bytecode.Select(b => (int)b).ToList(),
                 Literals = ConvertLiterals(compiledData.Literals),

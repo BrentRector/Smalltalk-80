@@ -16397,8 +16397,7 @@ explain: selection for: model
 						ifFalse: 
 							[tiVars _ self explainTemp: string.
 							tiVars == nil ifTrue: [tiVars _ self explainInst: string]].
-					(tiVars == nil)
-						ifTrue: [tiVars _ model explainSpecial: string].
+					(tiVars == nil) ifTrue: [tiVars _ model explainSpecial: string].
 					tiVars == nil
 						ifTrue: [tiVars _ '']
 						ifFalse: [tiVars _ tiVars , NewLine].

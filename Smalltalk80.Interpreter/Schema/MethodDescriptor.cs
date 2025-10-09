@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Compiled method descriptor.
-/// Matches coldstart-v1.0.0.schema.json methods items schema.
+/// Matches coldstart-v1.0.2.schema.json methods items schema.
 /// </summary>
 public class MethodDescriptor
 {

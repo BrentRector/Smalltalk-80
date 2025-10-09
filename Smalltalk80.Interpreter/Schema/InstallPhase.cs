@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Installation phase descriptor.
-/// Matches coldstart-v1.0.0.schema.json installOrder phase structure.
+/// Matches coldstart-v1.0.2.schema.json installOrder phase structure.
 /// </summary>
 public class InstallPhase
 {

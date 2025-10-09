@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Blue Book method header (16-bit word).
-/// Matches coldstart-v1.0.0.schema.json method header structure.
+/// Matches coldstart-v1.0.2.schema.json method header structure.
 /// </summary>
 public class MethodHeader
 {

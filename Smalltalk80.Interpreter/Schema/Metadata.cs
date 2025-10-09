@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Cold start bundle metadata.
-/// Matches coldstart-v1.0.0.schema.json metadata structure.
+/// Matches coldstart-v1.0.2.schema.json metadata structure.
 /// </summary>
 public class Metadata
 {

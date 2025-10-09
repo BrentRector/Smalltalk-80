@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Source file manifest entry.
-/// Matches coldstart-v1.0.0.schema.json sourceFiles items schema.
+/// Matches coldstart-v1.0.2.schema.json sourceFiles items schema.
 /// </summary>
 public class SourceFile
 {

@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Class and metaclass descriptor.
-/// Matches coldstart-v1.0.0.schema.json classes items schema.
+/// Matches coldstart-v1.0.2.schema.json classes items schema.
 /// </summary>
 public class ClassDescriptor
 {

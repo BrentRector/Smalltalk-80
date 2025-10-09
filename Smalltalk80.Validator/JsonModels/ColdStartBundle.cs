@@ -4,7 +4,7 @@ namespace Smalltalk80.Validator.JsonModels;
 
 /// <summary>
 /// Root model for coldstart.json file.
-/// Matches schema: docs/schemas/coldstart-v1.0.0.schema.json
+/// Matches schema: docs/schemas/coldstart-v1.0.2.schema.json
 /// </summary>
 public class ColdStartBundle
 {

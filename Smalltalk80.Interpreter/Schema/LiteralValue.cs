@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Discriminated union for method literal frame entries.
-/// Matches coldstart-v1.0.0.schema.json#/definitions/literalValue
+/// Matches coldstart-v1.0.2.schema.json#/definitions/literalValue
 /// </summary>
 public class LiteralValue
 {

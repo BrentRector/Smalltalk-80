@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Concrete object descriptor.
-/// Matches coldstart-v1.0.0.schema.json objects items schema.
+/// Matches coldstart-v1.0.2.schema.json objects items schema.
 /// </summary>
 public class ObjectDescriptor
 {

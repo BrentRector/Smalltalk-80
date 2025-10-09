@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Initialization expression (DoIt) descriptor.
-/// Matches coldstart-v1.0.0.schema.json initExpressions items schema.
+/// Matches coldstart-v1.0.2.schema.json initExpressions items schema.
 /// </summary>
 public class InitExpression
 {

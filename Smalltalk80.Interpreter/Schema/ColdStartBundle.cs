@@ -4,7 +4,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Root cold start bundle structure.
-/// Matches coldstart-v1.0.0.schema.json root schema.
+/// Matches coldstart-v1.0.2.schema.json root schema.
 /// </summary>
 public class ColdStartBundle
 {

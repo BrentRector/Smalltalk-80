@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Association literal structure for method literals.
-/// Matches coldstart-v1.0.0.schema.json literalValue association structure.
+/// Matches coldstart-v1.0.2.schema.json literalValue association structure.
 /// </summary>
 public class AssociationLiteral
 {
