@@ -16,9 +16,9 @@ public class ValidationResult
         Errors.Add(new ValidationError(category, message, location));
     }
 
-    public void AddWarning(string category, string message, string? location = null)
+    public void AddWarning(string category, string message, string? location = null, bool verboseOnly = false)
     {
-        Warnings.Add(new ValidationWarning(category, message, location));
+        Warnings.Add(new ValidationWarning(category, message, location, verboseOnly));
     }
 
     public void AddInfo(string message)
@@ -32,8 +32,18 @@ public class ValidationResult
         Warnings.AddRange(other.Warnings);
         Info.AddRange(other.Info);
     }
+
+    /// <summary>
+    /// Gets warnings filtered by verbosity level.
+    /// </summary>
+    public IEnumerable<ValidationWarning> GetWarnings(bool verbose)
+    {
+        return verbose
+            ? Warnings
+            : Warnings.Where(w => !w.VerboseOnly);
+    }
 }
 
 public record ValidationError(string Category, string Message, string? Location = null);
 
-public record ValidationWarning(string Category, string Message, string? Location = null);
+public record ValidationWarning(string Category, string Message, string? Location = null, bool VerboseOnly = false);

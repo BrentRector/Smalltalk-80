@@ -1,5 +1,124 @@
 # Cold Start Schema Changelog
 
+## Version 1.0.3 (2025-10-09)
+
+**Major Changes**:
+- Extended BlockContext objects with complete closure metadata (homeContext and outerContext)
+- Added closure linkage validation rule
+- Enhanced debugging and introspection capabilities for nested blocks
+
+### Changes
+
+1. **Extended BlockContext Structure** (ENHANCED):
+   - Changed from 3-field to **5-field** structure
+   - **New field layout**:
+     - `fields[0]`: method (objectRef to block's CompiledMethod)
+     - `fields[1]`: initialIP (SmallInt, always 0 for blocks)
+     - `fields[2]`: blockArgumentCount (SmallInt)
+     - `fields[3]`: **homeContext** (objectRef to enclosing method/block) - NEW
+     - `fields[4]`: **outerContext** (objectRef to outermost method or nil) - NEW
+
+2. **Closure Metadata Semantics**:
+   - **homeContext**: References the immediate enclosing method or block that created this block
+     - Enables proper lexical scoping for nested blocks
+     - May reference another block for blocks created inside blocks
+     - Always points to a valid method or block localId
+   - **outerContext**: References the outermost method in the closure chain
+     - Always points to a method (method:*), never a block
+     - Enables quick access to root execution context
+     - Set to nil if homeContext is already the method
+
+3. **Example: Nested Block Closure Chain**:
+   ```json
+   // Outer block: [:x | ...]
+   {
+     "localId": "blockctx:outer",
+     "formatHint": "blockContext",
+     "fields": [
+       { "type": "objectRef", "localId": "block:outer" },
+       { "type": "smallInt", "value": 0 },
+       { "type": "smallInt", "value": 1 },
+       { "type": "objectRef", "localId": "method:MyClass>>myMethod" },
+       { "type": "nil" }
+     ]
+   }
+
+   // Inner block: ['positive']
+   {
+     "localId": "blockctx:inner",
+     "formatHint": "blockContext",
+     "fields": [
+       { "type": "objectRef", "localId": "block:inner" },
+       { "type": "smallInt", "value": 0 },
+       { "type": "smallInt", "value": 0 },
+       { "type": "objectRef", "localId": "block:outer" },
+       { "type": "objectRef", "localId": "method:MyClass>>myMethod" }
+     ]
+   }
+   ```
+
+4. **New Validation Rule**:
+   - `closureLinkageValid`: Verify BlockContext closure metadata references valid methods/blocks
+   - Validates homeContext and outerContext form proper closure chains
+   - Ensures outerContext always references a method (not a block)
+   - Default: true
+
+5. **Debugging and Introspection Benefits**:
+   - **Stack frame reconstruction**: Follow homeContext chain to rebuild call stack
+   - **Closure provenance**: Trace where blocks were defined vs. invoked
+   - **Lexical ancestry**: Navigate nested block structures for variable resolution
+   - **Profiling support**: Analyze block invocation patterns across closure chains
+
+6. **Full System Statistics**:
+   - 5,419 BlockContext objects generated for Smalltalk-80.st
+   - Nesting depth distribution:
+     - Depth 1: 3,580 blocks (66%)
+     - Depth 2: 1,250 blocks (23%)
+     - Depth 3-7: 589 blocks (11%)
+     - Maximum observed depth: 7 levels
+
+### Breaking Changes
+
+- BlockContext objects now **REQUIRE** 5 fields (previously 3)
+- Old JSON with 3-field BlockContext objects will fail schema validation
+- Compiler must emit homeContext and outerContext fields
+- Loader must handle extended BlockContext structure
+
+### Migration Path
+
+1. **Update compiler** to track block-to-parent relationships during compilation
+2. **Implement closure chain resolution** to compute homeContext and outerContext
+3. **Recompile all source** with updated compiler
+4. **Update loader** to process 5-field BlockContext objects
+5. **Enable closureLinkageValid validation** to verify closure integrity
+
+### Example: Complete BlockContext v1.0.3
+
+```json
+{
+  "localId": "blockctx:abc123",
+  "classNameIndex": 88,
+  "formatHint": "blockContext",
+  "fields": [
+    { "type": "objectRef", "localId": "block:abc123" },
+    { "type": "smallInt", "value": 0 },
+    { "type": "smallInt", "value": 2 },
+    { "type": "objectRef", "localId": "method:Boolean>>ifTrue:ifFalse:" },
+    { "type": "nil" }
+  ],
+  "indexedFields": [],
+  "blockContextStructure": {
+    "method": "block:abc123",
+    "initialIP": 0,
+    "blockArgumentCount": 2,
+    "homeContext": "method:Boolean>>ifTrue:ifFalse:",
+    "outerContext": null
+  }
+}
+```
+
+---
+
 ## Version 1.0.2 (2025-10-09)
 
 **Major Changes**:

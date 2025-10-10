@@ -21,6 +21,7 @@ namespace Smalltalk80.Compiler.AST
         private readonly CompilationResult _result;
         private string? _currentClass;
         private bool _isMetaclass;
+        private string _currentCategory = "";
         private readonly Dictionary<string, ClassDefinitionNode> _classes;
         private readonly List<InitializationExpression> _initExpressions;
         private readonly BytecodeCompiler _bytecodeCompiler;
@@ -50,7 +51,14 @@ namespace Smalltalk80.Compiler.AST
 
             // Build the final result
             _result.Classes = _classes.Values.ToList();
-            
+
+            // Compute total instance variable count for all classes
+            // Must be done AFTER all classes are loaded so inheritance chains are complete
+            foreach (var classNode in _result.Classes)
+            {
+                classNode.TotalInstanceVariableCount = ComputeInheritedInstanceVariables(classNode.Name).Count;
+            }
+
             // Deduplicate initialization expressions based on source text
             // The Smalltalk-80.st file contains two complete copies of the system concatenated together
             // (194 out of 217 classes are defined twice), so we need to deduplicate
@@ -175,6 +183,9 @@ namespace Smalltalk80.Compiler.AST
             _currentClass = className;
             _isMetaclass = false;
 
+            // Note: TotalInstanceVariableCount is computed later in VisitFileIn()
+            // after all classes are loaded, so inheritance chains are complete
+
             return classNode;
         }
 
@@ -200,18 +211,22 @@ namespace Smalltalk80.Compiler.AST
             
             // Set the metaclass flag for this entire category
             _isMetaclass = isClassSide;
-            
-            string category = "";
+
+            // Extract and set current category
             if (context.stringConst() != null)
             {
-                category = StripQuotes(context.stringConst().STRING().GetText());
+                _currentCategory = StripQuotes(context.stringConst().STRING().GetText());
             }
-            
+            else
+            {
+                _currentCategory = "";
+            }
+
             // Process all methods in this category - use methodDef() array
             foreach (var methodDef in context.methodDef())
             {
                 var method = ProcessMethodDefinition(methodDef);
-                
+
                 if (method != null)
                 {
                     var classNode = _classes[_currentClass];
@@ -225,9 +240,10 @@ namespace Smalltalk80.Compiler.AST
                     }
                 }
             }
-            
-            // Reset metaclass flag after processing this category
+
+            // Reset metaclass flag and category after processing this category
             _isMetaclass = false;
+            _currentCategory = "";
 
             return null;
         }
@@ -368,7 +384,8 @@ namespace Smalltalk80.Compiler.AST
                 ArgNames = compiledData.ArgumentNames,
                 TempNames = compiledData.TemporaryNames,
                 IsQuickReturnSelf = compiledData.IsQuickReturnSelf,
-                QuickReturnFieldIndex = compiledData.QuickReturnFieldIndex
+                QuickReturnFieldIndex = compiledData.QuickReturnFieldIndex,
+                Category = _currentCategory  // Assign the current category
             };
 
             // Check for primitive declaration
@@ -1143,6 +1160,13 @@ namespace Smalltalk80.Compiler.AST
         [JsonPropertyName("instanceVariables")]
         public List<string> InstanceVariables { get; set; } = new();
 
+        /// <summary>
+        /// Total count of all instance variables including inherited ones.
+        /// Used for format word calculation.
+        /// </summary>
+        [JsonIgnore]
+        public int TotalInstanceVariableCount { get; set; }
+
         [JsonPropertyName("classVariables")]
         public List<string> ClassVariables { get; set; } = new();
 
@@ -1169,6 +1193,9 @@ namespace Smalltalk80.Compiler.AST
 
         [JsonPropertyName("selector")]
         public string Selector { get; set; } = "";
+
+        [JsonPropertyName("category")]
+        public string? Category { get; set; }
 
         [JsonPropertyName("source")]
         public string? Source { get; set; }

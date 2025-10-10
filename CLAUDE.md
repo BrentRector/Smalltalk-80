@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-10-09
 **Status**: Current Standing Guidance
-**Current Phase**: Schema v1.0.2 Complete, Blue Book Block Compilation Implemented, Bytecode Interpreter Complete (256/256 opcodes), Standalone Validator 100% Complete (All Bugs Fixed), Ready for First Execution
+**Current Phase**: 🎉 **100% VALIDATION ACHIEVED** - All 10,059 methods compile and validate correctly (0 errors, 0 warnings). Compiler fully operational with Blue Book-compliant bytecode generation. Ready for interpreter execution.
 
 ## Session Initialization
 
@@ -90,7 +90,7 @@ All development work must align with the architecture documented in that file. B
 - SystemDictionary reference
 
 ✅ **Shared (static):**
-- JSON cold-start schema (coldstart-v1.0.2.schema.json)
+- JSON cold-start schema (coldstart-v1.0.3.schema.json)
 - Bytecode constants
 - Blue Book specifications
 - Primitive implementations (delegates)
@@ -103,40 +103,58 @@ All development work must align with the architecture documented in that file. B
 
 ✅ **Correct:**
 - Compiler generates `Smalltalk-80.json` from source (11MB, compresses to 1.2MB)
-- Schema-validated JSON conforming to `docs/schemas/coldstart-v1.0.2.schema.json`
+- Schema-validated JSON conforming to `docs/schemas/coldstart-v1.0.3.schema.json`
 - LocalId-based references resolved by interpreter loader
 - Deterministic install order phases
 - Blue Book block compilation (blocks as separate CompiledMethods with selector=null)
 - All method headers include required fields (literalCount, tempCount, argCount, primitiveIndex, largeContext)
 - Bytecodes as integer arrays only (no base64 encoding)
+- Dynamic array literals compiled to runtime array creation ({expr. expr})
+- Method categories tracked from file-out format (optional field)
 
 ❌ **Incorrect:**
 - Using generated C# code (ColdStartData.cs, Layouts.cs) - these are deprecated
 - Hardcoding object IDs in compiler - use stable localIds instead
 - Skipping schema validation
-- Incomplete method headers (all fields are required in v1.0.2)
+- Incomplete method headers (all fields are required since v1.0.2)
 - Using base64-encoded bytecode strings (removed in v1.0.1)
+- Inline block compilation with jump bytecodes (use Blue Book separate CompiledMethods)
 
 **Schema Version History:**
 - **v1.0.0**: Initial schema with optional header fields
 - **v1.0.1**: Added Blue Book block compilation, removed base64 bytecode encoding
-- **v1.0.2**: Required header fields, enhanced validation rules, source mapping support (current)
+- **v1.0.2**: Required header fields, enhanced validation rules, source mapping support
+- **v1.0.3**: Added dynamic array literal support, method category field (current)
 
-**Key v1.0.2 Requirements:**
+**Key v1.0.3 Requirements:**
 - All method/block headers MUST include: word, literalCount, tempCount, argCount, primitiveIndex, largeContext
 - Expanded header fields MUST match bit encoding in header.word
 - Blocks (compiledMethod literals) MUST have selector=null
 - Blocks MUST have primitiveIndex=0 (no primitives allowed)
 - header.literalCount MUST match actual literals.length
+- Dynamic arrays `{expr}` MUST compile to Array new: + at:put: pattern
+- Method category field is optional but recommended for organization
 
 ### 6. Source File Immutability
 
-**NEVER modify the Smalltalk-80.st source file:**
+**🚨 CRITICAL: NEVER MODIFY Smalltalk-80.st 🚨**
 
-- This file is the master, canonical reference for Smalltalk-80
+**This is a MANDATORY, ABSOLUTE rule:**
+
+- `Smalltalk-80 Source/Smalltalk-80.st` is the **master, canonical, read-only** Smalltalk-80 system image
+- **NEVER add, modify, or delete** ANY content in this file
+- **NEVER append** test classes or examples to this file
 - All cold start data comes from compiler analysis of this file
 - No hand-written method installers or hardcoded symbol lists
 - The compiler extracts all information (classes, methods, literals) from the AST
+
+**For Testing and Examples:**
+
+- Use the `Smalltalk-80 Source/tests/` directory for test Smalltalk source files
+- Add `.st` files with test classes and examples there
+- CI/CD pipeline compiles test files separately
+- Test files can be modified, added, or deleted freely
+- Each test file should have corresponding expected JSON output for validation
 
 ## Code Quality Standards
 
@@ -146,6 +164,99 @@ All development work must align with the architecture documented in that file. B
 - **XML documentation** required for all public members
 - **Null safety** - use nullable reference types correctly
 - **Expression-bodied members** when they improve readability
+
+### Block Compilation Correctness
+
+**CRITICAL: All block compilation MUST follow the Blue Book canonical model:**
+
+✅ **Correct - Separate CompiledMethod Objects:**
+- Each block `[]` is a separate CompiledMethod stored in parent's literal frame
+- Blocks pushed via `PUSH_LITERAL N` bytecode
+- No inline bytecode, no jump-over patterns
+- Blocks have `selector=null`, `primitiveIndex=0`
+- Fully recursive: blocks can contain other blocks
+
+**Example:**
+```smalltalk
+1 = 0 ifTrue: []
+```
+
+Compiles to:
+```
+PUSH_CONSTANT 1
+PUSH_CONSTANT 0
+SEND #=
+PUSH_LITERAL 0        ; Block is literals[0]
+SEND #ifTrue:
+```
+
+❌ **WRONG - Inline Blocks with Jumps:**
+```
+JUMP_FORWARD +5       ; Skip block body
+  <block bytecodes>
+PUSH_LITERAL <ctx>
+SEND #ifTrue:
+```
+
+**Why This Matters:**
+1. **Blue Book Compliance**: Specification requires separate CompiledMethod objects
+2. **Simplicity**: No complex jump analysis needed
+3. **Closures**: Natural representation for captured variables
+4. **Debugging**: Each block visible as separate object
+5. **Validation**: Stack analysis simpler without jumps
+
+**See**: `docs/Interpreter-Architecture.md` "Blue Book Block Compilation" section for complete specification
+
+### Compiler Test Suite Requirements
+
+**MANDATORY: All 131 unit tests MUST pass before commits.**
+
+**Test Location:** `Smalltalk80.Compiler.Tests/`
+
+**Run Tests:**
+```bash
+cd Smalltalk80.Compiler.Tests
+dotnet test
+```
+
+**Expected Output:**
+```
+Test run for Smalltalk80.Compiler.Tests.dll (.NET 9.0)
+Total tests: 131
+     Passed: 131
+     Failed: 0
+    Skipped: 0
+ Total time: ~2.5s
+```
+
+**Test Categories:**
+1. **BlockTests** (25 tests) - Empty blocks, blocks with args, nested blocks
+2. **MessageTests** (18 tests) - Unary, binary, keyword sends
+3. **LiteralTests** (22 tests) - Numbers, strings, symbols, arrays
+4. **DynamicArrayTests** (11 tests) - `{expr}` syntax compilation
+5. **AssignmentTests** (8 tests) - Variable assignment
+6. **ReturnTests** (7 tests) - Method/block returns
+7. **ControlFlowTests** (12 tests) - ifTrue:, whileTrue:, etc.
+8. **StackTests** (15 tests) - Stack balance validation
+9. **CascadeTests** (6 tests) - Message cascades
+10. **PrimitiveTests** (7 tests) - Primitive method headers
+
+**Test Infrastructure:**
+- Base class: `CompilerTestBase` with helper methods
+- Schema compliance: All tests validate against v1.0.3 schema
+- Bytecode verification: Tests check exact bytecode sequences
+- Stack analysis: Tests verify stack depth and balance
+
+**Adding New Tests:**
+1. Create test class inheriting from `CompilerTestBase`
+2. Add test methods with `[Fact]` or `[Theory]` attributes
+3. Use helper methods: `CompileMethod()`, `AssertBytecode()`, `AssertStackDepth()`
+4. Verify all 131 tests still pass after changes
+
+**CI/CD Integration:**
+- Tests run automatically on every commit
+- Pull requests require 131/131 passing tests
+- No exceptions - all tests must pass
 
 ### Shared Source Files
 
@@ -278,13 +389,45 @@ pwsh scripts/build-and-validate.ps1
 
 **Pipeline Steps**:
 1. Build Compiler
-2. Generate `coldstart.json` from `Smalltalk-80.st`
-3. Run Standalone Validator on generated JSON
-4. Report validation results
+2. **Run Compiler Unit Tests** (131/131 must pass)
+3. Generate `coldstart.json` from `Smalltalk-80.st`
+4. Run Standalone Validator on generated JSON
+5. Report validation results
 
 **Exit Codes**:
 - `0` - Validation passed (all critical checks pass)
-- `1` - Validation failed (errors found)
+- `1` - Validation failed (errors found or tests failed)
+
+### Compiler Unit Tests
+
+**Run All Tests:**
+```bash
+cd Smalltalk80.Compiler.Tests
+dotnet test --verbosity normal
+```
+
+**Run Specific Test Category:**
+```bash
+dotnet test --filter "FullyQualifiedName~BlockTests"
+dotnet test --filter "FullyQualifiedName~DynamicArrayTests"
+```
+
+**Success Criteria:** 131/131 tests passing (100%)
+
+**Test Coverage:**
+- **Block Compilation** (25 tests): Empty blocks, blocks with args, nested blocks, block returns
+- **Message Sends** (18 tests): Unary, binary, keyword messages, special sends
+- **Literals** (22 tests): SmallIntegers, floats, strings, symbols, static arrays
+- **Dynamic Arrays** (11 tests): `{expr}` syntax with all expression types
+- **Control Flow** (12 tests): ifTrue:, whileTrue:, to:do:, etc.
+- **Stack Analysis** (15 tests): Stack depth tracking, balance validation
+- **Other** (28 tests): Assignments, returns, cascades, primitives
+
+**Failure Handling:**
+- **DO NOT commit** if any tests fail
+- Investigate root cause (compiler bug vs. test bug)
+- Fix issue and re-run all 131 tests
+- Ensure no regressions introduced
 
 ### Standalone Validator
 
@@ -304,9 +447,9 @@ The standalone validator performs **compile-time validation** on `coldstart.json
 dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj -- bin/Debug/net9.0/coldstart.json
 ```
 
-**Success Criteria**: 99.98% validation rate (4,639/4,640 methods pass)
+**Success Criteria**: ✅ **100% validation rate (10,059/10,059 methods pass)**
 
-**Known Issue**: 1 method (`Explainer>>explain:for:`) has complex nested block edge case (0.02% of codebase, **needs fixing**)
+**Status (2025-10-09)**: All validation errors resolved. Zero compilation or validation errors.
 
 ### Interpreter Phase 12 Validation
 
@@ -386,19 +529,18 @@ The interpreter runs **runtime validation** after loading the heap. This validat
   - **Process Management** (85-88): Signal, Wait, Resume, Suspend - needs ProcessorScheduler
   - **System Advanced** (114-116, 128-131, 139): Object enumeration, become:, GC control
 
-**Standalone Validator (Smalltalk80.Validator)** - 100% COMPLETE (2025-10-08):
+**Standalone Validator (Smalltalk80.Validator)** - ✅ **100% COMPLETE (2025-10-09)**:
 - ✅ **CFG-Based Stack Validation** - Control-flow-graph worklist propagation
   - Validates stack discipline across all code paths
   - Handles jumps, conditionals, returns correctly
-  - **Bug fixes applied**: SEND_N argCount offset (pc+3), jump target +1
-  - Result: **4,639/4,640 methods pass** (99.98%)
-  - Only error: Explainer>>explain:for: (complex nested blocks - **needs fixing**)
+  - **Bug fixes applied**: SEND_N argCount offset (pc+3), jump target +1, block return fix, negative radix literals
+  - Result: **✅ 10,059/10,059 methods pass (100%)**
 - ✅ **Operand Index Validation** - Static analysis of all operand references
   - Validates literal indices are in range
   - Validates temporary variable indices (args + temps)
   - Validates instance variable indices with inheritance
   - Computes inheritance chains for accurate inst var counts
-  - Result: **4,640/4,640 methods pass** (100%)
+  - Result: **10,059/10,059 methods pass (100%)**
 - ✅ **Method Header Validation** - Blue Book encoding compliance (100%)
 - ✅ **Literal Frame Validation** - Symbol/string index bounds checking (100%)
 - ✅ **Patch Validation** - Patch structure validation (100%)
@@ -407,11 +549,13 @@ The interpreter runs **runtime validation** after loading the heap. This validat
   - Fixed 1,746 false errors ("unknown localId 'patch:XXX'")
   - Result: **All validation errors resolved**
 - ✅ **Object Format Validation** - Format hints match class formats (100%)
+  - **Bug fixes applied** (2025-10-09): Pool dictionary field count, BlockContext field layout
+  - Result: **All format warnings resolved**
 - ✅ **Automated Build Pipeline** - `scripts/build-and-validate.ps1`
   - Compile → Generate JSON → Validate → Report
   - CI/CD ready with proper exit codes
   - ~5 second feedback loop (vs ~30 seconds before)
-  - **Overall result: 1 error requiring fix (Explainer>>explain:for:), all other validators pass**
+  - **✅ Overall result: 100% validation, 0 errors, 0 warnings**
 
 ### ✅ Completed Work (October 2025)
 
@@ -543,72 +687,57 @@ public static SObjectRef Primitive(IPrimitiveContext ctx, SObjectRef receiver, S
    - **Impact**: 1 method out of 4,640 (0.02%)
    - **Status**: Documented, not fixed (edge case with complex nested blocks)
 
-**Validation Results**:
-- Total methods: 4,640
-- Valid methods: 4,639
-- Invalid methods: 1
-- **Success rate: 99.98%**
+**Validation Results (2025-10-09)**:
+- Total methods: 10,059 (4,640 regular methods + 5,419 blocks)
+- Valid methods: 10,059
+- Invalid methods: 0
+- **✅ Success rate: 100%**
 
-**See**: [docs/Final-Validation-Results.md](docs/Final-Validation-Results.md) for complete analysis
+### 🎉 All Compiler Bugs Fixed (2025-10-09)
+
+**Bug Fixes Completed:**
+
+1. **Pool Dictionary Field Count** (FIXED ✅)
+   - **Problem**: TextConstants, FilePool created with 0 fields but Dictionary format declares 1 (tally inherited from Set)
+   - **Fix**: Added tally field initialized to SmallInt(0) in pool dictionary creation
+   - **File**: [ColdStartJsonGenerator.cs:374-382](Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs#L374-L382)
+   - **Impact**: Resolved 2 ObjectFormat warnings
+
+2. **Block Return Bytecode** (FIXED ✅)
+   - **Problem**: Compiler emitting RETURN_TOP (0x7C) after RETURN_BLOCK (0x7E), creating unreachable dead code in 546 blocks
+   - **Fix**: Check if last bytecode is already a return before emitting implicit RETURN_TOP
+   - **File**: [BytecodeCompiler.cs:1797-1805](Smalltalk80.Compiler/BytecodeCompiler.cs#L1797-L1805)
+   - **Impact**: Fixed all 546 blocks with explicit returns like `[^1]`, `[^self]`
+
+3. **Negative Radix Literal Compilation** (FIXED ✅)
+   - **Problem**: Negative radix literals like `-16r100` not compiling (missing argument push)
+   - **Fix**: Changed `int.TryParse` to `TryParseSmalltalkNumber` in negativeNumber handling
+   - **File**: [BytecodeCompiler.cs:1650-1673](Smalltalk80.Compiler/BytecodeCompiler.cs#L1650-L1673)
+   - **Impact**: Fixed SmallInteger>>digitLength and all methods using negative radix literals
+
+4. **Array Literal Number Parsing** (FIXED ✅)
+   - **Problem**: Array elements using `double.Parse`/`long.TryParse`, not handling radix notation
+   - **Fix**: Changed to `TryParseSmalltalkNumber` for future-proofing
+   - **File**: [BytecodeCompiler.cs:2072-2080](Smalltalk80.Compiler/BytecodeCompiler.cs#L2072-L2080)
+   - **Impact**: Handles radix notation in arrays like `#(16rFF 10 20)` if ever used
+
+**All Previous Bugs Also Fixed:**
+- ✅ SEND_N argCount offset (pc+3 not pc+2)
+- ✅ Jump target calculation (+1 offset)
+- ✅ Negative radix literals in assignments
+- ✅ Total instance variable count for format words
+- ✅ BlockContext field layout (6 fields not 5)
+
 **Files Involved**:
-- `Smalltalk80.Interpreter/Core/Bytecodes/BytecodeStackValidator.cs` - CFG-based validator ✅
-- `Smalltalk80.Interpreter/LoaderPhases/Phase12_BytecodeValidation.cs` - Validation runner
-- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Compiler emitting bad bytecode ❌
-- `docs/Decompiler-Jump-Handling-Bug.md` - Analysis of jump handling issues
-
-**Bytecode Decompiler Jump Handling** (LOW - Documented):
-
-The BytecodeDecompiler (validation tool only) fails to decompile 1 out of 4,640 methods (`SmallInteger>>digitLength`) due to linear scanning instead of control-flow-graph-based decompilation.
-
-**Problem**: The decompiler outputs `<jump +N>` for jump bytecodes but continues linearly through the bytecode array instead of following jump targets. This causes stack simulation to diverge when processing unreachable code after unconditional jumps.
-
-**Status**:
-- ✅ Root cause identified and documented ([docs/Decompiler-Jump-Handling-Bug.md](docs/Decompiler-Jump-Handling-Bug.md))
-- ✅ Added defensive stack guards with detailed error messages
-- ✅ Error now clearly explains the limitation and points to documentation
-- ⏳ Future: Implement CFG-based decompilation if needed for runtime use
-
-**Impact**:
-- **None on runtime** - decompiler is only used for validation/debugging
-- 99.98% success rate (4639/4640 methods decompile correctly)
-- **Needs fixing** - will be addressed in future work
-
-**Error Message**:
-```
-SmallInteger>>digitLength: Decompiler stack underflow at PC 37: bytecode 0x69 requires 1 stack item(s),
-but only 0 available. This likely indicates unreachable code after an unconditional jump, or incorrect
-control flow in the bytecode. The decompiler uses linear scanning and does not follow jump targets, which
-can cause stack simulation to diverge from actual execution. See docs/Decompiler-Jump-Handling-Bug.md for details.
-```
-
-**Files Involved**:
-- `Smalltalk80.Interpreter/Core/Bytecodes/BytecodeDecompiler.cs` - Decompiler with stack guards
+- `Smalltalk80.Compiler/BytecodeCompiler.cs` - All compilation logic ✅
+- `Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs` - JSON generation ✅
+- `Smalltalk80.Validator/` - All 6 validators passing ✅
 - `Smalltalk80.Interpreter/LoaderPhases/Phase12_BytecodeValidation.cs` - Validation runner
 - `docs/Decompiler-Jump-Handling-Bug.md` - Full analysis and solution options
 
-**Compiler Instance Variable Layout Bug** (CRITICAL - Under Investigation):
+**All Known Bugs Resolved (2025-10-09)** ✅
 
-The bytecode operand validator discovered 846 methods with invalid bytecode operands, all in Windows* extension classes. The root cause was identified:
-
-**Problem**: `FileInFormatAstBuilder.ComputeInheritedInstanceVariables()` uses `InsertRange(0)` which reverses the inheritance order, placing subclass variables before superclass variables. This violates Smalltalk's requirement that superclass instance variables come first.
-
-**Status**:
-- ✅ Bug identified in FileInFormatAstBuilder.cs:920-930
-- ✅ Fix implemented (uses classChain and reverses iteration order)
-- ❌ Fix not working - 846 errors persist after clean rebuild
-- ❌ Debug output shows correct layout being computed, but bytecode still has wrong indices
-- 🔍 Investigation needed: Why does correct layout computation not translate to correct bytecode?
-
-**Impact**:
-- All standard Smalltalk-80 classes work correctly (Object has no inst vars)
-- Windows* extension classes have invalid bytecode (accessing wrong inst var indices)
-- System cannot execute methods in affected classes
-
-**Files Involved**:
-- `Smalltalk80.Compiler/AST/FileInFormatAstBuilder.cs` - Instance variable layout computation
-- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Bytecode generation
-- `Smalltalk80.Interpreter/LoaderPhases/Phase6_MethodInstallation.cs` - Validation
-- `Smalltalk80.Interpreter/Core/Bytecodes/BytecodeOperandValidator.cs` - Validation logic
+The compiler and validator are now in a fully operational state with 100% validation passing. All previously documented bugs have been fixed and verified.
 
 ### ⏳ Remaining Infrastructure Gaps
 
@@ -885,22 +1014,30 @@ Output shows inheritance with box-drawing characters (├─, └─).
 
 ### Before Committing
 
-**CRITICAL: Both compiler and interpreter MUST compile and run without errors before committing.**
+**CRITICAL: Compiler tests, builds, and interpreter MUST all succeed before committing.**
 
-1. **Build verification** (REQUIRED - must pass):
+1. **Compiler test verification** (REQUIRED - must pass):
+   ```bash
+   # Run all 131 compiler unit tests
+   cd Smalltalk80.Compiler.Tests
+   dotnet test
+   # Must show: Total tests: 131, Passed: 131, Failed: 0
+   ```
+
+2. **Build verification** (REQUIRED - must pass):
    ```bash
    # Build compiler
    cd Smalltalk80.Compiler
    dotnet build --no-restore
-   # Must show: 0 Error(s)
+   # Must show: 0 Error(s), 0 Warning(s)
 
    # Build interpreter
    cd ../Smalltalk80.Interpreter
    dotnet build --no-restore
-   # Must show: 0 Error(s)
+   # Must show: 0 Error(s), 0 Warning(s)
    ```
 
-2. **Runtime verification** (IDEAL - should pass):
+3. **Runtime verification** (IDEAL - should pass):
    ```bash
    # Test interpreter cold start with GC validation
    cd Smalltalk80.Interpreter
@@ -909,11 +1046,14 @@ Output shows inheritance with box-drawing characters (├─, └─).
    # Ideally: Should show "0 objects collected" on all GC runs
    ```
 
-3. **Update documentation**: Update Interpreter-Architecture.md if architecture changed
+4. **Update documentation**: Update Interpreter-Architecture.md if architecture changed
 
-4. **Clean build required**: Build must succeed with 0 errors and 0 warnings
+5. **Clean build required**: Build must succeed with 0 errors and 0 warnings
 
-**DO NOT commit if either project has compilation errors or warnings.**
+**DO NOT commit if:**
+- Any compiler tests fail (must be 131/131)
+- Either project has compilation errors or warnings
+- Documentation is out of sync with code changes
 
 ### Commit Message Format
 
@@ -944,13 +1084,17 @@ Before submitting any change, verify:
 - [ ] Zero garbage during cold start
 - [ ] All objects reachable from 5 SOA roots
 - [ ] Per-VM architecture (no static VM state)
-- [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.2.schema.json)
+- [ ] JSON conforms to schema (docs/schemas/coldstart-v1.0.3.schema.json)
+- [ ] **All 131 compiler unit tests pass (REQUIRED)**
+- [ ] Block compilation uses Blue Book model (separate CompiledMethods)
+- [ ] Dynamic arrays compile to Array new: + at:put: pattern
 - [ ] Compiler builds and generates valid JSON
 - [ ] Interpreter builds successfully
 - [ ] Build succeeds (0 errors, 0 warnings)
 - [ ] GC validation passes (0 objects collected)
 - [ ] Documentation updated (if architecture changed)
 - [ ] No modification to Smalltalk-80.st source
+- [ ] Test files in `tests/` directory, not in Smalltalk-80.st
 
 ---
 

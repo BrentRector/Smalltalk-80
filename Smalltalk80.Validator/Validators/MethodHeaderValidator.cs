@@ -170,11 +170,13 @@ public class MethodHeaderValidator
         if (actualLiteralCount != literalCount)
         {
             // Extended literals: method can have >63 literals (header capped at 63)
+            // This is a verbose-only warning since it's a normal Blue Book feature
             if (literalCount == 63 && actualLiteralCount > 63)
             {
                 result.AddWarning("MethodHeader",
                     $"Method has {actualLiteralCount} literals (extended literal support, header capped at 63)",
-                    location);
+                    location,
+                    verboseOnly: true);
             }
             else
             {
@@ -245,11 +247,13 @@ public class MethodHeaderValidator
         if (actualLiteralCount != literalCount)
         {
             // Extended literals: init expression can have >63 literals (header capped at 63)
+            // This is a verbose-only warning since it's a normal Blue Book feature
             if (literalCount == 63 && actualLiteralCount > 63)
             {
                 result.AddWarning("MethodHeader",
                     $"Init expression has {actualLiteralCount} literals (extended literal support, header capped at 63)",
-                    location);
+                    location,
+                    verboseOnly: true);
             }
             else
             {

@@ -27,6 +27,8 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     private readonly List<JsonPatch> _patches = [];
     private readonly List<InstallPhase> _installPhases = [];
     private readonly Dictionary<string, int> _selectorFrequency = new();
+    private readonly Dictionary<string, string> _blockToHomeMethod = new(); // Maps block localId → home method localId
+    private string? _currentMethodLocalId; // Tracks the current method being processed
 
     /// <summary>
     /// Generates the complete cold-start JSON bundle from the AST.
@@ -47,6 +49,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         // Phase 4: Convert methods
         ConvertMethods(ast);
+
+        // Phase 4.5: Create BlockContext objects for each block
+        CreateBlockContextObjects();
 
         // Phase 5: Convert init expressions
         ConvertInitExpressions(ast);
@@ -307,13 +312,14 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 : null;
 
             // Generate instance class
+            // Use TotalInstanceVariableCount (computed in AST builder) for format word
             var instanceClass = new JsonClass
             {
                 LocalId = $"class:{classNode.Name}",
                 NameIndex = _symbolTable[classNode.Name],
                 IsMetaclass = false,
                 MetaclassOfLocalId = null,
-                Format = CalculateFormatWord(classNode.SubclassKind, classNode.InstanceVariables.Count),
+                Format = CalculateFormatWord(classNode.SubclassKind, classNode.TotalInstanceVariableCount),
                 InstVarNames = classNode.InstanceVariables.Select(v => _symbolTable[v]).ToList(),
                 ClassVarNames = classNode.ClassVariables.Select(v => _symbolTable[v]).ToList(),
                 PoolLocalIds = classNode.PoolDictionaries.Select(p => $"pool:{p}").ToList(),
@@ -330,14 +336,19 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             _classes.Add(instanceClass);
 
             // Generate metaclass
+            // All metaclasses are instances of Metaclass, which inherits:
+            // Object (0) -> Behavior (4) -> ClassDescription (2) -> Metaclass (1) = 7 inst vars
+            // Format: instanceSpec=01 (pointers), fixedFields=7, not indexable
+            var metaclassFormat = CalculateFormatWord("subclass:", 7);
+
             var metaclass = new JsonClass
             {
                 LocalId = $"meta:{classNode.Name}",
                 NameIndex = _symbolTable[classNode.Name],
                 IsMetaclass = true,
                 MetaclassOfLocalId = $"class:{classNode.Name}",
-                Format = 0, // Metaclasses have fixed pointer format
-                InstVarNames = [], // Metaclasses don't declare additional instance variables
+                Format = metaclassFormat, // All metaclasses have same format (7 inst vars, pointers only)
+                InstVarNames = [], // Metaclasses don't declare additional instance variables beyond Metaclass
                 ClassVarNames = [], // Class variables belong to the instance side
                 PoolLocalIds = [],
                 SuperNameIndex = string.IsNullOrEmpty(classNode.Superclass) || classNode.Superclass == "nil"
@@ -360,7 +371,15 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                         LocalId = $"pool:{poolName}",
                         ClassNameIndex = _symbolTable.GetValueOrDefault("Dictionary", -1),
                         FormatHint = "pointers",
-                        Fields = [],
+                        Fields =
+                        [
+                            // Field 0: tally (inherited from Set) - initialized to 0
+                            new Dictionary<string, object>
+                            {
+                                ["type"] = "smallInt",
+                                ["value"] = 0
+                            }
+                        ],
                         IndexedFields = []
                     });
                 }
@@ -369,21 +388,43 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     }
 
     /// <summary>
-    /// Calculates the Blue Book format word for a class.
+    /// Calculates the format word for a class.
+    /// Per Blue Book Chapter 16 and Interpreter-Architecture.md:
+    /// Bits 15-14: Unused (00)
+    /// Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
+    /// Bits 11-6:  Fixed fields count (0-63) - INCLUDES ALL INHERITED INSTANCE VARIABLES
+    /// Bit 5:      Unused
+    /// Bit 4:      Indexable flag (1 = has indexed portion)
+    /// Bit 3:      Pointer flag (1 = indexed portion contains pointers)
+    /// Bits 2-0:   Unused
     /// </summary>
     private static int CalculateFormatWord(string subclassKind, int fixedFieldCount)
     {
+        int format = 0;
+
+        // Instance specification (bits 13-12)
         int instSpec = subclassKind switch
         {
-            "subclass:" => 0,                    // Fixed pointers only
-            "variableSubclass:" => 1,            // Variable pointers
-            "variableByteSubclass:" => 2,        // Variable bytes
-            "variableWordSubclass:" => 3,        // Variable words
-            _ => 0
+            "subclass:" => 0x01,                 // 01 = only pointer fields
+            "variableSubclass:" => 0x02,         // 10 = word-indexable (with pointers)
+            "variableByteSubclass:" => 0x03,     // 11 = byte-indexable
+            "variableWordSubclass:" => 0x02,     // 10 = word-indexable (no pointers)
+            _ => 0x01                            // Default to pointer fields
         };
+        format |= (instSpec << 12);
 
-        // Blue Book format: bits 0-4 = instSpec, bits 5-10 = fixed field count
-        return instSpec | (fixedFieldCount << 5);
+        // Fixed fields count (bits 11-6)
+        format |= ((fixedFieldCount & 0x3F) << 6);
+
+        // Indexable flag (bit 4)
+        if (subclassKind.StartsWith("variable"))
+            format |= 0x10;
+
+        // Pointer flag (bit 3) - set for subclass: and variableSubclass:
+        if (subclassKind == "subclass:" || subclassKind == "variableSubclass:")
+            format |= 0x08;
+
+        return format;
     }
 
     /// <summary>
@@ -396,6 +437,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // Convert instance methods
             foreach (var methodNode in classNode.Methods)
             {
+                // Set current method context for block homeContext tracking
+                _currentMethodLocalId = $"method:{classNode.Name}>>{methodNode.Selector}";
+
                 // For extended form (flags=7), add encoded argCount+primitive as last literal
                 var literals = ConvertLiterals(methodNode.Literals);
                 int literalCount = methodNode.Literals.Count;
@@ -418,6 +462,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     LocalId = $"method:{classNode.Name}>>{methodNode.Selector}",
                     HomeClassLocalId = $"class:{classNode.Name}",
                     SelectorIndex = _symbolTable[methodNode.Selector],
+                    Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
@@ -452,6 +497,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // Convert class methods
             foreach (var methodNode in classNode.ClassMethods)
             {
+                // Set current method context for block homeContext tracking
+                _currentMethodLocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}";
+
                 // For extended form (flags=7), add encoded argCount+primitive as last literal
                 var literals = ConvertLiterals(methodNode.Literals);
                 int literalCount = methodNode.Literals.Count;
@@ -474,6 +522,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     LocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}",
                     HomeClassLocalId = $"meta:{classNode.Name}",
                     SelectorIndex = _symbolTable[methodNode.Selector],
+                    Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
                     Header = new MethodHeader
                     {
                         Word = CalculateMethodHeaderWord(
@@ -505,6 +554,118 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 _methods.Add(method);
             }
         }
+    }
+
+    /// <summary>
+    /// Creates BlockContext objects for each block method in the methods collection.
+    /// BlockContext objects represent runtime closures for blocks in the Smalltalk-80 system.
+    ///
+    /// BlockContext instance variable layout (must match class definition):
+    /// BlockContext inherits from: Object (0) -> InstructionStream (2) -> ContextPart (1) -> BlockContext (3)
+    ///
+    /// - field[0]: sender (InstructionStream) - nil for unactivated blocks
+    /// - field[1]: pc (InstructionStream) - initialIP (always 0 for blocks)
+    /// - field[2]: stackp (ContextPart) - nil for unactivated blocks
+    /// - field[3]: nargs (BlockContext) - number of block arguments
+    /// - field[4]: startpc (BlockContext) - initialIP (always 0 for blocks)
+    /// - field[5]: home (BlockContext) - reference to enclosing method context
+    ///
+    /// Total: 6 instance variables
+    /// </summary>
+    private void CreateBlockContextObjects()
+    {
+        // Find BlockContext class index (will be -1 if not found, but that's ok for test bundles)
+        int blockContextClassIndex = _symbolTable.GetValueOrDefault("BlockContext", -1);
+
+        // Iterate through all methods and create BlockContext objects for blocks
+        foreach (var method in _methods.Where(m => m.SelectorIndex == -1))
+        {
+            // Generate a unique localId for the BlockContext
+            var blockContextLocalId = $"blockctx:{method.LocalId.Replace("block:", "")}";
+
+            // Look up the homeContext for this block
+            string? homeContextLocalId = _blockToHomeMethod.GetValueOrDefault(method.LocalId);
+
+            // Build the fields list following BlockContext's exact instance variable layout
+            // BlockContext inherits: Object (0) -> InstructionStream (2) -> ContextPart (1) -> BlockContext (3)
+            var fields = new List<object>
+            {
+                // Field 0: sender (InstructionStream) - nil for unactivated blocks
+                new Dictionary<string, object> { ["type"] = "nil" },
+
+                // Field 1: pc (InstructionStream) - initialIP (always 0 for blocks)
+                new Dictionary<string, object>
+                {
+                    ["type"] = "smallInt",
+                    ["value"] = 0
+                },
+
+                // Field 2: stackp (ContextPart) - nil for unactivated blocks
+                new Dictionary<string, object> { ["type"] = "nil" },
+
+                // Field 3: nargs (BlockContext) - number of block arguments
+                new Dictionary<string, object>
+                {
+                    ["type"] = "smallInt",
+                    ["value"] = method.Header.ArgCount ?? 0
+                },
+
+                // Field 4: startpc (BlockContext) - initialIP (always 0 for blocks)
+                new Dictionary<string, object>
+                {
+                    ["type"] = "smallInt",
+                    ["value"] = 0
+                },
+
+                // Field 5: home (BlockContext) - reference to enclosing method context
+                homeContextLocalId != null
+                    ? new Dictionary<string, object>
+                    {
+                        ["type"] = "objectRef",
+                        ["localId"] = homeContextLocalId
+                    }
+                    : new Dictionary<string, object> { ["type"] = "nil" }
+            };
+
+            // Create the BlockContext object with closure metadata
+            var blockContext = new JsonObject
+            {
+                LocalId = blockContextLocalId,
+                ClassNameIndex = blockContextClassIndex,
+                FormatHint = "blockContext",
+                Fields = fields,
+                IndexedFields = [] // BlockContext has no indexed fields
+            };
+
+            _objects.Add(blockContext);
+        }
+    }
+
+    /// <summary>
+    /// Finds the outermost method in the closure chain by following homeContext links.
+    /// Returns the localId of the root method, or null if no homeContext exists.
+    /// </summary>
+    private string? FindOutermostMethod(string blockLocalId)
+    {
+        string? current = blockLocalId;
+        string? outermost = null;
+
+        // Follow the homeContext chain to the root
+        while (current != null && _blockToHomeMethod.TryGetValue(current, out string? parent))
+        {
+            outermost = parent;
+
+            // If the parent is a method (starts with "method:"), we've reached the root
+            if (parent.StartsWith("method:"))
+            {
+                break;
+            }
+
+            // Otherwise, the parent is another block, keep following the chain
+            current = parent;
+        }
+
+        return outermost;
     }
 
     /// <summary>
@@ -671,14 +832,30 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     /// <summary>
     /// Converts a block (CompiledMethodData with null selector) to a method reference.
     /// Blocks are added to the methods collection and referenced as compiledMethod literals.
+    /// This method also tracks homeContext relationships for closure metadata.
     /// </summary>
     private object ConvertBlockToMethod(CompiledMethodData block)
     {
         // Generate a unique localId for the block
         var blockLocalId = $"block:{Guid.NewGuid():N}";
 
+        // Track the homeContext relationship
+        // The _currentMethodLocalId may be either a method or a parent block
+        if (_currentMethodLocalId != null)
+        {
+            _blockToHomeMethod[blockLocalId] = _currentMethodLocalId;
+        }
+
+        // Save the current method context and set this block as the new context for nested blocks
+        var savedMethodContext = _currentMethodLocalId;
+        _currentMethodLocalId = blockLocalId;
+
         // Convert block's literals recursively (blocks can contain blocks)
+        // Nested blocks will see this block as their homeContext
         var convertedLiterals = ConvertLiterals(block.Literals.ToList());
+
+        // Restore the parent context
+        _currentMethodLocalId = savedMethodContext;
 
         // Create the JSON method object for the block
         var jsonMethod = new JsonMethod
@@ -987,7 +1164,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         return new Metadata
         {
-            Version = "1.0.2",
+            Version = "1.0.3",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = Path.GetFileName(_sourceFilePath),
@@ -1063,6 +1240,7 @@ internal sealed record JsonMethod
     public required string LocalId { get; init; }
     public required string HomeClassLocalId { get; init; }
     public required int SelectorIndex { get; init; }
+    public string? Category { get; init; }
     public required MethodHeader Header { get; init; }
     public required List<object> Literals { get; init; }
     public required List<int> Bytecodes { get; init; }

@@ -247,19 +247,8 @@ namespace Smalltalk80.Compiler
                     currentDepth++;
                     pc++;
                 }
-                else if (bytecode >= 144 && bytecode <= 151) // SHORT_JUMP_FWD (0x90-0x97)
-                {
-                    pc++; // Single byte, no operands
-                }
-                else if (bytecode == 160) // MEDIUM_JUMP_FWD (0xA0)
-                {
-                    pc += 2; // 1-byte offset
-                }
-                else if (bytecode >= 161 && bytecode <= 167) // LONG_JUMP_FWD (0xA1-0xA7)
-                {
-                    int numBytes = bytecode - 159; // 0xA1 => 2, 0xA2 => 3, etc.
-                    pc += numBytes + 1; // Skip opcode + N offset bytes
-                }
+                // NOTE: Jump bytecodes (0x90-0x97, 0xA0-0xA7) removed.
+                // Compiler generates zero jumps with Blue Book block compilation.
                 else if (bytecode >= 176 && bytecode <= 191) // Send Arithmetic Message
                 {
                     // Arithmetic messages typically have 1 arg
@@ -657,153 +646,10 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
         }
 
-        // Jump operations
-        
-        public int EmitJumpPlaceholder()
-        {
-            var position = CurrentIP;
-            EmitBytes(0, 0); // Placeholder for jump
-            return position;
-        }
-        
-        public void PatchJump(int position, int offset)
-        {
-            // IMPORTANT: We always use 2-byte encoding (medium or long) to avoid the
-            // address-shifting bug. Short jumps would require RemoveAt(), which breaks
-            // all subsequent address calculations.
-            //
-            // Blue Book allows medium jump (0xA0) for distances 1-256 bytes.
-
-            if (offset <= 0)
-            {
-                throw new InvalidOperationException($"Invalid jump offset: {offset}. Must be positive.");
-            }
-
-            if (offset >= 1 && offset <= 256)
-            {
-                // Use medium jump (0xA0) for all small jumps
-                // Bytecode 160 with 1-byte parameter
-                bytecodes[position] = 160;
-                bytecodes[position + 1] = (byte)(offset - 1);
-            }
-            else
-            {
-                // Long jumps: bytecodes 161-167
-                PatchLongJumpInternal(position, offset);
-            }
-        }
-        
-        public int EmitConditionalJumpPlaceholder(bool jumpOnTrue)
-        {
-            var position = CurrentIP;
-            EmitBytes(0, 0); // Placeholder
-            return position;
-        }
-        
-        /// <summary>
-        /// Patches a conditional jump instruction following Blue Book specification.
-        /// Uses extended bytecodes (0x80 + subop) for all conditional jumps.
-        /// - JUMP_FALSE (0x80 0x15): Pop and jump forward if false (2-byte offset)
-        /// - JUMP_TRUE (0x80 0x14): Pop and jump forward if true (2-byte offset)
-        /// - JUMP_LONG_FALSE (0x80 0x18): Pop and long jump if false (2-byte offset)
-        /// - JUMP_LONG_TRUE (0x80 0x17): Pop and long jump if true (2-byte offset)
-        /// </summary>
-        public void PatchConditionalJump(int position, int offset, bool jumpOnFalse = true)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidOperationException($"Invalid jump offset: {offset}. Must be positive.");
-            }
-
-            // All conditional jumps use extended bytecodes (0x80 + subop)
-            // Extended bytecode format: 0x80, subop, offsetHigh, offsetLow
-            // Offset is 2 bytes (big-endian), allowing jumps up to 65535 bytes
-
-            if (offset > 0xFFFF)
-            {
-                throw new InvalidOperationException($"Jump offset {offset} too large (max 65535). Consider restructuring method.");
-            }
-
-            // Choose subop based on condition and distance
-            byte subOp;
-            if (jumpOnFalse)
-            {
-                if (offset <= 0xFF)
-                    subOp = 0x15; // JUMP_FALSE (regular)
-                else
-                    subOp = 0x18; // JUMP_LONG_FALSE (long)
-            }
-            else
-            {
-                if (offset <= 0xFF)
-                    subOp = 0x14; // JUMP_TRUE (regular)
-                else
-                    subOp = 0x17; // JUMP_LONG_TRUE (long)
-            }
-
-            // Extended conditional jumps are 4 bytes: 0x80, subop, offsetHigh, offsetLow
-            // We have a 2-byte placeholder at position, need to insert 2 more bytes
-            bytecodes.Insert(position + 2, 0); // Placeholder for offsetHigh
-            bytecodes.Insert(position + 3, 0); // Placeholder for offsetLow
-
-            // Now set the actual bytecode values
-            bytecodes[position] = 0x80;                             // Extended prefix
-            bytecodes[position + 1] = subOp;                         // Subopcode
-            bytecodes[position + 2] = (byte)((offset >> 8) & 0xFF); // Offset high byte
-            bytecodes[position + 3] = (byte)(offset & 0xFF);        // Offset low byte
-        }
-        
-        // Block operations
-        
-        // NOTE: EmitBlockCopy and PatchBlockSize have been removed.
-        // Blocks are now compiled as separate CompiledMethodData objects per Blue Book spec.
-        // The inline block compilation with jumps was incorrect for the Blue Book specification.
-
-        /// <summary>
-        /// Handles patching of long jumps (greater than 256 bytes).
-        /// Blue Book specification: For distances > 256 bytes, choose minimal N (2-8)
-        /// such that distance - 1 fits in N bytes, then emit [159 + N, followed by
-        /// distance - 1 encoded as N-byte big-endian].
-        /// </summary>
-        private void PatchLongJumpInternal(int position, int distance)
-        {
-            // Blue Book specification for long jumps:
-            // - Bytecodes 161-167 represent N = 2 to 8 bytes
-            // - Bytecode = 159 + N where N is the number of bytes needed
-            // - Followed by (distance - 1) encoded in N bytes, big-endian
-
-            int adjustedDistance = distance - 1;
-
-            // Determine minimal number of bytes N needed to encode adjustedDistance
-            int bytesNeeded;
-            if (adjustedDistance <= 0xFFFF)           // Fits in 2 bytes
-                bytesNeeded = 2;
-            else if (adjustedDistance <= 0xFFFFFF)    // Fits in 3 bytes
-                bytesNeeded = 3;
-            else                                       // Fits in 4 bytes (max for int)
-                bytesNeeded = 4;
-
-            // Set the bytecode: 159 + N
-            bytecodes[position] = (byte)(159 + bytesNeeded);
-
-            // We need to extend the bytecodes list if necessary
-            // Currently we have a placeholder at position + 1
-            // We need bytesNeeded bytes total for the distance encoding
-
-            // Remove the single placeholder byte first
-            bytecodes.RemoveAt(position + 1);
-
-            // Insert the big-endian encoding of adjustedDistance
-            byte[] distanceBytes = new byte[bytesNeeded];
-            for (int i = bytesNeeded - 1; i >= 0; i--)
-            {
-                distanceBytes[i] = (byte)(adjustedDistance & 0xFF);
-                adjustedDistance >>= 8;
-            }
-
-            // Insert all bytes at once
-            bytecodes.InsertRange(position + 1, distanceBytes);
-        }
+        // NOTE: Jump operations have been removed.
+        // With Blue Book block compilation, blocks are separate CompiledMethod objects.
+        // Control flow (ifTrue:, whileTrue:, etc.) is implemented via message sends,
+        // NOT via jump bytecodes. The compiler generates zero jump instructions.
 
         // Send operations - Following Blue Book specification
         
@@ -1003,7 +849,9 @@ namespace Smalltalk80.Compiler
             selector = "doIt"; // Standard selector for expressions
             primitiveNumber = 0;
             hasPrimitive = false;
-            
+            argumentNames.Clear();
+            temporaryNames.Clear();
+
             try
             {
                 // No arguments or temporaries for file-scope expressions
@@ -1065,6 +913,8 @@ namespace Smalltalk80.Compiler
             selector = "";
             primitiveNumber = 0;
             hasPrimitive = false;
+            argumentNames.Clear();
+            temporaryNames.Clear();
             
             // Set up instance variables with correct offsets
             for (int i = 0; i < instanceVars.Count; i++)
@@ -1796,25 +1646,30 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 if (innerBase.literal() != null && innerBase.literal().numberLiteral() != null)
                 {
                     var numText = innerBase.literal().numberLiteral().GetText();
-                    if (int.TryParse(numText, out int positiveVal))
+
+                    // Use TryParseSmalltalkNumber to handle all number formats including radix notation
+                    if (TryParseSmalltalkNumber(numText, out object? positiveValue))
                     {
-                        int negativeVal = -positiveVal;
-                        
-                        // Use special bytecode for -1
-                        if (negativeVal == -1)
+                        if (positiveValue is int positiveIntVal)
                         {
-                            emitter.PushMinusOne();
+                            int negativeVal = -positiveIntVal;
+
+                            // Use special bytecode for -1
+                            if (negativeVal == -1)
+                            {
+                                emitter.PushMinusOne();
+                            }
+                            else
+                            {
+                                // For other negative integers, push as literal constant
+                                emitter.PushLiteralConstant(negativeVal);
+                            }
                         }
-                        else
+                        else if (positiveValue is double positiveFloatVal)
                         {
-                            // For other negative integers, push as literal constant
-                            emitter.PushLiteralConstant(negativeVal);
+                            // For negative floats, push as literal constant
+                            emitter.PushLiteralConstant(-positiveFloatVal);
                         }
-                    }
-                    else if (double.TryParse(numText, out double floatVal))
-                    {
-                        // For negative floats, push as literal constant
-                        emitter.PushLiteralConstant(-floatVal);
                     }
                 }
                 else
@@ -1831,6 +1686,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             else if (baseCtx.block() != null)
             {
                 CompileBlock(baseCtx.block());
+            }
+            else if (baseCtx.dynamicArray() != null)
+            {
+                CompileDynamicArray(baseCtx.dynamicArray());
             }
         }
         
@@ -1940,12 +1799,15 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             {
                 CompileStatements(statements, inBlock: true);
 
-                // If the last statement didn't leave a value on the stack,
-                // or if there were no statements, blocks should return top of stack
-                // The last statement in CompileStatements with inBlock=true leaves value on stack
-
-                // Emit RETURN_TOP to return the top stack value
-                emitter.Emit(Bytecode.RETURN_TOP);
+                // Check if the last statement already emitted a return (e.g., ^1, ^self)
+                // If so, don't emit another RETURN_TOP (would be unreachable dead code)
+                var bytecodes = emitter.GetBytecodes();
+                if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
+                {
+                    // The last statement didn't return explicitly, so emit RETURN_TOP
+                    // to return the value left on stack by the last statement
+                    emitter.Emit(Bytecode.RETURN_TOP);
+                }
             }
             else
             {
@@ -1980,6 +1842,63 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             emitter = savedEmitter;
 
             return blockMethod;
+        }
+
+        /// <summary>
+        /// Compiles a dynamic array literal {expr1. expr2. expr3} into bytecode.
+        ///
+        /// Generates:
+        ///   1. Push Array class
+        ///   2. Push element count
+        ///   3. Send new: (creates array of size N)
+        ///   4. For each expression:
+        ///      - DUP (duplicate array reference)
+        ///      - Evaluate expression
+        ///      - Push index (1-based in Smalltalk)
+        ///      - Send at:put:
+        ///   5. Array reference remains on stack
+        /// </summary>
+        private void CompileDynamicArray(Smalltalk80Parser.DynamicArrayContext dynArray)
+        {
+            // Get all expressions in the dynamic array
+            var expressions = dynArray.expression();
+            int elementCount = expressions?.Length ?? 0;
+
+            // 1. Push Array class (as global variable)
+            PushVariable("Array");
+
+            // 2. Push element count
+            emitter.PushLiteralConstant(elementCount);
+
+            // 3. Send new: to create array of specified size
+            emitter.EmitSend("new:", 1);
+
+            // 4. For each expression, compile and store in array
+            if (expressions != null)
+            {
+                for (int i = 0; i < expressions.Length; i++)
+                {
+                    // DUP - duplicate array reference on stack
+                    // (we need the array ref for at:put: and to leave on stack at end)
+                    emitter.Emit(Bytecode.EXTENDED_PREFIX);
+                    emitter.Emit((byte)ExtendedSubOp.DUP);
+
+                    // Compile the expression (leaves value on stack)
+                    CompileExpression(expressions[i]);
+
+                    // Push 1-based index (Smalltalk arrays are 1-indexed)
+                    emitter.PushLiteralConstant(i + 1);
+
+                    // Send at:put: (pops index, value, array ref; pushes value)
+                    emitter.EmitSend("at:put:", 2);
+
+                    // Pop the returned value (we don't need it, we have the array ref on stack)
+                    emitter.Emit(Bytecode.EXTENDED_PREFIX);
+                    emitter.Emit((byte)ExtendedSubOp.POP);
+                }
+            }
+
+            // Array reference remains on stack (ready to be returned or assigned)
         }
 
         /// <summary>
@@ -2149,12 +2068,16 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 if (lit.numberLiteral() != null)
                 {
                     var text = lit.numberLiteral().GetText();
-                    if (text.Contains('.'))
-                        return double.Parse(text);
-                    else if (long.TryParse(text, out var longVal))
-                        return longVal;
+
+                    // Use TryParseSmalltalkNumber to handle all number formats including radix notation
+                    if (TryParseSmalltalkNumber(text, out object? numValue) && numValue != null)
+                    {
+                        return numValue; // Returns int or double
+                    }
                     else
-                        return text; // Keep as string if too large
+                    {
+                        return text; // Keep as string if parsing failed
+                    }
                 }
                 else if (lit.stringConst() != null)
                 {

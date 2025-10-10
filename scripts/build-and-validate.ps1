@@ -88,7 +88,12 @@ if (-not $SkipBuild) {
     }
 }
 
-$validatorOutput = dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj --no-build -- $outputFile 2>&1
+$validatorArgs = @($outputFile)
+if ($Verbose) {
+    $validatorArgs += "--verbose"
+}
+
+$validatorOutput = dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj --no-build -- @validatorArgs 2>&1
 $validatorExitCode = $LASTEXITCODE
 
 if ($Verbose) {

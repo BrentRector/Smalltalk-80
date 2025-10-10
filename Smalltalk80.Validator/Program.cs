@@ -2,12 +2,49 @@ using System.Text.Json;
 using Smalltalk80.Validator;
 using Smalltalk80.Validator.JsonModels;
 
-if (args.Length == 0)
+// Parse command-line arguments
+var jsonPath = "";
+var verbose = false;
+
+foreach (var arg in args)
+{
+    if (arg == "--verbose" || arg == "-v")
+    {
+        verbose = true;
+    }
+    else if (arg == "--help" || arg == "-h")
+    {
+        ShowUsage();
+        return 0;
+    }
+    else if (!arg.StartsWith("-"))
+    {
+        jsonPath = arg;
+    }
+    else
+    {
+        Console.WriteLine($"Unknown option: {arg}");
+        ShowUsage();
+        return 1;
+    }
+}
+
+if (string.IsNullOrEmpty(jsonPath))
+{
+    ShowUsage();
+    return 1;
+}
+
+static void ShowUsage()
 {
     Console.WriteLine("Smalltalk-80 Cold Start Validator");
     Console.WriteLine("==================================");
     Console.WriteLine();
-    Console.WriteLine("Usage: dotnet run -- <coldstart.json>");
+    Console.WriteLine("Usage: dotnet run -- <coldstart.json> [options]");
+    Console.WriteLine();
+    Console.WriteLine("Options:");
+    Console.WriteLine("  --verbose, -v    Show verbose warnings (e.g., extended literal frames)");
+    Console.WriteLine("  --help, -h       Show this help message");
     Console.WriteLine();
     Console.WriteLine("Validates a cold-start JSON file against:");
     Console.WriteLine("  - Method header consistency");
@@ -16,10 +53,7 @@ if (args.Length == 0)
     Console.WriteLine("  - Patch target resolution");
     Console.WriteLine("  - Install order completeness");
     Console.WriteLine("  - Object format hints");
-    return 1;
 }
-
-var jsonPath = args[0];
 
 if (!File.Exists(jsonPath))
 {
@@ -110,15 +144,16 @@ if (result.Errors.Count > 0)
     Console.WriteLine();
 }
 
-// Show warnings
-if (result.Warnings.Count > 0)
+// Show warnings (filtered by verbosity)
+var warnings = result.GetWarnings(verbose).ToList();
+if (warnings.Count > 0)
 {
     Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.WriteLine($"Warnings ({result.Warnings.Count}):");
+    Console.WriteLine($"Warnings ({warnings.Count}):");
     Console.ResetColor();
 
     var warningLimit = 10;
-    foreach (var warning in result.Warnings.Take(warningLimit))
+    foreach (var warning in warnings.Take(warningLimit))
     {
         Console.WriteLine($"  [{warning.Category}] {warning.Message}");
         if (warning.Location != null)
@@ -127,12 +162,24 @@ if (result.Warnings.Count > 0)
         }
     }
 
-    if (result.Warnings.Count > warningLimit)
+    if (warnings.Count > warningLimit)
     {
-        Console.WriteLine($"  ... and {result.Warnings.Count - warningLimit} more warnings");
+        Console.WriteLine($"  ... and {warnings.Count - warningLimit} more warnings");
     }
 
     Console.WriteLine();
+}
+else if (!verbose && result.Warnings.Count > 0)
+{
+    // Show hint about suppressed verbose warnings
+    var suppressedCount = result.Warnings.Count(w => w.VerboseOnly);
+    if (suppressedCount > 0)
+    {
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"({suppressedCount} verbose warnings suppressed; use --verbose to show)");
+        Console.ResetColor();
+        Console.WriteLine();
+    }
 }
 
 // Show info

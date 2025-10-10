@@ -134,6 +134,9 @@ public class MethodDefinition
     [JsonPropertyName("selectorIndex")]
     public required int SelectorIndex { get; init; }
 
+    [JsonPropertyName("category")]
+    public string? Category { get; init; }
+
     [JsonPropertyName("header")]
     public required MethodHeader Header { get; init; }
 
