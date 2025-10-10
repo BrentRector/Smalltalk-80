@@ -1,0 +1,181 @@
+using System.Text;
+using Smalltalk80.Validator.JsonModels;
+
+namespace Smalltalk80.Validator.Validators;
+
+/// <summary>
+/// Validates that symbols and strings are valid UTF-8 and that symbols are unique.
+/// Duplicate symbols defeat interning assumptions and selector packing.
+/// </summary>
+public class SymbolUtf8AndUniquenessValidator
+{
+    public ValidationResult Validate(ColdStartBundle bundle)
+    {
+        var result = new ValidationResult();
+        
+        // Validate symbols
+        ValidateSymbols(result, bundle);
+        
+        // Validate strings
+        ValidateStrings(result, bundle);
+        
+        if (result.IsValid)
+        {
+            result.AddInfo($"✓ All {bundle.Symbols.Length} symbols and {bundle.Strings.Length} strings are valid UTF-8");
+        }
+        
+        return result;
+    }
+    
+    private void ValidateSymbols(ValidationResult result, ColdStartBundle bundle)
+    {
+        var seenSymbols = new Dictionary<string, int>();
+        
+        for (int i = 0; i < bundle.Symbols.Length; i++)
+        {
+            var symbol = bundle.Symbols[i];
+            
+            // Check for null or empty
+            if (string.IsNullOrEmpty(symbol))
+            {
+                result.AddDiagnostic(
+                    DiagnosticCodes.SymbolInvalidUtf8,
+                    Severity.Error,
+                    $"symbols[{i}] is null or empty",
+                    new DiagnosticLocation("symbols", Index: i),
+                    "Symbols cannot be null or empty");
+                continue;
+            }
+            
+            // Check UTF-8 validity
+            if (!IsValidUtf8(symbol))
+            {
+                result.AddDiagnostic(
+                    DiagnosticCodes.SymbolInvalidUtf8,
+                    Severity.Error,
+                    $"symbols[{i}] contains invalid UTF-8 encoding",
+                    new DiagnosticLocation("symbols", Index: i),
+                    "Ensure compiler emits valid UTF-8 encoded symbols");
+            }
+            
+            // Check for control characters (except common ones like tab/newline in comments)
+            if (ContainsProblematicControlCharacters(symbol))
+            {
+                result.AddDiagnostic(
+                    DiagnosticCodes.SymbolInvalidUtf8,
+                    Severity.Warning,
+                    $"symbols[{i}] contains control characters: '{EscapeString(symbol)}'",
+                    new DiagnosticLocation("symbols", Index: i),
+                    "Avoid control characters in symbols");
+            }
+            
+            // Check for duplicates
+            if (seenSymbols.TryGetValue(symbol, out var previousIndex))
+            {
+                result.AddDiagnostic(new Diagnostic(
+                    DiagnosticCodes.SymbolDuplicate,
+                    Severity.Error,
+                    $"Duplicate symbol '{symbol}' at indices {previousIndex} and {i}",
+                    new[]
+                    {
+                        new DiagnosticLocation("symbols", Index: previousIndex),
+                        new DiagnosticLocation("symbols", Index: i)
+                    },
+                    "Deduplicate symbols in the compiler emitter"));
+            }
+            else
+            {
+                seenSymbols[symbol] = i;
+            }
+        }
+    }
+    
+    private void ValidateStrings(ValidationResult result, ColdStartBundle bundle)
+    {
+        for (int i = 0; i < bundle.Strings.Length; i++)
+        {
+            var str = bundle.Strings[i];
+            
+            // Strings can be null (representing nil)
+            if (str == null)
+                continue;
+            
+            // Check UTF-8 validity
+            if (!IsValidUtf8(str))
+            {
+                result.AddDiagnostic(
+                    DiagnosticCodes.StringInvalidUtf8,
+                    Severity.Error,
+                    $"strings[{i}] contains invalid UTF-8 encoding",
+                    new DiagnosticLocation("strings", Index: i),
+                    "Ensure compiler emits valid UTF-8 encoded strings");
+            }
+            
+            // For strings, control characters might be intentional (e.g., in source code)
+            // so we only warn for the most problematic ones
+            if (ContainsNullCharacter(str))
+            {
+                result.AddDiagnostic(
+                    DiagnosticCodes.StringInvalidUtf8,
+                    Severity.Warning,
+                    $"strings[{i}] contains null character (\\0)",
+                    new DiagnosticLocation("strings", Index: i),
+                    "Null characters can cause string processing issues");
+            }
+        }
+        
+        // Note: We don't check for duplicate strings as they are not interned like symbols
+    }
+    
+    private bool IsValidUtf8(string s)
+    {
+        try
+        {
+            // Try to encode and decode - will throw if invalid UTF-8
+            var bytes = Encoding.UTF8.GetBytes(s);
+            var decoded = Encoding.UTF8.GetString(bytes);
+            return decoded == s;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    private bool ContainsProblematicControlCharacters(string s)
+    {
+        foreach (char c in s)
+        {
+            // Allow common whitespace
+            if (c == '\t' || c == '\n' || c == '\r' || c == ' ')
+                continue;
+                
+            // Flag other control characters
+            if (char.IsControl(c))
+                return true;
+        }
+        return false;
+    }
+    
+    private bool ContainsNullCharacter(string s)
+    {
+        return s.Contains('\0');
+    }
+    
+    private string EscapeString(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (char c in s)
+        {
+            if (char.IsControl(c))
+            {
+                sb.Append($"\\x{(int)c:X2}");
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        return sb.ToString();
+    }
+}

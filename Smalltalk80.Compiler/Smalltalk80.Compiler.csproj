@@ -79,21 +79,29 @@
     <Message Text="" Importance="high" />
     <Message Text="[1/3] Compiling test source files..." Importance="high" />
 
-    <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;Tests/TestSources/TestLanguageCoverage.st&quot; &quot;$(OutDir)test_TestLanguageCoverage.json&quot;"
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;Tests/TestSources/SimpleClass.st&quot; &quot;$(OutDir)test_SimpleClass.json&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           ContinueOnError="false">
-      <Output TaskParameter="ExitCode" PropertyName="TestLanguageCoverageExitCode" />
+      <Output TaskParameter="ExitCode" PropertyName="SimpleClassExitCode" />
     </Exec>
-    <Message Text="  ✓ TestLanguageCoverage.st compiled" Importance="high"
-             Condition="'$(TestLanguageCoverageExitCode)'=='0'" />
+    <Message Text="  ✓ SimpleClass.st compiled" Importance="high"
+             Condition="'$(SimpleClassExitCode)'=='0'" />
 
-    <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;Tests/TestSources/test_blocks_comprehensive.st&quot; &quot;$(OutDir)test_blocks_comprehensive.json&quot;"
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;Tests/TestSources/ControlStructures.st&quot; &quot;$(OutDir)test_ControlStructures.json&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           ContinueOnError="false">
-      <Output TaskParameter="ExitCode" PropertyName="TestBlocksExitCode" />
+      <Output TaskParameter="ExitCode" PropertyName="ControlStructuresExitCode" />
     </Exec>
-    <Message Text="  ✓ test_blocks_comprehensive.st compiled" Importance="high"
-             Condition="'$(TestBlocksExitCode)'=='0'" />
+    <Message Text="  ✓ ControlStructures.st compiled" Importance="high"
+             Condition="'$(ControlStructuresExitCode)'=='0'" />
+    
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;Tests/TestSources/ComplexExpressions.st&quot; &quot;$(OutDir)test_ComplexExpressions.json&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          ContinueOnError="false">
+      <Output TaskParameter="ExitCode" PropertyName="ComplexExpressionsExitCode" />
+    </Exec>
+    <Message Text="  ✓ ComplexExpressions.st compiled" Importance="high"
+             Condition="'$(ComplexExpressionsExitCode)'=='0'" />
 
     <!-- Run validation if Python is available -->
     <Message Text="" Importance="high" />
@@ -110,7 +118,7 @@
     <Message Text="  Python not found - skipping validation (install Python 3.8+ to enable)" Importance="high"
              Condition="'$(PythonAvailable)'!='0'" />
 
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Tests/Scripts/test_compiler_suite.py&quot; &quot;$(OutDir)test_TestLanguageCoverage.json&quot;"
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Tests/Scripts/test_compiler_suite.py&quot; &quot;$(OutDir)test_SimpleClass.json&quot; &quot;$(OutDir)test_ControlStructures.json&quot; &quot;$(OutDir)test_ComplexExpressions.json&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           ContinueOnError="true"
           Condition="'$(PythonAvailable)'=='0'">
@@ -125,7 +133,7 @@
     <!-- Summary -->
     <Message Text="" Importance="high" />
     <Message Text="[3/3] Test Summary:" Importance="high" />
-    <Message Text="  • Test files compiled: 2/2" Importance="high" />
+    <Message Text="  • Test files compiled: 3/3" Importance="high" />
     <Message Text="  • Validation: $(ValidationExitCode) errors" Importance="high"
              Condition="'$(PythonAvailable)'=='0' AND '$(ValidationExitCode)'=='0'" />
     <Message Text="  • Validation: Passed" Importance="high"
