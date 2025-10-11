@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+  </ItemGroup>
+</Project>

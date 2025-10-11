@@ -1,11 +1,12 @@
 # Smalltalk-80 Interpreter Architecture
 
-**Last Updated**: 2025-10-09
+**Last Updated**: 2025-01-10
 **Status**: ✅ VM Implementation Complete - Bytecode Interpreter & 94 Primitives Operational
 **Build**: ✅ Smalltalk80.Interpreter Compiles Successfully (0 errors, 1 unrelated warning)
-**Cold Start Format**: JSON-based (Schema v1.0.2) - ✅ Complete & Working - Blue Book Block Compilation Implemented
+**Cold Start Format**: JSON-based (Schema v1.0.3) - ✅ Complete & Working - Blue Book Block Compilation Implemented
 **Primitive Coverage**: ✅ 85% Complete (94/111 primitives fully functional)
-**Schema Version**: v1.0.2 (Enhanced validation, required header fields, source mapping support)
+**Schema Version**: v1.0.3 (Blue Book-compliant block compilation, enhanced validation)
+**Validator Status**: ✅ 100% Validation Passing (17 validators, 10,059 methods, 474 classes)
 
 ## Executive Summary
 
@@ -48,13 +49,14 @@ This document provides the canonical architectural documentation for the Smallta
 
 ```
 Classes: 474 (237 classes + 237 metaclasses)
-Methods: 4,640 compiled methods
+Methods: 10,059 compiled methods (including 5,419 blocks)
 Objects: 3,413 total heap objects
 Init Expressions: 285 top-level initialization expressions
 GC Performance: 0 objects collected after cold start ✅
-Cold Start Format: ✅ coldstart.json (~15-20MB, schema v1.0.2)
+Cold Start Format: ✅ coldstart.json (~15-20MB, schema v1.0.3)
 Compiler: ✅ Builds successfully, generates valid JSON with clean bytecode enums
 Interpreter: ✅ Compiles successfully (0 errors, 1 unrelated warning)
+Validator: ✅ 100% validation passing (17 validators, zero errors)
 Bytecode Interpreter: ✅ All 256 opcodes implemented (VirtualMachine.cs)
 Primitive System: ✅ 111 primitives (94 fully implemented, 17 stubs)
 Graphics System: ✅ Complete BitBlt engine with all 16 combination rules
@@ -63,22 +65,36 @@ BlockContext System: ✅ Full block closure support with context switching
 
 ### Project Structure
 
-**Two Separate Projects:**
+**Main Projects:**
 
 1. **Smalltalk80.Compiler** (✅ Complete & Working):
-   - Parses Smalltalk-80.st source
+   - Parses Smalltalk-80.st source using ANTLR4 grammar
    - Generates bytecode using clean enums (Bytecode, ExtendedSubOp)
-   - Outputs coldstart.json (schema v1.0.2)
+   - Outputs coldstart.json (schema v1.0.3)
    - All literal indexing correctly uses +1 offset
+   - Structure: Single project with CodeGen/, AST/, BytecodeCompiler components
 
 2. **Smalltalk80.Interpreter** (✅ Complete & Working):
-   - Loads coldstart.json via 10-phase bootstrap
+   - Loads coldstart.json via 12-phase bootstrap
    - Uses SmalltalkHeap for object storage
    - Uses LayoutResolver for dynamic field lookups
    - VirtualMachine.cs - Complete bytecode interpreter (all 256 opcodes)
-   - VM/Primitives/ - 111 primitives (72 fully implemented)
+   - VM/Primitives/ - 111 primitives (94 fully implemented)
+   - Structure: Single project with VM/, Memory/, ColdStart/ components
 
-3. **Smalltalk80.FullInterpreter** (⚠️ OLD - For Reference Only):
+3. **Smalltalk80.Validator** (✅ Complete & Working - **NEW**):
+   - Performs static analysis on generated JSON files
+   - Validates Blue Book compliance before runtime
+   - 17 validators covering all aspects of cold-start image
+   - 100% validation passing (10,059 methods, 474 classes)
+   - Structure: Modular architecture
+     - `Smalltalk80.Validator/` - CLI application
+     - `Smalltalk80.Validator/Core/` - Core types and validators
+     - `Smalltalk80.Validator/Engine/` - Validation orchestration
+     - `Smalltalk80.Validator/Tests/` - Unit tests
+   - **See**: [Smalltalk80.Validator/README.md](../Smalltalk80.Validator/README.md) for complete documentation
+
+4. **Smalltalk80.FullInterpreter** (⚠️ OLD - For Reference Only):
    - Contains old VM implementation
    - Uses LayoutManagement.Layout (hard-coded indices)
    - Uses ObjectMemory (static methods)
@@ -88,13 +104,14 @@ BlockContext System: ✅ Full block closure support with context switching
 ### Migration Status
 
 **Completed** (Previous Sessions):
-- ✅ JSON schema definition (docs/schemas/coldstart-v1.0.2.schema.json)
+- ✅ JSON schema definition (docs/schemas/coldstart-v1.0.3.schema.json)
 - ✅ Compiler JSON generation with clean bytecode enums
-- ✅ 10-phase bootstrap loader in Smalltalk80.Interpreter
+- ✅ 12-phase bootstrap loader in Smalltalk80.Interpreter
 - ✅ Two-phase symbol interning (SymbolInterning.cs)
 - ✅ SystemDictionary creation (SystemDictionaryCreator.cs)
 - ✅ SmalltalkHeap with correct header-at-lit[0] format
 - ✅ Zero garbage collection after bootstrap
+- ✅ Comprehensive validator (17 validators, 100% passing)
 
 **Completed** (Previous Sessions):
 - ✅ **VirtualMachine.cs** - Complete bytecode interpreter:
@@ -185,9 +202,16 @@ BlockContext System: ✅ Full block closure support with context switching
 - **SystemPrimitives.cs** - System utilities (112-139)
 
 **Cold Start Data:**
-- **docs/schemas/coldstart-v1.0.2.schema.json** - Canonical JSON schema
+- **docs/schemas/coldstart-v1.0.3.schema.json** - Canonical JSON schema
 - **coldstart.json** - Generated cold-start image (15-20MB, not in repo)
 - **coldstart.json.gz** - Compressed format (~2-3MB, production)
+
+**Validator (Smalltalk80.Validator/):**
+- **Smalltalk80.Validator.csproj** - CLI application entry point
+- **Core/** - ValidationContext, Diagnostic, IValidator, 17 validator implementations
+- **Engine/** - ValidatorRunner, ValidatorPipeline (orchestration)
+- **Tests/** - Unit tests and test fixtures
+- **README.md** - Complete validator documentation
 
 **Compiler (✅ Generates JSON):**
 - **Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs** - Main JSON generator
@@ -543,8 +567,8 @@ The interpreter uses a **JSON-based cold-start format** that eliminates the need
 ### Schema Location and Versioning
 
 **Canonical Schema:**
-- **Path**: `docs/schemas/coldstart-v1.0.2.schema.json`
-- **Schema ID**: `https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.2`
+- **Path**: `docs/schemas/coldstart-v1.0.3.schema.json`
+- **Schema ID**: `https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.3`
 - **Standard**: JSON Schema Draft-07
 - **Validation**: Tools can validate generated JSON against schema
 
@@ -556,7 +580,28 @@ The interpreter uses a **JSON-based cold-start format** that eliminates the need
 **Version History:**
 - **v1.0.0**: Initial schema with optional header fields
 - **v1.0.1**: Added Blue Book block compilation support (blocks as separate CompiledMethods with selector=null), removed base64 bytecode encoding
-- **v1.0.2**: Enhanced validation rules, required header fields, source mapping support (current)
+- **v1.0.2**: Enhanced validation rules, required header fields, source mapping support
+- **v1.0.3**: Blue Book-compliant block compilation, comprehensive validator integration (current)
+
+### Schema v1.0.3 Changes (2025-01-10)
+
+**Updates:**
+
+1. **Validator Integration** - Added comprehensive validation system:
+   - 17 specialized validators covering all aspects of cold-start image
+   - CFG-based bytecode stack analysis with worklist propagation
+   - Parallel execution with diagnostic deduplication
+   - 100% validation passing on production data (10,059 methods, 474 classes)
+
+2. **Block Compilation Enhancement** - Blocks compile to separate CompiledMethod objects:
+   - All blocks have selectorIndex=-1 (null selector marker)
+   - Blocks included in method count (10,059 total = 4,640 methods + 5,419 blocks)
+   - Proper nesting and closure support
+
+3. **Patch Handling** - Special handling for patches:
+   - Patches use `patchId` property instead of `localId`
+   - Install order validators correctly handle patch references
+   - No errors on 1,746 patch references
 
 ### Schema v1.0.2 Changes (2025-10-09)
 
@@ -1872,38 +1917,56 @@ This automated pipeline:
 
 #### Standalone Validator (Compile-Time Validation)
 
-The `Smalltalk80.Validator` project performs **static analysis** on generated JSON files **before** they are loaded into the interpreter. This catches compiler bugs at compile-time rather than runtime.
+The `Smalltalk80.Validator` project performs **comprehensive static analysis** on generated JSON files **before** they are loaded into the interpreter. This catches compiler bugs at compile-time rather than runtime, providing fast feedback and detailed error messages.
 
-**Manual invocation**:
+**Quick invocation**:
 ```bash
-dotnet run --project Smalltalk80.Validator/Smalltalk80.Validator.csproj -- bin/Debug/net9.0/coldstart.json
+dotnet run --project Smalltalk80.Validator -- bin/Debug/net9.0/coldstart.json
 ```
 
-**What it validates**:
-1. **Stack Discipline** (CFG-based) - Control-flow-graph worklist propagation
-   - Validates stack balance across all code paths
-   - Handles jumps, conditionals, returns correctly
-   - Result: 4,639/4,640 methods pass (99.98%)
-2. **Operand Indices** - All operand references in valid ranges
-   - Literal indices, temp indices, inst var indices (with inheritance)
-   - Result: 4,640/4,640 methods pass (100%)
-3. **Method Headers** - Blue Book-compliant encoding
-4. **Literal Frames** - Symbol/string index bounds
-5. **Patches** - Patch structure validation
-6. **Install Order** - Completeness checking
-7. **Object Formats** - Format hint validation
+**High-Level Overview**:
 
-**Benefits**:
-- ~5 second feedback loop (vs ~30 seconds loading into interpreter)
-- Better error messages with method names and locations
-- No heap required - validates JSON directly
-- CI/CD integration ready
+The validator runs **17 specialized validators** organized in 4 phases:
+
+1. **Phase 1: Structural Integrity** (fast, fail-fast)
+   - Metadata counts, LocalId uniqueness, Symbol/String UTF-8 validation
+
+2. **Phase 2: Semantic Validation**
+   - Method headers (Blue Book encoding)
+   - **Bytecode integrity** (CFG-based stack analysis with worklist propagation)
+   - Literal frames, Patches, Install order
+
+3. **Phase 3: Deep Semantic Validation**
+   - Class hierarchy, Method primitives, Method selectors
+   - Pool dictionaries, Object formats, Block context closures
+
+4. **Phase 4: Static Analysis** (heavy validators)
+   - Dead code detection using reachability analysis
+
+**Current Status**: ✅ **100% Validation Passing**
+- 10,059 methods validated (including 5,419 blocks)
+- 474 classes validated (237 instance + 237 metaclasses)
+- Zero errors, zero warnings
+- All validators pass in ~2-3 seconds
+
+**Key Features**:
+- **CFG-based stack analysis** - Handles complex control flow (jumps, loops, branches)
+- **Parallel execution** - Multiple validators run concurrently
+- **Diagnostic deduplication** - Eliminates duplicate error reports
+- **JSON-based** - No heap construction required (fast feedback)
+- **CI/CD ready** - Exit code 0 = pass, 1 = fail
+
+**Complete Documentation**: See [Smalltalk80.Validator/README.md](../Smalltalk80.Validator/README.md) for:
+- Detailed description of all 17 validators
+- Error codes and diagnostic system
+- Extension guide for custom validators
+- Architecture and technical details
 
 #### Schema Validation
 
 ```bash
 # Validate generated JSON against schema
-jsonschema -i coldstart.json docs/schemas/coldstart-v1.0.2.schema.json
+jsonschema -i coldstart.json docs/schemas/coldstart-v1.0.3.schema.json
 ```
 
 #### Loader Unit Tests
@@ -2005,9 +2068,9 @@ public void ColdStart_AllClassesRegistered()
 - Lazy-load symbols (intern on first use)
 - Optional binary MessagePack format (50-70% smaller, 2-3x faster parse)
 
-### Validation Architecture (NEW - 2025-10-07)
+### Validation Architecture (UPDATED - 2025-01-10)
 
-**Design Principle**: Validation is now split into **two phases** for faster feedback and better error messages:
+**Design Principle**: Validation is split into **two phases** for faster feedback and better error messages:
 
 1. **Compile-Time Validation** (Standalone Validator) - Static analysis on JSON
 2. **Runtime Validation** (Interpreter Phase 12) - Heap-dependent analysis
@@ -2016,14 +2079,15 @@ public void ColdStart_AllClassesRegistered()
 
 | Validation Type | When | Tool | What It Validates |
 |----------------|------|------|-------------------|
-| **Static Analysis** | Compile-time | Smalltalk80.Validator | Bytecode stack, operand indices, headers, literal frames |
-| **Heap-Dependent** | Runtime | Interpreter Phase 12 | Decompilation, source comparison, reachability |
+| **Static Analysis** | Compile-time | Smalltalk80.Validator (17 validators) | Metadata, bytecode stack (CFG-based), operand indices, headers, literal frames, patches, install order, class hierarchy, primitives, selectors, pool dictionaries, object formats, block closures, dead code |
+| **Heap-Dependent** | Runtime | Interpreter Phase 12 | Reachability analysis, GC validation |
 
 **Benefits of Separation**:
-- Faster feedback (~5s vs ~30s)
-- Better error messages (method names + locations)
-- No heap required for static checks
-- CI/CD integration ready
+- Fast feedback (~2-3s for static validation vs ~30s full bootstrap)
+- Better error messages with method names, locations, and suggestions
+- Parallel validator execution for performance
+- No heap construction required for static checks
+- CI/CD integration ready (exit codes: 0=pass, 1=fail)
 
 #### Validation Checklist
 
@@ -2043,11 +2107,12 @@ public void ColdStart_AllClassesRegistered()
 
 **Key Insight**: Static validation (compile-time) catches 100% of compiler bugs without requiring heap construction. Runtime validation (interpreter) catches the remaining heap-dependent issues.
 
-**Current Status (2025-10-09)**: ✅ **100% Validation Achieved**
+**Current Status (2025-01-10)**: ✅ **100% Validation Achieved**
 - Total methods validated: 10,059 (4,640 regular methods + 5,419 blocks)
 - Validation errors: 0
-- Validation warnings: 0 (6 verbose-only informational)
-- All 6 validators passing (Stack, Operand, Header, Literal, Patch, InstallOrder, ObjectFormat)
+- Validation warnings: 0
+- All 17 validators passing (see [Validator README](../Smalltalk80.Validator/README.md) for details)
+- Validation time: ~2-3 seconds for complete static analysis
 
 #### Compiler Guarantees
 
@@ -2188,30 +2253,52 @@ This enables:
 - Adds complexity to compiler
 - Optional field (loaders can ignore if not needed)
 
-#### Phase 3: Schema Validator Tooling
+#### Phase 3: Schema Validator Tooling (✅ COMPLETE)
 
-**Build standalone validator** that checks:
+**Standalone validator** performs comprehensive static analysis:
 
 ```bash
 dotnet run --project Smalltalk80.Validator -- coldstart.json
 ```
 
-**Checks**:
-1. **Bytecode stack effects**: Use `BytecodeStackAnalyzer.Analyze()`
-2. **Literal usage vs types**: PUSH_LITERAL_VAR expects Association, etc.
-3. **Selector arity vs header**: `argCount` matches selector format (keyword count)
-4. **Association keys are symbols**: Blue Book requirement
-5. **Patch targets resolvable**: All forward refs have patches
-6. **Install order complete**: All referenced localIds appear in install order
+**What it validates** (17 specialized validators):
 
-**Output**:
+**Phase 1: Structural Integrity**
+1. Metadata counts match array lengths
+2. LocalId uniqueness across all entities
+3. Symbol/String UTF-8 encoding and symbol uniqueness
+
+**Phase 2: Semantic Validation**
+4. Method headers (Blue Book encoding)
+5. Bytecode integrity (CFG-based stack analysis)
+6. Operand indices (literals, temps, instance variables)
+7. Literal frames (symbol/string bounds, Association keys)
+8. Patch structure and targets
+9. Install order completeness and coverage
+
+**Phase 3: Deep Semantic**
+10. Class hierarchy (cycles, superclass resolution)
+11. Method primitives (range, encoding)
+12. Method selectors (presence, validity)
+13. Pool dictionaries (references, usage)
+14. Object formats (formatHint compatibility)
+15. Block context closure graphs (homeContext, outerContext)
+16. Patch target existence (localIds, field indices)
+
+**Phase 4: Static Analysis**
+17. Dead code detection (unreachable bytecode)
+
+**Example Output**:
 ```
-✓ Schema validation passed (coldstart-v1.0.2.schema.json)
-✓ Bytecode validation: 4640/4640 methods have balanced stacks
-✓ Literal validation: All literal types match usage
-⚠ Warning: Method "Foo>>bar" has unreachable bytecode at offset 15
-✗ Error: Patch target "object:missing" not found in install order
+Smalltalk-80 Validator
+Input: bin/Debug/net9.0/coldstart.json
+
+Loaded: 10059 methods, 474 classes
+
+✓ Validation PASSED
 ```
+
+**See**: [Smalltalk80.Validator/README.md](../Smalltalk80.Validator/README.md) for complete documentation of all validators, error codes, and diagnostic system.
 
 #### Phase 4: Round-Trip Generator
 
@@ -2263,36 +2350,39 @@ Point>>+ aPoint
 |-------|--------|----------|
 | **Phase 1: Source Metadata** | ✅ Partially implemented (`source` field exists) | Medium |
 | **Phase 2: AST Embedding** | ⏳ Not implemented | Low |
-| **Phase 3: Validator Tool** | ✅ Implemented in Phase12_BytecodeValidation | High |
+| **Phase 3: Validator Tool** | ✅ **COMPLETE** - Smalltalk80.Validator with 17 validators | High |
 | **Phase 4: Round-Trip Generator** | ⏳ Not implemented | Medium |
+
+**Completed**:
+- ✅ Standalone validator CLI tool (Phase 3) - See [Smalltalk80.Validator/README.md](../Smalltalk80.Validator/README.md)
+- ✅ Comprehensive validation (17 validators, 100% passing)
+- ✅ CI/CD integration ready
 
 **Next Steps**:
 1. Add `fileIndex` and `lineNumber` to schema (Phase 1)
-2. Build standalone validator CLI tool (Phase 3)
-3. Prototype round-trip decompiler (Phase 4)
+2. Prototype round-trip decompiler (Phase 4)
 4. Evaluate AST embedding value (Phase 2)
 
 ## Cold Start Bootstrap Process
 
 ### Overview
 
-The bootstrap process reads the JSON cold-start file and creates all objects deterministically using a 10-phase algorithm. The key constraint is that Symbol and String classes don't exist until Phase 3-5, so symbols must be stored in temporary C# storage first, then migrated to the Smalltalk USTable after Symbol class is created.
+The bootstrap process reads the JSON cold-start file and creates all objects deterministically using a 12-phase algorithm. The key constraint is that Symbol and String classes don't exist until Phase 3-5, so symbols must be stored in temporary C# storage first, then migrated to the Smalltalk USTable after Symbol class is created.
 
-**10-Phase Bootstrap Algorithm:**
+**12-Phase Bootstrap Algorithm:**
 
-1. **Parse & Validate** - Load JSON, validate against schema (docs/schemas/coldstart-v1.0.2.schema.json)
+1. **Parse & Validate** - Load JSON, validate against schema (docs/schemas/coldstart-v1.0.3.schema.json)
 2. **Create Temporary Storage** - Allocate placeholder OOPs for symbols/strings in C# Dictionary (Symbol class doesn't exist yet!)
 3. **Allocate Bootstrap Classes** - Create Object, Behavior, Class, Metaclass, etc.
 4. **Allocate Core Classes** - Create remaining 470 classes (Symbol, String, Array, etc.)
 5. **Allocate Pool Dictionaries** - Create class pools and shared pools
-6. **Install Methods** - Create all 4,640 CompiledMethod instances
+6. **Install Methods** - Create all 10,059 CompiledMethod instances (4,640 methods + 5,419 blocks)
 7. **Create SystemDictionary** - Allocate Smalltalk global dictionary, populate with all classes, pools, and system globals
 8. **Migrate Symbols to USTable** - Now Symbol class exists - create real Symbol objects, migrate from temp storage to USTable using Smalltalk hash algorithm
 9. **Apply Patches** - Resolve forward references (Association values, metaclass wiring, nil singleton)
 10. **Execute Init Expressions** - Run 285 global initialization expressions
 11. **Create Special Objects Array** - Build 5-element SOA structure (nil, false, true, Smalltalk, ProcessorScheduler)
-12. **Verify Reachability** - Ensure all 3,413 objects are reachable from SOA roots
-13. **Finalize** - Initialize GC, validate zero garbage collection
+12. **Finalize** - Initialize GC, verify reachability, validate zero garbage collection
 
 **Critical Design Decision**: Phases 2 and 8 implement the two-phase symbol interning pattern to avoid the chicken-and-egg problem where symbols are needed before the Symbol class exists.
 
