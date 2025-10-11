@@ -56,41 +56,79 @@ public class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Creates a MethodContext object for executing a method.
+    /// Implements proper Blue Book MethodContext initialization with all required fields.
     /// </summary>
-    private int CreateMethodContext(int methodId, int receiverId, int[] arguments)
+    /// <param name="methodId">CompiledMethod objectId to execute</param>
+    /// <param name="receiverId">Receiver object for this activation</param>
+    /// <param name="arguments">Method arguments</param>
+    /// <param name="callerContextId">Optional caller context (sender), 0 for top-level DoIts</param>
+    /// <returns>Allocated and initialized MethodContext objectId</returns>
+    private int CreateMethodContext(int methodId, int receiverId, int[] arguments, int callerContextId = 0)
     {
-        // Parse method header using correct Smalltalk-80 format
+        // Step 1: Validate CompiledMethod exists and parse header
         var header = ParseMethodHeader(methodId);
 
-        // Calculate stack size (args + temps + execution stack)
+        // Validate argument count matches
+        if (arguments.Length != header.NumArgs)
+        {
+            throw new InvalidOperationException(
+                $"Argument count mismatch: method expects {header.NumArgs} args, got {arguments.Length}");
+        }
+
+        // Step 2: Calculate stack size (args + temps + execution stack)
         // Use large frame (48) or small frame (16) based on needsLargeFrame flag
         int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
         int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
 
-        // Allocate MethodContext with indexed fields for stack
+        // Step 3: Get MethodContext class ID from GlobalRegistry
+        if (!GlobalRegistry.TryGet("class:MethodContext", out int methodContextClassId))
+        {
+            throw new InvalidOperationException(
+                "MethodContext class not found - ensure cold start completed Phase 2");
+        }
+
+        // Step 4: Allocate MethodContext with indexed fields for stack
+        // MethodContext hierarchy:
+        //   Object -> InstructionStream (sender, pc) -> ContextPart (stackp) -> MethodContext (method, receiverMap, receiver)
         int contextId = _heap.AllocateRawObject(
-            classId: 0, // TODO: Get MethodContext class ID
+            classId: methodContextClassId,
             format: SmalltalkHeap.ObjectFormat.PointerIndexed,
-            fixedSize: 7, // sender, instructionPointer, stackPointer, method, receiver, closure, (reserved)
+            fixedSize: 6, // sender, pc, stackp, method, receiverMap, receiver
             indexedSize: stackSize
         );
 
-        // Get field indices using LayoutResolver
+        // Step 5: Get field indices using LayoutResolver
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
-        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackPointer");
+        int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+        int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+        int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
-        // Initialize MethodContext fields
-        _heap.SetField(contextId, senderIndex, GlobalRegistry.NilObjectId);
-        _heap.SetField(contextId, ipIndex, EncodeSmallInteger(0)); // Start at PC 0
-        _heap.SetField(contextId, spIndex, EncodeSmallInteger(header.NumArgs + header.NumTemps)); // Stack starts after args+temps
+        // Step 6: Initialize MethodContext fixed fields
+
+        // sender: caller context or nil for top-level DoIts
+        _heap.SetField(contextId, senderIndex, callerContextId == 0 ? GlobalRegistry.NilObjectId : callerContextId);
+
+        // pc: start at bytecode offset 0
+        _heap.SetField(contextId, pcIndex, EncodeSmallInteger(0));
+
+        // stackp: points after args+temps (start of execution stack)
+        _heap.SetField(contextId, stackpIndex, EncodeSmallInteger(header.NumArgs + header.NumTemps));
+
+        // method: the CompiledMethod being executed
         _heap.SetField(contextId, methodIndex, methodId);
+
+        // receiverMap: used for multiple inheritance (not implemented yet, set to nil)
+        _heap.SetField(contextId, receiverMapIndex, GlobalRegistry.NilObjectId);
+
+        // receiver: the object receiving this message
         _heap.SetField(contextId, receiverIndex, receiverId);
 
-        // Store arguments in indexed fields
-        for (int i = 0; i < arguments.Length && i < header.NumArgs; i++)
+        // Step 7: Initialize indexed fields (args + temps + stack)
+
+        // Copy arguments into arg slots
+        for (int i = 0; i < header.NumArgs; i++)
         {
             _heap.SetIndexedField(contextId, i, arguments[i]);
         }
@@ -101,6 +139,16 @@ public class VirtualMachine : IPrimitiveContext
             _heap.SetIndexedField(contextId, i, GlobalRegistry.NilObjectId);
         }
 
+        // Initialize execution stack slots to nil
+        for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
+        {
+            _heap.SetIndexedField(contextId, i, GlobalRegistry.NilObjectId);
+        }
+
+        // Note: GC root registration is implicit - the VM's _activeContextId field keeps the context alive
+        // Note: home field is not applicable for MethodContext (only for BlockContext)
+        // Note: literalFrame is accessed via method.literals, not stored in context
+
         return contextId;
     }
 
@@ -110,7 +158,7 @@ public class VirtualMachine : IPrimitiveContext
     private int ExecuteBytecodeLoop()
     {
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
 
         int methodId = _heap.GetField(_activeContextId, methodIndex);
         byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
@@ -189,6 +237,17 @@ public class VirtualMachine : IPrimitiveContext
             // Association has layout: [key, value]
             int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
             int value = _heap.GetField(associationId, valueIndex);
+
+            // Debug: Check if this is ActionMenu and log its classId
+            int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+            int keyId = _heap.GetField(associationId, keyIndex);
+            string? keyName = _heap.GetSymbolName(keyId);
+            if (keyName == "ActionMenu")
+            {
+                int classId = _heap.GetClass(value);
+                Console.WriteLine($"DEBUG: Pushing ActionMenu from association, OOP={value}, classId={classId}");
+            }
+
             Push(value);
             return true;
         }
@@ -300,7 +359,7 @@ public class VirtualMachine : IPrimitiveContext
         if (bytecode >= 0x90 && bytecode <= 0x97)
         {
             int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
             int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
             _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
             return true;
@@ -310,7 +369,7 @@ public class VirtualMachine : IPrimitiveContext
         if (bytecode == 0xA0)
         {
             byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
             int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
 
             byte distanceByte = bytecodes[currentIp++];
@@ -324,7 +383,7 @@ public class VirtualMachine : IPrimitiveContext
         if (bytecode >= 0xA1 && bytecode <= 0xA7)
         {
             byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
             int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
 
             int numBytes = bytecode - 0x9F; // 0xA1 => 2 bytes, 0xA2 => 3 bytes, etc.
@@ -404,7 +463,7 @@ public class VirtualMachine : IPrimitiveContext
     private bool ExecuteExtendedBytecode(int methodId)
     {
         byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
-        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "instructionPointer");
+        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
         int ip = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
@@ -634,7 +693,7 @@ public class VirtualMachine : IPrimitiveContext
 
             case 0x13: // DUP - Duplicate top of stack
                 {
-                    int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackPointer");
+                    int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
                     int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
                     if (sp <= 0)
                     {
@@ -880,6 +939,15 @@ public class VirtualMachine : IPrimitiveContext
     {
         // Look up the method in the receiver's class
         int classId = _heap.GetClass(receiverId);
+
+        // Debug: check for classId 0 on "comment:" send
+        if (classId == 0)
+        {
+            string selectorName = _heap.GetSymbolName(selectorId) ?? "unknown";
+            throw new InvalidOperationException(
+                $"Method not found: {selectorName} in class 0 (receiver OOP={receiverId}, receiverId has classId 0!)");
+        }
+
         var methodInfo = _heap.GetMethod(classId, _heap.GetSymbolName(selectorId)!);
 
         if (methodInfo == null)
@@ -914,8 +982,20 @@ public class VirtualMachine : IPrimitiveContext
             // Primitive failed - execute method bytecodes as fallback
         }
 
-        // Execute the method
-        return Execute(methodInfo.MethodId, receiverId, args);
+        // Execute the method with proper context chaining
+        // Save current active context as the sender
+        int previousContextId = _activeContextId;
+
+        // Create new context with current context as sender
+        _activeContextId = CreateMethodContext(methodInfo.MethodId, receiverId, args, previousContextId);
+
+        // Execute the new context
+        int result = ExecuteBytecodeLoop();
+
+        // Restore previous context
+        _activeContextId = previousContextId;
+
+        return result;
     }
 
     /// <summary>
@@ -1022,7 +1102,7 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void Push(int value)
     {
-        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackPointer");
+        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
         int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
 
         _heap.SetIndexedField(_activeContextId, sp, value);
@@ -1034,7 +1114,7 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private int Pop()
     {
-        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackPointer");
+        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
         int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
 
         if (sp <= 0)

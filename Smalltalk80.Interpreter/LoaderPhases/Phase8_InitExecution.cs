@@ -47,7 +47,7 @@ public class Phase8_InitExecution
                     LocalId = expr.LocalId,
                     HomeClassLocalId = "class:UndefinedObject", // placeholder
                     SelectorIndex = 0,
-                    Header = new MethodHeader { Word = 0 }, // default
+                    Header = expr.Header, // Use the actual header from init expression
                     Literals = Array.Empty<LiteralValue>(), // already resolved
                     Bytecodes = expr.Bytecodes
                 },
@@ -83,6 +83,7 @@ public class Phase8_InitExecution
     /// <summary>
     /// Resolves an init expression literal to an object ID.
     /// Init expressions use the same LiteralValue type as methods.
+    /// v1.0.3: Supports "compiledMethod" for nested blocks.
     /// </summary>
     private int ResolveLiteral(LiteralValue literal)
     {
@@ -96,6 +97,7 @@ public class Phase8_InitExecution
             "true" => GlobalRegistry.TrueObjectId,
             "false" => GlobalRegistry.FalseObjectId,
             "objectRef" => _localIdToObjectId[literal.LocalId!],
+            "compiledMethod" => _localIdToObjectId[literal.LocalId!],  // v1.0.3: Blocks reference their method via localId
             "character" => _heap.AllocateCharacter(literal.CodePoint!.Value),
             "bytes" => _heap.AllocateByteArray(literal.Encoding!, literal.Data!),
             "association" => ResolveAssociation(literal.Association!),
@@ -127,13 +129,51 @@ public class Phase8_InitExecution
 
     private int AllocateFloat(double value)
     {
-        byte[] bytes = BitConverter.GetBytes(value);
-        return _heap.AllocateByteArray("base64", Convert.ToBase64String(bytes));
+        return _heap.AllocateFloat(value);
     }
 
+    /// <summary>
+    /// Resolves an association literal (key/value pair).
+    /// CRITICAL: Reuse existing SystemDictionary associations instead of creating duplicates with nil value.
+    /// </summary>
     private int ResolveAssociation(AssociationLiteral assoc)
     {
         int keyId = _heap.InternSymbol(_bundle.Symbols[assoc.KeyIndex]);
+        string keyName = _bundle.Symbols[assoc.KeyIndex];
+
+        // CRITICAL FIX: If this is a class association and valueRef is None,
+        // look up the existing association from SystemDictionary instead of creating new one with nil
+        if (assoc.ValueRef?.LocalId == null)
+        {
+            // Try to find existing class association in SystemDictionary
+            if (GlobalRegistry.TryGet($"class:{keyName}", out int classOop))
+            {
+                // This is a known class - find its existing association in SystemDictionary
+                var heap = (SmalltalkHeap)_heap;
+                int sysDictId = GlobalRegistry.SystemDictionaryId;
+                int sysDictSize = heap.GetIndexedSize(sysDictId);
+
+                for (int i = 0; i < sysDictSize; i++)
+                {
+                    int assocId = heap.GetIndexedField(sysDictId, i);
+                    if (assocId == 0) continue;
+
+                    int assocKeyId = heap.GetField(assocId, 0);
+                    if (assocKeyId == keyId)
+                    {
+                        // Found the existing association - reuse it!
+                        if (keyName == "ActionMenu")
+                        {
+                            int assocValue = heap.GetField(assocId, 1);
+                            Console.WriteLine($"DEBUG Phase9: Reusing ActionMenu assoc OOP={assocId}, value={assocValue}");
+                        }
+                        return assocId;
+                    }
+                }
+            }
+        }
+
+        // Fall back to creating new association
         int valueId = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
             : GlobalRegistry.NilObjectId;

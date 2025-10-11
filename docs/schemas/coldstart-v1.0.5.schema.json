@@ -1,0 +1,939 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.5",
+  "title": "Smalltalk-80 ColdStart Image Schema v1.0.5",
+  "description": "Comprehensive schema for emitting a deterministic Smalltalk-80 cold-start bundle. Compiler emits localIds; loader allocates interpreter-native object IDs and resolves localId references. v1.0.4: BlockContext objects moved to metadata.blockContexts[] array (tooling-only, not runtime objects). v1.0.5: BlockContext metadata uses blockMethodId instead of separate localId/method fields, eliminating dual-ID scheme - block methods have ONE canonical identifier.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "symbols",
+    "strings",
+    "optimizedSelectors",
+    "classes",
+    "objects",
+    "methods",
+    "initExpressions",
+    "installOrder",
+    "patches"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "generator", "generatedAt", "sourceChecksum"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Schema version, e.g. 1.0.5",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "generator": {
+          "type": "string",
+          "description": "Compiler tool name and version"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of generation"
+        },
+        "sourceFile": {
+          "type": ["string","null"],
+          "description": "Canonical source file or bundle name"
+        },
+        "sourceChecksum": {
+          "type": "string",
+          "description": "sha256:<hex> of input source for traceability",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "symbolCount": { "type": "integer", "minimum": 0 },
+        "stringCount": { "type": "integer", "minimum": 0 },
+        "classCount": { "type": "integer", "minimum": 0 },
+        "methodCount": { "type": "integer", "minimum": 0 },
+        "objectCount": { "type": "integer", "minimum": 0 },
+        "initExpressionCount": { "type": "integer", "minimum": 0 },
+        "blockContextCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "v1.0.4+: Count of BlockContext template entries in metadata.blockContexts[]"
+        },
+        "notes": { "type": "string" },
+        "blockContexts": {
+          "type": "array",
+          "description": "v1.0.4+: BlockContext template metadata for tooling, debuggers, and validators. These are NOT runtime objects and are NOT allocated during cold start. Tooling can use these templates to inspect closure structure, validate lexical scoping, and provide rich debugging without executing code. v1.0.5: Uses blockMethodId (canonical block method localId) instead of separate localId/method fields.",
+          "items": {
+            "type": "object",
+            "required": ["blockMethodId", "initialIP", "blockArgumentCount"],
+            "properties": {
+              "blockMethodId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "LocalId of the block's CompiledMethod in methods[] array (e.g., 'block:896fc801f0b14eae8b74f6f32152d735'). This is the ONLY identifier for this block - no separate blockctx: prefix."
+              },
+              "initialIP": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Instruction pointer where block execution begins (typically 0)"
+              },
+              "blockArgumentCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15,
+                "description": "Number of block arguments (e.g., [:x :y | ...] = 2)"
+              },
+              "homeContext": {
+                "type": ["string","null"],
+                "description": "LocalId of enclosing method/block that created this block (references method: or block: localId). Null for orphaned blocks."
+              },
+              "outerContext": {
+                "type": ["string","null"],
+                "description": "LocalId of outermost method in closure chain (always method:*, never block:*). Null if homeContext is the method."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "symbols": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Canonical interned symbol names; indexable by integer indices used throughout file. Must be unique.",
+      "minItems": 1
+    },
+
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "String literal pool; indexable. Strings may be duplicated (not interned).",
+      "minItems": 0
+    },
+
+    "optimizedSelectors": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 },
+      "description": "Indices into symbols[] that the loader should arrange at low indices for single-byte send encodings (typically reserved for indices 0..15). Loader must ensure these symbols occupy the first N symbol table slots in order.",
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+
+    "primitives": {
+      "type": "object",
+      "description": "Optional table describing primitives (index -> name/signature) for documentation and validation",
+      "properties": {
+        "byIndex": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index","name"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1, "maximum": 255 },
+              "name": { "type": "string" },
+              "signature": { "type": ["string","null"] },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "classes": {
+      "type": "array",
+      "description": "Class and metaclass descriptors. Compiler supplies localId values; loader allocates concrete objects and maps localIds to objectIds.",
+      "items": {
+        "type": "object",
+        "required": [
+          "localId",
+          "nameIndex",
+          "isMetaclass",
+          "format",
+          "instVarNames",
+          "classVarNames",
+          "poolLocalIds",
+          "category"
+        ],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Compiler-provided stable id for this class (e.g., 'class:Object', 'meta:Object'). Must be unique across all localIds in the bundle."
+          },
+          "nameIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for class name"
+          },
+          "isMetaclass": {
+            "type": "boolean",
+            "description": "True if this descriptor is a metaclass"
+          },
+          "metaclassOfLocalId": {
+            "type": ["string","null"],
+            "description": "If isMetaclass=true, localId of the class this is the metaclass of. Null for instance-side classes."
+          },
+          "format": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Blue Book format word (16-bit). Encodes: instance specification (0-4), fixed fields count, indexability, pointer/word/byte kind. See Blue Book Chapter 16 for encoding details."
+          },
+          "instVarNames": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Indices into symbols[] for instance variable names declared by THIS class only (not inherited). Listed in declaration order."
+          },
+          "classVarNames": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Indices into symbols[] for class variable names"
+          },
+          "poolLocalIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "localIds of pool dictionaries (shared pools) used by this class. Each referenced localId must appear in objects[] as a Dictionary."
+          },
+          "superNameIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Index into symbols[] for immediate superclass name. Null means superclass is nil (e.g., Object has no superclass)."
+          },
+          "category": {
+            "type": "string",
+            "description": "Class organization category (e.g., 'Kernel-Objects'). Empty string allowed."
+          },
+          "commentStringIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Index into strings[] for class comment, or null if no comment"
+          },
+          "classSideInitMethodLocalId": {
+            "type": ["string","null"],
+            "description": "Optional localId of a class-side #initialize method to run during cold start after this class is installed. Null if no initializer."
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "objects": {
+      "type": "array",
+      "description": "v1.0.4: Concrete object shapes emitted by the compiler (pool dictionaries, global associations, etc.). Compiler provides localId placeholders; loader allocates concrete runtime objects and maps localId -> objectId. BlockContext objects are NO LONGER included here - they are now in metadata.blockContexts[] as tooling-only templates.",
+      "items": {
+        "type": "object",
+        "required": ["localId","classNameIndex","fields","indexedFields","formatHint"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId for this object (e.g., 'pool:TextConstants', 'assoc:Smalltalk')"
+          },
+          "classNameIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for the object's class name. Loader will resolve to the class object."
+          },
+          "formatHint": {
+            "type": "string",
+            "enum": ["pointers","words","bytes","compiledMethod","custom"],
+            "description": "v1.0.4: Hint for loader memory allocation strategy. 'blockContext' is NO LONGER valid here - BlockContext templates are in metadata.blockContexts[]"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Named/fixed fields (non-indexed part). For Dictionary: entries. For Association: key/value pair.",
+            "items": { "$ref": "#/definitions/fieldValue" }
+          },
+          "indexedFields": {
+            "type": "array",
+            "description": "Indexed part (e.g., for Array elements, ByteArray bytes, Dictionary entries).",
+            "items": { "$ref": "#/definitions/fieldValue" }
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "methods": {
+      "type": "array",
+      "description": "All compiled methods (both class and instance methods). Compiler provides method localId; loader creates CompiledMethod objects and installs in method dictionaries.",
+      "items": {
+        "type": "object",
+        "required": ["localId","homeClassLocalId","selectorIndex","header","literals","bytecodes"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId (e.g., 'method:Object>>hash', 'method:Object_class>>new')"
+          },
+          "homeClassLocalId": {
+            "type": "string",
+            "description": "localId of the class or metaclass that owns this method"
+          },
+          "selectorIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into symbols[] for selector"
+          },
+          "header": {
+            "type": "object",
+            "required": ["word","literalCount","tempCount","argCount","primitiveIndex","largeContext"],
+            "description": "Blue Book method header (16-bit word). MUST include both encoded word and expanded fields. Loader validates consistency between word and expanded fields per validation rules.",
+            "properties": {
+              "word": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535,
+                "description": "Canonical 16-bit header word encoding: [7 bits literal count | 5 bits temp count | 1 bit large context | 3 bits arg count OR 8 bits primitive index]"
+              },
+              "literalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127,
+                "description": "REQUIRED: Number of literals in literal frame. MUST match bits 9-15 of word."
+              },
+              "tempCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31,
+                "description": "REQUIRED: Number of temporary variables. MUST match bits 4-8 of word."
+              },
+              "argCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7,
+                "description": "REQUIRED: Number of arguments. MUST match bits 1-3 of word (if primitiveIndex=0)."
+              },
+              "primitiveIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255,
+                "description": "REQUIRED: Primitive number (0 = no primitive, 1-255 = primitive). If >0, replaces argCount in word encoding."
+              },
+              "largeContext": {
+                "type": "boolean",
+                "description": "REQUIRED: true if method needs >32 stack slots. MUST match bit 3 of word."
+              }
+            },
+            "additionalProperties": false
+          },
+          "literals": {
+            "type": "array",
+            "description": "Literal frame for this method. Each entry is a discriminated literal. Order matters: selectors and associations typically come first.",
+            "items": { "$ref": "#/definitions/literalValue" }
+          },
+          "bytecodes": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "description": "Bytecode array as integer sequence (0-255)"
+          },
+          "source": {
+            "type": ["string","null"],
+            "description": "Optional Smalltalk source text for this method"
+          },
+          "fileIndex": {
+            "type": ["integer","null"],
+            "minimum": 0,
+            "description": "Optional index into sourceFiles[] manifest"
+          },
+          "sourceRange": {
+            "type": ["object","null"],
+            "description": "Optional precise source mapping for method definition",
+            "properties": {
+              "startOffset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Character offset where method definition starts in source file"
+              },
+              "endOffset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Character offset where method definition ends in source file"
+              },
+              "startLine": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Line number where method definition starts (1-based)"
+              },
+              "endLine": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Line number where method definition ends (1-based)"
+              }
+            },
+            "required": ["startOffset","endOffset"],
+            "additionalProperties": false
+          },
+          "sourceLineMap": {
+            "type": ["array","null"],
+            "description": "Optional debug metadata mapping bytecode PCs to source line numbers for debugger step-through",
+            "items": {
+              "type": "object",
+              "required": ["pc","line"],
+              "properties": {
+                "pc": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Bytecode program counter (index into bytecodes array)"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Source line number (1-based, relative to method start)"
+                },
+                "columnStart": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Optional column number where statement starts"
+                },
+                "columnEnd": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Optional column number where statement ends"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "initExpressions": {
+      "type": "array",
+      "description": "Top-level initialization expressions (DoIts) to execute during cold start. Each is compiled like a method but has no home class. Executed in initOrder sequence.",
+      "items": {
+        "type": "object",
+        "required": ["localId","header","literals","bytecodes"],
+        "properties": {
+          "localId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique localId (e.g., 'init:000', 'init:Character-initialize')"
+          },
+          "header": { "$ref": "#/properties/methods/items/properties/header" },
+          "literals": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/literalValue" }
+          },
+          "bytecodes": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "description": "Bytecode array as integer sequence (0-255)"
+          },
+          "source": {
+            "type": ["string","null"],
+            "description": "Original Smalltalk expression source"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "installOrder": {
+      "type": "object",
+      "required": ["phases"],
+      "description": "Deterministic installation sequence. Loader must process in this order to avoid forward-reference issues.",
+      "properties": {
+        "phases": {
+          "type": "array",
+          "description": "Sequential installation phases. Each phase lists localIds to process.",
+          "items": {
+            "type": "object",
+            "required": ["name","kind","localIds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Human-readable phase name (e.g., 'Bootstrap Classes', 'Pool Dictionaries', 'Methods')"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["classes","objects","methods","initExpressions","patches"],
+                "description": "Type of entities in this phase"
+              },
+              "localIds": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Ordered list of localIds to install in this phase"
+              },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "patches": {
+      "type": "array",
+      "description": "Explicit patch operations the loader must apply after allocation. Resolves forward references, circular structures, and Association values.",
+      "items": {
+        "type": "object",
+        "required": ["patchId","target","operation","value"],
+        "properties": {
+          "patchId": {
+            "type": "string",
+            "description": "Unique identifier for this patch (e.g., 'patch:Object-assoc-value')"
+          },
+          "target": {
+            "type": "object",
+            "required": ["kind"],
+            "description": "Describes what to patch",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "methodLiteral",
+                  "objectField",
+                  "objectIndexed",
+                  "classSlot",
+                  "metaclassWiring",
+                  "systemDictionary",
+                  "custom"
+                ]
+              },
+              "methodLocalId": {
+                "type": "string",
+                "description": "For methodLiteral: which method"
+              },
+              "literalIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For methodLiteral: which literal slot"
+              },
+              "objectLocalId": {
+                "type": "string",
+                "description": "For objectField/objectIndexed: which object"
+              },
+              "fieldIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For objectField: which fixed field (0-based)"
+              },
+              "indexedSlot": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "For objectIndexed: which indexed slot"
+              },
+              "classLocalId": {
+                "type": "string",
+                "description": "For classSlot/metaclassWiring: which class"
+              },
+              "slotName": {
+                "type": "string",
+                "description": "For classSlot: name of class field (e.g., 'superclass', 'methodDictionary')"
+              }
+            },
+            "additionalProperties": false
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["setValue","setAssociationValue","wireMetaclass","addToSystemDictionary","custom"],
+            "description": "Patch operation semantics"
+          },
+          "value": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": { "enum": ["objectRef","symbolRef","smallInt","nil"] },
+                  "localId": { "type": "string" },
+                  "symbolIndex": { "type": "integer" },
+                  "intValue": { "type": "integer" }
+                }
+              }
+            ],
+            "description": "Value to set. Loader resolves localId references to objectIds."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this patch does"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "sourceFiles": {
+      "type": "array",
+      "description": "Optional manifest of source files referenced by methods/initExpressions via fileIndex",
+      "items": {
+        "type": "object",
+        "required": ["index","path"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "path": { "type": "string" },
+          "checksum": {
+            "type": "string",
+            "pattern": "^(sha256|md5):[0-9a-f]+$"
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "partitionManifest": {
+      "type": "array",
+      "description": "Optional: describes file partitions if bundle is split across multiple JSON files for streaming/parallel loading",
+      "items": {
+        "type": "object",
+        "required": ["filename","contains"],
+        "properties": {
+          "filename": { "type": "string" },
+          "contains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["symbols","strings","classes","objects","methods","initExpressions","patches"]
+            },
+            "description": "Which top-level sections are in this file"
+          },
+          "checksum": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "validationRules": {
+      "type": "object",
+      "description": "Optional validation constraints the loader should check. v1.0.4: Added blockContextInObjectsIsError rule to enforce metadata-only pattern.",
+      "properties": {
+        "allLocalIdsUnique": { "type": "boolean", "default": true, "description": "Verify all localIds are unique across entire bundle" },
+        "allSymbolIndicesValid": { "type": "boolean", "default": true, "description": "Verify all symbol indices reference valid symbols[] entries" },
+        "allStringIndicesValid": { "type": "boolean", "default": true, "description": "Verify all string indices reference valid strings[] entries" },
+        "allObjectRefsResolvable": { "type": "boolean", "default": true, "description": "Verify all objectRef localIds can be resolved" },
+        "associationKeysMustBeSymbols": { "type": "boolean", "default": true, "description": "Verify all Association keys are symbols per Blue Book" },
+        "installOrderCoversAllEntities": { "type": "boolean", "default": true, "description": "Verify install order phases cover all entities" },
+        "headerFieldsMatchWord": { "type": "boolean", "default": true, "description": "v1.0.2: Verify expanded header fields (literalCount, tempCount, etc.) match bits in header.word encoding" },
+        "blockLiteralsMustHaveNullSelector": { "type": "boolean", "default": true, "description": "v1.0.2: Verify all compiledMethod literals have selector=null (blocks must have null selector)" },
+        "blocksMustHaveZeroPrimitive": { "type": "boolean", "default": true, "description": "v1.0.2: Verify all block compiledMethods have primitiveIndex=0 (blocks cannot have primitives)" },
+        "literalCountMatchesArrayLength": { "type": "boolean", "default": true, "description": "v1.0.2: Verify header.literalCount matches actual length of literals[] array" },
+        "methodDictionaryMustContainSelector": { "type": "boolean", "default": true, "description": "v1.0.2 Enhanced: Verify each method's selector is present in its home class's method dictionary for cold-start reproducibility" },
+        "closureLinkageValid": { "type": "boolean", "default": true, "description": "v1.0.3: Verify BlockContext closure metadata (homeContext and outerContext) reference valid methods/blocks and form proper closure chains" },
+        "blockContextInObjectsIsError": { "type": "boolean", "default": true, "description": "v1.0.4: ERROR if any object in objects[] has formatHint='blockContext' or localId starting with 'blockctx:'. BlockContext templates must be in metadata.blockContexts[]" },
+        "optimizedSelectorsPacked": { "type": "boolean", "default": true, "description": "v1.0.2 Enhanced: Verify optimizedSelectors[] contains indices 0-N for single-byte send optimization" }
+      }
+    },
+
+    "symbolTablePartitioning": {
+      "type": ["object","null"],
+      "description": "Optional: Symbol table partitioning strategy for optimizing single-byte sends. Loader enforces selector packing for performance-critical message sends.",
+      "properties": {
+        "lowSendRange": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 31 },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Range [start, end] of symbol indices reserved for optimized single-byte sends (typically [0, 15] or [0, 31])"
+        },
+        "reservedSelectors": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "description": "Specific symbol indices that MUST be reserved for critical selectors (e.g., 0=#new, 1=#at:, 2=#value). Loader verifies these symbols occupy the specified indices."
+        },
+        "partitionStrategy": {
+          "type": "string",
+          "enum": ["frequency","manual","hybrid"],
+          "description": "Strategy for symbol table partitioning: 'frequency' = most-sent selectors first, 'manual' = compiler-specified, 'hybrid' = combine both"
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "definitions": {
+    "fieldValue": {
+      "type": "object",
+      "required": ["type"],
+      "description": "Discriminated union for object field/indexed values",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "nil" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "true" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "false" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "smallInt" },
+            "value": { "type": "integer" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largePositiveInteger" },
+            "value": { "type": "string", "pattern": "^[0-9]+$" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largeNegativeInteger" },
+            "value": { "type": "string", "pattern": "^-[0-9]+$" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "float" },
+            "value": { "type": "number" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "symbolRef" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "stringRef" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "objectRef" },
+            "localId": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type","localId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "character" },
+            "codePoint": { "type": "integer", "minimum": 0, "maximum": 255 }
+          },
+          "required": ["type","codePoint"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "bytes" },
+            "encoding": { "type": "string", "enum": ["hex","base64"] },
+            "data": { "type": "string" }
+          },
+          "required": ["type","encoding","data"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "literalValue": {
+      "type": "object",
+      "required": ["type"],
+      "description": "Discriminated union for method literal frame entries",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "symbol" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "string" },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["type","index"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "smallInt" },
+            "value": { "type": "integer" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largePositiveInteger" },
+            "value": { "type": "string" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "largeNegativeInteger" },
+            "value": { "type": "string" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "float" },
+            "value": { "type": "number" }
+          },
+          "required": ["type","value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "association" },
+            "association": {
+              "type": "object",
+              "required": ["keyType","keyIndex","valueRef"],
+              "properties": {
+                "keyType": {
+                  "type": "string",
+                  "enum": ["symbol"],
+                  "description": "Blue Book requires Association keys in literal frames to be Symbols"
+                },
+                "keyIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Index into symbols[] array"
+                },
+                "valueRef": {
+                  "oneOf": [
+                    { "type": "null", "description": "Unresolved; will be patched" },
+                    {
+                      "type": "object",
+                      "required": ["type","localId"],
+                      "properties": {
+                        "type": { "const": "objectRef" },
+                        "localId": { "type": "string" }
+                      }
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["type","association"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "array" },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/literalValue" }
+            }
+          },
+          "required": ["type","elements"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "objectRef" },
+            "localId": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type","localId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "character" },
+            "codePoint": { "type": "integer", "minimum": 0, "maximum": 255 }
+          },
+          "required": ["type","codePoint"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "bytes" },
+            "encoding": { "type": "string", "enum": ["hex","base64"] },
+            "data": { "type": "string" }
+          },
+          "required": ["type","encoding","data"],
+          "additionalProperties": false
+        },
+        {
+          "description": "BLUE BOOK: Blocks are separate CompiledMethods with selector=null stored as literals. Blocks can be nested recursively in the literals array.",
+          "properties": {
+            "type": { "const": "compiledMethod" },
+            "selector": { "type": "null", "description": "CRITICAL: Blocks always have null selector (distinguishes from regular methods)" },
+            "numArgs": { "type": "integer", "minimum": 0, "description": "Number of block arguments (e.g., [:x :y | ...] has numArgs=2)" },
+            "numTemps": { "type": "integer", "minimum": 0, "description": "Number of block temporaries (e.g., [| temp | ...] has numTemps=1)" },
+            "maxStack": { "type": "integer", "minimum": 0, "description": "Maximum stack depth required by block execution" },
+            "header": {
+              "type": "object",
+              "required": ["word","literalCount","tempCount","argCount","primitiveIndex","largeContext"],
+              "description": "Blue Book method header for block. MUST include both encoded word and expanded fields.",
+              "properties": {
+                "word": { "type": "integer", "minimum": 0, "maximum": 65535, "description": "Canonical 16-bit header word" },
+                "literalCount": { "type": "integer", "minimum": 0, "maximum": 127, "description": "REQUIRED: Number of literals. MUST match word encoding." },
+                "tempCount": { "type": "integer", "minimum": 0, "maximum": 31, "description": "REQUIRED: Number of temporaries. MUST match word encoding." },
+                "argCount": { "type": "integer", "minimum": 0, "maximum": 7, "description": "REQUIRED: Number of arguments. MUST match word encoding." },
+                "primitiveIndex": { "type": "integer", "const": 0, "description": "REQUIRED: Always 0 (blocks never have primitives)" },
+                "largeContext": { "type": "boolean", "description": "REQUIRED: Large context flag. MUST match word encoding." }
+              },
+              "additionalProperties": false
+            },
+            "literals": {
+              "type": "array",
+              "description": "Block's literal frame. Can contain nested blocks recursively!",
+              "items": { "$ref": "#/definitions/literalValue" }
+            },
+            "bytecodes": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "description": "Block bytecode. Empty blocks contain only RETURN_TOP (0x7C)"
+            },
+            "argNames": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Block argument names for debugging"
+            },
+            "tempNames": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Block temporary names for debugging"
+            }
+          },
+          "required": ["type","selector","numArgs","numTemps","maxStack","header","literals","bytecodes"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "nil" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

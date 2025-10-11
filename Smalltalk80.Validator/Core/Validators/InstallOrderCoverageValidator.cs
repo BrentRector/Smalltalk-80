@@ -83,12 +83,18 @@ public class InstallOrderCoverageValidator : IValidator
         }
 
         // Check for entities not in install order
+        // v1.0.4: SKIP metadata.blockContexts - they are tooling-only, not installed
         foreach (var kvp in ctx.IndexByLocalId)
         {
             var localId = kvp.Key;
+            var occurrence = kvp.Value.First();
+
+            // Skip BlockContext metadata entries (they're in metadata.blockContexts[], not installed)
+            if (occurrence.Section == "metadata.blockContexts")
+                continue;
+
             if (!installedLocalIds.Contains(localId))
             {
-                var occurrence = kvp.Value.First();
                 diagnostics.Add(new Diagnostic(
                     ErrorCodes.InstallOmitted,
                     Severity.Error,

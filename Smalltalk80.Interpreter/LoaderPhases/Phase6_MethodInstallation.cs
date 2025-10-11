@@ -44,10 +44,10 @@ public class Phase6_MethodInstallation
         // FIRST: Count methods per class to pre-allocate method dictionaries to EXACT size
         var methodsPerClass = new Dictionary<string, List<(int selectorId, int methodId)>>();
 
-        // Pre-count methods per class
+        // Pre-count methods per class (skip blocks with empty homeClassLocalId)
         foreach (var method in _bundle.Methods)
         {
-            if (!methodsPerClass.ContainsKey(method.HomeClassLocalId))
+            if (!string.IsNullOrEmpty(method.HomeClassLocalId) && !methodsPerClass.ContainsKey(method.HomeClassLocalId))
             {
                 methodsPerClass[method.HomeClassLocalId] = new List<(int, int)>();
             }
@@ -56,7 +56,10 @@ public class Phase6_MethodInstallation
         // Pre-allocate all method dictionaries to EXACT final size (no resizing!)
         foreach (var kvp in methodsPerClass)
         {
-            int classId = _localIdToObjectId[kvp.Key];
+            if (!_localIdToObjectId.TryGetValue(kvp.Key, out int classId))
+            {
+                throw new InvalidOperationException($"Class not found for method dictionary: '{kvp.Key}'");
+            }
             int methodCount = _bundle.Methods.Count(m => m.HomeClassLocalId == kvp.Key);
             int methodDictId = _heap.CreateMethodDictionary(methodCount);
             _heap.SetNamedSlot(classId, "methodDictionary", methodDictId);
@@ -67,14 +70,23 @@ public class Phase6_MethodInstallation
         foreach (var method in _bundle.Methods)
         {
             totalMethods++;
-            int selectorId = _heap.InternSymbol(_symbols[method.SelectorIndex]);
-            int homeClassId = _localIdToObjectId[method.HomeClassLocalId];
 
             var literalIds = method.Literals.Select(ResolveLiteralValue).ToArray();
             var bytecodes = DecodeBytecodes(method.Bytecodes);
 
             int methodId = _heap.CreateCompiledMethod(method, literalIds, bytecodes);
-            _heap.InstallMethod(homeClassId, selectorId, methodId);
+
+            // Only install in method dictionary if this is a real method (not a block)
+            // Blocks have empty homeClassLocalId and selectorIndex that might be out of range
+            if (!string.IsNullOrEmpty(method.HomeClassLocalId))
+            {
+                if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out int homeClassId))
+                {
+                    throw new InvalidOperationException($"Home class not found for method {method.LocalId}: '{method.HomeClassLocalId}'");
+                }
+                int selectorId = _heap.InternSymbol(_symbols[method.SelectorIndex]);
+                _heap.InstallMethod(homeClassId, selectorId, methodId);
+            }
 
             _localIdToObjectId[method.LocalId] = methodId;
         }
@@ -83,6 +95,7 @@ public class Phase6_MethodInstallation
 
     /// <summary>
     /// Resolves a literal value from the discriminated union to an object ID.
+    /// v1.0.3: Supports "compiledMethod" for nested blocks.
     /// </summary>
     private int ResolveLiteralValue(LiteralValue literal)
     {
@@ -95,7 +108,8 @@ public class Phase6_MethodInstallation
             "nil" => GlobalRegistry.NilObjectId,
             "true" => GlobalRegistry.TrueObjectId,
             "false" => GlobalRegistry.FalseObjectId,
-            "objectRef" => _localIdToObjectId[literal.LocalId!],
+            "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out int objId1) ? objId1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
+            "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out int objId2) ? objId2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),  // v1.0.3: Blocks reference their method via localId
             "character" => _heap.AllocateCharacter(literal.CodePoint!.Value),
             "bytes" => _heap.AllocateByteArray(literal.Encoding!, literal.Data!),
             "association" => ResolveAssociation(literal.Association!),
@@ -136,18 +150,56 @@ public class Phase6_MethodInstallation
     /// </summary>
     private int AllocateFloat(double value)
     {
-        // Float objects in Smalltalk-80 are typically stored as a word-indexed object
-        // containing the IEEE 754 representation
-        byte[] bytes = BitConverter.GetBytes(value);
-        return _heap.AllocateByteArray("base64", Convert.ToBase64String(bytes));
+        return _heap.AllocateFloat(value);
     }
 
     /// <summary>
     /// Resolves an association literal (key/value pair).
+    /// If the association already exists in SystemDictionary (for global class names),
+    /// reuse it instead of creating a new one with nil value.
     /// </summary>
     private int ResolveAssociation(AssociationLiteral assoc)
     {
         int keyId = _heap.InternSymbol(_symbols[assoc.KeyIndex]);
+        string keyName = _symbols[assoc.KeyIndex];
+
+        // CRITICAL FIX: If this is a class association and valueRef is None,
+        // look up the existing association from SystemDictionary instead of creating new one with nil
+        if (assoc.ValueRef?.LocalId == null)
+        {
+            // Try to find existing class association in SystemDictionary
+            if (GlobalRegistry.TryGet($"class:{keyName}", out int classOop))
+            {
+                if (keyName == "ActionMenu")
+                {
+                    Console.WriteLine($"DEBUG ResolveAssoc: Looking for existing ActionMenu association, classOop={classOop}");
+                }
+
+                // This is a known class - find its existing association in SystemDictionary
+                var heap = (SmalltalkHeap)_heap;
+                int sysDictId = GlobalRegistry.SystemDictionaryId;
+                int sysDictSize = heap.GetIndexedSize(sysDictId);
+
+                for (int i = 0; i < sysDictSize; i++)
+                {
+                    int assocId = heap.GetIndexedField(sysDictId, i);
+                    if (assocId == 0) continue;
+
+                    int assocKeyId = heap.GetField(assocId, 0);
+                    if (assocKeyId == keyId)
+                    {
+                        // Found the existing association - reuse it!
+                        if (keyName == "ActionMenu")
+                        {
+                            Console.WriteLine($"DEBUG ResolveAssoc: Found existing ActionMenu assoc OOP={assocId}, returning it!");
+                        }
+                        return assocId;
+                    }
+                }
+            }
+        }
+
+        // Fall back to creating new association
         int valueId = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
             : GlobalRegistry.NilObjectId;

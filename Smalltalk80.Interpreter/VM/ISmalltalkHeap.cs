@@ -128,6 +128,13 @@ public interface ISmalltalkHeap
     int AllocateByteArray(string encoding, string data);
 
     /// <summary>
+    /// Allocates a Float object with the given value.
+    /// </summary>
+    /// <param name="value">Floating-point value</param>
+    /// <returns>Object ID of the Float object</returns>
+    int AllocateFloat(double value);
+
+    /// <summary>
     /// Allocates an Association object (key-value pair).
     /// </summary>
     /// <param name="keyId">Object ID of the key</param>
@@ -202,6 +209,14 @@ public interface ISmalltalkHeap
     /// <param name="objectId">Object ID</param>
     /// <returns>String representation of the object</returns>
     string GetObjectDisplay(int objectId);
+
+    /// <summary>
+    /// Sets the class of an object (updates the classId field).
+    /// Used during bootstrap to wire up class-metaclass relationships.
+    /// </summary>
+    /// <param name="objectId">Object ID</param>
+    /// <param name="classId">Class ID to set</param>
+    void SetClass(int objectId, int classId);
 
     /// <summary>
     /// Sets the optimized selector names for bytecode disassembly.

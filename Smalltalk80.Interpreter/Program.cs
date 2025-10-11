@@ -1,3 +1,4 @@
+using Smalltalk80.Interpreter.InitExecution;
 using Smalltalk80.Interpreter.Schema;
 using Smalltalk80.Interpreter.VM;
 
@@ -53,8 +54,44 @@ public static class Program
             var loader = new Loader(bundle, heap);
             loader.Run();
 
-            Console.WriteLine("\nCold start complete!");
-            Console.WriteLine("Virtual machine ready.");
+            Console.WriteLine("\n=== Executing Init Expressions ===\n");
+
+            // Execute init expressions AFTER cold start completes
+            if (loader.InitExpressionsArrayId != 0 && loader.LayoutResolver != null)
+            {
+                var vm = new VirtualMachine((SmalltalkHeap)heap, loader.LayoutResolver);
+                var executor = new InitExpressionExecutor(
+                    heap,
+                    vm,
+                    loader.LocalIdToObjectId.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    InitPolicy.ContinueAndCollect,
+                    defaultTimeoutMs: 5000
+                );
+
+                var report = executor.ExecuteAll(loader.InitExpressionsArrayId);
+
+                Console.WriteLine($"\nInit Expression Results:");
+                Console.WriteLine($"  Total: {report.Total}");
+                Console.WriteLine($"  Succeeded: {report.Succeeded}");
+                Console.WriteLine($"  Failed: {report.Failed}");
+                Console.WriteLine($"  Duration: {report.TotalElapsedMilliseconds}ms");
+
+                if (report.Failed > 0)
+                {
+                    Console.WriteLine($"\n⚠ Failures:");
+                    foreach (var failure in report.Failures.Take(10))
+                    {
+                        Console.WriteLine($"  - {failure.InitLocalId}: {failure.Status}");
+                        if (failure.Diagnostic != null)
+                        {
+                            Console.WriteLine($"    {failure.Diagnostic.Message}");
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine("\n✓ All systems ready!");
+            Console.WriteLine("Virtual machine initialized successfully.");
 
             // If --dump-class was specified, dump the class
             if (dumpClassName != null)
@@ -66,7 +103,7 @@ public static class Program
                 Console.WriteLine(classDump);
             }
 
-            // TODO: Start REPL or execute startup code
+            // TODO: Start REPL or execute user code
         }
         catch (Exception ex)
         {

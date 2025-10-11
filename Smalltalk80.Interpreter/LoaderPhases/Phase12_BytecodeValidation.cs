@@ -56,6 +56,13 @@ public class Phase12_BytecodeValidation
         foreach (var method in _bundle.Methods)
         {
             totalMethods++;
+
+            // Skip block methods (no homeClassLocalId, no selector)
+            if (string.IsNullOrEmpty(method.HomeClassLocalId))
+            {
+                continue;
+            }
+
             var literalIds = method.Literals.Select(ResolveLiteralValue).ToArray();
             var bytecodes = DecodeBytecodes(method.Bytecodes);
             int homeClassId = _localIdToObjectId[method.HomeClassLocalId];
@@ -86,8 +93,8 @@ public class Phase12_BytecodeValidation
                 var operandValidation = BytecodeOperandValidator.Validate(
                     bytecodes,
                     literalIds.Length,
-                    method.Header.TempCount ?? 0,
-                    method.Header.ArgCount ?? 0,
+                    method.Header.TempCount,
+                    method.Header.ArgCount,
                     instVarCount);
 
                 if (!operandValidation.IsValid && operandValidation.ErrorMessage != null)
@@ -294,6 +301,7 @@ public class Phase12_BytecodeValidation
             "true" => GlobalRegistry.TrueObjectId,
             "false" => GlobalRegistry.FalseObjectId,
             "objectRef" => _localIdToObjectId[literal.LocalId!],
+            "compiledMethod" => _localIdToObjectId[literal.LocalId!],  // v1.0.3: Blocks reference their method via localId
             "character" => _heap.AllocateCharacter(literal.CodePoint!.Value),
             "bytes" => _heap.AllocateByteArray(literal.Encoding!, literal.Data!),
             "association" => ResolveAssociation(literal.Association!),
@@ -325,8 +333,7 @@ public class Phase12_BytecodeValidation
 
     private int AllocateFloat(double value)
     {
-        byte[] bytes = BitConverter.GetBytes(value);
-        return _heap.AllocateByteArray("base64", Convert.ToBase64String(bytes));
+        return _heap.AllocateFloat(value);
     }
 
     private int ResolveAssociation(AssociationLiteral assoc)

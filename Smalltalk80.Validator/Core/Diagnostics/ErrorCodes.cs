@@ -22,6 +22,7 @@ public static class ErrorCodes
     public const string BlockOuterMissing = "STV-BLOCK-OUTER-MISSING";
     public const string BlockOuterNotMethod = "STV-BLOCK-OUTER-NOT-METHOD";
     public const string BlockCycle = "STV-BLOCK-CYCLE";
+    public const string BlockContextInObjectsArray = "STV-BLOCK-CTX-IN-OBJECTS"; // v1.0.4: BlockContext must be in metadata, not objects[]
 
     // Method validation
     public const string MethodMissingInDict = "STV-METHOD-MISSING-IN-DICT";

@@ -2,7 +2,8 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Cold start bundle metadata.
-/// Matches coldstart-v1.0.2.schema.json metadata structure.
+/// Matches coldstart-v1.0.5.schema.json metadata structure.
+/// v1.0.5: Changed BlockContext metadata from dual-ID to single blockMethodId.
 /// </summary>
 public class Metadata
 {
@@ -17,5 +18,22 @@ public class Metadata
     public int? MethodCount { get; init; }
     public int? ObjectCount { get; init; }
     public int? InitExpressionCount { get; init; }
+    public int? BlockContextCount { get; init; }
+    public BlockContextMetadata[]? BlockContexts { get; init; }
     public string? Notes { get; init; }
+}
+
+/// <summary>
+/// BlockContext metadata entry (v1.0.5).
+/// These are tooling-only templates, NOT runtime objects.
+/// Used by validators and debuggers to inspect closure structure.
+/// v1.0.5: Uses single blockMethodId instead of localId + method.
+/// </summary>
+public class BlockContextMetadata
+{
+    public required string BlockMethodId { get; init; }
+    public required int InitialIP { get; init; }
+    public required int BlockArgumentCount { get; init; }
+    public string? HomeContext { get; init; }
+    public string? OuterContext { get; init; }
 }

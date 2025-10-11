@@ -18,7 +18,6 @@ public class LocalIdUniquenessValidator : IValidator
         "object:",
         "assoc:",
         "pool:",
-        "blockctx:",
         "init:",
         "patch:",
         "block:"  // For block compiled methods
@@ -92,7 +91,8 @@ public class LocalIdUniquenessValidator : IValidator
             ("classes", var id) when id.StartsWith("class:") || id.StartsWith("meta:") => true,
             ("methods", var id) when id.StartsWith("method:") || id.StartsWith("block:") => true,
             ("objects", var id) when id.StartsWith("object:") || id.StartsWith("assoc:") ||
-                                     id.StartsWith("pool:") || id.StartsWith("blockctx:") => true,
+                                     id.StartsWith("pool:") => true,
+            ("metadata.blockContexts", var id) when id.StartsWith("block:") => true,
             ("initExpressions", var id) when id.StartsWith("init:") => true,
             ("patches", var id) when id.StartsWith("patch:") => true,
             _ => false

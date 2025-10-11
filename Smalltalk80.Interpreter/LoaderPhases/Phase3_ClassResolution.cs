@@ -38,7 +38,8 @@ public class Phase3_ClassResolution
             _heap.SetNamedSlot(classId, "name", _heap.InternSymbol(name));
 
             // Set superclass reference
-            if (cls.SuperNameIndex is int superIdx)
+            // IMPORTANT: Skip for metaclasses - their superclass chain is already wired in Phase 2
+            if (!cls.IsMetaclass && cls.SuperNameIndex is int superIdx)
             {
                 string superName = _symbols[superIdx];
                 int superId = GlobalRegistry.LookupClassObjectId(superName);

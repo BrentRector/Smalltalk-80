@@ -23,14 +23,8 @@ public class Phase1_ClassShells
 
     public void Run()
     {
-        // First, create the well-known singleton objects: nil, true, false
-        int nilId = _heap.AllocateObject("UndefinedObject", "fixed", fixedSize: 0, indexedSize: 0);
-        int trueId = _heap.AllocateObject("True", "fixed", fixedSize: 0, indexedSize: 0);
-        int falseId = _heap.AllocateObject("False", "fixed", fixedSize: 0, indexedSize: 0);
-
-        GlobalRegistry.Register("nil", nilId);
-        GlobalRegistry.Register("true", trueId);
-        GlobalRegistry.Register("false", falseId);
+        // NOTE: nil/true/false are created AFTER all classes are fully wired (in a separate phase)
+        // We just need SystemDictionary first so classes can be registered
 
         // Count EXACTLY what goes in SystemDictionary - NO TEMPORARY OBJECTS!
         // Contents: All instance classes + pool dictionaries
@@ -55,6 +49,12 @@ public class Phase1_ClassShells
             int objectId = _heap.AllocateObject("Class", "pointers", fixedSize: 10, indexedSize: 0);
             _localIdToObjectId[cls.LocalId] = objectId;
 
+            // Debug: Track ActionMenu allocation
+            if (cls.LocalId == "class:ActionMenu")
+            {
+                Console.WriteLine($"DEBUG Phase2: Allocated ActionMenu class shell, OOP={objectId}");
+            }
+
             // Register class in GlobalRegistry
             // For instance classes (class:Name), register as "Name"
             // For metaclasses (meta:Name), DON'T register (only instance classes need global lookup)
@@ -66,12 +66,34 @@ public class Phase1_ClassShells
                 // Add the class to Smalltalk dictionary as Association
                 int classNameSymbol = _heap.InternSymbol(className);
                 int association = _heap.AllocateAssociation(classNameSymbol, objectId);
+
+                // Debug: Track ActionMenu association
+                if (cls.LocalId == "class:ActionMenu")
+                {
+                    var heap = (SmalltalkHeap)_heap;
+                    Console.WriteLine($"DEBUG Phase2: Created Association for ActionMenu, assoc OOP={association}, value={objectId}");
+                    // Verify the association was created correctly
+                    int assocKey = heap.GetField(association, 0);
+                    int assocValue = heap.GetField(association, 1);
+                    Console.WriteLine($"DEBUG Phase2: Association[0 (key)]={assocKey}, Association[1 (value)]={assocValue}");
+                }
+
                 _heap.SetIndexedField(smalltalkId, nextSmalltalkIndex++, association);
             }
         }
 
         // Store the next available index for other phases to use
         _localIdToObjectId["__smalltalk_next_index__"] = nextSmalltalkIndex;
+
+        // Debug: Verify ActionMenu association at END of Phase 2
+        if (_localIdToObjectId.TryGetValue("class:ActionMenu", out int actionMenuId))
+        {
+            var heap = (SmalltalkHeap)_heap;
+            // Find the ActionMenu association in SystemDictionary
+            int assocOop = 7842; // We know from logs this is the association
+            int assocValue = heap.GetField(assocOop, 1);
+            Console.WriteLine($"DEBUG Phase2 END: ActionMenu Association[1 (value)]={assocValue}, expected={actionMenuId}");
+        }
     }
 
     private string GetClassNameFromLocalId(string localId)

@@ -50,8 +50,8 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
         // Phase 4: Convert methods
         ConvertMethods(ast);
 
-        // Phase 4.5: Create BlockContext objects for each block
-        CreateBlockContextObjects();
+        // Phase 4.5: BlockContext metadata is now generated in GenerateMetadata()
+        // (no longer added to objects[] array)
 
         // Phase 5: Convert init expressions
         ConvertInitExpressions(ast);
@@ -557,88 +557,41 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     }
 
     /// <summary>
-    /// Creates BlockContext objects for each block method in the methods collection.
-    /// BlockContext objects represent runtime closures for blocks in the Smalltalk-80 system.
+    /// Creates BlockContext metadata entries for each block method.
+    /// v1.0.4: BlockContext objects are now METADATA-ONLY (not runtime objects).
     ///
-    /// BlockContext instance variable layout (must match class definition):
-    /// BlockContext inherits from: Object (0) -> InstructionStream (2) -> ContextPart (1) -> BlockContext (3)
+    /// These metadata entries are used by:
+    /// - Validators: to check closure graph integrity and lexical scoping
+    /// - Debuggers: to inspect block closure structure without execution
+    /// - Tooling: to analyze block relationships and homeContext chains
     ///
-    /// - field[0]: sender (InstructionStream) - nil for unactivated blocks
-    /// - field[1]: pc (InstructionStream) - initialIP (always 0 for blocks)
-    /// - field[2]: stackp (ContextPart) - nil for unactivated blocks
-    /// - field[3]: nargs (BlockContext) - number of block arguments
-    /// - field[4]: startpc (BlockContext) - initialIP (always 0 for blocks)
-    /// - field[5]: home (BlockContext) - reference to enclosing method context
-    ///
-    /// Total: 6 instance variables
+    /// Loader does NOT allocate these as runtime objects during cold start.
     /// </summary>
-    private void CreateBlockContextObjects()
+    private List<BlockContextMetadata> CreateBlockContextMetadata()
     {
-        // Find BlockContext class index (will be -1 if not found, but that's ok for test bundles)
-        int blockContextClassIndex = _symbolTable.GetValueOrDefault("BlockContext", -1);
+        var blockContexts = new List<BlockContextMetadata>();
 
-        // Iterate through all methods and create BlockContext objects for blocks
+        // Iterate through all methods and create metadata for blocks (selectorIndex == -1)
         foreach (var method in _methods.Where(m => m.SelectorIndex == -1))
         {
-            // Generate a unique localId for the BlockContext
-            var blockContextLocalId = $"blockctx:{method.LocalId.Replace("block:", "")}";
-
             // Look up the homeContext for this block
             string? homeContextLocalId = _blockToHomeMethod.GetValueOrDefault(method.LocalId);
 
-            // Build the fields list following BlockContext's exact instance variable layout
-            // BlockContext inherits: Object (0) -> InstructionStream (2) -> ContextPart (1) -> BlockContext (3)
-            var fields = new List<object>
+            // Find the outermost method in the closure chain
+            string? outerContextLocalId = FindOutermostMethod(method.LocalId);
+
+            // Create BlockContext metadata (NOT a runtime object)
+            blockContexts.Add(new BlockContextMetadata
             {
-                // Field 0: sender (InstructionStream) - nil for unactivated blocks
-                new Dictionary<string, object> { ["type"] = "nil" },
-
-                // Field 1: pc (InstructionStream) - initialIP (always 0 for blocks)
-                new Dictionary<string, object>
-                {
-                    ["type"] = "smallInt",
-                    ["value"] = 0
-                },
-
-                // Field 2: stackp (ContextPart) - nil for unactivated blocks
-                new Dictionary<string, object> { ["type"] = "nil" },
-
-                // Field 3: nargs (BlockContext) - number of block arguments
-                new Dictionary<string, object>
-                {
-                    ["type"] = "smallInt",
-                    ["value"] = method.Header.ArgCount ?? 0
-                },
-
-                // Field 4: startpc (BlockContext) - initialIP (always 0 for blocks)
-                new Dictionary<string, object>
-                {
-                    ["type"] = "smallInt",
-                    ["value"] = 0
-                },
-
-                // Field 5: home (BlockContext) - reference to enclosing method context
-                homeContextLocalId != null
-                    ? new Dictionary<string, object>
-                    {
-                        ["type"] = "objectRef",
-                        ["localId"] = homeContextLocalId
-                    }
-                    : new Dictionary<string, object> { ["type"] = "nil" }
-            };
-
-            // Create the BlockContext object with closure metadata
-            var blockContext = new JsonObject
-            {
-                LocalId = blockContextLocalId,
-                ClassNameIndex = blockContextClassIndex,
-                FormatHint = "blockContext",
-                Fields = fields,
-                IndexedFields = [] // BlockContext has no indexed fields
-            };
-
-            _objects.Add(blockContext);
+                BlockMethodId = method.LocalId,
+                InitialIP = 0, // Blocks always start at IP 0
+                BlockArgumentCount = method.Header.ArgCount ?? 0,
+                HomeContext = homeContextLocalId,
+                OuterContext = outerContextLocalId
+            });
         }
+
+        return blockContexts;
     }
 
     /// <summary>
@@ -1162,9 +1115,12 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         var version = GetType().Assembly.GetName().Version;
 
+        // Count BlockContext metadata entries (one per block method)
+        var blockContexts = CreateBlockContextMetadata();
+
         return new Metadata
         {
-            Version = "1.0.3",
+            Version = "1.0.5",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = Path.GetFileName(_sourceFilePath),
@@ -1174,7 +1130,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             ClassCount = _classes.Count,
             MethodCount = _methods.Count,
             ObjectCount = _objects.Count,
-            InitExpressionCount = _initExprs.Count
+            InitExpressionCount = _initExprs.Count,
+            BlockContextCount = blockContexts.Count,
+            BlockContexts = blockContexts
         };
     }
 }
@@ -1208,6 +1166,17 @@ internal sealed record Metadata
     public required int MethodCount { get; init; }
     public required int ObjectCount { get; init; }
     public required int InitExpressionCount { get; init; }
+    public int? BlockContextCount { get; init; }
+    public List<BlockContextMetadata>? BlockContexts { get; init; }
+}
+
+internal sealed record BlockContextMetadata
+{
+    public required string BlockMethodId { get; init; }
+    public required int InitialIP { get; init; }
+    public required int BlockArgumentCount { get; init; }
+    public string? HomeContext { get; init; }
+    public string? OuterContext { get; init; }
 }
 
 internal sealed record JsonClass

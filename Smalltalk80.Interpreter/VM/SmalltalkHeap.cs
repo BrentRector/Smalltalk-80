@@ -83,8 +83,14 @@ public class SmalltalkHeap : ISmalltalkHeap
     /// </summary>
     public int InternString(string value)
     {
-        // String class will be resolved later, use placeholder 0 for now
-        int stringId = AllocateRawObject(0, ObjectFormat.ByteIndexed, 0, System.Text.Encoding.UTF8.GetByteCount(value));
+        // Look up String class ID from GlobalRegistry
+        int stringClassId = 0;
+        if (GlobalRegistry.TryGet("class:String", out int foundClassId))
+        {
+            stringClassId = foundClassId;
+        }
+
+        int stringId = AllocateRawObject(stringClassId, ObjectFormat.ByteIndexed, 0, System.Text.Encoding.UTF8.GetByteCount(value));
 
         var stringData = _objectTable[GetTableIndex(stringId)];
         stringData.IndexedData = System.Text.Encoding.UTF8.GetBytes(value);
@@ -125,6 +131,15 @@ public class SmalltalkHeap : ISmalltalkHeap
     {
         int tableIndex = _nextObjectId++;
         var objectData = new ObjectData(classId, format, fixedSize);
+
+        // Debug: Track specific OOP allocation
+        int oop = tableIndex << 1;
+        if (oop == 17474)
+        {
+            Console.WriteLine($"DEBUG ALLOC: tableIdx={tableIndex}, OOP={oop}, classId={classId}, fmt={format}, fix={fixedSize}, idx={indexedSize}");
+            Console.WriteLine($"  ^^^ OOP 17474 allocated with classId={classId}! Stack trace:");
+            Console.WriteLine(Environment.StackTrace);
+        }
 
         // Allocate indexed data based on format
         if (indexedSize > 0)
@@ -179,6 +194,7 @@ public class SmalltalkHeap : ISmalltalkHeap
 
     /// <summary>
     /// Gets an indexed field (for arrays, byte arrays, etc.).
+    /// For pointer-indexed objects only. Use GetIndexedByte for byte-indexed objects.
     /// </summary>
     public int GetIndexedField(int objectId, int index)
     {
@@ -198,7 +214,50 @@ public class SmalltalkHeap : ISmalltalkHeap
     }
 
     /// <summary>
+    /// Gets a byte from a byte-indexed object (for Float, String, ByteArray, etc.).
+    /// </summary>
+    public byte GetIndexedByte(int objectId, int index)
+    {
+        int tableIndex = GetTableIndex(objectId);
+
+        if (!_objectTable.TryGetValue(tableIndex, out var objectData))
+            throw new ArgumentException($"Invalid object ID: {objectId}");
+
+        if (objectData.IndexedData is byte[] byteArray)
+        {
+            if (index < 0 || index >= byteArray.Length)
+                throw new ArgumentOutOfRangeException(nameof(index), $"Index {index} out of range for byte-indexed object with {byteArray.Length} elements");
+            return byteArray[index];
+        }
+
+        throw new InvalidOperationException($"Object {objectId} does not have byte indexed data");
+    }
+
+    /// <summary>
+    /// Sets a byte in a byte-indexed object (for Float, String, ByteArray, etc.).
+    /// Takes a raw byte value, not a SmallInteger OOP.
+    /// </summary>
+    public void SetIndexedByte(int objectId, int index, byte value)
+    {
+        int tableIndex = GetTableIndex(objectId);
+
+        if (!_objectTable.TryGetValue(tableIndex, out var objectData))
+            throw new ArgumentException($"Invalid object ID: {objectId}");
+
+        if (objectData.IndexedData is byte[] byteArray)
+        {
+            if (index < 0 || index >= byteArray.Length)
+                throw new ArgumentOutOfRangeException(nameof(index), $"Index {index} out of range for byte-indexed object with {byteArray.Length} elements");
+            byteArray[index] = value;
+            return;
+        }
+
+        throw new InvalidOperationException($"Object {objectId} does not have byte indexed data");
+    }
+
+    /// <summary>
     /// Sets an indexed field (for arrays, byte arrays, etc.).
+    /// For SmallInteger-encoded byte values, use this. For raw byte values, use SetIndexedByte.
     /// </summary>
     public void SetIndexedField(int objectId, int index, int valueId)
     {
@@ -415,6 +474,27 @@ public class SmalltalkHeap : ISmalltalkHeap
     }
 
     /// <summary>
+    /// Allocates a Float object with the correct Float class.
+    /// Float objects in Smalltalk-80 are stored as byte-indexed objects containing IEEE 754 representation.
+    /// </summary>
+    public int AllocateFloat(double value)
+    {
+        // Look up Float class ID from GlobalRegistry
+        int floatClassId = 0;
+        if (GlobalRegistry.TryGet("class:Float", out int foundClassId))
+        {
+            floatClassId = foundClassId;
+        }
+
+        byte[] bytes = BitConverter.GetBytes(value);
+        int floatId = AllocateRawObject(floatClassId, ObjectFormat.ByteIndexed, 0, bytes.Length);
+        var floatData = _objectTable[GetTableIndex(floatId)];
+        floatData.IndexedData = bytes;
+
+        return floatId;
+    }
+
+    /// <summary>
     /// Allocates an Association (key-value pair).
     /// </summary>
     public int AllocateAssociation(int keyId, int valueId)
@@ -586,7 +666,7 @@ public class SmalltalkHeap : ISmalltalkHeap
             MarkObject(objectData.ClassId);
         }
 
-        // Mark instance variables
+        // Mark instance variables (includes literals for CompiledMethod)
         foreach (var fieldId in objectData.InstanceVariables)
         {
             if (fieldId != 0 && !IsSmallInteger(fieldId))
@@ -727,32 +807,98 @@ public class SmalltalkHeap : ISmalltalkHeap
     /// </summary>
     public MethodInfo? GetMethod(int classId, string selector)
     {
-        int tableIndex = GetTableIndex(classId);
-        if (!_objectTable.TryGetValue(tableIndex, out var classData))
-            return null;
-
-        // Get method dictionary
-        var methodDictId = classData.NamedSlots?.GetValueOrDefault("methodDictionary", 0) ?? 0;
-        if (methodDictId == 0 || IsSmallInteger(methodDictId))
-            return null;
-
-        var methodDictData = _objectTable[GetTableIndex(methodDictId)];
-        if (methodDictData.IndexedData is not int[] methods)
-            return null;
-
-        // Find the selector
+        // Walk the superclass chain until we find the method
+        int currentClassId = classId;
         int selectorId = InternSymbol(selector);
-        int methodId = 0;
+        int depth = 0;
 
-        for (int i = 0; i < methods.Length; i += 2)
+        // Debug: trace method lookup
+        if (selector == "comment:")
         {
-            if (methods[i] == selectorId)
+            Console.WriteLine($"DEBUG GetMethod: Looking for '{selector}' starting in class {classId}");
+        }
+
+        while (currentClassId != 0 && !IsSmallInteger(currentClassId))
+        {
+            int tableIndex = GetTableIndex(currentClassId);
+            if (!_objectTable.TryGetValue(tableIndex, out var classData))
             {
-                methodId = methods[i + 1];
+                if (selector == "comment:")
+                    Console.WriteLine($"DEBUG GetMethod: Class {currentClassId} not in object table!");
+                return null;
+            }
+
+            // Get class name for debugging
+            string? className = null;
+            if (selector == "comment:")
+            {
+                var nameId = classData.NamedSlots?.GetValueOrDefault("name", 0) ?? 0;
+                className = nameId != 0 ? GetSymbolName(nameId) : $"<class {currentClassId}>";
+                Console.WriteLine($"DEBUG GetMethod: [{depth}] Searching in class '{className}' (OOP={currentClassId})");
+            }
+
+            // Get method dictionary
+            var methodDictId = classData.NamedSlots?.GetValueOrDefault("methodDictionary", 0) ?? 0;
+            if (methodDictId != 0 && !IsSmallInteger(methodDictId))
+            {
+                var methodDictData = _objectTable[GetTableIndex(methodDictId)];
+                if (methodDictData.IndexedData is int[] methods)
+                {
+                    if (selector == "comment:")
+                        Console.WriteLine($"DEBUG GetMethod: [{depth}] Method dict has {methods.Length / 2} entries");
+
+                    // Search for the selector in this class's method dictionary
+                    for (int i = 0; i < methods.Length; i += 2)
+                    {
+                        if (methods[i] == selectorId)
+                        {
+                            int methodId = methods[i + 1];
+                            if (methodId == 0)
+                                continue; // Empty slot, keep searching
+
+                            // Found the method! Extract and return method info
+                            if (selector == "comment:")
+                                Console.WriteLine($"DEBUG GetMethod: [{depth}] FOUND '{selector}' in '{className}', method OOP={methodId}");
+                            return ExtractMethodInfo(methodId, selector);
+                        }
+                    }
+
+                    if (selector == "comment:")
+                        Console.WriteLine($"DEBUG GetMethod: [{depth}] '{selector}' NOT in this class's method dict");
+                }
+            }
+            else
+            {
+                if (selector == "comment:")
+                    Console.WriteLine($"DEBUG GetMethod: [{depth}] No method dictionary in '{className}'");
+            }
+
+            // Method not found in this class, try superclass
+            int nextClassId = classData.NamedSlots?.GetValueOrDefault("superclass", 0) ?? 0;
+            if (selector == "comment:")
+                Console.WriteLine($"DEBUG GetMethod: [{depth}] Moving to superclass OOP={nextClassId}");
+
+            currentClassId = nextClassId;
+            depth++;
+
+            if (depth > 20)
+            {
+                Console.WriteLine($"DEBUG GetMethod: Too many levels in class hierarchy! Breaking.");
                 break;
             }
         }
 
+        // Method not found in entire hierarchy
+        if (selector == "comment:")
+            Console.WriteLine($"DEBUG GetMethod: '{selector}' NOT FOUND in entire hierarchy starting from class {classId}");
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts MethodInfo from a CompiledMethod object.
+    /// </summary>
+    private MethodInfo? ExtractMethodInfo(int methodId, string selector)
+    {
         if (methodId == 0)
             return null;
 
@@ -824,6 +970,20 @@ public class SmalltalkHeap : ISmalltalkHeap
             throw new ArgumentException($"Invalid object ID: {objectId}");
 
         return objectData.ClassId;
+    }
+
+    /// <summary>
+    /// Sets the class ID of an object.
+    /// Used during bootstrap to wire up class-metaclass relationships.
+    /// </summary>
+    public void SetClass(int objectId, int classId)
+    {
+        int tableIndex = GetTableIndex(objectId);
+
+        if (!_objectTable.TryGetValue(tableIndex, out var objectData))
+            throw new ArgumentException($"Invalid object ID: {objectId}");
+
+        objectData.ClassId = classId;
     }
 
     /// <summary>
@@ -1035,5 +1195,69 @@ public class SmalltalkHeap : ISmalltalkHeap
         // Note: We swap the data, not the references, so all existing references
         // to oop1 now point to what was oop2's data, and vice versa.
         // This is the correct Blue Book semantics for become:.
+    }
+
+    // ========== Runtime Field Resolution (VM Support) ==========
+
+    /// <summary>
+    /// Gets the field index for a named instance variable by walking the class hierarchy.
+    /// This uses ONLY heap data - NOT LayoutResolver.
+    /// During cold start, class metadata is stored in NamedSlots.
+    /// Returns -1 if field not found.
+    /// </summary>
+    public int GetFieldIndex(int classId, string fieldName)
+    {
+        if (classId == 0 || IsSmallInteger(classId))
+            return -1;
+
+        // Build the complete field list by walking up the superclass chain
+        var fieldList = new List<string>();
+        int currentClassId = classId;
+
+        while (currentClassId != 0 && !IsSmallInteger(currentClassId))
+        {
+            int tableIndex = GetTableIndex(currentClassId);
+            if (!_objectTable.TryGetValue(tableIndex, out var classData))
+                break;
+
+            // Get the instanceVariables array from the class object's named slots
+            // This is where the cold start loader stores it
+            if (classData.NamedSlots?.TryGetValue("instanceVariables", out int instVarsArrayId) == true)
+            {
+                if (instVarsArrayId != 0 && !IsSmallInteger(instVarsArrayId))
+                {
+                    var instVarsData = _objectTable[GetTableIndex(instVarsArrayId)];
+                    if (instVarsData.IndexedData is int[] instVarSymbols)
+                    {
+                        // Get this class's instance variable names
+                        var classFields = new List<string>();
+                        foreach (int symbolId in instVarSymbols)
+                        {
+                            if (symbolId != 0 && !IsSmallInteger(symbolId))
+                            {
+                                string? varName = GetSymbolName(symbolId);
+                                if (varName != null)
+                                    classFields.Add(varName);
+                            }
+                        }
+                        // Prepend (superclass fields come before subclass fields)
+                        fieldList.InsertRange(0, classFields);
+                    }
+                }
+            }
+
+            // Move to superclass (also stored in named slots during cold start)
+            if (classData.NamedSlots?.TryGetValue("superclass", out int superclassId) == true)
+            {
+                currentClassId = superclassId;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Now search for the field name in the accumulated list
+        return fieldList.IndexOf(fieldName);
     }
 }

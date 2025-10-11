@@ -20,7 +20,7 @@ public static class FloatPrimitives
         int floatId = (int)floatRef.AsObjectPointer();
         for (int i = 0; i < 8; i++)
         {
-            bytes[i] = (byte)ctx.Heap.GetIndexedField(floatId, i);
+            bytes[i] = ctx.Heap.GetIndexedByte(floatId, i);
         }
 
         return BitConverter.ToDouble(bytes, 0);
@@ -49,7 +49,7 @@ public static class FloatPrimitives
         byte[] bytes = BitConverter.GetBytes(value);
         for (int i = 0; i < 8; i++)
         {
-            ctx.Heap.SetIndexedField(floatId, i, bytes[i]);
+            ctx.Heap.SetIndexedByte(floatId, i, bytes[i]);
         }
 
         return SObjectRef.FromObjectPointer(floatId);

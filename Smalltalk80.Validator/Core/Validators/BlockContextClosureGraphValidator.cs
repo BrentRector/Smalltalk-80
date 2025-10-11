@@ -15,10 +15,9 @@ public class BlockContextClosureGraphValidator : IValidator
 {
     private class BlockContextInfo
     {
-        public string LocalId { get; set; } = "";
+        public string BlockMethodId { get; set; } = "";
         public string? HomeContext { get; set; }
         public string? OuterContext { get; set; }
-        public string? Method { get; set; }
     }
 
     public string Id => "BlockContextClosureGraphValidator";
@@ -28,45 +27,43 @@ public class BlockContextClosureGraphValidator : IValidator
     {
         var diagnostics = new List<Diagnostic>();
 
-        // Build map of all block contexts
+        // Build map of all block contexts from metadata.blockContexts (v1.0.5)
         var blockContexts = new Dictionary<string, BlockContextInfo>();
 
-        // Find all block contexts in objects
+        // Read BlockContext metadata from metadata.blockContexts array
+        foreach (var blockCtx in ctx.BlockContexts)
+        {
+            var blockMethodId = blockCtx.GetStringProp("blockMethodId");
+            if (blockMethodId == null) continue;
+
+            var homeContext = blockCtx.GetStringProp("homeContext");
+            var outerContext = blockCtx.GetStringProp("outerContext");
+
+            var blockInfo = new BlockContextInfo
+            {
+                BlockMethodId = blockMethodId,
+                HomeContext = homeContext,
+                OuterContext = outerContext
+            };
+
+            blockContexts[blockMethodId] = blockInfo;
+        }
+
+        // v1.0.4: Verify that there are NO BlockContext objects in objects[] array
+        // (they should only be in metadata.blockContexts)
         foreach (var obj in ctx.Objects)
         {
             var localId = obj.GetStringProp("localId");
-            if (localId == null) continue;
-
             var formatHint = obj.GetStringProp("formatHint");
-            if (formatHint == "blockContext" || localId.StartsWith("blockctx:"))
-            {
-                var blockInfo = ExtractBlockContextInfo(obj);
-                if (blockInfo != null)
-                {
-                    blockContexts[localId] = blockInfo;
-                }
-            }
-        }
 
-        // Find all blocks in methods (blocks are compiled as methods with null selector)
-        foreach (var method in ctx.Methods)
-        {
-            var localId = method.GetStringProp("localId");
-            if (localId == null) continue;
-
-            var selectorIndex = method.GetIntProp("selectorIndex") ?? 0;
-            if (selectorIndex == -1 || localId.StartsWith("block:"))
+            if (formatHint == "blockContext" || (localId != null && localId.StartsWith("blockctx:")))
             {
-                if (!blockContexts.ContainsKey(localId))
-                {
-                    var homeClassLocalId = method.GetStringProp("homeClassLocalId");
-                    blockContexts[localId] = new BlockContextInfo
-                    {
-                        LocalId = localId,
-                        Method = localId,
-                        HomeContext = homeClassLocalId
-                    };
-                }
+                diagnostics.Add(new Diagnostic(
+                    ErrorCodes.BlockContextInObjectsArray,
+                    Severity.Error,
+                    $"BlockContext '{localId}' found in objects[] array. v1.0.4: BlockContext entries must be in metadata.blockContexts[], not objects[]",
+                    new[] { new Location("objects", localId ?? "") },
+                    "Move BlockContext entries to metadata.blockContexts[] array"));
             }
         }
 
@@ -82,42 +79,10 @@ public class BlockContextClosureGraphValidator : IValidator
         return Task.FromResult<IEnumerable<Diagnostic>>(diagnostics);
     }
 
-    private BlockContextInfo? ExtractBlockContextInfo(JsonElement obj)
-    {
-        var localId = obj.GetStringProp("localId");
-        if (localId == null) return null;
-
-        var info = new BlockContextInfo { LocalId = localId };
-
-        // Try to extract context references from fields
-        if (obj.TryGetProperty("fields", out var fields) && fields.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var field in fields.EnumerateArray())
-            {
-                if (field.ValueKind == JsonValueKind.String)
-                {
-                    var value = field.GetString();
-                    if (value != null && value.StartsWith("blockctx:"))
-                    {
-                        if (info.HomeContext == null)
-                            info.HomeContext = value;
-                    }
-                    else if (value != null && value.StartsWith("method:"))
-                    {
-                        if (info.OuterContext == null)
-                            info.OuterContext = value;
-                    }
-                }
-            }
-        }
-
-        return info;
-    }
-
     private void ValidateBlockContext(List<Diagnostic> diagnostics, ValidationContext ctx,
         BlockContextInfo blockInfo, Dictionary<string, BlockContextInfo> allBlocks)
     {
-        var blockId = blockInfo.LocalId;
+        var blockId = blockInfo.BlockMethodId;
 
         // Validate homeContext
         if (!string.IsNullOrEmpty(blockInfo.HomeContext))
@@ -128,7 +93,7 @@ public class BlockContextClosureGraphValidator : IValidator
                     ErrorCodes.BlockHomeMissing,
                     Severity.Error,
                     $"Block '{blockId}' references non-existent homeContext '{blockInfo.HomeContext}'",
-                    new[] { new Location("objects", blockId) },
+                    new[] { new Location("metadata.blockContexts", blockId) },
                 "HomeContext must reference an existing method or block"));
             }
             else
@@ -138,10 +103,10 @@ public class BlockContextClosureGraphValidator : IValidator
                 {
                     diagnostics.Add(new Diagnostic(
                         ErrorCodes.BlockHomeMissing,
-                        Severity.Warning,
+                        Severity.Error,
                         $"Block '{blockId}' homeContext chain does not reach a method",
-                        new[] { new Location("objects", blockId) },
-                "HomeContext chain should terminate at a method"));
+                        new[] { new Location("metadata.blockContexts", blockId) },
+                "HomeContext chain MUST terminate at a method"));
                 }
             }
         }
@@ -155,7 +120,7 @@ public class BlockContextClosureGraphValidator : IValidator
                     ErrorCodes.BlockOuterMissing,
                     Severity.Error,
                     $"Block '{blockId}' references non-existent outerContext '{blockInfo.OuterContext}'",
-                    new[] { new Location("objects", blockId) },
+                    new[] { new Location("metadata.blockContexts", blockId) },
                 "OuterContext must reference an existing method"));
             }
             else if (!blockInfo.OuterContext.StartsWith("method:"))
@@ -164,7 +129,7 @@ public class BlockContextClosureGraphValidator : IValidator
                     ErrorCodes.BlockOuterNotMethod,
                     Severity.Error,
                     $"Block '{blockId}' outerContext '{blockInfo.OuterContext}' is not a method",
-                    new[] { new Location("objects", blockId) },
+                    new[] { new Location("metadata.blockContexts", blockId) },
                 "OuterContext must reference a method (lexical parent)"));
             }
         }
@@ -218,13 +183,20 @@ public class BlockContextClosureGraphValidator : IValidator
         {
             if (!string.IsNullOrEmpty(blockInfo.HomeContext))
             {
+                // If homeContext is a method, no cycle possible
+                if (blockInfo.HomeContext.StartsWith("method:"))
+                {
+                    recursionStack.Remove(blockId);
+                    return false;
+                }
+
                 if (recursionStack.Contains(blockInfo.HomeContext))
                 {
                     diagnostics.Add(new Diagnostic(
                         ErrorCodes.BlockCycle,
                         Severity.Error,
                         $"Closure cycle detected: '{blockId}' -> '{blockInfo.HomeContext}' forms a cycle",
-                        new[] { new Location("objects", blockId) },
+                        new[] { new Location("metadata.blockContexts", blockId) },
                 "HomeContext chains must not form cycles"));
                     recursionStack.Remove(blockId);
                     return true;

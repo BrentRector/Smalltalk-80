@@ -4,7 +4,8 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Root cold start bundle structure.
-/// Matches coldstart-v1.0.2.schema.json root schema.
+/// Matches coldstart-v1.0.4.schema.json root schema.
+/// v1.0.4: BlockContext objects moved to metadata.blockContexts[] (tooling-only, not runtime objects).
 /// </summary>
 public class ColdStartBundle
 {

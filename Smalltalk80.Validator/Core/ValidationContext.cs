@@ -13,6 +13,7 @@ public sealed class ValidationContext
     public IReadOnlyList<JsonElement> Objects { get; init; }
     public IReadOnlyList<JsonElement> InitExpressions { get; init; }
     public IReadOnlyList<JsonElement> Patches { get; init; }
+    public IReadOnlyList<JsonElement> BlockContexts { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<EntityRef>> IndexByLocalId { get; init; }
 
     private ValidationContext(
@@ -23,6 +24,7 @@ public sealed class ValidationContext
         IReadOnlyList<JsonElement> objects,
         IReadOnlyList<JsonElement> initExpressions,
         IReadOnlyList<JsonElement> patches,
+        IReadOnlyList<JsonElement> blockContexts,
         IReadOnlyDictionary<string, IReadOnlyList<EntityRef>> indexByLocalId)
     {
         Bundle = bundle;
@@ -32,12 +34,23 @@ public sealed class ValidationContext
         Objects = objects;
         InitExpressions = initExpressions;
         Patches = patches;
+        BlockContexts = blockContexts;
         IndexByLocalId = indexByLocalId;
     }
 
     public static ValidationContext Build(JsonDocument doc)
     {
         var root = doc.RootElement;
+
+        // Read BlockContexts from metadata.blockContexts (v1.0.4) or fallback to empty array
+        IReadOnlyList<JsonElement> blockContexts = Array.Empty<JsonElement>();
+        if (root.TryGetProperty("metadata", out var metadata) &&
+            metadata.TryGetProperty("blockContexts", out var blockContextsArray) &&
+            blockContextsArray.ValueKind == JsonValueKind.Array)
+        {
+            blockContexts = ReadArray(blockContextsArray);
+        }
+
         return new ValidationContext(
             doc,
             ReadStringArray(root, "symbols"),
@@ -46,7 +59,8 @@ public sealed class ValidationContext
             ReadArray(root, "objects"),
             ReadArray(root, "initExpressions"),
             ReadArray(root, "patches"),
-            BuildIndexByLocalId(root)
+            blockContexts,
+            BuildIndexByLocalId(root, blockContexts)
         );
     }
 
@@ -61,12 +75,18 @@ public sealed class ValidationContext
     private static IReadOnlyList<JsonElement> ReadArray(JsonElement root, string name)
     {
         if (!root.TryGetProperty(name, out var a) || a.ValueKind != JsonValueKind.Array) return Array.Empty<JsonElement>();
-        var list = new List<JsonElement>(a.GetArrayLength());
-        foreach (var el in a.EnumerateArray()) list.Add(el);
+        return ReadArray(a);
+    }
+
+    private static IReadOnlyList<JsonElement> ReadArray(JsonElement arrayElement)
+    {
+        if (arrayElement.ValueKind != JsonValueKind.Array) return Array.Empty<JsonElement>();
+        var list = new List<JsonElement>(arrayElement.GetArrayLength());
+        foreach (var el in arrayElement.EnumerateArray()) list.Add(el);
         return list;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<EntityRef>> BuildIndexByLocalId(JsonElement root)
+    private static IReadOnlyDictionary<string, IReadOnlyList<EntityRef>> BuildIndexByLocalId(JsonElement root, IReadOnlyList<JsonElement> blockContexts)
     {
         var map = new Dictionary<string, List<EntityRef>>();
         void AddFromArray(string section)
@@ -85,6 +105,16 @@ public sealed class ValidationContext
         AddFromArray("objects");
         AddFromArray("initExpressions");
         AddFromArray("patches");
+
+        // Add BlockContexts from metadata (v1.0.4)
+        foreach (var el in blockContexts)
+        {
+            if (!el.TryGetProperty("localId", out var lidProp) || lidProp.ValueKind != JsonValueKind.String) continue;
+            var lid = lidProp.GetString()!;
+            if (!map.TryGetValue(lid, out var list)) { list = []; map[lid] = list; }
+            list.Add(new EntityRef("metadata.blockContexts", el));
+        }
+
         var readonlyMap = new Dictionary<string, IReadOnlyList<EntityRef>>(map.Count);
         foreach (var kv in map) readonlyMap[kv.Key] = kv.Value.AsReadOnly();
         return readonlyMap;

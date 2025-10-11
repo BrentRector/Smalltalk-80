@@ -2,7 +2,7 @@ namespace Smalltalk80.Interpreter.Schema;
 
 /// <summary>
 /// Discriminated union for method literal frame entries.
-/// Matches coldstart-v1.0.2.schema.json#/definitions/literalValue
+/// Matches coldstart-v1.0.3.schema.json#/definitions/literalValue
 /// </summary>
 public class LiteralValue
 {
@@ -20,7 +20,7 @@ public class LiteralValue
     // For "array"
     public LiteralValue[]? Elements { get; init; }
 
-    // For "objectRef"
+    // For "objectRef" or "compiledMethod" (blocks reference methods via localId)
     public string? LocalId { get; init; }
 
     // For "character"

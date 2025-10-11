@@ -15,6 +15,7 @@ public class Loader
     private readonly ISmalltalkHeap _heap;
     private readonly Dictionary<string, int> _localIdToObjectId = new();
     private LayoutResolver? _layoutResolver;
+    private int _initExpressionsArrayId;
 
     public Loader(ColdStartBundle bundle, ISmalltalkHeap heap)
     {
@@ -23,7 +24,23 @@ public class Loader
     }
 
     /// <summary>
+    /// Gets the init expressions array ID (available after Run() completes).
+    /// </summary>
+    public int InitExpressionsArrayId => _initExpressionsArrayId;
+
+    /// <summary>
+    /// Gets the layout resolver (available after Run() completes).
+    /// </summary>
+    public LayoutResolver? LayoutResolver => _layoutResolver;
+
+    /// <summary>
+    /// Gets the localId to objectId mapping (available after Run() completes).
+    /// </summary>
+    public IReadOnlyDictionary<string, int> LocalIdToObjectId => _localIdToObjectId;
+
+    /// <summary>
     /// Executes all cold start phases in order.
+    /// Does NOT execute init expressions - that should be done separately after Run() completes.
     /// </summary>
     public void Run()
     {
@@ -98,12 +115,11 @@ public class Loader
             phase.Run();
         });
 
-        // Phase 9: Prepare Init Expressions (but don't add to SystemDictionary)
-        int initExpressionsArrayId = 0;
+        // Phase 9: Prepare Init Expressions (but don't execute them yet)
         RunPhase("Phase 9: Prepare Init Expressions", () =>
         {
             var phase = new Phase8_InitExecution(_bundle, _heap, _localIdToObjectId);
-            initExpressionsArrayId = phase.Run();
+            _initExpressionsArrayId = phase.Run();
         });
 
         // Phase 10: USTable Population
@@ -117,7 +133,6 @@ public class Loader
         Console.WriteLine($"Total objects created: {_localIdToObjectId.Count}");
 
         // Create Special Objects Array for GC roots
-        // Include init expressions array temporarily so they're reachable during GC
         RunPhase("Creating Special Objects Array", () =>
         {
             // Get USTable from GlobalRegistry
@@ -132,7 +147,7 @@ public class Loader
                 GlobalRegistry.SystemDictionaryId,
                 0, // ProcessorScheduler - will be created later when process system is initialized
                 ustableId, // USTable contains all symbols
-                initExpressionsArrayId // Temporary: keep init expressions reachable during GC verification
+                _initExpressionsArrayId // Temporary: keep init expressions reachable during GC verification
             };
             _heap.SetSpecialObjectsArray(specialObjects);
         });
