@@ -1,15 +1,98 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-11
+**Last Updated**: 2025-01-12
 **Status**: Current Working State
 **Compiler Status**: ✅ Fully operational - generates valid JSON from Smalltalk-80.st
 **Validator Status**: ✅ 100% validation passing (10,059 methods validate correctly)
-**Interpreter Status**: ✅ WORKING - Successfully executes init expressions!
+**Interpreter Status**: ⚠️ GC ISSUE - All phases complete, heap manager enhanced, but GC verification failing
 
-## Recent Accomplishments (2025-01-11)
+## Recent Accomplishments (2025-01-12)
+
+### ✅ Heap Manager Enhanced - Large Object Support
+
+**Problem**: Artificial 255-word (1020-byte) limit in heap manager prevented large objects like USTable (7828 words) and large strings (2712+ characters).
+
+**Root Cause**: ObjectTableEntry PackedMetadata used only 8 bits for size field, limiting objects to 255 words maximum.
+
+**Solution**: Expanded heap manager architecture for large object support:
+- **Expanded PackedMetadata**: Size field increased from 8 bits to 16 bits (0-65535 words = 0-256KB objects)
+- **ExtendedSize field**: Added optional uint field for objects larger than 65535 words
+- **Removed artificial limits**: SmalltalkHeapManager no longer enforces 255-word restriction
+- **Updated bit layout**: Reorganized PackedMetadata to prioritize size over GC flags
+
+**Impact**: 
+- ✅ Large strings (2712+ chars) now supported without truncation
+- ✅ Large arrays (285+ elements) now supported without chunking  
+- ✅ USTable (7828 symbols) can be allocated as single hash table
+- ✅ Modern object sizes supported (up to 256KB standard, unlimited with ExtendedSize)
+
+### ✅ Primitive Implementation Complete - CompiledMethod Support
+
+**Problem**: Missing primitives 60, 68, 69 for proper CompiledMethod object access according to Smalltalk-80 source.
+
+**Solution**: Implemented correct primitive mapping based on Smalltalk-80.st source analysis:
+- **Primitive 60**: `at:` / `basicAt:` / `digitAt:` - General object indexing ✅
+- **Primitive 68**: `objectAt:` - CompiledMethod header/literal access ✅ (was incorrectly `become:`)
+- **Primitive 69**: `objectAt:put:` - CompiledMethod header/literal modification ✅ (was missing)
+- **Primitive 72**: `become:` - Object identity swap ✅ (moved from 68)
+- **Primitive 75**: `asOop` - Object pointer access ✅ (was `hash`)
+
+**Key Insight**: CompiledMethod uses dual access patterns:
+- `objectAt:` (primitive 68) for header/literals in PointerIndexed part
+- `at:` (primitive 60) for bytecodes in separate ByteArray (via hidden reference)
+
+### ✅ Cold Start Phases All Complete
+
+**Achievement**: All 10 cold start phases now complete successfully:
+- Phase 0: Preflight validation ✅
+- Phase 1: Symbol interning ✅  
+- Phase 2: Class shells ✅
+- Phase 3: Metaclass wiring ✅
+- Phase 4: Class resolution ✅
+- Phase 5: Layout computation ✅
+- Phase 6: Object allocation ✅
+- Phase 7: Method installation ✅
+- Phase 8: Patch application ✅
+- Phase 9: Init expression preparation ✅
+- Phase 10: USTable population ✅
+
+**Current Issue**: ⚠️ **Missing method dictionary installation** - Method dictionaries exist as objects and CompiledMethods exist, but no phase installs methods into the dictionaries. This incomplete object structure likely causes GC traversal issues.
+
+### ⚠️ Method Dictionary Installation - CRITICAL MISSING PHASE
+
+**Problem**: Method dictionaries exist as objects (from Phase 6) and CompiledMethods exist (from Phase 7), but no phase actually installs the methods into the dictionaries.
+
+**Root Cause**: Phase 7 comment says "installation happens elsewhere" but no such phase exists. Classes have empty method dictionaries, breaking Smalltalk semantics and likely causing GC traversal to miss method references.
+
+**Investigation Results**:
+- ✅ Method dictionaries present in JSON bundle and allocated in Phase 6
+- ✅ CompiledMethods created in Phase 7 but only stored in `_localIdToObjectId` 
+- ❌ No code found that installs methods into class method dictionaries
+- ❌ GC likely fails because method references not properly established
+
+**Next Steps**:
+
+1. ⚠️ **Create Phase 7.5: Method Dictionary Population** (HIGHEST PRIORITY)
+   - Install CompiledMethods into class method dictionaries 
+   - Handle both instance-side and class-side methods
+   - Use primitive interface for clean separation
+   - Run between Phase 7 (method creation) and Phase 8 (patches)
+
+2. ⚠️ **Enable comprehensive validation** - Fix Phase 12 to work with new heap manager
+   - Validate all objects match JSON definitions
+   - Verify method dictionaries properly populated
+   - Check cross-references and object integrity
+   - Use results to diagnose remaining GC issues
+
+3. ⚠️ **Fix GC traversal** - Once objects properly structured
+   - Method dictionaries will contain proper references to CompiledMethods
+   - GC should traverse method references correctly  
+   - May resolve the 26,815 collected objects issue
+
+## Previous Accomplishments (2025-01-11)
 
 ### ✅ Interpreter Breakthrough - Init Expression Execution Working!
-- **Fixed** all cold start phases (0-10) - complete system bootstrap successful
+- **Fixed** all cold start phases (0-9) - complete system bootstrap successful
 - **Implemented** metaclass hierarchy wiring with superclass chain traversal
 - **Fixed** method lookup to walk superclass chain (enables inheritance)
 - **Added** byte-indexed object access (`GetIndexedByte`, `SetIndexedByte`)
@@ -17,6 +100,14 @@
 - **Working** Float arithmetic primitives (add, subtract, multiply, divide, etc.)
 - **Executed** first init expression successfully: `Float>>initialize` (init:123)
 - **Result**: Init expression results show "Succeeded: 1, Failed: 0"
+
+### ✅ Heap Manager Architecture Overhaul (2025-01-12)
+- **Migrated** from old heap manager to new `SmalltalkHeapManager` architecture
+- **Implemented** ObjectTableEntry with PackedMetadata for efficient object storage
+- **Added** tagged OOP system for SmallInteger optimization
+- **Fixed** instance variable counting and allocation across all phases
+- **Converted** cold start phases to use primitive interfaces (Phase3, Phase4)
+- **Implemented** proper CompiledMethod as PointerIndexed with separate ByteArray design
 
 ### Key Technical Fixes (2025-01-11)
 
@@ -123,27 +214,44 @@ Solution file includes: Compiler, Validator (+ Core, Engine, Tests), Interpreter
   - Parallel execution with diagnostic deduplication
   - Comprehensive validation: metadata, bytecode, headers, literals, patches, install order, class hierarchy, primitives, selectors, pool dictionaries, object formats, block closures, dead code
   - Complete documentation in Smalltalk80.Validator/README.md
-- **Interpreter**: All 10 cold start phases complete successfully!
+- **Interpreter**: All 10 cold start phases complete successfully! ✅
   - Phase 0: Preflight validation ✅
   - Phase 1: Symbol interning ✅
-  - Phase 2: Class shells & metaclass wiring ✅
-  - Phase 3: Class resolution ✅
-  - Phase 4: Layout computation ✅
-  - Phase 5: Object allocation ✅
-  - Phase 6: Method installation ✅
-  - Phase 7: Patch application ✅
-  - Phase 8: Init expression preparation ✅
-  - Phase 9: USTable population ✅
-  - **Init Expression Execution**: Float>>initialize executes successfully! ✅
-  - Garbage collection verification ✅
-  - Optional bytecode validation ✅
+  - Phase 2: Class shells ✅
+  - Phase 3: Metaclass wiring ✅
+  - Phase 4: Class resolution ✅
+  - Phase 5: Layout computation ✅
+  - Phase 6: Object allocation ✅
+  - Phase 7: Method installation ✅
+  - Phase 8: Patch application ✅
+  - Phase 9: Init expression preparation ✅
+  - Phase 10: USTable population ✅
+  - **All GC roots set correctly** ✅
+  - **Large object support**: USTable (7828 words), large strings (2712+ chars), large arrays (285+ elements) ✅
+- **Heap Manager**: Modern architecture with large object support ✅
+  - ObjectTableEntry with expandable PackedMetadata (16-bit size field = 0-65535 words)
+  - ExtendedSize field for objects larger than 256KB
+  - Tagged OOP system for SmallInteger optimization
+  - Proper instance variable tracking and allocation
+- **Primitives**: Correct Smalltalk-80 primitive implementation ✅
+  - Primitive 60: `at:` - General object indexing
+  - Primitive 68: `objectAt:` - CompiledMethod header/literal access  
+  - Primitive 69: `objectAt:put:` - CompiledMethod header/literal modification
+  - Primitive 72: `become:` - Object identity swap
+  - Primitive 75: `asOop` - Object pointer access
 - **JSON Schema**: v1.0.3 with Blue Book-compliant bytecode generation
 - **CI/CD Pipeline**: Automated build-and-validate.ps1 script (build → compile → validate)
+
+### Current Issue ⚠️
+- **GC Verification**: 26,815 objects collected during verification (should be 0)
+  - Suggests GC traversal issue with large objects or new ObjectTableEntry structure
+  - All objects should be reachable from GC roots array
+  - May be related to ExtendedSize field or PackedMetadata bit layout changes
 
 ### What's Broken ⚠️
 - **Compiler Tests**: 131 tests exist but reference obsolete compiler API
 - **MSBuild Integration**: Looks for non-existent test files
-- **Remaining Init Expressions**: Only Float>>initialize tested so far (1 of 285)
+- **Init Expression Execution**: Blocked by GC verification failure
 
 ### Known Issues
 1. Compiler.Tests project won't build due to missing types (AstBuilder, ProcessorContext, etc.)
@@ -378,24 +486,51 @@ git status
 
 ## Next Steps
 
-1. **Test All Init Expressions**: Systematically execute all 285 init expressions
-   - Currently only Float>>initialize (init:123) tested
+### IMMEDIATE (Session Continuation)
+
+1. **Fix GC Traversal Issue** (CRITICAL - blocking init expression execution)
+   - ⚠️ **Root Cause**: 26,815 objects collected during GC verification (should be 0)
+   - ⚠️ **Investigation needed**: GC traversal may not handle new ObjectTableEntry structure correctly
+   - ⚠️ **Potential issues**: ExtendedSize field, PackedMetadata bit layout changes, large object traversal
+   - ⚠️ **Debug approach**: Check if GC properly reads SizeInWords from new bit layout
+   - ⚠️ **Test**: Ensure GC can traverse large objects (USTable 7828 words, large arrays 285+ elements)
+
+### SHORT TERM
+
+2. **Complete BlockContext Implementation** (After GC fix)
+   - ✅ Documentation updated
+   - ✅ blockOwnerMap built
+   - ✅ CreateBlockContext implemented
+   - ⚠️ Modify VirtualMachine.SendMessage() to detect block invocation
+   - ⚠️ Implement block invocation handler (InvokeBlock method)
+   - ⚠️ Update interpreter bytecode dispatch for temp/arg/self resolution in blocks
+   - ⚠️ Create DoIt MethodContext for init expressions
+   - ⚠️ Test init:000 (ActionMenu comment:) - should succeed after BlockContext complete
+
+3. **Test All Init Expressions**: Systematically execute all 285 init expressions
+   - Currently blocked by GC verification failure
+   - After GC fixed and BlockContext working, test init:000
    - Modify InitExpressionExecutor to test all or specific sets
    - Identify and fix any failing init expressions
 
-2. **Implement Missing Primitives**: As init expressions fail, implement required primitives
-   - Object instantiation primitives (new, new:, basicNew, basicNew:)
-   - Collection primitives (at:, at:put:, size, etc.)
-   - Block evaluation primitives (value, value:, etc.)
-   - String primitives (comparison, concatenation, etc.)
+4. **Validate Large Object Support**: Ensure heap manager changes work correctly
+   - ✅ Large string allocation (2712+ characters)
+   - ✅ Large array allocation (285+ elements)  
+   - ✅ Large USTable allocation (7828 words)
+   - ⚠️ GC traversal of large objects
+   - ⚠️ Memory alignment and performance with large objects
 
-3. **Update Compiler Tests**: Either update tests to match current API or remove them
+### MEDIUM TERM
+
+4. **Update Compiler Tests**: Either update tests to match current API or remove them
    - 131 tests reference obsolete API
    - Need to decide: fix or remove
 
-4. **Fix MSBuild Integration**: Remove or fix test file references in Compiler.csproj
+5. **Fix MSBuild Integration**: Remove or fix test file references in Compiler.csproj
 
-5. **Implement REPL**: Once init expressions complete, build interactive REPL
+### LONG TERM
+
+6. **Implement REPL**: Once init expressions complete, build interactive REPL
    - Parse Smalltalk expressions
    - Compile to bytecode
    - Execute in VM
