@@ -1,6 +1,8 @@
-using Smalltalk80.Interpreter.InitExecution;
-using Smalltalk80.Interpreter.Schema;
-using Smalltalk80.Interpreter.VM;
+using Smalltalk80.Interpreter.Engine;
+using Smalltalk80.Interpreter.Engine.InitExecution;
+using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter;
 
@@ -45,13 +47,13 @@ public static class Program
             Console.WriteLine($"  Methods: {bundle.Methods.Length}");
             Console.WriteLine();
 
-            // Create the heap implementation
-            Console.WriteLine("Initializing heap...");
-            var heap = new SmalltalkHeap();
+            // Create the heap manager
+            Console.WriteLine("Initializing heap manager...");
+            var heapManager = new SmalltalkHeapManager();
 
             // Create and run the loader
             Console.WriteLine("Starting cold start loader...");
-            var loader = new Loader(bundle, heap);
+            var loader = new Loader(bundle, heapManager);
             loader.Run();
 
             Console.WriteLine("\n=== Executing Init Expressions ===\n");
@@ -59,9 +61,9 @@ public static class Program
             // Execute init expressions AFTER cold start completes
             if (loader.InitExpressionsArrayId != 0 && loader.LayoutResolver != null)
             {
-                var vm = new VirtualMachine((SmalltalkHeap)heap, loader.LayoutResolver);
+                var vm = new VirtualMachine(heapManager, loader.LayoutResolver);
                 var executor = new InitExpressionExecutor(
-                    heap,
+                    heapManager,
                     vm,
                     loader.LocalIdToObjectId.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     InitPolicy.ContinueAndCollect,
@@ -99,7 +101,7 @@ public static class Program
                 Console.WriteLine();
                 Console.WriteLine($"Dumping class: {dumpClassName}");
                 Console.WriteLine();
-                string classDump = ClassPrettyPrinter.DumpClass(heap, dumpClassName);
+                string classDump = ClassPrettyPrinter.DumpClass(heapManager, dumpClassName);
                 Console.WriteLine(classDump);
             }
 

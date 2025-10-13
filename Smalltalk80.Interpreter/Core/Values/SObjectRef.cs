@@ -3,7 +3,7 @@ namespace Smalltalk80.Interpreter.Core.Values;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Smalltalk80.Interpreter.Core.Objects;
-using Smalltalk80.Interpreter.Memory;
+using Smalltalk80.Interpreter.Core.Memory;
 
 /// <summary>
 /// A tagged reference that can hold either a Smalltalk object pointer or a SmallInteger immediate value.

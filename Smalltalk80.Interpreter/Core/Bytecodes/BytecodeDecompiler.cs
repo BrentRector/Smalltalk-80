@@ -1,6 +1,6 @@
 using System.Text;
 using Smalltalk80.Core.Bytecodes;
-using Smalltalk80.Interpreter.VM;
+using Smalltalk80.Interpreter.Core.VM;
 
 namespace Smalltalk80.Interpreter.Core.Bytecodes;
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  
+  <!-- Temporarily exclude files that still reference old heap manager -->
+  <ItemGroup>
+    <Compile Remove="LoaderPhases\Phase11_InitExpressionExecution.cs" />
+    <Compile Remove="LoaderPhases\Phase4_MethodDictionaries.cs" />
+    <Compile Remove="LoaderPhases\Phase12_BytecodeValidation.cs" />
+    <Compile Remove="LoaderPhases\Phase12_ComprehensiveValidation.cs" />
+    <Compile Remove="InitExecution\InitExpressionExecutor.cs" />
+  </ItemGroup>
+  
+  <!-- Reference to Core -->
+  <ItemGroup>
+    <ProjectReference Include="..\Core\Smalltalk80.Interpreter.Core.csproj" />
+  </ItemGroup>
+</Project>

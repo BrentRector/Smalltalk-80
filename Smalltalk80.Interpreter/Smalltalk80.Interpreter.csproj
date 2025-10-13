@@ -3,29 +3,28 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
-    <LangVersion>13</LangVersion>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-
+  
+  <!-- Reference to Engine (which references Core) -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
   </ItemGroup>
-
+  
+  <!-- Only CLI files -->
   <ItemGroup>
-    <!-- Project reference to Compiler to ensure it builds first -->
+    <Compile Include="TestColdStart.cs" />
+  </ItemGroup>
+  
+  <!-- Preserve existing compiler integration -->
+  <ItemGroup>
     <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
-      <!-- Don't copy compiler assembly to output, we only want the coldstart.json -->
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
-
-  <!-- Link to shared bytecode definitions -->
-  <ItemGroup>
-    <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
-  </ItemGroup>
-
+  
   <!-- Copy coldstart.json from Compiler output to Interpreter output after Compiler builds -->
   <Target Name="CopyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
@@ -44,5 +43,6 @@
       Importance="high"
       Condition="!Exists('$(ColdStartSource)')" />
   </Target>
+
 
 </Project>

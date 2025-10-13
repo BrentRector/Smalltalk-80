@@ -1,0 +1,487 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.VM;
+
+namespace Smalltalk80.Interpreter.Core;
+
+/// <summary>
+/// Semantic allocator that wraps the semantic-agnostic heap manager.
+/// Provides high-level allocation methods with knowledge of Smalltalk object structure.
+/// This layer handles all semantic knowledge about object formats, slot calculations, etc.
+/// </summary>
+public class SemanticAllocator
+{
+    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ColdStartBundle _bundle;
+
+    public SemanticAllocator(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    {
+        _heapManager = heapManager;
+        _bundle = bundle;
+    }
+
+    /// <summary>
+    /// Allocates a basic object with only fixed instance variables (Pointer format).
+    /// Common for: Association, Character, True/False/UndefinedObject, etc.
+    /// Does NOT set class reference - must be done in separate pass.
+    /// </summary>
+    public SmalltalkOOP AllocateFixedObject(string className)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Just allocate - no cross-references set
+        return _heapManager.AllocateObject(ObjectFormat.Pointer, fixedSlots, 0);
+    }
+
+    /// <summary>
+    /// Allocates a string object (ByteIndexed format).
+    /// Common for: Symbol, String literals.
+    /// Does NOT set class reference - must be done in separate pass.
+    /// </summary>
+    public SmalltalkOOP AllocateString(string value)
+    {
+        int fixedSlots = CalculateInstanceVariableCount("String");
+        byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
+        
+        // Allocate ByteIndexed object
+        var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
+        
+        // Store the string bytes
+        for (int i = 0; i < stringBytes.Length; i++)
+        {
+            _heapManager.SetIndexedByte(stringOOP, i, stringBytes[i]);
+        }
+        
+        return stringOOP;
+    }
+
+    /// <summary>
+    /// Allocates a string object (ByteIndexed format) with specific class name.
+    /// Overload for backward compatibility.
+    /// </summary>
+    public SmalltalkOOP AllocateString(string className, int stringLength)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Just allocate - no cross-references set
+        return _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringLength);
+    }
+
+    /// <summary>
+    /// Allocates an array object (PointerIndexed format).
+    /// Common for: Array, USTable, MethodDictionary, CompiledMethod.
+    /// Does NOT set class reference - must be done in separate pass.
+    /// </summary>
+    public SmalltalkOOP AllocateArray(string className, int elementCount)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Just allocate - no cross-references set
+        return _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
+    }
+
+    /// <summary>
+    /// Allocates a byte array object (ByteIndexed format).
+    /// Common for: ByteArray, Float (8 bytes), bytecode arrays.
+    /// Does NOT set class reference - must be done in separate pass.
+    /// </summary>
+    public SmalltalkOOP AllocateByteArray(string className, byte[] bytes)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Allocate ByteIndexed object
+        var byteArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, bytes.Length);
+        
+        // Store the bytes
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            _heapManager.SetIndexedByte(byteArrayOOP, i, bytes[i]);
+        }
+        
+        return byteArrayOOP;
+    }
+
+    /// <summary>
+    /// Allocates a byte array object (ByteIndexed format) with size only.
+    /// Overload for backward compatibility.
+    /// </summary>
+    public SmalltalkOOP AllocateByteArray(string className, int byteCount)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Just allocate - no cross-references set
+        return _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, byteCount);
+    }
+
+    /// <summary>
+    /// Low-level allocation for custom object layouts.
+    /// Does NOT set class reference - must be done in separate pass.
+    /// </summary>
+    public SmalltalkOOP AllocateObject(string className, ObjectFormat format, int indexedSize)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        
+        // Just allocate - no cross-references set
+        return _heapManager.AllocateObject(format, fixedSlots, indexedSize);
+    }
+
+    /// <summary>
+    /// Sets the class OOP in slot 0 (used to fix placeholder references).
+    /// </summary>
+    public void SetObjectClass(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
+    {
+        _heapManager.SetSlot(objectOOP, 0, classOOP);
+    }
+
+    /// <summary>
+    /// Gets raw slot access to the underlying heap manager.
+    /// </summary>
+    public SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
+    {
+        return _heapManager.GetSlot(objectOOP, slotIndex);
+    }
+
+    /// <summary>
+    /// Sets raw slot access to the underlying heap manager.
+    /// </summary>
+    public void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
+    {
+        _heapManager.SetSlot(objectOOP, slotIndex, value);
+    }
+
+    /// <summary>
+    /// Gets indexed byte from ByteIndexed objects.
+    /// </summary>
+    public byte GetIndexedByte(SmalltalkOOP objectOOP, int index)
+    {
+        return _heapManager.GetIndexedByte(objectOOP, index);
+    }
+
+    /// <summary>
+    /// Sets indexed byte in ByteIndexed objects.
+    /// </summary>
+    public void SetIndexedByte(SmalltalkOOP objectOOP, int index, byte value)
+    {
+        _heapManager.SetIndexedByte(objectOOP, index, value);
+    }
+
+    /// <summary>
+    /// Gets indexed OOP from PointerIndexed objects.
+    /// </summary>
+    public SmalltalkOOP GetIndexedOOP(SmalltalkOOP objectOOP, int index)
+    {
+        return _heapManager.GetIndexedOOP(objectOOP, index);
+    }
+
+    /// <summary>
+    /// Sets indexed OOP in PointerIndexed objects.
+    /// </summary>
+    public void SetIndexedOOP(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
+    {
+        _heapManager.SetIndexedOOP(objectOOP, index, value);
+    }
+
+    /// <summary>
+    /// Gets instance variable from objects.
+    /// </summary>
+    public SmalltalkOOP GetInstanceVariable(SmalltalkOOP objectOOP, int index)
+    {
+        return _heapManager.GetInstanceVariable(objectOOP, index);
+    }
+
+    /// <summary>
+    /// Sets instance variable in objects.
+    /// </summary>
+    public void SetInstanceVariable(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
+    {
+        _heapManager.SetInstanceVariable(objectOOP, index, value);
+    }
+
+    /// <summary>
+    /// Calculates the total instance variable count for a class.
+    /// </summary>
+    private int CalculateInstanceVariableCount(string className)
+    {
+        return ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+    }
+
+    /// <summary>
+    /// Gets the indexed size of an object.
+    /// </summary>
+    public int GetIndexedSize(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetIndexedSize(objectOOP);
+    }
+
+    /// <summary>
+    /// Gets the instance variable count of an object.
+    /// </summary>
+    public int GetInstanceVariableCount(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetInstanceVariableCount(objectOOP);
+    }
+
+    /// <summary>
+    /// Validates that an OOP refers to a valid object.
+    /// </summary>
+    public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.IsValidObjectOOP(objectOOP);
+    }
+
+    /// <summary>
+    /// Gets the object format from ObjectTableEntry.
+    /// </summary>
+    public ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetObjectFormat(objectOOP);
+    }
+
+    /// <summary>
+    /// Gets the OOP stored in slot 0 (class reference).
+    /// </summary>
+    public SmalltalkOOP GetClassOOP(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetClassOOP(objectOOP);
+    }
+
+    /// <summary>
+    /// Implements objectAt: primitive with proper index translation.
+    /// Smalltalk objectAt: 1 → C# indexed slot 0 (header)
+    /// Smalltalk objectAt: 2 → C# indexed slot 1 (literal1)
+    /// Does NOT provide access to hidden bytecode array reference.
+    /// </summary>
+    public SmalltalkOOP ObjectAt(SmalltalkOOP objectOOP, int smalltalkIndex)
+    {
+        if (smalltalkIndex < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), "Smalltalk uses 1-based indexing");
+        }
+        
+        // Convert Smalltalk 1-based to C# 0-based
+        int csharpIndex = smalltalkIndex - 1;
+        
+        // Get object format to determine access limits
+        var format = _heapManager.GetObjectFormat(objectOOP);
+        int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+        
+        // For CompiledMethod, hide the last slot (bytecode array reference)
+        if (IsCompiledMethod(objectOOP))
+        {
+            int visibleSlots = indexedSize - 1; // Hide bytecode array OOP
+            if (csharpIndex >= visibleSlots)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {visibleSlots}]");
+            }
+        }
+        else
+        {
+            if (csharpIndex >= indexedSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {indexedSize}]");
+            }
+        }
+        
+        return _heapManager.GetIndexedOOP(objectOOP, csharpIndex);
+    }
+
+    /// <summary>
+    /// Implements objectAt:put: primitive with proper index translation.
+    /// </summary>
+    public void ObjectAtPut(SmalltalkOOP objectOOP, int smalltalkIndex, SmalltalkOOP value)
+    {
+        if (smalltalkIndex < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), "Smalltalk uses 1-based indexing");
+        }
+        
+        // Convert Smalltalk 1-based to C# 0-based
+        int csharpIndex = smalltalkIndex - 1;
+        
+        // Get object format to determine access limits
+        var format = _heapManager.GetObjectFormat(objectOOP);
+        int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+        
+        // For CompiledMethod, hide the last slot (bytecode array reference)
+        if (IsCompiledMethod(objectOOP))
+        {
+            int visibleSlots = indexedSize - 1; // Hide bytecode array OOP
+            if (csharpIndex >= visibleSlots)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {visibleSlots}]");
+            }
+        }
+        else
+        {
+            if (csharpIndex >= indexedSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {indexedSize}]");
+            }
+        }
+        
+        _heapManager.SetIndexedOOP(objectOOP, csharpIndex, value);
+    }
+
+    /// <summary>
+    /// Implements at: primitive for byte-indexed access.
+    /// For CompiledMethod: accesses bytecodes via hidden ByteArray reference.
+    /// For other ByteIndexed objects: accesses bytes directly.
+    /// </summary>
+    public byte At(SmalltalkOOP objectOOP, int smalltalkIndex)
+    {
+        if (smalltalkIndex < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), "Smalltalk uses 1-based indexing");
+        }
+        
+        // Convert Smalltalk 1-based to C# 0-based
+        int csharpIndex = smalltalkIndex - 1;
+        
+        if (IsCompiledMethod(objectOOP))
+        {
+            // Access bytecodes via hidden ByteArray reference
+            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+            var bytecodeArrayOOP = _heapManager.GetIndexedOOP(objectOOP, indexedSize - 1); // Last slot
+            
+            int bytecodeArraySize = _heapManager.GetIndexedSize(bytecodeArrayOOP);
+            if (csharpIndex >= bytecodeArraySize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Bytecode index {smalltalkIndex} out of range [1, {bytecodeArraySize}]");
+            }
+            
+            return _heapManager.GetIndexedByte(bytecodeArrayOOP, csharpIndex);
+        }
+        else
+        {
+            // Direct byte access for other ByteIndexed objects
+            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+            if (csharpIndex >= indexedSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {indexedSize}]");
+            }
+            
+            return _heapManager.GetIndexedByte(objectOOP, csharpIndex);
+        }
+    }
+
+    /// <summary>
+    /// Implements at:put: primitive for byte-indexed access.
+    /// </summary>
+    public void AtPut(SmalltalkOOP objectOOP, int smalltalkIndex, byte value)
+    {
+        if (smalltalkIndex < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), "Smalltalk uses 1-based indexing");
+        }
+        
+        // Convert Smalltalk 1-based to C# 0-based
+        int csharpIndex = smalltalkIndex - 1;
+        
+        if (IsCompiledMethod(objectOOP))
+        {
+            // Access bytecodes via hidden ByteArray reference
+            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+            var bytecodeArrayOOP = _heapManager.GetIndexedOOP(objectOOP, indexedSize - 1); // Last slot
+            
+            int bytecodeArraySize = _heapManager.GetIndexedSize(bytecodeArrayOOP);
+            if (csharpIndex >= bytecodeArraySize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Bytecode index {smalltalkIndex} out of range [1, {bytecodeArraySize}]");
+            }
+            
+            _heapManager.SetIndexedByte(bytecodeArrayOOP, csharpIndex, value);
+        }
+        else
+        {
+            // Direct byte access for other ByteIndexed objects
+            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+            if (csharpIndex >= indexedSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(smalltalkIndex), $"Index {smalltalkIndex} out of range [1, {indexedSize}]");
+            }
+            
+            _heapManager.SetIndexedByte(objectOOP, csharpIndex, value);
+        }
+    }
+
+    /// <summary>
+    /// Determines if an object is a CompiledMethod based on its class.
+    /// </summary>
+    private bool IsCompiledMethod(SmalltalkOOP objectOOP)
+    {
+        // Get class OOP and check if it's the CompiledMethod class
+        var classOOP = _heapManager.GetClassOOP(objectOOP);
+        int compiledMethodClassId = GlobalRegistry.LookupClassObjectId("CompiledMethod");
+        return classOOP.AsObjectTableIndex() == compiledMethodClassId;
+    }
+
+    /// <summary>
+    /// Allocates a Float object (ByteIndexed format with 8 bytes for IEEE 754 double).
+    /// </summary>
+    public SmalltalkOOP AllocateFloat(double value)
+    {
+        int fixedSlots = CalculateInstanceVariableCount("Float");
+        
+        // Allocate ByteIndexed object with 8 bytes for IEEE 754 double
+        var floatOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, 8);
+        
+        // Store the double as 8 bytes
+        byte[] bytes = BitConverter.GetBytes(value);
+        for (int i = 0; i < 8; i++)
+        {
+            _heapManager.SetIndexedByte(floatOOP, i, bytes[i]);
+        }
+        
+        return floatOOP;
+    }
+
+    /// <summary>
+    /// Allocates a CompiledMethod object following our C# design:
+    /// PointerIndexed: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
+    /// + Separate ByteArray for actual bytecodes
+    /// 
+    /// Smalltalk access patterns:
+    /// - objectAt: 1 → header (our indexed slot 0)
+    /// - objectAt: 2 → literal1 (our indexed slot 1) 
+    /// - at: 1 → first bytecode (via hidden ByteArray reference)
+    /// </summary>
+    public SmalltalkOOP AllocateCompiledMethod(string className, int headerWord, int[] literalRawValues, byte[] bytecodes)
+    {
+        int fixedSlots = CalculateInstanceVariableCount(className);
+        int indexedSlots = 1 + literalRawValues.Length + 1; // header + literals + bytecodeArrayOOP
+        
+        // Step 1: Create separate ByteArray for bytecodes
+        var bytecodeArrayOOP = AllocateByteArray("ByteArray", bytecodes);
+        // Set ByteArray class reference (since this is called after Phase Y)
+        int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
+        var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
+        SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
+        
+        // Step 2: Allocate PointerIndexed CompiledMethod
+        var methodOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
+        
+        // Step 3: Set class reference in hidden slot 0 (since this is called after Phase Y)
+        int classObjectId = GlobalRegistry.LookupClassObjectId(className);
+        var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
+        SetSlot(methodOOP, 0, classOOP);
+        
+        // Step 4: Populate indexed slots
+        // Indexed slot 0: Method header (accessed via objectAt: 1)
+        _heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
+        
+        // Slots 1..N: Literals (accessed via objectAt: 2, objectAt: 3, etc.)
+        // Note: literalRawValues contains mixed values: object pointers and tagged SmallIntegers
+        for (int i = 0; i < literalRawValues.Length; i++)
+        {
+            var literalOOP = new SmalltalkOOP(literalRawValues[i]);
+            _heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOP);
+        }
+        
+        // Slot N+1: Hidden ByteArray reference (not accessible from Smalltalk)
+        _heapManager.SetIndexedOOP(methodOOP, literalRawValues.Length + 1, bytecodeArrayOOP);
+        
+        return methodOOP;
+    }
+
+}

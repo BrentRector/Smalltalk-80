@@ -4,5 +4,8 @@
         "mode": "none"
     },
     "csharp.debug.logging.exceptions": false,
-    "explorer.autoReveal": false
+    "explorer.autoReveal": false,
+    "claude-code.environmentVariables": [
+        
+    ]
 }

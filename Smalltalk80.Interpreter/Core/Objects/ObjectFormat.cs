@@ -13,7 +13,7 @@ public enum ObjectFormat
 
     /// <summary>
     /// Object with both named instance variables and indexed pointer fields.
-    /// Used for Array, OrderedCollection, etc.
+    /// Used for Array, OrderedCollection, CompiledMethod, etc.
     /// </summary>
     PointerIndexed = 1,
 
@@ -27,11 +27,5 @@ public enum ObjectFormat
     /// Object with indexed word fields (16-bit).
     /// Used for WordArray, etc.
     /// </summary>
-    WordIndexed = 3,
-
-    /// <summary>
-    /// CompiledMethod object with special format.
-    /// Header, literals (pointers), and bytecode (bytes).
-    /// </summary>
-    CompiledMethod = 4
+    WordIndexed = 3
 }
