@@ -39,7 +39,7 @@ public class Phase11_InitExecution
 
         foreach (var expr in _bundle.InitExpressions)
         {
-            var literalIds = expr.Literals.Select(ResolveLiteral).ToArray();
+            var literalOOPs = expr.Literals.Select(ResolveLiteralAsOOP).ToArray();
 
             // Create a method object for the init expression to keep its literals alive
             // This will be executed after GC verification
@@ -54,7 +54,7 @@ public class Phase11_InitExecution
                     Literals = Array.Empty<LiteralValue>(), // already resolved
                     Bytecodes = expr.Bytecodes
                 },
-                literalIds,
+                literalOOPs,
                 bytecodes);
 
             initExprMethods.Add(initMethodId);
@@ -65,8 +65,7 @@ public class Phase11_InitExecution
         // This will be stored temporarily as a GC root, then executed and discarded
         if (initExprMethods.Count > 0)
         {
-            Console.WriteLine($"DEBUG: Creating single array for {initExprMethods.Count} init expressions");
-            return AllocateArray(initExprMethods.ToArray());
+            return AllocateArray(initExprMethods.Select(id => SmalltalkOOP.FromObjectTableIndex(id)).ToArray());
         }
 
         return 0;
@@ -79,23 +78,23 @@ public class Phase11_InitExecution
     /// Init expressions use the same LiteralValue type as methods.
     /// v1.0.3: Supports "compiledMethod" for nested blocks.
     /// </summary>
-    private int ResolveLiteral(LiteralValue literal)
+    private SmalltalkOOP ResolveLiteralAsOOP(LiteralValue literal)
     {
         return literal.Type switch
         {
-            "symbol" => InternSymbol(_bundle.Symbols[literal.Index!.Value]),
-            "string" => InternString(_bundle.Strings[literal.Index!.Value]),
-            "smallInt" => EncodeSmallInteger(GetIntValue(literal.Value!)),
-            "float" => AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.NilObjectId,
-            "true" => GlobalRegistry.TrueObjectId,
-            "false" => GlobalRegistry.FalseObjectId,
-            "objectRef" => _localIdToObjectId[literal.LocalId!],
-            "compiledMethod" => _localIdToObjectId[literal.LocalId!],  // v1.0.3: Blocks reference their method via localId
-            "character" => AllocateCharacter(literal.CodePoint!.Value),
-            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
-            "association" => ResolveAssociation(literal.Association!),
-            "array" => AllocateArrayLiteral(literal.Elements!.Select(ResolveLiteral).ToArray()),
+            "symbol" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_bundle.Symbols[literal.Index!.Value])),
+            "string" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Symbols[literal.Index!.Value])),
+            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
+            "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(literal.Value!))),
+            "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
+            "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
+            "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
+            "objectRef" => SmalltalkOOP.FromObjectTableIndex(_localIdToObjectId[literal.LocalId!]),
+            "compiledMethod" => SmalltalkOOP.FromObjectTableIndex(_localIdToObjectId[literal.LocalId!]),
+            "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(literal.CodePoint!.Value)),
+            "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(literal.Encoding!, literal.Data!)),
+            "association" => SmalltalkOOP.FromObjectTableIndex(ResolveAssociation(literal.Association!)),
+            "array" => SmalltalkOOP.FromObjectTableIndex(AllocateArrayLiteral(literal.Elements!.Select(ResolveLiteralAsOOP).ToArray())),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
     }
@@ -125,7 +124,7 @@ public class Phase11_InitExecution
     /// Creates a CompiledMethod object using the new PointerIndexed design.
     /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
-    private int CreateCompiledMethod(MethodDescriptor method, int[] literalIds, byte[] bytecodes)
+    private int CreateCompiledMethod(MethodDescriptor method, SmalltalkOOP[] literalOOPs, byte[] bytecodes)
     {
         // Look up CompiledMethod class layout
         var compiledMethodClassDefinition = FindClassDefinition("CompiledMethod");
@@ -134,55 +133,39 @@ public class Phase11_InitExecution
             throw new InvalidOperationException("CompiledMethod class not found in bundle");
         }
 
-        // Create ByteArray object for bytecodes first
-        int bytecodeArrayId = AllocateByteArrayForBytecodes(bytecodes);
-        
-        // Calculate OOP slots: header + literals + bytecode array reference
-        int oopSlots = 1 + literalIds.Length + 1; // header + literals + bytecodeArrayOOP
+        // Calculate OOP slots: header + literals + bytecode array reference  
+        // (AllocateCompiledMethod will create the ByteArray internally)
+        int oopSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
         int totalWords = CalculateTotalInstanceVariableCount(compiledMethodClassDefinition) + oopSlots;
         
-        Console.WriteLine($"DEBUG: Creating init expression {method.LocalId} with {literalIds.Length} literals, {bytecodes.Length} bytecodes, total {totalWords} words");
         
         if (totalWords > 255)
         {
-            throw new InvalidOperationException($"Init expression {method.LocalId} too large: {totalWords} words (literals: {literalIds.Length}, bytecodes: {bytecodes.Length})");
+            throw new InvalidOperationException($"Init expression {method.LocalId} too large: {totalWords} words (literals: {literalOOPs.Length}, bytecodes: {bytecodes.Length})");
         }
         
-        var methodOOP = _allocator.AllocateCompiledMethod("CompiledMethod", method.Header.Word, literalIds, bytecodes);
+        var methodOOP = _allocator.AllocateCompiledMethod("CompiledMethod", method.Header.Word, literalOOPs, bytecodes);
 
-        // Set method header at index 0
-        _allocator.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(method.Header.Word));
-        
-        // Set literals at indices 1..N
-        for (int i = 0; i < literalIds.Length; i++)
-        {
-            _allocator.SetIndexedOOP(methodOOP, i + 1, SmalltalkOOP.FromObjectTableIndex(literalIds[i]));
-        }
-        
-        // Set bytecode array reference at final index (hidden from objectAt: primitive)
-        int bytecodeArrayIndex = 1 + literalIds.Length;
-        _allocator.SetIndexedOOP(methodOOP, bytecodeArrayIndex, SmalltalkOOP.FromObjectTableIndex(bytecodeArrayId));
-
+        // AllocateCompiledMethod already sets up the header, literals, and bytecode array reference
         return methodOOP.AsObjectTableIndex();
     }
 
     /// <summary>
     /// Allocates an Array object for literal arrays with debug output.
     /// </summary>
-    private int AllocateArrayLiteral(int[] elementIds)
+    private int AllocateArrayLiteral(SmalltalkOOP[] elementOOPs)
     {
-        Console.WriteLine($"DEBUG: AllocateArrayLiteral called with {elementIds.Length} elements");
-        if (elementIds.Length > 200)
+        if (elementOOPs.Length > 200)
         {
-            Console.WriteLine($"WARNING: Large array literal with {elementIds.Length} elements!");
+            Console.WriteLine($"WARNING: Large array literal with {elementOOPs.Length} elements!");
         }
-        return AllocateArray(elementIds);
+        return AllocateArray(elementOOPs);
     }
 
     /// <summary>
     /// Allocates an Array object.
     /// </summary>
-    private int AllocateArray(int[] elementIds)
+    private int AllocateArray(SmalltalkOOP[] elementOOPs)
     {
         // Look up Array class layout
         var arrayClassDefinition = FindClassDefinition("Array");
@@ -192,16 +175,14 @@ public class Phase11_InitExecution
         }
 
         int arrayInstanceVars = CalculateTotalInstanceVariableCount(arrayClassDefinition);
-        int totalWords = arrayInstanceVars + elementIds.Length;
-        Console.WriteLine($"DEBUG: Allocating Array with {elementIds.Length} elements, {arrayInstanceVars} instance vars, total {totalWords} words");
+        int totalWords = arrayInstanceVars + elementOOPs.Length;
 
-        var arrayOOP = _allocator.AllocateArray("Array", elementIds.Length);
+        var arrayOOP = _allocator.AllocateArray("Array", elementOOPs.Length);
 
         // Store the elements
-        for (int i = 0; i < elementIds.Length; i++)
+        for (int i = 0; i < elementOOPs.Length; i++)
         {
-            var elementOOP = SmalltalkOOP.FromObjectTableIndex(elementIds[i]);
-            _allocator.SetIndexedOOP(arrayOOP, i, elementOOP);
+            _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
         }
 
         return arrayOOP.AsObjectTableIndex();
@@ -229,7 +210,6 @@ public class Phase11_InitExecution
     /// </summary>
     private int InternString(string value)
     {
-        Console.WriteLine($"DEBUG: InternString called with string length {value.Length}");
         
         // Look up String class layout from bundle data
         var stringClassDefinition = FindClassDefinition("String");
@@ -298,7 +278,6 @@ public class Phase11_InitExecution
     /// </summary>
     private int AllocateByteArray(string encoding, string data)
     {
-        Console.WriteLine($"DEBUG: AllocateByteArray called with encoding={encoding}, data length={data.Length}");
         // Look up ByteArray class layout
         var byteArrayClassDefinition = FindClassDefinition("ByteArray");
         if (byteArrayClassDefinition == null)
@@ -317,24 +296,6 @@ public class Phase11_InitExecution
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
 
         return byteArrayOOP.AsObjectTableIndex();
-    }
-
-    /// <summary>
-    /// Allocates a ByteArray object specifically for CompiledMethod bytecodes.
-    /// </summary>
-    private int AllocateByteArrayForBytecodes(byte[] bytecodes)
-    {
-        Console.WriteLine($"DEBUG: AllocateByteArrayForBytecodes called with {bytecodes.Length} bytes");
-        // Look up ByteArray class layout
-        var byteArrayClassDefinition = FindClassDefinition("ByteArray");
-        if (byteArrayClassDefinition == null)
-        {
-            throw new InvalidOperationException("ByteArray class not found in bundle");
-        }
-
-        var bytecodeArrayOOP = _allocator.AllocateByteArray("ByteArray", bytecodes);
-
-        return bytecodeArrayOOP.AsObjectTableIndex();
     }
 
     /// <summary>

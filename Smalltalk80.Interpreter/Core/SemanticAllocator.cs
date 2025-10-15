@@ -69,15 +69,35 @@ public class SemanticAllocator
     }
 
     /// <summary>
-    /// Allocates an array object (PointerIndexed format).
+    /// Allocates an array object (PointerIndexed format) with class reference set.
+    /// Common for: Array, USTable, MethodDictionary, CompiledMethod.
+    /// REQUIRES classOOP parameter to ensure class reference is always set.
+    /// This is the new API for Phase 7+ that eliminates NULL_CLASS issues.
+    /// </summary>
+    public SmalltalkOOP AllocateArray(SmalltalkOOP classOOP, int elementCount)
+    {
+        int fixedSlots = CalculateInstanceVariableCountFromClass(classOOP);
+        
+        // Allocate the object
+        var arrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
+        
+        // ALWAYS set class reference immediately - no way to forget this step
+        _heapManager.SetSlot(arrayOOP, 0, classOOP);
+        
+        return arrayOOP;
+    }
+
+    /// <summary>
+    /// Allocates an array object (PointerIndexed format) - legacy API for early phases.
     /// Common for: Array, USTable, MethodDictionary, CompiledMethod.
     /// Does NOT set class reference - must be done in separate pass.
+    /// This is the old API used by Phases 0-6 during bootstrap.
     /// </summary>
     public SmalltalkOOP AllocateArray(string className, int elementCount)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
         
-        // Just allocate - no cross-references set
+        // Just allocate - no cross-references set (bootstrap phase)
         return _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
     }
 
@@ -196,6 +216,32 @@ public class SemanticAllocator
     public void SetInstanceVariable(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         _heapManager.SetInstanceVariable(objectOOP, index, value);
+    }
+
+    /// <summary>
+    /// Calculates the total instance variable count from a class object.
+    /// Currently uses conservative approach during development.
+    /// TODO: Implement full class introspection when class objects are fully formed.
+    /// </summary>
+    private int CalculateInstanceVariableCountFromClass(SmalltalkOOP classOOP)
+    {
+        // For now, use well-known class mappings to determine instance variable counts
+        // This is accurate for the common cases and safer during bootstrap
+        int classId = classOOP.AsObjectTableIndex();
+        
+        // Look up well-known classes by their object IDs
+        if (classId == GlobalRegistry.LookupClassObjectId("Array"))
+            return 0; // Array has no instance variables (pure indexed)
+        else if (classId == GlobalRegistry.LookupClassObjectId("MethodDictionary"))
+            return 2; // MethodDictionary has 2 instance variables (valueArray + tally)
+        else if (classId == GlobalRegistry.LookupClassObjectId("CompiledMethod"))
+            return 0; // CompiledMethod has no instance variables (pure indexed with header + literals)
+        else
+        {
+            // For unknown classes during Phase 7+, use conservative approach
+            // TODO: Implement actual class object introspection
+            return 0;
+        }
     }
 
     /// <summary>
@@ -446,10 +492,10 @@ public class SemanticAllocator
     /// - objectAt: 2 → literal1 (our indexed slot 1) 
     /// - at: 1 → first bytecode (via hidden ByteArray reference)
     /// </summary>
-    public SmalltalkOOP AllocateCompiledMethod(string className, int headerWord, int[] literalRawValues, byte[] bytecodes)
+    public SmalltalkOOP AllocateCompiledMethod(string className, int headerWord, SmalltalkOOP[] literalOOPs, byte[] bytecodes)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        int indexedSlots = 1 + literalRawValues.Length + 1; // header + literals + bytecodeArrayOOP
+        int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
         
         // Step 1: Create separate ByteArray for bytecodes
         var bytecodeArrayOOP = AllocateByteArray("ByteArray", bytecodes);
@@ -471,15 +517,13 @@ public class SemanticAllocator
         _heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
         
         // Slots 1..N: Literals (accessed via objectAt: 2, objectAt: 3, etc.)
-        // Note: literalRawValues contains mixed values: object pointers and tagged SmallIntegers
-        for (int i = 0; i < literalRawValues.Length; i++)
+        for (int i = 0; i < literalOOPs.Length; i++)
         {
-            var literalOOP = new SmalltalkOOP(literalRawValues[i]);
-            _heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOP);
+            _heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOPs[i]);
         }
         
         // Slot N+1: Hidden ByteArray reference (not accessible from Smalltalk)
-        _heapManager.SetIndexedOOP(methodOOP, literalRawValues.Length + 1, bytecodeArrayOOP);
+        _heapManager.SetIndexedOOP(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
         
         return methodOOP;
     }
