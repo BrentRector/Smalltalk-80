@@ -50,9 +50,18 @@ public class Phase13_GlobalVariableInstallation
             installedGlobals++;
         }
 
-        // TODO: Install other system globals as needed:
-        // - ProcessorScheduler (when process system is implemented)
-        // - Character table, etc.
+        // Install all classes as global variables in SystemDictionary
+        // Each class becomes accessible as: Smalltalk at: #ClassName
+        foreach (var cls in _bundle.Classes)
+        {
+            // Only install instance classes (not metaclasses) as globals
+            if (!cls.IsMetaclass && _localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
+            {
+                string className = _bundle.Symbols[cls.NameIndex];
+                InstallClassGlobal(className, classObjectId);
+                installedGlobals++;
+            }
+        }
 
         Console.WriteLine($"DEBUG: Global variable installation complete: {installedGlobals} globals installed");
     }
@@ -88,6 +97,22 @@ public class Phase13_GlobalVariableInstallation
         
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationId, "USTable");
+    }
+
+    /// <summary>
+    /// Installs a class as a global variable in SystemDictionary.
+    /// This enables: Smalltalk at: #ClassName -> Class object
+    /// </summary>
+    private void InstallClassGlobal(string className, int classObjectId)
+    {
+        // Create symbol for the class name
+        int classSymbolId = GetSymbolObjectId(className);
+        
+        // Create Association (#ClassName -> Class object)
+        int associationId = AllocateAssociation(classSymbolId, classObjectId);
+        
+        // Install in SystemDictionary
+        InstallAssociationInSystemDictionary(associationId, className);
     }
 
     /// <summary>

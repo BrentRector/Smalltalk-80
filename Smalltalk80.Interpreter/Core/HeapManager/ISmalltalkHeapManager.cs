@@ -146,6 +146,12 @@ public interface ISmalltalkHeapManager
     GCStatistics GarbageCollect();
 
     /// <summary>
+    /// DEBUG: Performs GC marking phase only and returns unreachable objects without collecting them.
+    /// Returns array of OOPs that would be collected during a full GC.
+    /// </summary>
+    SmalltalkOOP[] GetUnreachableObjects();
+
+    /// <summary>
     /// Gets current GC statistics without performing collection.
     /// </summary>
     GCStatistics GetGCStatistics();

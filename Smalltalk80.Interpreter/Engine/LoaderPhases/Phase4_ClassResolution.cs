@@ -47,25 +47,11 @@ public class Phase4_ClassResolution
             if (cls.IsMetaclass)
             {
                 // Metaclass objects are instances of the "Metaclass" class
-                // Find the Metaclass class from JSON data instead of hard-coding
-                var metaclassClassDefinition = ClassHierarchyUtils.FindClassDefinition("Metaclass", _bundle);
-                if (metaclassClassDefinition != null && _localIdToObjectId.TryGetValue(metaclassClassDefinition.LocalId, out int metaclassClassId))
-                {
-                    var metaclassClassOOP = SmalltalkOOP.FromObjectTableIndex(metaclassClassId);
-                    // Set class OOP in slot 0 (header) using raw slot access
-                    _heapManager.SetSlot(classObjectOOP, 0, metaclassClassOOP);
-                }
+                // Note: Class reference will be set by PhaseX
             }
             else
             {
-                // Regular class objects are instances of their metaclass
-                string metaclassLocalId = $"meta:{_symbols[cls.NameIndex]}";
-                if (_localIdToObjectId.TryGetValue(metaclassLocalId, out int metaclassId))
-                {
-                    var metaclassOOP = SmalltalkOOP.FromObjectTableIndex(metaclassId);
-                    // Set class OOP in slot 0 (header) using raw slot access
-                    _heapManager.SetSlot(classObjectOOP, 0, metaclassOOP);
-                }
+                // Note: Class reference will be set by PhaseX
             }
         }
 
@@ -298,8 +284,7 @@ public class Phase4_ClassResolution
             stringBytes.Length
         );
         
-        // Set class reference to placeholder (will be fixed in multi-pass initialization)
-        _heapManager.SetSlot(stringOOP, 0, placeholderClassOOP);
+        // Note: Class reference will be set by PhaseX (placeholder not needed with new architecture)
 
         // Store the string text as bytes
         for (int i = 0; i < stringBytes.Length; i++)

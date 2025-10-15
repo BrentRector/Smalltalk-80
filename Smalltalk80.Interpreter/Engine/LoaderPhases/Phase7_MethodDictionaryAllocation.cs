@@ -99,10 +99,14 @@ public class Phase7_MethodDictionaryAllocation
         }
 
         // Allocate the MethodDictionary object (PointerIndexed with capacity for keys)
-        var methodDictOOP = _allocator.AllocateArray("MethodDictionary", capacity);
+        int methodDictClassId = GlobalRegistry.LookupClassObjectId("MethodDictionary");
+        var methodDictClassOOP = SmalltalkOOP.FromObjectTableIndex(methodDictClassId);
+        var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
 
         // Allocate valueArray (Array of CompiledMethod) 
-        var valuesArrayOOP = _allocator.AllocateArray("Array", capacity);
+        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
+        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var valuesArrayOOP = _allocator.AllocateArray(arrayClassOOP, capacity);
         _allocator.SetInstanceVariable(methodDictOOP, 0, valuesArrayOOP);
 
         // Set tally to 0 (no methods installed yet)
@@ -131,7 +135,9 @@ public class Phase7_MethodDictionaryAllocation
             throw new InvalidOperationException("Array class not found in bundle");
         }
 
-        var arrayOOP = _allocator.AllocateArray("Array", size);
+        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
+        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var arrayOOP = _allocator.AllocateArray(arrayClassOOP, size);
 
         // Initialize all elements to nil
         var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);

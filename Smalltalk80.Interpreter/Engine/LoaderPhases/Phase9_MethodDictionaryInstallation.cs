@@ -86,6 +86,14 @@ public class Phase9_MethodDictionaryInstallation
             string selectorName = _symbols[method.SelectorIndex];
             int selectorSymbolId = GetSymbolObjectId(selectorName);
 
+            // DEBUG: Track installation of method containing objectId 9790
+            if (method.LocalId.Contains("TRACK") || methodObjectId == 10535) // Will update with actual methodId
+            {
+                Console.WriteLine($"DEBUG Phase9 TRACK: Installing method {method.LocalId} (objectId={methodObjectId})");
+                Console.WriteLine($"  Selector: {selectorName}, HomeClass: {method.HomeClassLocalId}");
+                Console.WriteLine($"  MethodDict objectId: {methodDictOOP.AsObjectTableIndex()}");
+            }
+
             // Install the method in the method dictionary
             InstallMethodInDictionary(methodDictOOP.AsObjectTableIndex(), selectorSymbolId, methodObjectId);
             installedMethods++;

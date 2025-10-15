@@ -18,6 +18,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     
     // GC root management
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
+    private int _debugCount = 0; // For CompiledMethod debug tracking
 
     /// <summary>Represents a block of ObjectTable entries for scalable growth.</summary>
     private sealed class ObjectTableBlock
@@ -59,6 +60,19 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         // Get ObjectTable index
         int tableIndex = AllocateObjectTableIndex();
+        
+        // DEBUG: Track allocations of objects that will have NULL class references
+        if (format == ObjectFormat.PointerIndexed && tableIndex >= 4980 && tableIndex <= 5000)
+        {
+            // Get stack trace to see which method/phase is allocating this
+            var stackTrace = new System.Diagnostics.StackTrace(1, false);
+            var callingMethod = stackTrace.GetFrame(0)?.GetMethod()?.Name ?? "Unknown";
+            var callingClass = stackTrace.GetFrame(0)?.GetMethod()?.DeclaringType?.Name ?? "Unknown";
+            
+            Console.WriteLine($"DEBUG ALLOC: Allocating PointerIndexed object {tableIndex} (format={format}, fixedSlots={fixedSlots}, indexedSize={indexedSize})");
+            Console.WriteLine($"  Called from: {callingClass}.{callingMethod}()");
+            Console.WriteLine($"  This object will initially have slot0=0 until class reference is set later");
+        }
 
         // Create ObjectTableEntry with format information for GC
         // For ByteIndexed objects, preserve the original indexed size before word alignment
@@ -111,6 +125,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set slot in SmallInteger");
+
+        // DEBUG: Track class reference setting for problematic objects
+        int objectId = objectOOP.AsObjectTableIndex();
+        if (slotIndex == 0 && objectId >= 4980 && objectId <= 5000)
+        {
+            Console.WriteLine($"DEBUG SETSLOT: Setting class reference for object {objectId}: slot0 = {value.AsObjectTableIndex()} (isSmallInt={value.IsSmallInteger})");
+        }
 
         var entry = GetObjectTableEntry(objectOOP.AsObjectTableIndex());
         
@@ -581,6 +602,48 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     }
 
     /// <summary>
+    /// DEBUG: Performs GC marking phase only and returns unreachable objects without collecting them.
+    /// Returns array of OOPs that would be collected during a full GC.
+    /// </summary>
+    public SmalltalkOOP[] GetUnreachableObjects()
+    {
+        var unreachableObjects = new List<SmalltalkOOP>();
+        
+        // Phase 1: Clear all mark bits
+        foreach (var block in _objectTableBlocks)
+        {
+            for (int i = 0; i < block.Entries.Length; i++)
+            {
+                if (block.Entries[i] != null)
+                    block.Entries[i]!.IsMarked = false;
+            }
+        }
+        
+        // Phase 2: Mark from configured roots
+        foreach (var rootOOP in _gcRoots)
+        {
+            MarkObjectRecursively(rootOOP);
+        }
+        
+        // Phase 3: Find unmarked objects (would be collected)
+        for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
+        {
+            var block = _objectTableBlocks[blockIndex];
+            for (int i = 0; i < block.Entries.Length; i++)
+            {
+                var entry = block.Entries[i];
+                if (entry != null && !entry.IsMarked)
+                {
+                    int objectId = blockIndex * ObjectTableBlockSize + i;
+                    unreachableObjects.Add(SmalltalkOOP.FromObjectTableIndex(objectId));
+                }
+            }
+        }
+        
+        return unreachableObjects.ToArray();
+    }
+
+    /// <summary>
     /// Performs mark-and-sweep garbage collection using the configured root objects.
     /// Returns detailed statistics about the collection.
     /// </summary>
@@ -617,8 +680,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         long estimatedBytesFreed = 0;
         int objectsCollected = 0;
         
-        foreach (var block in _objectTableBlocks)
+        var firstCollectedIds = new List<int>();
+        
+        for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
         {
+            var block = _objectTableBlocks[blockIndex];
             for (int i = 0; i < block.Entries.Length; i++)
             {
                 var entry = block.Entries[i];
@@ -629,6 +695,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                     estimatedBytesFreed += entry.SizeInBytes;
                     objectsCollected++;
                     
+                    // Track collected object IDs for debugging
+                    int objectId = blockIndex * ObjectTableBlockSize + i;
+                    if (firstCollectedIds.Count < 20)
+                    {
+                        firstCollectedIds.Add(objectId);
+                    }
+                    
                     // Free the object (set entry to null)
                     block.Entries[i] = null;
                     block.ActiveCount--;
@@ -638,11 +711,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             }
         }
         
+        
         double sweepEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double sweepTime = sweepEndTime - markEndTime;
         
         int objectsAfterCollection = GetActiveObjectCount();
         int freeEntries = GetObjectTableSize() - objectsAfterCollection;
+        
+        // Debug output summary
+        if (objectsCollected > 0)
+        {
+            Console.WriteLine($"DEBUG GC: Total collected: {objectsCollected} objects");
+        }
         
         return new GCStatistics
         {
@@ -668,6 +748,20 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (entry.IsMarked)
             return; // Already marked
 
+        // DEBUG: Track if we're marking the unreachable String objects
+        int objectId = objectOOP.AsObjectTableIndex();
+        if (objectId == 9790 || objectId == 9794)
+        {
+            Console.WriteLine($"DEBUG GC: MARKING String object {objectId}!");
+            var stackTrace = new System.Diagnostics.StackTrace(true);
+            Console.WriteLine($"  Called from:");
+            for (int i = 1; i < Math.Min(5, stackTrace.FrameCount); i++)
+            {
+                var frame = stackTrace.GetFrame(i);
+                Console.WriteLine($"    {frame?.GetMethod()?.Name}");
+            }
+        }
+
         entry.IsMarked = true;
 
         // Mark header slot OOP
@@ -692,13 +786,103 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                                 $"Format: {entry.Format}, TotalWords: {entry.SizeInWords}, InstVars: {instanceVarCount}");
                 return;
             }
-            for (int i = 0; i < indexedSize; i++)
+            
+            // Debug CompiledMethod traversal - they should have ByteArray OOP in last slot
+            var classOOP = GetSlot(objectOOP, 0);
+            bool isCompiledMethod = IsObjectOfClass(objectOOP, "CompiledMethod");
+            
+            // Debug: Determine actual class of first few PointerIndexed objects
+            if (_debugCount < 10 && indexedSize > 0)
             {
-                var indexedOOP = GetIndexedOOP(objectOOP, i);
-                MarkObjectRecursively(indexedOOP);
+                var slot0OOP = GetSlot(objectOOP, 0); // Class OOP
+                var slot1OOP = GetSlot(objectOOP, 1); // First indexed slot
+                
+                // Try to get actual class name by traversing: object -> class -> class name symbol
+                string actualClassName = "Unknown";
+                if (!slot0OOP.IsSmallInteger && IsValidObjectOOP(slot0OOP))
+                {
+                    // Get the class object's name by looking at its instance variable 0 (should be name symbol)
+                    try
+                    {
+                        var classNameSymbolOOP = GetInstanceVariable(slot0OOP, 0);
+                        if (!classNameSymbolOOP.IsSmallInteger && IsValidObjectOOP(classNameSymbolOOP))
+                        {
+                            var symbolEntry = GetObjectTableEntry(classNameSymbolOOP.AsObjectTableIndex());
+                            if (symbolEntry.Format == ObjectFormat.ByteIndexed)
+                            {
+                                int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
+                                if (symbolSize > 0 && symbolSize < 100) // Reasonable symbol size
+                                {
+                                    var symbolBytes = new byte[symbolSize];
+                                    for (int i = 0; i < symbolSize; i++)
+                                    {
+                                        symbolBytes[i] = GetIndexedByte(classNameSymbolOOP, i);
+                                    }
+                                    actualClassName = System.Text.Encoding.UTF8.GetString(symbolBytes);
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        actualClassName = $"Error_ClassOOP_{slot0OOP.AsObjectTableIndex()}";
+                    }
+                }
+                else if (slot0OOP.AsObjectTableIndex() == 0)
+                {
+                    actualClassName = "NULL_CLASS";
+                }
+                
+                Console.WriteLine($"DEBUG GC: PointerIndexed object {objectOOP.AsObjectTableIndex()}: class='{actualClassName}' (classOOP={slot0OOP.AsObjectTableIndex()}), slot1={slot1OOP.AsObjectTableIndex()} (isSmallInt={slot1OOP.IsSmallInteger}), indexedSlots={indexedSize}");
+                _debugCount++;
+            }
+            
+            if (isCompiledMethod && indexedSize > 0)
+            {
+                var lastSlotOOP = GetIndexedOOP(objectOOP, indexedSize - 1);
+                Console.WriteLine($"DEBUG GC: CompiledMethod {objectOOP.AsObjectTableIndex()} has {indexedSize} indexed slots, last slot points to ByteArray {lastSlotOOP.AsObjectTableIndex()}");
+                
+                for (int i = 0; i < indexedSize; i++)
+                {
+                    var indexedOOP = GetIndexedOOP(objectOOP, i);
+                    if (i == indexedSize - 1) // Last slot should be ByteArray
+                    {
+                        Console.WriteLine($"  DEBUG GC: Marking CompiledMethod last slot {i} -> ByteArray {indexedOOP.AsObjectTableIndex()}");
+                    }
+                    MarkObjectRecursively(indexedOOP);
+                }
+            }
+            // Debug SystemDictionary traversal
+            else if (objectOOP.AsObjectTableIndex() == 3915) // SystemDictionary
+            {
+                Console.WriteLine($"DEBUG GC: Marking SystemDictionary {objectOOP.AsObjectTableIndex()} with {indexedSize} indexed slots");
+                int markedAssociations = 0;
+                for (int i = 0; i < indexedSize; i++)
+                {
+                    var indexedOOP = GetIndexedOOP(objectOOP, i);
+                    if (!indexedOOP.IsSmallInteger && IsValidObjectOOP(indexedOOP) && indexedOOP.AsObjectTableIndex() != 4390) // not nil
+                    {
+                        markedAssociations++;
+                        if (markedAssociations <= 5) // Log first few
+                        {
+                            Console.WriteLine($"  DEBUG GC: Marking SystemDict slot {i} -> object {indexedOOP.AsObjectTableIndex()}");
+                        }
+                    }
+                    MarkObjectRecursively(indexedOOP);
+                }
+                Console.WriteLine($"DEBUG GC: SystemDictionary marked {markedAssociations} non-nil associations");
+            }
+            else
+            {
+                for (int i = 0; i < indexedSize; i++)
+                {
+                    var indexedOOP = GetIndexedOOP(objectOOP, i);
+                    MarkObjectRecursively(indexedOOP);
+                }
             }
         }
     }
+
 
     /// <summary>
     /// Gets current GC statistics without performing collection.
@@ -761,5 +945,90 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         return blockIndex < _objectTableBlocks.Count && 
                _objectTableBlocks[blockIndex].Entries[entryIndex] != null;
+    }
+
+    /// <summary>
+    /// Helper method to get the class name of an object.
+    /// Traverses: object -> class -> class name (symbol) -> extract string
+    /// </summary>
+    private string GetObjectClassName(SmalltalkOOP objectOOP)
+    {
+        try
+        {
+            if (objectOOP.IsSmallInteger || !IsValidObjectOOP(objectOOP))
+                return "SmallInteger";
+
+            // Get class OOP from object header (slot 0)
+            var classOOP = GetSlot(objectOOP, 0);
+            if (classOOP.IsSmallInteger || !IsValidObjectOOP(classOOP))
+                return "InvalidClass";
+
+            // Get class name symbol from class object
+            var classNameSymbolOOP = GetInstanceVariable(classOOP, 0);
+            if (classNameSymbolOOP.IsSmallInteger || !IsValidObjectOOP(classNameSymbolOOP))
+                return "InvalidSymbol";
+
+            // Extract the string from the Symbol's byte data
+            var symbolEntry = GetObjectTableEntry(classNameSymbolOOP.AsObjectTableIndex());
+            if (symbolEntry.Format != ObjectFormat.ByteIndexed)
+                return "NotSymbol";
+
+            int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
+            var symbolBytes = new byte[symbolSize];
+            for (int i = 0; i < symbolSize; i++)
+            {
+                symbolBytes[i] = GetIndexedByte(classNameSymbolOOP, i);
+            }
+            
+            return System.Text.Encoding.UTF8.GetString(symbolBytes);
+        }
+        catch
+        {
+            return "Error";
+        }
+    }
+
+    /// <summary>
+    /// Helper method to check if an object is of a specific class by name.
+    /// Traverses: object -> class -> class name (symbol) -> compare string
+    /// </summary>
+    private bool IsObjectOfClass(SmalltalkOOP objectOOP, string className)
+    {
+        try
+        {
+            if (objectOOP.IsSmallInteger || !IsValidObjectOOP(objectOOP))
+                return false;
+
+            // Get class OOP from object header (slot 0)
+            var classOOP = GetSlot(objectOOP, 0);
+            if (classOOP.IsSmallInteger || !IsValidObjectOOP(classOOP))
+                return false;
+
+            // Get class name symbol from class object
+            // Assuming class has name in instance variable 0 (typical Smalltalk layout)
+            var classNameSymbolOOP = GetInstanceVariable(classOOP, 0);
+            if (classNameSymbolOOP.IsSmallInteger || !IsValidObjectOOP(classNameSymbolOOP))
+                return false;
+
+            // Check if this is a Symbol object with ByteIndexed format containing the class name
+            var symbolEntry = GetObjectTableEntry(classNameSymbolOOP.AsObjectTableIndex());
+            if (symbolEntry.Format != ObjectFormat.ByteIndexed)
+                return false;
+
+            // Extract the string from the Symbol's byte data
+            int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
+            var symbolBytes = new byte[symbolSize];
+            for (int i = 0; i < symbolSize; i++)
+            {
+                symbolBytes[i] = GetIndexedByte(classNameSymbolOOP, i);
+            }
+            
+            string actualClassName = System.Text.Encoding.UTF8.GetString(symbolBytes);
+            return actualClassName == className;
+        }
+        catch
+        {
+            return false; // Any error means it's not the expected class
+        }
     }
 }

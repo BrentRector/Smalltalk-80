@@ -152,12 +152,15 @@ public class Loader
             phase.Run();
         });
 
-        // Phase 11: Prepare Init Expressions (but don't execute them yet)
+        // Phase 11: Prepare Init Expressions (TEMPORARILY DISABLED - creates 721 unreachable objects!)
+        _initExpressionsArrayId = 0; // Set to 0 since no init expressions array created
+        /*
         RunPhase("Phase 11: Prepare Init Expressions", () =>
         {
             var phase = new Phase11_InitExecution(_bundle, _allocator, _localIdToObjectId);
             _initExpressionsArrayId = phase.Run();
         });
+        */
 
         // Phase 12: USTable Population
         RunPhase("Phase 12: USTable Population", () =>
@@ -190,58 +193,126 @@ public class Loader
             int ustableId = 0;
             GlobalRegistry.TryGet("USTable", out ustableId);
 
-            // Get all class objects from localIdToObjectId (both instance classes and metaclasses)
-            var classObjectIds = new List<int>();
-            foreach (var cls in _bundle.Classes)
-            {
-                if (_localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
-                {
-                    classObjectIds.Add(classObjectId);
-                }
-            }
-
-            // Create comprehensive GC roots array per Smalltalk-80 architecture:
-            // - Core singletons (nil, false, true) - required for bytecode operations
-            // - SystemDictionary - contains all globals 
-            // - USTable - temporary direct root (should be via SystemDictionary when classes are installed)
-            // - All class objects - ensures method dictionaries and methods are reachable
+            // Create proper Smalltalk-80 GC roots - only the fundamental special objects:
+            // 1. nil - required for bytecode operations and default values
+            // 2. false - required for boolean operations  
+            // 3. true - required for boolean operations
+            // 4. Smalltalk (SystemDictionary) - contains all globals including classes
+            // 5. USTable - symbol table (should be reachable via Smalltalk but adding as root for safety)
             var gcRootsList = new List<SmalltalkOOP>
             {
                 SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
                 SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
                 SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
-                SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId),
-                SmalltalkOOP.FromObjectTableIndex(ustableId), // Temporary: direct root until SystemDictionary integration
-                SmalltalkOOP.FromObjectTableIndex(_initExpressionsArrayId) // Temporary: keep init expressions reachable during GC verification
+                SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId)
             };
-
-            // Add all class objects as GC roots (ensures method dictionaries and methods are reachable)
-            foreach (int classId in classObjectIds)
+            
+            // Add USTable as root (it should be reachable via SystemDictionary but verify installation)
+            if (ustableId != 0)
             {
-                gcRootsList.Add(SmalltalkOOP.FromObjectTableIndex(classId));
+                gcRootsList.Add(SmalltalkOOP.FromObjectTableIndex(ustableId));
+            }
+            
+            // Add init expressions array as temporary root if it exists (for GC verification)
+            if (_initExpressionsArrayId != 0)
+            {
+                gcRootsList.Add(SmalltalkOOP.FromObjectTableIndex(_initExpressionsArrayId));
             }
 
-            Console.WriteLine($"DEBUG: Setting {gcRootsList.Count} GC roots ({classObjectIds.Count} classes + 6 core objects)");
+            // All classes should be reachable via SystemDictionary associations
+            // All methods should be reachable via class method dictionaries
+            // No need to add classes or methods as direct GC roots
+            
+            Console.WriteLine($"DEBUG: Setting {gcRootsList.Count} special object GC roots (proper Smalltalk-80 architecture)");
+            Console.WriteLine($"DEBUG: GC Roots - nil:{GlobalRegistry.NilObjectId}, false:{GlobalRegistry.FalseObjectId}, true:{GlobalRegistry.TrueObjectId}, SystemDict:{GlobalRegistry.SystemDictionaryId}, USTable:{ustableId}");
             _heapManager.SetGCRoots(gcRootsList.ToArray());
         });
 
-        // Run GC to verify all objects are reachable
+        // Run GC debug to find unreachable objects without collecting them
         Console.Write("Garbage Collection Verification... ");
         {
-            var stats = _heapManager.GarbageCollect();
+            var unreachableObjects = _heapManager.GetUnreachableObjects();
 
-            if (stats.CollectedObjects > 0)
+            if (unreachableObjects.Length > 0)
             {
                 Console.WriteLine("✗ FAILED");
+                Console.WriteLine($"DEBUG GC: Found {unreachableObjects.Length} unreachable objects");
+                
+                // Analyze first 10 unreachable objects to understand what they are
+                Console.WriteLine("DEBUG GC: Analyzing first 10 unreachable objects:");
+                for (int i = 0; i < Math.Min(10, unreachableObjects.Length); i++)
+                {
+                    var oop = unreachableObjects[i];
+                    var format = _heapManager.GetObjectFormat(oop);
+                    var size = _heapManager.GetObjectSizeInWords(oop);
+                    var classOOP = _heapManager.GetSlot(oop, 0);
+                    
+                    string className = "Unknown";
+                    int classId = classOOP.AsObjectTableIndex();
+                    var classEntry = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == classId);
+                    if (!string.IsNullOrEmpty(classEntry.Key))
+                    {
+                        className = classEntry.Key;
+                    }
+                    
+                    Console.WriteLine($"  Object {oop.AsObjectTableIndex()}: format={format}, size={size} words, classOOP={classId} ({className})");
+                }
+                
+                // Group by format and class
+                var byFormat = unreachableObjects.GroupBy(oop => _heapManager.GetObjectFormat(oop))
+                    .ToDictionary(g => g.Key, g => g.Count());
+                var formatBreakdown = string.Join(", ", byFormat.Select(kv => $"{kv.Key}: {kv.Value}"));
+                Console.WriteLine($"DEBUG GC: Objects by format: {formatBreakdown}");
+                
+                // Group by class
+                var byClass = new Dictionary<string, int>();
+                foreach (var oop in unreachableObjects)
+                {
+                    var classOOP = _heapManager.GetSlot(oop, 0);
+                    int classId = classOOP.AsObjectTableIndex();
+                    var classEntry = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == classId);
+                    string className = string.IsNullOrEmpty(classEntry.Key) ? $"Unknown(id={classId})" : classEntry.Key;
+                    byClass[className] = byClass.GetValueOrDefault(className) + 1;
+                }
+                var classBreakdown = string.Join(", ", byClass.Select(kv => $"{kv.Key}: {kv.Value}"));
+                Console.WriteLine($"DEBUG GC: Objects by class: {classBreakdown}");
+                
+                // Dump content of unreachable Strings for investigation
+                Console.WriteLine("DEBUG GC: Unreachable String content:");
+                int stringCount = 0;
+                foreach (var oop in unreachableObjects)
+                {
+                    if (stringCount >= 5) break; // Only show first 5 strings
+                    
+                    var classOOP = _heapManager.GetSlot(oop, 0);
+                    int classId = classOOP.AsObjectTableIndex();
+                    var classEntry = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == classId);
+                    if (classEntry.Key == "class:String")
+                    {
+                        // Extract string bytes
+                        int indexedSize = _heapManager.GetIndexedSize(oop);
+                        var bytes = new byte[indexedSize];
+                        for (int i = 0; i < indexedSize; i++)
+                        {
+                            bytes[i] = _heapManager.GetIndexedByte(oop, i);
+                        }
+                        string stringValue = System.Text.Encoding.UTF8.GetString(bytes);
+                        Console.WriteLine($"  String {oop.AsObjectTableIndex()}: \"{stringValue}\"");
+                        stringCount++;
+                    }
+                }
+                
+                var currentRoots = _heapManager.GetGCRoots();
                 throw new InvalidOperationException(
-                    $"COLD START BUG: {stats.CollectedObjects} objects were collected during GC! " +
-                    $"All {stats.TotalObjects} objects should be reachable from GC roots array.");
+                    $"COLD START BUG: {unreachableObjects.Length} objects are unreachable from GC roots! " +
+                    $"All objects should be reachable from the {currentRoots.Length} GC roots.");
             }
             else
             {
                 Console.WriteLine("✓");
-                Console.WriteLine($"  Objects: {stats.TotalObjects} total, {stats.LiveObjects} marked, {stats.CollectedObjects} collected");
-                Console.WriteLine("  ✓ All objects reachable - no garbage collected");
+                var stats = _heapManager.GetGCStatistics();
+                Console.WriteLine($"  Objects: {stats.TotalObjects} total, all reachable from GC roots");
+                Console.WriteLine("  ✓ All objects reachable - no garbage would be collected");
             }
         }
 

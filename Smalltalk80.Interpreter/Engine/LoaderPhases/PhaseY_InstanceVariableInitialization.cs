@@ -230,7 +230,7 @@ public class PhaseY_InstanceVariableInitialization
         // Set Float class reference (since Phase Y runs after Phase X)
         int floatClassId = GlobalRegistry.LookupClassObjectId("Float");
         var floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClassId);
-        _allocator.SetSlot(floatOOP, 0, floatClassOOP);
+        _allocator.SetObjectClass(floatOOP, floatClassOOP);
 
         byte[] bytes = BitConverter.GetBytes(value);
         for (int i = 0; i < 8; i++)
@@ -264,8 +264,26 @@ public class PhaseY_InstanceVariableInitialization
         // Set String class reference (since Phase Y runs after Phase X)
         int stringClassId = GlobalRegistry.LookupClassObjectId("String");
         var stringClassOOP = SmalltalkOOP.FromObjectTableIndex(stringClassId);
-        _allocator.SetSlot(stringOOP, 0, stringClassOOP);
-        return stringOOP.AsObjectTableIndex();
+        _allocator.SetObjectClass(stringOOP, stringClassOOP);
+        
+        int objectId = stringOOP.AsObjectTableIndex();
+        
+        // DEBUG: Track String allocations from Phase Y
+        if (objectId >= 9790 && objectId <= 9800)
+        {
+            Console.WriteLine($"DEBUG PhaseY TRACK: Allocated String objectId={objectId} value='{value.Substring(0, Math.Min(50, value.Length))}'");
+            
+            // Get stack trace
+            var stackTrace = new System.Diagnostics.StackTrace(true);
+            Console.WriteLine($"  Stack trace:");
+            for (int i = 0; i < Math.Min(10, stackTrace.FrameCount); i++)
+            {
+                var frame = stackTrace.GetFrame(i);
+                Console.WriteLine($"    {frame?.GetMethod()?.DeclaringType?.Name}.{frame?.GetMethod()?.Name} line {frame?.GetFileLineNumber()}");
+            }
+        }
+        
+        return objectId;
     }
 
     /// <summary>
@@ -277,7 +295,7 @@ public class PhaseY_InstanceVariableInitialization
         // Set Character class reference (since Phase Y runs after Phase X)
         int characterClassId = GlobalRegistry.LookupClassObjectId("Character");
         var characterClassOOP = SmalltalkOOP.FromObjectTableIndex(characterClassId);
-        _allocator.SetSlot(characterOOP, 0, characterClassOOP);
+        _allocator.SetObjectClass(characterOOP, characterClassOOP);
 
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
@@ -300,7 +318,7 @@ public class PhaseY_InstanceVariableInitialization
         // Set ByteArray class reference (since Phase Y runs after Phase X)
         int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
         var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
-        _allocator.SetSlot(byteArrayOOP, 0, byteArrayClassOOP);
+        _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
         return byteArrayOOP.AsObjectTableIndex();
     }
 
