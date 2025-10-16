@@ -1,35 +1,38 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Objects;
+
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Registry for tracking symbol object IDs during cold start.
-/// Maps symbol indices to their allocated object IDs.
+/// Registry for tracking symbol OOPs during cold start.
+/// Maps symbol indices to their allocated SmalltalkOOPs.
 /// </summary>
 public static class SymbolRegistry
 {
-    private static readonly Dictionary<int, int> _symbolIndexToObjectId = new();
+    private static readonly Dictionary<int, SmalltalkOOP> _symbolIndexToOOP = new();
 
     /// <summary>
-    /// Registers a symbol object ID for a given symbol index.
+    /// Registers a symbol OOP for a given symbol index.
     /// </summary>
-    public static void Register(int symbolIndex, int objectId)
+    public static void Register(int symbolIndex, SmalltalkOOP symbolOOP)
     {
-        _symbolIndexToObjectId[symbolIndex] = objectId;
+        _symbolIndexToOOP[symbolIndex] = symbolOOP;
     }
 
     /// <summary>
-    /// Gets the object ID for a symbol by its index.
+    /// Gets the SmalltalkOOP for a symbol by its index.
     /// </summary>
-    public static int GetObjectId(int symbolIndex)
+    public static SmalltalkOOP GetSymbolOOP(int symbolIndex)
     {
-        return _symbolIndexToObjectId[symbolIndex];
+        return _symbolIndexToOOP[symbolIndex];
     }
 
     /// <summary>
-    /// Returns all registered symbols as (index, objectId) pairs.
+    /// Returns all registered symbols as (index, symbolOOP) pairs.
     /// </summary>
-    public static IEnumerable<(int Index, int ObjectId)> AllSymbols()
+    public static IEnumerable<(int Index, SmalltalkOOP SymbolOOP)> AllSymbols()
     {
-        return _symbolIndexToObjectId.Select(kvp => (kvp.Key, kvp.Value));
+        return _symbolIndexToOOP.Select(kvp => (kvp.Key, kvp.Value));
     }
 
     /// <summary>
@@ -37,6 +40,6 @@ public static class SymbolRegistry
     /// </summary>
     public static void Clear()
     {
-        _symbolIndexToObjectId.Clear();
+        _symbolIndexToOOP.Clear();
     }
 }

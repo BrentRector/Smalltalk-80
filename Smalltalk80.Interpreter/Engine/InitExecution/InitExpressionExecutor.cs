@@ -106,7 +106,7 @@ public class InitExpressionExecutor
                 // Execute using existing ExecuteInitExpression method
                 var result = ExecuteInitExpression(
                     initExpression.LocalId,
-                    tempMethodOOP.ToObjectTableIndex());
+                    tempMethodOOP);
                 
                 results.Add(result);
 
@@ -155,9 +155,9 @@ public class InitExpressionExecutor
             "string" => InternString(bundle.Strings[literal.Index!.Value], allocator),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => AllocateFloat(GetFloatValue(literal.Value!), allocator),
-            "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
-            "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
-            "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) 
                 ? objOOP1 
                 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
@@ -182,7 +182,7 @@ public class InitExpressionExecutor
         {
             if (bundle.Symbols[i] == symbolText)
             {
-                return SmalltalkOOP.FromObjectTableIndex(SymbolRegistry.GetObjectId(i));
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -203,8 +203,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP AllocateFloat(double value, SemanticAllocator allocator)
     {
         var floatOOP = allocator.AllocateFixedObject("Float");
-        int floatClassId = GlobalRegistry.LookupClassObjectId("Float");
-        var floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClassId);
+        var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
         allocator.SetObjectClass(floatOOP, floatClassOOP);
         
         // Store the double value as two SmallIntegers (high and low words)
@@ -224,8 +223,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP AllocateCharacter(int codePoint, SemanticAllocator allocator)
     {
         var characterOOP = allocator.AllocateFixedObject("Character");
-        int characterClassId = GlobalRegistry.LookupClassObjectId("Character");
-        var characterClassOOP = SmalltalkOOP.FromObjectTableIndex(characterClassId);
+        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
         allocator.SetObjectClass(characterOOP, characterClassOOP);
         
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
@@ -247,8 +245,7 @@ public class InitExpressionExecutor
         };
         
         var byteArrayOOP = allocator.AllocateByteArray("ByteArray", bytes);
-        int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
-        var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
+        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
         allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
         
         return byteArrayOOP;
@@ -259,8 +256,7 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, SemanticAllocator allocator)
     {
-        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
-        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
         
         for (int i = 0; i < elementOOPs.Length; i++)
@@ -283,16 +279,16 @@ public class InitExpressionExecutor
         // look up the existing association from SystemDictionary
         if (assoc.ValueRef?.LocalId == null)
         {
-            if (GlobalRegistry.TryGet($"class:{keyName}", out int classOop))
+            if (GlobalRegistry.TryGet($"class:{keyName}", out SmalltalkOOP classOop))
             {
-                int sysDictId = GlobalRegistry.SystemDictionaryId;
-                var sysDictOOP = SmalltalkOOP.FromObjectTableIndex(sysDictId);
+                var sysDictId = GlobalRegistry.SystemDictionaryOOP;
+                var sysDictOOP = sysDictId;
                 int sysDictSize = allocator.GetIndexedSize(sysDictOOP);
                 
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
+                    if (assocOOP == GlobalRegistry.NilOOP) continue;
                     
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -306,7 +302,7 @@ public class InitExpressionExecutor
         // Create new association
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+            : GlobalRegistry.NilOOP;
         
         return AllocateAssociation(keyOOP, valueOOP, allocator);
     }
@@ -317,8 +313,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP, SemanticAllocator allocator)
     {
         var associationOOP = allocator.AllocateFixedObject("Association");
-        int associationClassId = GlobalRegistry.LookupClassObjectId("Association");
-        var associationClassOOP = SmalltalkOOP.FromObjectTableIndex(associationClassId);
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
         allocator.SetObjectClass(associationOOP, associationClassOOP);
         
         allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -382,7 +377,7 @@ public class InitExpressionExecutor
         var totalStopwatch = Stopwatch.StartNew();
 
         // Get init expression array size
-        var initArrayOOP = SmalltalkOOP.FromObjectTableIndex(initArrayOop);
+        var initArrayOOP = initArrayOop;
         int count = _heapManager.GetIndexedSize(initArrayOOP);
 
         // TEMPORARY: Execute Float initialize for testing
@@ -433,7 +428,7 @@ public class InitExpressionExecutor
 
 
             // Execute the target init expression
-            var result = ExecuteInitExpression(targetInitLocalId, targetMethodOOP.ToObjectTableIndex());
+            var result = ExecuteInitExpression(targetInitLocalId, targetMethodOOP);
             results.Add(result);
 
 
@@ -466,7 +461,7 @@ public class InitExpressionExecutor
     /// 6. Capture diagnostics
     /// 7. Teardown and unroot
     /// </summary>
-    public InitResult ExecuteInitExpression(string initLocalId, int compiledMethodOop, int? timeoutMs = null)
+    public InitResult ExecuteInitExpression(string initLocalId, SmalltalkOOP compiledMethodOOP, int? timeoutMs = null)
     {
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
@@ -474,19 +469,19 @@ public class InitExpressionExecutor
         try
         {
             // Step 1: Lookup and sanity-check
-            if (!ValidateCompiledMethod(compiledMethodOop, out string? validationError))
+            if (!ValidateCompiledMethod(compiledMethodOOP, out string? validationError))
             {
                 return InitResult.ValidationFailed(initLocalId, validationError ?? "Unknown validation error");
             }
 
             // Step 2: Prepare canonical receiver
-            int receiverOop = GetCanonicalReceiverForDoIt();
+            SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
 
             // Step 3: Create MethodContext for init expression
-            int methodContextOop = CreateMethodContextForInitExpression(compiledMethodOop, receiverOop);
+            SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
             // Step 4: Create Process with this context
-            int processOop = CreateProcess(methodContextOop, priority: 4);
+            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
 
             // Step 5: Execute via primitive 87 (resume)
             SmalltalkOOP resultOOP;
@@ -495,11 +490,11 @@ public class InitExpressionExecutor
                 if (effectiveTimeout > 0)
                 {
                     using var cts = new CancellationTokenSource(effectiveTimeout);
-                    resultOOP = ExecuteWithTimeout(processOop, cts.Token);
+                    resultOOP = ExecuteWithTimeout(processOOP, cts.Token);
                 }
                 else
                 {
-                    resultOOP = _processPrimitives.Resume(SmalltalkOOP.FromObjectTableIndex(processOop));
+                    resultOOP = _processPrimitives.Resume(processOOP);
                 }
             }
             catch (OperationCanceledException)
@@ -521,7 +516,7 @@ public class InitExpressionExecutor
 
             // Step 6 & 7: Success - teardown handled by VM
             stopwatch.Stop();
-            return InitResult.Success(initLocalId, resultOOP.ToObjectTableIndex(), stopwatch.ElapsedMilliseconds);
+            return InitResult.Success(initLocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
@@ -533,12 +528,12 @@ public class InitExpressionExecutor
     /// <summary>
     /// Validates that a CompiledMethod OOP is suitable for init expression execution.
     /// </summary>
-    private bool ValidateCompiledMethod(int methodOop, out string? error)
+    private bool ValidateCompiledMethod(SmalltalkOOP methodOOP, out string? error)
     {
         error = null;
 
-        // Basic validation - just check it's not zero
-        if (methodOop == 0)
+        // Basic validation - check it's not null or zero
+        if (methodOOP == SmalltalkOOP.Null || methodOOP.RawValue == 0)
         {
             error = "Method OOP is null (0)";
             return false;
@@ -556,24 +551,24 @@ public class InitExpressionExecutor
     /// Gets the canonical receiver for DoIt expressions.
     /// Per Smalltalk-80 semantics: use Smalltalk global if available, otherwise nil.
     /// </summary>
-    private int GetCanonicalReceiverForDoIt()
+    private SmalltalkOOP GetCanonicalReceiverForDoIt()
     {
         // Try to get Smalltalk global (SystemDictionary)
-        if (GlobalRegistry.TryGet("Smalltalk", out int smalltalkOop))
+        if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP smalltalkOop))
         {
             return smalltalkOop;
         }
 
-        if (GlobalRegistry.TryGet("SystemDictionary", out int sysDictOop))
+        if (GlobalRegistry.TryGet("SystemDictionary", out SmalltalkOOP sysDictOop))
         {
             return sysDictOop;
         }
 
         // Fall back to nil
-        return GlobalRegistry.NilObjectId;
+        return GlobalRegistry.NilOOP;
     }
 
-    private int CreateMethodContextForInitExpression(int methodOop, int receiverOop)
+    private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
         if (_allocator == null)
             throw new InvalidOperationException("Allocator not provided to InitExpressionExecutor");
@@ -583,8 +578,7 @@ public class InitExpressionExecutor
         var contextOOP = _allocator.AllocateObject("MethodContext", ObjectFormat.PointerIndexed, indexedSize: 12);
         
         // Set class reference
-        int methodContextClassId = GlobalRegistry.LookupClassObjectId("MethodContext");
-        var methodContextClassOOP = SmalltalkOOP.FromObjectTableIndex(methodContextClassId);
+        var methodContextClassOOP = GlobalRegistry.LookupClassOOP("MethodContext");
         _allocator.SetObjectClass(contextOOP, methodContextClassOOP);
         
         // Set instance variables using LayoutResolver indices
@@ -595,23 +589,23 @@ public class InitExpressionExecutor
         int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
         
-        _allocator.SetInstanceVariable(contextOOP, senderIndex, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
+        _allocator.SetInstanceVariable(contextOOP, senderIndex, GlobalRegistry.NilOOP);
         _allocator.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         _allocator.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
-        _allocator.SetInstanceVariable(contextOOP, methodIndex, SmalltalkOOP.FromObjectTableIndex(methodOop));
-        _allocator.SetInstanceVariable(contextOOP, receiverMapIndex, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
-        _allocator.SetInstanceVariable(contextOOP, receiverIndex, SmalltalkOOP.FromObjectTableIndex(receiverOop));
+        _allocator.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
+        _allocator.SetInstanceVariable(contextOOP, receiverMapIndex, GlobalRegistry.NilOOP);
+        _allocator.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
         
         // Initialize indexed portion (stack) with nil
         for (int i = 0; i < 12; i++)
         {
-            _allocator.SetIndexedOOP(contextOOP, i, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
+            _allocator.SetIndexedOOP(contextOOP, i, GlobalRegistry.NilOOP);
         }
         
-        return contextOOP.ToObjectTableIndex();
+        return contextOOP;
     }
 
-    private int CreateProcess(int suspendedContextOop, int priority)
+    private SmalltalkOOP CreateProcess(SmalltalkOOP suspendedContextOOP, int priority)
     {
         if (_allocator == null)
             throw new InvalidOperationException("Allocator not provided to InitExpressionExecutor");
@@ -624,20 +618,20 @@ public class InitExpressionExecutor
         int priorityIndex = _layoutResolver.GetFieldIndex("class:Process", "priority");
         int myListIndex = _layoutResolver.GetFieldIndex("class:Process", "myList");
         
-        _allocator.SetInstanceVariable(processOOP, suspendedContextIndex, SmalltalkOOP.FromObjectTableIndex(suspendedContextOop));
+        _allocator.SetInstanceVariable(processOOP, suspendedContextIndex, suspendedContextOOP);
         _allocator.SetInstanceVariable(processOOP, priorityIndex, SmalltalkOOP.FromSmallInteger(priority));
-        _allocator.SetInstanceVariable(processOOP, myListIndex, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
+        _allocator.SetInstanceVariable(processOOP, myListIndex, GlobalRegistry.NilOOP);
         
-        return processOOP.ToObjectTableIndex();
+        return processOOP;
     }
 
     /// <summary>
     /// Executes a method with timeout support.
     /// </summary>
-    private SmalltalkOOP ExecuteWithTimeout(int processOop, CancellationToken cancellationToken)
+    private SmalltalkOOP ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return _processPrimitives.Resume(SmalltalkOOP.FromObjectTableIndex(processOop));
+        return _processPrimitives.Resume(processOOP);
     }
 
     /// <summary>

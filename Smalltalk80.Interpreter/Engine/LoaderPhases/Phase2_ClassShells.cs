@@ -45,7 +45,7 @@ public class Phase2_ClassShells
         var systemDictOOP = _allocator.AllocateArray("SystemDictionary", totalEntries);
         _localIdToObjectId["object:Smalltalk"] = systemDictOOP;
 
-        GlobalRegistry.Register("Smalltalk", systemDictOOP.ToObjectTableIndex());
+        GlobalRegistry.Register("Smalltalk", systemDictOOP);
 
         // Now allocate all class shells
         foreach (var cls in _bundle.Classes)
@@ -66,7 +66,7 @@ public class Phase2_ClassShells
             if (!cls.IsMetaclass)
             {
                 string className = GetClassNameFromLocalId(cls.LocalId);
-                GlobalRegistry.RegisterClass(className, classOOP.ToObjectTableIndex());
+                GlobalRegistry.RegisterClass(className, classOOP);
 
             }
         }
@@ -104,7 +104,7 @@ public class Phase2_ClassShells
     /// Interns a symbol using the symbol table from Phase 1.
     /// During Phase 2, symbols already exist so we look them up in SymbolRegistry.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         // This is a simplified lookup - in practice we'd need to search through all symbols
@@ -112,7 +112,7 @@ public class Phase2_ClassShells
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         

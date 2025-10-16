@@ -23,19 +23,19 @@ public class Phase11_USTablePopulation
 
     public void Run()
     {
-        var symbolObjects = SymbolRegistry.AllSymbols(); // index → objectId
+        var symbolObjects = SymbolRegistry.AllSymbols();
         int ustableSize = ComputeUSTableSize(symbolObjects.Count());
         
-        int ustableId = CreateUSTable(ustableSize);
+        SmalltalkOOP ustableOOP = CreateUSTable(ustableSize);
 
-        foreach (var (index, symbolId) in symbolObjects)
+        foreach (var (index, symbolOOP) in symbolObjects)
         {
             string symbolName = _bundle.Symbols[index];
             int hash = SymbolHasher.ComputeHash(symbolName);
-            InsertIntoUSTable(ustableId, symbolId, hash);
+            InsertIntoUSTable(ustableOOP, symbolOOP, hash);
         }
 
-        GlobalRegistry.Register("USTable", ustableId);
+        GlobalRegistry.Register("USTable", ustableOOP);
         
         // Note: USTable will be installed as a global variable in Phase 11 (Global Variable Installation)
     }
@@ -45,7 +45,7 @@ public class Phase11_USTablePopulation
     /// <summary>
     /// Creates a USTable (Universal Symbol Table) as an Array.
     /// </summary>
-    private int CreateUSTable(int size)
+    private SmalltalkOOP CreateUSTable(int size)
     {
         
         // Look up Array class layout
@@ -58,26 +58,24 @@ public class Phase11_USTablePopulation
         var ustableOOP = _allocator.AllocateArray("Array", size);
         
         // Set class reference (Phase 11 runs after Phase X, so we must set it manually)
-        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
-        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
         // Initialize all slots to nil
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+        var nilOOP = GlobalRegistry.NilOOP;
         for (int i = 0; i < size; i++)
         {
             _allocator.SetIndexedOOP(ustableOOP, i, nilOOP);
         }
 
-        return ustableOOP.ToObjectTableIndex();
+        return ustableOOP;
     }
 
     /// <summary>
     /// Inserts a symbol into the USTable using open addressing.
     /// </summary>
-    private void InsertIntoUSTable(int ustableId, int symbolId, int hash)
+    private void InsertIntoUSTable(SmalltalkOOP ustableOOP, SmalltalkOOP symbolOOP, int hash)
     {
-        var ustableOOP = SmalltalkOOP.FromObjectTableIndex(ustableId);
         int size = _allocator.GetIndexedSize(ustableOOP);
         int index = hash % size;
         
@@ -85,10 +83,9 @@ public class Phase11_USTablePopulation
         while (true)
         {
             var slotOOP = _allocator.GetIndexedOOP(ustableOOP, index);
-            if (slotOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+            if (slotOOP == GlobalRegistry.NilOOP)
             {
                 // Found empty slot
-                var symbolOOP = SmalltalkOOP.FromObjectTableIndex(symbolId);
                 _allocator.SetIndexedOOP(ustableOOP, index, symbolOOP);
                 break;
             }

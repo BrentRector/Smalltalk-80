@@ -21,22 +21,25 @@ public class PhaseY_InstanceVariableInitialization
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
+    private readonly ISmalltalkHeapManager _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
 
     public PhaseY_InstanceVariableInitialization(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, SmalltalkOOP> localIdToObjectId)
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
+        ISmalltalkHeapManager heapManager)
     {
         _bundle = bundle;
         _allocator = allocator;
+        _heapManager = heapManager;
         _localIdToObjectId = localIdToObjectId;
     }
 
     public void Run()
     {
         int instanceVariablesInitialized = 0;
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+        var nilOOP = GlobalRegistry.NilOOP;
 
         // Step 1: Initialize class object instance variables
         // All class objects should have their instance variables initialized to nil
@@ -105,14 +108,19 @@ public class PhaseY_InstanceVariableInitialization
         // Step 4: Initialize SystemDictionary and other special objects
         InitializeSpecialObjectInstanceVariables(nilOOP);
 
+        // Step 5: Initialize Dictionary indexed slots to nil
+        // Dictionaries allocated in Phase 4 (like classPool dictionaries) have uninitialized indexed slots
+        // We need to initialize them to nil now that nil singleton exists
+        InitializeDictionaryIndexedSlots(nilOOP);
+
     }
 
     private void InitializeSingletonInstanceVariables(string globalName, string className, SmalltalkOOP nilOOP)
     {
-        if (GlobalRegistry.TryGet(globalName, out int objectId))
+        if (GlobalRegistry.TryGet(globalName, out SmalltalkOOP objectId))
         {
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
+            var objectOOP = objectId;
             
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
@@ -129,10 +137,10 @@ public class PhaseY_InstanceVariableInitialization
     private void InitializeSpecialObjectInstanceVariables(SmalltalkOOP nilOOP)
     {
         // Initialize SystemDictionary instance variables
-        if (GlobalRegistry.TryGet("Smalltalk", out int systemDictId))
+        if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP systemDictId))
         {
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
-            var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(systemDictId);
+            var systemDictOOP = systemDictId;
             
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
@@ -156,39 +164,39 @@ public class PhaseY_InstanceVariableInitialization
     {
         return value.Type switch
         {
-            "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
-            "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
-            "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
-            "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
-            "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
-            "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(value.Value!))),
-            "symbolRef" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_bundle.Symbols[value.Index!.Value])),
-            "stringRef" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Strings[value.Index!.Value])),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
-            "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(value.CodePoint!.Value)),
-            "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(value.Encoding!, value.Data!)),
-            _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
-        };
-    }
-
-    /// <summary>
-    /// Resolves a field value from JSON to an object ID.
-    /// </summary>
-    private int ResolveFieldValue(FieldValue value)
-    {
-        return value.Type switch
-        {
-            "nil" => GlobalRegistry.NilObjectId,
-            "true" => GlobalRegistry.TrueObjectId,
-            "false" => GlobalRegistry.FalseObjectId,
-            "smallInt" => EncodeSmallInteger(GetIntValue(value.Value!)),
             "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
             "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_bundle.Symbols[value.Index!.Value]),
             "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP.ToObjectTableIndex() : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.NilOOP,
+            "character" => AllocateCharacter(value.CodePoint!.Value),
+            "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
+            _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
+        };
+    }
+
+    /// <summary>
+    /// Resolves a field value from JSON to a SmalltalkOOP.
+    /// </summary>
+    private SmalltalkOOP ResolveFieldValue(FieldValue value)
+    {
+        return value.Type switch
+        {
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
+            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
+            "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
+            "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
+            "float" => AllocateFloat(GetFloatValue(value.Value!)),
+            "symbolRef" => InternSymbol(_bundle.Symbols[value.Index!.Value]),
+            "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.NilOOP,  // Forward reference: use nil as placeholder, will be patched later
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -223,22 +231,21 @@ public class PhaseY_InstanceVariableInitialization
     }
 
     /// <summary>
-    /// Encodes a SmallInteger using SObjectRef format.
+    /// Encodes a SmallInteger as a SmalltalkOOP.
     /// </summary>
-    private int EncodeSmallInteger(int value)
+    private SmalltalkOOP EncodeSmallInteger(int value)
     {
-        return SmalltalkOOP.FromSmallInteger(value).RawValue;
+        return SmalltalkOOP.FromSmallInteger(value);
     }
 
     /// <summary>
     /// Allocates a Float object.
     /// </summary>
-    private int AllocateFloat(double value)
+    private SmalltalkOOP AllocateFloat(double value)
     {
         var floatOOP = _allocator.AllocateByteArray("Float", 8);
         // Set Float class reference (since Phase Y runs after Phase X)
-        int floatClassId = GlobalRegistry.LookupClassObjectId("Float");
-        var floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClassId);
+        var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
         _allocator.SetObjectClass(floatOOP, floatClassOOP);
 
         byte[] bytes = BitConverter.GetBytes(value);
@@ -246,19 +253,19 @@ public class PhaseY_InstanceVariableInitialization
         {
             _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
         }
-        return floatOOP.ToObjectTableIndex();
+        return floatOOP;
     }
 
     /// <summary>
     /// Interns a symbol by finding it in the symbol table.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         throw new InvalidOperationException($"Symbol '{name}' not found in symbol table");
@@ -267,40 +274,35 @@ public class PhaseY_InstanceVariableInitialization
     /// <summary>
     /// Interns a string by allocating a String object.
     /// </summary>
-    private int InternString(string value)
+    private SmalltalkOOP InternString(string value)
     {
         var stringOOP = _allocator.AllocateString(value);
         // Set String class reference (since Phase Y runs after Phase X)
-        int stringClassId = GlobalRegistry.LookupClassObjectId("String");
-        var stringClassOOP = SmalltalkOOP.FromObjectTableIndex(stringClassId);
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         _allocator.SetObjectClass(stringOOP, stringClassOOP);
         
-        int objectId = stringOOP.ToObjectTableIndex();
-        
-        
-        return objectId;
+        return stringOOP;
     }
 
     /// <summary>
     /// Allocates a Character object.
     /// </summary>
-    private int AllocateCharacter(int codePoint)
+    private SmalltalkOOP AllocateCharacter(int codePoint)
     {
         var characterOOP = _allocator.AllocateFixedObject("Character");
         // Set Character class reference (since Phase Y runs after Phase X)
-        int characterClassId = GlobalRegistry.LookupClassObjectId("Character");
-        var characterClassOOP = SmalltalkOOP.FromObjectTableIndex(characterClassId);
+        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
         _allocator.SetObjectClass(characterOOP, characterClassOOP);
 
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-        return characterOOP.ToObjectTableIndex();
+        return characterOOP;
     }
 
     /// <summary>
     /// Allocates a ByteArray object.
     /// </summary>
-    private int AllocateByteArray(string encoding, string data)
+    private SmalltalkOOP AllocateByteArray(string encoding, string data)
     {
         byte[] bytes = encoding.ToLower() switch
         {
@@ -311,10 +313,9 @@ public class PhaseY_InstanceVariableInitialization
 
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
         // Set ByteArray class reference (since Phase Y runs after Phase X)
-        int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
-        var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
+        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
         _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
-        return byteArrayOOP.ToObjectTableIndex();
+        return byteArrayOOP;
     }
 
     /// <summary>
@@ -329,5 +330,54 @@ public class PhaseY_InstanceVariableInitialization
             bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
         }
         return bytes;
+    }
+
+    /// <summary>
+    /// Initializes Dictionary indexed slots to nil.
+    /// Phase 4 allocates empty Dictionary objects for classPool, but those dictionaries
+    /// have uninitialized indexed slots (OOP=0). This method initializes them to nil.
+    /// </summary>
+    private void InitializeDictionaryIndexedSlots(SmalltalkOOP nilOOP)
+    {
+        // Get Dictionary class OOP to identify which objects are Dictionaries
+        if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictClassOOP))
+            return; // Dictionary class doesn't exist, skip initialization
+        
+        // Iterate through all class objects and initialize their classPool dictionaries
+        foreach (var cls in _bundle.Classes)
+        {
+            if (cls.IsMetaclass)
+                continue; // Metaclasses don't have classPool
+                
+            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
+                continue;
+            
+            // Find classPool instance variable
+            string templateClassName = "Class";
+            int classPoolIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
+            if (classPoolIndex < 0)
+                continue; // No classPool variable
+            
+            // Get the classPool Dictionary OOP
+            var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
+            if (classPoolOOP.RawValue == 0)
+                continue; // No classPool allocated
+            
+            // Check if this object is a Dictionary by checking its class OOP
+            var objectClassOOP = _heapManager.GetClassOOP(classPoolOOP);
+            if (objectClassOOP.RawValue != dictClassOOP.RawValue)
+                continue; // Not a Dictionary
+            
+            // Initialize all indexed slots to nil
+            int indexedSize = _allocator.GetIndexedSize(classPoolOOP);
+            for (int i = 0; i < indexedSize; i++)
+            {
+                var currentOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
+                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                {
+                    _allocator.SetIndexedOOP(classPoolOOP, i, nilOOP);
+                }
+            }
+        }
     }
 }

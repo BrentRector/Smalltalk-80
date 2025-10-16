@@ -50,6 +50,34 @@ public class Loader
     public int InitExpressionsArrayId => _initExpressionsArrayId;
 
     /// <summary>
+    /// Builds VM metadata from the loaded cold start data.
+    /// Must be called after Run() completes.
+    /// </summary>
+    public VMMetadata BuildVMMetadata()
+    {
+        if (_layoutResolver == null)
+            throw new InvalidOperationException("Cannot build VM metadata before cold start completes");
+
+        return new VMMetadata
+        {
+            ClassNameFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "name"),
+            ClassSuperclassFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass"),
+            ClassMethodDictFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict"),
+            ClassFormatFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "format"),
+            MetaclassThisClassFieldIndex = _layoutResolver.GetFieldIndex("class:Metaclass", "thisClass"),
+            MethodDictTallyFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "tally"),
+            MethodDictKeysFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "keys"),
+            MethodDictValuesFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "values"),
+            ClassClassOOP = GlobalRegistry.Get("class:Class"),
+            MetaclassClassOOP = GlobalRegistry.Get("class:Metaclass"),
+            SymbolClassOOP = GlobalRegistry.Get("class:Symbol"),
+            StringClassOOP = GlobalRegistry.Get("class:String"),
+            ArrayClassOOP = GlobalRegistry.Get("class:Array"),
+            CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod")
+        };
+    }
+
+    /// <summary>
     /// Executes all cold start phases in order.
     /// Does NOT execute init expressions - that should be done separately after Run() completes.
     /// </summary>
@@ -137,7 +165,7 @@ public class Loader
         // Phase Y: Instance Variable Initialization (after class refs set)
         RunPhase("Phase Y: Instance Variable Initialization", () =>
         {
-            var phase = new PhaseY_InstanceVariableInitialization(_bundle, _allocator, _localIdToObjectId);
+            var phase = new PhaseY_InstanceVariableInitialization(_bundle, _allocator, _localIdToObjectId, _heapManager);
             phase.Run();
         });
 
@@ -206,10 +234,10 @@ public class Loader
             // USTable is reachable via SystemDictionary, no need for direct root
             var gcRootsList = new List<(string name, SmalltalkOOP oop)>
             {
-                ("nil", SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId)),
-                ("false", SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId)),
-                ("true", SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId)),
-                ("Smalltalk", SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId))
+                ("nil", GlobalRegistry.NilOOP),
+                ("false", GlobalRegistry.FalseOOP),
+                ("true", GlobalRegistry.TrueOOP),
+                ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
             };
 
             // Set as GC roots
@@ -221,7 +249,7 @@ public class Loader
             foreach (var (name, oop) in gcRootsList)
             {
                 var className = _heapManager.GetClassName(oop);
-                Console.WriteLine($"    {name} (id={oop.ToObjectTableIndex()}, class={className})");
+                Console.WriteLine($"    {name} (oop={oop}, class={className})");
             }
         }
         Console.WriteLine("✓");

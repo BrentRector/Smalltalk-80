@@ -38,8 +38,7 @@ public static class PrimitiveTable
 
         // Primitive not found - signal failure
         ctx.PrimitiveSuccess = false;
-        // Return nil OOP from GlobalRegistry
-        return new SmalltalkOOP(GlobalRegistry.NilObjectId << 1);
+        return GlobalRegistry.NilOOP;
     }
 
     private static void RegisterPrimitives()

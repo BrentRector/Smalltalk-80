@@ -1,3 +1,5 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+
 namespace Smalltalk80.Interpreter.Engine.InitExecution;
 
 /// <summary>
@@ -8,17 +10,17 @@ public record InitResult
 {
     public string InitLocalId { get; init; } = "";
     public InitStatus Status { get; init; }
-    public int? ReturnValueOop { get; init; }
+    public SmalltalkOOP? ReturnValueOop { get; init; }
     public long ElapsedMilliseconds { get; init; }
     public InitDiagnostic? Diagnostic { get; init; }
 
-    public static InitResult Success(string initLocalId, int returnValueOop, long elapsedMs)
+    public static InitResult Success(string initLocalId, SmalltalkOOP returnValueOop, long elapsedMs)
         => new() { InitLocalId = initLocalId, Status = InitStatus.Success, ReturnValueOop = returnValueOop, ElapsedMilliseconds = elapsedMs };
 
     public static InitResult ValidationFailed(string initLocalId, string reason)
         => new() { InitLocalId = initLocalId, Status = InitStatus.ValidationFailed, Diagnostic = new InitDiagnostic { Message = reason } };
 
-    public static InitResult Exception(string initLocalId, int exceptionOop, string message, string stackTrace, long elapsedMs)
+    public static InitResult Exception(string initLocalId, SmalltalkOOP exceptionOop, string message, string stackTrace, long elapsedMs)
         => new()
         {
             InitLocalId = initLocalId,
@@ -71,7 +73,7 @@ public enum InitStatus
 public record InitDiagnostic
 {
     public string? Message { get; init; }
-    public int? ExceptionOop { get; init; }
+    public SmalltalkOOP? ExceptionOop { get; init; }
     public int? PrimitiveIndex { get; init; }
     public string? StackTrace { get; init; }
     public int? FailedAtPc { get; init; }

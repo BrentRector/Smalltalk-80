@@ -73,7 +73,7 @@ public class Phase9_MethodDictionaryInstallation
             // Get the class's method dictionary (instance variable 1 in Behavior)
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at index 1
 
-            if (methodDictOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+            if (methodDictOOP == GlobalRegistry.NilOOP)
             {
                 Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
                 skippedMethods++;
@@ -82,11 +82,11 @@ public class Phase9_MethodDictionaryInstallation
 
             // Get the selector symbol
             string selectorName = _symbols[method.SelectorIndex];
-            int selectorSymbolId = GetSymbolObjectId(selectorName);
+            SmalltalkOOP selectorSymbolOOP = GetSymbolOOP(selectorName);
 
 
             // Install the method in the method dictionary
-            InstallMethodInDictionary(methodDictOOP.ToObjectTableIndex(), selectorSymbolId, methodOOP.ToObjectTableIndex());
+            InstallMethodInDictionary(methodDictOOP, selectorSymbolOOP, methodOOP);
             installedMethods++;
 
         }
@@ -94,16 +94,16 @@ public class Phase9_MethodDictionaryInstallation
     }
 
     /// <summary>
-    /// Gets the object ID for a symbol that was interned in Phase 1.
+    /// Gets the OOP for a symbol that was interned in Phase 1.
     /// </summary>
-    private int GetSymbolObjectId(string symbolName)
+    private SmalltalkOOP GetSymbolOOP(string symbolName)
     {
         // Find the symbol in the symbol table from Phase 1
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == symbolName)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -114,17 +114,16 @@ public class Phase9_MethodDictionaryInstallation
     /// Installs a method into a method dictionary using IdentityDictionary structure.
     /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
     /// </summary>
-    private void InstallMethodInDictionary(int methodDictId, int selectorSymbolId, int methodObjectId)
+    private void InstallMethodInDictionary(SmalltalkOOP methodDictOOP, SmalltalkOOP selectorSymbolOOP, SmalltalkOOP methodOOP)
     {
-        var methodDictOOP = SmalltalkOOP.FromObjectTableIndex(methodDictId);
         
         // MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
         var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
         var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
 
-        if (valuesArrayOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+        if (valuesArrayOOP == GlobalRegistry.NilOOP)
         {
-            throw new InvalidOperationException($"MethodDictionary {methodDictId} has nil valueArray");
+            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
         }
 
         int dictionarySize = _allocator.GetIndexedSize(methodDictOOP);
@@ -132,7 +131,7 @@ public class Phase9_MethodDictionaryInstallation
 
         if (dictionarySize != valuesArraySize)
         {
-            throw new InvalidOperationException($"MethodDictionary {methodDictId} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
+            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
         }
 
         // Find an empty slot or existing entry for this selector
@@ -141,13 +140,13 @@ public class Phase9_MethodDictionaryInstallation
         {
             var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
             
-            if (keyOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+            if (keyOOP == GlobalRegistry.NilOOP)
             {
                 // Empty slot found
                 targetIndex = i;
                 break;
             }
-            else if (keyOOP.ToObjectTableIndex() == selectorSymbolId)
+            else if (keyOOP == selectorSymbolOOP)
             {
                 // Existing entry for this selector - replace it
                 targetIndex = i;
@@ -157,18 +156,15 @@ public class Phase9_MethodDictionaryInstallation
 
         if (targetIndex == -1)
         {
-            throw new InvalidOperationException($"MethodDictionary {methodDictId} is full - no empty slots available");
+            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available");
         }
 
         // Check if this is a new entry (for tally update)
         var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId;
+        bool isNewEntry = existingKeyOOP == GlobalRegistry.NilOOP;
 
         // Install the method
-        var selectorOOP = SmalltalkOOP.FromObjectTableIndex(selectorSymbolId);
-        var methodOOP = SmalltalkOOP.FromObjectTableIndex(methodObjectId);
-
-        _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorOOP);
+        _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);
         _allocator.SetIndexedOOP(valuesArrayOOP, targetIndex, methodOOP);
 
         // Update tally if we used a new slot

@@ -48,11 +48,19 @@ public class PhaseX_ClassReferenceInitialization
             if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
                 continue;
             
+            // DIAGNOSTIC: Check if classOOP is a SmallInteger (should NEVER happen)
+            if (classOOP.IsSmallInteger)
+            {
+                throw new InvalidOperationException(
+                    $"CRITICAL BUG: Class '{cls.LocalId}' has SmallInteger OOP {classOOP} in _localIdToObjectId! " +
+                    $"Classes must be object pointers, not immediate values. " +
+                    $"SmallInteger value: {classOOP.AsSmallInteger()}");
+            }
+            
             if (cls.IsMetaclass)
             {
                 // Metaclass objects point to the Metaclass class
-                int metaclassClassId = GlobalRegistry.LookupClassObjectId("Metaclass");
-                var metaclassClassOOP = SmalltalkOOP.FromObjectTableIndex(metaclassClassId);
+                var metaclassClassOOP = GlobalRegistry.LookupClassOOP("Metaclass");
                 _allocator.SetSlot(classOOP, 0, metaclassClassOOP);
             }
             else
@@ -87,9 +95,7 @@ public class PhaseX_ClassReferenceInitialization
                 continue;
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
-            int classObjectId = GlobalRegistry.LookupClassObjectId(className);
-            
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
+            var classOOP = GlobalRegistry.LookupClassOOP(className);
             _allocator.SetSlot(objectOOP, 0, classOOP);
             
             classReferencesSet++;
@@ -107,11 +113,11 @@ public class PhaseX_ClassReferenceInitialization
 
     private void SetSingletonClassReference(string globalName, string className)
     {
-        if (GlobalRegistry.TryGet(globalName, out int objectId))
+        if (GlobalRegistry.TryGet(globalName, out SmalltalkOOP objectId))
         {
-            int classObjectId = GlobalRegistry.LookupClassObjectId(className);
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
+            SmalltalkOOP classObjectId = GlobalRegistry.LookupClassOOP(className);
+            var objectOOP = objectId;
+            var classOOP = classObjectId;
             _allocator.SetSlot(objectOOP, 0, classOOP);
         }
     }
@@ -120,30 +126,28 @@ public class PhaseX_ClassReferenceInitialization
     {
         // Set class references for symbols (created during symbol interning)
         var allSymbols = SymbolRegistry.AllSymbols();
-        int symbolClassId = GlobalRegistry.LookupClassObjectId("Symbol");
-        var symbolClassOOP = SmalltalkOOP.FromObjectTableIndex(symbolClassId);
+        var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
 
-        foreach (var (index, symbolObjectId) in allSymbols)
+        foreach (var (index, symbolOOP) in allSymbols)
         {
-            var symbolOOP = SmalltalkOOP.FromObjectTableIndex(symbolObjectId);
             _allocator.SetSlot(symbolOOP, 0, symbolClassOOP);
         }
 
         // Set class reference for SystemDictionary
-        if (GlobalRegistry.TryGet("Smalltalk", out int systemDictId))
+        if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP systemDictId))
         {
-            int systemDictClassId = GlobalRegistry.LookupClassObjectId("SystemDictionary");
-            var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(systemDictId);
-            var systemDictClassOOP = SmalltalkOOP.FromObjectTableIndex(systemDictClassId);
+            SmalltalkOOP systemDictClassId = GlobalRegistry.LookupClassOOP("SystemDictionary");
+            var systemDictOOP = systemDictId;
+            var systemDictClassOOP = systemDictClassId;
             _allocator.SetSlot(systemDictOOP, 0, systemDictClassOOP);
         }
 
         // Set class reference for USTable (Array)
-        if (GlobalRegistry.TryGet("USTable", out int ustableId))
+        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableId))
         {
-            int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
-            var ustableOOP = SmalltalkOOP.FromObjectTableIndex(ustableId);
-            var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+            SmalltalkOOP arrayClassId = GlobalRegistry.LookupClassOOP("Array");
+            var ustableOOP = ustableId;
+            var arrayClassOOP = arrayClassId;
             _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
         }
     }
@@ -157,45 +161,12 @@ public class PhaseX_ClassReferenceInitialization
     
     private void FixRemainingNullClassReferences()
     {
-        // Association objects created in Phase 6 are not tracked in _localIdToObjectId
-        // These have format=Pointer, 2 instance variables, and classOOP=0
-        // We need to find them and set their class reference to Association
+        // NOTE: This method should NOT iterate through raw object table indices.
+        // All objects MUST be properly tracked in _localIdToObjectId during allocation.
+        // If objects are missing class references, that indicates a bug in earlier phases
+        // that must be fixed at the source, not patched here.
         
-        int associationClassId = GlobalRegistry.LookupClassObjectId("Association");
-        var associationClassOOP = SmalltalkOOP.FromObjectTableIndex(associationClassId);
-        
-        // Scan all allocated objects looking for ones with NULL_CLASS (classOOP=0)
-        int maxObjectId = _heapManager.GetObjectTableSize();
-        int fixedCount = 0;
-        var nullClassObjects = new List<(int objectId, ObjectFormat format, int instVars, int indexed)>();
-        
-        for (int objectId = 0; objectId <= maxObjectId; objectId++)
-        {
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-            
-            // Skip if object doesn't exist
-            if (!_heapManager.IsValidObjectOOP(objectOOP))
-                continue;
-            
-            // Check if this object has NULL_CLASS
-            var classOOP = _heapManager.GetSlot(objectOOP, 0);
-            if (classOOP.RawValue != 0)
-                continue; // Already has a class
-            
-            // Log all NULL_CLASS objects for debugging
-            int instVarCount = _heapManager.GetInstanceVariableCount(objectOOP);
-            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
-            var format = _heapManager.GetObjectFormat(objectOOP);
-            nullClassObjects.Add((objectId, format, instVarCount, indexedSize));
-            
-            // Check if this is an Association (2 instance variables, Pointer format, no indexed data)
-            if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
-            {
-                // This is an Association object - set its class reference
-                _heapManager.SetSlot(objectOOP, 0, associationClassOOP);
-                fixedCount++;
-            }
-        }
-        
+        // This method is intentionally left as a no-op.
+        // If NULL_CLASS objects exist, they will be caught by Phase 14 validation.
     }
 }

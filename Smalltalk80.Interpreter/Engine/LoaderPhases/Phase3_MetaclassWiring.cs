@@ -50,6 +50,13 @@ public class Phase3_MetaclassWiring
                 {
                     SetInstanceVariableUsingPrimitive(metaOOP, "metaclassOf", instOOP);
                 }
+                
+                // CRITICAL: Set thisClass on metaclass instances (required for class variable lookup)
+                // Metaclass instances have 'thisClass' instance variable pointing to their instance class
+                if (metaClassDef != null && FindInstanceVariableIndex(metaClassDef, "thisClass") != -1)
+                {
+                    SetInstanceVariableUsingPrimitive(metaOOP, "thisClass", instOOP);
+                }
 
                 count++;
             }
@@ -94,7 +101,7 @@ public class Phase3_MetaclassWiring
         var classDefinition = FindClassDefinitionForObject(objectOOP);
         if (classDefinition == null)
         {
-            throw new InvalidOperationException($"Cannot find class definition for object {objectOOP.ToObjectTableIndex()}");
+            throw new InvalidOperationException($"Cannot find class definition for object {objectOOP}");
         }
         
         // Look up the slot name in the class's instance variable names using ClassHierarchyUtils

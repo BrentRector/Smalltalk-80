@@ -21,15 +21,13 @@ public class ProcessPrimitives
     
     public SmalltalkOOP Resume(SmalltalkOOP processOOP)
     {
-        if (!GlobalRegistry.TryGet("ProcessorScheduler", out int schedulerId))
+        if (!GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP schedulerOOP))
             throw new InvalidOperationException("ProcessorScheduler not found");
-        
-        var schedulerOOP = SmalltalkOOP.FromObjectTableIndex(schedulerId);
         
         int activeProcessIndex = _layoutResolver.GetFieldIndex("class:ProcessorScheduler", "activeProcess");
         var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
         
-        if (currentActiveOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
+        if (currentActiveOOP != GlobalRegistry.NilOOP)
         {
             throw new InvalidOperationException("Process switching not yet implemented");
         }
@@ -48,7 +46,7 @@ public class ProcessPrimitives
         _heapManager.SetInstanceVariable(
             schedulerOOP, 
             activeProcessIndex, 
-            SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId)
+            GlobalRegistry.NilOOP
         );
         
         return resultOOP;

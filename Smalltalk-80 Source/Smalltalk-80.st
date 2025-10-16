@@ -18933,7 +18933,9 @@ buildMessageView: messageString
 	messageView controller: NoController new.
 	messageView window: (0@0 extent: (messageView window extent max: 200@30)).
 	messageView centered.
-	^messageView! !Number variableWordSubclass: #Float
+	^messageView! !
+	
+Number variableWordSubclass: #Float
 	instanceVariableNames: ''
 	classVariableNames: 'ExpPCoefficients ExpQCoefficients Fourthpi Halfpi Ln2 LnCoefficients Pi RadiansPerDegree SinCoefficients Sqrt2 TanCoefficients Twopi '
 	poolDictionaries: ''

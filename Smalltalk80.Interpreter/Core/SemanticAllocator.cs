@@ -227,14 +227,13 @@ public class SemanticAllocator
     {
         // For now, use well-known class mappings to determine instance variable counts
         // This is accurate for the common cases and safer during bootstrap
-        int classId = classOOP.ToObjectTableIndex();
         
-        // Look up well-known classes by their object IDs
-        if (classId == GlobalRegistry.LookupClassObjectId("Array"))
+        // Look up well-known classes by their OOPs
+        if (classOOP == GlobalRegistry.LookupClassOOP("Array"))
             return 0; // Array has no instance variables (pure indexed)
-        else if (classId == GlobalRegistry.LookupClassObjectId("MethodDictionary"))
+        else if (classOOP == GlobalRegistry.LookupClassOOP("MethodDictionary"))
             return 2; // MethodDictionary has 2 instance variables (valueArray + tally)
-        else if (classId == GlobalRegistry.LookupClassObjectId("CompiledMethod"))
+        else if (classOOP == GlobalRegistry.LookupClassOOP("CompiledMethod"))
             return 0; // CompiledMethod has no instance variables (pure indexed with header + literals)
         else
         {
@@ -458,8 +457,8 @@ public class SemanticAllocator
     {
         // Get class OOP and check if it's the CompiledMethod class
         var classOOP = _heapManager.GetClassOOP(objectOOP);
-        int compiledMethodClassId = GlobalRegistry.LookupClassObjectId("CompiledMethod");
-        return classOOP.ToObjectTableIndex() == compiledMethodClassId;
+        SmalltalkOOP compiledMethodClassOOP = GlobalRegistry.LookupClassOOP("CompiledMethod");
+        return classOOP == compiledMethodClassOOP;
     }
 
     /// <summary>

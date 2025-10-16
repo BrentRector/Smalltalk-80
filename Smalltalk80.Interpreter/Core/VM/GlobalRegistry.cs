@@ -1,53 +1,56 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Registry for well-known global object IDs during cold start.
+/// Registry for well-known global OOPs during cold start.
 /// Tracks singleton objects, system objects, and class objects by name.
+/// CRITICAL: Stores SmalltalkOOP values, NEVER object table indices.
 /// </summary>
 public static class GlobalRegistry
 {
-    private static readonly Dictionary<string, int> _globals = new();
-    private static readonly Dictionary<string, object> _objects = new(); // For non-int global data
+    private static readonly Dictionary<string, SmalltalkOOP> _globals = new();
+    private static readonly Dictionary<string, object> _objects = new();
 
-    // Well-known singleton object IDs
-    public static int NilObjectId { get; private set; }
-    public static int TrueObjectId { get; private set; }
-    public static int FalseObjectId { get; private set; }
-    public static int SystemDictionaryId { get; private set; }
+    // Well-known singleton OOPs
+    public static SmalltalkOOP NilOOP { get; private set; }
+    public static SmalltalkOOP TrueOOP { get; private set; }
+    public static SmalltalkOOP FalseOOP { get; private set; }
+    public static SmalltalkOOP SystemDictionaryOOP { get; private set; }
 
     /// <summary>
-    /// Registers a well-known global object.
+    /// Registers a well-known global object OOP.
     /// </summary>
-    public static void Register(string name, int objectId)
+    public static void Register(string name, SmalltalkOOP oop)
     {
-        _globals[name] = objectId;
+        _globals[name] = oop;
 
         // Update well-known properties
         switch (name)
         {
             case "nil":
-                NilObjectId = objectId;
+                NilOOP = oop;
                 break;
             case "true":
-                TrueObjectId = objectId;
+                TrueOOP = oop;
                 break;
             case "false":
-                FalseObjectId = objectId;
+                FalseOOP = oop;
                 break;
             case "SystemDictionary":
             case "Smalltalk":
-                SystemDictionaryId = objectId;
+                SystemDictionaryOOP = oop;
                 break;
         }
     }
 
     /// <summary>
-    /// Looks up a class object ID by class name.
+    /// Looks up a class object OOP by class name.
     /// </summary>
-    public static int LookupClassObjectId(string className)
+    public static SmalltalkOOP LookupClassOOP(string className)
     {
-        if (_globals.TryGetValue($"class:{className}", out var objectId))
-            return objectId;
+        if (_globals.TryGetValue($"class:{className}", out var oop))
+            return oop;
 
         throw new KeyNotFoundException($"Class not found: {className}");
     }
@@ -55,29 +58,29 @@ public static class GlobalRegistry
     /// <summary>
     /// Registers a class object by name.
     /// </summary>
-    public static void RegisterClass(string className, int objectId)
+    public static void RegisterClass(string className, SmalltalkOOP oop)
     {
-        _globals[$"class:{className}"] = objectId;
+        _globals[$"class:{className}"] = oop;
     }
 
     /// <summary>
-    /// Gets a global object ID by name.
+    /// Gets a global object OOP by name.
     /// </summary>
-    public static int Get(string name)
+    public static SmalltalkOOP Get(string name)
     {
         return _globals[name];
     }
 
     /// <summary>
-    /// Tries to get a global object ID by name.
+    /// Tries to get a global object OOP by name.
     /// </summary>
-    public static bool TryGet(string name, out int objectId)
+    public static bool TryGet(string name, out SmalltalkOOP oop)
     {
-        return _globals.TryGetValue(name, out objectId);
+        return _globals.TryGetValue(name, out oop);
     }
 
     /// <summary>
-    /// Sets a generic object in the registry (for non-int data like maps, lists, etc.)
+    /// Sets a generic object in the registry (for non-OOP data like maps, lists, etc.)
     /// </summary>
     public static void Set(string name, object value)
     {
@@ -111,15 +114,23 @@ public static class GlobalRegistry
     }
 
     /// <summary>
+    /// Returns all registered globals as an enumerable of key-value pairs.
+    /// </summary>
+    public static IEnumerable<KeyValuePair<string, SmalltalkOOP>> GetAll()
+    {
+        return _globals;
+    }
+
+    /// <summary>
     /// Clears all registered globals. Used for testing or reinitialization.
     /// </summary>
     public static void Clear()
     {
         _globals.Clear();
         _objects.Clear();
-        NilObjectId = 0;
-        TrueObjectId = 0;
-        FalseObjectId = 0;
-        SystemDictionaryId = 0;
+        NilOOP = SmalltalkOOP.Null;
+        TrueOOP = SmalltalkOOP.Null;
+        FalseOOP = SmalltalkOOP.Null;
+        SystemDictionaryOOP = SmalltalkOOP.Null;
     }
 }

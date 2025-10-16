@@ -80,7 +80,7 @@ public class Phase13_ComprehensiveValidation
         
         if (!_allocator.IsValidObjectOOP(classOOP))
         {
-            results.AddError($"Class {className} has invalid OOP {classOOP.ToObjectTableIndex()}");
+            results.AddError($"Class {className} has invalid OOP {classOOP}");
             return;
         }
         
@@ -127,7 +127,7 @@ public class Phase13_ComprehensiveValidation
         
         if (!_allocator.IsValidObjectOOP(methodOOP))
         {
-            results.AddError($"Method {method.LocalId} has invalid OOP {methodOOP.ToObjectTableIndex()}");
+            results.AddError($"Method {method.LocalId} has invalid OOP {methodOOP}");
             return;
         }
         
@@ -226,22 +226,21 @@ public class Phase13_ComprehensiveValidation
         Console.WriteLine("  Validating special objects...");
         
         // Validate nil
-        ValidateSpecialObject("nil", GlobalRegistry.NilObjectId, results);
+        ValidateSpecialObject("nil", GlobalRegistry.NilOOP, results);
         
         // Validate true/false
-        ValidateSpecialObject("true", GlobalRegistry.TrueObjectId, results);
-        ValidateSpecialObject("false", GlobalRegistry.FalseObjectId, results);
+        ValidateSpecialObject("true", GlobalRegistry.TrueOOP, results);
+        ValidateSpecialObject("false", GlobalRegistry.FalseOOP, results);
         
         // Validate SystemDictionary
-        ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryId, results);
+        ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryOOP, results);
         
         // Validate USTable
-        if (GlobalRegistry.TryGet("USTable", out int ustableId))
+        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
         {
-            ValidateSpecialObject("USTable", ustableId, results);
+            ValidateSpecialObject("USTable", ustableOOP, results);
             
             // Validate USTable is Array with expected size
-            var ustableOOP = SmalltalkOOP.FromObjectTableIndex(ustableId);
             if (_allocator.IsValidObjectOOP(ustableOOP))
             {
                 var format = _allocator.GetObjectFormat(ustableOOP);
@@ -264,12 +263,11 @@ public class Phase13_ComprehensiveValidation
         }
     }
 
-    private void ValidateSpecialObject(string name, int objectId, ValidationResults results)
+    private void ValidateSpecialObject(string name, SmalltalkOOP objectOOP, ValidationResults results)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
         if (!_allocator.IsValidObjectOOP(objectOOP))
         {
-            results.AddError($"Special object {name} (id {objectId}) is not valid");
+            results.AddError($"Special object {name} ({objectOOP}) is not valid");
         }
         else
         {
@@ -312,7 +310,7 @@ public class Phase13_ComprehensiveValidation
                 var classOOP = _allocator.GetClassOOP(objectOOP);
                 if (!classOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(classOOP))
                 {
-                    results.AddError($"Object {kvp.Key} has invalid class OOP {classOOP.ToObjectTableIndex()}");
+                    results.AddError($"Object {kvp.Key} has invalid class OOP {classOOP}");
                     invalidReferences++;
                 }
             }
@@ -331,7 +329,7 @@ public class Phase13_ComprehensiveValidation
                     var instVarOOP = _allocator.GetInstanceVariable(objectOOP, i);
                     if (!instVarOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(instVarOOP))
                     {
-                        results.AddError($"Object {kvp.Key} instance variable {i} has invalid OOP {instVarOOP.ToObjectTableIndex()}");
+                        results.AddError($"Object {kvp.Key} instance variable {i} has invalid OOP {instVarOOP}");
                         invalidReferences++;
                     }
                 }
@@ -354,7 +352,7 @@ public class Phase13_ComprehensiveValidation
                         var indexedOOP = _allocator.GetIndexedOOP(objectOOP, i);
                         if (!indexedOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(indexedOOP))
                         {
-                            results.AddError($"Object {kvp.Key} indexed field {i} has invalid OOP {indexedOOP.ToObjectTableIndex()}");
+                            results.AddError($"Object {kvp.Key} indexed field {i} has invalid OOP {indexedOOP}");
                             invalidReferences++;
                         }
                     }

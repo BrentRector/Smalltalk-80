@@ -42,22 +42,17 @@ public class Phase6_ObjectAllocation
         var trueOOP = _allocator.AllocateFixedObject("True");
         var falseOOP = _allocator.AllocateFixedObject("False");
         
-        int nilId = nilOOP.ToObjectTableIndex();
-        int trueId = trueOOP.ToObjectTableIndex();
-        int falseId = falseOOP.ToObjectTableIndex();
-
-        GlobalRegistry.Register("nil", nilId);
-        GlobalRegistry.Register("true", trueId);
-        GlobalRegistry.Register("false", falseId);
+        GlobalRegistry.Register("nil", nilOOP);
+        GlobalRegistry.Register("true", trueOOP);
+        GlobalRegistry.Register("false", falseOOP);
 
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
-        InitializeSystemDictionaryWithNil(nilId);
+        InitializeSystemDictionaryWithNil(nilOOP);
 
         // Create ProcessorScheduler singleton
         // This is the unique process scheduler instance that manages all processes in the system
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
-        int processorSchedulerId = processorSchedulerOOP.ToObjectTableIndex();
-        GlobalRegistry.Register("ProcessorScheduler", processorSchedulerId);
+        GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
         
         // Initialize ProcessorScheduler fields that should NOT be nil
         // Phase Y will later fill any remaining uninitialized fields with nil
@@ -69,12 +64,12 @@ public class Phase6_ObjectAllocation
         foreach (var obj in _bundle.Objects)
         {
             string className = _symbols[obj.ClassNameIndex];
-            int classId = ResolveClassObjectId(className);
+            SmalltalkOOP classOOP = ResolveClassOOP(className);
             int fixedSize = obj.Fields.Length;
             int indexedSize = obj.IndexedFields.Length;
 
-            int objectId = AllocateObjectWithSemanticAllocator(className, obj.FormatHint, fixedSize, indexedSize);
-            _localIdToObjectId[obj.LocalId] = SmalltalkOOP.FromObjectTableIndex(objectId);
+            SmalltalkOOP objectOOP = AllocateObjectWithSemanticAllocator(className, obj.FormatHint, fixedSize, indexedSize);
+            _localIdToObjectId[obj.LocalId] = objectOOP;
 
             // Note: Field initialization moved to Phase Y after nil exists
 
@@ -82,8 +77,8 @@ public class Phase6_ObjectAllocation
             if (obj.LocalId.StartsWith("pool:"))
             {
                 string poolName = obj.LocalId.Substring(5); // Remove "pool:" prefix
-                int poolNameSymbol = InternSymbol(poolName);
-                int association = AllocateAssociationWithSemanticAllocator(poolNameSymbol, objectId);
+                SmalltalkOOP poolNameSymbol = InternSymbol(poolName);
+                SmalltalkOOP association = AllocateAssociationWithSemanticAllocator(poolNameSymbol, objectOOP);
                 InstallAssociationInSystemDictionary(association, poolName);
             }
         }
@@ -92,32 +87,32 @@ public class Phase6_ObjectAllocation
     }
 
     /// <summary>
-    /// Resolves a class name to its object ID.
+    /// Resolves a class name to its OOP.
     /// Assumes class objects were already allocated and mapped by name.
     /// </summary>
-    private int ResolveClassObjectId(string className)
+    private SmalltalkOOP ResolveClassOOP(string className)
     {
-        return GlobalRegistry.LookupClassObjectId(className);
+        return GlobalRegistry.LookupClassOOP(className);
     }
 
     /// <summary>
-    /// Resolves a field value from the discriminated union to an object ID.
+    /// Resolves a field value from the discriminated union to an OOP.
     /// Handles JsonElement types from JSON deserialization.
     /// </summary>
-    private int ResolveFieldValue(FieldValue value)
+    private SmalltalkOOP ResolveFieldValue(FieldValue value)
     {
         return value.Type switch
         {
-            "nil" => GlobalRegistry.NilObjectId,
-            "true" => GlobalRegistry.TrueObjectId,
-            "false" => GlobalRegistry.FalseObjectId,
-            "smallInt" => EncodeSmallInteger(GetIntValue(value.Value!)),
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
+            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
             "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
             "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
             "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP.ToObjectTableIndex() : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.NilOOP,  // Forward reference: use nil as placeholder, will be patched later
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -156,7 +151,7 @@ public class Phase6_ObjectAllocation
     /// <summary>
     /// Allocates an object using SemanticAllocator based on format hint.
     /// </summary>
-    private int AllocateObjectWithSemanticAllocator(string className, string formatHint, int fixedSize, int indexedSize)
+    private SmalltalkOOP AllocateObjectWithSemanticAllocator(string className, string formatHint, int fixedSize, int indexedSize)
     {
         // Map format hint to appropriate SemanticAllocator method
         var objectOOP = formatHint.ToLower() switch
@@ -169,40 +164,36 @@ public class Phase6_ObjectAllocation
             _ => _allocator.AllocateFixedObject(className) // Default fallback
         };
 
-        return objectOOP.ToObjectTableIndex();
+        return objectOOP;
     }
 
     /// <summary>
     /// Sets an instance variable in an object.
     /// </summary>
-    private void SetInstanceVariable(int objectId, int fieldIndex, int valueId)
+    private void SetInstanceVariable(SmalltalkOOP objectOOP, int fieldIndex, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         _allocator.SetInstanceVariable(objectOOP, fieldIndex, valueOOP);
     }
 
     /// <summary>
     /// Sets an indexed OOP in an object.
     /// </summary>
-    private void SetIndexedOOP(int objectId, int index, int valueId)
+    private void SetIndexedOOP(SmalltalkOOP objectOOP, int index, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         _allocator.SetIndexedOOP(objectOOP, index, valueOOP);
     }
 
     /// <summary>
     /// Interns a symbol using the symbol table from Phase 1.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -212,7 +203,7 @@ public class Phase6_ObjectAllocation
     /// <summary>
     /// Interns a string by creating a ByteIndexed object.
     /// </summary>
-    private int InternString(string value)
+    private SmalltalkOOP InternString(string value)
     {
         // Encode string as UTF-8 bytes
         byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
@@ -226,37 +217,36 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(stringOOP, i, stringBytes[i]);
         }
         
-        return stringOOP.ToObjectTableIndex();
+        return stringOOP;
     }
 
     /// <summary>
     /// Allocates an Association object (key-value pair) using SemanticAllocator.
     /// </summary>
-    private int AllocateAssociationWithSemanticAllocator(int keyId, int valueId)
+    private SmalltalkOOP AllocateAssociationWithSemanticAllocator(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         var associationOOP = _allocator.AllocateFixedObject("Association");
-        int objectId = associationOOP.ToObjectTableIndex();
         
         // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
-        _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
-        _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
         
-        return objectId;
+        return associationOOP;
     }
 
     /// <summary>
     /// Encodes a SmallInteger as a tagged OOP.
+    /// Returns the SmalltalkOOP (tagged with LSB=1) for storage in _localIdToObjectId.
     /// </summary>
-    private int EncodeSmallInteger(int value)
+    private SmalltalkOOP EncodeSmallInteger(int value)
     {
-        var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.ToObjectTableIndex();
+        return SmalltalkOOP.FromSmallInteger(value);
     }
 
     /// <summary>
     /// Allocates a Character object.
     /// </summary>
-    private int AllocateCharacter(int codePoint)
+    private SmalltalkOOP AllocateCharacter(int codePoint)
     {
         var characterOOP = _allocator.AllocateFixedObject("Character");
 
@@ -264,13 +254,13 @@ public class Phase6_ObjectAllocation
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
 
-        return characterOOP.ToObjectTableIndex();
+        return characterOOP;
     }
 
     /// <summary>
     /// Allocates a ByteArray object.
     /// </summary>
-    private int AllocateByteArray(string encoding, string data)
+    private SmalltalkOOP AllocateByteArray(string encoding, string data)
     {
         // Decode the data based on encoding
         byte[] bytes = encoding.ToLower() switch
@@ -288,13 +278,13 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(byteArrayOOP, i, bytes[i]);
         }
 
-        return byteArrayOOP.ToObjectTableIndex();
+        return byteArrayOOP;
     }
 
     /// <summary>
     /// Allocates a Float object.
     /// </summary>
-    private int AllocateFloat(double value)
+    private SmalltalkOOP AllocateFloat(double value)
     {
         var floatOOP = _allocator.AllocateByteArray("Float", 8); // 8 bytes for IEEE 754 double
 
@@ -305,7 +295,7 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
         }
 
-        return floatOOP.ToObjectTableIndex();
+        return floatOOP;
     }
 
     /// <summary>
@@ -331,7 +321,7 @@ public class Phase6_ObjectAllocation
     /// Creates SystemDictionary instance with proper dependency ordering.
     /// SystemDictionary is created AFTER nil exists so it can be properly initialized.
     /// </summary>
-    private int CreateSystemDictionary(int nilId)
+    private SmalltalkOOP CreateSystemDictionary(SmalltalkOOP nilOOP)
     {
         // Calculate SystemDictionary size requirements
         int instanceClassCount = _bundle.Classes.Count(c => !c.IsMetaclass);
@@ -345,36 +335,33 @@ public class Phase6_ObjectAllocation
         
         // Allocate SystemDictionary instance using SemanticAllocator
         var systemDictOOP = _allocator.AllocateArray("SystemDictionary", totalEntries);
-        int systemDictId = systemDictOOP.ToObjectTableIndex();
         
         // Initialize all indexed slots with nil (proper dependency ordering!)
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(nilId);
         for (int i = 0; i < totalEntries; i++)
         {
             _allocator.SetIndexedOOP(systemDictOOP, i, nilOOP);
         }
         
-        return systemDictId;
+        return systemDictOOP;
     }
 
     /// <summary>
     /// Installs an association in SystemDictionary using semantic slot finding (no sequential indexing).
     /// Finds the first available nil slot rather than relying on brittle object ID sequencing.
     /// </summary>
-    private void InstallAssociationInSystemDictionary(int associationId, string name)
+    private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string name)
     {
-        var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId);
+        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        int nilId = GlobalRegistry.NilObjectId;
+        SmalltalkOOP nilOOP = GlobalRegistry.NilOOP;
         
         // Find first available nil slot
         for (int i = 0; i < systemDictSize; i++)
         {
             var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            if (slotOOP.ToObjectTableIndex() == nilId)
+            if (slotOOP == nilOOP)
             {
                 // Found empty slot - install association
-                var associationOOP = SmalltalkOOP.FromObjectTableIndex(associationId);
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
                 return;
             }
@@ -387,11 +374,10 @@ public class Phase6_ObjectAllocation
     /// Initializes SystemDictionary indexed slots with nil.
     /// SystemDictionary was created in Phase 2 but couldn't be initialized until nil object exists.
     /// </summary>
-    private void InitializeSystemDictionaryWithNil(int nilId)
+    private void InitializeSystemDictionaryWithNil(SmalltalkOOP nilOOP)
     {
-        var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId);
+        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(nilId);
         
         for (int i = 0; i < systemDictSize; i++)
         {

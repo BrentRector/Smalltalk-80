@@ -156,6 +156,22 @@ public interface ISmalltalkHeapManager
     /// </summary>
     GCStatistics GetGCStatistics();
 
+    // Write Barrier Support
+    
+    /// <summary>
+    /// Sets an instance variable with write barrier (for runtime use).
+    /// Use this for all heap mutations during runtime execution.
+    /// Ensures GC sees the reference update for concurrent/incremental collection.
+    /// </summary>
+    void SetInstanceVariableWithBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value);
+    
+    /// <summary>
+    /// Sets an instance variable without write barrier (for loader-only use).
+    /// DANGER: Only use during single-threaded loader phases before GC is enabled.
+    /// Runtime code MUST use SetInstanceVariableWithBarrier.
+    /// </summary>
+    void SetInstanceVariableNoBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value);
+
     // ObjectTable Management
 
     /// <summary>

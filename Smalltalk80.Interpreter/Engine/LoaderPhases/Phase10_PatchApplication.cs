@@ -38,8 +38,8 @@ public class Phase10_PatchApplication
             if (patch.Target.Kind == "metaclassWiring")
                 continue;
 
-            int targetId = ResolveTarget(patch.Target);
-            int valueId = patch.Value != null ? ResolveValue(patch.Value) : GlobalRegistry.NilObjectId;
+            SmalltalkOOP targetOOP = ResolveTarget(patch.Target);
+            SmalltalkOOP valueOOP = patch.Value != null ? ResolveValue(patch.Value) : GlobalRegistry.NilOOP;
 
             // Find the localId for debug purposes
             string? targetLocalId = patch.Target.ObjectLocalId ?? patch.Target.MethodLocalId ?? patch.Target.ClassLocalId ?? "unknown";
@@ -47,16 +47,16 @@ public class Phase10_PatchApplication
             switch (patch.Operation)
             {
                 case "setValue":
-                    SetField(targetId, patch.Target.FieldIndex!.Value, valueId);
+                    SetField(targetOOP, patch.Target.FieldIndex!.Value, valueOOP);
                     break;
 
                 case "setAssociationValue":
-                    SetNamedSlot(targetId, "value", valueId);
+                    SetNamedSlot(targetOOP, "value", valueOOP);
                     break;
 
                 case "addToSystemDictionary":
                     string key = _symbols[patch.Value!.SymbolIndex!.Value];
-                    SetNamedSlot(GlobalRegistry.SystemDictionaryId, key, valueId);
+                    SetNamedSlot(GlobalRegistry.SystemDictionaryOOP, key, valueOOP);
                     break;
 
                 case "wireMetaclass":
@@ -70,42 +70,41 @@ public class Phase10_PatchApplication
     }
 
     /// <summary>
-    /// Resolves the target of a patch to an object ID.
+    /// Resolves the target of a patch to a SmalltalkOOP.
     /// </summary>
-    private int ResolveTarget(PatchTarget target)
+    private SmalltalkOOP ResolveTarget(PatchTarget target)
     {
         return target.Kind switch
         {
-            "objectField" => _localIdToObjectId[target.ObjectLocalId!].ToObjectTableIndex(),
+            "objectField" => _localIdToObjectId[target.ObjectLocalId!],
             "methodLiteral" => GetMethodLiteral(target.MethodLocalId!, target.LiteralIndex!.Value),
-            "classSlot" => _localIdToObjectId[target.ClassLocalId!].ToObjectTableIndex(),
-            "metaclassWiring" => 0, // Should be skipped in Run(), but return dummy value
+            "classSlot" => _localIdToObjectId[target.ClassLocalId!],
+            "metaclassWiring" => SmalltalkOOP.FromObjectTableIndex(0), // Should be skipped in Run(), but return dummy value
             _ => throw new NotSupportedException($"Unsupported patch target: {target.Kind}")
         };
     }
 
-    private int GetMethodLiteral(string methodLocalId, int literalIndex)
+    private SmalltalkOOP GetMethodLiteral(string methodLocalId, int literalIndex)
     {
-        int methodObjectId = _localIdToObjectId[methodLocalId].ToObjectTableIndex();
-        var methodOOP = SmalltalkOOP.FromObjectTableIndex(methodObjectId);
+        SmalltalkOOP methodOOP = _localIdToObjectId[methodLocalId];
         
         // CompiledMethod structure: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
         // Literals start at indexed slot 1 (slot 0 is header)
         var literalOOP = _allocator.GetIndexedOOP(methodOOP, literalIndex + 1);
-        return literalOOP.ToObjectTableIndex();
+        return literalOOP;
     }
 
     /// <summary>
-    /// Resolves a patch value to an object ID.
+    /// Resolves a patch value to a SmalltalkOOP.
     /// </summary>
-    private int ResolveValue(PatchValue value)
+    private SmalltalkOOP ResolveValue(PatchValue value)
     {
         return value.Type switch
         {
-            "objectRef" => _localIdToObjectId[value.LocalId!].ToObjectTableIndex(),
+            "objectRef" => _localIdToObjectId[value.LocalId!],
             "symbolRef" => InternSymbol(_symbols[value.SymbolIndex!.Value]),
-            "smallInt" => EncodeSmallInteger(value.IntValue!.Value),
-            "nil" => GlobalRegistry.NilObjectId,
+            "smallInt" => SmalltalkOOP.FromSmallInteger(value.IntValue!.Value),
+            "nil" => GlobalRegistry.NilOOP,
             _ => throw new InvalidOperationException($"Unknown patch value type: {value.Type}")
         };
     }
@@ -113,10 +112,8 @@ public class Phase10_PatchApplication
     /// <summary>
     /// Sets a field (instance variable) in an object.
     /// </summary>
-    private void SetField(int objectId, int fieldIndex, int valueId)
+    private void SetField(SmalltalkOOP objectOOP, int fieldIndex, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         _allocator.SetInstanceVariable(objectOOP, fieldIndex, valueOOP);
     }
 
@@ -124,13 +121,10 @@ public class Phase10_PatchApplication
     /// Sets a named slot in an object by looking up the slot name in the class's instance variable names.
     /// Handles objects created dynamically (like Associations) that don't have localId mappings.
     /// </summary>
-    private void SetNamedSlot(int objectId, string slotName, int valueId)
+    private void SetNamedSlot(SmalltalkOOP objectOOP, string slotName, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
-        
         // Try to find the class definition for this object
-        var classDefinition = FindClassDefinitionForObject(objectId);
+        var classDefinition = FindClassDefinitionForObject(objectOOP);
         
         if (classDefinition == null)
         {
@@ -141,7 +135,7 @@ public class Phase10_PatchApplication
             {
                 if (instVarCount < 2)
                 {
-                    throw new InvalidOperationException($"Object {objectId} claims to be Association but only has {instVarCount} instance variables (expected 2 for key+value)");
+                    throw new InvalidOperationException($"Object {objectOOP} claims to be Association but only has {instVarCount} instance variables (expected 2 for key+value)");
                 }
                 // For Association objects: key = index 0, value = index 1
                 // This is the standard Association layout in Smalltalk-80
@@ -152,7 +146,7 @@ public class Phase10_PatchApplication
             {
                 if (instVarCount < 1)
                 {
-                    throw new InvalidOperationException($"Object {objectId} claims to be Association but only has {instVarCount} instance variables (expected at least 1 for key)");
+                    throw new InvalidOperationException($"Object {objectOOP} claims to be Association but only has {instVarCount} instance variables (expected at least 1 for key)");
                 }
                 // For Association objects: key = index 0, value = index 1
                 _allocator.SetInstanceVariable(objectOOP, 0, valueOOP);
@@ -160,7 +154,7 @@ public class Phase10_PatchApplication
             }
             else
             {
-                throw new InvalidOperationException($"Cannot find class definition for object {objectId} and unknown slot '{slotName}'");
+                throw new InvalidOperationException($"Cannot find class definition for object {objectOOP} and unknown slot '{slotName}'");
             }
         }
         
@@ -177,14 +171,14 @@ public class Phase10_PatchApplication
     /// <summary>
     /// Interns a symbol using the symbol table from Phase 1.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -194,19 +188,18 @@ public class Phase10_PatchApplication
     /// <summary>
     /// Encodes a SmallInteger as a tagged OOP.
     /// </summary>
-    private int EncodeSmallInteger(int value)
+    private SmalltalkOOP EncodeSmallInteger(int value)
     {
-        var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.ToObjectTableIndex();
+        return SmalltalkOOP.FromSmallInteger(value);
     }
 
     /// <summary>
     /// Finds the class definition for an object by looking up its localId.
     /// </summary>
-    private ClassDescriptor? FindClassDefinitionForObject(int objectId)
+    private ClassDescriptor? FindClassDefinitionForObject(SmalltalkOOP objectOOP)
     {
         // Find the localId for this object
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == SmalltalkOOP.FromObjectTableIndex(objectId).RawValue).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectOOP).Key;
         if (localId == null) return null;
         
         // Find the class definition in the bundle

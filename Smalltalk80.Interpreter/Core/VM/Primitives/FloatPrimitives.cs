@@ -31,19 +31,8 @@ public static class FloatPrimitives
     /// </summary>
     private static SmalltalkOOP FromDouble(IPrimitiveContext ctx, double value)
     {
-        // Get Float class ID from well-known globals
-        // TODO: Need to add GetClassByName or use special objects array
-        // For now, assume Float class is known (will need infrastructure)
-
-        // Allocate Float object with 8 indexed bytes
-        // Format: ByteIndexed, no fixed fields, 8 indexed bytes
-        int floatClass = GetFloatClass(ctx);
-        // Allocate Float object with ByteIndexed format
-        SmalltalkOOP floatOop = ctx.HeapManager.AllocateObject(
-            format: ObjectFormat.ByteIndexed,
-            fixedSlots: 0,
-            indexedSize: 8
-        );
+        // Allocate Float object with 8 indexed bytes using dynamic class lookup
+        SmalltalkOOP floatOop = ctx.AllocateObject("class:Float", 8);
 
         // Store the double as 8 bytes
         byte[] bytes = BitConverter.GetBytes(value);
@@ -51,10 +40,6 @@ public static class FloatPrimitives
         {
             ctx.HeapManager.SetIndexedByte(floatOop, i, bytes[i]);
         }
-
-        // Set the class reference
-        SmalltalkOOP floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClass);
-        ctx.HeapManager.SetSlot(floatOop, 0, floatClassOOP);
         
         return floatOop;
     }
@@ -67,22 +52,15 @@ public static class FloatPrimitives
         if (objectOop.IsSmallInteger)
             return false;
 
-        SmalltalkOOP classOOP = ctx.HeapManager.GetClassOOP(objectOop);
-        int classId = classOOP.ToObjectTableIndex();
-        int floatClass = GetFloatClass(ctx);
-
-        return classId == floatClass;
+        // Check if the object's format is ByteIndexed with 8 bytes (Float characteristic)
+        var format = ctx.HeapManager.GetObjectFormat(objectOop);
+        if (format != ObjectFormat.ByteIndexed)
+            return false;
+            
+        int size = ctx.HeapManager.GetIndexedSize(objectOop);
+        return size == 8;
     }
 
-    /// <summary>
-    /// Gets the Float class ID.
-    /// </summary>
-    private static int GetFloatClass(IPrimitiveContext ctx)
-    {
-        // TODO: Need to get Float class from well-known objects or context
-        // For now, this is a stub that needs proper implementation
-        throw new NotImplementedException("GetFloatClass needs implementation with proper class lookup");
-    }
 
     /// <summary>
     /// Primitive 40: SmallInteger asFloat (convert SmallInteger to Float).

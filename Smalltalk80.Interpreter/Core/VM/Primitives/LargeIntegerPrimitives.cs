@@ -52,7 +52,7 @@ public static class LargeIntegerPrimitives
         }
 
         // Set the class reference
-        SmalltalkOOP classOOP = SmalltalkOOP.FromObjectTableIndex(classId);
+        SmalltalkOOP classOOP = classId;
         ctx.HeapManager.SetSlot(largeIntOop, 0, classOOP);
         
         return largeIntOop;
@@ -67,8 +67,7 @@ public static class LargeIntegerPrimitives
             return false;
 
         SmalltalkOOP classOOP = ctx.HeapManager.GetClassOOP(objectOop);
-        int classId = classOOP.ToObjectTableIndex();
-        // TODO: Check if classId is LargePositiveInteger or LargeNegativeInteger
+        // TODO: Check if classOOP is LargePositiveInteger or LargeNegativeInteger
         // For now, assume any non-SmallInteger numeric type might be LargeInteger
         return true; // Temporary - needs proper class checking
     }

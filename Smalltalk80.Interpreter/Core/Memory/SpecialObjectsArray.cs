@@ -145,7 +145,7 @@ public readonly struct SpecialObjectsArray
     /// </summary>
     public override string ToString()
     {
-        return $"SOA[Nil={Nil.ToObjectTableIndex():X}, False={False.ToObjectTableIndex():X}, True={True.ToObjectTableIndex():X}, Smalltalk={Smalltalk.ToObjectTableIndex():X}, ProcessorScheduler={ProcessorScheduler.ToObjectTableIndex():X}]";
+        return $"SOA[Nil={Nil}, False={False}, True={True}, Smalltalk={Smalltalk}, ProcessorScheduler={ProcessorScheduler}]";
     }
 
     // ========================================

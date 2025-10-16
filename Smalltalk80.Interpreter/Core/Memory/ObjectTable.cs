@@ -202,9 +202,9 @@ public sealed class ObjectTable
     /// OOP encoding: index shifted left 1 bit with LSB=0 (31-bit index in 32-bit OOP).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int IndexFromOop(int oop)
+    public static int IndexFromOop(SmalltalkOOP oop)
     {
-        return oop >> 1;
+        return oop.RawValue >> 1;
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public sealed class ObjectTable
     /// Mark phase of garbage collection.
     /// Clears all mark bits, then marks reachable objects from roots.
     /// </summary>
-    public void MarkPhase(IEnumerable<int> roots)
+    public void MarkPhase(IEnumerable<SmalltalkOOP> roots)
     {
         lock (_tableLock)
         {
@@ -236,15 +236,14 @@ public sealed class ObjectTable
             }
 
             // Phase 2: Mark from roots using worklist algorithm
-            var workList = new Queue<int>();
-            var marked = new HashSet<int>();
+            var workList = new Queue<SmalltalkOOP>();
+            var marked = new HashSet<SmalltalkOOP>();
 
-            foreach (var root in roots)
+            foreach (var rootOOP in roots)
             {
-                var rootOOP = SmalltalkOOP.FromObjectTableIndex(root);
                 if (rootOOP != SmalltalkOOP.Null && rootOOP.IsObjectPointer)
                 {
-                    workList.Enqueue(root);
+                    workList.Enqueue(rootOOP);
                 }
             }
 
@@ -308,14 +307,14 @@ public sealed class ObjectTable
     /// <summary>
     /// Traces all object references in the given ObjectData.
     /// </summary>
-    private void TraceReferences(ObjectMemory.ObjectData data, Queue<int> workList)
+    private void TraceReferences(ObjectMemory.ObjectData data, Queue<SmalltalkOOP> workList)
     {
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
         if (data.ClassRef != SmalltalkOOP.Null && data.ClassRef.IsObjectPointer)
         {
-            workList.Enqueue(data.ClassRef.ToObjectTableIndex());
+            workList.Enqueue(data.ClassRef);
         }
 
         // Trace instance variables
@@ -332,7 +331,7 @@ public sealed class ObjectTable
             {
                 if (varRef != SmalltalkOOP.Null && varRef.IsObjectPointer)
                 {
-                    workList.Enqueue(varRef.ToObjectTableIndex());
+                    workList.Enqueue(varRef);
                 }
             }
         }
@@ -346,7 +345,7 @@ public sealed class ObjectTable
                 {
                     if (indexedRef != SmalltalkOOP.Null && indexedRef.IsObjectPointer)
                     {
-                        workList.Enqueue(indexedRef.ToObjectTableIndex());
+                        workList.Enqueue(indexedRef);
                     }
                 }
             }

@@ -65,10 +65,9 @@ public class Phase7_MethodDictionaryAllocation
             // Allocate method dictionary with room for growth (next power of 2, min 8)
             int dictionarySize = Math.Max(8, NextPowerOfTwo(methodCount * 2)); // 50% load factor
             
-            int methodDictId = AllocateMethodDictionary(dictionarySize);
+            SmalltalkOOP methodDictOOP = AllocateMethodDictionary(dictionarySize);
             
             // Set the method dictionary as instance variable 1 in the class
-            var methodDictOOP = SmalltalkOOP.FromObjectTableIndex(methodDictId);
             _allocator.SetInstanceVariable(classOOP, 1, methodDictOOP);
             
             allocatedDictionaries++;
@@ -81,7 +80,7 @@ public class Phase7_MethodDictionaryAllocation
     /// Allocates a MethodDictionary object with the specified capacity.
     /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
     /// </summary>
-    private int AllocateMethodDictionary(int capacity)
+    private SmalltalkOOP AllocateMethodDictionary(int capacity)
     {
         // Find MethodDictionary class definition
         var methodDictClassDefinition = FindClassDefinition("MethodDictionary");
@@ -91,13 +90,11 @@ public class Phase7_MethodDictionaryAllocation
         }
 
         // Allocate the MethodDictionary object (PointerIndexed with capacity for keys)
-        int methodDictClassId = GlobalRegistry.LookupClassObjectId("MethodDictionary");
-        var methodDictClassOOP = SmalltalkOOP.FromObjectTableIndex(methodDictClassId);
+        var methodDictClassOOP = GlobalRegistry.LookupClassOOP("MethodDictionary");
         var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
 
         // Allocate valueArray (Array of CompiledMethod) 
-        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
-        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var valuesArrayOOP = _allocator.AllocateArray(arrayClassOOP, capacity);
         _allocator.SetInstanceVariable(methodDictOOP, 0, valuesArrayOOP);
 
@@ -106,19 +103,19 @@ public class Phase7_MethodDictionaryAllocation
         _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
 
         // Initialize all indexed fields (keys) to nil
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+        var nilOOP = GlobalRegistry.NilOOP;
         for (int i = 0; i < capacity; i++)
         {
             _allocator.SetIndexedOOP(methodDictOOP, i, nilOOP);
         }
 
-        return methodDictOOP.ToObjectTableIndex();
+        return methodDictOOP;
     }
 
     /// <summary>
     /// Allocates an Array object with the specified size, initialized to nil.
     /// </summary>
-    private int AllocateArray(int size)
+    private SmalltalkOOP AllocateArray(int size)
     {
         // Find Array class definition
         var arrayClassDefinition = FindClassDefinition("Array");
@@ -127,18 +124,17 @@ public class Phase7_MethodDictionaryAllocation
             throw new InvalidOperationException("Array class not found in bundle");
         }
 
-        int arrayClassId = GlobalRegistry.LookupClassObjectId("Array");
-        var arrayClassOOP = SmalltalkOOP.FromObjectTableIndex(arrayClassId);
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = _allocator.AllocateArray(arrayClassOOP, size);
 
         // Initialize all elements to nil
-        var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+        var nilOOP = GlobalRegistry.NilOOP;
         for (int i = 0; i < size; i++)
         {
             _allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
         }
 
-        return arrayOOP.ToObjectTableIndex();
+        return arrayOOP;
     }
 
     /// <summary>

@@ -72,7 +72,7 @@ public class Phase4_ClassResolution
                 int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "name", _bundle);
                 if (nameIndex >= 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classOOP, nameIndex, SmalltalkOOP.FromObjectTableIndex(InternSymbol(className)));
+                    SetInstanceVariableUsingPrimitive(classOOP, nameIndex, InternSymbol(className));
                 }
             }
 
@@ -108,11 +108,11 @@ public class Phase4_ClassResolution
                 ClassHierarchyUtils.HasInstanceVariable(templateClassName, "superclass", _bundle))
             {
                 string superName = _symbols[superIdx];
-                int superId = GlobalRegistry.LookupClassObjectId(superName);
+                SmalltalkOOP superOOP = GlobalRegistry.LookupClassOOP(superName);
                 int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "superclass", _bundle);
                 if (superclassIndex >= 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classOOP, superclassIndex, SmalltalkOOP.FromObjectTableIndex(superId));
+                    SetInstanceVariableUsingPrimitive(classOOP, superclassIndex, superOOP);
                 }
             }
 
@@ -123,6 +123,20 @@ public class Phase4_ClassResolution
                 // Comments are typically stored in 'organization' or similar field
                 // For now, skip setting comments until we understand the field mapping better
                 // TODO: Determine correct field for class comments in Smalltalk-80
+            }
+
+            // Allocate empty classPool dictionary for class variables (entries created lazily on access)
+            if (!cls.IsMetaclass &&
+                ClassHierarchyUtils.HasInstanceVariable(templateClassName, "classPool", _bundle))
+            {
+                int classPoolIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
+                if (classPoolIndex >= 0)
+                {
+                    // Size the dictionary based on the number of class variables for this class
+                    int classVarCount = cls.ClassVarNames?.Length ?? 0;
+                    var classPoolOOP = AllocateEmptyDictionary(classVarCount);
+                    SetInstanceVariableUsingPrimitive(classOOP, classPoolIndex, classPoolOOP);
+                }
             }
 
             // Set pool dictionaries (skip if not yet allocated - will be patched later)
@@ -174,7 +188,7 @@ public class Phase4_ClassResolution
         var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
         if (localId == null)
         {
-            throw new InvalidOperationException($"Cannot find localId for object {objectOOP.ToObjectTableIndex()}");
+            throw new InvalidOperationException($"Cannot find localId for object {objectOOP}");
         }
         
         // Determine template class name from JSON data
@@ -239,14 +253,14 @@ public class Phase4_ClassResolution
     /// Interns a symbol using the symbol table from Phase 1.
     /// During Phase 4, symbols already exist so we look them up in SymbolRegistry.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -257,7 +271,7 @@ public class Phase4_ClassResolution
     /// Interns a string by creating a ByteIndexed object.
     /// Unlike symbols, strings are not deduplicated.
     /// </summary>
-    private int InternString(string value)
+    private SmalltalkOOP InternString(string value)
     {
         // Use placeholder class (will be fixed later when String class exists)
         var placeholderClassOOP = SmalltalkOOP.FromObjectTableIndex(0);
@@ -287,7 +301,7 @@ public class Phase4_ClassResolution
             _heapManager.SetIndexedByte(stringOOP, i, stringBytes[i]);
         }
         
-        return stringOOP.ToObjectTableIndex();
+        return stringOOP;
     }
 
     /// <summary>
@@ -296,7 +310,7 @@ public class Phase4_ClassResolution
     /// </summary>
     private void EnsureAllInstanceVariablesNil()
     {
-        int nilObjectId = GlobalRegistry.NilObjectId;
+        SmalltalkOOP nilOOP = GlobalRegistry.NilOOP;
         
         foreach (var cls in _bundle.Classes)
         {
@@ -311,7 +325,7 @@ public class Phase4_ClassResolution
                 var currentOOP = _heapManager.GetInstanceVariable(classOOP, i);
                 if (currentOOP.RawValue == 0) // If still uninitialized (OOP 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classOOP, i, SmalltalkOOP.FromObjectTableIndex(nilObjectId));
+                    SetInstanceVariableUsingPrimitive(classOOP, i, nilOOP);
                 }
             }
         }
@@ -327,11 +341,11 @@ public class Phase4_ClassResolution
         int totalInstanceVars = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(
             ClassHierarchyUtils.FindClassDefinition(templateClassName, _bundle)!, _bundle);
             
-        int nilObjectId = GlobalRegistry.NilObjectId;
+        SmalltalkOOP nilOOP = GlobalRegistry.NilOOP;
         
         for (int i = 0; i < totalInstanceVars; i++)
         {
-            SetInstanceVariableUsingPrimitive(objectOOP, i, SmalltalkOOP.FromObjectTableIndex(nilObjectId));
+            SetInstanceVariableUsingPrimitive(objectOOP, i, nilOOP);
         }
     }
 
@@ -363,6 +377,72 @@ public class Phase4_ClassResolution
             }
             throw new InvalidOperationException("Class class definition not found in JSON bundle");
         }
+    }
+
+    /// <summary>
+    /// Allocates an empty Dictionary for classPool.
+    /// Dictionary has instance variables: tally (SmallInteger 0), plus indexed array for associations.
+    /// Size is calculated based on the number of class variables with a reasonable load factor.
+    /// </summary>
+    private SmalltalkOOP AllocateEmptyDictionary(int classVarCount)
+    {
+        // Calculate initial size with ~75% load factor (round up to next power of 2 for efficiency)
+        // Minimum size of 4 for classes with 0-3 class variables
+        int initialSize = classVarCount == 0 ? 4 : NextPowerOfTwo((int)Math.Ceiling(classVarCount / 0.75));
+        
+        if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictClassOOP))
+        {
+            throw new InvalidOperationException("Dictionary class not found - needed for classPool allocation");
+        }
+        
+        // Dictionary layout: instance var 'tally' + indexed array
+        // Find Dictionary's instance variable count
+        var dictClassDef = ClassHierarchyUtils.FindClassDefinition("Dictionary", _bundle);
+        if (dictClassDef == null)
+        {
+            throw new InvalidOperationException("Dictionary class definition not found in bundle");
+        }
+        
+        int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(dictClassDef, _bundle);
+        
+        // Allocate Dictionary as PointerIndexed object
+        var dictOOP = _heapManager.AllocateObject(
+            Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed,
+            instVarCount,
+            initialSize
+        );
+        
+        // Set class reference (will be done by PhaseX, but we can set it now since Dictionary class exists)
+        _heapManager.SetSlot(dictOOP, 0, dictClassOOP);
+        
+        // Initialize tally to SmallInteger 0
+        // Find 'tally' instance variable index in Dictionary hierarchy
+        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        if (tallyIndex >= 0)
+        {
+            _heapManager.SetInstanceVariable(dictOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+        }
+        
+        // NOTE: Dictionary indexed slots will be initialized to nil in Phase Y
+        // (after nil singleton is created in Phase 6). Phase 4 runs before Phase 6,
+        // so GlobalRegistry.NilOOP is not yet available here.
+        
+        return dictOOP;
+    }
+
+    /// <summary>
+    /// Calculates the next power of 2 greater than or equal to the given value.
+    /// Used for efficient Dictionary sizing.
+    /// </summary>
+    private int NextPowerOfTwo(int value)
+    {
+        if (value <= 4) return 4;
+        if (value <= 8) return 8;
+        if (value <= 16) return 16;
+        if (value <= 32) return 32;
+        if (value <= 64) return 64;
+        if (value <= 128) return 128;
+        return 256;
     }
 
     // All duplicate methods removed - now using ClassHierarchyUtils

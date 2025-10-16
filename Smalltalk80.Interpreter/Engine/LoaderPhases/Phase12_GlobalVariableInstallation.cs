@@ -43,16 +43,16 @@ public class Phase12_GlobalVariableInstallation
         installedGlobals++;
 
         // Install USTable -> Universal Symbol Table
-        if (GlobalRegistry.TryGet("USTable", out int ustableId))
+        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
         {
-            InstallUSTableGlobal(ustableId);
+            InstallUSTableGlobal(ustableOOP);
             installedGlobals++;
         }
 
         // Install Processor -> ProcessorScheduler singleton
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out int processorSchedulerId))
+        if (GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP processorSchedulerOOP))
         {
-            InstallProcessorGlobal(processorSchedulerId);
+            InstallProcessorGlobal(processorSchedulerOOP);
             installedGlobals++;
         }
 
@@ -64,7 +64,7 @@ public class Phase12_GlobalVariableInstallation
             if (!cls.IsMetaclass && _localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
             {
                 string className = _bundle.Symbols[cls.NameIndex];
-                InstallClassGlobal(className, classOOP.ToObjectTableIndex());
+                InstallClassGlobal(className, classOOP);
                 installedGlobals++;
             }
         }
@@ -78,30 +78,30 @@ public class Phase12_GlobalVariableInstallation
     private void InstallSmalltalkGlobal()
     {
         // Create symbol for #Smalltalk
-        int smalltalkSymbolId = GetSymbolObjectId("Smalltalk");
+        SmalltalkOOP smalltalkSymbolOOP = GetSymbolOOP("Smalltalk");
         
         // Create Association (#Smalltalk -> SystemDictionary)
-        int systemDictionaryId = GlobalRegistry.SystemDictionaryId;
-        int associationId = AllocateAssociation(smalltalkSymbolId, systemDictionaryId);
+        var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
+        SmalltalkOOP associationOOP = AllocateAssociation(smalltalkSymbolOOP, systemDictionaryOOP);
         
         // Install in SystemDictionary
-        InstallAssociationInSystemDictionary(associationId, "Smalltalk");
+        InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
     }
 
     /// <summary>
     /// Installs "USTable" as a global variable that references the Universal Symbol Table.
     /// This enables: Smalltalk at: #USTable -> Array of all symbols
     /// </summary>
-    private void InstallUSTableGlobal(int ustableId)
+    private void InstallUSTableGlobal(SmalltalkOOP ustableOOP)
     {
         // Create symbol for #USTable
-        int ustableSymbolId = GetSymbolObjectId("USTable");
+        SmalltalkOOP ustableSymbolOOP = GetSymbolOOP("USTable");
         
         // Create Association (#USTable -> USTable)
-        int associationId = AllocateAssociation(ustableSymbolId, ustableId);
+        SmalltalkOOP associationOOP = AllocateAssociation(ustableSymbolOOP, ustableOOP);
         
         // Install in SystemDictionary
-        InstallAssociationInSystemDictionary(associationId, "USTable");
+        InstallAssociationInSystemDictionary(associationOOP, "USTable");
     }
 
     /// <summary>
@@ -109,57 +109,55 @@ public class Phase12_GlobalVariableInstallation
     /// This enables: Smalltalk at: #Processor -> ProcessorScheduler instance
     /// Note: By convention, the global is named "Processor" not "ProcessorScheduler"
     /// </summary>
-    private void InstallProcessorGlobal(int processorSchedulerId)
+    private void InstallProcessorGlobal(SmalltalkOOP processorSchedulerOOP)
     {
         // Create symbol for #Processor
-        int processorSymbolId = GetSymbolObjectId("Processor");
+        SmalltalkOOP processorSymbolOOP = GetSymbolOOP("Processor");
         
         // Create Association (#Processor -> ProcessorScheduler singleton)
-        int associationId = AllocateAssociation(processorSymbolId, processorSchedulerId);
+        SmalltalkOOP associationOOP = AllocateAssociation(processorSymbolOOP, processorSchedulerOOP);
         
         // Install in SystemDictionary
-        InstallAssociationInSystemDictionary(associationId, "Processor");
+        InstallAssociationInSystemDictionary(associationOOP, "Processor");
     }
 
     /// <summary>
     /// Installs a class as a global variable in SystemDictionary.
     /// This enables: Smalltalk at: #ClassName -> Class object
     /// </summary>
-    private void InstallClassGlobal(string className, int classObjectId)
+    private void InstallClassGlobal(string className, SmalltalkOOP classOOP)
     {
         // Create symbol for the class name
-        int classSymbolId = GetSymbolObjectId(className);
+        SmalltalkOOP classSymbolOOP = GetSymbolOOP(className);
         
         // Create Association (#ClassName -> Class object)
-        int associationId = AllocateAssociation(classSymbolId, classObjectId);
+        SmalltalkOOP associationOOP = AllocateAssociation(classSymbolOOP, classOOP);
         
         // Install in SystemDictionary
-        InstallAssociationInSystemDictionary(associationId, className);
+        InstallAssociationInSystemDictionary(associationOOP, className);
     }
 
     /// <summary>
     /// Installs an association in the first available slot in SystemDictionary.
     /// </summary>
-    private void InstallAssociationInSystemDictionary(int associationId, string globalName)
+    private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string globalName)
     {
-        var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId);
+        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         
         
         int usedSlots = 0;
-        int nilObjectId = GlobalRegistry.NilObjectId;
+        var nilOOP = GlobalRegistry.NilOOP;
         
         // Find first nil slot in SystemDictionary
         for (int i = 0; i < systemDictSize; i++)
         {
             var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            int slotObjectId = slotOOP.ToObjectTableIndex();
             
             
-            if (slotObjectId == nilObjectId || slotObjectId == 0)
+            if (slotOOP == nilOOP || slotOOP.RawValue == 0)
             {
                 // Found empty slot - handle both nil and any uninitialized cases during architectural transition
-                var associationOOP = SmalltalkOOP.FromObjectTableIndex(associationId);
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
                 return;
             }
@@ -173,15 +171,15 @@ public class Phase12_GlobalVariableInstallation
     }
 
     /// <summary>
-    /// Gets the symbol object ID for a given symbol name.
+    /// Gets the symbol OOP for a given symbol name.
     /// </summary>
-    private int GetSymbolObjectId(string symbolName)
+    private SmalltalkOOP GetSymbolOOP(string symbolName)
     {
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == symbolName)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -191,7 +189,7 @@ public class Phase12_GlobalVariableInstallation
     /// <summary>
     /// Allocates an Association object (key-value pair).
     /// </summary>
-    private int AllocateAssociation(int keyId, int valueId)
+    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         // Find Association class definition
         var associationClassDefinition = FindClassDefinition("Association");
@@ -203,10 +201,10 @@ public class Phase12_GlobalVariableInstallation
         var associationOOP = _allocator.AllocateFixedObject("Association");
         
         // Set instance variables: [0] = key, [1] = value
-        _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
-        _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
         
-        return associationOOP.ToObjectTableIndex();
+        return associationOOP;
     }
 
     /// <summary>

@@ -29,10 +29,10 @@ public class Phase16_InitExecution
     }
 
     /// <summary>
-    /// Creates init expression method objects and returns the array ID for temporary GC root storage.
-    /// Returns 0 if there are no init expressions.
+    /// Creates init expression method objects and returns the array OOP for temporary GC root storage.
+    /// Returns NIL OOP if there are no init expressions.
     /// </summary>
-    public int Run()
+    public SmalltalkOOP Run()
     {
         // Look up CompiledMethod and ByteArray classes - they were created in Phase2
         if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
@@ -46,7 +46,7 @@ public class Phase16_InitExecution
         }
         
         // Create array to hold all init expression method objects
-        var initExprMethods = new List<int>();
+        var initExprMethods = new List<SmalltalkOOP>();
 
         foreach (var expr in _bundle.InitExpressions)
         {
@@ -55,7 +55,7 @@ public class Phase16_InitExecution
             // Create a method object for the init expression to keep its literals alive
             // This will be executed after GC verification
             var bytecodes = ClassHierarchyUtils.DecodeBytecodes(expr.Bytecodes);
-            int initMethodId = CreateCompiledMethod(
+            SmalltalkOOP initMethodOOP = CreateCompiledMethod(
                 new MethodDescriptor
                 {
                     LocalId = expr.LocalId,
@@ -70,18 +70,18 @@ public class Phase16_InitExecution
                 compiledMethodClassOOP,
                 byteArrayClassOOP);
 
-            initExprMethods.Add(initMethodId);
-            _localIdToObjectId[expr.LocalId] = SmalltalkOOP.FromObjectTableIndex(initMethodId);
+            initExprMethods.Add(initMethodOOP);
+            _localIdToObjectId[expr.LocalId] = initMethodOOP;
         }
 
-        // Return the array (or 0 if no init expressions)
+        // Return the array (or NIL if no init expressions)
         // This will be stored temporarily as a GC root, then executed and discarded
         if (initExprMethods.Count > 0)
         {
-            return AllocateArray(initExprMethods.Select(id => SmalltalkOOP.FromObjectTableIndex(id)).ToArray());
+            return AllocateArray(initExprMethods.ToArray());
         }
 
-        return 0;
+        return GlobalRegistry.NilOOP;
     }
 
     // DecodeBytecodes method moved to ClassHierarchyUtils to eliminate duplication
@@ -95,19 +95,19 @@ public class Phase16_InitExecution
     {
         return literal.Type switch
         {
-            "symbol" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_bundle.Symbols[literal.Index!.Value])),
-            "string" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Strings[literal.Index!.Value])),
+            "symbol" => InternSymbol(_bundle.Symbols[literal.Index!.Value]),
+            "string" => InternString(_bundle.Strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(literal.Value!))),
-            "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
-            "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
-            "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
+            "float" => AllocateFloat(GetFloatValue(literal.Value!)),
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
             "objectRef" => _localIdToObjectId[literal.LocalId!],
             "compiledMethod" => _localIdToObjectId[literal.LocalId!],
-            "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(literal.CodePoint!.Value)),
-            "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(literal.Encoding!, literal.Data!)),
-            "association" => SmalltalkOOP.FromObjectTableIndex(ResolveAssociation(literal.Association!)),
-            "array" => SmalltalkOOP.FromObjectTableIndex(AllocateArrayLiteral(literal.Elements!.Select(ResolveLiteralAsOOP).ToArray())),
+            "character" => AllocateCharacter(literal.CodePoint!.Value),
+            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
+            "association" => ResolveAssociation(literal.Association!),
+            "array" => AllocateArrayLiteral(literal.Elements!.Select(ResolveLiteralAsOOP).ToArray()),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
     }
@@ -137,7 +137,7 @@ public class Phase16_InitExecution
     /// Creates a CompiledMethod object using the new PointerIndexed design.
     /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
-    private int CreateCompiledMethod(
+    private SmalltalkOOP CreateCompiledMethod(
         MethodDescriptor method, 
         SmalltalkOOP[] literalOOPs, 
         byte[] bytecodes,
@@ -161,13 +161,13 @@ public class Phase16_InitExecution
             literalOOPs, 
             bytecodes);
 
-        return methodOOP.ToObjectTableIndex();
+        return methodOOP;
     }
 
     /// <summary>
     /// Allocates an Array object for literal arrays with debug output.
     /// </summary>
-    private int AllocateArrayLiteral(SmalltalkOOP[] elementOOPs)
+    private SmalltalkOOP AllocateArrayLiteral(SmalltalkOOP[] elementOOPs)
     {
         if (elementOOPs.Length > 200)
         {
@@ -179,7 +179,7 @@ public class Phase16_InitExecution
     /// <summary>
     /// Allocates an Array object.
     /// </summary>
-    private int AllocateArray(SmalltalkOOP[] elementOOPs)
+    private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs)
     {
         // Look up Array class layout
         var arrayClassDefinition = FindClassDefinition("Array");
@@ -199,20 +199,20 @@ public class Phase16_InitExecution
             _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
         }
 
-        return arrayOOP.ToObjectTableIndex();
+        return arrayOOP;
     }
 
     /// <summary>
     /// Interns a symbol using the symbol table from Phase 1.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SymbolRegistry.GetSymbolOOP(i);
             }
         }
         
@@ -222,7 +222,7 @@ public class Phase16_InitExecution
     /// <summary>
     /// Interns a string by creating a ByteIndexed object.
     /// </summary>
-    private int InternString(string value)
+    private SmalltalkOOP InternString(string value)
     {
         
         // Look up String class layout from bundle data
@@ -237,22 +237,22 @@ public class Phase16_InitExecution
         // Allocate string object (AllocateString handles the bytes internally)
         var stringOOP = _allocator.AllocateString(value);
         
-        return stringOOP.ToObjectTableIndex();
+        return stringOOP;
     }
 
     /// <summary>
     /// Encodes a SmallInteger as a tagged OOP.
     /// </summary>
-    private int EncodeSmallInteger(int value)
+    private SmalltalkOOP EncodeSmallInteger(int value)
     {
         var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.ToObjectTableIndex();
+        return smallIntOOP;
     }
 
     /// <summary>
     /// Allocates a Float object.
     /// </summary>
-    private int AllocateFloat(double value)
+    private SmalltalkOOP AllocateFloat(double value)
     {
         // Look up Float class layout
         var floatClassDefinition = FindClassDefinition("Float");
@@ -263,13 +263,13 @@ public class Phase16_InitExecution
 
         var floatOOP = _allocator.AllocateFloat(value);
 
-        return floatOOP.ToObjectTableIndex();
+        return floatOOP;
     }
 
     /// <summary>
     /// Allocates a Character object.
     /// </summary>
-    private int AllocateCharacter(int codePoint)
+    private SmalltalkOOP AllocateCharacter(int codePoint)
     {
         // Look up Character class layout
         var characterClassDefinition = FindClassDefinition("Character");
@@ -284,13 +284,13 @@ public class Phase16_InitExecution
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
 
-        return characterOOP.ToObjectTableIndex();
+        return characterOOP;
     }
 
     /// <summary>
     /// Allocates a ByteArray object.
     /// </summary>
-    private int AllocateByteArray(string encoding, string data)
+    private SmalltalkOOP AllocateByteArray(string encoding, string data)
     {
         // Look up ByteArray class layout
         var byteArrayClassDefinition = FindClassDefinition("ByteArray");
@@ -309,13 +309,13 @@ public class Phase16_InitExecution
 
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
 
-        return byteArrayOOP.ToObjectTableIndex();
+        return byteArrayOOP;
     }
 
     /// <summary>
     /// Allocates an Association object (key-value pair).
     /// </summary>
-    private int AllocateAssociation(int keyId, int valueId)
+    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         // Look up Association class layout from bundle data
         var associationClassDefinition = FindClassDefinition("Association");
@@ -328,10 +328,10 @@ public class Phase16_InitExecution
         var associationOOP = _allocator.AllocateFixedObject("Association");
         
         // Set instance variables: [0] = key, [1] = value
-        _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
-        _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
         
-        return associationOOP.ToObjectTableIndex();
+        return associationOOP;
     }
 
     /// <summary>
@@ -366,9 +366,9 @@ public class Phase16_InitExecution
     /// Resolves an association literal (key/value pair).
     /// CRITICAL: Reuse existing SystemDictionary associations instead of creating duplicates with nil value.
     /// </summary>
-    private int ResolveAssociation(AssociationLiteral assoc)
+    private SmalltalkOOP ResolveAssociation(AssociationLiteral assoc)
     {
-        int keyId = InternSymbol(_bundle.Symbols[assoc.KeyIndex]);
+        SmalltalkOOP keyOOP = InternSymbol(_bundle.Symbols[assoc.KeyIndex]);
         string keyName = _bundle.Symbols[assoc.KeyIndex];
 
         // CRITICAL FIX: If this is a class association and valueRef is None,
@@ -376,34 +376,34 @@ public class Phase16_InitExecution
         if (assoc.ValueRef?.LocalId == null)
         {
             // Try to find existing class association in SystemDictionary
-            if (GlobalRegistry.TryGet($"class:{keyName}", out int classOop))
+            if (GlobalRegistry.TryGet($"class:{keyName}", out SmalltalkOOP classOop))
             {
                 // This is a known class - find its existing association in SystemDictionary
-                int sysDictId = GlobalRegistry.SystemDictionaryId;
-                var sysDictOOP = SmalltalkOOP.FromObjectTableIndex(sysDictId);
+                var sysDictId = GlobalRegistry.SystemDictionaryOOP;
+                var sysDictOOP = sysDictId;
                 int sysDictSize = _allocator.GetIndexedSize(sysDictOOP);
 
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
+                    if (assocOOP == GlobalRegistry.NilOOP) continue;
 
                     var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
-                    if (assocKeyOOP.ToObjectTableIndex() == keyId)
+                    if (assocKeyOOP == keyOOP)
                     {
                         // Found the existing association - reuse it!
-                        return assocOOP.ToObjectTableIndex();
+                        return assocOOP;
                     }
                 }
             }
         }
 
         // Fall back to creating new association
-        int valueId = assoc.ValueRef?.LocalId != null
-            ? _localIdToObjectId[assoc.ValueRef.LocalId].ToObjectTableIndex()
-            : GlobalRegistry.NilObjectId;
+        SmalltalkOOP valueOOP = assoc.ValueRef?.LocalId != null
+            ? _localIdToObjectId[assoc.ValueRef.LocalId]
+            : GlobalRegistry.NilOOP;
 
-        return AllocateAssociation(keyId, valueId);
+        return AllocateAssociation(keyOOP, valueOOP);
     }
 
     /// <summary>
