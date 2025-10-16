@@ -143,7 +143,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python test_compiler_suite.py <json_file> [json_file2 ...]")
         print("\nThis script runs comprehensive validation on compiler output:")
-        print("  1. Schema v1.0.3 compliance")
+        print("  1. Schema compliance (v1.0.3 or v1.0.5)")
         print("  2. Block compilation correctness")
         print("  3. Expected test methods presence")
         print("  4. Bytecode pattern analysis")
@@ -157,7 +157,7 @@ def main():
     print("="*70)
     
     # 1. Schema validation
-    print("\n[1/4] Schema v1.0.3 Validation")
+    print("\n[1/4] Schema Validation")
     print("-"*40)
     success, output = run_validator("validate_schema.py", json_files)
     if success:

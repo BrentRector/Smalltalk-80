@@ -26,8 +26,9 @@ def validate_metadata(data: Dict[str, Any]) -> List[str]:
         if field not in metadata:
             errors.append(f"Missing required metadata field: {field}")
     
-    if metadata.get('version') != '1.0.3':
-        errors.append(f"Invalid schema version: {metadata.get('version')} (expected 1.0.3)")
+    valid_versions = ['1.0.3', '1.0.5']
+    if metadata.get('version') not in valid_versions:
+        errors.append(f"Invalid schema version: {metadata.get('version')} (expected {' or '.join(valid_versions)})")
     
     return errors
 
