@@ -172,4 +172,16 @@ public interface ISmalltalkHeapManager
     /// Validates that an OOP refers to a valid object.
     /// </summary>
     bool IsValidObjectOOP(SmalltalkOOP objectOOP);
+
+    /// <summary>
+    /// Gets the class name of an object for diagnostic purposes.
+    /// Returns descriptive error strings for invalid objects.
+    /// </summary>
+    string GetClassName(SmalltalkOOP objectOOP);
+
+    /// <summary>
+    /// Validates all objects have valid class references.
+    /// Reports objects with invalid class OOPs for diagnostic purposes.
+    /// </summary>
+    void ValidateAllObjectClasses(Dictionary<string, int> localIdToObjectId);
 }

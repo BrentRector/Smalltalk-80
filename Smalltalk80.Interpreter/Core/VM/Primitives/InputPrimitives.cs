@@ -1,5 +1,6 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -14,7 +15,7 @@ public static class InputPrimitives
     /// Returns a Point object with x and y coordinates.
     /// Per Blue Book: Returns Point with current mouse coordinates in display space.
     /// </summary>
-    public static SObjectRef MousePoint(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP MousePoint(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -27,20 +28,20 @@ public static class InputPrimitives
         // For now, return Point at (0, 0)
 
         // Allocate Point object (class:Point has fields: x, y)
-        int pointId = ctx.AllocateObject("class:Point", 0);
+        SmalltalkOOP pointOOP = ctx.AllocateObject("class:Point", 0);
 
         // Set x and y to 0 (encoded as SmallIntegers)
-        ctx.SetFieldValue(pointId, "class:Point", "x", EncodeSmallInteger(0));
-        ctx.SetFieldValue(pointId, "class:Point", "y", EncodeSmallInteger(0));
+        ctx.SetFieldValue(pointOOP, "class:Point", "x", SmalltalkOOP.FromSmallInteger(0));
+        ctx.SetFieldValue(pointOOP, "class:Point", "y", SmalltalkOOP.FromSmallInteger(0));
 
-        return SObjectRef.FromObjectPointer(pointId);
+        return pointOOP;
     }
 
     /// <summary>
     /// Primitive 91: cursorLocPut: - Set cursor position.
     /// Per Blue Book: Argument is a Point specifying new cursor location.
     /// </summary>
-    public static SObjectRef CursorLocPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP CursorLocPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -56,15 +57,13 @@ public static class InputPrimitives
         }
 
         // Extract x and y from Point object
-        int pointId = point.AsObjectPointer();
-
         try
         {
-            int x = ctx.GetFieldValue(pointId, "class:Point", "x");
-            int y = ctx.GetFieldValue(pointId, "class:Point", "y");
+            SmalltalkOOP xOOP = ctx.GetFieldValue(point, "class:Point", "x");
+            SmalltalkOOP yOOP = ctx.GetFieldValue(point, "class:Point", "y");
 
             // TODO: When IDisplayProvider is integrated, set cursor position:
-            // displayProvider.SetCursorPosition(DecodeSmallInteger(x), DecodeSmallInteger(y));
+            // displayProvider.SetCursorPosition(xOOP.AsSmallInteger(), yOOP.AsSmallInteger());
             // For now, just succeed
 
             return receiver;
@@ -80,7 +79,7 @@ public static class InputPrimitives
     /// Primitive 92: cursorLink: - Link cursor to Form.
     /// Per Blue Book: Associates cursor display with a Cursor object.
     /// </summary>
-    public static SObjectRef CursorLink(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP CursorLink(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -100,7 +99,7 @@ public static class InputPrimitives
     /// Primitive 93: inputSemaphore: - Set input event semaphore.
     /// Per Blue Book: Designates a semaphore to be signaled on input events.
     /// </summary>
-    public static SObjectRef InputSemaphore(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP InputSemaphore(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -125,7 +124,7 @@ public static class InputPrimitives
     /// Primitive 94: sampleInterval: - Set input sampling interval.
     /// Per Blue Book: Sets interval in milliseconds for polling input devices.
     /// </summary>
-    public static SObjectRef SampleInterval(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP SampleInterval(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -150,7 +149,7 @@ public static class InputPrimitives
     /// Per Blue Book: Returns SmallInteger with encoded input event data.
     /// Format: bits 0-7 = character, bits 8-10 = mouse buttons, bits 11-13 = modifiers.
     /// </summary>
-    public static SObjectRef InputWord(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP InputWord(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -160,20 +159,10 @@ public static class InputPrimitives
 
         // TODO: When IDisplayProvider is integrated, return:
         // int inputWord = displayProvider.GetInputWord();
-        // return SObjectRef.FromSmallInteger(inputWord);
+        // return SmalltalkOOP.FromSmallInteger(inputWord);
 
         // For now, return 0 (no input events)
-        return SObjectRef.FromSmallInteger(0);
+        return SmalltalkOOP.FromSmallInteger(0);
     }
 
-    /// <summary>
-    /// Helper to encode a C# int as a Smalltalk SmallInteger.
-    /// SmallIntegers have LSB set to 1 for tagging.
-    /// </summary>
-    private static int EncodeSmallInteger(int value) => (value << 1) | 1;
-
-    /// <summary>
-    /// Helper to decode a Smalltalk SmallInteger to a C# int.
-    /// </summary>
-    private static int DecodeSmallInteger(int encoded) => encoded >> 1;
 }

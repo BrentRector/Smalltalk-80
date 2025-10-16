@@ -1,6 +1,6 @@
 using Smalltalk80.Interpreter.Core.Objects;
-using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public static class ObjectPrimitives
 {
     // Primitive 60: Array at:
-    public static SObjectRef At(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP At(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -34,8 +34,8 @@ public static class ObjectPrimitives
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetIndexedField((int)receiver.AsObjectPointer(), index - 1);
-            return SObjectRef.FromObjectPointer(value);
+            // Arrays use PointerIndexed format - get OOP directly
+            return ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
         }
         catch
         {
@@ -45,7 +45,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 61: Array at:put:
-    public static SObjectRef AtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP AtPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -65,13 +65,13 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        SObjectRef value = args[1];
+        SmalltalkOOP value = args[1];
 
         try
         {
             // Convert to 0-based index
-            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
-            ctx.Heap.SetIndexedField((int)receiver.AsObjectPointer(), index - 1, valueAsInt);
+            // Arrays use PointerIndexed format - set OOP directly
+            ctx.HeapManager.SetIndexedOOP(receiver, index - 1, value);
             return value;
         }
         catch
@@ -82,7 +82,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 62: Object size
-    public static SObjectRef Size(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Size(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -96,12 +96,12 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         } // SmallIntegers don't have a size
 
-        int indexedSize = ctx.Heap.GetIndexedSize((int)receiver.AsObjectPointer());
-        return SObjectRef.FromSmallInteger(indexedSize);
+        int indexedSize = ctx.HeapManager.GetIndexedSize(receiver);
+        return SmalltalkOOP.FromSmallInteger(indexedSize);
     }
 
     // Primitive 70: Object new
-    public static SObjectRef New(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP New(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -121,8 +121,7 @@ public static class ObjectPrimitives
         // We allocate with size 0 for fixed-size objects
         try
         {
-            int newInstanceOop = ctx.AllocateObject("class:Object", 0);
-            return SObjectRef.FromObjectPointer(newInstanceOop);
+            return ctx.AllocateObject("class:Object", 0);
         }
         catch
         {
@@ -132,7 +131,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 71: Object new:
-    public static SObjectRef NewWithSize(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NewWithSize(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -163,8 +162,7 @@ public static class ObjectPrimitives
         // Used for Array new: n, ByteArray new: n, etc.
         try
         {
-            int newInstanceOop = ctx.AllocateObject("class:Array", size);
-            return SObjectRef.FromObjectPointer(newInstanceOop);
+            return ctx.AllocateObject("class:Array", size);
         }
         catch
         {
@@ -174,7 +172,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 110: Object ==
-    public static SObjectRef IdentityEquals(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP IdentityEquals(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -188,7 +186,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 111: Object class
-    public static SObjectRef Class(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Class(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -198,8 +196,8 @@ public static class ObjectPrimitives
 
         try
         {
-            int classId = ctx.Heap.GetClass((int)receiver.AsObjectPointer());
-            return SObjectRef.FromObjectPointer(classId);
+            // Get the class OOP from slot 0
+            return ctx.HeapManager.GetClassOOP(receiver);
         }
         catch
         {
@@ -211,7 +209,7 @@ public static class ObjectPrimitives
     // Primitive 70-77: Instance variable access
     // These are optimized for getting/setting instance variables
 
-    public static SObjectRef InstVarAt(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP InstVarAt(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -234,8 +232,8 @@ public static class ObjectPrimitives
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetField((int)receiver.AsObjectPointer(), index - 1);
-            return SObjectRef.FromObjectPointer(value);
+            // Get instance variable as OOP
+            return ctx.HeapManager.GetInstanceVariable(receiver, index - 1);
         }
         catch
         {
@@ -244,7 +242,7 @@ public static class ObjectPrimitives
         }
     }
 
-    public static SObjectRef InstVarAtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP InstVarAtPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -264,13 +262,13 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        SObjectRef value = args[1];
+        SmalltalkOOP value = args[1];
 
         try
         {
             // Convert to 0-based index
-            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
-            ctx.Heap.SetField((int)receiver.AsObjectPointer(), index - 1, valueAsInt);
+            // Set instance variable as OOP
+            ctx.HeapManager.SetInstanceVariable(receiver, index - 1, value);
             return value;
         }
         catch
@@ -281,7 +279,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 63: String at: (character access for byte-indexed objects)
-    public static SObjectRef StringAt(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP StringAt(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -304,8 +302,9 @@ public static class ObjectPrimitives
         try
         {
             // Convert to 0-based index
-            int value = ctx.Heap.GetIndexedField((int)receiver.AsObjectPointer(), index - 1);
-            return SObjectRef.FromSmallInteger(value & 0xFF); // Ensure byte range
+            // Strings use ByteIndexed format
+            byte byteValue = ctx.HeapManager.GetIndexedByte(receiver, index - 1);
+            return SmalltalkOOP.FromSmallInteger(byteValue);
         }
         catch
         {
@@ -315,7 +314,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 64: String at:put: (character store for byte-indexed objects)
-    public static SObjectRef StringAtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP StringAtPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -345,7 +344,7 @@ public static class ObjectPrimitives
         try
         {
             // Convert to 0-based index
-            ctx.Heap.SetIndexedField((int)receiver.AsObjectPointer(), index - 1, charValue);
+            ctx.HeapManager.SetIndexedByte(receiver, index - 1, (byte)charValue);
             return args[1];
         }
         catch
@@ -357,7 +356,7 @@ public static class ObjectPrimitives
 
     // Primitive 65: Stream next - Read next element from stream
     // Blue Book: Stream has instance variables: collection, position, readLimit
-    public static SObjectRef Next(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Next(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -373,16 +372,14 @@ public static class ObjectPrimitives
 
         try
         {
-            int streamOop = (int)receiver.AsObjectPointer();
-
             // Get Stream instance variables
-            int positionEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "position");
-            int readLimitEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "readLimit");
-            int collectionOop = ctx.GetFieldValue(streamOop, "class:Stream", "collection");
+            SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
+            SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
+            SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
 
             // Decode SmallIntegers
-            int position = positionEncoded >> 1;
-            int readLimit = readLimitEncoded >> 1;
+            int position = positionOOP.AsSmallInteger();
+            int readLimit = readLimitOOP.AsSmallInteger();
 
             // Check if at end
             if (position >= readLimit)
@@ -392,12 +389,13 @@ public static class ObjectPrimitives
             }
 
             // Read element at position (1-indexed in Smalltalk)
-            int element = ctx.Heap.GetIndexedField(collectionOop, position);
+            // Streams typically work with PointerIndexed collections
+            SmalltalkOOP element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position);
 
             // Increment position
-            ctx.SetFieldValue(streamOop, "class:Stream", "position", (position + 1) << 1 | 1);
+            ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
-            return SObjectRef.FromObjectPointer(element);
+            return element;
         }
         catch
         {
@@ -407,7 +405,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 66: Stream nextPut: - Write element to stream
-    public static SObjectRef NextPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NextPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -423,17 +421,16 @@ public static class ObjectPrimitives
 
         try
         {
-            int streamOop = (int)receiver.AsObjectPointer();
-            SObjectRef value = args[0];
+            SmalltalkOOP value = args[0];
 
             // Get Stream instance variables
-            int positionEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "position");
-            int writeLimitEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "writeLimit");
-            int collectionOop = ctx.GetFieldValue(streamOop, "class:Stream", "collection");
+            SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
+            SmalltalkOOP writeLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "writeLimit");
+            SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
 
             // Decode SmallIntegers
-            int position = positionEncoded >> 1;
-            int writeLimit = writeLimitEncoded >> 1;
+            int position = positionOOP.AsSmallInteger();
+            int writeLimit = writeLimitOOP.AsSmallInteger();
 
             // Check if at limit
             if (position >= writeLimit)
@@ -443,11 +440,11 @@ public static class ObjectPrimitives
             }
 
             // Write element at position (0-indexed internally)
-            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
-            ctx.Heap.SetIndexedField(collectionOop, position, valueAsInt);
+            // Streams typically work with PointerIndexed collections
+            ctx.HeapManager.SetIndexedOOP(collectionOOP, position, value);
 
             // Increment position
-            ctx.SetFieldValue(streamOop, "class:Stream", "position", (position + 1) << 1 | 1);
+            ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
             return value;
         }
@@ -459,7 +456,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 67: Stream atEnd - Check if stream is at end
-    public static SObjectRef AtEnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP AtEnd(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -475,15 +472,13 @@ public static class ObjectPrimitives
 
         try
         {
-            int streamOop = (int)receiver.AsObjectPointer();
-
             // Get Stream instance variables
-            int positionEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "position");
-            int readLimitEncoded = ctx.GetFieldValue(streamOop, "class:Stream", "readLimit");
+            SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
+            SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
 
             // Decode SmallIntegers
-            int position = positionEncoded >> 1;
-            int readLimit = readLimitEncoded >> 1;
+            int position = positionOOP.AsSmallInteger();
+            int readLimit = readLimitOOP.AsSmallInteger();
 
             // Return true if at or past limit
             return position >= readLimit
@@ -498,7 +493,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 68: Object become: (two-way identity swap)
-    public static SObjectRef Become(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Become(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -513,13 +508,10 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int oop1 = (int)receiver.AsObjectPointer();
-        int oop2 = (int)args[0].AsObjectPointer();
-
         try
         {
             // Swap identities bidirectionally
-            ctx.BecomeTwoWay(oop1, oop2);
+            ctx.BecomeTwoWay(receiver, args[0]);
             return receiver;
         }
         catch
@@ -530,7 +522,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 68: CompiledMethod objectAt: - Access method header/literal
-    public static SObjectRef ObjectAt(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ObjectAt(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -563,11 +555,10 @@ public static class ObjectPrimitives
             // Index 2+ = literals
             // This accesses the PointerIndexed part of the CompiledMethod
             // (header + literals), NOT the bytecode array
-            int receiverOop = (int)receiver.AsObjectPointer();
             
             // Get the indexed OOP at the specified position (1-based → 0-based)
-            int value = ctx.Heap.GetIndexedField(receiverOop, index - 1);
-            return SObjectRef.FromObjectPointer(value);
+            // CompiledMethod uses PointerIndexed format for header and literals
+            return ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
         }
         catch
         {
@@ -577,7 +568,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 69: CompiledMethod objectAt:put: - Modify method header/literal
-    public static SObjectRef ObjectAtPut(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ObjectAtPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -603,7 +594,7 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        SObjectRef value = args[1];
+        SmalltalkOOP value = args[1];
 
         try
         {
@@ -612,11 +603,10 @@ public static class ObjectPrimitives
             // Index 2+ = literals  
             // This modifies the PointerIndexed part of the CompiledMethod
             // (header + literals), NOT the bytecode array
-            int receiverOop = (int)receiver.AsObjectPointer();
             
             // Set the indexed OOP at the specified position (1-based → 0-based)
-            int valueAsInt = value.IsSmallInteger ? (int)value.AsSmallInteger() : (int)value.AsObjectPointer();
-            ctx.Heap.SetIndexedField(receiverOop, index - 1, valueAsInt);
+            // CompiledMethod uses PointerIndexed format for header and literals
+            ctx.HeapManager.SetIndexedOOP(receiver, index - 1, value);
             return value;
         }
         catch
@@ -627,7 +617,7 @@ public static class ObjectPrimitives
     }
 
     // Primitive 75: Object asOop - Get object pointer as integer
-    public static SObjectRef AsOop(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP AsOop(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -643,13 +633,15 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
         
-        // Return the object table index as a SmallInteger
-        int oop = (int)receiver.AsObjectPointer();
-        return SObjectRef.FromSmallInteger(oop);
+        // Return the raw object table index as a SmallInteger
+        // This is a special case where we need the raw index value for identity
+        // Extract just the index portion of the OOP (bits 1-30, bit 0 is tag)
+        int rawIndex = receiver.RawValue >> 1;
+        return SmalltalkOOP.FromSmallInteger(rawIndex);
     }
 
     // Primitive 75 alternative: Object hash (for backward compatibility)
-    public static SObjectRef Hash(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Hash(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -666,9 +658,9 @@ public static class ObjectPrimitives
         else
         {
             // Object ID is already a good hash
-            int oop = (int)receiver.AsObjectPointer();
-            int hash = oop >> 1; // Remove pointer tag
-            return SObjectRef.FromSmallInteger(hash & 0x1FFFFFFF);
+            // Extract raw index from the OOP value for hashing
+            int rawIndex = receiver.RawValue >> 1;
+            return SmalltalkOOP.FromSmallInteger(rawIndex & 0x1FFFFFFF);
         }
     }
 }

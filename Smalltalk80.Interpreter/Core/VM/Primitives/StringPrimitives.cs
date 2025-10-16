@@ -1,5 +1,6 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -14,7 +15,7 @@ public static class StringPrimitives
     /// Primitive 103: replaceFrom:to:with:startingAt:
     /// Efficiently copies a range of elements from one collection to another.
     /// </summary>
-    public static SObjectRef StringReplace(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP StringReplace(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 4)
         {
@@ -30,7 +31,7 @@ public static class StringPrimitives
 
         int startIndex = args[0].AsSmallInteger() - 1; // Convert to 0-based
         int stopIndex = args[1].AsSmallInteger() - 1;
-        SObjectRef sourceRef = args[2];
+        SmalltalkOOP sourceOop = args[2];
         int sourceStart = args[3].AsSmallInteger() - 1;
 
         // Validate indices
@@ -40,7 +41,7 @@ public static class StringPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        if (receiver.IsSmallInteger || sourceRef.IsSmallInteger)
+        if (receiver.IsSmallInteger || sourceOop.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
@@ -49,10 +50,8 @@ public static class StringPrimitives
         int copyCount = stopIndex - startIndex + 1;
 
         // Validate bounds
-        int receiverId = (int)receiver.AsObjectPointer();
-        int sourceId = (int)sourceRef.AsObjectPointer();
-        int receiverSize = ctx.Heap.GetIndexedSize(receiverId);
-        int sourceSize = ctx.Heap.GetIndexedSize(sourceId);
+        int receiverSize = ctx.HeapManager.GetIndexedSize(receiver);
+        int sourceSize = ctx.HeapManager.GetIndexedSize(sourceOop);
 
         if (stopIndex >= receiverSize || sourceStart + copyCount > sourceSize)
         {
@@ -65,8 +64,9 @@ public static class StringPrimitives
         {
             for (int i = 0; i < copyCount; i++)
             {
-                int value = ctx.Heap.GetIndexedField(sourceId, sourceStart + i);
-                ctx.Heap.SetIndexedField(receiverId, startIndex + i, value);
+                // String/ByteArray use ByteIndexed format
+                byte value = ctx.HeapManager.GetIndexedByte(sourceOop, sourceStart + i);
+                ctx.HeapManager.SetIndexedByte(receiver, startIndex + i, value);
             }
             return receiver;
         }
@@ -81,7 +81,7 @@ public static class StringPrimitives
     /// Primitive 104: String hash
     /// Computes a hash value for a string.
     /// </summary>
-    public static SObjectRef StringHash(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP StringHash(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -97,20 +97,19 @@ public static class StringPrimitives
 
         try
         {
-            int receiverId = (int)receiver.AsObjectPointer();
-            int size = ctx.Heap.GetIndexedSize(receiverId);
+            int size = ctx.HeapManager.GetIndexedSize(receiver);
             int hash = 0;
 
             for (int i = 0; i < size; i++)
             {
-                int byteValue = ctx.Heap.GetIndexedField(receiverId, i);
+                byte byteValue = ctx.HeapManager.GetIndexedByte(receiver, i);
                 hash = (hash * 31) + byteValue;
             }
 
             // Ensure positive and within SmallInteger range
             hash &= 0x3FFFFFFF;
 
-            return SObjectRef.FromSmallInteger(hash);
+            return SmalltalkOOP.FromSmallInteger(hash);
         }
         catch
         {
@@ -124,7 +123,7 @@ public static class StringPrimitives
     /// Compares two strings lexicographically.
     /// Returns -1, 0, or 1 for less than, equal, or greater than.
     /// </summary>
-    public static SObjectRef StringCompare(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP StringCompare(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -140,34 +139,32 @@ public static class StringPrimitives
 
         try
         {
-            int receiverId = (int)receiver.AsObjectPointer();
-            int argId = (int)args[0].AsObjectPointer();
-            int receiverSize = ctx.Heap.GetIndexedSize(receiverId);
-            int argSize = ctx.Heap.GetIndexedSize(argId);
+            int receiverSize = ctx.HeapManager.GetIndexedSize(receiver);
+            int argSize = ctx.HeapManager.GetIndexedSize(args[0]);
             int minSize = Math.Min(receiverSize, argSize);
 
             // Compare byte by byte up to the shorter length
             for (int i = 0; i < minSize; i++)
             {
-                int receiverByte = ctx.Heap.GetIndexedField(receiverId, i);
-                int argByte = ctx.Heap.GetIndexedField(argId, i);
+                byte receiverByte = ctx.HeapManager.GetIndexedByte(receiver, i);
+                byte argByte = ctx.HeapManager.GetIndexedByte(args[0], i);
 
                 if (receiverByte < argByte)
-                    return SObjectRef.FromSmallInteger(-1);
+                    return SmalltalkOOP.FromSmallInteger(-1);
 
                 if (receiverByte > argByte)
-                    return SObjectRef.FromSmallInteger(1);
+                    return SmalltalkOOP.FromSmallInteger(1);
             }
 
             // If all compared bytes are equal, compare lengths
             if (receiverSize < argSize)
-                return SObjectRef.FromSmallInteger(-1);
+                return SmalltalkOOP.FromSmallInteger(-1);
 
             if (receiverSize > argSize)
-                return SObjectRef.FromSmallInteger(1);
+                return SmalltalkOOP.FromSmallInteger(1);
 
             // Completely equal
-            return SObjectRef.FromSmallInteger(0);
+            return SmalltalkOOP.FromSmallInteger(0);
         }
         catch
         {
@@ -180,7 +177,7 @@ public static class StringPrimitives
     /// Primitive 106: String asSymbol
     /// Converts a string to a unique symbol.
     /// </summary>
-    public static SObjectRef AsSymbol(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP AsSymbol(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {

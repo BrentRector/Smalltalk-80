@@ -15,7 +15,7 @@
   
   <!-- Only CLI files -->
   <ItemGroup>
-    <Compile Include="TestColdStart.cs" />
+    <Compile Include="Program.cs" />
   </ItemGroup>
   
   <!-- Preserve existing compiler integration -->

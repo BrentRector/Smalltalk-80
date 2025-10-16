@@ -151,6 +151,11 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 
 - **No Hard-Coded OOP Value Checks**: No code should ever check for a hard-coded OOP value, e.g. checking for zero to determine if it's the Nil object. First, OOP zero is a valid reference that can be to any object. Second, OOP values can change build to build as the Smalltalk source code changes.
 
+### Methodology and Problem-Solving
+
+- Never perform "workaround". Always find and fix the root cause of any error.
+
 ### Model Selection Guidelines
 
 - Always use model claude-sonnet-4-5
+```

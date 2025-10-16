@@ -2,6 +2,7 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -15,9 +16,9 @@ public class Phase2_ClassShells
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
 
-    public Phase2_ClassShells(ColdStartBundle bundle, SemanticAllocator allocator, Dictionary<string, int> localIdMap)
+    public Phase2_ClassShells(ColdStartBundle bundle, SemanticAllocator allocator, Dictionary<string, SmalltalkOOP> localIdMap)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -42,9 +43,9 @@ public class Phase2_ClassShells
             throw new InvalidOperationException("SystemDictionary class not found in bundle");
         }
         var systemDictOOP = _allocator.AllocateArray("SystemDictionary", totalEntries);
-        int smalltalkId = systemDictOOP.AsObjectTableIndex();
+        _localIdToObjectId["object:Smalltalk"] = systemDictOOP;
 
-        GlobalRegistry.Register("Smalltalk", smalltalkId);
+        GlobalRegistry.Register("Smalltalk", systemDictOOP.ToObjectTableIndex());
 
         // Now allocate all class shells
         foreach (var cls in _bundle.Classes)
@@ -57,8 +58,7 @@ public class Phase2_ClassShells
             // Get the appropriate class name from the class hierarchy - no hard-coding!
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             var classOOP = _allocator.AllocateFixedObject(classOfClassName);
-            int objectId = classOOP.AsObjectTableIndex();
-            _localIdToObjectId[cls.LocalId] = objectId;
+            _localIdToObjectId[cls.LocalId] = classOOP;
 
             // Register class in GlobalRegistry
             // For instance classes (class:Name), register as "Name"
@@ -66,13 +66,12 @@ public class Phase2_ClassShells
             if (!cls.IsMetaclass)
             {
                 string className = GetClassNameFromLocalId(cls.LocalId);
-                GlobalRegistry.RegisterClass(className, objectId);
+                GlobalRegistry.RegisterClass(className, classOOP.ToObjectTableIndex());
 
             }
         }
 
-        // Store next index for Phase 6 (maintaining compatibility while removing object ID sequencing)
-        _localIdToObjectId["__smalltalk_next_index__"] = 0;
+        // Note: Special key "__smalltalk_next_index__" removed - no longer needed with SmalltalkOOP
     }
 
     /// <summary>
@@ -124,24 +123,22 @@ public class Phase2_ClassShells
     /// Allocates an Association object (key-value pair).
     /// Association has 2 instance variables: key and value.
     /// </summary>
-    private int AllocateAssociation(int keyId, int valueId)
+    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         var associationOOP = _allocator.AllocateFixedObject("Association");
         
         // Set instance variables: [0] = key (from LookupKey), [1] = value (from Association)
-        _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
-        _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
         
-        return associationOOP.AsObjectTableIndex();
+        return associationOOP;
     }
 
     /// <summary>
     /// Sets an indexed field in an object.
     /// </summary>
-    private void SetIndexedField(int objectId, int index, int valueId)
+    private void SetIndexedField(SmalltalkOOP objectOOP, int index, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         _allocator.SetIndexedOOP(objectOOP, index, valueOOP);
     }
 

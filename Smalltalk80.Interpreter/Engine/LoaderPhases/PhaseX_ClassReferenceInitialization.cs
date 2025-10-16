@@ -22,32 +22,31 @@ public class PhaseX_ClassReferenceInitialization
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
+    private readonly ISmalltalkHeapManager _heapManager;
 
     public PhaseX_ClassReferenceInitialization(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId)
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
+        ISmalltalkHeapManager heapManager)
     {
         _bundle = bundle;
         _allocator = allocator;
         _localIdToObjectId = localIdToObjectId;
+        _heapManager = heapManager;
     }
 
     public void Run()
     {
-        Console.WriteLine("Multi-Pass Phase X: Initializing class references...");
-        
         int classReferencesSet = 0;
 
         // Step 1: Set class references for all class objects themselves
         // Each class object's slot 0 should point to its metaclass
         foreach (var cls in _bundle.Classes)
         {
-            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
+            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
                 continue;
-
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
             
             if (cls.IsMetaclass)
             {
@@ -55,7 +54,6 @@ public class PhaseX_ClassReferenceInitialization
                 int metaclassClassId = GlobalRegistry.LookupClassObjectId("Metaclass");
                 var metaclassClassOOP = SmalltalkOOP.FromObjectTableIndex(metaclassClassId);
                 _allocator.SetSlot(classOOP, 0, metaclassClassOOP);
-                Console.WriteLine($"DEBUG: Set metaclass {GetClassNameFromLocalId(cls.LocalId)} class reference to Metaclass class");
             }
             else
             {
@@ -63,11 +61,9 @@ public class PhaseX_ClassReferenceInitialization
                 string instanceClassName = GetClassNameFromLocalId(cls.LocalId);
                 string metaclassLocalId = $"meta:{instanceClassName}";
                 
-                if (_localIdToObjectId.TryGetValue(metaclassLocalId, out int metaclassObjectId))
+                if (_localIdToObjectId.TryGetValue(metaclassLocalId, out SmalltalkOOP metaclassOOP))
                 {
-                    var metaclassOOP = SmalltalkOOP.FromObjectTableIndex(metaclassObjectId);
                     _allocator.SetSlot(classOOP, 0, metaclassOOP);
-                    Console.WriteLine($"DEBUG: Set class {instanceClassName} class reference to its metaclass");
                 }
                 else
                 {
@@ -87,13 +83,12 @@ public class PhaseX_ClassReferenceInitialization
         // Step 3: Set class references for all other objects created in phases
         foreach (var obj in _bundle.Objects)
         {
-            if (!_localIdToObjectId.TryGetValue(obj.LocalId, out int objectId))
+            if (!_localIdToObjectId.TryGetValue(obj.LocalId, out SmalltalkOOP objectOOP))
                 continue;
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
             int classObjectId = GlobalRegistry.LookupClassObjectId(className);
             
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
             var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
             _allocator.SetSlot(objectOOP, 0, classOOP);
             
@@ -103,8 +98,11 @@ public class PhaseX_ClassReferenceInitialization
         // Step 4: Set class references for symbols, strings, and other runtime objects
         // These were allocated during symbol interning and other phases
         SetRuntimeObjectClassReferences();
+        
+        // Step 5: Fix any remaining objects with NULL_CLASS (classOOP=0)
+        // This catches dynamically allocated objects like Associations that weren't tracked
+        FixRemainingNullClassReferences();
 
-        Console.WriteLine($"DEBUG: Set class references for {classReferencesSet} objects");
     }
 
     private void SetSingletonClassReference(string globalName, string className)
@@ -155,5 +153,49 @@ public class PhaseX_ClassReferenceInitialization
         // LocalId format: "class:ClassName" or "meta:ClassName"
         int colonIndex = localId.IndexOf(':');
         return colonIndex >= 0 ? localId[(colonIndex + 1)..] : localId;
+    }
+    
+    private void FixRemainingNullClassReferences()
+    {
+        // Association objects created in Phase 6 are not tracked in _localIdToObjectId
+        // These have format=Pointer, 2 instance variables, and classOOP=0
+        // We need to find them and set their class reference to Association
+        
+        int associationClassId = GlobalRegistry.LookupClassObjectId("Association");
+        var associationClassOOP = SmalltalkOOP.FromObjectTableIndex(associationClassId);
+        
+        // Scan all allocated objects looking for ones with NULL_CLASS (classOOP=0)
+        int maxObjectId = _heapManager.GetObjectTableSize();
+        int fixedCount = 0;
+        var nullClassObjects = new List<(int objectId, ObjectFormat format, int instVars, int indexed)>();
+        
+        for (int objectId = 0; objectId <= maxObjectId; objectId++)
+        {
+            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
+            
+            // Skip if object doesn't exist
+            if (!_heapManager.IsValidObjectOOP(objectOOP))
+                continue;
+            
+            // Check if this object has NULL_CLASS
+            var classOOP = _heapManager.GetSlot(objectOOP, 0);
+            if (classOOP.RawValue != 0)
+                continue; // Already has a class
+            
+            // Log all NULL_CLASS objects for debugging
+            int instVarCount = _heapManager.GetInstanceVariableCount(objectOOP);
+            int indexedSize = _heapManager.GetIndexedSize(objectOOP);
+            var format = _heapManager.GetObjectFormat(objectOOP);
+            nullClassObjects.Add((objectId, format, instVarCount, indexedSize));
+            
+            // Check if this is an Association (2 instance variables, Pointer format, no indexed data)
+            if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
+            {
+                // This is an Association object - set its class reference
+                _heapManager.SetSlot(objectOOP, 0, associationClassOOP);
+                fixedCount++;
+            }
+        }
+        
     }
 }

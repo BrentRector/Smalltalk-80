@@ -11,7 +11,6 @@
     <Compile Remove="LoaderPhases\Phase4_MethodDictionaries.cs" />
     <Compile Remove="LoaderPhases\Phase12_BytecodeValidation.cs" />
     <Compile Remove="LoaderPhases\Phase12_ComprehensiveValidation.cs" />
-    <Compile Remove="InitExecution\InitExpressionExecutor.cs" />
   </ItemGroup>
   
   <!-- Reference to Core -->

@@ -7,7 +7,7 @@ using Smalltalk80.Interpreter.Core;
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
-/// Phase 13: Global Variable Installation
+/// Phase 12: Global Variable Installation
 /// 
 /// Installs all global variables into SystemDictionary after classes are fully initialized.
 /// This includes:
@@ -17,16 +17,16 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// 
 /// This phase runs after all classes and methods are complete to ensure proper object references.
 /// </summary>
-public class Phase13_GlobalVariableInstallation
+public class Phase12_GlobalVariableInstallation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
 
-    public Phase13_GlobalVariableInstallation(
+    public Phase12_GlobalVariableInstallation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId)
+        Dictionary<string, SmalltalkOOP> localIdToObjectId)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -35,7 +35,6 @@ public class Phase13_GlobalVariableInstallation
 
     public void Run()
     {
-        Console.WriteLine($"DEBUG: Installing global variables in SystemDictionary...");
 
         int installedGlobals = 0;
 
@@ -50,20 +49,26 @@ public class Phase13_GlobalVariableInstallation
             installedGlobals++;
         }
 
+        // Install Processor -> ProcessorScheduler singleton
+        if (GlobalRegistry.TryGet("ProcessorScheduler", out int processorSchedulerId))
+        {
+            InstallProcessorGlobal(processorSchedulerId);
+            installedGlobals++;
+        }
+
         // Install all classes as global variables in SystemDictionary
         // Each class becomes accessible as: Smalltalk at: #ClassName
         foreach (var cls in _bundle.Classes)
         {
             // Only install instance classes (not metaclasses) as globals
-            if (!cls.IsMetaclass && _localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
+            if (!cls.IsMetaclass && _localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
             {
                 string className = _bundle.Symbols[cls.NameIndex];
-                InstallClassGlobal(className, classObjectId);
+                InstallClassGlobal(className, classOOP.ToObjectTableIndex());
                 installedGlobals++;
             }
         }
 
-        Console.WriteLine($"DEBUG: Global variable installation complete: {installedGlobals} globals installed");
     }
 
     /// <summary>
@@ -100,6 +105,23 @@ public class Phase13_GlobalVariableInstallation
     }
 
     /// <summary>
+    /// Installs "Processor" as a global variable that references the ProcessorScheduler singleton.
+    /// This enables: Smalltalk at: #Processor -> ProcessorScheduler instance
+    /// Note: By convention, the global is named "Processor" not "ProcessorScheduler"
+    /// </summary>
+    private void InstallProcessorGlobal(int processorSchedulerId)
+    {
+        // Create symbol for #Processor
+        int processorSymbolId = GetSymbolObjectId("Processor");
+        
+        // Create Association (#Processor -> ProcessorScheduler singleton)
+        int associationId = AllocateAssociation(processorSymbolId, processorSchedulerId);
+        
+        // Install in SystemDictionary
+        InstallAssociationInSystemDictionary(associationId, "Processor");
+    }
+
+    /// <summary>
     /// Installs a class as a global variable in SystemDictionary.
     /// This enables: Smalltalk at: #ClassName -> Class object
     /// </summary>
@@ -123,29 +145,22 @@ public class Phase13_GlobalVariableInstallation
         var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.SystemDictionaryId);
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         
-        Console.WriteLine($"DEBUG: Searching SystemDictionary (size {systemDictSize}) for empty slot to install {globalName}");
         
         int usedSlots = 0;
         int nilObjectId = GlobalRegistry.NilObjectId;
-        Console.WriteLine($"DEBUG: Looking for nil object ID {nilObjectId} in SystemDictionary slots");
         
         // Find first nil slot in SystemDictionary
         for (int i = 0; i < systemDictSize; i++)
         {
             var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            int slotObjectId = slotOOP.AsObjectTableIndex();
+            int slotObjectId = slotOOP.ToObjectTableIndex();
             
-            if (i < 5) // Debug first few slots
-            {
-                Console.WriteLine($"DEBUG: Slot {i} contains object ID {slotObjectId} (nil={nilObjectId})");
-            }
             
             if (slotObjectId == nilObjectId || slotObjectId == 0)
             {
                 // Found empty slot - handle both nil and any uninitialized cases during architectural transition
                 var associationOOP = SmalltalkOOP.FromObjectTableIndex(associationId);
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
-                Console.WriteLine($"DEBUG: Installed {globalName} in SystemDictionary at slot {i} (out of {systemDictSize} slots, {usedSlots} were used)");
                 return;
             }
             else
@@ -154,7 +169,6 @@ public class Phase13_GlobalVariableInstallation
             }
         }
         
-        Console.WriteLine($"DEBUG: SystemDictionary full - all {systemDictSize} slots occupied");
         throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} global variable (all {systemDictSize} slots occupied)");
     }
 
@@ -192,7 +206,7 @@ public class Phase13_GlobalVariableInstallation
         _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
         _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
         
-        return associationOOP.AsObjectTableIndex();
+        return associationOOP.ToObjectTableIndex();
     }
 
     /// <summary>

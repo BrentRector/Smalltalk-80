@@ -24,14 +24,14 @@ public class Phase8_MethodInstallation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
 
     public Phase8_MethodInstallation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         IReadOnlyList<string> symbols,
         IReadOnlyList<string> strings)
     {
@@ -44,6 +44,17 @@ public class Phase8_MethodInstallation
 
     public void Run()
     {
+        // Look up CompiledMethod and ByteArray classes - they were created in Phase2
+        if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
+        {
+            throw new InvalidOperationException("CompiledMethod class not found in _localIdToObjectId - Phase 2 must run first");
+        }
+        
+        if (!_localIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
+        {
+            throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId - Phase 2 must run first");
+        }
+        
         // STEP 0: Build blockOwnerMap by scanning all method literals for block references
         // This map is needed at runtime to determine block home contexts
         var blockOwnerMap = new Dictionary<string, string>(); // blockLocalId -> ownerMethodOrBlockLocalId
@@ -70,20 +81,39 @@ public class Phase8_MethodInstallation
 
 
         // Method dictionaries should already exist from Phase6 object allocation
-        // Phase7 only creates and installs CompiledMethod objects
-
-        // Create and install all methods
+        // Phase8 creates CompiledMethod objects in TWO PASSES to handle block references
+        
+        // PASS 1: Create all CompiledMethod shells with nil placeholder literals
+        // This ensures all blocks exist in _localIdToObjectId before we resolve literals
+        int methodsCreated = 0;
         foreach (var method in _bundle.Methods)
         {
-            var literalIds = method.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
-            
             var bytecodes = ClassHierarchyUtils.DecodeBytecodes(method.Bytecodes);
-            int methodId = CreateCompiledMethod(method, literalIds, bytecodes);
-
-            // Phase8 only creates CompiledMethod objects - installation happens elsewhere
-
-            _localIdToObjectId[method.LocalId] = methodId;
-            objectIdToLocalId[methodId] = method.LocalId;
+            var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
+            var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
+            for (int i = 0; i < placeholderLiterals.Length; i++)
+            {
+                placeholderLiterals[i] = nilOOP;
+            }
+            
+            var methodOOP = CreateCompiledMethod(method, placeholderLiterals, bytecodes, compiledMethodClassOOP, byteArrayClassOOP);
+            _localIdToObjectId[method.LocalId] = methodOOP;
+            objectIdToLocalId[methodOOP.ToObjectTableIndex()] = method.LocalId;
+            methodsCreated++;
+        }
+        
+        // PASS 2: Resolve and patch all literals now that all blocks exist
+        foreach (var method in _bundle.Methods)
+        {
+            if (method.Literals.Length == 0) continue;
+            
+            var methodOOP = _localIdToObjectId[method.LocalId];
+            for (int i = 0; i < method.Literals.Length; i++)
+            {
+                var literalOOP = ResolveLiteralValueAsOOP(method.Literals[i]);
+                // Patch literal in CompiledMethod: literals start at indexed slot 1 (slot 0 is header)
+                _allocator.SetIndexedOOP(methodOOP, i + 1, literalOOP);
+            }
         }
 
         // Store the reverse mapping in GlobalRegistry for runtime access
@@ -100,19 +130,19 @@ public class Phase8_MethodInstallation
         
         var result = literal.Type switch
         {
-            "symbol" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_symbols[literal.Index!.Value])),
-            "string" => SmalltalkOOP.FromObjectTableIndex(InternString(_strings[literal.Index!.Value])),
+            "symbol" => InternSymbol(_symbols[literal.Index!.Value]),
+            "string" => InternString(_strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(literal.Value!))),
+            "float" => AllocateFloat(GetFloatValue(literal.Value!)),
             "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
             "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
             "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
-            "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out int objId1) ? SmalltalkOOP.FromObjectTableIndex(objId1) : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
-            "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out int objId2) ? SmalltalkOOP.FromObjectTableIndex(objId2) : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),  // v1.0.3: Blocks reference their method via localId
-            "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(literal.CodePoint!.Value)),
-            "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(literal.Encoding!, literal.Data!)),
-            "association" => SmalltalkOOP.FromObjectTableIndex(ResolveAssociation(literal.Association!)),
-            "array" => SmalltalkOOP.FromObjectTableIndex(AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray())),
+            "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
+            "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
+            "character" => AllocateCharacter(literal.CodePoint!.Value),
+            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
+            "association" => ResolveAssociation(literal.Association!),
+            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
         
@@ -152,24 +182,26 @@ public class Phase8_MethodInstallation
     /// Creates a CompiledMethod object using PointerIndexed layout with separate ByteArray for bytecodes.
     /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
-    private int CreateCompiledMethod(MethodDescriptor method, SmalltalkOOP[] literalOOPs, byte[] bytecodes)
+    private SmalltalkOOP CreateCompiledMethod(
+        MethodDescriptor method, 
+        SmalltalkOOP[] literalOOPs, 
+        byte[] bytecodes,
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP)
     {
-        // Look up CompiledMethod class layout
-        var compiledMethodClassDefinition = ClassHierarchyUtils.FindClassDefinition("CompiledMethod", _bundle);
-        if (compiledMethodClassDefinition == null)
-        {
-            throw new InvalidOperationException("CompiledMethod class not found in bundle");
-        }
-
         // Use AllocateCompiledMethod which handles all the setup including class reference
-        var methodOOP = _allocator.AllocateCompiledMethod("CompiledMethod", method.Header.Word, literalOOPs, bytecodes);
-        return methodOOP.AsObjectTableIndex();
+        return _allocator.AllocateCompiledMethod(
+            compiledMethodClassOOP, 
+            byteArrayClassOOP,
+            method.Header.Word, 
+            literalOOPs, 
+            bytecodes);
     }
 
     /// <summary>
     /// Creates a ByteArray object to hold method bytecodes.
     /// </summary>
-    private int AllocateByteArrayForBytecodes(byte[] bytecodes)
+    private SmalltalkOOP AllocateByteArrayForBytecodes(byte[] bytecodes)
     {
         // Look up ByteArray class layout
         var byteArrayClassDefinition = ClassHierarchyUtils.FindClassDefinition("ByteArray", _bundle);
@@ -190,7 +222,7 @@ public class Phase8_MethodInstallation
             _allocator.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
         }
 
-        return bytecodeArrayOOP.AsObjectTableIndex();
+        return bytecodeArrayOOP;
     }
 
 
@@ -198,7 +230,7 @@ public class Phase8_MethodInstallation
     /// <summary>
     /// Allocates a Float object.
     /// </summary>
-    private int AllocateFloat(double value)
+    private SmalltalkOOP AllocateFloat(double value)
     {
         // Look up Float class layout
         var floatClassDefinition = ClassHierarchyUtils.FindClassDefinition("Float", _bundle);
@@ -207,7 +239,7 @@ public class Phase8_MethodInstallation
             throw new InvalidOperationException("Float class not found in bundle");
         }
 
-        var floatOOP = _allocator.AllocateByteArray("Float", 8); // 8 bytes for IEEE 754 double
+        var floatOOP = _allocator.AllocateByteArray("Float", 8);
         // Set Float class reference (since Phase 8 runs after Phase Y)
         int floatClassId = GlobalRegistry.LookupClassObjectId("Float");
         var floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClassId);
@@ -220,20 +252,20 @@ public class Phase8_MethodInstallation
             _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
         }
 
-        return floatOOP.AsObjectTableIndex();
+        return floatOOP;
     }
 
     /// <summary>
     /// Interns a symbol using the symbol table from Phase 1.
     /// </summary>
-    private int InternSymbol(string name)
+    private SmalltalkOOP InternSymbol(string name)
     {
         // Find the symbol in the SymbolRegistry (created in Phase 1)
         for (int i = 0; i < _bundle.Symbols.Length; i++)
         {
             if (_bundle.Symbols[i] == name)
             {
-                return SymbolRegistry.GetObjectId(i);
+                return SmalltalkOOP.FromObjectTableIndex(SymbolRegistry.GetObjectId(i));
             }
         }
         
@@ -244,7 +276,7 @@ public class Phase8_MethodInstallation
     /// Allocates a String object (NOT interned - each call creates a new String).
     /// In Smalltalk-80, Strings are mutable and NOT interned.
     /// </summary>
-    private int InternString(string value)
+    private SmalltalkOOP InternString(string value)
     {
         // Look up String class layout from bundle data
         var stringClassDefinition = ClassHierarchyUtils.FindClassDefinition("String", _bundle);
@@ -259,14 +291,14 @@ public class Phase8_MethodInstallation
         int stringClassId = GlobalRegistry.LookupClassObjectId("String");
         var stringClassOOP = SmalltalkOOP.FromObjectTableIndex(stringClassId);
         _allocator.SetObjectClass(stringOOP, stringClassOOP);
-        return stringOOP.AsObjectTableIndex();
+        return stringOOP;
     }
 
 
     /// <summary>
     /// Allocates a Character object.
     /// </summary>
-    private int AllocateCharacter(int codePoint)
+    private SmalltalkOOP AllocateCharacter(int codePoint)
     {
         // Look up Character class layout
         var characterClassDefinition = ClassHierarchyUtils.FindClassDefinition("Character", _bundle);
@@ -285,13 +317,13 @@ public class Phase8_MethodInstallation
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
 
-        return characterOOP.AsObjectTableIndex();
+        return characterOOP;
     }
 
     /// <summary>
     /// Allocates a ByteArray object.
     /// </summary>
-    private int AllocateByteArray(string encoding, string data)
+    private SmalltalkOOP AllocateByteArray(string encoding, string data)
     {
         // Look up ByteArray class layout
         var byteArrayClassDefinition = ClassHierarchyUtils.FindClassDefinition("ByteArray", _bundle);
@@ -316,13 +348,13 @@ public class Phase8_MethodInstallation
 
         // Bytes already stored during allocation
 
-        return byteArrayOOP.AsObjectTableIndex();
+        return byteArrayOOP;
     }
 
     /// <summary>
     /// Allocates an Array object.
     /// </summary>
-    private int AllocateArray(SmalltalkOOP[] elementOOPs)
+    private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs)
     {
         // Look up Array class layout
         var arrayClassDefinition = ClassHierarchyUtils.FindClassDefinition("Array", _bundle);
@@ -336,21 +368,19 @@ public class Phase8_MethodInstallation
         var arrayOOP = _allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
         // Class reference automatically set by new AllocateArray API
 
-        int arrayObjectId = arrayOOP.AsObjectTableIndex();
-
         // Store the elements
         for (int i = 0; i < elementOOPs.Length; i++)
         {
             _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
         }
 
-        return arrayObjectId;
+        return arrayOOP;
     }
 
     /// <summary>
     /// Allocates an Association object (key-value pair).
     /// </summary>
-    private int AllocateAssociation(int keyId, int valueId)
+    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         // Look up Association class layout from bundle data
         var associationClassDefinition = ClassHierarchyUtils.FindClassDefinition("Association", _bundle);
@@ -366,10 +396,10 @@ public class Phase8_MethodInstallation
         _allocator.SetObjectClass(associationOOP, associationClassOOP);
         
         // Set instance variables: [0] = key, [1] = value
-        _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
-        _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
         
-        return associationOOP.AsObjectTableIndex();
+        return associationOOP;
     }
 
     /// <summary>
@@ -377,9 +407,9 @@ public class Phase8_MethodInstallation
     /// If the association already exists in SystemDictionary (for global class names),
     /// reuse it instead of creating a new one with nil value.
     /// </summary>
-    private int ResolveAssociation(AssociationLiteral assoc)
+    private SmalltalkOOP ResolveAssociation(AssociationLiteral assoc)
     {
-        int keyId = InternSymbol(_symbols[assoc.KeyIndex]);
+        var keyOOP = InternSymbol(_symbols[assoc.KeyIndex]);
         string keyName = _symbols[assoc.KeyIndex];
 
         // CRITICAL FIX: If this is a class association and valueRef is None,
@@ -397,24 +427,24 @@ public class Phase8_MethodInstallation
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
+                    if (assocOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
 
                     var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
-                    if (assocKeyOOP.AsObjectTableIndex() == keyId)
+                    if (assocKeyOOP == keyOOP)
                     {
                         // Found the existing association - reuse it!
-                        return assocOOP.AsObjectTableIndex();
+                        return assocOOP;
                     }
                 }
             }
         }
 
         // Fall back to creating new association
-        int valueId = assoc.ValueRef?.LocalId != null
+        var valueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.NilObjectId;
+            : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
 
-        return AllocateAssociation(keyId, valueId);
+        return AllocateAssociation(keyOOP, valueOOP);
     }
 
     // DecodeBytecodes method moved to ClassHierarchyUtils to eliminate duplication

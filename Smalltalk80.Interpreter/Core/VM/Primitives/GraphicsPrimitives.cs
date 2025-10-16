@@ -1,6 +1,7 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -15,7 +16,7 @@ public static class GraphicsPrimitives
     /// Receiver is a BitBlt object with instance variables describing the operation.
     /// Per Blue Book page 346: BitBlt has 14 instance variables defining the operation.
     /// </summary>
-    public static SObjectRef CopyBits(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP CopyBits(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -31,28 +32,26 @@ public static class GraphicsPrimitives
 
         try
         {
-            int bitbltId = receiver.AsObjectPointer();
-
             // Extract BitBlt instance variables (Blue Book page 346):
             // 0: destForm, 1: sourceForm, 2: halftoneForm, 3: combinationRule
             // 4: destX, 5: destY, 6: width, 7: height
             // 8: sourceX, 9: sourceY
             // 10: clipX, 11: clipY, 12: clipWidth, 13: clipHeight
 
-            int destForm = ctx.GetFieldValue(bitbltId, "class:BitBlt", "destForm");
-            int sourceForm = ctx.GetFieldValue(bitbltId, "class:BitBlt", "sourceForm");
-            int halftoneForm = ctx.GetFieldValue(bitbltId, "class:BitBlt", "halftoneForm");
-            int combinationRule = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "combinationRule"));
-            int destX = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "destX"));
-            int destY = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "destY"));
-            int width = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "width"));
-            int height = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "height"));
-            int sourceX = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "sourceX"));
-            int sourceY = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "sourceY"));
-            int clipX = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "clipX"));
-            int clipY = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "clipY"));
-            int clipWidth = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "clipWidth"));
-            int clipHeight = DecodeSmallInteger(ctx.GetFieldValue(bitbltId, "class:BitBlt", "clipHeight"));
+            SmalltalkOOP destForm = ctx.GetFieldValue(receiver, "class:BitBlt", "destForm");
+            SmalltalkOOP sourceForm = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceForm");
+            SmalltalkOOP halftoneForm = ctx.GetFieldValue(receiver, "class:BitBlt", "halftoneForm");
+            int combinationRule = ctx.GetFieldValue(receiver, "class:BitBlt", "combinationRule").AsSmallInteger();
+            int destX = ctx.GetFieldValue(receiver, "class:BitBlt", "destX").AsSmallInteger();
+            int destY = ctx.GetFieldValue(receiver, "class:BitBlt", "destY").AsSmallInteger();
+            int width = ctx.GetFieldValue(receiver, "class:BitBlt", "width").AsSmallInteger();
+            int height = ctx.GetFieldValue(receiver, "class:BitBlt", "height").AsSmallInteger();
+            int sourceX = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceX").AsSmallInteger();
+            int sourceY = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceY").AsSmallInteger();
+            int clipX = ctx.GetFieldValue(receiver, "class:BitBlt", "clipX").AsSmallInteger();
+            int clipY = ctx.GetFieldValue(receiver, "class:BitBlt", "clipY").AsSmallInteger();
+            int clipWidth = ctx.GetFieldValue(receiver, "class:BitBlt", "clipWidth").AsSmallInteger();
+            int clipHeight = ctx.GetFieldValue(receiver, "class:BitBlt", "clipHeight").AsSmallInteger();
 
             // Extract Form data (Form has: bits, width, height)
             var (destBits, destWidth, destHeight) = ExtractFormData(ctx, destForm);
@@ -85,21 +84,21 @@ public static class GraphicsPrimitives
     /// Extracts bitmap data from a Form object.
     /// Form has instance variables: bits (ByteArray), width (SmallInteger), height (SmallInteger).
     /// </summary>
-    private static (Memory<byte> bits, int width, int height) ExtractFormData(IPrimitiveContext ctx, int formId)
+    private static (Memory<byte> bits, int width, int height) ExtractFormData(IPrimitiveContext ctx, SmalltalkOOP formOOP)
     {
         // Check for nil or SmallInteger (invalid Form)
-        if (formId == SpecialObjectsArray.Instance.Nil.AsObjectPointer() || IsSmallInteger(formId))
+        if (formOOP == SpecialObjectsArray.Instance.Nil || formOOP.IsSmallInteger)
             return (Memory<byte>.Empty, 0, 0);
 
         try
         {
             // Get Form instance variables
-            int bitsId = ctx.GetFieldValue(formId, "class:Form", "bits");
-            int width = DecodeSmallInteger(ctx.GetFieldValue(formId, "class:Form", "width"));
-            int height = DecodeSmallInteger(ctx.GetFieldValue(formId, "class:Form", "height"));
+            SmalltalkOOP bitsOOP = ctx.GetFieldValue(formOOP, "class:Form", "bits");
+            int width = ctx.GetFieldValue(formOOP, "class:Form", "width").AsSmallInteger();
+            int height = ctx.GetFieldValue(formOOP, "class:Form", "height").AsSmallInteger();
 
             // Get bitmap data
-            Memory<byte> bits = ctx.GetByteArray(bitsId);
+            Memory<byte> bits = ctx.GetByteArray(bitsOOP);
 
             return (bits, width, height);
         }
@@ -112,7 +111,7 @@ public static class GraphicsPrimitives
     /// <summary>
     /// Primitive 97: snapshot - Save image to disk.
     /// </summary>
-    public static SObjectRef Snapshot(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Snapshot(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -129,7 +128,7 @@ public static class GraphicsPrimitives
     /// Primitive 98: oopsLeft - Available object pointers.
     /// Returns an estimate of available object table slots.
     /// </summary>
-    public static SObjectRef OopsLeft(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP OopsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -138,7 +137,7 @@ public static class GraphicsPrimitives
         }
 
         // Return a large number as estimate
-        return SObjectRef.FromSmallInteger(100000);
+        return SmalltalkOOP.FromSmallInteger(100000);
     }
 
     /// <summary>
@@ -146,7 +145,7 @@ public static class GraphicsPrimitives
     /// Returns estimate of available heap memory.
     /// Per Blue Book, returns SmallInteger with available bytes.
     /// </summary>
-    public static SObjectRef CoreLeft(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP CoreLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -160,7 +159,7 @@ public static class GraphicsPrimitives
 
         // Mask to positive SmallInteger range
         coreLeft = coreLeft & 0x7FFFFFFF;
-        return SObjectRef.FromSmallInteger(coreLeft);
+        return SmalltalkOOP.FromSmallInteger(coreLeft);
     }
 
     /// <summary>
@@ -168,7 +167,7 @@ public static class GraphicsPrimitives
     /// Returns seconds since Unix epoch (January 1, 1970 UTC).
     /// Per Blue Book, returns SmallInteger with time value (masked to 31 bits).
     /// </summary>
-    public static SObjectRef TimeWords(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP TimeWords(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -178,13 +177,13 @@ public static class GraphicsPrimitives
 
         // Return seconds since Unix epoch, masked to fit in SmallInteger
         var seconds = (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0x7FFFFFFF);
-        return SObjectRef.FromSmallInteger(seconds);
+        return SmalltalkOOP.FromSmallInteger(seconds);
     }
 
     /// <summary>
     /// Primitive 101: beDisplay - Make Form the active display.
     /// </summary>
-    public static SObjectRef BeDisplay(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BeDisplay(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -200,7 +199,7 @@ public static class GraphicsPrimitives
     /// <summary>
     /// Primitive 102: beCursor - Set hardware cursor.
     /// </summary>
-    public static SObjectRef BeCursor(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BeCursor(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -217,7 +216,7 @@ public static class GraphicsPrimitives
     /// Primitive 103: beep - System beep sound.
     /// Per Blue Book: Makes a beep sound.
     /// </summary>
-    public static SObjectRef Beep(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Beep(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -240,7 +239,7 @@ public static class GraphicsPrimitives
     /// <summary>
     /// Primitive 104: clipboardText - Clipboard operations.
     /// </summary>
-    public static SObjectRef ClipboardText(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ClipboardText(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -253,9 +252,5 @@ public static class GraphicsPrimitives
         return SpecialObjectsArray.Instance.Nil;
     }
 
-    // Helper methods
-
-    private static int DecodeSmallInteger(int encoded) => encoded >> 1;
-
-    private static bool IsSmallInteger(int value) => (value & 1) != 0;
+    // Helper methods are no longer needed - we use SmalltalkOOP's built-in methods
 }

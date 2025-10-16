@@ -19,13 +19,13 @@ public class Phase6_ObjectAllocation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
 
     public Phase6_ObjectAllocation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         IReadOnlyList<string> symbols)
     {
         _bundle = bundle;
@@ -42,9 +42,9 @@ public class Phase6_ObjectAllocation
         var trueOOP = _allocator.AllocateFixedObject("True");
         var falseOOP = _allocator.AllocateFixedObject("False");
         
-        int nilId = nilOOP.AsObjectTableIndex();
-        int trueId = trueOOP.AsObjectTableIndex();
-        int falseId = falseOOP.AsObjectTableIndex();
+        int nilId = nilOOP.ToObjectTableIndex();
+        int trueId = trueOOP.ToObjectTableIndex();
+        int falseId = falseOOP.ToObjectTableIndex();
 
         GlobalRegistry.Register("nil", nilId);
         GlobalRegistry.Register("true", trueId);
@@ -53,7 +53,17 @@ public class Phase6_ObjectAllocation
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
         InitializeSystemDictionaryWithNil(nilId);
 
-        int smalltalkIndex = _localIdToObjectId["__smalltalk_next_index__"];
+        // Create ProcessorScheduler singleton
+        // This is the unique process scheduler instance that manages all processes in the system
+        var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
+        int processorSchedulerId = processorSchedulerOOP.ToObjectTableIndex();
+        GlobalRegistry.Register("ProcessorScheduler", processorSchedulerId);
+        
+        // Initialize ProcessorScheduler fields that should NOT be nil
+        // Phase Y will later fill any remaining uninitialized fields with nil
+        InitializeProcessorSchedulerFields(processorSchedulerOOP, nilOOP);
+
+        // Note: smalltalkIndex no longer needed - was part of object ID sequencing
 
         // Create other bundle objects
         foreach (var obj in _bundle.Objects)
@@ -64,7 +74,7 @@ public class Phase6_ObjectAllocation
             int indexedSize = obj.IndexedFields.Length;
 
             int objectId = AllocateObjectWithSemanticAllocator(className, obj.FormatHint, fixedSize, indexedSize);
-            _localIdToObjectId[obj.LocalId] = objectId;
+            _localIdToObjectId[obj.LocalId] = SmalltalkOOP.FromObjectTableIndex(objectId);
 
             // Note: Field initialization moved to Phase Y after nil exists
 
@@ -78,8 +88,7 @@ public class Phase6_ObjectAllocation
             }
         }
 
-        // Update next index for Phase8 compatibility (but no longer used for sequencing)
-        _localIdToObjectId["__smalltalk_next_index__"] = 0;
+        // Note: Special key "__smalltalk_next_index__" removed - no longer needed with SmalltalkOOP
     }
 
     /// <summary>
@@ -108,7 +117,7 @@ public class Phase6_ObjectAllocation
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
             "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out int objId) ? objId : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP.ToObjectTableIndex() : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -160,7 +169,7 @@ public class Phase6_ObjectAllocation
             _ => _allocator.AllocateFixedObject(className) // Default fallback
         };
 
-        return objectOOP.AsObjectTableIndex();
+        return objectOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -217,7 +226,7 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(stringOOP, i, stringBytes[i]);
         }
         
-        return stringOOP.AsObjectTableIndex();
+        return stringOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -226,7 +235,7 @@ public class Phase6_ObjectAllocation
     private int AllocateAssociationWithSemanticAllocator(int keyId, int valueId)
     {
         var associationOOP = _allocator.AllocateFixedObject("Association");
-        int objectId = associationOOP.AsObjectTableIndex();
+        int objectId = associationOOP.ToObjectTableIndex();
         
         // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
         _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
@@ -241,7 +250,7 @@ public class Phase6_ObjectAllocation
     private int EncodeSmallInteger(int value)
     {
         var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.AsObjectTableIndex();
+        return smallIntOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -255,7 +264,7 @@ public class Phase6_ObjectAllocation
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
 
-        return characterOOP.AsObjectTableIndex();
+        return characterOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -279,7 +288,7 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(byteArrayOOP, i, bytes[i]);
         }
 
-        return byteArrayOOP.AsObjectTableIndex();
+        return byteArrayOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -296,7 +305,7 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
         }
 
-        return floatOOP.AsObjectTableIndex();
+        return floatOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -333,11 +342,10 @@ public class Phase6_ObjectAllocation
         // Add generous buffer for hash table efficiency
         totalEntries = Math.Max(totalEntries * 2, 500); // Ensure at least 500 slots
         
-        Console.WriteLine($"DEBUG: Creating SystemDictionary with {totalEntries} slots for {instanceClassCount} classes + {poolCount} pools + {systemGlobalCount} globals");
         
         // Allocate SystemDictionary instance using SemanticAllocator
         var systemDictOOP = _allocator.AllocateArray("SystemDictionary", totalEntries);
-        int systemDictId = systemDictOOP.AsObjectTableIndex();
+        int systemDictId = systemDictOOP.ToObjectTableIndex();
         
         // Initialize all indexed slots with nil (proper dependency ordering!)
         var nilOOP = SmalltalkOOP.FromObjectTableIndex(nilId);
@@ -346,7 +354,6 @@ public class Phase6_ObjectAllocation
             _allocator.SetIndexedOOP(systemDictOOP, i, nilOOP);
         }
         
-        Console.WriteLine($"DEBUG: SystemDictionary created with ID {systemDictId}, {totalEntries} slots initialized with nil {nilId}");
         return systemDictId;
     }
 
@@ -364,12 +371,11 @@ public class Phase6_ObjectAllocation
         for (int i = 0; i < systemDictSize; i++)
         {
             var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            if (slotOOP.AsObjectTableIndex() == nilId)
+            if (slotOOP.ToObjectTableIndex() == nilId)
             {
                 // Found empty slot - install association
                 var associationOOP = SmalltalkOOP.FromObjectTableIndex(associationId);
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
-                Console.WriteLine($"DEBUG: Installed {name} association in SystemDictionary at slot {i} (semantic lookup)");
                 return;
             }
         }
@@ -387,11 +393,39 @@ public class Phase6_ObjectAllocation
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         var nilOOP = SmalltalkOOP.FromObjectTableIndex(nilId);
         
-        Console.WriteLine($"DEBUG: Initializing SystemDictionary ({systemDictSize} slots) with nil object {nilId}");
         for (int i = 0; i < systemDictSize; i++)
         {
             _allocator.SetIndexedOOP(systemDictOOP, i, nilOOP);
         }
+    }
+
+    /// <summary>
+    /// Initializes ProcessorScheduler instance variables with their proper initial values.
+    /// Sets activeProcess and quiescentProcessLists to nil (no processes scheduled yet).
+    /// Phase Y will skip these fields since they're already initialized (not 0).
+    /// </summary>
+    private void InitializeProcessorSchedulerFields(SmalltalkOOP processorSchedulerOOP, SmalltalkOOP nilOOP)
+    {
+        // ProcessorScheduler instance variables (from Smalltalk-80 Blue Book):
+        // - quiescentProcessLists: Array of LinkedLists (one per priority level)
+        // - activeProcess: Currently executing Process (or nil)
+        
+        // For now, set both to nil (simplified scheduler for init expressions)
+        // Later, quiescentProcessLists can be initialized as Array new: 8 with LinkedList instances
+        
+        // Get instance variable count for ProcessorScheduler
+        int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
+        
+        // Initialize all instance variables to nil
+        // This prevents Phase Y from overwriting with nil (it only sets uninitialized fields)
+        for (int i = 0; i < instVarCount; i++)
+        {
+            _allocator.SetInstanceVariable(processorSchedulerOOP, i, nilOOP);
+        }
+        
+        // Note: activeProcess and quiescentProcessLists are both set to nil
+        // This is correct for the initial state (no processes scheduled)
+        // When we execute init expressions, we'll create a Process and set activeProcess
     }
 
 }

@@ -1,11 +1,194 @@
 # Heap Manager Design and Architecture
 
-**Last Updated**: 2025-01-13  
-**Status**: Production-ready with NULL_CLASS bug eliminated and bulletproof allocation architecture
+**Last Updated**: 2025-01-15  
+**Status**: ✅ Production-ready with perfect GC (0 unreachable objects) and bulletproof allocation architecture
 
 ## Overview
 
 This document describes the design and architecture of the Smalltalk-80 heap manager. The heap manager is responsible for low-level object allocation and provides the foundation for garbage collection, but deliberately avoids any knowledge of high-level Smalltalk class semantics.
+
+## Recent Achievements (2025-01-15)
+
+### 🎉 Perfect GC - Zero Unreachable Objects
+
+**Achievement**: Eliminated literal handling double-tagging bug, achieving **0 unreachable objects** out of 31,927 total objects during cold start.
+
+**Root Cause**: Code was mixing raw object table indices (`int`) with tagged OOP values (`SmalltalkOOP`):
+```csharp
+// BUG: Double-tagging literals
+private int AllocateArray(int[] elementIds)  // elementIds already contained RawValue from tagged OOPs!
+{
+    for (int i = 0; i < elementIds.Length; i++)
+    {
+        var elementOOP = SmalltalkOOP.FromObjectTableIndex(elementIds[i]); // WRONG - creates invalid OOP!
+        _allocator.SetIndexedOOP(arrayOOP, i, elementOOP);
+    }
+}
+```
+
+**Critical Principle Violated**: **"Only OOPs (tagged values) should be stored, never raw object indices"**
+
+**Solution**: Changed all literal handling from `int[]` to `SmalltalkOOP[]`:
+```csharp
+// FIXED: Use tagged OOPs directly
+private int AllocateArray(SmalltalkOOP[] elementOOPs)  // Already tagged!
+{
+    for (int i = 0; i < elementOOPs.Length; i++)
+    {
+        _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]); // CORRECT - direct use
+    }
+}
+```
+
+**Files Modified**:
+- `Phase8_MethodInstallation.cs`: Changed `ResolveLiteralValueAsOOP()` to return `SmalltalkOOP`, updated all array allocation methods
+- `Phase11_InitExecution.cs`: Changed `ResolveLiteralAsOOP()` to return `SmalltalkOOP`, updated all array allocation methods  
+- `SemanticAllocator.cs`: Changed `AllocateCompiledMethod()` signature from `int[] literalRawValues` to `SmalltalkOOP[] literalOOPs`
+
+**Results**:
+- ✅ **Perfect GC**: 31,927 objects allocated, 31,927 reachable, **0 unreachable**
+- ✅ **No double-tagging**: All OOP values correctly tagged once
+- ✅ **All phases working**: Complete cold start success maintained
+- ✅ **Clean codebase**: All debug output removed
+
+### 🎉 NULL_CLASS Bug Elimination (2025-01-13)
+
+**Problem**: Phase 7 (Method Dictionary Allocation) was creating objects with `classOOP=0` (NULL_CLASS), causing massive GC traversal failures.
+
+**Root Cause**: Error-prone allocation pattern:
+```csharp
+// ERROR-PRONE PATTERN:
+var methodDictOOP = _allocator.AllocateArray("MethodDictionary", capacity);
+_allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
+```
+
+**Solution**: Bulletproof dual API design:
+```csharp
+// BULLETPROOF PATTERN (automatically sets class reference):
+var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
+// Class reference automatically set - impossible to forget
+```
+
+**Results**:
+- ✅ **NULL_CLASS issue completely eliminated**
+- ✅ **GC improvement**: 406→201→0 unreachable objects  
+- ✅ **100% validation success**: All 10,535 objects pass Phase 13
+
+### ProcessorScheduler Singleton (2025-01-15)
+
+**Implementation**: Added ProcessorScheduler singleton instance for future process management:
+
+**Phase 6 Changes** (`Phase6_ObjectAllocation.cs`):
+```csharp
+// Create ProcessorScheduler singleton
+var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
+int processorSchedulerId = processorSchedulerOOP.AsObjectTableIndex();
+GlobalRegistry.Register("ProcessorScheduler", processorSchedulerId);
+```
+
+**Phase Y Changes** (`PhaseY_InstanceVariableInitialization.cs`):
+```csharp
+// Initialize ProcessorScheduler instance variables to nil
+InitializeSingletonInstanceVariables("ProcessorScheduler", "ProcessorScheduler", nilOOP);
+```
+
+**Phase 12 Changes** (`Phase12_GlobalVariableInstallation.cs`):
+```csharp
+// Install Processor -> ProcessorScheduler singleton
+// Note: By convention, the global is named "Processor" not "ProcessorScheduler"
+private void InstallProcessorGlobal(int processorSchedulerId)
+{
+    int processorSymbolId = GetSymbolObjectId("Processor");
+    int associationId = AllocateAssociation(processorSymbolId, processorSchedulerId);
+    InstallAssociationInSystemDictionary(associationId, "Processor");
+}
+```
+
+**Results**:
+- ✅ ProcessorScheduler singleton created and registered
+- ✅ Instance variables properly initialized to nil
+- ✅ Accessible via `Smalltalk at: #Processor`
+- ✅ Object count increased to 31,927 (ProcessorScheduler + Association)
+- ✅ Still maintains 0 unreachable objects
+
+### GC Root Configuration (2025-01-15)
+
+**Updated GC Roots**: Removed USTable from direct GC roots since it's reachable via SystemDictionary:
+
+**Before**:
+```csharp
+// 5 direct GC roots
+var gcRootsList = new List<(string name, int objectId)>
+{
+    ("nil", GlobalRegistry.NilObjectId),
+    ("false", GlobalRegistry.FalseObjectId),
+    ("true", GlobalRegistry.TrueObjectId),
+    ("Smalltalk", GlobalRegistry.SystemDictionaryId),
+    ("USTable", ustableId)  // ❌ Redundant - reachable via Smalltalk
+};
+```
+
+**After**:
+```csharp
+// 4 fundamental GC roots only
+var gcRootsList = new List<(string name, int objectId)>
+{
+    ("nil", GlobalRegistry.NilObjectId),
+    ("false", GlobalRegistry.FalseObjectId),
+    ("true", GlobalRegistry.TrueObjectId),
+    ("Smalltalk", GlobalRegistry.SystemDictionaryId)
+    // USTable reachable via: Smalltalk at: #USTable
+    // ProcessorScheduler reachable via: Smalltalk at: #Processor
+};
+```
+
+**Results**:
+- ✅ Cleaner GC root configuration (4 roots instead of 5)
+- ✅ All objects still reachable (0 collected)
+- ✅ Proper Smalltalk semantics (globals accessed via SystemDictionary)
+
+### Dynamic Class Name Resolution (2025-01-15)
+
+**Problem**: Class names displayed as "UnknownClass" because heap manager had hard-coded instance variable index.
+
+**Solution**: Dynamic index lookup from coldstart.json metadata:
+
+**SmalltalkHeapManager Changes**:
+```csharp
+// Field to store dynamically-determined index
+private int _classNameFieldIndex = -1;
+
+// Configuration method called during cold start
+public void SetClassNameFieldIndex(int index)
+{
+    _classNameFieldIndex = index;
+}
+
+// GetClassName now uses dynamic index
+if (_classNameFieldIndex >= 0 && instVarCount > _classNameFieldIndex)
+{
+    var classNameSymbolOOP = GetInstanceVariable(classOOP, _classNameFieldIndex);
+    // Extract class name from Symbol object...
+}
+```
+
+**Loader Changes**:
+```csharp
+// After Phase 0, configure heap manager with class name field index
+if (_heapManager is SmalltalkHeapManager concreteHeapManager)
+{
+    int nameFieldIndex = LoaderPhases.ClassHierarchyUtils.FindInstanceVariableIndex("Class", "name", _bundle);
+    if (nameFieldIndex >= 0)
+    {
+        concreteHeapManager.SetClassNameFieldIndex(nameFieldIndex);
+    }
+}
+```
+
+**Results**:
+- ✅ Class names display correctly: UndefinedObject, False, True, SystemDictionary, Array
+- ✅ No hard-coded indices - robust to Smalltalk source code changes
+- ✅ All indices determined from coldstart.json at runtime
 
 ## Core Design Principles
 
@@ -24,7 +207,16 @@ This document describes the design and architecture of the Smalltalk-80 heap man
 - ✅ Use semantic slot finding (search for nil slots, not sequential indexing)
 - ❌ NEVER use patterns like `smalltalkIndex++` or assume object ID sequence
 
-### 2. Minimal Responsibilities
+### 2. OOP Type Safety
+**The OOP tagging system is the fundamental contract. Raw object indices should NEVER be stored or passed between methods - only tagged SmalltalkOOP values.**
+
+**Key Principles**:
+- All methods should accept/return `SmalltalkOOP`, never `int`
+- Only use `.AsObjectTableIndex()` at the lowest heap manager boundary
+- Use `.RawValue` only for serialization or debugging
+- This prevents double-tagging bugs and maintains type safety
+
+### 3. Minimal Responsibilities
 The heap manager operates at the machine level and has minimal responsibilities:
 - Allocate contiguous memory for heap objects with correct alignment
 - Write object headers at fixed offsets as the VM expects
@@ -32,13 +224,13 @@ The heap manager operates at the machine level and has minimal responsibilities:
 - Support GC operations through ObjectTable management
 - Maintain ObjectTable indirection for all heap objects
 
-### 3. No Semantic Knowledge
+### 4. No Semantic Knowledge
 The heap manager explicitly avoids hardcoding knowledge about:
 - Smalltalk class layouts, instance variable names, or method tables
 - High-level class semantics (what Array, String, Float mean)
 - Business logic or Smalltalk-specific invariants
 
-### 4. Header-Driven Design
+### 5. Header-Driven Design
 The caller (object allocator/VM layer) provides all semantic information:
 - Class OOP (stored opaquely)
 - Object format bits (how to interpret the body)
@@ -107,8 +299,6 @@ for (int i = 0; i < sysDictSize; i++)
 
 **Key Principle**: Always use `GlobalRegistry.NilObjectId` for nil comparisons, never hardcoded values.
 
-**Applied in**: Phase7_MethodInstallation.cs:435, Phase9_InitExecution.cs:470
-
 ## ObjectTable Indirection
 
 ### Purpose
@@ -147,9 +337,6 @@ public sealed class ObjectTableEntry
     
     // Garbage collection
     public bool IsMarked { get; set; }           // GC mark bit
-    
-    // Bootstrap support (temporary)
-    public Dictionary<string, int>? NamedSlots { get; set; }  // Legacy compatibility
 }
 ```
 
@@ -174,21 +361,6 @@ Size (8 bits): Total object size in words (0-255 words = 0-1020 bytes)
 GC Flags (8 bits): Mark bits, generation, pin status, forwarding info
 Flags (4 bits): Identity hash cached, immutable marker, etc.
 Reserved (8 bits): Future expansion
-```
-
-### PackedMetadata Access Patterns
-```csharp
-// Fast format extraction
-ObjectFormat format = (ObjectFormat)(entry.PackedMetadata & 0xF);
-
-// Fast size access  
-int sizeInWords = (int)((entry.PackedMetadata >> 16) & 0xFF);
-
-// Fast GC flag checking
-bool hasIdentityHash = ((entry.PackedMetadata >> 24) & 0x80) != 0;
-
-// Fast flag access
-bool isImmutable = ((entry.PackedMetadata >> 4) & 0x1) != 0;
 ```
 
 ## Object Memory Layout
@@ -245,7 +417,7 @@ ObjectTable[1234] = {
   IsMarked: false
 }
 
-Returned OOP: 0x00000998 (1234 << 1 = 2468 = 0x998, but index should be correct)
+Returned OOP: 0x000009A8 (1234 << 1)
 ```
 
 ## Object Format Types
@@ -358,39 +530,40 @@ Phase 3: .NET Cleanup
 └─────────────────┘
 ```
 
+### Perfect GC Achievement (2025-01-15)
+
+The system now achieves **perfect garbage collection** with 0 unreachable objects:
+
+```bash
+# GC Verification Output
+Phase 15: GC Verification...
+  GC Results: 0/31,927 objects collected (0.0% efficiency) in 9.96ms
+  Object table size: 31,927
+  Active objects: 31,927
+✓
+
+=== Cold Start Complete ===
+All phases executed successfully and all objects reachable from GC roots.
+```
+
+**How Perfect GC Was Achieved**:
+1. **Eliminated Double-Tagging Bug**: Changed literal handling from `int[]` to `SmalltalkOOP[]`
+2. **Proper OOP Type Safety**: All methods use `SmalltalkOOP` instead of raw `int`
+3. **Correct GC Root Configuration**: 4 fundamental roots (nil, false, true, Smalltalk)
+4. **Global Variable Installation**: USTable and Processor accessible via SystemDictionary
+5. **NULL_CLASS Bug Fix**: Bulletproof allocation API prevents class reference bugs
+
 ### GC Benefits
 - **No object copying**: Objects never move in memory
 - **Simple become: operation**: Copy MemoryPointer between ObjectTable entries
 - **No forwarding pointers**: Never needed since objects don't move
 - **Concurrent friendly**: Can mark ObjectTable entries safely
 - **Leverages .NET**: Let .NET handle actual memory management
+- **Perfect Reachability**: 100% of allocated objects are reachable from GC roots
 
 ## Heap Manager API
 
 ### Core Allocation Interface
-
-**Semantic Layer API (implemented above heap manager):**
-```csharp
-public interface ISmalltalkObjectAllocator 
-{
-    /// <summary>
-    /// Allocates a Smalltalk object with specified layout.
-    /// Memory is zero-initialized by .NET guarantee.
-    /// This layer handles semantic knowledge about object structure.
-    /// </summary>
-    /// <param name="classOOP">Class reference to store in object</param>
-    /// <param name="format">How to interpret variable portion</param>  
-    /// <param name="fixedSlots">Number of instance variable slots</param>
-    /// <param name="indexedSize">Size of variable portion</param>
-    /// <returns>Tagged OOP referencing new object</returns>
-    SmalltalkOOP AllocateObject(
-        SmalltalkOOP classOOP,     
-        ObjectFormat format,       
-        int fixedSlots,           
-        int indexedSize           
-    );
-}
-```
 
 **Heap Manager API (current - minimal semantic knowledge for GC):**
 ```csharp
@@ -409,18 +582,24 @@ public interface ISmalltalkHeapManager
     /// <summary>
     /// Raw slot access - gets OOP from any slot (semantic-agnostic).
     /// </summary>
-    /// <param name="objectOOP">Object to access</param>
-    /// <param name="slotIndex">Zero-based slot index</param>
-    /// <returns>OOP stored at slot</returns>
     SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex);
 
     /// <summary>
     /// Raw slot access - sets OOP in any slot (semantic-agnostic).
     /// </summary>
-    /// <param name="objectOOP">Object to modify</param>
-    /// <param name="slotIndex">Zero-based slot index</param>
-    /// <param name="value">OOP to store at slot</param>
     void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value);
+    
+    /// <summary>
+    /// Configures the instance variable index for the class name field.
+    /// This must be called after bundle is loaded to enable GetClassName() functionality.
+    /// </summary>
+    void SetClassNameFieldIndex(int index);
+    
+    /// <summary>
+    /// Gets the class name for display/debugging purposes.
+    /// Returns "UnknownClass" if class name field index not configured.
+    /// </summary>
+    string GetClassName(SmalltalkOOP objectOOP);
 }
 ```
 
@@ -429,6 +608,7 @@ public interface ISmalltalkHeapManager
 - **No Semantics**: Doesn't know what objects represent (String, Array, etc.) - only format
 - **GC Safety**: ObjectFormat ensures correct traversal (OOPs vs raw bytes/words)
 - **Size Preservation**: Original indexed sizes preserved for validation
+- **Dynamic Configuration**: Class name field index determined at runtime from coldstart.json
 
 **GC Traversal by Format:**
 - **Pointer/PointerIndexed**: GC traverses all fixed + all indexed slots as OOPs
@@ -495,9 +675,9 @@ void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value);
 #### GC Support
 ```csharp
 /// <summary>
-/// Marks an object as reachable during GC mark phase.
+/// Sets the GC root objects (replaces any previous roots).
 /// </summary>
-void MarkObject(SmalltalkOOP objectOOP);
+void SetGCRoots(SmalltalkOOP[] rootObjects);
 
 /// <summary>
 /// Performs mark-and-sweep garbage collection with detailed statistics.
@@ -510,252 +690,24 @@ GarbageCollectionResult GarbageCollect();
 HeapStatistics GetHeapStatistics();
 ```
 
-#### GC Result and Statistics Types
+#### GC Result Types
 ```csharp
 /// <summary>
 /// Comprehensive garbage collection results with timing and object counts.
 /// </summary>
 public sealed class GarbageCollectionResult
 {
-    /// <summary>Total objects in ObjectTable before collection.</summary>
-    public int ObjectsBeforeCollection { get; init; }
-    
-    /// <summary>Objects marked as reachable during mark phase.</summary>
-    public int ObjectsReachable { get; init; }
-    
-    /// <summary>Objects collected (unreachable) during sweep phase.</summary>
-    public int ObjectsCollected { get; init; }
-    
-    /// <summary>Objects remaining after collection.</summary>
-    public int ObjectsAfterCollection { get; init; }
-    
-    /// <summary>Time spent in mark phase (milliseconds).</summary>
-    public double MarkTimeMs { get; init; }
-    
-    /// <summary>Time spent in sweep phase (milliseconds).</summary>
-    public double SweepTimeMs { get; init; }
-    
-    /// <summary>Total garbage collection time (milliseconds).</summary>
-    public double TotalTimeMs { get; init; }
-    
-    /// <summary>Memory reclaimed estimate (bytes freed by setting pointers to null).</summary>
-    public long EstimatedBytesFreed { get; init; }
-    
-    /// <summary>Breakdown of collected objects by format type.</summary>
-    public Dictionary<ObjectFormat, int> CollectedByFormat { get; init; }
-    
-    /// <summary>Number of ObjectTable entries with null MemoryPointer after collection.</summary>
-    public int FreeObjectTableEntries { get; init; }
-}
-
-/// <summary>
-/// Current heap statistics (snapshot without collection).
-/// </summary>
-public sealed class HeapStatistics
-{
-    /// <summary>Total ObjectTable entries allocated.</summary>
-    public int TotalObjectTableEntries { get; init; }
-    
-    /// <summary>ObjectTable entries with valid objects (non-null MemoryPointer).</summary>
-    public int ActiveObjects { get; init; }
-    
-    /// <summary>ObjectTable entries with null MemoryPointer (available for reuse).</summary>
-    public int FreeObjectTableEntries { get; init; }
-    
-    /// <summary>Breakdown of active objects by format type.</summary>
-    public Dictionary<ObjectFormat, int> ObjectsByFormat { get; init; }
-    
-    /// <summary>Total estimated memory used by all objects (bytes).</summary>
-    public long EstimatedMemoryUsage { get; init; }
-    
-    /// <summary>Number of ObjectTable blocks allocated.</summary>
-    public int ObjectTableBlocks { get; init; }
-    
-    /// <summary>Current ObjectTable capacity (entries across all blocks).</summary>
-    public int ObjectTableCapacity { get; init; }
-    
-    /// <summary>ObjectTable utilization percentage.</summary>
-    public double ObjectTableUtilization => (double)ActiveObjects / TotalObjectTableEntries * 100;
+    public int TotalObjects { get; init; }        // Total objects before collection
+    public int LiveObjects { get; init; }          // Objects marked as reachable
+    public int CollectedObjects { get; init; }     // Objects collected (unreachable)
+    public double MarkTimeMs { get; init; }        // Time spent in mark phase
+    public double SweepTimeMs { get; init; }       // Time spent in sweep phase
+    public double TotalTimeMs { get; init; }       // Total GC time
+    public long EstimatedBytesFreed { get; init; } // Estimated memory freed
 }
 ```
 
-#### GC Usage Examples
-```csharp
-// Perform garbage collection with detailed results
-var gcResult = heap.GarbageCollect();
-
-Console.WriteLine($"GC Results:");
-Console.WriteLine($"  Objects before: {gcResult.ObjectsBeforeCollection}");
-Console.WriteLine($"  Objects reachable: {gcResult.ObjectsReachable}");
-Console.WriteLine($"  Objects collected: {gcResult.ObjectsCollected}");
-Console.WriteLine($"  Objects after: {gcResult.ObjectsAfterCollection}");
-Console.WriteLine($"  Mark time: {gcResult.MarkTimeMs:F2} ms");
-Console.WriteLine($"  Sweep time: {gcResult.SweepTimeMs:F2} ms");
-Console.WriteLine($"  Total time: {gcResult.TotalTimeMs:F2} ms");
-Console.WriteLine($"  Estimated bytes freed: {gcResult.EstimatedBytesFreed:N0}");
-Console.WriteLine($"  Free ObjectTable entries: {gcResult.FreeObjectTableEntries}");
-
-// Show breakdown by object format
-Console.WriteLine($"  Collected by format:");
-foreach (var (format, count) in gcResult.CollectedByFormat.OrderByDescending(x => x.Value))
-{
-    Console.WriteLine($"    {format}: {count} objects");
-}
-
-// Get heap statistics without collecting
-var stats = heap.GetHeapStatistics();
-Console.WriteLine($"\nHeap Statistics:");
-Console.WriteLine($"  Total ObjectTable entries: {stats.TotalObjectTableEntries}");
-Console.WriteLine($"  Active objects: {stats.ActiveObjects}");
-Console.WriteLine($"  Free entries: {stats.FreeObjectTableEntries}");
-Console.WriteLine($"  ObjectTable utilization: {stats.ObjectTableUtilization:F1}%");
-Console.WriteLine($"  Estimated memory usage: {stats.EstimatedMemoryUsage:N0} bytes");
-Console.WriteLine($"  ObjectTable blocks: {stats.ObjectTableBlocks}");
-Console.WriteLine($"  ObjectTable capacity: {stats.ObjectTableCapacity}");
-
-// Show active objects by format
-Console.WriteLine($"  Objects by format:");
-foreach (var (format, count) in stats.ObjectsByFormat.OrderByDescending(x => x.Value))
-{
-    Console.WriteLine($"    {format}: {count} objects");
-}
-```
-
-#### Sample GC Output
-```
-GC Results:
-  Objects before: 15,847
-  Objects reachable: 12,203
-  Objects collected: 3,644
-  Objects after: 12,203
-  Mark time: 15.42 ms
-  Sweep time: 8.73 ms
-  Total time: 24.15 ms
-  Estimated bytes freed: 1,458,400
-  Free ObjectTable entries: 3,644
-  Collected by format:
-    ByteIndexed: 1,892 objects
-    PointerIndexed: 1,203 objects
-    Pointer: 458 objects
-    CompiledMethod: 91 objects
-
-Heap Statistics:
-  Total ObjectTable entries: 16,384
-  Active objects: 12,203
-  Free entries: 4,181
-  ObjectTable utilization: 74.5%
-  Estimated memory usage: 4,881,200 bytes
-  ObjectTable blocks: 1
-  ObjectTable capacity: 16,384
-  Objects by format:
-    PointerIndexed: 4,582 objects
-    ByteIndexed: 3,891 objects
-    Pointer: 2,934 objects
-    CompiledMethod: 796 objects
-```
-
-### Bounds Checking and Validation
-
-All heap manager access methods perform comprehensive validation to ensure memory safety:
-
-#### Format Validation
-```csharp
-public byte GetIndexedByte(SmalltalkOOP objectOOP, int index)
-{
-    var entry = GetObjectTableEntry(objectOOP);
-    var format = (ObjectFormat)(entry.PackedMetadata & 0xF);
-    
-    // Validate format supports byte indexing
-    if (format != ObjectFormat.ByteIndexed && format != ObjectFormat.CompiledMethod)
-        throw new InvalidOperationException(
-            $"Object format {format} does not support byte indexing");
-    
-    // Continue with bounds checking...
-}
-```
-
-#### Range Validation  
-```csharp
-public SmalltalkOOP GetInstanceVariable(SmalltalkOOP objectOOP, int index)
-{
-    var entry = GetObjectTableEntry(objectOOP);
-    int instanceVarCount = GetInstanceVariableCount(entry);
-    
-    // Validate index range
-    if (index < 0 || index >= instanceVarCount)
-        throw new ArgumentOutOfRangeException(nameof(index), 
-            $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
-    
-    // Safe to access
-    int offset = 4 + (index * 4); // After 4-byte Class OOP header
-    return ReadOOPAtOffset(entry.MemoryPointer, offset);
-}
-```
-
-#### Size Calculation by Format
-```csharp
-private int GetIndexedDataSize(ObjectTableEntry entry, ObjectFormat format)
-{
-    int totalSizeInWords = (int)((entry.PackedMetadata >> 16) & 0xFF);
-    int instanceVarCount = GetInstanceVariableCount(entry);
-    int headerWords = 1; // Class OOP header
-    
-    int indexedWords = totalSizeInWords - headerWords - instanceVarCount;
-    
-    return format switch
-    {
-        ObjectFormat.PointerIndexed => indexedWords,           // 1 word = 1 OOP
-        ObjectFormat.ByteIndexed => indexedWords * 4,         // 1 word = 4 bytes  
-        ObjectFormat.WordIndexed => indexedWords * 2,         // 1 word = 2 shorts
-        ObjectFormat.CompiledMethod => indexedWords * 4,      // Bytecodes as bytes
-        _ => 0
-    };
-}
-```
-
-#### Comprehensive Error Messages
-The heap manager provides detailed error messages for debugging:
-```
-"Instance variable index 5 out of range [0, 2] for object 0x00001234"
-"Indexed byte index 100 out of range [0, 15] for object 0x00005678" 
-"Object format PointerIndexed does not support byte indexing"
-"Cannot access indexed data on Pointer format object"
-```
-
-### API Usage Examples
-
-#### Object Creation and Access
-```csharp
-// VM/Primitive layer usage:
-
-// Create a Point with 2 instance variables (x, y coordinates)
-var point = heap.AllocateObject(pointClassOOP, ObjectFormat.Pointer, 2, 0);
-heap.SetInstanceVariable(point, 0, xCoordOOP);  // x coordinate
-heap.SetInstanceVariable(point, 1, yCoordOOP);  // y coordinate
-
-// Create a String with 5 characters
-var string = heap.AllocateObject(stringClassOOP, ObjectFormat.ByteIndexed, 0, 5);
-heap.SetIndexedByte(string, 0, (byte)'H');
-heap.SetIndexedByte(string, 1, (byte)'e');
-heap.SetIndexedByte(string, 2, (byte)'l');
-heap.SetIndexedByte(string, 3, (byte)'l');
-heap.SetIndexedByte(string, 4, (byte)'o');
-
-// Create an Array with 3 elements
-var array = heap.AllocateObject(arrayClassOOP, ObjectFormat.PointerIndexed, 0, 3);
-heap.SetIndexedOOP(array, 0, firstElementOOP);
-heap.SetIndexedOOP(array, 1, secondElementOOP);
-heap.SetIndexedOOP(array, 2, thirdElementOOP);
-
-// Create a WordArray (Bitmap) with 4 16-bit words
-var bitmap = heap.AllocateObject(bitmapClassOOP, ObjectFormat.WordIndexed, 0, 4);
-heap.SetIndexedWord(bitmap, 0, 0x1234);
-heap.SetIndexedWord(bitmap, 1, 0x5678);
-heap.SetIndexedWord(bitmap, 2, 0x9ABC);
-heap.SetIndexedWord(bitmap, 3, 0xDEF0);
-```
-
-## Semantic Layer Integration (2025-01-13)
+## Semantic Layer Integration
 
 ### SemanticAllocator Architecture
 
@@ -785,7 +737,7 @@ public class SemanticAllocator
     public SmalltalkOOP AllocateFixedObject(string className);
     public SmalltalkOOP AllocateString(string value);
     public SmalltalkOOP AllocateCompiledMethod(string className, int headerWord, 
-                                               int[] literalIds, byte[] bytecodes);
+                                               SmalltalkOOP[] literalOOPs, byte[] bytecodes);
     
     // Primitive access with Smalltalk semantics
     public SmalltalkOOP ObjectAt(SmalltalkOOP objectOOP, int smalltalkIndex);
@@ -794,29 +746,6 @@ public class SemanticAllocator
     public void AtPut(SmalltalkOOP objectOOP, int smalltalkIndex, byte value);
 }
 ```
-
-### 🎉 NULL_CLASS Bug Elimination (2025-01-13)
-
-**Problem**: Phase 7 (Method Dictionary Allocation) was creating objects with `classOOP=0` (NULL_CLASS), causing massive GC traversal failures.
-
-**Root Cause**: Error-prone allocation pattern:
-```csharp
-// ERROR-PRONE PATTERN:
-var methodDictOOP = _allocator.AllocateArray("MethodDictionary", capacity);
-_allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
-```
-
-**Solution**: Bulletproof dual API design:
-```csharp
-// BULLETPROOF PATTERN (automatically sets class reference):
-var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
-// Class reference automatically set - impossible to forget
-```
-
-**Results**:
-- ✅ **NULL_CLASS issue completely eliminated**
-- ✅ **50% GC improvement**: 406→201 unreachable objects  
-- ✅ **100% validation success**: All 10,535 objects pass Phase 14
 
 ### Multi-Pass Cold Start Architecture
 
@@ -829,7 +758,7 @@ BOOTSTRAP PHASES (0-5):
 - Allocate core objects without cross-references
 
 MULTI-PASS INITIALIZATION:
-- Phase 6: Object Allocation (creates nil singleton)
+- Phase 6: Object Allocation (creates nil/true/false/ProcessorScheduler singletons)
 - Phase X: Class Reference Initialization (after nil exists)  
 - Phase Y: Instance Variable Initialization (after class refs set)
 
@@ -884,61 +813,6 @@ public byte At(SmalltalkOOP methodOOP, int smalltalkIndex)
 
 **GC Safety**: Tagged SmallInteger headers (LSB=1) automatically ignored during traversal.
 
-#### Error Handling
-```csharp
-try
-{
-    // This will throw - trying to access byte in pointer array
-    byte b = heap.GetIndexedByte(arrayOOP, 0);
-}
-catch (InvalidOperationException ex)
-{
-    // "Object format PointerIndexed does not support byte indexing"
-}
-
-try 
-{
-    // This will throw - index out of bounds
-    var value = heap.GetInstanceVariable(pointOOP, 5);
-}
-catch (ArgumentOutOfRangeException ex)
-{
-    // "Instance variable index 5 out of range [0, 1] for object 0x00001234"
-}
-```
-
-### Benefits of Format-Aware API
-- **Type Safety**: Prevents accessing bytes on pointer arrays, OOPs on byte arrays
-- **Memory Safety**: Comprehensive bounds checking prevents buffer overruns
-- **Clear Intent**: Method names indicate expected format and data type
-- **Performance**: Direct memory access with validation overhead only on debug/safety
-- **Debugging**: Detailed error messages with object OOP and valid ranges
-- **Convenience**: VM layer doesn't need to know memory layout details
-
-### Allocation Flow
-```
-1. Semantic Allocator Layer
-   ├─ Determines class OOP (semantic knowledge)
-   ├─ Looks up object format from class definition
-   ├─ Calculates fixed slots from class hierarchy
-   ├─ Determines indexed size (bytes for strings, elements for arrays)
-   └─ Calls heap manager: AllocateObject(format, fixedSlots, indexedSize)
-   
-2. Heap Manager (Minimal Semantic Knowledge)
-   ├─ Calculates total memory: fixed slots + aligned indexed data
-   ├─ Allocates memory with ObjectFormat for GC traversal
-   ├─ Creates ObjectTableEntry with format information
-   ├─ Preserves original indexed size for validation
-   ├─ Returns tagged OOP
-   └─ (Memory is zero-initialized by .NET)
-   
-3. Semantic Allocator Layer  
-   ├─ Uses SetSlot(oop, 0, classOOP) to set class reference
-   ├─ Initializes pointer slots to nil OOP using SetSlot()
-   ├─ Sets up initial object state
-   └─ Returns OOP to caller
-```
-
 ## Division of Responsibilities
 
 ### Heap Manager (Low-Level - Minimal Semantic Knowledge)
@@ -949,6 +823,7 @@ catch (ArgumentOutOfRangeException ex)
 - GC mark/sweep with correct format-based traversal
 - Original indexed size preservation for validation
 - Comprehensive error reporting with object context
+- Dynamic class name field index configuration
 - **Minimal knowledge**: Only memory layout, no object semantics
 
 ### Semantic Allocator Layer (High-Level)  
@@ -958,6 +833,7 @@ catch (ArgumentOutOfRangeException ex)
 - Class header management (setting slot 0)
 - nil OOP value management and object initialization
 - Format-aware access methods (instance variables, indexed data)
+- CompiledMethod allocation with separate ByteArray
 
 ### VM/Primitive Layer (Highest-Level)
 - Method dispatch and type checking
@@ -978,39 +854,37 @@ catch (ArgumentOutOfRangeException ex)
 │  • Object format interpretation                │
 │  • Instance variable layout                    │
 │  • Class header management                     │
+│  • Bulletproof allocation APIs                 │
 ├─────────────────────────────────────────────────┤
 │         Heap Manager (Semantic-Agnostic)       │
 │  • Raw memory allocation (N slots)             │
 │  • ObjectTable management                       │
 │  • OOP encoding/decoding                        │ 
-│  • GC mark/sweep                                │
+│  • GC mark/sweep (perfect 0 unreachable)       │
 │  • Raw slot access (no semantic knowledge)     │
+│  • Dynamic class name resolution               │
 └─────────────────────────────────────────────────┘
 ```
 
-## Implementation Notes
+## Implementation Status
 
-### Current Status
-- ObjectTableEntry uses PackedMetadata for space-efficient storage
-- Format-aware access methods with comprehensive validation implemented
-- Legacy NamedSlots retained for bootstrap compatibility only
-- Non-moving GC design leverages .NET memory management
-
-### Implementation Priorities
-1. **PackedMetadata Implementation**: Implement bit-field encoding for ObjectTableEntry
-2. **Format-Aware API**: Implement type-safe access methods with bounds checking
-3. **Enhanced GC Statistics**: Implement comprehensive GC result tracking with timing
-4. **ObjectTable Growth**: Implement block chaining for unlimited object capacity
-5. **Error Handling**: Comprehensive validation and detailed error messages
-6. **Performance Optimization**: Direct memory access with minimal overhead
+### Current Achievements
+- ✅ ObjectTableEntry uses PackedMetadata for space-efficient storage
+- ✅ Format-aware access methods with comprehensive validation
+- ✅ Non-moving GC design leverages .NET memory management
+- ✅ **Perfect GC**: 0 unreachable objects out of 31,927 allocated
+- ✅ **Bulletproof Allocation**: NULL_CLASS bug eliminated
+- ✅ **Dynamic Configuration**: Class name field index from metadata
+- ✅ **ProcessorScheduler Singleton**: Created and properly initialized
+- ✅ **Clean GC Roots**: 4 fundamental roots (nil, false, true, Smalltalk)
 
 ### Testing Strategy
 - **OOP System**: Unit tests for SmallInteger tagging and ObjectTable indexing
 - **Object Allocation**: Tests for all ObjectFormat types with various sizes
 - **Bounds Checking**: Validation of all range and format checks
 - **Memory Layout**: Verification of object header and slot arrangements
-- **GC Correctness**: Mark/sweep with complex object graphs and timing validation
-- **GC Statistics**: Verification of object counts, timing measurements, and format breakdowns
+- **GC Correctness**: Mark/sweep with complex object graphs achieving 0 unreachable objects
+- **GC Statistics**: Verification of object counts and timing measurements
 - **Heap Statistics**: Testing ObjectTable utilization and memory usage calculations
 - **Error Conditions**: Exception handling for invalid operations
 - **Performance**: Benchmarks for allocation, access patterns, and GC efficiency
@@ -1020,3 +894,5 @@ catch (ArgumentOutOfRangeException ex)
 This heap manager design provides a clean separation between low-level memory management and high-level Smalltalk semantics. By keeping the heap manager minimal and delegating semantic knowledge to higher layers, we achieve a maintainable, testable, and efficient foundation for the Smalltalk-80 runtime system.
 
 The design leverages .NET's memory management strengths while providing the ObjectTable indirection needed for Smalltalk's object model. The non-moving GC approach simplifies implementation while maintaining compatibility with Smalltalk semantics like become: operations.
+
+**Achievement**: The system now achieves **perfect garbage collection** with 0 unreachable objects, demonstrating the correctness of the allocation architecture and GC root configuration. This milestone validates the bulletproof allocation API design and proper OOP type safety throughout the codebase.

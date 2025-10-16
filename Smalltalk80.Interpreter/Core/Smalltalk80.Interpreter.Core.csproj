@@ -14,10 +14,7 @@
   
   <!-- Temporarily exclude files that still reference old heap manager -->
   <ItemGroup>
-    <Compile Remove="Bytecodes\BytecodeDecompiler.cs" />
     <Compile Remove="VM\ClassPrettyPrinter.cs" />
-    <Compile Remove="VM\Primitives\**\*.cs" />
-    <Compile Remove="VM\VirtualMachine.cs" />
     <Compile Remove="HeapManager\HeapManagerTests.cs" />
   </ItemGroup>
   

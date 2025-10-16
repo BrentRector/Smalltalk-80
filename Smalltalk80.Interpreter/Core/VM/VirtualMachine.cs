@@ -1,6 +1,5 @@
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Objects;
-using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.HeapManager;
 
@@ -9,54 +8,120 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <summary>
 /// The Smalltalk-80 Virtual Machine - handles bytecode execution, message sending, and method dispatch.
 /// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
+/// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 /// </summary>
 public class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
+    private readonly string[] _symbols;
 
-    // Active context (current MethodContext being executed)
-    private int _activeContextId;
+    // Active context (current MethodContext being executed) - now using SmalltalkOOP
+    private SmalltalkOOP _activeContextOOP;
 
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
 
-    // Track block contexts: contextId -> blockContextId mapping
-    private readonly Dictionary<int, int> _blockContextMapping = new();
+    // Track block contexts: contextOOP -> blockContextOOP mapping - now using SmalltalkOOP
+    private readonly Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver)
+    // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
+    private SmalltalkOOP[]? _arithmeticSelectorOOPs;
+
+    // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
+    private SmalltalkOOP[]? _specialSelectorOOPs;
+
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, string[] symbols)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
+        _symbols = symbols;
+    }
+
+    /// <summary>
+    /// Initializes the selector OOP caches by looking up selectors in the Smalltalk heap.
+    /// Must be called after cold start completes and all symbols are interned.
+    /// </summary>
+    public void InitializeSelectorCaches()
+    {
+        // Initialize arithmetic selector OOPs (bytecodes 0xB0-0xBF)
+        string[] arithmeticSelectors = new[]
+        {
+            "+", "-", "<", ">", "<=", ">=", "=", "~=",
+            "*", "/", "\\\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:"
+        };
+
+        _arithmeticSelectorOOPs = new SmalltalkOOP[16];
+        for (int i = 0; i < arithmeticSelectors.Length; i++)
+        {
+            _arithmeticSelectorOOPs[i] = LookupSymbolInHeap(arithmeticSelectors[i]);
+        }
+
+        // Initialize special selector OOPs (bytecodes 0xC0-0xCF)
+        string[] specialSelectors = new[]
+        {
+            "at:", "at:put:", "size", "next", "nextPut:", "atEnd",
+            "==", "class", "blockCopy:", "value", "value:", "do:",
+            "new", "new:", "x", "y"
+        };
+
+        _specialSelectorOOPs = new SmalltalkOOP[16];
+        for (int i = 0; i < specialSelectors.Length; i++)
+        {
+            _specialSelectorOOPs[i] = LookupSymbolInHeap(specialSelectors[i]);
+        }
+    }
+
+    /// <summary>
+    /// Looks up a symbol in the Smalltalk heap by searching the symbol table.
+    /// This accesses Smalltalk heap structures (SymbolRegistry) not C# objects.
+    /// </summary>
+    private SmalltalkOOP LookupSymbolInHeap(string symbolName)
+    {
+        // Search the symbol table to find the symbol by name
+        for (int i = 0; i < _symbols.Length; i++)
+        {
+            if (_symbols[i] == symbolName)
+            {
+                return SmalltalkOOP.FromObjectTableIndex(SymbolRegistry.GetObjectId(i));
+            }
+        }
+        throw new InvalidOperationException($"Symbol '{symbolName}' not found in symbol table during selector cache initialization");
     }
 
     /// <summary>
     /// Executes a method with the given receiver and arguments.
     /// Returns the result of the execution.
     /// </summary>
-    public int Execute(int methodId, int receiverId, int[] arguments)
+    public SmalltalkOOP Execute(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments)
     {
         // Parse method header to check for quick forms
-        var header = ParseMethodHeader(methodId);
+        var header = ParseMethodHeader(methodOOP);
 
         // Quick-return-self optimization (flags=5)
         if (header.IsQuickReturnSelf)
         {
-            return receiverId;
+            return receiverOOP;
         }
 
         // Quick-return-field optimization (flags=6)
         if (header.IsQuickReturnField)
         {
-            return _heap.GetField(receiverId, header.QuickReturnFieldIndex);
+            var fieldOOP = _heapManager.GetInstanceVariable(receiverOOP, header.QuickReturnFieldIndex);
+            return fieldOOP;
         }
 
         // Create a MethodContext for this execution
-        _activeContextId = CreateMethodContext(methodId, receiverId, arguments);
-        Console.WriteLine($"DEBUG Execute: Created MethodContext {_activeContextId} for method {methodId}, receiver {receiverId}");
-        Console.WriteLine($"DEBUG Execute: _activeContextId set to {_activeContextId}");
+        _activeContextOOP = CreateMethodContext(methodOOP, receiverOOP, arguments);
 
         // Execute bytecodes until we return
+        return ExecuteBytecodeLoop();
+    }
+
+    public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
+    {
+        _activeContextOOP = contextOOP;
+        
         return ExecuteBytecodeLoop();
     }
 
@@ -64,15 +129,15 @@ public class VirtualMachine : IPrimitiveContext
     /// Creates a MethodContext object for executing a method.
     /// Implements proper Blue Book MethodContext initialization with all required fields.
     /// </summary>
-    /// <param name="methodId">CompiledMethod objectId to execute</param>
-    /// <param name="receiverId">Receiver object for this activation</param>
-    /// <param name="arguments">Method arguments</param>
-    /// <param name="callerContextId">Optional caller context (sender), 0 for top-level DoIts</param>
-    /// <returns>Allocated and initialized MethodContext objectId</returns>
-    private int CreateMethodContext(int methodId, int receiverId, int[] arguments, int callerContextId = 0)
+    /// <param name="methodOOP">CompiledMethod OOP to execute</param>
+    /// <param name="receiverOOP">Receiver OOP for this activation</param>
+    /// <param name="arguments">Method arguments as OOPs</param>
+    /// <param name="callerContextOOP">Optional caller context (sender), default for top-level DoIts</param>
+    /// <returns>Allocated and initialized MethodContext OOP</returns>
+    private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
     {
         // Step 1: Validate CompiledMethod exists and parse header
-        var header = ParseMethodHeader(methodId);
+        var header = ParseMethodHeader(methodOOP);
 
         // Validate argument count matches
         if (arguments.Length != header.NumArgs)
@@ -93,10 +158,10 @@ public class VirtualMachine : IPrimitiveContext
                 "MethodContext class not found - ensure cold start completed Phase 2");
         }
 
-        // Step 4: Allocate MethodContext using AllocateInstance (same as primitive new:)
-        // This reads the class format field and properly initializes the object
-        int contextId = _heap.AllocateInstance(methodContextClassId, stackSize);
-        Console.WriteLine($"DEBUG CreateMethodContext: Allocated context {contextId} using AllocateInstance with classId={methodContextClassId}, indexedSize={stackSize}");
+        // Step 4: Allocate MethodContext using AllocateObject
+        var methodContextClassOOP = SmalltalkOOP.FromObjectTableIndex(methodContextClassId);
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
         // Step 5: Get field indices using LayoutResolver
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
@@ -109,73 +174,75 @@ public class VirtualMachine : IPrimitiveContext
         // Step 6: Initialize MethodContext fixed fields
 
         // sender: caller context or nil for top-level DoIts
-        _heap.SetField(contextId, senderIndex, callerContextId == 0 ? GlobalRegistry.NilObjectId : callerContextId);
+        var callerOOP = callerContextOOP == default ? SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId) : callerContextOOP;
+        _heapManager.SetInstanceVariable(contextOOP, senderIndex, callerOOP);
 
         // pc: start at bytecode offset 0
-        _heap.SetField(contextId, pcIndex, EncodeSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
 
         // stackp: points after args+temps (start of execution stack)
-        _heap.SetField(contextId, stackpIndex, EncodeSmallInteger(header.NumArgs + header.NumTemps));
+        _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
 
         // method: the CompiledMethod being executed
-        _heap.SetField(contextId, methodIndex, methodId);
+        _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
 
         // receiverMap: used for multiple inheritance (not implemented yet, set to nil)
-        _heap.SetField(contextId, receiverMapIndex, GlobalRegistry.NilObjectId);
+        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
 
         // receiver: the object receiving this message
-        _heap.SetField(contextId, receiverIndex, receiverId);
-        Console.WriteLine($"DEBUG CreateMethodContext: Set receiver field {receiverIndex} to {receiverId} for context {contextId}");
+        _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
 
         // Step 7: Initialize indexed fields (args + temps + stack)
 
         // Copy arguments into arg slots
         for (int i = 0; i < header.NumArgs; i++)
         {
-            _heap.SetIndexedField(contextId, i, arguments[i]);
+            _heapManager.SetIndexedOOP(contextOOP, i, arguments[i]);
         }
 
         // Initialize temps to nil
         for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
-            _heap.SetIndexedField(contextId, i, GlobalRegistry.NilObjectId);
+            _heapManager.SetIndexedOOP(contextOOP, i, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
         }
 
         // Initialize execution stack slots to nil
         for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
         {
-            _heap.SetIndexedField(contextId, i, GlobalRegistry.NilObjectId);
+            _heapManager.SetIndexedOOP(contextOOP, i, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
         }
 
-        // Note: GC root registration is implicit - the VM's _activeContextId field keeps the context alive
+        // Note: GC root registration is implicit - the VM's _activeContextOOP field keeps the context alive
         // Note: home field is not applicable for MethodContext (only for BlockContext)
         // Note: literalFrame is accessed via method.literals, not stored in context
 
-        return contextId;
+        return contextOOP;
     }
 
     /// <summary>
     /// Main bytecode execution loop.
     /// </summary>
-    private int ExecuteBytecodeLoop()
+    private SmalltalkOOP ExecuteBytecodeLoop()
     {
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
 
-        int methodId = _heap.GetField(_activeContextId, methodIndex);
-        byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+        var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        // TODO: Implement GetMethodBytecodes in heap manager or add helper method
+        byte[] bytecodes = GetMethodBytecodes(methodOOP);
 
-        int ip = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
 
         while (ip < bytecodes.Length)
         {
             byte bytecode = bytecodes[ip++];
 
             // Update IP
-            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
             // Execute the bytecode
-            bool continueExecution = ExecuteBytecode(bytecode, methodId);
+            bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
 
             if (!continueExecution)
             {
@@ -184,22 +251,24 @@ public class VirtualMachine : IPrimitiveContext
             }
 
             // Re-read IP in case bytecode modified it (jumps)
-            ip = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+            ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            ip = ipOOP.AsSmallInteger();
         }
 
         // If we fall off the end, return self
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        return _heap.GetField(_activeContextId, receiverIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        return receiverOOP;
     }
 
     /// <summary>
     /// Executes a single bytecode instruction.
     /// Returns true to continue execution, false if method returned.
     /// </summary>
-    private bool ExecuteBytecode(byte bytecode, int methodId)
+    private bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        int receiverId = _heap.GetField(_activeContextId, receiverIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         // Push receiver variable 0-15 (0x00-0x0F)
         if (BytecodeUtil.IsPushIvar(bytecode))
@@ -207,16 +276,15 @@ public class VirtualMachine : IPrimitiveContext
             int index = BytecodeUtil.PushIvarIndex(bytecode);
             
             // For blocks, receiver should be the home context receiver
-            int actualReceiver = receiverId;
-            if (_blockContextMapping.TryGetValue(_activeContextId, out int ivarBlockContextId))
+            var actualReceiverOOP = receiverOOP;
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var ivarBlockContextOOP))
             {
-                int homeContextId = _heap.GetField(ivarBlockContextId, 3); // homeContext field
-                actualReceiver = GetHomeContextReceiver(homeContextId);
-                Console.WriteLine($"DEBUG IVAR: Block accessing field {index} of home receiver {actualReceiver} instead of block receiver {receiverId}");
+                var homeContextOOP = _heapManager.GetInstanceVariable(ivarBlockContextOOP, 3); // homeContext field
+                actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
             }
             
-            int value = _heap.GetField(actualReceiver, index);
-            Push(value);
+            var valueOOP = _heapManager.GetInstanceVariable(actualReceiverOOP, index);
+            Push(valueOOP);
             return true;
         }
 
@@ -224,20 +292,20 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPushTemp(bytecode))
         {
             int index = BytecodeUtil.PushTempIndex(bytecode);
-            int value;
+            SmalltalkOOP valueOOP;
             
             // For blocks, read from BlockContext indexed fields
-            if (_blockContextMapping.TryGetValue(_activeContextId, out int blockContextId))
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
             {
-                value = _heap.GetIndexedField(blockContextId, index);
+                valueOOP = _heapManager.GetIndexedOOP(blockContextOOP, index);
             }
             else
             {
                 // Normal method - read from MethodContext indexed fields
-                value = _heap.GetIndexedField(_activeContextId, index);
+                valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
             }
             
-            Push(value);
+            Push(valueOOP);
             return true;
         }
 
@@ -246,7 +314,7 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPushLiteralConst(bytecode))
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
-            int literal = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+            var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
             Push(literal);
             return true;
         }
@@ -256,76 +324,65 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPushLiteralVar(bytecode))
         {
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
-            int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+            var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-            Console.WriteLine($"DEBUG PushLiteralVar: methodId={methodId}, index={index}, associationId={associationId}");
             
             // Handle blocks with nil literals - resolve from home context
-            if (associationId == GlobalRegistry.NilObjectId) // nil
+            if (associationOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId) // nil
             {
-                Console.WriteLine($"DEBUG PushLiteralVar: Block has nil literal at index {index}, resolving from home context");
                 
                 // Check if this is a block execution context using our mapping
-                if (_blockContextMapping.TryGetValue(_activeContextId, out int blockClosureId))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
                 {
-                    Console.WriteLine($"DEBUG PushLiteralVar: Found block mapping for context {_activeContextId} -> blockContext {blockClosureId}");
                     
                     // Get the home context from the block
                     int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                    int homeContextId = _heap.GetField(blockClosureId, homeContextIndex);
+                    var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
                     
-                    if (homeContextId != GlobalRegistry.NilObjectId)
+                    if (homeContextOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
                     {
                         // Get the method from home context
                         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-                        int homeMethodId = _heap.GetField(homeContextId, methodIndex);
+                        var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
                         
                         // Try to get the association from home method's literals
-                        int homeAssociationId = _heap.GetMethodLiteral(homeMethodId, index + 1);
+                        var homeAssociationOOP = GetMethodLiteral(homeMethodOOP, index + 1);
                         
-                        Console.WriteLine($"DEBUG PushLiteralVar: Resolved from home method {homeMethodId}, homeAssociation={homeAssociationId}");
                         
-                        if (homeAssociationId != GlobalRegistry.NilObjectId)
+                        if (homeAssociationOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
                         {
-                            associationId = homeAssociationId;
+                            associationOOP = homeAssociationOOP;
                         }
                         else
                         {
-                            Console.WriteLine($"DEBUG PushLiteralVar: Home method also has nil association, pushing nil");
-                            Push(GlobalRegistry.NilObjectId);
+                            Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
                             return true;
                         }
                     }
                     else
                     {
-                        Console.WriteLine($"DEBUG PushLiteralVar: No valid home context, pushing nil");
-                        Push(GlobalRegistry.NilObjectId);
+                        Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
                         return true;
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"DEBUG PushLiteralVar: Not a block context and literal is nil, pushing nil");
-                    Push(GlobalRegistry.NilObjectId);
+                    Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
                     return true;
                 }
             }
 
             // Association has layout: [key, value]
             int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
-            int value = _heap.GetField(associationId, valueIndex);
+            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
 
             // Debug: Check if this is ActionMenu and log its classId
             int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
-            int keyId = _heap.GetField(associationId, keyIndex);
-            string? keyName = _heap.GetSymbolName(keyId);
-            if (keyName == "ActionMenu")
-            {
-                int classId = _heap.GetClass(value);
-                Console.WriteLine($"DEBUG: Pushing ActionMenu from association, OOP={value}, classId={classId}");
-            }
+            var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+            // TODO: Implement GetSymbolName in heap manager or add helper method
+            string? keyName = null; // GetSymbolName(keyOOP);
 
-            Push(value);
+            Push(valueOOP);
             return true;
         }
 
@@ -333,18 +390,17 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPopStoreIvar(bytecode))
         {
             int index = BytecodeUtil.PopStoreIvarIndex(bytecode);
-            int value = Pop();
+            var valueOOP = Pop();
             
             // For blocks, store to home context receiver
-            int actualReceiver = receiverId;
-            if (_blockContextMapping.TryGetValue(_activeContextId, out int storeIvarBlockContextId))
+            var actualReceiverOOP = receiverOOP;
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var storeIvarBlockContextOOP))
             {
-                int homeContextId = _heap.GetField(storeIvarBlockContextId, 3); // homeContext field
-                actualReceiver = GetHomeContextReceiver(homeContextId);
-                Console.WriteLine($"DEBUG STORE IVAR: Block storing field {index} to home receiver {actualReceiver} instead of block receiver {receiverId}");
+                var homeContextOOP = _heapManager.GetInstanceVariable(storeIvarBlockContextOOP, 3); // homeContext field
+                actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
             }
             
-            _heap.SetField(actualReceiver, index, value);
+            _heapManager.SetInstanceVariable(actualReceiverOOP, index, valueOOP);
             return true;
         }
 
@@ -352,17 +408,17 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPopStoreTemp(bytecode))
         {
             int index = BytecodeUtil.PopStoreTempIndex(bytecode);
-            int value = Pop();
+            var valueOOP = Pop();
             
             // For blocks, store in BlockContext indexed fields
-            if (_blockContextMapping.TryGetValue(_activeContextId, out int blockContextId))
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
             {
-                _heap.SetIndexedField(blockContextId, index, value);
+                _heapManager.SetIndexedOOP(blockContextOOP, index, valueOOP);
             }
             else
             {
                 // Normal method - store in MethodContext indexed fields
-                _heap.SetIndexedField(_activeContextId, index, value);
+                _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
             }
             
             return true;
@@ -373,83 +429,79 @@ public class VirtualMachine : IPrimitiveContext
         {
             case Bytecode.PUSH_SELF:
                 // For blocks, self should be the home context receiver, not the block itself
-                if (_blockContextMapping.TryGetValue(_activeContextId, out int blockContextId))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP2))
                 {
-                    Console.WriteLine($"DEBUG PUSH_SELF: Block context {blockContextId}, getting homeContext from field 3");
                     try
                     {
                         // This is a block execution - get self from home context
-                        int homeContextId = _heap.GetField(blockContextId, 3); // homeContext field
-                        Console.WriteLine($"DEBUG PUSH_SELF: Got homeContextId {homeContextId}");
-                        int homeReceiver = GetHomeContextReceiver(homeContextId);
-                        Console.WriteLine($"DEBUG PUSH_SELF: Got homeReceiver {homeReceiver}");
-                        Push(homeReceiver);
+                        var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP2, 3); // homeContext field
+                        var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                        Push(homeReceiverOOP);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"DEBUG PUSH_SELF ERROR: {ex.Message}");
                         throw;
                     }
                 }
                 else
                 {
                     // Normal method execution
-                    Push(receiverId);
+                    Push(receiverOOP);
                 }
                 return true;
 
             case Bytecode.PUSH_TRUE:
-                Push(GlobalRegistry.TrueObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId));
                 return true;
 
             case Bytecode.PUSH_FALSE:
-                Push(GlobalRegistry.FalseObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId));
                 return true;
 
             case Bytecode.PUSH_NIL:
-                Push(GlobalRegistry.NilObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
                 return true;
 
             case Bytecode.PUSH_MINUS_ONE:
-                Push(EncodeSmallInteger(-1));
+                Push(SmalltalkOOP.FromSmallInteger(-1));
                 return true;
 
             case Bytecode.PUSH_ZERO:
-                Push(EncodeSmallInteger(0));
+                Push(SmalltalkOOP.FromSmallInteger(0));
                 return true;
 
             case Bytecode.PUSH_ONE:
-                Push(EncodeSmallInteger(1));
+                Push(SmalltalkOOP.FromSmallInteger(1));
                 return true;
 
             case Bytecode.PUSH_TWO:
-                Push(EncodeSmallInteger(2));
+                Push(SmalltalkOOP.FromSmallInteger(2));
                 return true;
 
             case Bytecode.RETURN_SELF:
                 // For blocks, return home context receiver as self
-                if (_blockContextMapping.TryGetValue(_activeContextId, out int returnBlockContextId))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnBlockContextOOP))
                 {
-                    int homeContextId = _heap.GetField(returnBlockContextId, 3); // homeContext field
-                    int homeReceiver = GetHomeContextReceiver(homeContextId);
-                    Push(homeReceiver);
+                    var homeContextOOP = _heapManager.GetInstanceVariable(returnBlockContextOOP, 3); // homeContext field
+                    var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                    Push(homeReceiverOOP);
                 }
                 else
                 {
-                    Push(receiverId);
+                    Push(receiverOOP);
                 }
                 return false; // Return from method
 
             case Bytecode.RETURN_TRUE:
-                Push(GlobalRegistry.TrueObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId));
                 return false;
 
             case Bytecode.RETURN_FALSE:
-                Push(GlobalRegistry.FalseObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId));
                 return false;
 
             case Bytecode.RETURN_NIL:
-                Push(GlobalRegistry.NilObjectId);
+                Push(SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
                 return false;
 
             case Bytecode.RETURN_TOP:
@@ -459,15 +511,15 @@ public class VirtualMachine : IPrimitiveContext
             case Bytecode.RETURN_SELF_POP:
                 // Return self from block context to caller's caller (0x7D)
                 // Variant of RETURN_SELF for block contexts
-                if (_blockContextMapping.TryGetValue(_activeContextId, out int returnSelfPopBlockContextId))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnSelfPopBlockContextOOP))
                 {
-                    int homeContextId = _heap.GetField(returnSelfPopBlockContextId, 3); // homeContext field
-                    int homeReceiver = GetHomeContextReceiver(homeContextId);
-                    Push(homeReceiver);
+                    var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockContextOOP, 3); // homeContext field
+                    var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                    Push(homeReceiverOOP);
                 }
                 else
                 {
-                    Push(receiverId);
+                    Push(receiverOOP);
                 }
                 return false; // TODO: Implement proper block return (non-local return)
 
@@ -485,13 +537,13 @@ public class VirtualMachine : IPrimitiveContext
         // Extended bytecodes (0x80)
         if (bytecode == 0x80)
         {
-            return ExecuteExtendedBytecode(methodId);
+            return ExecuteExtendedBytecode(methodOOP);
         }
 
         // Push active context (0x89) - used for block creation
         if (bytecode == 0x89)
         {
-            Push(_activeContextId);
+            Push(_activeContextOOP);
             return true;
         }
 
@@ -500,31 +552,34 @@ public class VirtualMachine : IPrimitiveContext
         {
             int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
             int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
-            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            int currentIp = ipOOP.AsSmallInteger();
+            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
         // Medium jump forward (0xA0)
         if (bytecode == 0xA0)
         {
-            byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+            byte[] bytecodes = GetMethodBytecodes(methodOOP);
             int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+            var ipOOP2 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            int currentIp = ipOOP2.AsSmallInteger();
 
             byte distanceByte = bytecodes[currentIp++];
             int distance = distanceByte + 1; // Distance is encoded as (distance - 1)
 
-            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
         // Long jump forward (0xA1-0xA7)
         if (bytecode >= 0xA1 && bytecode <= 0xA7)
         {
-            byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+            byte[] bytecodes = GetMethodBytecodes(methodOOP);
             int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-            int currentIp = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+            var ipOOP3 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            int currentIp = ipOOP3.AsSmallInteger();
 
             int numBytes = bytecode - 0x9F; // 0xA1 => 2 bytes, 0xA2 => 3 bytes, etc.
             int distance = 0;
@@ -534,7 +589,7 @@ public class VirtualMachine : IPrimitiveContext
             }
             distance += 1; // Distance is encoded as (distance - 1)
 
-            _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(currentIp + distance));
+            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
@@ -557,11 +612,11 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsSend0(bytecode))
         {
             int selectorIndex = BytecodeUtil.Send0Index(bytecode);
-            int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+            var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-            int receiver = Pop();
-            int result = SendMessage(receiver, selectorId, Array.Empty<int>());
-            Push(result);
+            var receiverOOP2 = Pop();
+            var resultOOP = SendMessage(receiverOOP2, selectorOOP, Array.Empty<SmalltalkOOP>());
+            Push(resultOOP);
             return true;
         }
 
@@ -570,12 +625,12 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsSend1(bytecode))
         {
             int selectorIndex = BytecodeUtil.Send1Index(bytecode);
-            int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+            var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-            int arg = Pop();
-            int receiver = Pop();
-            int result = SendMessage(receiver, selectorId, new[] { arg });
-            Push(result);
+            var argOOP = Pop();
+            var receiverOOP2 = Pop();
+            var resultOOP = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
+            Push(resultOOP);
             return true;
         }
 
@@ -584,13 +639,13 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsSend2(bytecode))
         {
             int selectorIndex = BytecodeUtil.Send2Index(bytecode);
-            int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+            var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-            int arg2 = Pop();
-            int arg1 = Pop();
-            int receiver = Pop();
-            int result = SendMessage(receiver, selectorId, new[] { arg1, arg2 });
-            Push(result);
+            var arg2OOP = Pop();
+            var arg1OOP = Pop();
+            var receiverOOP2 = Pop();
+            var resultOOP = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
+            Push(resultOOP);
             return true;
         }
 
@@ -600,81 +655,82 @@ public class VirtualMachine : IPrimitiveContext
     /// <summary>
     /// Executes extended bytecode operations (0x80 + sub-operation byte).
     /// </summary>
-    private bool ExecuteExtendedBytecode(int methodId)
+    private bool ExecuteExtendedBytecode(SmalltalkOOP methodOOP)
     {
-        byte[] bytecodes = _heap.GetMethodBytecodes(methodId);
+        byte[] bytecodes = GetMethodBytecodes(methodOOP);
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
-        int ip = DecodeSmallInteger(_heap.GetField(_activeContextId, ipIndex));
+        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
         byte subOp = bytecodes[ip++];
-        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-        int receiverId = _heap.GetField(_activeContextId, receiverIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         switch (subOp)
         {
             case 0x00: // PUSH_IVAR - Push instance variable at any index
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = _heap.GetField(receiverId, index);
-                    Push(value);
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = _heapManager.GetInstanceVariable(receiverOOP, index);
+                    Push(valueOOP);
                     return true;
                 }
 
             case 0x01: // STORE_IVAR - Store to instance variable without popping
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    _heap.SetField(receiverId, index, value);
-                    Push(value); // Leave value on stack
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    _heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
+                    Push(valueOOP); // Leave value on stack
                     return true;
                 }
 
             case 0x02: // POP_STORE_IVAR - Pop and store to instance variable
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    _heap.SetField(receiverId, index, value);
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    _heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
                     return true;
                 }
 
             case 0x03: // PUSH_TEMP - Push temporary at any index
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = _heap.GetIndexedField(_activeContextId, index);
-                    Push(value);
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+                    Push(valueOOP);
                     return true;
                 }
 
             case 0x04: // STORE_TEMP - Store to temporary without popping
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    _heap.SetIndexedField(_activeContextId, index, value);
-                    Push(value); // Leave value on stack
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
+                    Push(valueOOP); // Leave value on stack
                     return true;
                 }
 
             case 0x05: // POP_STORE_TEMP - Pop and store to temporary
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    _heap.SetIndexedField(_activeContextId, index, value);
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
                     return true;
                 }
 
             case 0x06: // PUSH_LITERAL - Push literal constant at any index
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int literal = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     Push(literal);
                     return true;
                 }
@@ -682,44 +738,44 @@ public class VirtualMachine : IPrimitiveContext
             case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value)
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
-                    int value = _heap.GetField(associationId, valueIndex);
-                    Push(value);
+                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
+                    Push(valueOOP);
                     return true;
                 }
 
             case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
-                    _heap.SetField(associationId, valueIndex, value);
-                    Push(value); // Leave value on stack
+                    _heapManager.SetInstanceVariable(associationOOP, valueIndex, valueOOP);
+                    Push(valueOOP); // Leave value on stack
                     return true;
                 }
 
             case 0x09: // POP_STORE_LITERAL_VAR - Pop and store to literal variable
                 {
                     byte index = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int value = Pop();
-                    int associationId = _heap.GetMethodLiteral(methodId, index + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = Pop();
+                    var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
-                    _heap.SetField(associationId, valueIndex, value);
+                    _heapManager.SetInstanceVariable(associationOOP, valueIndex, valueOOP);
                     return true;
                 }
 
             case 0x0A: // SEND_0 - Send with 0 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int receiver = Pop();
-                    int result = SendMessage(receiver, selectorId, Array.Empty<int>());
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var receiver = Pop();
+                    var result = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
                     Push(result);
                     return true;
                 }
@@ -727,11 +783,11 @@ public class VirtualMachine : IPrimitiveContext
             case 0x0B: // SEND_1 - Send with 1 arg
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int arg = Pop();
-                    int receiver = Pop();
-                    int result = SendMessage(receiver, selectorId, new[] { arg });
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var arg = Pop();
+                    var receiver = Pop();
+                    var result = SendMessage(receiver, selectorOOP, new[] { arg });
                     Push(result);
                     return true;
                 }
@@ -739,12 +795,12 @@ public class VirtualMachine : IPrimitiveContext
             case 0x0C: // SEND_2 - Send with 2 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int arg2 = Pop();
-                    int arg1 = Pop();
-                    int receiver = Pop();
-                    int result = SendMessage(receiver, selectorId, new[] { arg1, arg2 });
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var arg2 = Pop();
+                    var arg1 = Pop();
+                    var receiver = Pop();
+                    var result = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
                     Push(result);
                     return true;
                 }
@@ -753,16 +809,16 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte selectorIndex = bytecodes[ip++];
                     byte argCount = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-                    int[] args = new int[argCount];
+                    var args = new SmalltalkOOP[argCount];
                     for (int i = argCount - 1; i >= 0; i--)
                     {
                         args[i] = Pop();
                     }
-                    int receiver = Pop();
-                    int result = SendMessage(receiver, selectorId, args);
+                    var receiver = Pop();
+                    var result = SendMessage(receiver, selectorOOP, args);
                     Push(result);
                     return true;
                 }
@@ -770,11 +826,11 @@ public class VirtualMachine : IPrimitiveContext
             case 0x0E: // SEND_SUPER_0 - Send to super with 0 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int receiver = Pop();
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var receiver = Pop();
                     // TODO: Implement super send (lookup in superclass)
-                    int result = SendMessage(receiver, selectorId, Array.Empty<int>());
+                    var result = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
                     Push(result);
                     return true;
                 }
@@ -782,12 +838,12 @@ public class VirtualMachine : IPrimitiveContext
             case 0x0F: // SEND_SUPER_1 - Send to super with 1 arg
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int arg = Pop();
-                    int receiver = Pop();
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var arg = Pop();
+                    var receiver = Pop();
                     // TODO: Implement super send (lookup in superclass)
-                    int result = SendMessage(receiver, selectorId, new[] { arg });
+                    var result = SendMessage(receiver, selectorOOP, new[] { arg });
                     Push(result);
                     return true;
                 }
@@ -795,13 +851,13 @@ public class VirtualMachine : IPrimitiveContext
             case 0x10: // SEND_SUPER_2 - Send to super with 2 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
-                    int arg2 = Pop();
-                    int arg1 = Pop();
-                    int receiver = Pop();
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+                    var arg2 = Pop();
+                    var arg1 = Pop();
+                    var receiver = Pop();
                     // TODO: Implement super send (lookup in superclass)
-                    int result = SendMessage(receiver, selectorId, new[] { arg1, arg2 });
+                    var result = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
                     Push(result);
                     return true;
                 }
@@ -810,17 +866,17 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte selectorIndex = bytecodes[ip++];
                     byte argCount = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
-                    int selectorId = _heap.GetMethodLiteral(methodId, selectorIndex + 1); // +1 to skip header
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-                    int[] args = new int[argCount];
+                    var args = new SmalltalkOOP[argCount];
                     for (int i = argCount - 1; i >= 0; i--)
                     {
                         args[i] = Pop();
                     }
-                    int receiver = Pop();
+                    var receiver = Pop();
                     // TODO: Implement super send (lookup in superclass)
-                    int result = SendMessage(receiver, selectorId, args);
+                    var result = SendMessage(receiver, selectorOOP, args);
                     Push(result);
                     return true;
                 }
@@ -834,13 +890,14 @@ public class VirtualMachine : IPrimitiveContext
             case 0x13: // DUP - Duplicate top of stack
                 {
                     int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-                    int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
+                    var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+                    int sp = spOOP.AsSmallInteger();
                     if (sp <= 0)
                     {
                         throw new InvalidOperationException("Stack underflow on DUP");
                     }
-                    int value = _heap.GetIndexedField(_activeContextId, sp - 1);
-                    Push(value);
+                    var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
+                    Push(valueOOP);
                     return true;
                 }
 
@@ -848,14 +905,14 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
-                    int value = Pop();
+                    var valueOOP = Pop();
 
-                    if (value == GlobalRegistry.TrueObjectId)
+                    if (valueOOP.ToObjectTableIndex() == GlobalRegistry.TrueObjectId)
                     {
-                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -864,14 +921,14 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
-                    int value = Pop();
+                    var valueOOP = Pop();
 
-                    if (value == GlobalRegistry.FalseObjectId)
+                    if (valueOOP.ToObjectTableIndex() == GlobalRegistry.FalseObjectId)
                     {
-                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -881,7 +938,7 @@ public class VirtualMachine : IPrimitiveContext
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
                     int offset = (offsetHigh << 8) | offsetLow;
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     return true;
                 }
 
@@ -889,14 +946,14 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
-                    int value = Pop();
+                    var valueOOP = Pop();
 
-                    if (value == GlobalRegistry.TrueObjectId)
+                    if (valueOOP.ToObjectTableIndex() == GlobalRegistry.TrueObjectId)
                     {
-                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -905,14 +962,14 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
-                    int value = Pop();
+                    var valueOOP = Pop();
 
-                    if (value == GlobalRegistry.FalseObjectId)
+                    if (valueOOP.ToObjectTableIndex() == GlobalRegistry.FalseObjectId)
                     {
-                        _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -922,7 +979,7 @@ public class VirtualMachine : IPrimitiveContext
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
                     int offset = (offsetHigh << 8) | offsetLow;
-                    _heap.SetField(_activeContextId, ipIndex, EncodeSmallInteger(ip + offset));
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     return true;
                 }
 
@@ -936,47 +993,55 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void ExecuteSendArithmetic(byte bytecode)
     {
-        string selector = (bytecode & 0x0F) switch
+        if (_arithmeticSelectorOOPs == null)
         {
-            0x00 => "+",
-            0x01 => "-",
-            0x02 => "<",
-            0x03 => ">",
-            0x04 => "<=",
-            0x05 => ">=",
-            0x06 => "=",
-            0x07 => "~=",
-            0x08 => "*",
-            0x09 => "/",
-            0x0A => "\\",
-            0x0B => "@",
-            0x0C => "bitShift:",
-            0x0D => "//",
-            0x0E => "bitAnd:",
-            0x0F => "bitOr:",
-            _ => throw new InvalidOperationException($"Unknown arithmetic bytecode: 0x{bytecode:X2}")
-        };
+            throw new InvalidOperationException("Arithmetic selector cache not initialized. Call InitializeSelectorCaches() after cold start.");
+        }
 
-        int arg = Pop();
-        int receiver = Pop();
+        int selectorIndex = bytecode & 0x0F;
+        var selectorOOP = _arithmeticSelectorOOPs[selectorIndex];
+
+        var argOOP = Pop();
+        var receiverOOP = Pop();
 
         // Try primitive arithmetic for SmallIntegers
-        if (IsSmallInteger(receiver) && IsSmallInteger(arg))
+        if (receiverOOP.IsSmallInteger && argOOP.IsSmallInteger)
         {
-            int result = ExecuteIntegerArithmetic(receiver, selector, arg);
-            if (result != GlobalRegistry.NilObjectId ||
+            // For primitive arithmetic, we need the selector name for ExecuteIntegerArithmetic
+            string selector = selectorIndex switch
+            {
+                0x00 => "+",
+                0x01 => "-",
+                0x02 => "<",
+                0x03 => ">",
+                0x04 => "<=",
+                0x05 => ">=",
+                0x06 => "=",
+                0x07 => "~=",
+                0x08 => "*",
+                0x09 => "/",
+                0x0A => "\\",
+                0x0B => "@",
+                0x0C => "bitShift:",
+                0x0D => "//",
+                0x0E => "bitAnd:",
+                0x0F => "bitOr:",
+                _ => throw new InvalidOperationException($"Unknown arithmetic bytecode: 0x{bytecode:X2}")
+            };
+
+            var resultOOP = ExecuteIntegerArithmetic(receiverOOP, selector, argOOP);
+            if (resultOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId ||
                 selector == "=" || selector == "~=" ||
                 selector == "<" || selector == ">" ||
                 selector == "<=" || selector == ">=")
             {
-                Push(result);
+                Push(resultOOP);
                 return;
             }
         }
 
-        // Fall back to message send
-        int selectorId = _heap.InternSymbol(selector);
-        int sendResult = SendMessage(receiver, selectorId, new[] { arg });
+        // Fall back to message send using cached selector OOP
+        var sendResult = SendMessage(receiverOOP, selectorOOP, new[] { argOOP });
         Push(sendResult);
     }
 
@@ -985,89 +1050,102 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void ExecuteSendSpecial(byte bytecode)
     {
-        string[] specialSelectors = new[]
+        if (_specialSelectorOOPs == null)
         {
-            "at:", "at:put:", "size", "next", "nextPut:", "atEnd",
-            "==", "class", "blockCopy:", "value", "value:", "do:",
-            "new", "new:", "x", "y"
-        };
-
-        int selectorIndex = bytecode & 0x0F;
-        if (selectorIndex >= specialSelectors.Length)
-        {
-            throw new InvalidOperationException($"Invalid special selector index: {selectorIndex}");
+            throw new InvalidOperationException("Special selector cache not initialized. Call InitializeSelectorCaches() after cold start.");
         }
 
-        string selector = specialSelectors[selectorIndex];
-        int argCount = selector.Count(c => c == ':');
+        int selectorIndex = bytecode & 0x0F;
+        var selectorOOP = _specialSelectorOOPs[selectorIndex];
+
+        // Determine argument count from selector index
+        int argCount = selectorIndex switch
+        {
+            0 => 1,  // at:
+            1 => 2,  // at:put:
+            2 => 0,  // size
+            3 => 0,  // next
+            4 => 1,  // nextPut:
+            5 => 0,  // atEnd
+            6 => 1,  // ==
+            7 => 0,  // class
+            8 => 1,  // blockCopy:
+            9 => 0,  // value
+            10 => 1, // value:
+            11 => 1, // do:
+            12 => 0, // new
+            13 => 1, // new:
+            14 => 0, // x
+            15 => 0, // y
+            _ => throw new InvalidOperationException($"Invalid special selector index: {selectorIndex}")
+        };
 
         // Pop arguments
-        int[] args = new int[argCount];
+        var args = new SmalltalkOOP[argCount];
         for (int i = argCount - 1; i >= 0; i--)
         {
             args[i] = Pop();
         }
 
-        int receiver = Pop();
+        var receiverOOP = Pop();
 
         // Handle special cases
-        if (selector == "==")
+        if (selectorIndex == 6) // ==
         {
-            bool isIdentical = receiver == args[0];
-            Push(isIdentical ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId);
+            bool isIdentical = receiverOOP == args[0];
+            Push(SmalltalkOOP.FromObjectTableIndex(isIdentical ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId));
             return;
         }
 
-        if (selector == "class")
+        if (selectorIndex == 7) // class
         {
-            int classId = _heap.GetClass(receiver);
-            Push(classId);
+            var classOOP = GetClass(receiverOOP);
+            Push(classOOP);
             return;
         }
 
-        // Fall back to message send
-        int selectorId = _heap.InternSymbol(selector);
-        int result = SendMessage(receiver, selectorId, args);
+        // Fall back to message send using cached selector OOP
+        var result = SendMessage(receiverOOP, selectorOOP, args);
         Push(result);
     }
 
     /// <summary>
     /// Executes integer arithmetic primitively (for SmallIntegers).
-    /// Returns nil if operation fails or is not supported.
+    /// Returns nil OOP if operation fails or is not supported.
     /// </summary>
-    private int ExecuteIntegerArithmetic(int receiverId, string selector, int argId)
+    private SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
     {
-        if (!IsSmallInteger(receiverId) || !IsSmallInteger(argId))
-            return GlobalRegistry.NilObjectId;
+        if (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger)
+            return SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
 
-        int a = DecodeSmallInteger(receiverId);
-        int b = DecodeSmallInteger(argId);
+        int a = receiverOOP.AsSmallInteger();
+        int b = argOOP.AsSmallInteger();
 
         try
         {
             return selector switch
             {
-                "+" => EncodeSmallInteger(a + b),
-                "-" => EncodeSmallInteger(a - b),
-                "*" => EncodeSmallInteger(a * b),
-                "/" => b != 0 ? EncodeSmallInteger(a / b) : GlobalRegistry.NilObjectId,
-                "\\\\" => b != 0 ? EncodeSmallInteger(a % b) : GlobalRegistry.NilObjectId,
-                "//" => b != 0 ? EncodeSmallInteger(a / b) : GlobalRegistry.NilObjectId,
-                "<" => a < b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                ">" => a > b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                "<=" => a <= b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                ">=" => a >= b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                "=" => a == b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                "~=" => a != b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId,
-                "bitAnd:" => EncodeSmallInteger(a & b),
-                "bitOr:" => EncodeSmallInteger(a | b),
-                "bitShift:" => b >= 0 ? EncodeSmallInteger(a << b) : EncodeSmallInteger(a >> (-b)),
-                _ => GlobalRegistry.NilObjectId
+                "+" => SmalltalkOOP.FromSmallInteger(a + b),
+                "-" => SmalltalkOOP.FromSmallInteger(a - b),
+                "*" => SmalltalkOOP.FromSmallInteger(a * b),
+                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
+                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
+                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
+                "<" => SmalltalkOOP.FromObjectTableIndex(a < b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                ">" => SmalltalkOOP.FromObjectTableIndex(a > b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                "<=" => SmalltalkOOP.FromObjectTableIndex(a <= b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                ">=" => SmalltalkOOP.FromObjectTableIndex(a >= b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                "=" => SmalltalkOOP.FromObjectTableIndex(a == b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                "~=" => SmalltalkOOP.FromObjectTableIndex(a != b ? GlobalRegistry.TrueObjectId : GlobalRegistry.FalseObjectId),
+                "bitAnd:" => SmalltalkOOP.FromSmallInteger(a & b),
+                "bitOr:" => SmalltalkOOP.FromSmallInteger(a | b),
+                "bitShift:" => b >= 0 ? SmalltalkOOP.FromSmallInteger(a << b) : SmalltalkOOP.FromSmallInteger(a >> (-b)),
+                _ => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId)
             };
         }
         catch
         {
-            return GlobalRegistry.NilObjectId;
+            return SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
         }
     }
 
@@ -1075,62 +1153,53 @@ public class VirtualMachine : IPrimitiveContext
     /// Sends a message to a receiver.
     /// Looks up the method in the receiver's class and executes it.
     /// </summary>
-    private int SendMessage(int receiverId, int selectorId, int[] args)
+    private SmalltalkOOP SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
     {
         // Look up the method in the receiver's class
-        int classId = _heap.GetClass(receiverId);
-
+        var classOOP = GetClass(receiverOOP);
+        
+        // Get selector name once for all uses
+        string? selectorName = GetSymbolName(selectorOOP);
         // SPECIAL CASE: Block CompiledMethods responding to value/value:/value:value:
         // In v1.0.3, blocks are separate CompiledMethod objects that respond to value messages
         // by creating proper BlockContext and executing with closure semantics
         if (GlobalRegistry.TryGet("class:CompiledMethod", out int compiledMethodClassId) &&
-            classId == compiledMethodClassId)
+            classOOP.ToObjectTableIndex() == compiledMethodClassId)
         {
-            string? selectorName = _heap.GetSymbolName(selectorId);
             if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
             {
                 // Execute the block with proper BlockContext wrapping
-                return InvokeBlock(receiverId, args);
+                return InvokeBlock(receiverOOP, args);
             }
         }
 
         // Debug: check for classId 0 on "comment:" send
-        if (classId == 0)
+        if (classOOP.ToObjectTableIndex() == 0)
         {
-            string selectorName = _heap.GetSymbolName(selectorId) ?? "unknown";
             throw new InvalidOperationException(
-                $"Method not found: {selectorName} in class 0 (receiver OOP={receiverId}, receiverId has classId 0!)");
+                $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP.ToObjectTableIndex()}, receiverId has classId 0!)");
         }
 
-        var methodInfo = _heap.GetMethod(classId, _heap.GetSymbolName(selectorId)!);
+        var methodInfo = GetMethod(classOOP, selectorName!);
 
         if (methodInfo == null)
         {
+            string? className = GetClassName(classOOP);
             throw new InvalidOperationException(
-                $"Method not found: {_heap.GetSymbolName(selectorId)} in class {_heap.GetClass(receiverId)}");
+                $"Method not found: {selectorName ?? "<unknown>"} in class {className} (classOOP={classOOP.ToObjectTableIndex()})");
         }
 
         // Check if the method has a primitive
-        int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodId);
+        int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            // Convert receiver and args to SObjectRef for primitive execution
-            SObjectRef receiver = SObjectRef.FromObjectPointer(receiverId);
-            SObjectRef[] sobjectArgs = new SObjectRef[args.Length];
-            for (int i = 0; i < args.Length; i++)
-            {
-                sobjectArgs[i] = SObjectRef.FromObjectPointer(args[i]);
-            }
-
             // Try to execute the primitive
-            SObjectRef primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiver, sobjectArgs);
+            var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
             if (_primitiveSuccess)
             {
-                // Primitive succeeded - convert result back to int
-                return primitiveResult.IsSmallInteger
-                    ? (int)primitiveResult.AsSmallInteger()
-                    : (int)primitiveResult.AsObjectPointer();
+                // Primitive succeeded - return result directly
+                return primitiveResult;
             }
 
             // Primitive failed - execute method bytecodes as fallback
@@ -1138,16 +1207,16 @@ public class VirtualMachine : IPrimitiveContext
 
         // Execute the method with proper context chaining
         // Save current active context as the sender
-        int previousContextId = _activeContextId;
+        var previousContextOOP = _activeContextOOP;
 
         // Create new context with current context as sender
-        _activeContextId = CreateMethodContext(methodInfo.MethodId, receiverId, args, previousContextId);
+        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, previousContextOOP);
 
         // Execute the new context
-        int result = ExecuteBytecodeLoop();
+        var result = ExecuteBytecodeLoop();
 
         // Restore previous context
-        _activeContextId = previousContextId;
+        _activeContextOOP = previousContextOOP;
 
         return result;
     }
@@ -1156,24 +1225,22 @@ public class VirtualMachine : IPrimitiveContext
     /// Invokes a block CompiledMethod with proper BlockContext wrapping for v1.0.3 semantics.
     /// Creates BlockContext, resolves closure scope, and executes with proper self resolution.
     /// </summary>
-    /// <param name="blockMethodId">The block CompiledMethod to invoke</param>
+    /// <param name="blockMethodOOP">The block CompiledMethod to invoke</param>
     /// <param name="args">Arguments to pass to the block</param>
     /// <returns>The result of block execution</returns>
-    private int InvokeBlock(int blockMethodId, int[] args)
+    private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
     {
-        Console.WriteLine($"DEBUG InvokeBlock: Called with blockMethodId={blockMethodId}, args.Length={args.Length}");
         try
         {
-            return InvokeBlockInternal(blockMethodId, args);
+            return InvokeBlockInternal(blockMethodOOP, args);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"DEBUG InvokeBlock ERROR: {ex.GetType().Name}: {ex.Message}");
             throw;
         }
     }
 
-    private int InvokeBlockInternal(int blockMethodId, int[] args)
+    private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
     {
         // Step 1: Resolve block ownership from blockOwnerMap
         var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
@@ -1183,26 +1250,25 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Get local ID for the block method
-        string? blockLocalId = GetLocalId(blockMethodId);
+        string? blockLocalId = GetLocalId(blockMethodOOP);
         if (blockLocalId == null || !blockOwnerMap.TryGetValue(blockLocalId, out string? ownerLocalId))
         {
-            throw new InvalidOperationException($"Block method {blockMethodId} not found in blockOwnerMap");
+            throw new InvalidOperationException($"Block method {blockMethodOOP.ToObjectTableIndex()} not found in blockOwnerMap");
         }
 
         // Step 2: Determine contexts
         // homeContext = find the actual method context (not a block context) by walking the sender chain
-        int homeContextId = FindMethodContext(_activeContextId);
-        Console.WriteLine($"DEBUG InvokeBlock: _activeContextId={_activeContextId}, homeContextId={homeContextId}");
-        if (homeContextId == 0)
+        var homeContextOOP = FindMethodContext(_activeContextOOP);
+        if (homeContextOOP == default)
         {
             throw new InvalidOperationException("No method context found - blocks must be invoked within method execution");
         }
 
         // outerContext = resolve to root method by walking blockOwnerMap
-        int outerContextId = ResolveOuterContext(ownerLocalId, blockOwnerMap);
+        var outerContextOOP = ResolveOuterContext(ownerLocalId, blockOwnerMap);
 
         // Step 3: Parse block method header for metadata
-        var blockHeader = ParseMethodHeader(blockMethodId);
+        var blockHeader = ParseMethodHeader(blockMethodOOP);
         int argCount = blockHeader.NumArgs;
         int tempCount = blockHeader.NumTemps;
 
@@ -1219,43 +1285,55 @@ public class VirtualMachine : IPrimitiveContext
         int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
         int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
         
-        // Call SmalltalkHeap with resolved field indices (proper architectural boundaries)
-        int blockContextId = _heap.CreateBlockContext(
-            blockMethodId, 0, argCount, homeContextId, outerContextId, tempCount,
-            nargsIndex, startpcIndex, homeIndex);
+        // Call heap manager to create BlockContext with resolved field indices (proper architectural boundaries)
+        // Get BlockContext class ID from GlobalRegistry
+        if (!GlobalRegistry.TryGet("class:BlockContext", out int blockContextClassId))
+        {
+            throw new InvalidOperationException("BlockContext class not found");
+        }
+        
+        // Allocate BlockContext
+        var blockContextClassOOP = SmalltalkOOP.FromObjectTableIndex(blockContextClassId);
+        var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 4, argCount + tempCount);
+        _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
+        
+        // Initialize BlockContext fields
+        _heapManager.SetInstanceVariable(blockContextOOP, nargsIndex, SmalltalkOOP.FromSmallInteger(argCount));
+        _heapManager.SetInstanceVariable(blockContextOOP, startpcIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(blockContextOOP, homeIndex, homeContextOOP);
 
         // Step 5: Bind arguments into BlockContext indexed fields
         for (int i = 0; i < args.Length; i++)
         {
-            _heap.SetIndexedField(blockContextId, i, args[i]);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, args[i]);
         }
 
         // Step 6: Get home context receiver for proper self resolution
         // For blocks, we need to find the method where the block was originally defined
-        int homeContextReceiver = GetBlockHomeReceiver(blockMethodId, ownerLocalId);
+        var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
 
         // Step 7: Create execution MethodContext backed by BlockContext
-        int executionContextId = CreateBlockExecutionContext(
-            blockMethodId, homeContextReceiver, blockContextId, homeContextId);
+        var executionContextOOP = CreateBlockExecutionContext(
+            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP);
 
         // Step 8: Execute block with GC protection
         // Root the BlockContext during execution to prevent GC
         // Note: In a real implementation, we'd use proper GC rooting
         
         // Save current active context
-        int previousContextId = _activeContextId;
+        var previousContextOOP = _activeContextOOP;
         
         // Set the block execution context as active
-        _activeContextId = executionContextId;
+        _activeContextOOP = executionContextOOP;
 
         // Execute the block bytecodes
-        int result = ExecuteBytecodeLoop();
+        var result = ExecuteBytecodeLoop();
 
         // Clean up block context mapping
-        _blockContextMapping.Remove(executionContextId);
+        _blockContextMapping.Remove(executionContextOOP);
 
         // Restore previous context
-        _activeContextId = previousContextId;
+        _activeContextOOP = previousContextOOP;
 
         return result;
     }
@@ -1264,9 +1342,9 @@ public class VirtualMachine : IPrimitiveContext
     /// Creates a MethodContext for executing a block, backed by a BlockContext.
     /// This implements Approach B from the documentation.
     /// </summary>
-    private int CreateBlockExecutionContext(int blockMethodId, int receiverId, int blockContextId, int senderContextId)
+    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP)
     {
-        var header = ParseMethodHeader(blockMethodId);
+        var header = ParseMethodHeader(blockMethodOOP);
 
         // Calculate stack size for execution
         int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
@@ -1279,8 +1357,9 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Allocate MethodContext
-        int contextId = _heap.AllocateRawObject(
-            methodContextClassId, SmalltalkHeap.ObjectFormat.PointerIndexed, 6, stackSize);
+        var methodContextClassOOP = SmalltalkOOP.FromObjectTableIndex(methodContextClassId);
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
         // Get field indices
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
@@ -1291,23 +1370,23 @@ public class VirtualMachine : IPrimitiveContext
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
         // Initialize MethodContext fields
-        _heap.SetField(contextId, senderIndex, senderContextId);
-        _heap.SetField(contextId, pcIndex, EncodeSmallInteger(0));
-        _heap.SetField(contextId, stackpIndex, EncodeSmallInteger(header.NumArgs + header.NumTemps));
-        _heap.SetField(contextId, methodIndex, blockMethodId);
-        _heap.SetField(contextId, receiverMapIndex, GlobalRegistry.NilObjectId);
-        _heap.SetField(contextId, receiverIndex, receiverId); // self = home context receiver
+        _heapManager.SetInstanceVariable(contextOOP, senderIndex, senderContextOOP);
+        _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
+        _heapManager.SetInstanceVariable(contextOOP, methodIndex, blockMethodOOP);
+        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
+        _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP); // self = home context receiver
 
         // Store blockContext backreference in our mapping
-        _blockContextMapping[contextId] = blockContextId;
+        _blockContextMapping[contextOOP] = blockContextOOP;
 
-        return contextId;
+        return contextOOP;
     }
 
     /// <summary>
     /// Resolves the outer context by walking the blockOwnerMap to find the root method.
     /// </summary>
-    private int ResolveOuterContext(string ownerLocalId, Dictionary<string, string> blockOwnerMap)
+    private SmalltalkOOP ResolveOuterContext(string ownerLocalId, Dictionary<string, string> blockOwnerMap)
     {
         string currentLocalId = ownerLocalId;
         
@@ -1319,28 +1398,16 @@ public class VirtualMachine : IPrimitiveContext
 
         // currentLocalId is now the root method's localId
         // For now, return the home context (we'd need to implement proper outer context tracking)
-        return _activeContextId;
+        return _activeContextOOP;
     }
 
     /// <summary>
     /// Gets the receiver from the home context for proper self resolution in blocks.
     /// </summary>
-    private int GetHomeContextReceiver(int homeContextId)
+    private SmalltalkOOP GetHomeContextReceiver(SmalltalkOOP homeContextOOP)
     {
-        Console.WriteLine($"DEBUG GetHomeContextReceiver: homeContextId={homeContextId}");
-        
-        // Debug the object we're trying to access
-        int classId = _heap.GetClass(homeContextId);
-        int indexedSize = _heap.GetIndexedSize(homeContextId);
-        Console.WriteLine($"DEBUG GetHomeContextReceiver: object {homeContextId} has classId={classId}, indexedSize={indexedSize}");
-        
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        Console.WriteLine($"DEBUG GetHomeContextReceiver: receiverIndex={receiverIndex}");
-        Console.WriteLine($"DEBUG GetHomeContextReceiver: About to call _heap.GetField({homeContextId}, {receiverIndex})");
-        
-        // The error will show us exactly which field access is failing
-        int result = _heap.GetField(homeContextId, receiverIndex);
-        Console.WriteLine($"DEBUG GetHomeContextReceiver: _heap.GetField({homeContextId}, {receiverIndex}) returned {result}");
+        var result = _heapManager.GetInstanceVariable(homeContextOOP, receiverIndex);
         return result;
     }
 
@@ -1348,9 +1415,8 @@ public class VirtualMachine : IPrimitiveContext
     /// Gets the receiver from the home method context for a block.
     /// Uses the blockOwnerMap to find the ultimate method where the block was defined.
     /// </summary>
-    private int GetBlockHomeReceiver(int blockMethodId, string ownerLocalId)
+    private SmalltalkOOP GetBlockHomeReceiver(SmalltalkOOP blockMethodOOP, string ownerLocalId)
     {
-        Console.WriteLine($"DEBUG GetBlockHomeReceiver: blockMethodId={blockMethodId}, ownerLocalId={ownerLocalId}");
         
         // Walk the blockOwnerMap to find the root method (not another block)
         var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
@@ -1362,107 +1428,96 @@ public class VirtualMachine : IPrimitiveContext
         string currentLocalId = ownerLocalId;
         while (blockOwnerMap.TryGetValue(currentLocalId, out string? parentLocalId))
         {
-            Console.WriteLine($"DEBUG GetBlockHomeReceiver: {currentLocalId} → {parentLocalId}");
             currentLocalId = parentLocalId;
         }
         
-        Console.WriteLine($"DEBUG GetBlockHomeReceiver: Found root method: {currentLocalId}");
         
         // Now find the MethodContext for this root method
         // Look through all active contexts to find one executing this method
-        int methodContextId = FindMethodContextByLocalId(currentLocalId);
-        if (methodContextId == 0)
+        var methodContextOOP = FindMethodContextByLocalId(currentLocalId);
+        if (methodContextOOP == default)
         {
             throw new InvalidOperationException($"No active context found for method {currentLocalId}");
         }
         
-        Console.WriteLine($"DEBUG GetBlockHomeReceiver: Found method context {methodContextId}");
         
         // Get the receiver from this method context
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        int receiver = _heap.GetField(methodContextId, receiverIndex);
+        var receiver = _heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         
-        Console.WriteLine($"DEBUG GetBlockHomeReceiver: Receiver={receiver}");
         return receiver;
     }
 
     /// <summary>
     /// Finds a MethodContext that is executing the given method localId.
     /// </summary>
-    private int FindMethodContextByLocalId(string methodLocalId)
+    private SmalltalkOOP FindMethodContextByLocalId(string methodLocalId)
     {
         // For now, we'll use a simple approach: find the first context in the sender chain
         // that has the correct method. In a real implementation, we'd maintain a proper
         // context stack or use the blockOwnerMap more sophisticatedly.
         
-        int currentContextId = _activeContextId;
+        var currentContextOOP = _activeContextOOP;
         
-        while (currentContextId != 0 && currentContextId != GlobalRegistry.NilObjectId)
+        while (currentContextOOP != default && currentContextOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
         {
             // Get the method from this context
             int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-            int methodId = _heap.GetField(currentContextId, methodIndex);
+            var methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, methodIndex);
             
             // Check if this matches our target method
-            string? contextMethodLocalId = GetLocalId(methodId);
-            Console.WriteLine($"DEBUG FindMethodContextByLocalId: Context {currentContextId} executes method {contextMethodLocalId}");
+            string? contextMethodLocalId = GetLocalId(methodOOP);
             
             if (contextMethodLocalId == methodLocalId)
             {
-                Console.WriteLine($"DEBUG FindMethodContextByLocalId: Found matching context {currentContextId}");
-                return currentContextId;
+                return currentContextOOP;
             }
             
             // Move to sender
             int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-            int senderContextId = _heap.GetField(currentContextId, senderIndex);
-            currentContextId = senderContextId;
+            var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
+            currentContextOOP = senderContextOOP;
         }
         
-        Console.WriteLine($"DEBUG FindMethodContextByLocalId: No matching context found for {methodLocalId}");
-        return 0;
+        return default;
     }
 
     /// <summary>
     /// Finds the actual method context by walking up the sender chain.
     /// Skips block execution contexts to find the underlying method context.
     /// </summary>
-    private int FindMethodContext(int startContextId)
+    private SmalltalkOOP FindMethodContext(SmalltalkOOP startContextOOP)
     {
-        int currentContextId = startContextId;
+        var currentContextOOP = startContextOOP;
         
-        while (currentContextId != 0 && currentContextId != GlobalRegistry.NilObjectId)
+        while (currentContextOOP != default && currentContextOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
         {
-            Console.WriteLine($"DEBUG FindMethodContext: Checking context {currentContextId}");
             
             // Check if this context is a block execution context
-            if (_blockContextMapping.ContainsKey(currentContextId))
+            if (_blockContextMapping.ContainsKey(currentContextOOP))
             {
-                Console.WriteLine($"DEBUG FindMethodContext: Context {currentContextId} is a block execution context, skipping");
                 // This is a block execution context, get its sender
                 int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-                int senderContextId = _heap.GetField(currentContextId, senderIndex);
-                currentContextId = senderContextId;
+                var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
+                currentContextOOP = senderContextOOP;
                 continue;
             }
             
             // This should be a regular method context
-            Console.WriteLine($"DEBUG FindMethodContext: Found method context {currentContextId}");
-            return currentContextId;
+            return currentContextOOP;
         }
         
-        Console.WriteLine($"DEBUG FindMethodContext: No method context found, returning 0");
-        return 0;
+        return default;
     }
 
     /// <summary>
     /// Gets the local ID for an object (used for blockOwnerMap lookup).
     /// Uses the reverse mapping built during Phase6.
     /// </summary>
-    private string? GetLocalId(int objectId)
+    private string? GetLocalId(SmalltalkOOP objectOOP)
     {
         var objectIdToLocalId = GlobalRegistry.GetObject<Dictionary<int, string>>("objectIdToLocalId");
-        if (objectIdToLocalId?.TryGetValue(objectId, out string? localId) == true)
+        if (objectIdToLocalId?.TryGetValue(objectOOP.ToObjectTableIndex(), out string? localId) == true)
         {
             return localId;
         }
@@ -1496,10 +1551,10 @@ public class VirtualMachine : IPrimitiveContext
         int QuickReturnFieldIndex
     );
 
-    private MethodHeaderInfo ParseMethodHeader(int methodId)
+    private MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP)
     {
-        int headerOop = _heap.GetMethodLiteral(methodId, 0);
-        int header = DecodeSmallInteger(headerOop);
+        var headerOop = GetMethodLiteral(methodOOP, 0);
+        int header = headerOop.AsSmallInteger();
 
         // Method header word format per docs/Interpreter-Architecture.md lines 5015-5020:
         // Bits 0-5:   numLiterals (6 bits, 0-63)
@@ -1527,8 +1582,13 @@ public class VirtualMachine : IPrimitiveContext
             // Extended form: numArgs and primitive in last literal
             if (numLiterals > 0)
             {
-                int lastLiteralOop = _heap.GetMethodLiteral(methodId, numLiterals);  // No +1, last literal
-                int lastLiteral = DecodeSmallInteger(lastLiteralOop);
+                // Last literal is at indexed slot (numLiterals), since:
+                // - Indexed slot 0 = header
+                // - Indexed slots 1..N = literals (N = numLiterals)
+                // - Indexed slot N+1 = bytecode array (hidden)
+                // So last literal (literalN) is at indexed slot numLiterals
+                var lastLiteralOop = GetMethodLiteral(methodOOP, numLiterals);
+                int lastLiteral = lastLiteralOop.AsSmallInteger();
 
                 primitive = lastLiteral & 0xFF;           // Low byte
                 numArgs = (lastLiteral >> 8) & 0x1F;     // High bits
@@ -1562,31 +1622,33 @@ public class VirtualMachine : IPrimitiveContext
     /// Extracts the primitive number from a method's header.
     /// Returns 0 if the method has no primitive.
     /// </summary>
-    private int GetPrimitiveNumber(int methodId)
+    private int GetPrimitiveNumber(SmalltalkOOP methodOOP)
     {
-        var headerInfo = ParseMethodHeader(methodId);
+        var headerInfo = ParseMethodHeader(methodOOP);
         return headerInfo.Primitive;
     }
 
     /// <summary>
     /// Pushes a value onto the operand stack.
     /// </summary>
-    private void Push(int value)
+    private void Push(SmalltalkOOP valueOOP)
     {
         int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-        int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
+        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+        int sp = spOOP.AsSmallInteger();
 
-        _heap.SetIndexedField(_activeContextId, sp, value);
-        _heap.SetField(_activeContextId, spIndex, EncodeSmallInteger(sp + 1));
+        _heapManager.SetIndexedOOP(_activeContextOOP, sp, valueOOP);
+        _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
     }
 
     /// <summary>
     /// Pops a value from the operand stack.
     /// </summary>
-    private int Pop()
+    private SmalltalkOOP Pop()
     {
         int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-        int sp = DecodeSmallInteger(_heap.GetField(_activeContextId, spIndex));
+        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+        int sp = spOOP.AsSmallInteger();
 
         if (sp <= 0)
         {
@@ -1594,122 +1656,255 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         sp--;
-        _heap.SetField(_activeContextId, spIndex, EncodeSmallInteger(sp));
-        return _heap.GetIndexedField(_activeContextId, sp);
+        _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
+        return _heapManager.GetIndexedOOP(_activeContextOOP, sp);
     }
 
-    // SmallInteger encoding/decoding (LSB = 1 for SmallInteger)
-    private static bool IsSmallInteger(int objectId) => (objectId & 1) == 1;
-    private static int EncodeSmallInteger(int value) => (value << 1) | 1;
-    private static int DecodeSmallInteger(int encoded) => encoded >> 1;
 
 
-    // IPrimitiveContext implementation
-    SmalltalkHeap IPrimitiveContext.Heap => _heap;
-    LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
-    bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
-
-    int IPrimitiveContext.GetFieldValue(int oop, string className, string fieldName)
+    // Helper methods for heap access during refactoring
+    private byte[] GetMethodBytecodes(SmalltalkOOP methodOOP)
     {
-        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
-        return _heap.GetField(oop, fieldIndex);
+        // TODO: Implement GetMethodBytecodes - need to access bytecode array from CompiledMethod
+        // CompiledMethod structure: [header, literal1, ..., literalN, bytecodeArrayOOP]
+        // The last indexed slot contains OOP to ByteArray with bytecodes
+        int indexedSize = _heapManager.GetIndexedSize(methodOOP);
+        if (indexedSize > 0)
+        {
+            // Get the last indexed slot which should be the bytecode array OOP
+            var bytecodeArrayOOP = _heapManager.GetIndexedOOP(methodOOP, indexedSize - 1);
+            int byteCount = _heapManager.GetIndexedSize(bytecodeArrayOOP);
+            byte[] bytecodes = new byte[byteCount];
+            for (int i = 0; i < byteCount; i++)
+            {
+                bytecodes[i] = _heapManager.GetIndexedByte(bytecodeArrayOOP, i);
+            }
+            return bytecodes;
+        }
+        return Array.Empty<byte>();
     }
 
-    void IPrimitiveContext.SetFieldValue(int oop, string className, string fieldName, int value)
+    private SmalltalkOOP GetMethodLiteral(SmalltalkOOP methodOOP, int index)
     {
-        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
-        _heap.SetField(oop, fieldIndex, value);
+        // TODO: Implement GetMethodLiteral - access literal from CompiledMethod
+        var literalOOP = _heapManager.GetIndexedOOP(methodOOP, index);
+        return literalOOP;
     }
 
-    Memory<byte> IPrimitiveContext.GetByteArray(int oop)
+    private SmalltalkOOP GetClass(SmalltalkOOP objectOOP)
     {
-        // Get indexed size to verify it's a byte array
-        int size = _heap.GetIndexedSize(oop);
-        if (size == 0)
-            return Memory<byte>.Empty;
-
-        // For now, return empty - need to implement byte array access in heap
-        // TODO: Add GetIndexedBytes method to SmalltalkHeap
-        return Memory<byte>.Empty;
+        var classOOP = _heapManager.GetSlot(objectOOP, 0); // Class is in slot 0
+        return classOOP;
     }
 
-    int IPrimitiveContext.AllocateObject(string className, int indexedSize)
+    private string GetClassName(SmalltalkOOP classOOP)
     {
-        // Look up class ID using layout resolver
-        // For now, use a simple approach - this needs proper class lookup
-        // TODO: Add class name to class ID mapping in heap or layout resolver
-
-        // Get format from class name
-        var format = indexedSize > 0
-            ? SmalltalkHeap.ObjectFormat.ByteIndexed  // Default for indexed objects (bytes)
-            : SmalltalkHeap.ObjectFormat.FixedPointer;
-
-        // Count fields in the class layout
-        int fixedSize = 0;
         try
         {
-            // Try to count fields - this will fail if class not in layout
-            var fieldNames = new System.Collections.Generic.List<string>();
-            int index = 0;
-            while (true)
-            {
-                try
-                {
-                    _layoutResolver.GetFieldIndex(className, $"field{index}");
-                    index++;
-                }
-                catch
-                {
-                    break;
-                }
-            }
-            fixedSize = index;
+            // Class has a 'name' field which is a Symbol
+            int nameIndex = _layoutResolver.GetFieldIndex("class:Class", "name");
+            var nameSymbolOOP = _heapManager.GetInstanceVariable(classOOP, nameIndex);
+            string? name = GetSymbolName(nameSymbolOOP);
+            return name ?? $"<class {classOOP.ToObjectTableIndex()}>";
         }
         catch
         {
-            fixedSize = 0;  // No fixed fields
+            return $"<class {classOOP.ToObjectTableIndex()}>";
         }
-
-        // Allocate using heap
-        return _heap.AllocateRawObject(
-            classId: 0, // TODO: Proper class ID lookup
-            format: format,
-            fixedSize: fixedSize,
-            indexedSize: indexedSize
-        );
     }
 
-    int IPrimitiveContext.SendMessage(int receiverOop, int selectorOop, int argumentsArray)
+    private string? GetSymbolName(SmalltalkOOP symbolOOP)
+    {
+        int symbolId = symbolOOP.ToObjectTableIndex();
+        
+        // Try to find the symbol name by reverse lookup in SymbolRegistry first (fastest)
+        foreach (var (index, objectId) in SymbolRegistry.AllSymbols())
+        {
+            if (objectId == symbolId)
+            {
+                return _symbols[index];
+            }
+        }
+        
+        // Fall back to reading the Symbol object bytes directly
+        try
+        {
+            int byteCount = _heapManager.GetIndexedSize(symbolOOP);
+            if (byteCount > 0)
+            {
+                byte[] bytes = new byte[byteCount];
+                for (int i = 0; i < byteCount; i++)
+                {
+                    bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+                }
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+        }
+        catch
+        {
+            // Symbol reading failed
+        }
+        
+        return null;
+    }
+
+    private MethodInfo? GetMethod(SmalltalkOOP classOOP, string selectorName)
+    {
+        var currentClassOOP = classOOP;
+        
+        // Walk up the inheritance chain until we find the method or reach nil
+        while (currentClassOOP.ToObjectTableIndex() != GlobalRegistry.NilObjectId)
+        {
+            // Get the method dictionary from the class
+            int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
+            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
+            
+            if (methodDictOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+            {
+                // No method dictionary, try superclass
+                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+                currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                continue;
+            }
+            
+            // MethodDictionary structure (IdentityDictionary):
+            // - Instance variable [0] = valuesArray (Array of methods)
+            // - Instance variable [1] = tally (SmallInteger)  
+            // - Indexed fields = keys (selectors)
+            // To find a method: search indexed fields for selector, then get method from valuesArray at same index
+            
+            var valuesArrayOOP = _heapManager.GetInstanceVariable(methodDictOOP, 0);
+            if (valuesArrayOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+            {
+                // No values array, try superclass
+                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+                currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                continue;
+            }
+            
+            int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
+            
+            for (int i = 0; i < dictSize; i++)
+            {
+                var selectorOOP = _heapManager.GetIndexedOOP(methodDictOOP, i);
+                
+                // Skip nil entries (empty slots in the hash table)
+                if (selectorOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
+                    continue;
+                
+                // Check if this is the selector we're looking for
+                string? currentSelectorName = GetSymbolName(selectorOOP);
+                
+                if (currentSelectorName == selectorName)
+                {
+                    // Found it! Get the method from the valuesArray at the same index
+                    var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                    return new MethodInfo { MethodOOP = methodOOP };
+                }
+            }
+            
+            // Not found in this class, try superclass
+            int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+            currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
+        }
+        
+        return null;
+    }
+
+    private class MethodInfo
+    {
+        public SmalltalkOOP MethodOOP { get; set; }
+    }
+
+    // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
+    ISmalltalkHeapManager IPrimitiveContext.HeapManager => _heapManager;
+    LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
+    bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
+
+    SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
+    {
+        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        return _heapManager.GetInstanceVariable(oop, fieldIndex);
+    }
+
+    void IPrimitiveContext.SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
+    {
+        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        _heapManager.SetInstanceVariable(oop, fieldIndex, value);
+    }
+
+    Memory<byte> IPrimitiveContext.GetByteArray(SmalltalkOOP oop)
+    {
+        int size = _heapManager.GetIndexedSize(oop);
+        if (size == 0)
+            return Memory<byte>.Empty;
+
+        byte[] bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(oop, i);
+        }
+        return bytes;
+    }
+
+    SmalltalkOOP IPrimitiveContext.AllocateObject(string className, int indexedSize)
+    {
+        // Look up class ID from GlobalRegistry
+        string classKey = $"class:{className}";
+        if (!GlobalRegistry.TryGet(classKey, out int classId))
+        {
+            throw new InvalidOperationException($"Class {className} not found in GlobalRegistry");
+        }
+        var classOOP = SmalltalkOOP.FromObjectTableIndex(classId);
+
+        // Get format based on whether object has indexed fields
+        var format = indexedSize > 0
+            ? ObjectFormat.ByteIndexed  // Default for indexed objects (bytes)
+            : ObjectFormat.Pointer;
+
+        // For simplicity, use a basic fixed size - can be refined later
+        int fixedSize = 2; // Basic assumption for most objects
+
+        // Allocate the object
+        var objectOOP = _heapManager.AllocateObject(format, fixedSize, indexedSize);
+        
+        // Set the class reference
+        _heapManager.SetSlot(objectOOP, 0, classOOP);
+        
+        return objectOOP;
+    }
+
+    SmalltalkOOP IPrimitiveContext.SendMessage(SmalltalkOOP receiverOop, SmalltalkOOP selectorOop, SmalltalkOOP argumentsArray)
     {
         // Extract arguments from the array
-        int argCount = _heap.GetIndexedSize(argumentsArray);
-        int[] args = new int[argCount];
+        int argCount = _heapManager.GetIndexedSize(argumentsArray);
+        var args = new SmalltalkOOP[argCount];
         for (int i = 0; i < argCount; i++)
         {
-            args[i] = _heap.GetIndexedField(argumentsArray, i);
+            args[i] = _heapManager.GetIndexedOOP(argumentsArray, i);
         }
 
         // Call the private SendMessage method
         return SendMessage(receiverOop, selectorOop, args);
     }
 
-    int IPrimitiveContext.GetActiveContext()
+    SmalltalkOOP IPrimitiveContext.GetActiveContext()
     {
-        return _activeContextId;
+        return _activeContextOOP;
     }
 
     int IPrimitiveContext.GetInstructionPointer()
     {
         // Get the instruction pointer from the active context
         int ipIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
-        int ipOop = _heap.GetField(_activeContextId, ipIndex);
-        return DecodeSmallInteger(ipOop);
+        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        return ipOOP.AsSmallInteger();
     }
 
-    int IPrimitiveContext.CreateBlockContext(int homeContextOop, int startPC, int argCount)
+    SmalltalkOOP IPrimitiveContext.CreateBlockContext(SmalltalkOOP homeContextOop, int startPC, int argCount)
     {
         // Determine the home context (if current context is already a BlockContext, use its home)
-        int actualHome = homeContextOop;
+        var actualHomeOOP = homeContextOop;
 
         // Check if homeContextOop is a BlockContext - if so, get its home field
         // For simplicity, we'll use the passed homeContextOop directly for now
@@ -1718,13 +1913,16 @@ public class VirtualMachine : IPrimitiveContext
         // Calculate stack size (args + some execution stack space)
         int stackSize = argCount + 16; // 16 slots for execution stack
 
+        // Get BlockContext class ID
+        if (!GlobalRegistry.TryGet("class:BlockContext", out int blockContextClassId))
+        {
+            throw new InvalidOperationException("BlockContext class not found");
+        }
+
         // Allocate BlockContext with indexed fields for stack
-        int blockContextOop = _heap.AllocateRawObject(
-            classId: 0, // TODO: Get BlockContext class ID
-            format: SmalltalkHeap.ObjectFormat.PointerIndexed,
-            fixedSize: 3, // home, startpc, nargs (inherited fields from ContextPart are handled by superclass)
-            indexedSize: stackSize
-        );
+        var blockContextClassOOP = SmalltalkOOP.FromObjectTableIndex(blockContextClassId);
+        var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 3, stackSize);
+        _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
 
         // Get field indices using LayoutResolver
         int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
@@ -1733,23 +1931,24 @@ public class VirtualMachine : IPrimitiveContext
         int stackpIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "stackp");
 
         // Initialize BlockContext fields
-        _heap.SetField(blockContextOop, homeIndex, actualHome);
-        _heap.SetField(blockContextOop, startpcIndex, EncodeSmallInteger(startPC));
-        _heap.SetField(blockContextOop, nargsIndex, EncodeSmallInteger(argCount));
-        _heap.SetField(blockContextOop, stackpIndex, EncodeSmallInteger(0)); // Stack starts empty
+        _heapManager.SetInstanceVariable(blockContextOOP, homeIndex, actualHomeOOP);
+        _heapManager.SetInstanceVariable(blockContextOOP, startpcIndex, SmalltalkOOP.FromSmallInteger(startPC));
+        _heapManager.SetInstanceVariable(blockContextOOP, nargsIndex, SmalltalkOOP.FromSmallInteger(argCount));
+        _heapManager.SetInstanceVariable(blockContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0)); // Stack starts empty
 
         // Initialize indexed fields to nil
         for (int i = 0; i < stackSize; i++)
         {
-            _heap.SetIndexedField(blockContextOop, i, GlobalRegistry.NilObjectId);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId));
         }
 
-        return blockContextOop;
+        return blockContextOOP;
     }
 
-    int IPrimitiveContext.ActivateBlockContext(int blockContextOop, int argumentsArray)
+    SmalltalkOOP IPrimitiveContext.ActivateBlockContext(SmalltalkOOP blockContextOop, SmalltalkOOP argumentsArray)
     {
         // Get block context fields
+        var blockContextOOP = blockContextOop;
         int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
         int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
         int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
@@ -1757,58 +1956,63 @@ public class VirtualMachine : IPrimitiveContext
         int senderIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "sender");
         int pcIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
 
-        int homeOop = _heap.GetField(blockContextOop, homeIndex);
-        int startPcOop = _heap.GetField(blockContextOop, startpcIndex);
-        int nargsOop = _heap.GetField(blockContextOop, nargsIndex);
+        var homeOOP = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+        var startPcOOP = _heapManager.GetInstanceVariable(blockContextOOP, startpcIndex);
+        var nargsOOP = _heapManager.GetInstanceVariable(blockContextOOP, nargsIndex);
 
-        int startPC = DecodeSmallInteger(startPcOop);
-        int expectedArgCount = DecodeSmallInteger(nargsOop);
+        int startPC = startPcOOP.AsSmallInteger();
+        int expectedArgCount = nargsOOP.AsSmallInteger();
 
         // Verify argument count matches
-        int providedArgCount = _heap.GetIndexedSize(argumentsArray);
+        var argumentsOOP = argumentsArray;
+        int providedArgCount = _heapManager.GetIndexedSize(argumentsOOP);
         if (providedArgCount != expectedArgCount)
         {
             // Argument count mismatch - this will cause primitive to fail
-            return GlobalRegistry.NilObjectId;
+            return SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
         }
 
         // Copy arguments into the block context's indexed fields
         for (int i = 0; i < providedArgCount; i++)
         {
-            int argOop = _heap.GetIndexedField(argumentsArray, i);
-            _heap.SetIndexedField(blockContextOop, i, argOop);
+            var argOOP = _heapManager.GetIndexedOOP(argumentsOOP, i);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, argOOP);
         }
 
         // Set up the block context for execution
-        _heap.SetField(blockContextOop, senderIndex, _activeContextId); // Current context becomes sender
-        _heap.SetField(blockContextOop, pcIndex, EncodeSmallInteger(startPC)); // Set PC to start of block
-        _heap.SetField(blockContextOop, stackpIndex, EncodeSmallInteger(expectedArgCount)); // Stack pointer after args
+        _heapManager.SetInstanceVariable(blockContextOOP, senderIndex, _activeContextOOP); // Current context becomes sender
+        _heapManager.SetInstanceVariable(blockContextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(startPC)); // Set PC to start of block
+        _heapManager.SetInstanceVariable(blockContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(expectedArgCount)); // Stack pointer after args
 
         // Save current context and switch to block context
-        int previousContext = _activeContextId;
-        _activeContextId = blockContextOop;
+        var previousContext = _activeContextOOP;
+        _activeContextOOP = blockContextOOP;
 
         // Execute the block
-        int result = ExecuteBytecodeLoop();
+        var result = ExecuteBytecodeLoop();
 
         // Restore previous context
-        _activeContextId = previousContext;
+        _activeContextOOP = previousContext;
 
         return result;
     }
 
-    IEnumerable<int> IPrimitiveContext.GetAllObjects()
+    IEnumerable<SmalltalkOOP> IPrimitiveContext.GetAllObjects()
     {
-        return _heap.GetAllObjects();
+        // TODO: Implement proper enumeration of all objects in the object table
+        // For now, return empty enumerable
+        return Enumerable.Empty<SmalltalkOOP>();
     }
 
-    void IPrimitiveContext.BecomeOneWay(int fromOop, int toOop)
+    void IPrimitiveContext.BecomeOneWay(SmalltalkOOP fromOop, SmalltalkOOP toOop)
     {
-        _heap.BecomeOneWay(fromOop, toOop);
+        // TODO: Implement BecomeOneWay in heap manager
+        // This needs to replace all references to fromOop with toOop
     }
 
-    void IPrimitiveContext.BecomeTwoWay(int oop1, int oop2)
+    void IPrimitiveContext.BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
     {
-        _heap.BecomeTwoWay(oop1, oop2);
+        // TODO: Implement BecomeTwoWay in heap manager
+        // This needs to swap all references between oop1 and oop2
     }
 }

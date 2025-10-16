@@ -1,5 +1,4 @@
-using Smalltalk80.Interpreter.Core.Objects;
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -11,7 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public static class ArithmeticPrimitives
 {
     // Primitive 1: SmallInteger +
-    public static SObjectRef Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Add(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -31,7 +30,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = checked(a + b);
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch (OverflowException)
         {
@@ -41,7 +40,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 2: SmallInteger -
-    public static SObjectRef Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Subtract(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -61,7 +60,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = checked(a - b);
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch (OverflowException)
         {
@@ -71,7 +70,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 3: SmallInteger <
-    public static SObjectRef LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP LessThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -94,7 +93,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 4: SmallInteger >
-    public static SObjectRef GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP GreaterThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -117,7 +116,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 5: SmallInteger <=
-    public static SObjectRef LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP LessOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -140,7 +139,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 6: SmallInteger >=
-    public static SObjectRef GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP GreaterOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -163,7 +162,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 7: SmallInteger =
-    public static SObjectRef Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Equal(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -186,7 +185,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 8: SmallInteger ~=
-    public static SObjectRef NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NotEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -209,7 +208,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 9: SmallInteger *
-    public static SObjectRef Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Multiply(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -229,7 +228,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = checked(a * b);
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch (OverflowException)
         {
@@ -239,7 +238,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 10: SmallInteger /
-    public static SObjectRef Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Divide(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -265,7 +264,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = a / b;
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
         {
@@ -275,7 +274,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 11: SmallInteger \\
-    public static SObjectRef Mod(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Mod(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -301,7 +300,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = a % b;
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
         {
@@ -311,7 +310,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 12: SmallInteger //
-    public static SObjectRef Quo(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Quo(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -337,7 +336,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = a / b;
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
         {
@@ -347,7 +346,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 13: SmallInteger bitAnd:
-    public static SObjectRef BitAnd(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BitAnd(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -365,11 +364,11 @@ public static class ArithmeticPrimitives
         int b = args[0].AsSmallInteger();
 
         int result = a & b;
-        return SObjectRef.FromSmallInteger(result);
+        return SmalltalkOOP.FromSmallInteger(result);
     }
 
     // Primitive 14: SmallInteger bitOr:
-    public static SObjectRef BitOr(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BitOr(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -387,11 +386,11 @@ public static class ArithmeticPrimitives
         int b = args[0].AsSmallInteger();
 
         int result = a | b;
-        return SObjectRef.FromSmallInteger(result);
+        return SmalltalkOOP.FromSmallInteger(result);
     }
 
     // Primitive 15: SmallInteger bitXor:
-    public static SObjectRef BitXor(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BitXor(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -409,11 +408,11 @@ public static class ArithmeticPrimitives
         int b = args[0].AsSmallInteger();
 
         int result = a ^ b;
-        return SObjectRef.FromSmallInteger(result);
+        return SmalltalkOOP.FromSmallInteger(result);
     }
 
     // Primitive 16: SmallInteger bitShift:
-    public static SObjectRef BitShift(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BitShift(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -433,7 +432,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = shift >= 0 ? a << shift : a >> (-shift);
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
         {
@@ -443,7 +442,7 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 17: SmallInteger div:
-    public static SObjectRef Div(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Div(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -469,7 +468,7 @@ public static class ArithmeticPrimitives
         try
         {
             int result = a / b;
-            return SObjectRef.FromSmallInteger(result);
+            return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
         {

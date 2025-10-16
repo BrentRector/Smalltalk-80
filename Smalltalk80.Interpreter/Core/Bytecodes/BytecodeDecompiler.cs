@@ -1,6 +1,6 @@
 using System.Text;
 using Smalltalk80.Core.Bytecodes;
-using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.Bytecodes;
 
@@ -10,20 +10,28 @@ namespace Smalltalk80.Interpreter.Core.Bytecodes;
 /// </summary>
 public class BytecodeDecompiler
 {
-    private readonly SmalltalkHeap _heap;
+    private readonly Dictionary<int, string> _symbolNameLookup;
     private readonly string[] _symbols;
     private readonly int[] _literalIds;
     private readonly string[] _tempNames;
     private readonly string[] _instVarNames;
 
+    /// <summary>
+    /// Initializes a new instance of the BytecodeDecompiler class.
+    /// </summary>
+    /// <param name="symbolNameLookup">Dictionary mapping OOP values to symbol names.</param>
+    /// <param name="symbols">Array of symbol names for the method.</param>
+    /// <param name="literalIds">Array of literal OOP values for the method.</param>
+    /// <param name="tempNames">Array of temporary variable names.</param>
+    /// <param name="instVarNames">Array of instance variable names.</param>
     public BytecodeDecompiler(
-        SmalltalkHeap heap,
+        Dictionary<int, string> symbolNameLookup,
         string[] symbols,
         int[] literalIds,
         string[] tempNames,
         string[] instVarNames)
     {
-        _heap = heap;
+        _symbolNameLookup = symbolNameLookup;
         _symbols = symbols;
         _literalIds = literalIds;
         _tempNames = tempNames;
@@ -809,19 +817,24 @@ public class BytecodeDecompiler
         return result.ToString();
     }
 
+    /// <summary>
+    /// Formats a literal OOP value for display in decompiled source.
+    /// </summary>
+    /// <param name="oop">The OOP value to format.</param>
+    /// <returns>A string representation of the literal.</returns>
     private string FormatLiteral(int oop)
     {
-        // Try to get symbol name
-        string? symbolName = _heap.GetSymbolName(oop);
-        if (symbolName != null)
+        // Try to get symbol name from lookup
+        if (_symbolNameLookup.TryGetValue(oop, out string? symbolName))
         {
             return $"#{symbolName}";
         }
 
         // Try SmallInteger
-        if ((oop & 1) == 1)
+        var smallIntOOP = new SmalltalkOOP(oop);
+        if (smallIntOOP.IsSmallInteger)
         {
-            return (oop >> 1).ToString();
+            return smallIntOOP.AsSmallInteger().ToString();
         }
 
         // For other objects, show OOP

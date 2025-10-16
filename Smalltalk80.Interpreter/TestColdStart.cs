@@ -64,18 +64,7 @@ public class TestColdStart
             var loader = new Loader(bundle, heapManager);
             loader.Run();
 
-            Console.WriteLine("\n=== Cold Start Validation ===");
-
-            // Additional heap statistics
-            var finalStats = heapManager.GarbageCollect();
-            Console.WriteLine($"Final heap state:");
-            Console.WriteLine($"  {finalStats.GetSummary()}");
-            Console.WriteLine($"  Object table size: {heapManager.GetObjectTableSize()}");
-            Console.WriteLine($"  Active objects: {heapManager.GetActiveObjectCount()}");
-
-            // Success
-            Console.WriteLine("\n🎉 Cold start loader test PASSED!");
-            Console.WriteLine("All phases executed successfully and heap validation passed.");
+            // Success - message already printed by Loader
             
             return 0;
         }

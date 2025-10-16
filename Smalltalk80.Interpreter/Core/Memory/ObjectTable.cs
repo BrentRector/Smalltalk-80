@@ -1,8 +1,8 @@
 namespace Smalltalk80.Interpreter.Core.Memory;
 
 using System.Runtime.CompilerServices;
-using Smalltalk80.Interpreter.Core.Values;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 /// <summary>
 /// Segmented Object Table managing Smalltalk object pointers with O(1) allocation.
@@ -241,7 +241,8 @@ public sealed class ObjectTable
 
             foreach (var root in roots)
             {
-                if (root != 0 && !SObjectRef.FromObjectPointer(root).IsSmallInteger)
+                var rootOOP = SmalltalkOOP.FromObjectTableIndex(root);
+                if (rootOOP != SmalltalkOOP.Null && rootOOP.IsObjectPointer)
                 {
                     workList.Enqueue(root);
                 }
@@ -276,7 +277,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (!instVarNamesRef.IsNil && instVarNamesRef.IsHeapObject)
+                        if (instVarNamesRef != SmalltalkOOP.Null && instVarNamesRef.IsObjectPointer)
                         {
                             class9withInstVars++;
                         }
@@ -287,7 +288,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (!instVarNamesRef.IsNil && instVarNamesRef.IsHeapObject)
+                        if (instVarNamesRef != SmalltalkOOP.Null && instVarNamesRef.IsObjectPointer)
                         {
                             class7withInstVars++;
                         }
@@ -312,9 +313,9 @@ public sealed class ObjectTable
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
-        if (!data.ClassRef.IsNil && data.ClassRef.IsHeapObject)
+        if (data.ClassRef != SmalltalkOOP.Null && data.ClassRef.IsObjectPointer)
         {
-            workList.Enqueue(data.ClassRef.AsObjectPointer());
+            workList.Enqueue(data.ClassRef.ToObjectTableIndex());
         }
 
         // Trace instance variables
@@ -329,9 +330,9 @@ public sealed class ObjectTable
 
             foreach (var varRef in data.InstanceVariables)
             {
-                if (!varRef.IsNil && varRef.IsHeapObject)
+                if (varRef != SmalltalkOOP.Null && varRef.IsObjectPointer)
                 {
-                    workList.Enqueue(varRef.AsObjectPointer());
+                    workList.Enqueue(varRef.ToObjectTableIndex());
                 }
             }
         }
@@ -339,20 +340,20 @@ public sealed class ObjectTable
         // Trace indexed data if it contains pointers
         if (data.Format == ObjectFormat.PointerIndexed)
         {
-            if (data.IndexedData is SObjectRef[] indexedRefs)
+            if (data.IndexedData is SmalltalkOOP[] indexedRefs)
             {
                 foreach (var indexedRef in indexedRefs)
                 {
-                    if (!indexedRef.IsNil && indexedRef.IsHeapObject)
+                    if (indexedRef != SmalltalkOOP.Null && indexedRef.IsObjectPointer)
                     {
-                        workList.Enqueue(indexedRef.AsObjectPointer());
+                        workList.Enqueue(indexedRef.ToObjectTableIndex());
                     }
                 }
             }
             else if (enableDetailedLogging)
             {
                 var actualType = data.IndexedData?.GetType().Name ?? "null";
-                Console.WriteLine($"[GC] WARNING: PointerIndexed object has IndexedData type={actualType} instead of SObjectRef[]");
+                Console.WriteLine($"[GC] WARNING: PointerIndexed object has IndexedData type={actualType} instead of SmalltalkOOP[]");
             }
         }
     }

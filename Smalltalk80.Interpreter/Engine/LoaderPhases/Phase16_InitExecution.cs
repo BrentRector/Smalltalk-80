@@ -8,20 +8,20 @@ using Smalltalk80.Interpreter.Core;
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
-/// Phase 11: Prepare Init Expressions
+/// Phase 16: Prepare Init Expressions
 /// Creates method objects for initialization expressions but does NOT add them to SystemDictionary.
 /// Instead, returns an array of init expression methods that will be:
 /// 1. Temporarily stored as a GC root during verification
 /// 2. Executed as DoIts after GC verification passes
 /// 3. Discarded after execution (allowing garbage collection)
 /// </summary>
-public class Phase11_InitExecution
+public class Phase16_InitExecution
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
 
-    public Phase11_InitExecution(ColdStartBundle bundle, SemanticAllocator allocator, Dictionary<string, int> localIdMap)
+    public Phase16_InitExecution(ColdStartBundle bundle, SemanticAllocator allocator, Dictionary<string, SmalltalkOOP> localIdMap)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -34,6 +34,17 @@ public class Phase11_InitExecution
     /// </summary>
     public int Run()
     {
+        // Look up CompiledMethod and ByteArray classes - they were created in Phase2
+        if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
+        {
+            throw new InvalidOperationException("CompiledMethod class not found in _localIdToObjectId - Phase 2 must run first");
+        }
+        
+        if (!_localIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
+        {
+            throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId - Phase 2 must run first");
+        }
+        
         // Create array to hold all init expression method objects
         var initExprMethods = new List<int>();
 
@@ -55,10 +66,12 @@ public class Phase11_InitExecution
                     Bytecodes = expr.Bytecodes
                 },
                 literalOOPs,
-                bytecodes);
+                bytecodes,
+                compiledMethodClassOOP,
+                byteArrayClassOOP);
 
             initExprMethods.Add(initMethodId);
-            _localIdToObjectId[expr.LocalId] = initMethodId;
+            _localIdToObjectId[expr.LocalId] = SmalltalkOOP.FromObjectTableIndex(initMethodId);
         }
 
         // Return the array (or 0 if no init expressions)
@@ -83,14 +96,14 @@ public class Phase11_InitExecution
         return literal.Type switch
         {
             "symbol" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_bundle.Symbols[literal.Index!.Value])),
-            "string" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Symbols[literal.Index!.Value])),
+            "string" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Strings[literal.Index!.Value])),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(literal.Value!))),
             "nil" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
             "true" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.TrueObjectId),
             "false" => SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.FalseObjectId),
-            "objectRef" => SmalltalkOOP.FromObjectTableIndex(_localIdToObjectId[literal.LocalId!]),
-            "compiledMethod" => SmalltalkOOP.FromObjectTableIndex(_localIdToObjectId[literal.LocalId!]),
+            "objectRef" => _localIdToObjectId[literal.LocalId!],
+            "compiledMethod" => _localIdToObjectId[literal.LocalId!],
             "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(literal.CodePoint!.Value)),
             "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(literal.Encoding!, literal.Data!)),
             "association" => SmalltalkOOP.FromObjectTableIndex(ResolveAssociation(literal.Association!)),
@@ -124,30 +137,31 @@ public class Phase11_InitExecution
     /// Creates a CompiledMethod object using the new PointerIndexed design.
     /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
-    private int CreateCompiledMethod(MethodDescriptor method, SmalltalkOOP[] literalOOPs, byte[] bytecodes)
+    private int CreateCompiledMethod(
+        MethodDescriptor method, 
+        SmalltalkOOP[] literalOOPs, 
+        byte[] bytecodes,
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP)
     {
-        // Look up CompiledMethod class layout
-        var compiledMethodClassDefinition = FindClassDefinition("CompiledMethod");
-        if (compiledMethodClassDefinition == null)
-        {
-            throw new InvalidOperationException("CompiledMethod class not found in bundle");
-        }
-
         // Calculate OOP slots: header + literals + bytecode array reference  
         // (AllocateCompiledMethod will create the ByteArray internally)
         int oopSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
-        int totalWords = CalculateTotalInstanceVariableCount(compiledMethodClassDefinition) + oopSlots;
-        
+        int totalWords = 0 + oopSlots; // CompiledMethod has no instance variables
         
         if (totalWords > 255)
         {
             throw new InvalidOperationException($"Init expression {method.LocalId} too large: {totalWords} words (literals: {literalOOPs.Length}, bytecodes: {bytecodes.Length})");
         }
         
-        var methodOOP = _allocator.AllocateCompiledMethod("CompiledMethod", method.Header.Word, literalOOPs, bytecodes);
+        var methodOOP = _allocator.AllocateCompiledMethod(
+            compiledMethodClassOOP,
+            byteArrayClassOOP,
+            method.Header.Word, 
+            literalOOPs, 
+            bytecodes);
 
-        // AllocateCompiledMethod already sets up the header, literals, and bytecode array reference
-        return methodOOP.AsObjectTableIndex();
+        return methodOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -185,7 +199,7 @@ public class Phase11_InitExecution
             _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
         }
 
-        return arrayOOP.AsObjectTableIndex();
+        return arrayOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -223,7 +237,7 @@ public class Phase11_InitExecution
         // Allocate string object (AllocateString handles the bytes internally)
         var stringOOP = _allocator.AllocateString(value);
         
-        return stringOOP.AsObjectTableIndex();
+        return stringOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -232,7 +246,7 @@ public class Phase11_InitExecution
     private int EncodeSmallInteger(int value)
     {
         var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.AsObjectTableIndex();
+        return smallIntOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -249,7 +263,7 @@ public class Phase11_InitExecution
 
         var floatOOP = _allocator.AllocateFloat(value);
 
-        return floatOOP.AsObjectTableIndex();
+        return floatOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -270,7 +284,7 @@ public class Phase11_InitExecution
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
 
-        return characterOOP.AsObjectTableIndex();
+        return characterOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -295,7 +309,7 @@ public class Phase11_InitExecution
 
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
 
-        return byteArrayOOP.AsObjectTableIndex();
+        return byteArrayOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -317,7 +331,7 @@ public class Phase11_InitExecution
         _allocator.SetInstanceVariable(associationOOP, 0, SmalltalkOOP.FromObjectTableIndex(keyId));
         _allocator.SetInstanceVariable(associationOOP, 1, SmalltalkOOP.FromObjectTableIndex(valueId));
         
-        return associationOOP.AsObjectTableIndex();
+        return associationOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -372,13 +386,13 @@ public class Phase11_InitExecution
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
+                    if (assocOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId) continue;
 
                     var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
-                    if (assocKeyOOP.AsObjectTableIndex() == keyId)
+                    if (assocKeyOOP.ToObjectTableIndex() == keyId)
                     {
                         // Found the existing association - reuse it!
-                        return assocOOP.AsObjectTableIndex();
+                        return assocOOP.ToObjectTableIndex();
                     }
                 }
             }
@@ -386,7 +400,7 @@ public class Phase11_InitExecution
 
         // Fall back to creating new association
         int valueId = assoc.ValueRef?.LocalId != null
-            ? _localIdToObjectId[assoc.ValueRef.LocalId]
+            ? _localIdToObjectId[assoc.ValueRef.LocalId].ToObjectTableIndex()
             : GlobalRegistry.NilObjectId;
 
         return AllocateAssociation(keyId, valueId);

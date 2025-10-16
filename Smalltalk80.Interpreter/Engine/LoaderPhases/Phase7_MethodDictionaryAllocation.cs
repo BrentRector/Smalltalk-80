@@ -21,13 +21,13 @@ public class Phase7_MethodDictionaryAllocation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
 
     public Phase7_MethodDictionaryAllocation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         IReadOnlyList<string> symbols)
     {
         _bundle = bundle;
@@ -38,7 +38,6 @@ public class Phase7_MethodDictionaryAllocation
 
     public void Run()
     {
-        Console.WriteLine($"DEBUG: Allocating method dictionaries for {_bundle.Classes.Length} classes...");
 
         // Group methods by home class to count them
         var methodCounts = new Dictionary<string, int>();
@@ -54,7 +53,7 @@ public class Phase7_MethodDictionaryAllocation
 
         foreach (var cls in _bundle.Classes)
         {
-            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
+            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
             {
                 Console.WriteLine($"WARNING: Class not found in localIdToObjectId: {cls.LocalId}");
                 continue;
@@ -69,20 +68,13 @@ public class Phase7_MethodDictionaryAllocation
             int methodDictId = AllocateMethodDictionary(dictionarySize);
             
             // Set the method dictionary as instance variable 1 in the class
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
             var methodDictOOP = SmalltalkOOP.FromObjectTableIndex(methodDictId);
             _allocator.SetInstanceVariable(classOOP, 1, methodDictOOP);
             
             allocatedDictionaries++;
 
-            if (allocatedDictionaries % 50 == 0)
-            {
-                Console.WriteLine($"DEBUG: Allocated {allocatedDictionaries} method dictionaries so far...");
-            }
         }
 
-        Console.WriteLine($"DEBUG: Method dictionary allocation complete:");
-        Console.WriteLine($"  Allocated dictionaries: {allocatedDictionaries}");
     }
 
     /// <summary>
@@ -120,7 +112,7 @@ public class Phase7_MethodDictionaryAllocation
             _allocator.SetIndexedOOP(methodDictOOP, i, nilOOP);
         }
 
-        return methodDictOOP.AsObjectTableIndex();
+        return methodDictOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -146,7 +138,7 @@ public class Phase7_MethodDictionaryAllocation
             _allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
         }
 
-        return arrayOOP.AsObjectTableIndex();
+        return arrayOOP.ToObjectTableIndex();
     }
 
     /// <summary>

@@ -8,7 +8,7 @@ using Smalltalk80.Interpreter.Core;
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
-/// Phase 14: Comprehensive Heap Validation
+/// Phase 13: Comprehensive Heap Validation
 /// Performs complete validation of heap objects against JSON bundle definitions:
 /// - All classes match their JSON structure
 /// - All methods match their JSON structure  
@@ -16,17 +16,17 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// - All references are valid and match expected types
 /// This comprehensive validation helps diagnose heap corruption and GC issues.
 /// </summary>
-public class Phase14_ComprehensiveValidation
+public class Phase13_ComprehensiveValidation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly string[] _symbols;
 
-    public Phase14_ComprehensiveValidation(
+    public Phase13_ComprehensiveValidation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         string[] symbols)
     {
         _bundle = bundle;
@@ -37,8 +37,6 @@ public class Phase14_ComprehensiveValidation
 
     public void Run()
     {
-        Console.WriteLine("Phase 14: Comprehensive Heap Validation...");
-        
         var results = new ValidationResults();
         
         // 1. Validate all classes
@@ -66,24 +64,23 @@ public class Phase14_ComprehensiveValidation
         
         foreach (var classDesc in _bundle.Classes)
         {
-            if (!_localIdToObjectId.TryGetValue(classDesc.LocalId, out int classOop))
+            if (!_localIdToObjectId.TryGetValue(classDesc.LocalId, out SmalltalkOOP classOOP))
             {
                 results.AddError($"Class {GetClassName(classDesc)} not found in heap (localId: {classDesc.LocalId})");
                 continue;
             }
             
-            ValidateClassObject(classDesc, classOop, results);
+            ValidateClassObject(classDesc, classOOP, results);
         }
     }
 
-    private void ValidateClassObject(ClassDescriptor classDesc, int classOop, ValidationResults results)
+    private void ValidateClassObject(ClassDescriptor classDesc, SmalltalkOOP classOOP, ValidationResults results)
     {
         string className = GetClassName(classDesc);
-        var classOOP = SmalltalkOOP.FromObjectTableIndex(classOop);
         
         if (!_allocator.IsValidObjectOOP(classOOP))
         {
-            results.AddError($"Class {className} has invalid OOP {classOop}");
+            results.AddError($"Class {className} has invalid OOP {classOOP.ToObjectTableIndex()}");
             return;
         }
         
@@ -115,23 +112,22 @@ public class Phase14_ComprehensiveValidation
         
         foreach (var method in _bundle.Methods)
         {
-            if (!_localIdToObjectId.TryGetValue(method.LocalId, out int methodOop))
+            if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
             {
                 results.AddError($"Method {method.LocalId} not found in heap");
                 continue;
             }
             
-            ValidateMethodObject(method, methodOop, results);
+            ValidateMethodObject(method, methodOOP, results);
         }
     }
 
-    private void ValidateMethodObject(MethodDescriptor method, int methodOop, ValidationResults results)
+    private void ValidateMethodObject(MethodDescriptor method, SmalltalkOOP methodOOP, ValidationResults results)
     {
-        var methodOOP = SmalltalkOOP.FromObjectTableIndex(methodOop);
         
         if (!_allocator.IsValidObjectOOP(methodOOP))
         {
-            results.AddError($"Method {method.LocalId} has invalid OOP {methodOop}");
+            results.AddError($"Method {method.LocalId} has invalid OOP {methodOOP.ToObjectTableIndex()}");
             return;
         }
         
@@ -210,21 +206,6 @@ public class Phase14_ComprehensiveValidation
                 byte[] expectedBytecodes = ClassHierarchyUtils.DecodeBytecodes(method.Bytecodes);
                 int actualBytecodeSize = _allocator.GetIndexedSize(bytecodeArrayOOP);
                 
-                // DEBUG: Log details for problematic methods
-                if (method.LocalId.Contains("ActionMenu") && method.LocalId.Contains("setSelectors"))
-                {
-                    Console.WriteLine($"DEBUG Phase14: Method {method.LocalId}");
-                    Console.WriteLine($"  Expected bytecodes: [{string.Join(", ", expectedBytecodes)}] (length: {expectedBytecodes.Length})");
-                    Console.WriteLine($"  Actual bytecode size in heap: {actualBytecodeSize}");
-                    
-                    // Read actual bytecodes from heap
-                    byte[] actualBytecodes = new byte[actualBytecodeSize];
-                    for (int i = 0; i < actualBytecodeSize; i++)
-                    {
-                        actualBytecodes[i] = _allocator.GetIndexedByte(bytecodeArrayOOP, i);
-                    }
-                    Console.WriteLine($"  Actual bytecodes in heap: [{string.Join(", ", actualBytecodes)}]");
-                }
                 
                 if (actualBytecodeSize != expectedBytecodes.Length)
                 {
@@ -317,7 +298,7 @@ public class Phase14_ComprehensiveValidation
         
         foreach (var kvp in _localIdToObjectId)
         {
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(kvp.Value);
+            var objectOOP = kvp.Value;
             if (!_allocator.IsValidObjectOOP(objectOOP))
             {
                 continue; // Skip invalid objects (already reported)
@@ -331,7 +312,7 @@ public class Phase14_ComprehensiveValidation
                 var classOOP = _allocator.GetClassOOP(objectOOP);
                 if (!classOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(classOOP))
                 {
-                    results.AddError($"Object {kvp.Key} has invalid class OOP {classOOP.AsObjectTableIndex()}");
+                    results.AddError($"Object {kvp.Key} has invalid class OOP {classOOP.ToObjectTableIndex()}");
                     invalidReferences++;
                 }
             }
@@ -350,7 +331,7 @@ public class Phase14_ComprehensiveValidation
                     var instVarOOP = _allocator.GetInstanceVariable(objectOOP, i);
                     if (!instVarOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(instVarOOP))
                     {
-                        results.AddError($"Object {kvp.Key} instance variable {i} has invalid OOP {instVarOOP.AsObjectTableIndex()}");
+                        results.AddError($"Object {kvp.Key} instance variable {i} has invalid OOP {instVarOOP.ToObjectTableIndex()}");
                         invalidReferences++;
                     }
                 }
@@ -373,7 +354,7 @@ public class Phase14_ComprehensiveValidation
                         var indexedOOP = _allocator.GetIndexedOOP(objectOOP, i);
                         if (!indexedOOP.IsSmallInteger && !_allocator.IsValidObjectOOP(indexedOOP))
                         {
-                            results.AddError($"Object {kvp.Key} indexed field {i} has invalid OOP {indexedOOP.AsObjectTableIndex()}");
+                            results.AddError($"Object {kvp.Key} indexed field {i} has invalid OOP {indexedOOP.ToObjectTableIndex()}");
                             invalidReferences++;
                         }
                     }

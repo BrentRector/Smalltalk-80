@@ -227,7 +227,7 @@ public class SemanticAllocator
     {
         // For now, use well-known class mappings to determine instance variable counts
         // This is accurate for the common cases and safer during bootstrap
-        int classId = classOOP.AsObjectTableIndex();
+        int classId = classOOP.ToObjectTableIndex();
         
         // Look up well-known classes by their object IDs
         if (classId == GlobalRegistry.LookupClassObjectId("Array"))
@@ -459,7 +459,7 @@ public class SemanticAllocator
         // Get class OOP and check if it's the CompiledMethod class
         var classOOP = _heapManager.GetClassOOP(objectOOP);
         int compiledMethodClassId = GlobalRegistry.LookupClassObjectId("CompiledMethod");
-        return classOOP.AsObjectTableIndex() == compiledMethodClassId;
+        return classOOP.ToObjectTableIndex() == compiledMethodClassId;
     }
 
     /// <summary>
@@ -492,29 +492,33 @@ public class SemanticAllocator
     /// - objectAt: 2 → literal1 (our indexed slot 1) 
     /// - at: 1 → first bytecode (via hidden ByteArray reference)
     /// </summary>
-    public SmalltalkOOP AllocateCompiledMethod(string className, int headerWord, SmalltalkOOP[] literalOOPs, byte[] bytecodes)
+    public SmalltalkOOP AllocateCompiledMethod(
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP,
+        int headerWord, 
+        SmalltalkOOP[] literalOOPs, 
+        byte[] bytecodes)
     {
-        int fixedSlots = CalculateInstanceVariableCount(className);
+        // CompiledMethod has no instance variables, only indexed slots
+        int fixedSlots = 0;
         int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
         
-        // Step 1: Create separate ByteArray for bytecodes
-        var bytecodeArrayOOP = AllocateByteArray("ByteArray", bytecodes);
-        // Set ByteArray class reference (since this is called after Phase Y)
-        int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
-        var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
-        SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
+        // Step 1: Create separate ByteArray for bytecodes with proper class reference
+        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
+        _heapManager.SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
+        for (int i = 0; i < bytecodes.Length; i++)
+        {
+            _heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
+        }
         
-        // Step 2: Allocate PointerIndexed CompiledMethod
+        // Step 2: Allocate PointerIndexed CompiledMethod with proper class reference
         var methodOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
+        _heapManager.SetSlot(methodOOP, 0, compiledMethodClassOOP);
         
-        // Step 3: Set class reference in hidden slot 0 (since this is called after Phase Y)
-        int classObjectId = GlobalRegistry.LookupClassObjectId(className);
-        var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
-        SetSlot(methodOOP, 0, classOOP);
-        
-        // Step 4: Populate indexed slots
+        // Step 3: Populate indexed slots
         // Indexed slot 0: Method header (accessed via objectAt: 1)
-        _heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
+        var headerOOP = SmalltalkOOP.FromSmallInteger(headerWord);
+        _heapManager.SetIndexedOOP(methodOOP, 0, headerOOP);
         
         // Slots 1..N: Literals (accessed via objectAt: 2, objectAt: 3, etc.)
         for (int i = 0; i < literalOOPs.Length; i++)

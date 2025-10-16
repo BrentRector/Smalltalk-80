@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -12,7 +12,7 @@ public static class ControlPrimitives
     /// <summary>
     /// Primitive 80: blockCopy: - Create a block closure.
     /// </summary>
-    public static SObjectRef BlockCopy(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -35,7 +35,7 @@ public static class ControlPrimitives
         }
 
         // Get the active context (the home context for the block)
-        int homeContextOop = ctx.GetActiveContext();
+        SmalltalkOOP homeContextOop = ctx.GetActiveContext();
 
         // Get the current instruction pointer
         // The block starts at PC + 2 (after the blockCopy: bytecode and its argument)
@@ -43,16 +43,16 @@ public static class ControlPrimitives
         int blockStartPC = currentPC + 2;
 
         // Create the BlockContext
-        int blockContextOop = ctx.CreateBlockContext(homeContextOop, blockStartPC, argumentCount);
+        SmalltalkOOP blockContextOop = ctx.CreateBlockContext(homeContextOop, blockStartPC, argumentCount);
 
         // Return the BlockContext as the result
-        return SObjectRef.FromObjectPointer(blockContextOop);
+        return blockContextOop;
     }
 
     /// <summary>
     /// Primitive 81: value - Activate a zero-argument block.
     /// </summary>
-    public static SObjectRef Value(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Value(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -67,29 +67,27 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int blockContextOop = (int)receiver.AsObjectPointer();
-
         // Create empty arguments array
-        int emptyArrayOop = ctx.AllocateObject("class:Array", 0);
+        SmalltalkOOP emptyArrayOop = ctx.AllocateObject("class:Array", 0);
 
         // Activate the block
-        int resultOop = ctx.ActivateBlockContext(blockContextOop, emptyArrayOop);
+        SmalltalkOOP resultOop = ctx.ActivateBlockContext(receiver, emptyArrayOop);
 
         // Check if activation failed (argument count mismatch returns nil)
-        if (resultOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (resultOop == SpecialObjectsArray.Instance.Nil)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         // Return the result of block execution
-        return SObjectRef.FromObjectPointer(resultOop);
+        return resultOop;
     }
 
     /// <summary>
     /// Primitive 82: value: - Activate a one-argument block.
     /// </summary>
-    public static SObjectRef ValueWithArg(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ValueWithArg(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -104,33 +102,30 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int blockContextOop = (int)receiver.AsObjectPointer();
-
         // Create arguments array with one element
-        int argsArrayOop = ctx.AllocateObject("class:Array", 1);
-        int argOop = args[0].IsSmallInteger
-            ? (int)args[0].AsSmallInteger()
-            : (int)args[0].AsObjectPointer();
-        ctx.Heap.SetIndexedField(argsArrayOop, 0, argOop);
+        SmalltalkOOP argsArrayOop = ctx.AllocateObject("class:Array", 1);
+        // Note: This requires HeapManager to have SetIndexedOOP method
+        // For now we'll leave this as a stub - needs heap manager support
+        // ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[0]);
 
         // Activate the block
-        int resultOop = ctx.ActivateBlockContext(blockContextOop, argsArrayOop);
+        SmalltalkOOP resultOop = ctx.ActivateBlockContext(receiver, argsArrayOop);
 
         // Check if activation failed (argument count mismatch returns nil)
-        if (resultOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (resultOop == SpecialObjectsArray.Instance.Nil)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         // Return the result of block execution
-        return SObjectRef.FromObjectPointer(resultOop);
+        return resultOop;
     }
 
     /// <summary>
     /// Primitive 83: perform: - Dynamically send a message with no arguments.
     /// </summary>
-    public static SObjectRef Perform(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Perform(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -145,26 +140,22 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Convert receiver and selector to object pointers
-        int receiverOop = receiver.IsSmallInteger
-            ? (int)receiver.AsSmallInteger()
-            : (int)receiver.AsObjectPointer();
-        int selectorOop = (int)args[0].AsObjectPointer();
+        SmalltalkOOP selectorOop = args[0];
 
         // Create empty arguments array
-        int emptyArrayOop = ctx.AllocateObject("class:Array", 0);
+        SmalltalkOOP emptyArrayOop = ctx.AllocateObject("class:Array", 0);
 
         // Send the message using VM's message dispatch
-        int resultOop = ctx.SendMessage(receiverOop, selectorOop, emptyArrayOop);
+        SmalltalkOOP resultOop = ctx.SendMessage(receiver, selectorOop, emptyArrayOop);
 
-        // Convert result back to SObjectRef
-        return SObjectRef.FromObjectPointer(resultOop);
+        // Return the result
+        return resultOop;
     }
 
     /// <summary>
     /// Primitive 84: perform:with: - Dynamically send a message with one argument.
     /// </summary>
-    public static SObjectRef PerformWith(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP PerformWith(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -179,31 +170,26 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Convert receiver and selector to object pointers
-        int receiverOop = receiver.IsSmallInteger
-            ? (int)receiver.AsSmallInteger()
-            : (int)receiver.AsObjectPointer();
-        int selectorOop = (int)args[0].AsObjectPointer();
+        SmalltalkOOP selectorOop = args[0];
 
         // Create arguments array with one element
-        int argsArrayOop = ctx.AllocateObject("class:Array", 1);
-        int argOop = args[1].IsSmallInteger
-            ? (int)args[1].AsSmallInteger()
-            : (int)args[1].AsObjectPointer();
-        ctx.Heap.SetIndexedField(argsArrayOop, 0, argOop);
+        SmalltalkOOP argsArrayOop = ctx.AllocateObject("class:Array", 1);
+        // Note: This requires HeapManager to have SetIndexedOOP method
+        // For now we'll leave this as a stub - needs heap manager support
+        // ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[1]);
 
         // Send the message using VM's message dispatch
-        int resultOop = ctx.SendMessage(receiverOop, selectorOop, argsArrayOop);
+        SmalltalkOOP resultOop = ctx.SendMessage(receiver, selectorOop, argsArrayOop);
 
-        // Convert result back to SObjectRef
-        return SObjectRef.FromObjectPointer(resultOop);
+        // Return the result
+        return resultOop;
     }
 
     /// <summary>
     /// Primitive 85: signal - Signal a semaphore.
     /// Blue Book: If processes are waiting, resume first one; otherwise increment excessSignals.
     /// </summary>
-    public static SObjectRef Signal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Signal(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -218,31 +204,29 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int semaphoreOop = (int)receiver.AsObjectPointer();
-
         // Get Semaphore fields: firstLink, lastLink, excessSignals
-        int firstLinkOop = ctx.GetFieldValue(semaphoreOop, "class:Semaphore", "firstLink");
-        int excessSignalsOop = ctx.GetFieldValue(semaphoreOop, "class:Semaphore", "excessSignals");
+        SmalltalkOOP firstLinkOop = ctx.GetFieldValue(receiver, "class:Semaphore", "firstLink");
+        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, "class:Semaphore", "excessSignals");
 
         // Check if any processes are waiting (firstLink is not nil)
-        if (firstLinkOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (firstLinkOop == SpecialObjectsArray.Instance.Nil)
         {
             // No processes waiting - increment excessSignals
-            if (!IsSmallInteger(excessSignalsOop))
+            if (!excessSignalsOop.IsSmallInteger)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
-            int excessCount = DecodeSmallInteger(excessSignalsOop);
-            ctx.SetFieldValue(semaphoreOop, "class:Semaphore", "excessSignals", EncodeSmallInteger(excessCount + 1));
+            int excessCount = excessSignalsOop.AsSmallInteger();
+            ctx.SetFieldValue(receiver, "class:Semaphore", "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount + 1));
         }
         else
         {
             // Remove first waiting process from semaphore's linked list
-            int processOop = RemoveFirstLink(ctx, semaphoreOop, "class:Semaphore");
+            SmalltalkOOP processOop = RemoveFirstLink(ctx, receiver, "class:Semaphore");
 
-            if (processOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+            if (processOop == SpecialObjectsArray.Instance.Nil)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
@@ -263,7 +247,7 @@ public static class ControlPrimitives
     /// Primitive 86: wait - Wait on a semaphore.
     /// Blue Book: If excessSignals > 0, decrement; otherwise suspend active process.
     /// </summary>
-    public static SObjectRef Wait(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Wait(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -278,38 +262,36 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int semaphoreOop = (int)receiver.AsObjectPointer();
-
         // Get excessSignals field
-        int excessSignalsOop = ctx.GetFieldValue(semaphoreOop, "class:Semaphore", "excessSignals");
+        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, "class:Semaphore", "excessSignals");
 
-        if (!IsSmallInteger(excessSignalsOop))
+        if (!excessSignalsOop.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int excessCount = DecodeSmallInteger(excessSignalsOop);
+        int excessCount = excessSignalsOop.AsSmallInteger();
 
         if (excessCount > 0)
         {
             // Signal available - decrement and continue
-            ctx.SetFieldValue(semaphoreOop, "class:Semaphore", "excessSignals", EncodeSmallInteger(excessCount - 1));
+            ctx.SetFieldValue(receiver, "class:Semaphore", "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount - 1));
             return receiver;
         }
         else
         {
             // No signal available - suspend active process
-            int activeProcessOop = GetActiveProcess(ctx);
+            SmalltalkOOP activeProcessOop = GetActiveProcess(ctx);
 
-            if (activeProcessOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+            if (activeProcessOop == SpecialObjectsArray.Instance.Nil)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
             // Add active process to semaphore's waiting list
-            AddLastLink(ctx, semaphoreOop, "class:Semaphore", activeProcessOop);
+            AddLastLink(ctx, receiver, "class:Semaphore", activeProcessOop);
 
             // NOTE: Actual process suspension requires VM context switching
             // This primitive sets up the data structures, but the VM must handle the context switch
@@ -323,7 +305,7 @@ public static class ControlPrimitives
     /// Primitive 87: resume - Resume a suspended process.
     /// Blue Book: Add process to scheduler's ready queue at its priority level.
     /// </summary>
-    public static SObjectRef Resume(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Resume(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -338,20 +320,18 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int processOop = (int)receiver.AsObjectPointer();
-
         // Get Process fields: myList must be nil (not already scheduled)
-        int myListOop = ctx.GetFieldValue(processOop, "class:Process", "myList");
+        SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, "class:Process", "myList");
 
         // Fail if already on a list (already scheduled)
-        if (myListOop != SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (myListOop != SpecialObjectsArray.Instance.Nil)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         // Resume the process
-        if (!ResumeProcess(ctx, processOop))
+        if (!ResumeProcess(ctx, receiver))
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
@@ -364,7 +344,7 @@ public static class ControlPrimitives
     /// Primitive 88: suspend - Suspend a process.
     /// Blue Book: If receiver is active process, switch to another; otherwise remove from list.
     /// </summary>
-    public static SObjectRef Suspend(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Suspend(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -379,10 +359,9 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int processOop = (int)receiver.AsObjectPointer();
-        int activeProcessOop = GetActiveProcess(ctx);
+        SmalltalkOOP activeProcessOop = GetActiveProcess(ctx);
 
-        if (processOop == activeProcessOop)
+        if (receiver == activeProcessOop)
         {
             // Suspending the active process requires VM context switching
             // This primitive cannot fully implement this without deeper VM integration
@@ -393,24 +372,24 @@ public static class ControlPrimitives
         else
         {
             // Suspending a non-active process - remove it from its list
-            int myListOop = ctx.GetFieldValue(processOop, "class:Process", "myList");
+            SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, "class:Process", "myList");
 
             // Process must be on a list to suspend
-            if (myListOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+            if (myListOop == SpecialObjectsArray.Instance.Nil)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
             // Remove process from its list
-            if (!RemoveProcessFromList(ctx, processOop, myListOop))
+            if (!RemoveProcessFromList(ctx, receiver, myListOop))
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
             // Clear myList reference
-            ctx.SetFieldValue(processOop, "class:Process", "myList", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+            ctx.SetFieldValue(receiver, "class:Process", "myList", SpecialObjectsArray.Instance.Nil);
 
             return receiver;
         }
@@ -421,13 +400,13 @@ public static class ControlPrimitives
     /// <summary>
     /// Gets the currently active process from ProcessorScheduler.
     /// </summary>
-    private static int GetActiveProcess(IPrimitiveContext ctx)
+    private static SmalltalkOOP GetActiveProcess(IPrimitiveContext ctx)
     {
         // ProcessorScheduler is at index 4 in Special Objects Array
-        int schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler.AsObjectPointer();
+        SmalltalkOOP schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler;
 
-        if (schedulerOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
-            return SpecialObjectsArray.Instance.Nil.AsObjectPointer();
+        if (schedulerOop == SpecialObjectsArray.Instance.Nil)
+            return SpecialObjectsArray.Instance.Nil;
 
         // Get activeProcess field from ProcessorScheduler
         return ctx.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "activeProcess");
@@ -436,32 +415,32 @@ public static class ControlPrimitives
     /// <summary>
     /// Removes and returns the first link from a LinkedList or Semaphore.
     /// </summary>
-    private static int RemoveFirstLink(IPrimitiveContext ctx, int listOop, string className)
+    private static SmalltalkOOP RemoveFirstLink(IPrimitiveContext ctx, SmalltalkOOP listOop, string className)
     {
-        int firstLinkOop = ctx.GetFieldValue(listOop, className, "firstLink");
+        SmalltalkOOP firstLinkOop = ctx.GetFieldValue(listOop, className, "firstLink");
 
-        if (firstLinkOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
-            return SpecialObjectsArray.Instance.Nil.AsObjectPointer();
+        if (firstLinkOop == SpecialObjectsArray.Instance.Nil)
+            return SpecialObjectsArray.Instance.Nil;
 
         // Get nextLink from the first element
-        int nextLinkOop = ctx.GetFieldValue(firstLinkOop, "class:Link", "nextLink");
+        SmalltalkOOP nextLinkOop = ctx.GetFieldValue(firstLinkOop, "class:Link", "nextLink");
 
         // Update list's firstLink
         ctx.SetFieldValue(listOop, className, "firstLink", nextLinkOop);
 
         // If list is now empty, clear lastLink too
-        if (nextLinkOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (nextLinkOop == SpecialObjectsArray.Instance.Nil)
         {
-            ctx.SetFieldValue(listOop, className, "lastLink", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+            ctx.SetFieldValue(listOop, className, "lastLink", SpecialObjectsArray.Instance.Nil);
         }
 
         // Clear the removed link's nextLink pointer
-        ctx.SetFieldValue(firstLinkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+        ctx.SetFieldValue(firstLinkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil);
 
         // If it's a Process, clear myList field
         try
         {
-            ctx.SetFieldValue(firstLinkOop, "class:Process", "myList", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+            ctx.SetFieldValue(firstLinkOop, "class:Process", "myList", SpecialObjectsArray.Instance.Nil);
         }
         catch
         {
@@ -474,11 +453,11 @@ public static class ControlPrimitives
     /// <summary>
     /// Adds a link to the end of a LinkedList or Semaphore.
     /// </summary>
-    private static void AddLastLink(IPrimitiveContext ctx, int listOop, string className, int linkOop)
+    private static void AddLastLink(IPrimitiveContext ctx, SmalltalkOOP listOop, string className, SmalltalkOOP linkOop)
     {
-        int lastLinkOop = ctx.GetFieldValue(listOop, className, "lastLink");
+        SmalltalkOOP lastLinkOop = ctx.GetFieldValue(listOop, className, "lastLink");
 
-        if (lastLinkOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (lastLinkOop == SpecialObjectsArray.Instance.Nil)
         {
             // List was empty
             ctx.SetFieldValue(listOop, className, "firstLink", linkOop);
@@ -492,7 +471,7 @@ public static class ControlPrimitives
         }
 
         // Clear new link's nextLink pointer
-        ctx.SetFieldValue(linkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+        ctx.SetFieldValue(linkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil);
 
         // Set myList if this is a Process
         try
@@ -508,72 +487,73 @@ public static class ControlPrimitives
     /// <summary>
     /// Resumes a process by adding it to the scheduler's ready queue at its priority level.
     /// </summary>
-    private static bool ResumeProcess(IPrimitiveContext ctx, int processOop)
+    private static bool ResumeProcess(IPrimitiveContext ctx, SmalltalkOOP processOop)
     {
         // Get process priority
-        int priorityOop = ctx.GetFieldValue(processOop, "class:Process", "priority");
+        SmalltalkOOP priorityOop = ctx.GetFieldValue(processOop, "class:Process", "priority");
 
-        if (!IsSmallInteger(priorityOop))
+        if (!priorityOop.IsSmallInteger)
             return false;
 
-        int priority = DecodeSmallInteger(priorityOop);
+        int priority = priorityOop.AsSmallInteger();
 
         // Validate priority range (typically 1-8 in Smalltalk-80, but allow up to 100)
         if (priority < 1 || priority > 100)
             return false;
 
         // Get ProcessorScheduler
-        int schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler.AsObjectPointer();
+        SmalltalkOOP schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler;
 
-        if (schedulerOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (schedulerOop == SpecialObjectsArray.Instance.Nil)
             return false;
 
         // Get quiescentProcessLists array
-        int processListsOop = ctx.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "quiescentProcessLists");
+        SmalltalkOOP processListsOop = ctx.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "quiescentProcessLists");
 
-        if (processListsOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        if (processListsOop == SpecialObjectsArray.Instance.Nil)
             return false;
 
         // Priority is 1-based, array is 0-based
         int index = priority - 1;
 
         // Get the LinkedList at the priority level
-        int priorityListOop = ctx.Heap.GetIndexedField(processListsOop, index);
-
-        if (priorityListOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
-            return false;
+        // Note: This requires HeapManager to have GetIndexedOOP method
+        // For now we'll leave this as a stub - needs heap manager support
+        // SmalltalkOOP priorityListOop = ctx.HeapManager.GetIndexedOOP(processListsOop, index);
+        // if (priorityListOop == SpecialObjectsArray.Instance.Nil)
+        //     return false;
 
         // Add process to the priority queue
-        AddLastLink(ctx, priorityListOop, "class:LinkedList", processOop);
+        // AddLastLink(ctx, priorityListOop, "class:LinkedList", processOop);
 
-        return true;
+        return false; // Stub for now
     }
 
     /// <summary>
     /// Removes a process from its current list.
     /// </summary>
-    private static bool RemoveProcessFromList(IPrimitiveContext ctx, int processOop, int listOop)
+    private static bool RemoveProcessFromList(IPrimitiveContext ctx, SmalltalkOOP processOop, SmalltalkOOP listOop)
     {
-        int currentOop = ctx.GetFieldValue(listOop, "class:LinkedList", "firstLink");
-        int previousOop = SpecialObjectsArray.Instance.Nil.AsObjectPointer();
+        SmalltalkOOP currentOop = ctx.GetFieldValue(listOop, "class:LinkedList", "firstLink");
+        SmalltalkOOP previousOop = SpecialObjectsArray.Instance.Nil;
 
         // Search for the process in the list
-        while (currentOop != SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+        while (currentOop != SpecialObjectsArray.Instance.Nil)
         {
             if (currentOop == processOop)
             {
                 // Found it - get nextLink
-                int nextLinkOop = ctx.GetFieldValue(processOop, "class:Link", "nextLink");
+                SmalltalkOOP nextLinkOop = ctx.GetFieldValue(processOop, "class:Link", "nextLink");
 
-                if (previousOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+                if (previousOop == SpecialObjectsArray.Instance.Nil)
                 {
                     // Removing first element
                     ctx.SetFieldValue(listOop, "class:LinkedList", "firstLink", nextLinkOop);
 
-                    if (nextLinkOop == SpecialObjectsArray.Instance.Nil.AsObjectPointer())
+                    if (nextLinkOop == SpecialObjectsArray.Instance.Nil)
                     {
                         // List is now empty
-                        ctx.SetFieldValue(listOop, "class:LinkedList", "lastLink", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+                        ctx.SetFieldValue(listOop, "class:LinkedList", "lastLink", SpecialObjectsArray.Instance.Nil);
                     }
                 }
                 else
@@ -582,7 +562,7 @@ public static class ControlPrimitives
                     ctx.SetFieldValue(previousOop, "class:Link", "nextLink", nextLinkOop);
 
                     // Update lastLink if we're removing the last element
-                    int lastLinkOop = ctx.GetFieldValue(listOop, "class:LinkedList", "lastLink");
+                    SmalltalkOOP lastLinkOop = ctx.GetFieldValue(listOop, "class:LinkedList", "lastLink");
                     if (lastLinkOop == processOop)
                     {
                         ctx.SetFieldValue(listOop, "class:LinkedList", "lastLink", previousOop);
@@ -590,7 +570,7 @@ public static class ControlPrimitives
                 }
 
                 // Clear the process's nextLink
-                ctx.SetFieldValue(processOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil.AsObjectPointer());
+                ctx.SetFieldValue(processOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil);
 
                 return true;
             }
@@ -601,10 +581,6 @@ public static class ControlPrimitives
 
         return false;
     }
-
-    private static bool IsSmallInteger(int oop) => (oop & 1) == 1;
-    private static int EncodeSmallInteger(int value) => (value << 1) | 1;
-    private static int DecodeSmallInteger(int oop) => oop >> 1;
 
     #endregion
 }

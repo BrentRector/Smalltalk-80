@@ -15,13 +15,13 @@ public class Phase10_PatchApplication
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
 
     public Phase10_PatchApplication(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdMap,
+        Dictionary<string, SmalltalkOOP> localIdMap,
         IReadOnlyList<string> symbols)
     {
         _bundle = bundle;
@@ -43,7 +43,6 @@ public class Phase10_PatchApplication
 
             // Find the localId for debug purposes
             string? targetLocalId = patch.Target.ObjectLocalId ?? patch.Target.MethodLocalId ?? patch.Target.ClassLocalId ?? "unknown";
-            Console.WriteLine($"DEBUG: Applying patch operation '{patch.Operation}' to localId '{targetLocalId}' (object {targetId})");
 
             switch (patch.Operation)
             {
@@ -52,15 +51,7 @@ public class Phase10_PatchApplication
                     break;
 
                 case "setAssociationValue":
-                    // WORKAROUND: Skip setAssociationValue operations on method objects
-                    if (targetLocalId?.StartsWith("method:") == true)
-                    {
-                        Console.WriteLine($"WARNING: Skipping setAssociationValue on method object {targetLocalId}. This indicates a patch generation bug.");
-                    }
-                    else
-                    {
-                        SetNamedSlot(targetId, "value", valueId);
-                    }
+                    SetNamedSlot(targetId, "value", valueId);
                     break;
 
                 case "addToSystemDictionary":
@@ -85,12 +76,23 @@ public class Phase10_PatchApplication
     {
         return target.Kind switch
         {
-            "objectField" => _localIdToObjectId[target.ObjectLocalId!],
-            "methodLiteral" => _localIdToObjectId[target.MethodLocalId!],
-            "classSlot" => _localIdToObjectId[target.ClassLocalId!],
+            "objectField" => _localIdToObjectId[target.ObjectLocalId!].ToObjectTableIndex(),
+            "methodLiteral" => GetMethodLiteral(target.MethodLocalId!, target.LiteralIndex!.Value),
+            "classSlot" => _localIdToObjectId[target.ClassLocalId!].ToObjectTableIndex(),
             "metaclassWiring" => 0, // Should be skipped in Run(), but return dummy value
             _ => throw new NotSupportedException($"Unsupported patch target: {target.Kind}")
         };
+    }
+
+    private int GetMethodLiteral(string methodLocalId, int literalIndex)
+    {
+        int methodObjectId = _localIdToObjectId[methodLocalId].ToObjectTableIndex();
+        var methodOOP = SmalltalkOOP.FromObjectTableIndex(methodObjectId);
+        
+        // CompiledMethod structure: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
+        // Literals start at indexed slot 1 (slot 0 is header)
+        var literalOOP = _allocator.GetIndexedOOP(methodOOP, literalIndex + 1);
+        return literalOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -100,7 +102,7 @@ public class Phase10_PatchApplication
     {
         return value.Type switch
         {
-            "objectRef" => _localIdToObjectId[value.LocalId!],
+            "objectRef" => _localIdToObjectId[value.LocalId!].ToObjectTableIndex(),
             "symbolRef" => InternSymbol(_symbols[value.SymbolIndex!.Value]),
             "smallInt" => EncodeSmallInteger(value.IntValue!.Value),
             "nil" => GlobalRegistry.NilObjectId,
@@ -132,11 +134,7 @@ public class Phase10_PatchApplication
         
         if (classDefinition == null)
         {
-            // Add debug information about the problematic object
             int instVarCount = _allocator.GetInstanceVariableCount(objectOOP);
-            var format = ObjectFormat.Pointer; // AssocAssuming standard Association format
-            int indexedSize = 0; // Association is not indexed
-            Console.WriteLine($"DEBUG: Object {objectId} has {instVarCount} instance variables, format={format}, indexedSize={indexedSize}, trying to set slot '{slotName}'");
             
             // Handle dynamically created objects (like Associations) that don't have localId mappings
             if (slotName == "value")
@@ -199,7 +197,7 @@ public class Phase10_PatchApplication
     private int EncodeSmallInteger(int value)
     {
         var smallIntOOP = SmalltalkOOP.FromSmallInteger(value);
-        return smallIntOOP.AsObjectTableIndex();
+        return smallIntOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -208,7 +206,7 @@ public class Phase10_PatchApplication
     private ClassDescriptor? FindClassDefinitionForObject(int objectId)
     {
         // Find the localId for this object
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == SmalltalkOOP.FromObjectTableIndex(objectId).RawValue).Key;
         if (localId == null) return null;
         
         // Find the class definition in the bundle

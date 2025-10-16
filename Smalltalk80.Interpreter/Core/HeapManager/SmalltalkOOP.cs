@@ -18,11 +18,27 @@ public readonly struct SmalltalkOOP
     /// <summary>True if this OOP represents an object pointer (LSB = 0).</summary>
     public bool IsObjectPointer => (_value & 1) == 0;
 
-    /// <summary>Extracts SmallInteger value (assumes IsSmallInteger = true).</summary>
-    public int AsSmallInteger() => _value >> 1;
+    /// <summary>
+    /// Extracts SmallInteger value. Throws InvalidOperationException if this OOP is not a SmallInteger.
+    /// IMPORTANT: This is the ONLY way to convert an OOP to an integer. Never use RawValue >> 1 directly.
+    /// </summary>
+    public int AsSmallInteger()
+    {
+        if (!IsSmallInteger)
+            throw new InvalidOperationException($"Cannot convert non-SmallInteger OOP to integer. OOP value: {_value:X8}, IsObjectPointer: {IsObjectPointer}");
+        return _value >> 1;
+    }
 
-    /// <summary>Extracts object table index (assumes IsObjectPointer = true).</summary>
-    public int AsObjectTableIndex() => _value >> 1;
+    /// <summary>
+    /// Extracts object table index from an object pointer OOP. Throws if OOP is a SmallInteger.
+    /// IMPORTANT: Only use this for object pointers, never for SmallIntegers.
+    /// </summary>
+    public int ToObjectTableIndex()
+    {
+        if (IsSmallInteger)
+            throw new InvalidOperationException($"Cannot extract object table index from SmallInteger OOP. SmallInteger value: {_value >> 1}");
+        return _value >> 1;
+    }
 
     /// <summary>Creates a SmallInteger OOP from an integer value.</summary>
     public static SmalltalkOOP FromSmallInteger(int value) => new((value << 1) | 1);
@@ -38,7 +54,7 @@ public readonly struct SmalltalkOOP
 
     public override string ToString() => IsSmallInteger 
         ? $"SmallInteger({AsSmallInteger()})" 
-        : $"ObjectPointer(index={AsObjectTableIndex()})";
+        : $"ObjectPointer(oop={RawValue})";
 
     public override bool Equals(object? obj) => obj is SmalltalkOOP other && _value == other._value;
     public override int GetHashCode() => _value.GetHashCode();
@@ -46,7 +62,6 @@ public readonly struct SmalltalkOOP
     public static bool operator ==(SmalltalkOOP left, SmalltalkOOP right) => left._value == right._value;
     public static bool operator !=(SmalltalkOOP left, SmalltalkOOP right) => left._value != right._value;
 
-    // Implicit conversions for convenience
-    public static implicit operator int(SmalltalkOOP oop) => oop._value;
+    // Implicit conversion from int to OOP (for raw OOP values, not SmallIntegers)
     public static implicit operator SmalltalkOOP(int value) => new(value);
 }

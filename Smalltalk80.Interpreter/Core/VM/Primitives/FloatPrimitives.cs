@@ -1,7 +1,7 @@
 using System;
-using Smalltalk80.Interpreter.Core.Values;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -14,14 +14,13 @@ public static class FloatPrimitives
     /// <summary>
     /// Converts a Float object to a C# double.
     /// </summary>
-    private static double ToDouble(IPrimitiveContext ctx, SObjectRef floatRef)
+    private static double ToDouble(IPrimitiveContext ctx, SmalltalkOOP floatOop)
     {
         // Get the 8 bytes from the Float object (byte-indexed)
         byte[] bytes = new byte[8];
-        int floatId = (int)floatRef.AsObjectPointer();
         for (int i = 0; i < 8; i++)
         {
-            bytes[i] = ctx.Heap.GetIndexedByte(floatId, i);
+            bytes[i] = ctx.HeapManager.GetIndexedByte(floatOop, i);
         }
 
         return BitConverter.ToDouble(bytes, 0);
@@ -30,7 +29,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Creates a Float object from a C# double.
     /// </summary>
-    private static SObjectRef FromDouble(IPrimitiveContext ctx, double value)
+    private static SmalltalkOOP FromDouble(IPrimitiveContext ctx, double value)
     {
         // Get Float class ID from well-known globals
         // TODO: Need to add GetClassByName or use special objects array
@@ -39,10 +38,10 @@ public static class FloatPrimitives
         // Allocate Float object with 8 indexed bytes
         // Format: ByteIndexed, no fixed fields, 8 indexed bytes
         int floatClass = GetFloatClass(ctx);
-        int floatId = ctx.Heap.AllocateRawObject(
-            classId: floatClass,
+        // Allocate Float object with ByteIndexed format
+        SmalltalkOOP floatOop = ctx.HeapManager.AllocateObject(
             format: ObjectFormat.ByteIndexed,
-            fixedSize: 0,
+            fixedSlots: 0,
             indexedSize: 8
         );
 
@@ -50,21 +49,26 @@ public static class FloatPrimitives
         byte[] bytes = BitConverter.GetBytes(value);
         for (int i = 0; i < 8; i++)
         {
-            ctx.Heap.SetIndexedByte(floatId, i, bytes[i]);
+            ctx.HeapManager.SetIndexedByte(floatOop, i, bytes[i]);
         }
 
-        return SObjectRef.FromObjectPointer(floatId);
+        // Set the class reference
+        SmalltalkOOP floatClassOOP = SmalltalkOOP.FromObjectTableIndex(floatClass);
+        ctx.HeapManager.SetSlot(floatOop, 0, floatClassOOP);
+        
+        return floatOop;
     }
 
     /// <summary>
     /// Checks if an object is a Float.
     /// </summary>
-    private static bool IsFloat(IPrimitiveContext ctx, SObjectRef objectRef)
+    private static bool IsFloat(IPrimitiveContext ctx, SmalltalkOOP objectOop)
     {
-        if (objectRef.IsSmallInteger)
+        if (objectOop.IsSmallInteger)
             return false;
 
-        int classId = ctx.Heap.GetClass((int)objectRef.AsObjectPointer());
+        SmalltalkOOP classOOP = ctx.HeapManager.GetClassOOP(objectOop);
+        int classId = classOOP.ToObjectTableIndex();
         int floatClass = GetFloatClass(ctx);
 
         return classId == floatClass;
@@ -75,13 +79,15 @@ public static class FloatPrimitives
     /// </summary>
     private static int GetFloatClass(IPrimitiveContext ctx)
     {
-        return ctx.Heap.GetClassByName("Float");
+        // TODO: Need to get Float class from well-known objects or context
+        // For now, this is a stub that needs proper implementation
+        throw new NotImplementedException("GetFloatClass needs implementation with proper class lookup");
     }
 
     /// <summary>
     /// Primitive 40: SmallInteger asFloat (convert SmallInteger to Float).
     /// </summary>
-    public static SObjectRef AsFloat(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP AsFloat(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -104,7 +110,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 41: Float + (addition).
     /// </summary>
-    public static SObjectRef Add(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Add(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -128,7 +134,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 42: Float - (subtraction).
     /// </summary>
-    public static SObjectRef Subtract(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Subtract(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -152,7 +158,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 43: Float &lt; (less than).
     /// </summary>
-    public static SObjectRef LessThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP LessThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -177,7 +183,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 44: Float &gt; (greater than).
     /// </summary>
-    public static SObjectRef GreaterThan(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP GreaterThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -202,7 +208,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 45: Float &lt;= (less than or equal).
     /// </summary>
-    public static SObjectRef LessOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP LessOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -227,7 +233,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 46: Float &gt;= (greater than or equal).
     /// </summary>
-    public static SObjectRef GreaterOrEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP GreaterOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -252,7 +258,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 47: Float = (equality).
     /// </summary>
-    public static SObjectRef Equal(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Equal(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -277,7 +283,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 48: Float ~= (not equal).
     /// </summary>
-    public static SObjectRef NotEqual(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NotEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -302,7 +308,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 49: Float * (multiplication).
     /// </summary>
-    public static SObjectRef Multiply(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Multiply(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -326,7 +332,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 50: Float / (division).
     /// </summary>
-    public static SObjectRef Divide(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Divide(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -352,7 +358,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 51: Float truncated (convert to integer, truncate towards zero).
     /// </summary>
-    public static SObjectRef Truncated(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Truncated(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -384,7 +390,7 @@ public static class FloatPrimitives
 
         if (truncated >= SmallIntegerMinValue && truncated <= SmallIntegerMaxValue)
         {
-            return SObjectRef.FromSmallInteger((int)truncated);
+            return SmalltalkOOP.FromSmallInteger((int)truncated);
         }
 
         // TODO: Create LargeInteger for values outside SmallInteger range
@@ -396,7 +402,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 52: Float fractionPart (get the fractional part).
     /// </summary>
-    public static SObjectRef FractionPart(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP FractionPart(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -419,7 +425,7 @@ public static class FloatPrimitives
     /// <summary>
     /// Primitive 53: Float exponent (get the binary exponent).
     /// </summary>
-    public static SObjectRef Exponent(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Exponent(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -437,7 +443,7 @@ public static class FloatPrimitives
 
         // Handle special cases
         if (value == 0.0)
-            return SObjectRef.FromSmallInteger(0);
+            return SmalltalkOOP.FromSmallInteger(0);
 
         if (double.IsNaN(value) || double.IsInfinity(value))
         {
@@ -454,13 +460,13 @@ public static class FloatPrimitives
         // Subtract the bias (1023) to get the actual exponent
         int exponent = biasedExponent - 1023;
 
-        return SObjectRef.FromSmallInteger(exponent);
+        return SmalltalkOOP.FromSmallInteger(exponent);
     }
 
     /// <summary>
     /// Primitive 54: Float timesTwoPower: (multiply by power of 2).
     /// </summary>
-    public static SObjectRef TimesTwoPower(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP TimesTwoPower(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {

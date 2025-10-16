@@ -1,10 +1,10 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.Objects;
 
 /// <summary>
 /// Object memory management for the Smalltalk-80 interpreter.
-/// This class provides the interface between SObjectRef tagged pointers and actual object data.
+/// This class provides the interface between SmalltalkOOP tagged pointers and actual object data.
 /// </summary>
 public static class ObjectMemory
 {
@@ -13,10 +13,10 @@ public static class ObjectMemory
     /// </summary>
     public class ObjectData
     {
-        public SObjectRef ClassRef { get; set; }
+        public SmalltalkOOP ClassRef { get; set; }
         public ObjectFormat Format { get; set; }
-        public SObjectRef[]? InstanceVariables { get; set; }
-        public object? IndexedData { get; set; }  // byte[], ushort[], or SObjectRef[]
+        public SmalltalkOOP[]? InstanceVariables { get; set; }
+        public object? IndexedData { get; set; }  // byte[], ushort[], or SmalltalkOOP[]
         public bool Marked { get; set; }  // GC mark bit
     }
 
@@ -39,7 +39,7 @@ public static class ObjectMemory
     /// <summary>
     /// Gets the class reference for an object.
     /// </summary>
-    public static SObjectRef GetClass(int oop)
+    public static SmalltalkOOP GetClass(int oop)
     {
         throw new NotImplementedException("ObjectMemory.GetClass not yet implemented");
     }
@@ -63,7 +63,7 @@ public static class ObjectMemory
     /// <summary>
     /// Gets an instance variable by index.
     /// </summary>
-    public static SObjectRef GetInstanceVariable(int oop, int index)
+    public static SmalltalkOOP GetInstanceVariable(int oop, int index)
     {
         throw new NotImplementedException("ObjectMemory.GetInstanceVariable not yet implemented");
     }
@@ -71,7 +71,7 @@ public static class ObjectMemory
     /// <summary>
     /// Sets an instance variable by index.
     /// </summary>
-    public static void SetInstanceVariable(int oop, int index, SObjectRef value)
+    public static void SetInstanceVariable(int oop, int index, SmalltalkOOP value)
     {
         throw new NotImplementedException("ObjectMemory.SetInstanceVariable not yet implemented");
     }
@@ -119,7 +119,7 @@ public static class ObjectMemory
     /// <summary>
     /// Gets an indexed pointer.
     /// </summary>
-    public static SObjectRef GetIndexedPointer(int oop, int index)
+    public static SmalltalkOOP GetIndexedPointer(int oop, int index)
     {
         throw new NotImplementedException("ObjectMemory.GetIndexedPointer not yet implemented");
     }
@@ -127,7 +127,7 @@ public static class ObjectMemory
     /// <summary>
     /// Sets an indexed pointer.
     /// </summary>
-    public static void SetIndexedPointer(int oop, int index, SObjectRef value)
+    public static void SetIndexedPointer(int oop, int index, SmalltalkOOP value)
     {
         throw new NotImplementedException("ObjectMemory.SetIndexedPointer not yet implemented");
     }

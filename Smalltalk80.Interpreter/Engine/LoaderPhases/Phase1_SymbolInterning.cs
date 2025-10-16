@@ -32,7 +32,7 @@ public class Phase1_SymbolInterning
             var symbolOOP = InternSymbol(symbolName);
             
             // Convert SmalltalkOOP to int for SymbolRegistry (maintains compatibility)
-            int symbolId = symbolOOP.AsObjectTableIndex();
+            int symbolId = symbolOOP.ToObjectTableIndex();
             SymbolRegistry.Register(i, symbolId);
         }
     }

@@ -51,10 +51,10 @@ public sealed class ObjectTableEntry
     }
 
     /// <summary>
-    /// Gets the total size of this object in "slots" (for GC accounting).
+    /// Gets the total size of this object in "words" (for GC accounting).
     /// Instance variables + indexed data size.
     /// </summary>
-    public int GetTotalSlotCount()
+    public int GetTotalWordCount()
     {
         var baseSize = InstanceVariables.Length;
         return IndexedData switch

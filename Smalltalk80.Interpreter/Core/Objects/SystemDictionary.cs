@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.Objects;
 
@@ -8,17 +8,17 @@ namespace Smalltalk80.Interpreter.Core.Objects;
 /// </summary>
 public static class SystemDictionary
 {
-    private static SObjectRef _undefinedObjectClassRef;
-    private static SObjectRef _smallIntegerClassRef;
+    private static SmalltalkOOP _undefinedObjectClassRef;
+    private static SmalltalkOOP _smallIntegerClassRef;
 
     /// <summary>
     /// Gets the UndefinedObject class (nil's class).
     /// </summary>
-    public static SObjectRef UndefinedObjectClassRef
+    public static SmalltalkOOP UndefinedObjectClassRef
     {
         get
         {
-            if (_undefinedObjectClassRef.IsNil)
+            if (_undefinedObjectClassRef == SmalltalkOOP.Null)
                 throw new InvalidOperationException("UndefinedObject class not yet initialized");
             return _undefinedObjectClassRef;
         }
@@ -27,11 +27,11 @@ public static class SystemDictionary
     /// <summary>
     /// Gets the SmallInteger class.
     /// </summary>
-    public static SObjectRef SmallIntegerClassRef
+    public static SmalltalkOOP SmallIntegerClassRef
     {
         get
         {
-            if (_smallIntegerClassRef.IsNil)
+            if (_smallIntegerClassRef == SmalltalkOOP.Null)
                 throw new InvalidOperationException("SmallInteger class not yet initialized");
             return _smallIntegerClassRef;
         }
@@ -41,7 +41,7 @@ public static class SystemDictionary
     /// Initializes the system dictionary with well-known classes.
     /// Called once during cold start.
     /// </summary>
-    internal static void Initialize(SObjectRef undefinedObjectClass, SObjectRef smallIntegerClass)
+    internal static void Initialize(SmalltalkOOP undefinedObjectClass, SmalltalkOOP smallIntegerClass)
     {
         _undefinedObjectClassRef = undefinedObjectClass;
         _smallIntegerClassRef = smallIntegerClass;

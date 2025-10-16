@@ -23,13 +23,13 @@ public class Phase9_MethodDictionaryInstallation
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
 
     public Phase9_MethodDictionaryInstallation(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         IReadOnlyList<string> symbols)
     {
         _bundle = bundle;
@@ -44,19 +44,18 @@ public class Phase9_MethodDictionaryInstallation
         int installedBlocks = 0;
         int skippedMethods = 0;
 
-        Console.WriteLine($"DEBUG: Installing {_bundle.Methods.Length} methods into class method dictionaries...");
 
         foreach (var method in _bundle.Methods)
         {
             // Skip blocks - they are not installed in method dictionaries
-            if (method.HomeClassLocalId == null)
+            if (string.IsNullOrEmpty(method.HomeClassLocalId))
             {
                 installedBlocks++;
                 continue;
             }
 
             // Get the CompiledMethod object created in Phase 7
-            if (!_localIdToObjectId.TryGetValue(method.LocalId, out int methodObjectId))
+            if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
             {
                 Console.WriteLine($"WARNING: Method not found in localIdToObjectId: {method.LocalId}");
                 skippedMethods++;
@@ -64,7 +63,7 @@ public class Phase9_MethodDictionaryInstallation
             }
 
             // Resolve the home class object
-            if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out int classObjectId))
+            if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP classOOP))
             {
                 Console.WriteLine($"WARNING: Home class not found: {method.HomeClassLocalId}");
                 skippedMethods++;
@@ -72,10 +71,9 @@ public class Phase9_MethodDictionaryInstallation
             }
 
             // Get the class's method dictionary (instance variable 1 in Behavior)
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at index 1
 
-            if (methodDictOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId)
+            if (methodDictOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
             {
                 Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
                 skippedMethods++;
@@ -86,28 +84,13 @@ public class Phase9_MethodDictionaryInstallation
             string selectorName = _symbols[method.SelectorIndex];
             int selectorSymbolId = GetSymbolObjectId(selectorName);
 
-            // DEBUG: Track installation of method containing objectId 9790
-            if (method.LocalId.Contains("TRACK") || methodObjectId == 10535) // Will update with actual methodId
-            {
-                Console.WriteLine($"DEBUG Phase9 TRACK: Installing method {method.LocalId} (objectId={methodObjectId})");
-                Console.WriteLine($"  Selector: {selectorName}, HomeClass: {method.HomeClassLocalId}");
-                Console.WriteLine($"  MethodDict objectId: {methodDictOOP.AsObjectTableIndex()}");
-            }
 
             // Install the method in the method dictionary
-            InstallMethodInDictionary(methodDictOOP.AsObjectTableIndex(), selectorSymbolId, methodObjectId);
+            InstallMethodInDictionary(methodDictOOP.ToObjectTableIndex(), selectorSymbolId, methodOOP.ToObjectTableIndex());
             installedMethods++;
 
-            if (installedMethods % 1000 == 0)
-            {
-                Console.WriteLine($"DEBUG: Installed {installedMethods} methods so far...");
-            }
         }
 
-        Console.WriteLine($"DEBUG: Method dictionary installation complete:");
-        Console.WriteLine($"  Installed methods: {installedMethods}");
-        Console.WriteLine($"  Skipped blocks: {installedBlocks}");
-        Console.WriteLine($"  Skipped methods: {skippedMethods}");
     }
 
     /// <summary>
@@ -139,7 +122,7 @@ public class Phase9_MethodDictionaryInstallation
         var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
         var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
 
-        if (valuesArrayOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId)
+        if (valuesArrayOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
         {
             throw new InvalidOperationException($"MethodDictionary {methodDictId} has nil valueArray");
         }
@@ -158,13 +141,13 @@ public class Phase9_MethodDictionaryInstallation
         {
             var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
             
-            if (keyOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId)
+            if (keyOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId)
             {
                 // Empty slot found
                 targetIndex = i;
                 break;
             }
-            else if (keyOOP.AsObjectTableIndex() == selectorSymbolId)
+            else if (keyOOP.ToObjectTableIndex() == selectorSymbolId)
             {
                 // Existing entry for this selector - replace it
                 targetIndex = i;
@@ -179,7 +162,7 @@ public class Phase9_MethodDictionaryInstallation
 
         // Check if this is a new entry (for tally update)
         var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP.AsObjectTableIndex() == GlobalRegistry.NilObjectId;
+        bool isNewEntry = existingKeyOOP.ToObjectTableIndex() == GlobalRegistry.NilObjectId;
 
         // Install the method
         var selectorOOP = SmalltalkOOP.FromObjectTableIndex(selectorSymbolId);

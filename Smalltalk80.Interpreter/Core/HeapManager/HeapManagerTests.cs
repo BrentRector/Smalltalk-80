@@ -45,7 +45,7 @@ public static class HeapManagerTests
         Console.WriteLine($"SmallInteger 0: {smallInt0} (IsSmallInteger: {smallInt0.IsSmallInteger}, Value: {smallInt0.AsSmallInteger()})");
         
         var objectOOP = SmalltalkOOP.FromObjectTableIndex(123);
-        Console.WriteLine($"Object pointer: {objectOOP} (IsSmallInteger: {objectOOP.IsSmallInteger}, Index: {objectOOP.AsObjectTableIndex()})");
+        Console.WriteLine($"Object pointer: {objectOOP} (IsSmallInteger: {objectOOP.IsSmallInteger}, Index: {objectOOP.ToObjectTableIndex()})");
     }
 
     private static void TestBasicObjectAllocation(ISmalltalkHeapManager heapManager)

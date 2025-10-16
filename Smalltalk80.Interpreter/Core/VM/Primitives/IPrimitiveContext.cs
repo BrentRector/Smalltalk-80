@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -9,9 +9,9 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public interface IPrimitiveContext
 {
     /// <summary>
-    /// Gets the heap instance.
+    /// Gets the heap manager instance.
     /// </summary>
-    SmalltalkHeap Heap { get; }
+    ISmalltalkHeapManager HeapManager { get; }
 
     /// <summary>
     /// Gets the layout resolver for field lookups.
@@ -33,8 +33,8 @@ public interface IPrimitiveContext
     /// <param name="oop">Object pointer.</param>
     /// <param name="className">Class name (e.g., "class:Point").</param>
     /// <param name="fieldName">Field name (e.g., "x").</param>
-    /// <returns>Field value as object pointer or SmallInteger value.</returns>
-    int GetFieldValue(int oop, string className, string fieldName);
+    /// <returns>Field value as SmalltalkOOP.</returns>
+    SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName);
 
     /// <summary>
     /// Sets a field value in an object using the layout resolver.
@@ -42,23 +42,23 @@ public interface IPrimitiveContext
     /// <param name="oop">Object pointer.</param>
     /// <param name="className">Class name (e.g., "class:Point").</param>
     /// <param name="fieldName">Field name (e.g., "x").</param>
-    /// <param name="value">Field value as object pointer or SmallInteger value.</param>
-    void SetFieldValue(int oop, string className, string fieldName, int value);
+    /// <param name="value">Field value as SmalltalkOOP.</param>
+    void SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value);
 
     /// <summary>
     /// Gets byte array data from an indexed object (e.g., ByteArray, String, Form bits).
     /// </summary>
     /// <param name="oop">Object pointer to indexed byte object.</param>
     /// <returns>Memory span of bytes, or empty if not a byte array.</returns>
-    Memory<byte> GetByteArray(int oop);
+    Memory<byte> GetByteArray(SmalltalkOOP oop);
 
     /// <summary>
     /// Allocates a new object instance with optional indexed fields.
     /// </summary>
     /// <param name="className">Class name (e.g., "class:Point", "class:ByteArray").</param>
     /// <param name="indexedSize">Number of indexed elements (0 for fixed-size objects).</param>
-    /// <returns>Object pointer of newly allocated instance.</returns>
-    int AllocateObject(string className, int indexedSize);
+    /// <returns>SmalltalkOOP of newly allocated instance.</returns>
+    SmalltalkOOP AllocateObject(string className, int indexedSize);
 
     // Dynamic message sending support
 
@@ -69,15 +69,15 @@ public interface IPrimitiveContext
     /// <param name="selectorOop">Selector Symbol object pointer.</param>
     /// <param name="argumentsArray">Arguments array object pointer (contains indexed arguments).</param>
     /// <returns>Result of message send.</returns>
-    int SendMessage(int receiverOop, int selectorOop, int argumentsArray);
+    SmalltalkOOP SendMessage(SmalltalkOOP receiverOop, SmalltalkOOP selectorOop, SmalltalkOOP argumentsArray);
 
     // BlockContext support
 
     /// <summary>
     /// Gets the currently active context (MethodContext or BlockContext OOP).
     /// </summary>
-    /// <returns>Object pointer of the active context.</returns>
-    int GetActiveContext();
+    /// <returns>SmalltalkOOP of the active context.</returns>
+    SmalltalkOOP GetActiveContext();
 
     /// <summary>
     /// Gets the current instruction pointer (PC) of the active context.
@@ -91,8 +91,8 @@ public interface IPrimitiveContext
     /// <param name="homeContextOop">Home context (MethodContext where block is defined).</param>
     /// <param name="startPC">Starting program counter for the block.</param>
     /// <param name="argCount">Number of arguments the block expects.</param>
-    /// <returns>Object pointer of newly created BlockContext.</returns>
-    int CreateBlockContext(int homeContextOop, int startPC, int argCount);
+    /// <returns>SmalltalkOOP of newly created BlockContext.</returns>
+    SmalltalkOOP CreateBlockContext(SmalltalkOOP homeContextOop, int startPC, int argCount);
 
     /// <summary>
     /// Activates a BlockContext with given arguments (for value/value: primitives).
@@ -101,15 +101,15 @@ public interface IPrimitiveContext
     /// <param name="blockContextOop">BlockContext to activate.</param>
     /// <param name="argumentsArray">Arguments array object pointer.</param>
     /// <returns>Result of block execution.</returns>
-    int ActivateBlockContext(int blockContextOop, int argumentsArray);
+    SmalltalkOOP ActivateBlockContext(SmalltalkOOP blockContextOop, SmalltalkOOP argumentsArray);
 
     // Object enumeration support
 
     /// <summary>
     /// Gets all object pointers in the heap (for enumeration primitives).
     /// </summary>
-    /// <returns>Enumerable of all object pointers (excluding SmallIntegers).</returns>
-    IEnumerable<int> GetAllObjects();
+    /// <returns>Enumerable of all SmalltalkOOPs (excluding SmallIntegers).</returns>
+    IEnumerable<SmalltalkOOP> GetAllObjects();
 
     // Object identity operations
 
@@ -118,12 +118,12 @@ public interface IPrimitiveContext
     /// </summary>
     /// <param name="fromOop">Source object pointer.</param>
     /// <param name="toOop">Target object pointer.</param>
-    void BecomeOneWay(int fromOop, int toOop);
+    void BecomeOneWay(SmalltalkOOP fromOop, SmalltalkOOP toOop);
 
     /// <summary>
     /// Two-way become: Swaps identities of two objects.
     /// </summary>
     /// <param name="oop1">First object pointer.</param>
     /// <param name="oop2">Second object pointer.</param>
-    void BecomeTwoWay(int oop1, int oop2);
+    void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
 }

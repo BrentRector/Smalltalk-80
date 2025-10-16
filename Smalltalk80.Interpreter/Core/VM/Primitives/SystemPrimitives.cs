@@ -1,5 +1,6 @@
-using Smalltalk80.Interpreter.Core.Values;
+using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -12,7 +13,7 @@ public static class SystemPrimitives
     /// <summary>
     /// Primitive 112: coreLeft - Free memory available.
     /// </summary>
-    public static SObjectRef CoreLeft(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP CoreLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -22,13 +23,13 @@ public static class SystemPrimitives
 
         // TODO: Query actual heap free space
         // For now, return a large number
-        return SObjectRef.FromSmallInteger(1000000);
+        return SmalltalkOOP.FromSmallInteger(1000000);
     }
 
     /// <summary>
     /// Primitive 113: quit - Exit the VM.
     /// </summary>
-    public static SObjectRef Quit(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP Quit(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -45,7 +46,7 @@ public static class SystemPrimitives
     /// <summary>
     /// Primitive 114: exitToDebugger - Break to debugger.
     /// </summary>
-    public static SObjectRef ExitToDebugger(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ExitToDebugger(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -61,7 +62,7 @@ public static class SystemPrimitives
     /// <summary>
     /// Primitive 115: oopsLeft - Available object pointer slots.
     /// </summary>
-    public static SObjectRef OopsLeft(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP OopsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -70,13 +71,13 @@ public static class SystemPrimitives
         }
 
         // TODO: Query object table for free slots
-        return SObjectRef.FromSmallInteger(100000);
+        return SmalltalkOOP.FromSmallInteger(100000);
     }
 
     /// <summary>
     /// Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold.
     /// </summary>
-    public static SObjectRef SignalAtOopsLeftWordsLeft(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP SignalAtOopsLeftWordsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)
         {
@@ -94,7 +95,7 @@ public static class SystemPrimitives
     /// Primitive 128: someInstance - Get an instance of a class.
     /// Blue Book: Returns an arbitrary instance of the receiver class, or nil if none exists.
     /// </summary>
-    public static SObjectRef SomeInstance(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP SomeInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -109,15 +110,13 @@ public static class SystemPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int classOop = (int)receiver.AsObjectPointer();
-
         // Search heap for first instance of this class
-        foreach (int oop in ctx.GetAllObjects())
+        foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
-            int objClassOop = ctx.Heap.GetClass(oop);
-            if (objClassOop == classOop)
+            SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
+            if (objClassOOP == receiver)
             {
-                return SObjectRef.FromObjectPointer(oop);
+                return oop;
             }
         }
 
@@ -129,7 +128,7 @@ public static class SystemPrimitives
     /// Primitive 129: nextInstance - Get next instance of same class.
     /// Blue Book: Returns the next instance of the same class after receiver, or nil if none.
     /// </summary>
-    public static SObjectRef NextInstance(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NextInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -144,23 +143,22 @@ public static class SystemPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int receiverOop = (int)receiver.AsObjectPointer();
-        int receiverClassOop = ctx.Heap.GetClass(receiverOop);
+        SmalltalkOOP receiverClassOOP = ctx.HeapManager.GetClassOOP(receiver);
 
         // Search for next instance of same class after receiver
         bool foundReceiver = false;
-        foreach (int oop in ctx.GetAllObjects())
+        foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
             if (foundReceiver)
             {
-                int objClassOop = ctx.Heap.GetClass(oop);
-                if (objClassOop == receiverClassOop)
+                SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
+                if (objClassOOP == receiverClassOOP)
                 {
-                    return SObjectRef.FromObjectPointer(oop);
+                    return oop;
                 }
             }
 
-            if (oop == receiverOop)
+            if (oop == receiver)
                 foundReceiver = true;
         }
 
@@ -172,7 +170,7 @@ public static class SystemPrimitives
     /// Primitive 130: becomeForward: - One-way become operation.
     /// Blue Book: All references to receiver become references to argument.
     /// </summary>
-    public static SObjectRef BecomeForward(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP BecomeForward(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
         {
@@ -187,13 +185,10 @@ public static class SystemPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int fromOop = (int)receiver.AsObjectPointer();
-        int toOop = (int)args[0].AsObjectPointer();
-
         try
         {
             // Forward all references from receiver to argument
-            ctx.BecomeOneWay(fromOop, toOop);
+            ctx.BecomeOneWay(receiver, args[0]);
             return args[0]; // Return the argument (new identity)
         }
         catch
@@ -207,7 +202,7 @@ public static class SystemPrimitives
     /// Primitive 131: instanceCount - Count instances of a class.
     /// Blue Book: Returns the number of instances of the receiver class.
     /// </summary>
-    public static SObjectRef InstanceCount(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP InstanceCount(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -222,26 +217,25 @@ public static class SystemPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int classOop = (int)receiver.AsObjectPointer();
         int count = 0;
 
         // Count instances of this class
-        foreach (int oop in ctx.GetAllObjects())
+        foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
-            int objClassOop = ctx.Heap.GetClass(oop);
-            if (objClassOop == classOop)
+            SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
+            if (objClassOOP == receiver)
             {
                 count++;
             }
         }
 
-        return SObjectRef.FromSmallInteger(count);
+        return SmalltalkOOP.FromSmallInteger(count);
     }
 
     /// <summary>
     /// Primitive 133: forceGC - Force garbage collection.
     /// </summary>
-    public static SObjectRef ForceGC(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP ForceGC(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -260,7 +254,7 @@ public static class SystemPrimitives
     /// Primitive 139: nextObject - Enumerate all objects.
     /// Blue Book: Returns the next object in memory after receiver, or nil if none.
     /// </summary>
-    public static SObjectRef NextObject(IPrimitiveContext ctx, SObjectRef receiver, SObjectRef[] args)
+    public static SmalltalkOOP NextObject(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
         {
@@ -275,18 +269,16 @@ public static class SystemPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        int receiverOop = (int)receiver.AsObjectPointer();
-
         // Find next object after receiver
         bool foundReceiver = false;
-        foreach (int oop in ctx.GetAllObjects())
+        foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
             if (foundReceiver)
             {
-                return SObjectRef.FromObjectPointer(oop);
+                return oop;
             }
 
-            if (oop == receiverOop)
+            if (oop == receiver)
                 foundReceiver = true;
         }
 

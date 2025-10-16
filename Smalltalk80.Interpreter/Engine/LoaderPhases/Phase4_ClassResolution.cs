@@ -15,7 +15,7 @@ public class Phase4_ClassResolution
     private readonly ColdStartBundle _bundle;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly IColdStartPrimitives _primitives;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
 
@@ -23,7 +23,7 @@ public class Phase4_ClassResolution
         ColdStartBundle bundle,
         ISmalltalkHeapManager heapManager,
         IColdStartPrimitives primitives,
-        Dictionary<string, int> localIdMap,
+        Dictionary<string, SmalltalkOOP> localIdMap,
         IReadOnlyList<string> symbols,
         IReadOnlyList<string> strings)
     {
@@ -41,8 +41,7 @@ public class Phase4_ClassResolution
         // This fixes the fundamental issue where class objects have classOOP = 0
         foreach (var cls in _bundle.Classes)
         {
-            int classObjectId = _localIdToObjectId[cls.LocalId];
-            var classObjectOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
+            SmalltalkOOP classObjectOOP = _localIdToObjectId[cls.LocalId];
             
             if (cls.IsMetaclass)
             {
@@ -58,14 +57,14 @@ public class Phase4_ClassResolution
         // Second pass: Initialize instance variables for class objects
         foreach (var cls in _bundle.Classes)
         {
-            int classId = _localIdToObjectId[cls.LocalId];
+            SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
             string className = _symbols[cls.NameIndex];
             
             // Determine the template class for this object from JSON data
             string templateClassName = GetTemplateClassNameFromBundle(cls);
             
             // First, initialize ALL instance variables to nil (user requirement)
-            InitializeAllInstanceVariablesToNil(classId, templateClassName);
+            InitializeAllInstanceVariablesToNil(classOOP, templateClassName);
             
             // Set name instance variable (all Class objects have this)
             if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "name", _bundle))
@@ -73,7 +72,7 @@ public class Phase4_ClassResolution
                 int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "name", _bundle);
                 if (nameIndex >= 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classId, nameIndex, InternSymbol(className));
+                    SetInstanceVariableUsingPrimitive(classOOP, nameIndex, SmalltalkOOP.FromObjectTableIndex(InternSymbol(className)));
                 }
             }
 
@@ -98,8 +97,8 @@ public class Phase4_ClassResolution
                 int formatIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "format", _bundle);
                 if (formatIndex >= 0)
                 {
-                    int formatSmallInteger = (format << 1) | 1; // Encode as SmallInteger
-                    SetInstanceVariableUsingPrimitive(classId, formatIndex, formatSmallInteger);
+                    var formatOOP = SmalltalkOOP.FromSmallInteger(format);
+                    SetInstanceVariableUsingPrimitive(classOOP, formatIndex, formatOOP);
                 }
             }
 
@@ -113,7 +112,7 @@ public class Phase4_ClassResolution
                 int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "superclass", _bundle);
                 if (superclassIndex >= 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classId, superclassIndex, superId);
+                    SetInstanceVariableUsingPrimitive(classOOP, superclassIndex, SmalltalkOOP.FromObjectTableIndex(superId));
                 }
             }
 
@@ -129,7 +128,7 @@ public class Phase4_ClassResolution
             // Set pool dictionaries (skip if not yet allocated - will be patched later)
             foreach (var poolId in cls.PoolLocalIds)
             {
-                if (_localIdToObjectId.TryGetValue(poolId, out int poolObjId))
+                if (_localIdToObjectId.TryGetValue(poolId, out SmalltalkOOP poolOOP))
                 {
                     // Pool dictionaries are typically stored in sharedPools field
                     if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "sharedPools", _bundle))
@@ -138,7 +137,7 @@ public class Phase4_ClassResolution
                         if (sharedPoolsIndex >= 0)
                         {
                             // TODO: This should append to an array, not replace - needs proper implementation
-                            SetInstanceVariableUsingPrimitive(classId, sharedPoolsIndex, poolObjId);
+                            SetInstanceVariableUsingPrimitive(classOOP, sharedPoolsIndex, poolOOP);
                         }
                     }
                 }
@@ -155,10 +154,8 @@ public class Phase4_ClassResolution
     /// Sets an instance variable using primitive interface to match Smalltalk semantics.
     /// Uses instVarAt:put: primitive (1-based indexing) instead of direct heap manager calls.
     /// </summary>
-    private void SetInstanceVariableUsingPrimitive(int objectId, int zeroBasedIndex, int valueId)
+    private void SetInstanceVariableUsingPrimitive(SmalltalkOOP objectOOP, int zeroBasedIndex, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         
         // Use primitive interface with 1-based indexing (Smalltalk convention)
         int oneBasedIndex = zeroBasedIndex + 1;
@@ -170,16 +167,14 @@ public class Phase4_ClassResolution
     /// Uses instVarAt:put: primitive (1-based indexing) instead of direct heap manager calls.
     /// DEPRECATED: Use index-based version instead of string-based lookup.
     /// </summary>
-    private void SetInstanceVariableUsingPrimitive(int objectId, string slotName, int valueId)
+    private void SetInstanceVariableUsingPrimitive(SmalltalkOOP objectOOP, string slotName, SmalltalkOOP valueOOP)
     {
-        var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-        var valueOOP = SmalltalkOOP.FromObjectTableIndex(valueId);
         
         // Find which template this object was allocated with
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
         if (localId == null)
         {
-            throw new InvalidOperationException($"Cannot find localId for object {objectId}");
+            throw new InvalidOperationException($"Cannot find localId for object {objectOOP.ToObjectTableIndex()}");
         }
         
         // Determine template class name from JSON data
@@ -205,10 +200,10 @@ public class Phase4_ClassResolution
     /// <summary>
     /// Finds the class definition for an object by looking up its localId.
     /// </summary>
-    private ClassDescriptor? FindClassDefinitionForObject(int objectId)
+    private ClassDescriptor? FindClassDefinitionForObject(SmalltalkOOP objectOOP)
     {
         // Find the localId for this object
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
         if (localId == null) return null;
         
         // Find the class definition in the bundle
@@ -292,7 +287,7 @@ public class Phase4_ClassResolution
             _heapManager.SetIndexedByte(stringOOP, i, stringBytes[i]);
         }
         
-        return stringOOP.AsObjectTableIndex();
+        return stringOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -305,7 +300,7 @@ public class Phase4_ClassResolution
         
         foreach (var cls in _bundle.Classes)
         {
-            int classId = _localIdToObjectId[cls.LocalId];
+            SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
             string templateClassName = GetTemplateClassNameFromBundle(cls);
             
             int totalInstanceVars = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(
@@ -313,10 +308,10 @@ public class Phase4_ClassResolution
             
             for (int i = 0; i < totalInstanceVars; i++)
             {
-                var currentOOP = _heapManager.GetInstanceVariable(SmalltalkOOP.FromObjectTableIndex(classId), i);
+                var currentOOP = _heapManager.GetInstanceVariable(classOOP, i);
                 if (currentOOP.RawValue == 0) // If still uninitialized (OOP 0)
                 {
-                    SetInstanceVariableUsingPrimitive(classId, i, nilObjectId);
+                    SetInstanceVariableUsingPrimitive(classOOP, i, SmalltalkOOP.FromObjectTableIndex(nilObjectId));
                 }
             }
         }
@@ -327,7 +322,7 @@ public class Phase4_ClassResolution
     /// As per user requirement: "Instance variables are always part of a class instance, 
     /// so can be initialized to Nil because class instances are always created after the Nil singleton instance."
     /// </summary>
-    private void InitializeAllInstanceVariablesToNil(int objectId, string templateClassName)
+    private void InitializeAllInstanceVariablesToNil(SmalltalkOOP objectOOP, string templateClassName)
     {
         int totalInstanceVars = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(
             ClassHierarchyUtils.FindClassDefinition(templateClassName, _bundle)!, _bundle);
@@ -336,7 +331,7 @@ public class Phase4_ClassResolution
         
         for (int i = 0; i < totalInstanceVars; i++)
         {
-            SetInstanceVariableUsingPrimitive(objectId, i, nilObjectId);
+            SetInstanceVariableUsingPrimitive(objectOOP, i, SmalltalkOOP.FromObjectTableIndex(nilObjectId));
         }
     }
 

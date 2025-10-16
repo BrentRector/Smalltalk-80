@@ -1,7 +1,7 @@
 namespace Smalltalk80.Interpreter.Core.Memory;
 
+using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
-using Smalltalk80.Interpreter.Core.Values;
 
 /// <summary>
 /// The Special Objects Array - GC roots for the Smalltalk-80 Virtual Machine.
@@ -41,41 +41,41 @@ public readonly struct SpecialObjectsArray
     /// OOP of nil singleton (instance of UndefinedObject).
     /// Required for pushNil bytecode (113).
     /// </summary>
-    public readonly SObjectRef Nil;
+    public readonly SmalltalkOOP Nil;
 
     /// <summary>
     /// OOP of false singleton (instance of False).
     /// Required for pushFalse bytecode (114).
     /// </summary>
-    public readonly SObjectRef False;
+    public readonly SmalltalkOOP False;
 
     /// <summary>
     /// OOP of true singleton (instance of True).
     /// Required for pushTrue bytecode (115).
     /// </summary>
-    public readonly SObjectRef True;
+    public readonly SmalltalkOOP True;
 
     /// <summary>
     /// OOP of Smalltalk global (SystemDictionary instance).
     /// Root of ALL classes, methods, symbols, and global variables.
     /// </summary>
-    public readonly SObjectRef Smalltalk;
+    public readonly SmalltalkOOP Smalltalk;
 
     /// <summary>
     /// OOP of ProcessorScheduler singleton.
     /// Root of ALL processes and execution contexts.
     /// </summary>
-    public readonly SObjectRef ProcessorScheduler;
+    public readonly SmalltalkOOP ProcessorScheduler;
 
     /// <summary>
     /// Creates a new Special Objects Array with the 5 GC roots.
     /// </summary>
     public SpecialObjectsArray(
-        SObjectRef nil,
-        SObjectRef @false,
-        SObjectRef @true,
-        SObjectRef smalltalk,
-        SObjectRef processorScheduler)
+        SmalltalkOOP nil,
+        SmalltalkOOP @false,
+        SmalltalkOOP @true,
+        SmalltalkOOP smalltalk,
+        SmalltalkOOP processorScheduler)
     {
         Nil = nil;
         False = @false;
@@ -88,18 +88,19 @@ public readonly struct SpecialObjectsArray
     /// Gets the active process (6th root, accessed via ProcessorScheduler).
     /// This is not stored separately per Blue Book spec - it's ProcessorScheduler.activeProcess.
     /// </summary>
-    public SObjectRef ActiveProcess
+    public SmalltalkOOP ActiveProcess
     {
         get
         {
-            if (ProcessorScheduler.IsNil)
-                return SObjectRef.Nil;
+            if (ProcessorScheduler == SmalltalkOOP.Null)
+                return SmalltalkOOP.Null;
 
             // ProcessorScheduler.activeProcess is field index 1
-            var schedulerOop = ProcessorScheduler.AsObjectPointer();
             // TODO: Get actual field index from layout when LayoutManagement is implemented
             const int activeProcessIndex = 1;
-            return ObjectMemory.GetInstanceVariable(schedulerOop, activeProcessIndex);
+            // Note: This needs to be implemented via heap manager when available
+            // For now return null as placeholder
+            return SmalltalkOOP.Null;
         }
     }
 
@@ -107,7 +108,7 @@ public readonly struct SpecialObjectsArray
     /// Returns the 5 GC roots as an array for garbage collection marking.
     /// Allocates a new array each time - only called during GC.
     /// </summary>
-    public SObjectRef[] GetRootsForGC()
+    public SmalltalkOOP[] GetRootsForGC()
     {
         return new[] { Nil, False, True, Smalltalk, ProcessorScheduler };
     }
@@ -115,10 +116,10 @@ public readonly struct SpecialObjectsArray
     /// <summary>
     /// Returns all roots including ActiveProcess (6 total) for comprehensive GC.
     /// </summary>
-    public SObjectRef[] GetAllRootsForGC()
+    public SmalltalkOOP[] GetAllRootsForGC()
     {
         var activeProcess = ActiveProcess;
-        if (activeProcess.IsNil)
+        if (activeProcess == SmalltalkOOP.Null)
         {
             return GetRootsForGC();
         }
@@ -129,7 +130,7 @@ public readonly struct SpecialObjectsArray
     /// <summary>
     /// Gets a root by index (for compatibility with array-based code).
     /// </summary>
-    public SObjectRef this[int index] => index switch
+    public SmalltalkOOP this[int index] => index switch
     {
         0 => Nil,
         1 => False,
@@ -144,7 +145,7 @@ public readonly struct SpecialObjectsArray
     /// </summary>
     public override string ToString()
     {
-        return $"SOA[Nil={Nil.AsObjectPointer():X}, False={False.AsObjectPointer():X}, True={True.AsObjectPointer():X}, Smalltalk={Smalltalk.AsObjectPointer():X}, ProcessorScheduler={ProcessorScheduler.AsObjectPointer():X}]";
+        return $"SOA[Nil={Nil.ToObjectTableIndex():X}, False={False.ToObjectTableIndex():X}, True={True.ToObjectTableIndex():X}, Smalltalk={Smalltalk.ToObjectTableIndex():X}, ProcessorScheduler={ProcessorScheduler.ToObjectTableIndex():X}]";
     }
 
     // ========================================
@@ -168,11 +169,11 @@ public readonly struct SpecialObjectsArray
     {
         // Create empty SOA (will be populated during bootstrap)
         _instance = new SpecialObjectsArray(
-            SObjectRef.Nil,
-            SObjectRef.Nil,
-            SObjectRef.Nil,
-            SObjectRef.Nil,
-            SObjectRef.Nil
+            SmalltalkOOP.Null,
+            SmalltalkOOP.Null,
+            SmalltalkOOP.Null,
+            SmalltalkOOP.Null,
+            SmalltalkOOP.Null
         );
     }
 
@@ -182,14 +183,13 @@ public readonly struct SpecialObjectsArray
     public static void Initialize(SpecialObjectsArray soa)
     {
         _instance = soa;
-        // Cache nil OOP in SObjectRef for fast nil comparisons
-        Core.Values.SObjectRef.SetNilOop(soa.Nil.AsObjectPointer());
+        // No need to cache nil OOP since we're using SmalltalkOOP directly
     }
 
     /// <summary>
     /// Sets the nil singleton and caches it in SObjectRef.
     /// </summary>
-    public static void SetNil(SObjectRef nilObject)
+    public static void SetNil(SmalltalkOOP nilObject)
     {
         _instance = new SpecialObjectsArray(
             nilObject,
@@ -198,13 +198,12 @@ public readonly struct SpecialObjectsArray
             _instance.Smalltalk,
             _instance.ProcessorScheduler
         );
-        Core.Values.SObjectRef.SetNilOop(nilObject.AsObjectPointer());
     }
 
     /// <summary>
     /// Sets the false singleton.
     /// </summary>
-    public static void SetFalse(SObjectRef falseObject)
+    public static void SetFalse(SmalltalkOOP falseObject)
     {
         _instance = new SpecialObjectsArray(
             _instance.Nil,
@@ -218,7 +217,7 @@ public readonly struct SpecialObjectsArray
     /// <summary>
     /// Sets the true singleton.
     /// </summary>
-    public static void SetTrue(SObjectRef trueObject)
+    public static void SetTrue(SmalltalkOOP trueObject)
     {
         _instance = new SpecialObjectsArray(
             _instance.Nil,
@@ -232,7 +231,7 @@ public readonly struct SpecialObjectsArray
     /// <summary>
     /// Sets the Smalltalk global (SystemDictionary).
     /// </summary>
-    public static void SetSmalltalk(SObjectRef smalltalkObject)
+    public static void SetSmalltalk(SmalltalkOOP smalltalkObject)
     {
         _instance = new SpecialObjectsArray(
             _instance.Nil,
@@ -246,7 +245,7 @@ public readonly struct SpecialObjectsArray
     /// <summary>
     /// Sets the ProcessorScheduler singleton.
     /// </summary>
-    public static void SetProcessorScheduler(SObjectRef processorSchedulerObject)
+    public static void SetProcessorScheduler(SmalltalkOOP processorSchedulerObject)
     {
         _instance = new SpecialObjectsArray(
             _instance.Nil,
@@ -261,7 +260,7 @@ public readonly struct SpecialObjectsArray
     /// Sets the active process (no-op, kept for compatibility).
     /// ActiveProcess is accessed via ProcessorScheduler.activeProcess instance variable.
     /// </summary>
-    public static void SetActiveProcess(SObjectRef activeProcessObject)
+    public static void SetActiveProcess(SmalltalkOOP activeProcessObject)
     {
         // No-op: ActiveProcess is not stored in SOA, it's ProcessorScheduler.activeProcess
         // This method exists for compatibility during migration

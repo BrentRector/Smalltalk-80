@@ -21,12 +21,12 @@ public class PhaseY_InstanceVariableInitialization
 {
     private readonly ColdStartBundle _bundle;
     private readonly SemanticAllocator _allocator;
-    private readonly Dictionary<string, int> _localIdToObjectId;
+    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
 
     public PhaseY_InstanceVariableInitialization(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
-        Dictionary<string, int> localIdToObjectId)
+        Dictionary<string, SmalltalkOOP> localIdToObjectId)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -35,8 +35,6 @@ public class PhaseY_InstanceVariableInitialization
 
     public void Run()
     {
-        Console.WriteLine("Multi-Pass Phase Y: Initializing instance variables with nil...");
-        
         int instanceVariablesInitialized = 0;
         var nilOOP = SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId);
 
@@ -44,20 +42,23 @@ public class PhaseY_InstanceVariableInitialization
         // All class objects should have their instance variables initialized to nil
         foreach (var cls in _bundle.Classes)
         {
-            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out int classObjectId))
+            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
                 continue;
-
-            var classOOP = SmalltalkOOP.FromObjectTableIndex(classObjectId);
             
             // Get the number of instance variables for this type of class object
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
             
-            // Initialize all instance variables to nil (slots 1..N, slot 0 is class reference)
+            // Initialize ONLY uninitialized instance variables to nil (slots 1..N, slot 0 is class reference)
+            // Don't overwrite instance variables that were already set in Phase 4 (like the name field)
             for (int i = 0; i < instVarCount; i++)
             {
-                _allocator.SetInstanceVariable(classOOP, i, nilOOP);
-                instanceVariablesInitialized++;
+                var currentOOP = _allocator.GetInstanceVariable(classOOP, i);
+                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                {
+                    _allocator.SetInstanceVariable(classOOP, i, nilOOP);
+                    instanceVariablesInitialized++;
+                }
             }
         }
 
@@ -65,20 +66,19 @@ public class PhaseY_InstanceVariableInitialization
         InitializeSingletonInstanceVariables("nil", "UndefinedObject", nilOOP);
         InitializeSingletonInstanceVariables("true", "True", nilOOP);
         InitializeSingletonInstanceVariables("false", "False", nilOOP);
+        InitializeSingletonInstanceVariables("ProcessorScheduler", "ProcessorScheduler", nilOOP);
 
         // Step 3: Initialize instance variables for other allocated objects and set JSON values
         // These objects were allocated with class-specific instance variable counts
         // but their instance variables haven't been initialized to nil yet
         foreach (var obj in _bundle.Objects)
         {
-            if (!_localIdToObjectId.TryGetValue(obj.LocalId, out int objectId))
+            if (!_localIdToObjectId.TryGetValue(obj.LocalId, out SmalltalkOOP objectOOP))
                 continue;
                 
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
-            
-            var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
             
             // First: Initialize ALL instance variables to nil
             for (int i = 0; i < instVarCount; i++)
@@ -105,7 +105,6 @@ public class PhaseY_InstanceVariableInitialization
         // Step 4: Initialize SystemDictionary and other special objects
         InitializeSpecialObjectInstanceVariables(nilOOP);
 
-        Console.WriteLine($"DEBUG: Initialized {instanceVariablesInitialized} instance variables with nil");
     }
 
     private void InitializeSingletonInstanceVariables(string globalName, string className, SmalltalkOOP nilOOP)
@@ -115,9 +114,14 @@ public class PhaseY_InstanceVariableInitialization
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
             var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
             
+            // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                _allocator.SetInstanceVariable(objectOOP, i, nilOOP);
+                var currentOOP = _allocator.GetInstanceVariable(objectOOP, i);
+                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                {
+                    _allocator.SetInstanceVariable(objectOOP, i, nilOOP);
+                }
             }
         }
     }
@@ -130,9 +134,14 @@ public class PhaseY_InstanceVariableInitialization
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
             var systemDictOOP = SmalltalkOOP.FromObjectTableIndex(systemDictId);
             
+            // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                _allocator.SetInstanceVariable(systemDictOOP, i, nilOOP);
+                var currentOOP = _allocator.GetInstanceVariable(systemDictOOP, i);
+                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                {
+                    _allocator.SetInstanceVariable(systemDictOOP, i, nilOOP);
+                }
             }
         }
 
@@ -156,7 +165,7 @@ public class PhaseY_InstanceVariableInitialization
             "float" => SmalltalkOOP.FromObjectTableIndex(AllocateFloat(GetFloatValue(value.Value!))),
             "symbolRef" => SmalltalkOOP.FromObjectTableIndex(InternSymbol(_bundle.Symbols[value.Index!.Value])),
             "stringRef" => SmalltalkOOP.FromObjectTableIndex(InternString(_bundle.Strings[value.Index!.Value])),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out int objId) ? SmalltalkOOP.FromObjectTableIndex(objId) : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : SmalltalkOOP.FromObjectTableIndex(GlobalRegistry.NilObjectId),
             "character" => SmalltalkOOP.FromObjectTableIndex(AllocateCharacter(value.CodePoint!.Value)),
             "bytes" => SmalltalkOOP.FromObjectTableIndex(AllocateByteArray(value.Encoding!, value.Data!)),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -179,7 +188,7 @@ public class PhaseY_InstanceVariableInitialization
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_bundle.Symbols[value.Index!.Value]),
             "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out int objId) ? objId : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP.ToObjectTableIndex() : GlobalRegistry.NilObjectId,  // Forward reference: use nil as placeholder, will be patched later
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -237,7 +246,7 @@ public class PhaseY_InstanceVariableInitialization
         {
             _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
         }
-        return floatOOP.AsObjectTableIndex();
+        return floatOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -266,22 +275,8 @@ public class PhaseY_InstanceVariableInitialization
         var stringClassOOP = SmalltalkOOP.FromObjectTableIndex(stringClassId);
         _allocator.SetObjectClass(stringOOP, stringClassOOP);
         
-        int objectId = stringOOP.AsObjectTableIndex();
+        int objectId = stringOOP.ToObjectTableIndex();
         
-        // DEBUG: Track String allocations from Phase Y
-        if (objectId >= 9790 && objectId <= 9800)
-        {
-            Console.WriteLine($"DEBUG PhaseY TRACK: Allocated String objectId={objectId} value='{value.Substring(0, Math.Min(50, value.Length))}'");
-            
-            // Get stack trace
-            var stackTrace = new System.Diagnostics.StackTrace(true);
-            Console.WriteLine($"  Stack trace:");
-            for (int i = 0; i < Math.Min(10, stackTrace.FrameCount); i++)
-            {
-                var frame = stackTrace.GetFrame(i);
-                Console.WriteLine($"    {frame?.GetMethod()?.DeclaringType?.Name}.{frame?.GetMethod()?.Name} line {frame?.GetFileLineNumber()}");
-            }
-        }
         
         return objectId;
     }
@@ -299,7 +294,7 @@ public class PhaseY_InstanceVariableInitialization
 
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
         _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-        return characterOOP.AsObjectTableIndex();
+        return characterOOP.ToObjectTableIndex();
     }
 
     /// <summary>
@@ -319,7 +314,7 @@ public class PhaseY_InstanceVariableInitialization
         int byteArrayClassId = GlobalRegistry.LookupClassObjectId("ByteArray");
         var byteArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(byteArrayClassId);
         _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
-        return byteArrayOOP.AsObjectTableIndex();
+        return byteArrayOOP.ToObjectTableIndex();
     }
 
     /// <summary>

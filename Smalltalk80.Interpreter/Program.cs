@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter;
 
@@ -56,38 +57,44 @@ public static class Program
             var loader = new Loader(bundle, heapManager);
             loader.Run();
 
-            Console.WriteLine("\n=== Executing Init Expressions ===\n");
-
-            // Execute init expressions AFTER cold start completes
-            if (loader.InitExpressionsArrayId != 0 && loader.LayoutResolver != null)
+            // Execute init expressions
+            if (bundle.InitExpressions.Length > 0)
             {
-                var vm = new VirtualMachine(heapManager, loader.LayoutResolver);
+                Console.WriteLine("\n=== Init Expression Execution ===");
+                Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle");
+                
+                if (loader.LayoutResolver == null)
+                {
+                    Console.WriteLine("  ⚠️  Execution skipped - LayoutResolver not available");
+                    return;
+                }
+                
+                var vm = new VirtualMachine(heapManager, loader.LayoutResolver, bundle.Symbols);
+                
+                // Initialize selector caches after cold start completes
+                vm.InitializeSelectorCaches();
+                
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
+                    loader.LayoutResolver,
                     loader.LocalIdToObjectId.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    InitPolicy.ContinueAndCollect,
-                    defaultTimeoutMs: 5000
+                    InitPolicy.AbortOnFirstError,
+                    defaultTimeoutMs: 5000,
+                    symbols: bundle.Symbols,
+                    strings: bundle.Strings,
+                    allocator: loader.Allocator
                 );
-
-                var report = executor.ExecuteAll(loader.InitExpressionsArrayId);
-
-                Console.WriteLine($"\nInit Expression Results:");
-                Console.WriteLine($"  Total: {report.Total}");
-                Console.WriteLine($"  Succeeded: {report.Succeeded}");
-                Console.WriteLine($"  Failed: {report.Failed}");
-                Console.WriteLine($"  Duration: {report.TotalElapsedMilliseconds}ms");
-
+                
+                var report = executor.ExecuteFromBundle(bundle, loader.Allocator);
+                
+                Console.WriteLine($"  Executed: {report.Succeeded}/{bundle.InitExpressions.Length}");
                 if (report.Failed > 0)
                 {
-                    Console.WriteLine($"\n⚠ Failures:");
-                    foreach (var failure in report.Failures.Take(10))
+                    Console.WriteLine($"  ⚠️  Failed: {report.Failed}");
+                    foreach (var result in report.Results.Where(r => r.Status != InitStatus.Success))
                     {
-                        Console.WriteLine($"  - {failure.InitLocalId}: {failure.Status}");
-                        if (failure.Diagnostic != null)
-                        {
-                            Console.WriteLine($"    {failure.Diagnostic.Message}");
-                        }
+                        Console.WriteLine($"    - {result.InitLocalId}: {result.Status} - {result.Diagnostic?.Message}");
                     }
                 }
             }
@@ -95,14 +102,10 @@ public static class Program
             Console.WriteLine("\n✓ All systems ready!");
             Console.WriteLine("Virtual machine initialized successfully.");
 
-            // If --dump-class was specified, dump the class
+            // TODO: Implement --dump-class after ClassPrettyPrinter is migrated to new heap manager
             if (dumpClassName != null)
             {
-                Console.WriteLine();
-                Console.WriteLine($"Dumping class: {dumpClassName}");
-                Console.WriteLine();
-                string classDump = ClassPrettyPrinter.DumpClass(heapManager, dumpClassName);
-                Console.WriteLine(classDump);
+                Console.WriteLine($"\n⚠️  --dump-class not yet implemented (ClassPrettyPrinter not migrated to new heap manager)");
             }
 
             // TODO: Start REPL or execute user code
