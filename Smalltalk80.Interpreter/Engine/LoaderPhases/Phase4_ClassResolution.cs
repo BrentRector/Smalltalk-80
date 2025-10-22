@@ -106,14 +106,26 @@ public class Phase4_ClassResolution
 
             // Set superclass reference
             // IMPORTANT: Skip for metaclasses - their superclass chain is already wired in Phase 3
-            if (!cls.IsMetaclass && cls.SuperNameIndex is int superIdx && 
+            if (!cls.IsMetaclass && cls.SuperNameIndex is int superIdx &&
                 ClassHierarchyUtils.HasInstanceVariable(templateClassName, "superclass", _bundle))
             {
                 string superName = _symbols[superIdx];
-                SmalltalkOOP superOOP = GlobalRegistry.LookupClassOOP(superName);
+
+                // Look up superclass OOP from localIdToObjectId mapping (not using GlobalRegistry)
+                string superLocalId = $"class:{superName}";
+                if (!_localIdToObjectId.TryGetValue(superLocalId, out SmalltalkOOP superOOP))
+                {
+                    throw new InvalidOperationException($"Superclass '{superName}' not found in localIdToObjectId mapping");
+                }
+
                 int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "superclass", _bundle);
                 if (superclassIndex >= 0)
                 {
+                    // Debug Number class specifically
+                    if (className == "Number")
+                    {
+                        Console.WriteLine($"[Phase4] Setting Number.superclass = {superName} (superOOP={superOOP}, superLocalId={superLocalId})");
+                    }
                     SetInstanceVariableUsingPrimitive(classOOP, superclassIndex, superOOP);
                 }
             }

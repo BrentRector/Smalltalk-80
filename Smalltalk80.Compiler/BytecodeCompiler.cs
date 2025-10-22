@@ -310,29 +310,40 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public int AddLiteral(object literal)
         {
-            // Check for existing literal by value equality
-            foreach (var kvp in literalIndex)
-            {
-                if (LiteralsEqual(kvp.Key, literal))
-                    return kvp.Value;
-            }
-
-            int index;
+            // Check if literal is a Symbol
             if (literal is Symbol symbol)
             {
-                // Add to selectors list (will be at beginning of literal frame)
-                index = selectors.Count;
+                // Search through selectors list
+                for (int i = 0; i < selectors.Count; i++)
+                {
+                    if (LiteralsEqual(selectors[i], literal))
+                    {
+                        return i;  // Selectors are at indices 0..N-1
+                    }
+                }
+
+                // Not found - add new selector
+                int index = selectors.Count;
                 selectors.Add(symbol);
+                return index;
             }
             else
             {
-                // Add to other literals (will come after selectors in literal frame)
-                index = selectors.Count + otherLiterals.Count;
-                otherLiterals.Add(literal);
-            }
+                // Search through otherLiterals list
+                for (int i = 0; i < otherLiterals.Count; i++)
+                {
+                    if (LiteralsEqual(otherLiterals[i], literal))
+                    {
+                        // Return index = selectors.Count + position in otherLiterals
+                        return selectors.Count + i;
+                    }
+                }
 
-            literalIndex[literal] = index;
-            return index;
+                // Not found - add new literal
+                int index = selectors.Count + otherLiterals.Count;
+                otherLiterals.Add(literal);
+                return index;
+            }
         }
         
         private bool LiteralsEqual(object a, object b)

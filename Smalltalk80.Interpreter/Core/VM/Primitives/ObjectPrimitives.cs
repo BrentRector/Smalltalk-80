@@ -116,12 +116,11 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Allocate a new instance with no indexed fields
-        // The class is responsible for initialization via #initialize
-        // We allocate with size 0 for fixed-size objects
+        // Allocate a new instance of the receiver class with no indexed fields
+        // Uses heap data only - reads the class's format and instance variable count
         try
         {
-            return ctx.AllocateObject("class:Object", 0);
+            return ctx.HeapManager.AllocateInstanceOf(receiver, 0);
         }
         catch
         {
@@ -158,11 +157,12 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Allocate indexed object of given size
+        // Allocate indexed object of the receiver class with given size
+        // Uses heap data only - reads the class's format and instance variable count
         // Used for Array new: n, ByteArray new: n, etc.
         try
         {
-            return ctx.AllocateObject("class:Array", size);
+            return ctx.HeapManager.AllocateInstanceOf(receiver, size);
         }
         catch
         {

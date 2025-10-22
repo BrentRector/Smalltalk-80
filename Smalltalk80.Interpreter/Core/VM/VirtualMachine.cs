@@ -1768,19 +1768,27 @@ public class VirtualMachine : IPrimitiveContext
         // Walk up the inheritance chain until we find the method or reach nil
         while (currentClassOOP != GlobalRegistry.NilOOP && depth < maxDepth)
         {
-            Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassOOP} ({GetClassName(currentClassOOP)}), looking for '{selectorName}'");
+            string currentClassName = GetClassName(currentClassOOP);
+            Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
 
             // Get the method dictionary from the class
             int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
             var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
-            Console.WriteLine($"    methodDict={methodDictOOP}");
 
             if (methodDictOOP == GlobalRegistry.NilOOP)
             {
                 // No method dictionary, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
                 var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
-                Console.WriteLine($"    no methodDict, trying superclass={superclassOOP}");
+
+                if (superclassOOP == GlobalRegistry.NilOOP)
+                {
+                    Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
+                    break; // Reached root of class hierarchy
+                }
+
+                string superclassName = GetClassName(superclassOOP);
+                Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
                 currentClassOOP = superclassOOP;
                 depth++;
                 continue;
@@ -1798,14 +1806,14 @@ public class VirtualMachine : IPrimitiveContext
                 // No values array, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
                 var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
-                Console.WriteLine($"    no valuesArray, trying superclass={superclassOOP}");
+                string superclassName = GetClassName(superclassOOP);
+                Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
                 currentClassOOP = superclassOOP;
                 depth++;
                 continue;
             }
 
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
-            Console.WriteLine($"    searching methodDict with {dictSize} entries");
 
             for (int i = 0; i < dictSize; i++)
             {
@@ -1822,7 +1830,6 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     // Found it! Get the method from the valuesArray at the same index
                     var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
-                    Console.WriteLine($"    FOUND '{selectorName}' at index {i}, method={methodOOP}");
                     return new MethodInfo { MethodOOP = methodOOP };
                 }
             }
@@ -1830,7 +1837,17 @@ public class VirtualMachine : IPrimitiveContext
             // Not found in this class, try superclass
             int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
-            Console.WriteLine($"    '{selectorName}' not found, trying superclass={nextSuperclassOOP}");
+
+            if (nextSuperclassOOP == GlobalRegistry.NilOOP)
+            {
+                Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
+            }
+            else
+            {
+                string nextSuperclassName = GetClassName(nextSuperclassOOP);
+                Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
+            }
+
             currentClassOOP = nextSuperclassOOP;
             depth++;
         }

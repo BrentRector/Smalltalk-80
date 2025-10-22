@@ -19,6 +19,17 @@ public interface ISmalltalkHeapManager
     /// <returns>Tagged OOP referencing new object</returns>
     SmalltalkOOP AllocateObject(ObjectFormat format, int fixedSlots, int indexedSize);
 
+    /// <summary>
+    /// Allocates a new instance of the given class by reading its format and layout from the heap.
+    /// This is the proper way for primitives to allocate objects - uses only heap data.
+    /// Reads the class's format field (instance variable 2 in Behavior) to determine object layout.
+    /// Sets the new instance's class reference (slot 0) to classOOP.
+    /// </summary>
+    /// <param name="classOOP">Class object pointer (receiver of 'new' or 'new:' message)</param>
+    /// <param name="indexedSize">Number of indexed elements (0 for 'new', n for 'new: n')</param>
+    /// <returns>Tagged OOP referencing new instance</returns>
+    SmalltalkOOP AllocateInstanceOf(SmalltalkOOP classOOP, int indexedSize);
+
 
     /// <summary>
     /// Raw slot access - gets OOP from any slot (semantic-agnostic).

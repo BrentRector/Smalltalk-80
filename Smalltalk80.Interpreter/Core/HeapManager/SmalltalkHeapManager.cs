@@ -90,6 +90,53 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return SmalltalkOOP.FromObjectTableIndex(tableIndex);
     }
 
+    public SmalltalkOOP AllocateInstanceOf(SmalltalkOOP classOOP, int indexedSize)
+    {
+        // Receiver must be a valid class object (not SmallInteger)
+        if (classOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot allocate instance of SmallInteger", nameof(classOOP));
+
+        // Read the class's format field (instance variable 2 in Behavior hierarchy)
+        // Behavior: superclass(0), methodDict(1), format(2), subclasses(3)
+        SmalltalkOOP formatOOP = GetInstanceVariable(classOOP, 2);
+
+        if (!formatOOP.IsSmallInteger)
+            throw new InvalidOperationException($"Class format field must be a SmallInteger, got {formatOOP}");
+
+        // Decode the format SmallInteger
+        // Format encoding (from ColdStartJsonGenerator.cs CalculateFormatWord):
+        // - Bits 12-13: instanceSpec (instance specification: 01=pointer, 10=word-indexable, 11=byte-indexable)
+        // - Bits 6-11: fixedFieldCount (number of instance variables, 0-63)
+        // - Bit 4: isIndexable flag
+        // - Bit 3: hasPointers flag
+        int formatValue = formatOOP.AsSmallInteger();
+        int instanceSpec = (formatValue >> 12) & 0x03;
+        int instanceVariableCount = (formatValue >> 6) & 0x3F; // Bits 6-11
+        bool isIndexable = (formatValue & 0x10) != 0;
+        bool hasPointers = (formatValue & 0x08) != 0;
+
+        // Decode object format using the same logic as Phase2
+        ObjectFormat format = instanceSpec switch
+        {
+            0x00 => ObjectFormat.Pointer, // Fixed pointer objects
+            0x01 => ObjectFormat.Pointer, // Fixed pointer objects
+            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed, // Variable pointer objects
+            0x02 when hasPointers && !isIndexable => ObjectFormat.Pointer, // Fixed pointer objects
+            0x02 when !hasPointers && isIndexable => ObjectFormat.ByteIndexed, // ByteIndexed objects
+            0x02 when !hasPointers && !isIndexable => ObjectFormat.WordIndexed, // Word objects
+            0x03 => ObjectFormat.ByteIndexed, // Byte objects
+            _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}")
+        };
+
+        // Allocate the object with the decoded format
+        SmalltalkOOP newInstanceOOP = AllocateObject(format, instanceVariableCount, indexedSize);
+
+        // Set the new instance's class reference (slot 0) to the class
+        SetSlot(newInstanceOOP, 0, classOOP);
+
+        return newInstanceOOP;
+    }
+
 
     /// <summary>
     /// Raw slot access - gets OOP from any slot (semantic-agnostic).
@@ -227,7 +274,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         // Validate index
         if (index < 0 || index >= instanceVarCount)
-            throw new ArgumentOutOfRangeException(nameof(index), 
+            throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
 
         // Read from memory: skip header (4 bytes) + index * 4 bytes

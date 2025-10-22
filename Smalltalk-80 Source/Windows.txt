@@ -1,0 +1,1328 @@
+"==================== FileSystem ===================="
+
+Object subclass: #FileSystem
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+"==================== WindowsFileSystem ===================="
+
+FileSystem subclass: #WindowsFileSystem
+    instanceVariableNames: 'currentDrive'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+WindowsFileSystem comment:
+'I am the Windows file system that manages drive letters and volumes.'!
+
+!WindowsFileSystem methodsFor: 'initialization'!
+
+initialize
+    "Initialize with C: as default drive."
+    super initialize.
+    currentDrive := $C.
+    ^self!
+
+!WindowsFileSystem methodsFor: 'accessing'!
+
+drives
+    "Answer available drives. Primitive 135: GetDriveListPrimitive"
+    | driveString drives |
+    driveString := self primGetDrives.
+    drives := OrderedCollection new.
+    2 to: driveString size do: [:i |
+        (driveString at: i) = $: ifTrue: [
+            drives add: (driveString at: i - 1)]].
+    ^drives!
+
+currentDrive
+    "Answer current drive letter."
+    ^currentDrive!
+
+rootFor: aDriveCharacter
+    "Answer root path for a drive."
+    ^WindowsPathName newFromDrive: aDriveCharacter!
+
+changeDrive: aDriveCharacter
+    "Change current drive."
+    currentDrive := aDriveCharacter.
+    ^self!
+
+!WindowsFileSystem methodsFor: 'private'!
+
+primGetDrives
+    "Private - Get drive list primitive"
+    <primitive: 135>
+    ^'C:D:E:'!
+
+!WindowsFileSystem class methodsFor: 'class initialization'!
+
+initialize
+    "Class-side initialization if needed."
+    ^self!
+
+WindowsFileSystem class
+    instanceVariableNames: ''!
+
+WindowsFileSystem initialize!
+
+"==================== PathName ===================="
+
+Object subclass: #PathName
+    instanceVariableNames: 'components'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Paths'!
+
+PathName comment:
+'I am an abstract representation of a file system path.
+My subclasses implement platform-specific formatting and parsing.'!
+
+!PathName methodsFor: 'accessing'!
+
+components
+    ^components!
+
+components: aCollection
+    components := aCollection.
+    ^self!
+
+fileName
+    ^components isEmpty ifTrue: [''] ifFalse: [components last]!
+
+directoryName
+    ^components allButLast joinUsing: '\'!
+
+PathName class
+    instanceVariableNames: ''!
+
+"==================== WindowsPathName ===================="
+
+PathName subclass: #WindowsPathName
+    instanceVariableNames: 'driveLetter'
+    classVariableNames: 'PathSeparator'
+    poolDictionaries: ''
+    category: 'Files-Paths'!
+
+WindowsPathName comment:
+'I represent a Windows file system path with drive letters and backslash separators.
+I handle both regular paths (C:\dir\file.ext) and UNC paths (\\server\share\path).'!
+
+!WindowsPathName class methodsFor: 'class initialization'!
+
+initialize
+    "Initialize class variables."
+    PathSeparator := '\'.
+    ^self!
+
+!WindowsPathName class methodsFor: 'instance creation'!
+
+newFromDrive: aDriveCharacter
+    "Create a root path for a drive."
+    ^self new
+        driveLetter: aDriveCharacter;
+        components: #();
+        yourself!
+
+!WindowsPathName methodsFor: 'initialization'!
+
+pathNameFromString: aString
+    "Parse a Windows path string. Primitive 120: PathParsePrimitive"
+    <primitive: 120>
+    | parts |
+    (aString size >= 2 and: [(aString at: 2) = $:]) ifTrue: [
+        driveLetter := aString at: 1.
+        parts := (aString copyFrom: 3 to: aString size) findTokens: PathSeparator.
+        components := parts select: [:p | p notEmpty]].
+    (aString beginsWith: '\\') ifTrue: [
+        driveLetter := nil.
+        parts := (aString copyFrom: 3 to: aString size) findTokens: PathSeparator.
+        components := parts].
+    components ifNil: [
+        driveLetter := nil.
+        components := aString findTokens: PathSeparator].
+    ^self!
+
+!WindowsPathName methodsFor: 'accessing'!
+
+driveLetter
+    "Answer the drive letter or nil for UNC/relative paths."
+    ^driveLetter!
+
+driveLetter: aCharacter
+    "Set the drive letter."
+    driveLetter := aCharacter.
+    ^self!
+
+isAbsolute
+    "Answer whether this is an absolute path."
+    ^driveLetter notNil or: [self isUNC]!
+
+isUNC
+    "Answer whether this is a UNC path."
+    ^driveLetter isNil and: [components size >= 2]!
+
+asString
+    "Answer the path as a Windows string."
+    | stream |
+    stream := WriteStream on: (String new: 100).
+    driveLetter ifNotNil: [
+        stream nextPut: driveLetter; nextPut: $:].
+    self isUNC ifTrue: [
+        stream nextPutAll: '\\'].
+    components do: [:comp |
+        stream nextPut: PathSeparator; nextPutAll: comp].
+    ^stream contents!
+
+WindowsPathName class
+    instanceVariableNames: ''!
+
+"==================== WindowsFile ===================="
+
+Object subclass: #WindowsFile
+    instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'System-Files'!
+
+WindowsFile comment:
+'I represent a file in the Windows file system. I provide basic file operations
+using primitives 90–100 which interface directly with the Windows OS file system.'!
+
+!WindowsFile class methodsFor: 'instance creation'!
+
+named: aFileName
+    ^self new openNamed: aFileName mode: 'r'!
+
+named: aFileName mode: modeString
+    ^self new openNamed: aFileName mode: modeString!
+
+!WindowsFile methodsFor: 'file operations'!
+
+openNamed: aFileName mode: modeString
+    <primitive: 98>
+    fileHandle := self primOpen: aFileName mode: modeString.
+    fileName := aFileName.
+    position := 0.
+    readLimit := self size.
+    writeLimit := self size.
+    isBinary := false.
+    ^self!
+
+close
+    <primitive: 99>
+    fileHandle ifNotNil: [
+        self primClose: fileHandle.
+        fileHandle := nil].
+    ^self!
+
+delete
+    <primitive: 100>
+    self close.
+    self primDelete: fileName.
+    ^self!
+
+!WindowsFile methodsFor: 'accessing'!
+
+size
+    <primitive: 92>
+    ^self primSize: fileHandle!
+
+position
+    <primitive: 93>
+    ^position!
+
+position: anInteger
+    <primitive: 94>
+    self primSetPosition: fileHandle to: anInteger.
+    position := anInteger.
+    ^self!
+
+fileName
+    ^fileName!
+
+isBinary
+    ^isBinary!
+
+binary
+    isBinary := true.
+    ^self!
+
+text
+    isBinary := false.
+    ^self!
+
+!WindowsFile methodsFor: 'reading'!
+
+next
+    | byte |
+    byte := self nextByte.
+    isBinary ifTrue: [^byte].
+    byte = 13 ifTrue: [
+        self peek = 10 ifTrue: [position := position + 1]].
+    ^byte!
+
+nextByte
+    <primitive: 91>
+    | byte |
+    byte := self primAt: fileHandle position: position.
+    position := position + 1.
+    ^byte!
+
+peek
+    ^self primAt: fileHandle position: position!
+
+next: count
+    | bytes |
+    bytes := ByteArray new: count.
+    1 to: count do: [:i | bytes at: i put: self nextByte].
+    ^bytes!
+
+nextWord
+    | low high |
+    low := self nextByte.
+    high := self nextByte.
+    ^(high bitShift: 8) + low!
+
+!WindowsFile methodsFor: 'writing'!
+
+nextPut: aByte
+    isBinary 
+        ifTrue: [self nextPutByte: aByte]
+        ifFalse: [
+            self nextPutByte: aByte.
+            aByte = 13 ifTrue: [self nextPutByte: 10]].
+    ^aByte!
+
+nextPutByte: aByte
+    <primitive: 90>
+    self primAt: fileHandle position: position put: aByte.
+    position := position + 1.
+    ^aByte!
+
+nextPutAll: aCollection
+    aCollection do: [:byte | self nextPut: byte].
+    ^aCollection!
+
+nextWordPut: anInteger
+    self nextPutByte: (anInteger bitAnd: 255).
+    self nextPutByte: ((anInteger bitShift: -8) bitAnd: 255).
+    ^anInteger!
+
+cr
+    self nextPut: 13!
+
+lf
+    self nextPut: 10!
+
+crlf
+    self cr; lf!
+
+flush
+    "No explicit flush primitive — handled by OS."
+    ^self!
+
+!WindowsFile methodsFor: 'testing'!
+
+atEnd
+    ^position >= self size!
+
+exists
+    ^fileHandle notNil!
+
+!WindowsFile methodsFor: 'positioning'!
+
+reset
+    self position: 0!
+
+skip: anInteger
+    self position: position + anInteger!
+
+setToEnd
+    self position: self size!
+
+!WindowsFile methodsFor: 'private-primitives'!
+
+primOpen: aFileName mode: modeString
+    <primitive: 98>
+    self primitiveFailed!
+
+primClose: handle
+    <primitive: 99>
+    self primitiveFailed!
+
+primDelete: aFileName
+    <primitive: 100>
+    self primitiveFailed!
+
+primAt: handle position: pos
+    <primitive: 91>
+    self primitiveFailed!
+
+primAt: handle position: pos put: byte
+    <primitive: 90>
+    self primitiveFailed!
+
+primSize: handle
+    <primitive: 92>
+    self primitiveFailed!
+
+primPosition: handle
+    <primitive: 93>
+    self primitiveFailed!
+
+primSetPosition: handle to: pos
+    <primitive: 94>
+    self primitiveFailed!
+
+WindowsFile class
+    instanceVariableNames: ''!
+
+"==================== WindowsFileDirectory ===================="
+
+Object subclass: #WindowsFileDirectory
+    instanceVariableNames: 'pathName'
+    classVariableNames: 'PathSeparator CurrentDirectory'
+    poolDictionaries: ''
+    category: 'System-Files'!
+
+WindowsFileDirectory comment:
+'I represent a directory in the Windows file system.'!
+
+!WindowsFileDirectory class methodsFor: 'class initialization'!
+
+initialize
+    "Initialize class variables."
+    PathSeparator := '\'.
+    CurrentDirectory := '.'.
+    ^self!
+
+!WindowsFileDirectory class methodsFor: 'instance creation'!
+
+on: aPathName
+    "Answer a new instance for the given path."
+    ^self new setPath: aPathName!
+
+current
+    "Answer the current working directory."
+    ^self on: CurrentDirectory!
+
+default
+    "Answer the default directory."
+    ^self current!
+
+!WindowsFileDirectory class methodsFor: 'accessing'!
+
+pathSeparator
+    "Answer the path separator character."
+    ^PathSeparator!
+
+!WindowsFileDirectory methodsFor: 'initialize-release'!
+
+setPath: aPath
+    "Set the directory path."
+    pathName := aPath.
+    ^self!
+
+!WindowsFileDirectory methodsFor: 'accessing'!
+
+pathName
+    "Answer the full path of this directory."
+    ^pathName!
+
+fullNameFor: fileName
+    "Answer the full path for a file in this directory."
+    ^pathName, PathSeparator, fileName!
+
+!WindowsFileDirectory methodsFor: 'file operations'!
+
+fileNamed: fileName
+    "Answer a WindowsFile for the given filename in this directory."
+    | fullPath |
+    fullPath := self fullNameFor: fileName.
+    ^WindowsFile named: fullPath!
+
+oldFileNamed: fileName
+    "Answer an existing file or nil."
+    | file |
+    file := self fileNamed: fileName.
+    [file size] on: Error do: [^nil].
+    ^file!
+
+newFileNamed: fileName
+    "Answer a new file, creating it if needed."
+    ^self fileNamed: fileName!
+
+!WindowsFileDirectory methodsFor: 'directory operations'!
+
+directoryNamed: dirName
+    "Answer a subdirectory."
+    ^self class on: (self fullNameFor: dirName)!
+
+entries
+    "Answer a collection of file and directory names. Primitive 95."
+    <primitive: 95>
+    ^self primLookup: pathName pattern: '*'!
+
+fileNames
+    "Answer only the file names."
+    ^self entries select: [:name | (name endsWith: PathSeparator) not]!
+
+directoryNames
+    "Answer only the directory names."
+    ^self entries select: [:name | name endsWith: PathSeparator]!
+
+!WindowsFileDirectory methodsFor: 'testing'!
+
+exists: fileName
+    "Answer whether the named file exists."
+    | file |
+    [file := self fileNamed: fileName.
+     file close.
+     ^true] on: Error do: [^false]!
+
+includesKey: fileName
+    "Answer whether a file with the given name exists."
+    ^self exists: fileName!
+
+!WindowsFileDirectory methodsFor: 'private-primitives'!
+
+primLookup: dirPath pattern: pattern
+    <primitive: 95>
+    ^OrderedCollection new!
+
+WindowsFileDirectory class
+    instanceVariableNames: ''!
+
+WindowsFileDirectory initialize!
+
+"==================== FileReference ===================="
+
+Object subclass: #FileReference
+    instanceVariableNames: 'pathName'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+FileReference comment:
+'I am an abstract reference to a file in the file system.
+My subclasses provide platform-specific implementations.'!
+
+!FileReference methodsFor: 'accessing'!
+
+pathName
+    "Answer the path name."
+    ^pathName!
+
+pathName: aPathName
+    "Set the path name."
+    pathName := aPathName.
+    ^self!
+
+fileName
+    "Answer the file name."
+    ^pathName fileName!
+
+directory
+    "Answer the directory containing this file."
+    ^DirectoryReference pathName: pathName directoryName!
+
+!FileReference methodsFor: 'operations'!
+
+openRead
+    self subclassResponsibility!
+
+openWrite
+    self subclassResponsibility!
+
+openAppend
+    self subclassResponsibility!
+
+close
+    self subclassResponsibility!
+
+delete
+    self subclassResponsibility!
+
+rename: newName
+    self subclassResponsibility!
+
+size
+    self subclassResponsibility!
+
+exists
+    self subclassResponsibility!
+
+!FileReference class methodsFor: 'instance creation'!
+
+pathName: aPathName
+    ^self new pathName: aPathName!
+
+fileName: aString
+    ^self pathName: (WindowsPathName fromString: aString)!
+
+FileReference class
+    instanceVariableNames: ''!
+
+"==================== WindowsFileReference ===================="
+
+FileReference subclass: #WindowsFileReference
+    instanceVariableNames: 'handle'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+WindowsFileReference comment:
+'I represent a Windows file reference using Win32 file handles.
+I implement file operations using Windows primitives.'!
+
+!WindowsFileReference methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    handle := -1.
+    ^self!
+
+!WindowsFileReference methodsFor: 'accessing'!
+
+handle
+    ^handle!
+
+!WindowsFileReference methodsFor: 'operations'!
+
+openRead
+    <primitive: 121>
+    handle := self primOpen: pathName asString 
+        accessMode: 1
+        shareMode: 1
+        createMode: 3.
+    handle < 0 ifTrue: [self error: 'Cannot open file for reading'].
+    ^self!
+
+openWrite
+    <primitive: 121>
+    handle := self primOpen: pathName asString
+        accessMode: 2
+        shareMode: 0
+        createMode: 2.
+    handle < 0 ifTrue: [self error: 'Cannot open file for writing'].
+    ^self!
+
+openAppend
+    <primitive: 121>
+    handle := self primOpen: pathName asString
+        accessMode: 2
+        shareMode: 0
+        createMode: 4.
+    handle < 0 ifTrue: [self error: 'Cannot open file for appending'].
+    self seekToEnd.
+    ^self!
+
+close
+    <primitive: 122>
+    handle >= 0 ifTrue: [
+        self primClose: handle.
+        handle := -1].
+    ^self!
+
+delete
+    <primitive: 125>
+    self close.
+    self primDelete: pathName asString.
+    ^self!
+
+rename: newName
+    <primitive: 126>
+    | oldPath newPath |
+    self close.
+    oldPath := pathName asString.
+    newPath := newName isString 
+        ifTrue: [newName]
+        ifFalse: [newName asString].
+    self primMove: oldPath to: newPath.
+    pathName := WindowsPathName fromString: newPath.
+    ^self!
+
+size
+    <primitive: 130>
+    | attrs |
+    attrs := self primGetAttributes: pathName asString.
+    attrs ifNil: [^0].
+    ^attrs at: #size ifAbsent: [0]!
+
+exists
+    <primitive: 130>
+    | attrs |
+    attrs := self primGetAttributes: pathName asString.
+    ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]!
+
+!WindowsFileReference methodsFor: 'private'!
+
+seekToEnd
+    <primitive: 124>
+    self primSeek: handle offset: 0 origin: 2.
+    ^self!
+
+primOpen: path accessMode: access shareMode: share createMode: create
+    <primitive: 121>
+    ^-1!
+
+primClose: aHandle
+    <primitive: 122>
+    ^false!
+
+primDelete: path
+    <primitive: 125>
+    self error: 'Cannot delete file'!
+
+primMove: oldPath to: newPath
+    <primitive: 126>
+    self error: 'Cannot rename file'!
+
+primSeek: aHandle offset: offset origin: origin
+    <primitive: 124>
+    ^-1!
+
+primGetAttributes: path
+    <primitive: 130>
+    ^nil!
+
+WindowsFileReference class
+    instanceVariableNames: ''!
+
+"==================== DirectoryReference ===================="
+
+Object subclass: #DirectoryReference
+    instanceVariableNames: 'pathName'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+DirectoryReference comment:
+'I am an abstract reference to a directory in the file system.
+My subclasses provide platform-specific implementations.'!
+
+!DirectoryReference methodsFor: 'accessing'!
+
+pathName
+    ^pathName!
+
+pathName: aPathName
+    pathName := aPathName.
+    ^self!
+
+directoryName
+    ^pathName asString!
+
+!DirectoryReference methodsFor: 'operations'!
+
+create
+    self subclassResponsibility!
+
+delete
+    self subclassResponsibility!
+
+entries
+    self subclassResponsibility!
+
+nextEntry
+    self subclassResponsibility!
+
+reset
+    self subclassResponsibility!
+
+!DirectoryReference class methodsFor: 'instance creation'!
+
+pathName: aPathName
+    ^self new pathName: aPathName!
+
+directoryName: aString
+    ^self pathName: (WindowsPathName fromString: aString)!
+
+DirectoryReference class
+    instanceVariableNames: ''!
+
+"==================== WindowsDirectoryReference ===================="
+
+DirectoryReference subclass: #WindowsDirectoryReference
+    instanceVariableNames: 'findHandle'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-References'!
+
+WindowsDirectoryReference comment:
+'I represent a Windows directory reference using Win32 directory handles.
+I implement directory operations using Windows primitives.'!
+
+!WindowsDirectoryReference methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    findHandle := -1.
+    ^self!
+
+!WindowsDirectoryReference methodsFor: 'operations'!
+
+create
+    <primitive: 127>
+    self primCreateDirectory: pathName asString.
+    ^self!
+
+delete
+    <primitive: 128>
+    self primRemoveDirectory: pathName asString.
+    ^self!
+
+entries
+    | result entry pattern |
+    result := OrderedCollection new.
+    pattern := pathName asString, '\*'.
+
+    findHandle := self primFindFirst: pattern.
+    findHandle < 0 ifTrue: [^result].
+
+    entry := self primGetFindData: findHandle.
+    entry ifNotNil: [result add: entry].
+
+    [entry := self nextEntry.
+     entry notNil] whileTrue: [result add: entry].
+
+    self primFindClose: findHandle.
+    findHandle := -1.
+
+    ^result!
+
+nextEntry
+    <primitive: 133>
+    findHandle < 0 ifTrue: [^nil].
+    ^self primFindNext: findHandle!
+
+reset
+    | pattern |
+    findHandle >= 0 ifTrue: [
+        self primFindClose: findHandle.
+        findHandle := -1].
+    pattern := pathName asString, '\*'.
+    findHandle := self primFindFirst: pattern.
+    ^self!
+
+!WindowsDirectoryReference methodsFor: 'private'!
+
+primCreateDirectory: path
+    <primitive: 127>
+    self error: 'Cannot create directory'!
+
+primRemoveDirectory: path
+    <primitive: 128>
+    self error: 'Cannot remove directory'!
+
+primFindFirst: pattern
+    <primitive: 132>
+    ^-1!
+
+primFindNext: handle
+    <primitive: 133>
+    ^nil!
+
+primFindClose: handle
+    <primitive: 134>
+    ^false!
+
+primGetFindData: handle
+    "This would return a dictionary with file name and attributes"
+    ^nil!
+
+WindowsDirectoryReference class
+    instanceVariableNames: ''!
+
+"==================== ExternalBinaryStream ===================="
+
+Stream subclass: #ExternalBinaryStream
+    instanceVariableNames: 'fileReference position'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+ExternalBinaryStream comment:
+'I am an abstract binary stream for external file I/O.
+My subclasses provide platform-specific implementations.'!
+
+!ExternalBinaryStream methodsFor: 'accessing'!
+
+fileReference
+    ^fileReference!
+
+fileReference: aFileReference
+    fileReference := aFileReference.
+    ^self!
+
+position
+    ^position!
+
+position: anInteger
+    position := anInteger.
+    self setPosition: anInteger.
+    ^self!
+
+size
+    ^fileReference size!
+
+!ExternalBinaryStream methodsFor: 'reading'!
+
+basicRead: count
+    self subclassResponsibility!
+
+next
+    | buffer |
+    buffer := self basicRead: 1.
+    buffer isEmpty ifTrue: [^nil].
+    ^buffer at: 1!
+
+next: count
+    ^self basicRead: count!
+
+!ExternalBinaryStream methodsFor: 'writing'!
+
+basicWrite: buffer
+    self subclassResponsibility!
+
+nextPut: aByte
+    self basicWrite: (ByteArray with: aByte).
+    ^aByte!
+
+nextPutAll: aCollection
+    self basicWrite: aCollection asByteArray.
+    ^aCollection!
+
+!ExternalBinaryStream methodsFor: 'positioning'!
+
+setPosition: anOffset
+    self subclassResponsibility!
+
+reset
+    self position: 0!
+
+setToEnd
+    self position: self size!
+
+atEnd
+    ^position >= self size!
+
+!ExternalBinaryStream methodsFor: 'open/close'!
+
+close
+    fileReference close.
+    ^self!
+
+flush
+    ^self!
+
+ExternalBinaryStream class
+    instanceVariableNames: ''!
+
+"==================== WindowsFileStream ===================="
+
+ExternalBinaryStream subclass: #WindowsFileStream
+    instanceVariableNames: 'handle buffer bufferPosition bufferSize'
+    classVariableNames: 'BufferSize'
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+WindowsFileStream comment:
+'I am a Windows binary file stream using Win32 file I/O.
+I use buffering for efficient read/write operations.'!
+
+!WindowsFileStream class methodsFor: 'class initialization'!
+
+initialize
+    BufferSize := 4096.
+    ^self!
+
+!WindowsFileStream methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    buffer := ByteArray new: BufferSize.
+    bufferPosition := 0.
+    bufferSize := 0.
+    position := 0.
+    ^self!
+
+!WindowsFileStream methodsFor: 'open/close'!
+
+on: aWindowsFileReference
+    fileReference := aWindowsFileReference.
+    handle := aWindowsFileReference handle.
+    position := 0.
+    bufferPosition := 0.
+    bufferSize := 0.
+    ^self!
+
+on: aWindowsFileReference mode: modeSymbol
+    modeSymbol = #read ifTrue: [aWindowsFileReference openRead].
+    modeSymbol = #write ifTrue: [aWindowsFileReference openWrite].
+    modeSymbol = #append ifTrue: [aWindowsFileReference openAppend].
+    self on: aWindowsFileReference.
+    ^self!
+
+!WindowsFileStream methodsFor: 'reading'!
+
+basicRead: count
+    <primitive: 123>
+    | result bytesRead |
+    result := ByteArray new: count.
+    bytesRead := self primRead: handle into: result count: count.
+    bytesRead < count ifTrue: [
+        result := result copyFrom: 1 to: bytesRead].
+    position := position + bytesRead.
+    ^result!
+
+!WindowsFileStream methodsFor: 'writing'!
+
+basicWrite: buffer
+    <primitive: 123>
+    | bytesWritten |
+    bytesWritten := self primWrite: handle from: buffer count: buffer size.
+    position := position + bytesWritten.
+    ^bytesWritten!
+
+!WindowsFileStream methodsFor: 'positioning'!
+
+setPosition: anOffset
+    <primitive: 124>
+    self primSeek: handle offset: anOffset origin: 0.
+    position := anOffset.
+    ^self!
+
+!WindowsFileStream methodsFor: 'private'!
+
+primRead: aHandle into: buffer count: count
+    <primitive: 123>
+    ^0!
+
+primWrite: aHandle from: buffer count: count
+    <primitive: 123>
+    ^0!
+
+primSeek: aHandle offset: offset origin: origin
+    <primitive: 124>
+    ^-1!
+
+WindowsFileStream class
+    instanceVariableNames: ''!
+
+"==================== ExternalTextStream ===================="
+
+ExternalBinaryStream subclass: #ExternalTextStream
+    instanceVariableNames: 'binaryStream encoding lineEnding'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+ExternalTextStream comment:
+'I am a text stream layered over a binary stream.
+I handle character encoding and line ending normalization for text I/O.'!
+
+!ExternalTextStream methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    encoding := #ascii.
+    lineEnding := #crlf.
+    ^self!
+
+on: aBinaryStream
+    binaryStream := aBinaryStream.
+    position := 0.
+    ^self!
+
+on: aBinaryStream encoding: enc lineEnding: le
+    binaryStream := aBinaryStream.
+    encoding := enc.
+    lineEnding := le.
+    position := 0.
+    ^self!
+
+!ExternalTextStream methodsFor: 'accessing'!
+
+encoding
+    ^encoding!
+
+encoding: anEncoding
+    encoding := anEncoding.
+    ^self!
+
+lineEnding
+    ^lineEnding!
+
+lineEnding: aSymbol
+    lineEnding := aSymbol.
+    ^self!
+
+!ExternalTextStream methodsFor: 'reading'!
+
+next
+    | byte |
+    byte := binaryStream next.
+    byte isNil ifTrue: [^nil].
+    ^Character value: byte!
+
+nextLine
+    | line char |
+    line := WriteStream on: String new.
+    [char := self next.
+     char notNil and: [char ~= Character cr and: [char ~= Character lf]]] whileTrue: [
+        line nextPut: char].
+    (char = Character cr and: [self peek = Character lf]) ifTrue: [self next].
+    ^line contents!
+
+peek
+    | byte |
+    byte := binaryStream next.
+    binaryStream position := binaryStream position - 1.
+    byte isNil ifTrue: [^nil].
+    ^Character value: byte!
+
+!ExternalTextStream methodsFor: 'writing'!
+
+nextPut: aCharacter
+    binaryStream nextPut: aCharacter asciiValue.
+    ^aCharacter!
+
+nextPutAll: aString
+    aString do: [:char | self nextPut: char].
+    ^aString!
+
+nextLinePut: aString
+    self nextPutAll: aString.
+    lineEnding = #crlf ifTrue: [self crlf].
+    lineEnding = #lf ifTrue: [self lf].
+    lineEnding = #cr ifTrue: [self cr].
+    ^aString!
+
+cr
+    self nextPut: Character cr!
+
+lf
+    self nextPut: Character lf!
+
+crlf
+    self cr; lf!
+
+!ExternalTextStream methodsFor: 'positioning'!
+
+setPosition: anOffset
+    binaryStream setPosition: anOffset.
+    position := anOffset.
+    ^self!
+
+reset
+    self setPosition: 0!
+
+setToEnd
+    self setPosition: self size!
+
+atEnd
+    ^binaryStream atEnd!
+
+!ExternalTextStream methodsFor: 'open/close'!
+
+close
+    binaryStream close.
+    ^self!
+
+flush
+    binaryStream flush.
+    ^self!
+
+ExternalTextStream class
+    instanceVariableNames: ''!
+
+"==================== WindowsTextStream ===================="
+
+ExternalTextStream subclass: #WindowsTextStream
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+WindowsTextStream comment:
+'I am a Windows text stream layered over binary file I/O.
+I handle character encoding and line endings for text files.'!
+
+!WindowsTextStream class methodsFor: 'instance creation'!
+
+onFileNamed: fileName
+    | ref bin |
+    ref := WindowsFileReference fileName: fileName.
+    ref openRead.
+    bin := WindowsFileStream new on: ref.
+    ^self new on: bin encoding: #ascii lineEnding: #crlf!
+
+onFileNamed: fileName mode: modeSymbol
+    | ref bin |
+    ref := WindowsFileReference fileName: fileName.
+    modeSymbol = #read ifTrue: [ref openRead].
+    modeSymbol = #write ifTrue: [ref openWrite].
+    modeSymbol = #append ifTrue: [ref openAppend].
+    bin := WindowsFileStream new on: ref.
+    ^self new on: bin encoding: #ascii lineEnding: #crlf!
+
+WindowsTextStream class
+    instanceVariableNames: ''!
+
+"==================== WindowsVolume ===================="
+
+Object subclass: #WindowsVolume
+    instanceVariableNames: 'driveLetter volumeName serialNumber freeSpace totalSpace'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+WindowsVolume comment:
+'I represent a volume in the Windows file system.
+I provide access to volume metadata such as name, serial number, and free space.'!
+
+!WindowsVolume class methodsFor: 'instance creation'!
+
+forDrive: aDriveCharacter
+    ^self new driveLetter: aDriveCharacter; refresh; yourself!
+
+!WindowsVolume methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    driveLetter := nil.
+    volumeName := ''.
+    serialNumber := 0.
+    freeSpace := 0.
+    totalSpace := 0.
+    ^self!
+
+driveLetter: aCharacter
+    driveLetter := aCharacter.
+    ^self!
+
+!WindowsVolume methodsFor: 'accessing'!
+
+driveLetter
+    ^driveLetter!
+
+volumeName
+    ^volumeName!
+
+serialNumber
+    ^serialNumber!
+
+freeSpace
+    ^freeSpace!
+
+totalSpace
+    ^totalSpace!
+
+!WindowsVolume methodsFor: 'operations'!
+
+refresh
+    | info |
+    info := self primGetVolumeInfo: driveLetter.
+    info ifNil: [^self].
+    volumeName := info at: #name ifAbsent: [''].
+    serialNumber := info at: #serial ifAbsent: [0].
+    freeSpace := info at: #free ifAbsent: [0].
+    totalSpace := info at: #total ifAbsent: [0].
+    ^self!
+
+!WindowsVolume methodsFor: 'private-primitives'!
+
+primGetVolumeInfo: aDriveCharacter
+    <primitive: 160>
+    ^Dictionary newFrom: {
+        #name -> 'Local Disk'.
+        #serial -> 12345678.
+        #free -> 1000000000.
+        #total -> 5000000000
+    }!
+
+WindowsVolume class
+    instanceVariableNames: ''!
+
+"==================== WindowsFileAttributes ===================="
+
+Object subclass: #WindowsFileAttributes
+    instanceVariableNames: 'attributeBits'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-System'!
+
+WindowsFileAttributes comment:
+'I represent the attribute flags for a Windows file.
+These include read-only, hidden, system, archive, and directory flags.'!
+
+!WindowsFileAttributes methodsFor: 'initialization'!
+
+initialize
+    super initialize.
+    attributeBits := 0.
+    ^self!
+
+initializeFrom: info
+    info isNil ifTrue: [attributeBits := 0. ^self].
+    attributeBits := info at: #attributes ifAbsent: [0].
+    ^self!
+
+!WindowsFileAttributes methodsFor: 'accessing'!
+
+attributeBits
+    ^attributeBits!
+
+attributeBits: anInteger
+    attributeBits := anInteger.
+    ^self!
+
+!WindowsFileAttributes methodsFor: 'testing'!
+
+isReadOnly
+    ^(attributeBits bitAnd: 1) ~= 0!
+
+isHidden
+    ^(attributeBits bitAnd: 2) ~= 0!
+
+isSystem
+    ^(attributeBits bitAnd: 4) ~= 0!
+
+isArchive
+    ^(attributeBits bitAnd: 32) ~= 0!
+
+isDirectory
+    ^(attributeBits bitAnd: 16) ~= 0!
+
+!WindowsFileAttributes methodsFor: 'modifying'!
+
+setReadOnly: aBoolean
+    aBoolean
+        ifTrue: [attributeBits := attributeBits bitOr: 1]
+        ifFalse: [attributeBits := attributeBits bitAnd: 16rFFFFFFFE].
+    ^self!
+
+setHidden: aBoolean
+    aBoolean
+        ifTrue: [attributeBits := attributeBits bitOr: 2]
+        ifFalse: [attributeBits := attributeBits bitAnd: 16rFFFFFFFD].
+    ^self!
+
+setSystem: aBoolean
+    aBoolean
+        ifTrue: [attributeBits := attributeBits bitOr: 4]
+        ifFalse: [attributeBits := attributeBits bitAnd: 16rFFFFFFFB].
+    ^self!
+
+setArchive: aBoolean
+    aBoolean
+        ifTrue: [attributeBits := attributeBits bitOr: 32]
+        ifFalse: [attributeBits := attributeBits bitAnd: 16rFFFFFFDF].
+    ^self!
+
+WindowsFileAttributes class
+    instanceVariableNames: ''!

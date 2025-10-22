@@ -64,96 +64,131 @@ public static class Program
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle");
-                
+
                 if (loader.LayoutResolver == null)
                 {
                     Console.WriteLine("  ⚠️  Execution skipped - LayoutResolver not available");
                     return;
                 }
-                
+
                 var vmMetadata = loader.BuildVMMetadata();
                 var vm = new VirtualMachine(heapManager, loader.LayoutResolver, vmMetadata, bundle.Symbols);
-                
+
                 // Initialize selector caches after cold start completes
                 vm.InitializeSelectorCaches();
-                
+
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
                     loader.LayoutResolver,
                     loader.LocalIdToObjectId.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    InitPolicy.ContinueAndCollect,
+                    InitPolicy.AbortOnFirstError,  // Stop on first error for debugging
                     defaultTimeoutMs: 5000,
                     symbols: bundle.Symbols,
                     strings: bundle.Strings,
                     allocator: loader.Allocator
                 );
-                
-                // Filter to execute Float, Cursor, and Character initialize expressions
-                string[] targetInits = new[] { "init:123", "init:086", "init:057" }; // Float, Cursor, Character
-                var targetExprs = bundle.InitExpressions.Where(e => targetInits.Contains(e.LocalId)).ToArray();
 
-                if (targetExprs.Length > 0)
+                // Sort init expressions by instruction count (simplest first)
+                var sortedExprs = bundle.InitExpressions
+                    .Select(e => new {
+                        Expr = e,
+                        InstructionCount = CountInstructions(ClassHierarchyUtils.DecodeBytecodes(e.Bytecodes))
+                    })
+                    .OrderBy(x => x.InstructionCount)
+                    .Select(x => x.Expr)
+                    .ToArray();
+
+                Console.WriteLine($"\n  Sorted by instruction count (simplest to most complex)");
+                Console.WriteLine($"  Execution mode: INTERACTIVE (press Enter after each expression)\n");
+
+                int executed = 0;
+                int succeeded = 0;
+                int failed = 0;
+
+                foreach (var initExpr in sortedExprs)
                 {
-                    var filteredBundle = new ColdStartBundle
-                    {
-                        Metadata = bundle.Metadata,
-                        Symbols = bundle.Symbols,
-                        Strings = bundle.Strings,
-                        OptimizedSelectors = bundle.OptimizedSelectors,
-                        Classes = bundle.Classes,
-                        Objects = bundle.Objects,
-                        Methods = bundle.Methods,
-                        InitExpressions = targetExprs,
-                        InstallOrder = bundle.InstallOrder,
-                        Patches = bundle.Patches
-                    };
+                    var bytecodes = ClassHierarchyUtils.DecodeBytecodes(initExpr.Bytecodes);
+                    int instrCount = CountInstructions(bytecodes);
 
-                    var report = executor.ExecuteFromBundle(filteredBundle, loader.Allocator);
+                    Console.WriteLine($"[{executed + 1}/{sortedExprs.Length}] {initExpr.LocalId} ({instrCount} instructions)");
+                    Console.WriteLine($"Source: {initExpr.Source ?? "<no source>"}");
 
-                    Console.WriteLine($"  Executed: {report.Succeeded}/{targetExprs.Length}");
-                    if (report.Failed > 0)
+                    // Wait for user input
+                    Console.Write("Press Enter to execute (or 'q' to quit): ");
+                    string? input = Console.ReadLine();
+                    if (input?.ToLower() == "q")
                     {
-                        Console.WriteLine($"  ⚠️  Failed: {report.Failed}");
+                        Console.WriteLine("\n⚠️  Execution stopped by user");
+                        break;
                     }
-                    Console.WriteLine();
 
-                    // Create lookup for source code
-                    var initSourceLookup = targetExprs.ToDictionary(e => e.LocalId, e => e.Source ?? "<no source>");
-
-                    // Show all results
-                    foreach (var result in report.Results)
+                    try
                     {
-                        var source = initSourceLookup.TryGetValue(result.InitLocalId, out var src) ? src : "<source not found>";
+                        // Resolve literals from the init expression
+                        var literalOOPs = new SmalltalkOOP[initExpr.Literals.Length];
+                        for (int i = 0; i < initExpr.Literals.Length; i++)
+                        {
+                            literalOOPs[i] = ResolveLiteralValueAsOOP(initExpr.Literals[i], bundle, loader.Allocator, loader.LocalIdToObjectId);
+                        }
+
+                        // Create temporary CompiledMethod using allocator
+                        if (!loader.LocalIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
+                        {
+                            throw new InvalidOperationException("CompiledMethod class not found");
+                        }
+
+                        if (!loader.LocalIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
+                        {
+                            throw new InvalidOperationException("ByteArray class not found");
+                        }
+
+                        var tempMethodOOP = loader.Allocator.AllocateCompiledMethod(
+                            compiledMethodClassOOP,
+                            byteArrayClassOOP,
+                            initExpr.Header.Word,
+                            literalOOPs,
+                            bytecodes);
+
+                        // Execute the init expression
+                        var result = executor.ExecuteInitExpression(initExpr.LocalId, tempMethodOOP);
+
+                        executed++;
 
                         if (result.Status == InitStatus.Success)
                         {
-                            Console.WriteLine($"  ✓ {result.InitLocalId}: {source}");
-                            Console.WriteLine($"      Success ({result.ElapsedMilliseconds}ms) → OOP={result.ReturnValueOop}");
+                            succeeded++;
+                            Console.WriteLine($"✓ Success ({result.ElapsedMilliseconds}ms)");
+                            Console.WriteLine($"  Returned: {FormatReturnValue(heapManager, bundle, result.ReturnValueOop ?? GlobalRegistry.NilOOP)}");
                         }
                         else
                         {
-                            Console.WriteLine($"  ✗ {result.InitLocalId}: {source}");
-                            Console.WriteLine($"      {result.Status} ({result.ElapsedMilliseconds}ms)");
-                            if (result.Diagnostic?.Message != null)
-                            {
-                                Console.WriteLine($"      {result.Diagnostic.Message}");
-                            }
+                            failed++;
+                            Console.WriteLine($"✗ FAILED: {result.Status} ({result.ElapsedMilliseconds}ms)");
+
+                            // Verbose debugging output on failure
+                            DumpInitExpressionDebugInfo(initExpr, bytecodes, literalOOPs, result, heapManager, bundle);
+
+                            Console.WriteLine("\n⚠️  Execution stopped due to error (AbortOnFirstError policy)");
+                            break;
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        Console.WriteLine($"✗ FATAL ERROR: {ex.Message}");
+                        Console.WriteLine($"\nStack trace:\n{ex.StackTrace}");
+                        Console.WriteLine("\n⚠️  Execution stopped due to fatal error");
+                        break;
+                    }
 
-                    // Diagnose Float class variables (whether init succeeded or failed)
-                    Console.WriteLine("\n=== Float Class Variable Diagnostics ===");
-                    DiagnoseFloatClassVariables(heapManager, loader, bundle);
+                    Console.WriteLine(); // Blank line between executions
+                }
 
-                    // Diagnose Cursor class variables
-                    Console.WriteLine("\n=== Cursor Class Variable Diagnostics ===");
-                    DiagnoseCursorClassVariables(heapManager, loader, bundle);
-                }
-                else
-                {
-                    Console.WriteLine("  ⚠️  Target init expressions not found in bundle");
-                }
+                Console.WriteLine($"\n=== Execution Summary ===");
+                Console.WriteLine($"  Executed: {executed}/{sortedExprs.Length}");
+                Console.WriteLine($"  Succeeded: {succeeded}");
+                Console.WriteLine($"  Failed: {failed}");
             }
 
             Console.WriteLine("\n✓ All systems ready!");
@@ -180,6 +215,449 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName
     /// Default: coldstart.json in the same directory as the executable
     /// </summary>
+    /// <summary>
+    /// Counts the number of bytecode instructions (not bytes, since some are multi-byte).
+    /// </summary>
+    private static int CountInstructions(byte[] bytecodes)
+    {
+        int count = 0;
+        int i = 0;
+
+        while (i < bytecodes.Length)
+        {
+            byte opcode = bytecodes[i];
+            count++;
+            i++;
+
+            // Extended prefix - consumes additional bytes
+            if (opcode == 0x80)
+            {
+                if (i < bytecodes.Length)
+                {
+                    byte subop = bytecodes[i];
+                    i++; // subop byte
+
+                    // Check if this subop needs more bytes
+                    if (subop == 0x0D || subop == 0x11) // SEND_N, SEND_SUPER_N
+                    {
+                        i += 2; // selector index + arg count
+                    }
+                    else if (subop >= 0x14 && subop <= 0x19) // Jump operations
+                    {
+                        i += 2; // offset (2 bytes)
+                    }
+                    else
+                    {
+                        i++; // most extended ops have 1 operand byte
+                    }
+                }
+            }
+            // Long jumps (0xA1-0xA7) - consume N bytes
+            else if (opcode >= 0xA1 && opcode <= 0xA7)
+            {
+                int n = opcode - 159; // Number of bytes for distance
+                i += n;
+            }
+            // Medium jump (0xA0) - consumes 1 byte
+            else if (opcode == 0xA0)
+            {
+                i++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Helper method to find a method literal for debugging.
+    /// </summary>
+    private static SmalltalkOOP FindMethodLiteral(Loader loader, ColdStartBundle bundle, string methodLocalId, int literalIndex)
+    {
+        if (loader.LocalIdToObjectId.TryGetValue(methodLocalId, out var methodOOP))
+        {
+            return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
+        }
+        return new SmalltalkOOP(0);
+    }
+
+    /// <summary>
+    /// Resolves a literal value to a SmalltalkOOP (from InitExpressionExecutor).
+    /// </summary>
+    private static SmalltalkOOP ResolveLiteralValueAsOOP(
+        LiteralValue literal,
+        ColdStartBundle bundle,
+        SemanticAllocator allocator,
+        IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
+    {
+        return literal.Type switch
+        {
+            "symbol" => SymbolRegistry.GetSymbolOOP(literal.Index!.Value),
+            "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
+            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
+            "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
+            "nil" => GlobalRegistry.NilOOP,
+            "true" => GlobalRegistry.TrueOOP,
+            "false" => GlobalRegistry.FalseOOP,
+            "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
+                ? objOOP1
+                : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
+            "compiledMethod" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2)
+                ? objOOP2
+                : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
+            "character" => AllocateCharacter(literal.CodePoint!.Value, allocator),
+            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!, allocator),
+            "association" => ResolveAssociation(literal.Association!, bundle, allocator, localIdToObjectId),
+            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l, bundle, allocator, localIdToObjectId)).ToArray(), allocator),
+            _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
+        };
+    }
+
+    private static SmalltalkOOP AllocateCharacter(int codePoint, SemanticAllocator allocator)
+    {
+        var characterOOP = allocator.AllocateFixedObject("Character");
+        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
+        allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
+        return characterOOP;
+    }
+
+    private static SmalltalkOOP AllocateByteArray(string encoding, string data, SemanticAllocator allocator)
+    {
+        byte[] bytes = encoding.ToLower() switch
+        {
+            "base64" => Convert.FromBase64String(data),
+            "hex" => ConvertHexStringToBytes(data),
+            _ => throw new InvalidOperationException($"Unsupported byte array encoding: {encoding}")
+        };
+        return allocator.AllocateByteArray("ByteArray", bytes);
+    }
+
+    private static SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, SemanticAllocator allocator)
+    {
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var arrayOOP = allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
+        for (int i = 0; i < elementOOPs.Length; i++)
+        {
+            allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
+        }
+        return arrayOOP;
+    }
+
+    private static SmalltalkOOP ResolveAssociation(
+        AssociationLiteral assoc,
+        ColdStartBundle bundle,
+        SemanticAllocator allocator,
+        IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
+    {
+        var keyOOP = SymbolRegistry.GetSymbolOOP(assoc.KeyIndex);
+        string keyName = bundle.Symbols[assoc.KeyIndex];
+
+        if (assoc.ValueRef?.LocalId == null)
+        {
+            if (GlobalRegistry.TryGet($"class:{keyName}", out SmalltalkOOP classOop))
+            {
+                var sysDictOOP = GlobalRegistry.SystemDictionaryOOP;
+                int sysDictSize = allocator.GetIndexedSize(sysDictOOP);
+
+                for (int i = 0; i < sysDictSize; i++)
+                {
+                    var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
+                    if (assocOOP == GlobalRegistry.NilOOP) continue;
+
+                    var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
+                    if (assocKeyOOP == keyOOP)
+                    {
+                        return assocOOP;
+                    }
+                }
+            }
+        }
+
+        var valueOOP = assoc.ValueRef?.LocalId != null
+            ? localIdToObjectId[assoc.ValueRef.LocalId]
+            : GlobalRegistry.NilOOP;
+
+        var associationOOP = allocator.AllocateFixedObject("Association");
+        allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
+        return associationOOP;
+    }
+
+    private static byte[] ConvertHexStringToBytes(string hex)
+    {
+        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
+        if (hex.Length % 2 != 0)
+            throw new InvalidOperationException("Hex string must have even number of characters");
+
+        byte[] bytes = new byte[hex.Length / 2];
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        }
+        return bytes;
+    }
+
+    private static int GetIntValue(object value)
+    {
+        return value switch
+        {
+            System.Text.Json.JsonElement e => e.GetInt32(),
+            int i => i,
+            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
+        };
+    }
+
+    private static double GetFloatValue(object value)
+    {
+        return value switch
+        {
+            System.Text.Json.JsonElement e => e.GetDouble(),
+            double d => d,
+            float f => f,
+            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
+        };
+    }
+
+    /// <summary>
+    /// Formats a return value OOP for display.
+    /// </summary>
+    private static string FormatReturnValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
+    {
+        if (returnOOP.IsSmallInteger)
+            return $"SmallInteger({returnOOP.AsSmallInteger()})";
+
+        if (returnOOP == GlobalRegistry.NilOOP)
+            return "nil";
+
+        if (returnOOP == GlobalRegistry.TrueOOP)
+            return "true";
+
+        if (returnOOP == GlobalRegistry.FalseOOP)
+            return "false";
+
+        try
+        {
+            // Get the class OOP, then get the class name from it
+            var classOOP = heapManager.GetClassOOP(returnOOP);
+            var className = heapManager.GetClassName(classOOP);
+
+            // GetClassName returns the actual class name, never "UnknownClass"
+            return $"{className} (OOP={returnOOP})";
+        }
+        catch (Exception ex)
+        {
+            // Even if there's an error, try to get some useful info
+            try
+            {
+                var classOOP = heapManager.GetClassOOP(returnOOP);
+                return $"<class={classOOP}> (OOP={returnOOP})";
+            }
+            catch
+            {
+                return $"<error: {ex.Message}> (OOP={returnOOP})";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dumps verbose debugging information when an init expression fails.
+    /// </summary>
+    private static void DumpInitExpressionDebugInfo(
+        InitExpression initExpr,
+        byte[] bytecodes,
+        SmalltalkOOP[] literalOOPs,
+        InitResult result,
+        ISmalltalkHeapManager heapManager,
+        ColdStartBundle bundle)
+    {
+        Console.WriteLine("\n=== VERBOSE DEBUG OUTPUT ===");
+
+        // 1. Source code
+        Console.WriteLine($"\nSource Code:");
+        Console.WriteLine($"  {initExpr.Source ?? "<no source>"}");
+
+        // 2. Error details
+        Console.WriteLine($"\nError:");
+        Console.WriteLine($"  Status: {result.Status}");
+        if (result.Diagnostic?.Message != null)
+        {
+            Console.WriteLine($"  Message: {result.Diagnostic.Message}");
+        }
+
+        // 3. Literals
+        Console.WriteLine($"\nLiterals ({literalOOPs.Length}):");
+        for (int i = 0; i < literalOOPs.Length; i++)
+        {
+            Console.WriteLine($"  [{i}] = {FormatReturnValue(heapManager, bundle, literalOOPs[i])}");
+        }
+
+        // 4. Bytecode disassembly (symbolic form)
+        Console.WriteLine($"\nBytecode ({bytecodes.Length} bytes, {CountInstructions(bytecodes)} instructions):");
+        DisassembleBytecodes(bytecodes, bundle);
+
+        // 5. Stack trace (if available)
+        if (result.Diagnostic?.StackTrace != null)
+        {
+            Console.WriteLine($"\nStack Trace:");
+            Console.WriteLine($"  {result.Diagnostic.StackTrace}");
+        }
+
+        Console.WriteLine("\n=== END DEBUG OUTPUT ===");
+    }
+
+    /// <summary>
+    /// Disassembles bytecodes to symbolic form for debugging.
+    /// </summary>
+    private static void DisassembleBytecodes(byte[] bytecodes, ColdStartBundle bundle)
+    {
+        int pc = 0;
+        int instrNum = 0;
+
+        while (pc < bytecodes.Length)
+        {
+            byte opcode = bytecodes[pc];
+            Console.Write($"  [{instrNum:D3}] @{pc:D4}: ");
+
+            pc++;
+
+            // Decode based on bytecode ranges from Interpreter-Architecture.md
+            if (opcode <= 0x0F) // Push receiver variable 0-15
+            {
+                Console.WriteLine($"PUSH_IVAR_{opcode}");
+            }
+            else if (opcode <= 0x1F) // Push temporary 0-15
+            {
+                Console.WriteLine($"PUSH_TEMP_{opcode - 0x10}");
+            }
+            else if (opcode <= 0x3F) // Push literal constant 0-31
+            {
+                Console.WriteLine($"PUSH_LITERAL_CONST_{opcode - 0x20}");
+            }
+            else if (opcode <= 0x5F) // Push literal variable 0-31
+            {
+                Console.WriteLine($"PUSH_LITERAL_VAR_{opcode - 0x40}");
+            }
+            else if (opcode <= 0x67) // Pop/store receiver variable 0-7
+            {
+                Console.WriteLine($"POP_STORE_IVAR_{opcode - 0x60}");
+            }
+            else if (opcode <= 0x6F) // Pop/store temporary 0-7
+            {
+                Console.WriteLine($"POP_STORE_TEMP_{opcode - 0x68}");
+            }
+            else if (opcode == 0x70) Console.WriteLine("PUSH_SELF");
+            else if (opcode == 0x71) Console.WriteLine("PUSH_TRUE");
+            else if (opcode == 0x72) Console.WriteLine("PUSH_FALSE");
+            else if (opcode == 0x73) Console.WriteLine("PUSH_NIL");
+            else if (opcode == 0x74) Console.WriteLine("PUSH_MINUS_ONE");
+            else if (opcode == 0x75) Console.WriteLine("PUSH_ZERO");
+            else if (opcode == 0x76) Console.WriteLine("PUSH_ONE");
+            else if (opcode == 0x77) Console.WriteLine("PUSH_TWO");
+            else if (opcode == 0x78) Console.WriteLine("RETURN_SELF");
+            else if (opcode == 0x79) Console.WriteLine("RETURN_TRUE");
+            else if (opcode == 0x7A) Console.WriteLine("RETURN_FALSE");
+            else if (opcode == 0x7B) Console.WriteLine("RETURN_NIL");
+            else if (opcode == 0x7C) Console.WriteLine("RETURN_TOP");
+            else if (opcode == 0x7D) Console.WriteLine("BLOCK_RETURN_SELF");
+            else if (opcode == 0x7E) Console.WriteLine("BLOCK_RETURN_TOP");
+            else if (opcode == 0x7F) Console.WriteLine("NOP");
+            else if (opcode == 0x80) // Extended prefix
+            {
+                if (pc < bytecodes.Length)
+                {
+                    byte subop = bytecodes[pc++];
+                    Console.Write($"EXTENDED_{subop:X2} ");
+
+                    string[] extendedNames = new[] {
+                        "PUSH_IVAR", "STORE_IVAR", "POP_STORE_IVAR", "PUSH_TEMP", "STORE_TEMP", "POP_STORE_TEMP",
+                        "PUSH_LITERAL", "PUSH_LITERAL_VAR", "STORE_LITERAL_VAR", "POP_STORE_LITERAL_VAR",
+                        "SEND_0", "SEND_1", "SEND_2", "SEND_N", "SEND_SUPER_0", "SEND_SUPER_1",
+                        "SEND_SUPER_2", "SEND_SUPER_N", "POP", "DUP", "JUMP_TRUE", "JUMP_FALSE",
+                        "JUMP", "JUMP_LONG_TRUE", "JUMP_LONG_FALSE", "JUMP_LONG"
+                    };
+
+                    if (subop < extendedNames.Length)
+                    {
+                        Console.Write($"({extendedNames[subop]})");
+                        if (subop <= 0x09 && pc < bytecodes.Length) // Has index operand
+                        {
+                            Console.Write($" {bytecodes[pc++]}");
+                        }
+                        else if ((subop == 0x0D || subop == 0x11) && pc + 1 < bytecodes.Length) // SEND_N
+                        {
+                            Console.Write($" selector={bytecodes[pc++]}, argc={bytecodes[pc++]}");
+                        }
+                        else if (subop >= 0x14 && subop <= 0x19 && pc + 1 < bytecodes.Length) // Jumps
+                        {
+                            int offset = (bytecodes[pc] << 8) | bytecodes[pc + 1];
+                            pc += 2;
+                            Console.Write($" offset={offset}");
+                        }
+                    }
+                    Console.WriteLine();
+                }
+                else
+                {
+                    Console.WriteLine("(incomplete)");
+                }
+            }
+            else if (opcode == 0x89) Console.WriteLine("PUSH_ACTIVE_CONTEXT");
+            else if (opcode >= 0x90 && opcode <= 0x97) // Short jumps
+            {
+                Console.WriteLine($"SHORT_JUMP_FWD_{opcode - 0x8F}");
+            }
+            else if (opcode == 0xA0 && pc < bytecodes.Length) // Medium jump
+            {
+                Console.WriteLine($"MEDIUM_JUMP_FWD {bytecodes[pc++] + 1}");
+            }
+            else if (opcode >= 0xA1 && opcode <= 0xA7) // Long jumps
+            {
+                int n = opcode - 159;
+                Console.Write($"LONG_JUMP_FWD_{n} ");
+                if (pc + n <= bytecodes.Length)
+                {
+                    int distance = 0;
+                    for (int i = 0; i < n; i++)
+                    {
+                        distance = (distance << 8) | bytecodes[pc++];
+                    }
+                    Console.WriteLine($"{distance + 1}");
+                }
+                else
+                {
+                    Console.WriteLine("(incomplete)");
+                }
+            }
+            else if (opcode >= 0xB0 && opcode <= 0xBF) // Arithmetic sends
+            {
+                string[] arithOps = new[] { "+", "-", "<", ">", "<=", ">=", "=", "~=", "*", "/", "\\\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:" };
+                Console.WriteLine($"SEND_ARITH ({arithOps[opcode - 0xB0]})");
+            }
+            else if (opcode >= 0xC0 && opcode <= 0xCF) // Special sends
+            {
+                string[] specialOps = new[] { "at:", "at:put:", "size", "next", "nextPut:", "atEnd", "==", "class", "blockCopy:", "value", "value:", "do:", "new", "new:", "x", "y" };
+                Console.WriteLine($"SEND_SPECIAL ({specialOps[opcode - 0xC0]})");
+            }
+            else if (opcode >= 0xD0 && opcode <= 0xDF) // Send literal 0 args
+            {
+                Console.WriteLine($"SEND_LIT_0_ARGS_{opcode - 0xD0}");
+            }
+            else if (opcode >= 0xE0 && opcode <= 0xEF) // Send literal 1 arg
+            {
+                Console.WriteLine($"SEND_LIT_1_ARG_{opcode - 0xE0}");
+            }
+            else if (opcode >= 0xF0 && opcode <= 0xFF) // Send literal 2 args
+            {
+                Console.WriteLine($"SEND_LIT_2_ARGS_{opcode - 0xF0}");
+            }
+            else
+            {
+                Console.WriteLine($"UNKNOWN_{opcode:X2}");
+            }
+
+            instrNum++;
+        }
+    }
+
     private static (string coldStartFile, string? dumpClassName) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;

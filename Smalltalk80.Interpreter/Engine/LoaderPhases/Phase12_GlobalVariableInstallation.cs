@@ -79,11 +79,23 @@ public class Phase12_GlobalVariableInstallation
     {
         // Create symbol for #Smalltalk
         SmalltalkOOP smalltalkSymbolOOP = GetSymbolOOP("Smalltalk");
-        
-        // Create Association (#Smalltalk -> SystemDictionary)
+
+        // First, try to find an existing canonical Association created by Phase 8
+        SmalltalkOOP associationOOP = FindCanonicalAssociation("Smalltalk");
+
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
-        SmalltalkOOP associationOOP = AllocateAssociation(smalltalkSymbolOOP, systemDictionaryOOP);
-        
+
+        if (associationOOP.RawValue != 0)
+        {
+            // Found existing canonical Association - update its value
+            _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
+        }
+        else
+        {
+            // No existing Association - create new one
+            associationOOP = AllocateAssociation(smalltalkSymbolOOP, systemDictionaryOOP);
+        }
+
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
     }
@@ -96,10 +108,21 @@ public class Phase12_GlobalVariableInstallation
     {
         // Create symbol for #USTable
         SmalltalkOOP ustableSymbolOOP = GetSymbolOOP("USTable");
-        
-        // Create Association (#USTable -> USTable)
-        SmalltalkOOP associationOOP = AllocateAssociation(ustableSymbolOOP, ustableOOP);
-        
+
+        // First, try to find an existing canonical Association created by Phase 8
+        SmalltalkOOP associationOOP = FindCanonicalAssociation("USTable");
+
+        if (associationOOP.RawValue != 0)
+        {
+            // Found existing canonical Association - update its value
+            _allocator.SetInstanceVariable(associationOOP, 1, ustableOOP);
+        }
+        else
+        {
+            // No existing Association - create new one
+            associationOOP = AllocateAssociation(ustableSymbolOOP, ustableOOP);
+        }
+
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "USTable");
     }
@@ -113,10 +136,21 @@ public class Phase12_GlobalVariableInstallation
     {
         // Create symbol for #Processor
         SmalltalkOOP processorSymbolOOP = GetSymbolOOP("Processor");
-        
-        // Create Association (#Processor -> ProcessorScheduler singleton)
-        SmalltalkOOP associationOOP = AllocateAssociation(processorSymbolOOP, processorSchedulerOOP);
-        
+
+        // First, try to find an existing canonical Association created by Phase 8
+        SmalltalkOOP associationOOP = FindCanonicalAssociation("Processor");
+
+        if (associationOOP.RawValue != 0)
+        {
+            // Found existing canonical Association - update its value
+            _allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
+        }
+        else
+        {
+            // No existing Association - create new one
+            associationOOP = AllocateAssociation(processorSymbolOOP, processorSchedulerOOP);
+        }
+
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Processor");
     }
@@ -129,10 +163,21 @@ public class Phase12_GlobalVariableInstallation
     {
         // Create symbol for the class name
         SmalltalkOOP classSymbolOOP = GetSymbolOOP(className);
-        
-        // Create Association (#ClassName -> Class object)
-        SmalltalkOOP associationOOP = AllocateAssociation(classSymbolOOP, classOOP);
-        
+
+        // First, try to find an existing canonical Association created by Phase 8
+        SmalltalkOOP associationOOP = FindCanonicalAssociation(className);
+
+        if (associationOOP.RawValue != 0)
+        {
+            // Found existing canonical Association - update its value
+            _allocator.SetInstanceVariable(associationOOP, 1, classOOP);
+        }
+        else
+        {
+            // No existing Association - create new one
+            associationOOP = AllocateAssociation(classSymbolOOP, classOOP);
+        }
+
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, className);
     }
@@ -223,15 +268,15 @@ public class Phase12_GlobalVariableInstallation
     {
         int totalCount = 0;
         var currentClass = classDefinition;
-        
+
         while (currentClass != null)
         {
             totalCount += currentClass.InstVarNames.Length;
-            
+
             if (currentClass.SuperNameIndex.HasValue)
             {
                 string superName = _bundle.Symbols[currentClass.SuperNameIndex.Value];
-                currentClass = _bundle.Classes.FirstOrDefault(c => 
+                currentClass = _bundle.Classes.FirstOrDefault(c =>
                     !c.IsMetaclass && _bundle.Symbols[c.NameIndex] == superName);
             }
             else
@@ -239,7 +284,57 @@ public class Phase12_GlobalVariableInstallation
                 currentClass = null;
             }
         }
-        
+
         return totalCount;
+    }
+
+    /// <summary>
+    /// Searches through all compiled methods to find an existing canonical Association
+    /// with the given key name. This is critical for ensuring Phase 12 updates the same
+    /// Association objects created by Phase 8, rather than creating duplicate Associations.
+    ///
+    /// The Association canonicalization system ensures only one Association object exists
+    /// per variable name across the entire system. Phase 8 creates these canonical Associations
+    /// with nil values when compiling methods. Phase 12 must find and update these same
+    /// Associations with proper class values.
+    ///
+    /// Returns SmalltalkOOP.Nil if no canonical Association exists for the key.
+    /// </summary>
+    private SmalltalkOOP FindCanonicalAssociation(string keyName)
+    {
+        // Get the symbol OOP for the key we're looking for
+        SmalltalkOOP targetKeyOOP = GetSymbolOOP(keyName);
+
+        // Scan all methods to find Association literals with matching key
+        foreach (var method in _bundle.Methods)
+        {
+            if (method.Literals.Length == 0) continue;
+
+            // Get the CompiledMethod OOP
+            if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
+                continue;
+
+            // Check each literal in the method
+            for (int i = 0; i < method.Literals.Length; i++)
+            {
+                var literal = method.Literals[i];
+                if (literal.Type != "association") continue;
+
+                // Get the Association OOP from the method's literal array
+                // Literals start at indexed slot 1 (slot 0 is header)
+                var assocOOP = _allocator.GetIndexedOOP(methodOOP, i + 1);
+
+                // Check if this Association has the key we're looking for
+                var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
+                if (assocKeyOOP == targetKeyOOP)
+                {
+                    // Found the canonical Association for this key
+                    return assocOOP;
+                }
+            }
+        }
+
+        // No canonical Association found for this key
+        return new SmalltalkOOP(0);
     }
 }
