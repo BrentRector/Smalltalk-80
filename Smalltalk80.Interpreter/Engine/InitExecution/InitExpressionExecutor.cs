@@ -199,22 +199,11 @@ public class InitExpressionExecutor
 
     /// <summary>
     /// Allocates a Float object.
+    /// Float is stored as ByteIndexed with 8 bytes containing IEEE 754 double precision value.
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value, SemanticAllocator allocator)
     {
-        var floatOOP = allocator.AllocateFixedObject("Float");
-        var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        allocator.SetObjectClass(floatOOP, floatClassOOP);
-        
-        // Store the double value as two SmallIntegers (high and low words)
-        long bits = BitConverter.DoubleToInt64Bits(value);
-        int highWord = (int)(bits >> 32);
-        int lowWord = (int)(bits & 0xFFFFFFFF);
-        
-        allocator.SetInstanceVariable(floatOOP, 0, SmalltalkOOP.FromSmallInteger(highWord));
-        allocator.SetInstanceVariable(floatOOP, 1, SmalltalkOOP.FromSmallInteger(lowWord));
-        
-        return floatOOP;
+        return allocator.AllocateFloat(value);
     }
 
     /// <summary>
@@ -380,8 +369,8 @@ public class InitExpressionExecutor
         var initArrayOOP = initArrayOop;
         int count = _heapManager.GetIndexedSize(initArrayOOP);
 
-        // TEMPORARY: Execute Float initialize for testing
-        string[] targetInitLocalIds = new[] { "init:123" }; // Float initialize
+        // TEMPORARY: Execute Float initialize, Cursor initialize, and Character initialize for testing
+        string[] targetInitLocalIds = new[] { "init:123", "init:086", "init:057" }; // Float initialize, Cursor initialize, Character initialize
 
         foreach (var targetInitLocalId in targetInitLocalIds)
         {

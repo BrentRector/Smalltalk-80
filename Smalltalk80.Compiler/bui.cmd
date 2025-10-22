@@ -1,0 +1,1 @@
+java -jar ANTLR4\antlr-4.13.2-complete.jar -Dlanguage=CSharp -no-listener -visitor -package Smalltalk80.Compiler.Generated -o $OutputDir Generated Grammar Grammar\Smalltalk80.g4

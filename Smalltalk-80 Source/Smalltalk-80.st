@@ -7738,7 +7738,9 @@ superclassOrder: classes
 		[(aa _ a superclass) ~~ (bb _ b superclass)]
 			whileTrue: [a _ aa. b _ bb].
 		a == b ifTrue: [na <= nb] "chains overlap--one is sub*-class of other"
-			ifFalse: [a name <= b name] "alphabetize at the fork" ]! !Magnitude subclass: #Character
+			ifFalse: [a name <= b name] "alphabetize at the fork" ]! !
+			
+Magnitude subclass: #Character
 	instanceVariableNames: 'value '
 	classVariableNames: 'CharacterTable '
 	poolDictionaries: ''

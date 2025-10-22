@@ -18,6 +18,7 @@ public class Loader
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly SemanticAllocator _allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = new();
+    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields = new();
     private LayoutResolver? _layoutResolver;
     private int _initExpressionsArrayId = 0;
 
@@ -58,13 +59,16 @@ public class Loader
         if (_layoutResolver == null)
             throw new InvalidOperationException("Cannot build VM metadata before cold start completes");
 
+        int thisClassIdx = _layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
+        Console.WriteLine($"VMMetadata: MetaclassThisClassFieldIndex = {thisClassIdx}");
+
         return new VMMetadata
         {
             ClassNameFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "name"),
             ClassSuperclassFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass"),
             ClassMethodDictFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict"),
             ClassFormatFieldIndex = _layoutResolver.GetFieldIndex("class:Class", "format"),
-            MetaclassThisClassFieldIndex = _layoutResolver.GetFieldIndex("class:Metaclass", "thisClass"),
+            MetaclassThisClassFieldIndex = thisClassIdx,
             MethodDictTallyFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "tally"),
             MethodDictKeysFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "keys"),
             MethodDictValuesFieldIndex = _layoutResolver.GetFieldIndex("class:MethodDictionary", "values"),
@@ -73,7 +77,8 @@ public class Loader
             SymbolClassOOP = GlobalRegistry.Get("class:Symbol"),
             StringClassOOP = GlobalRegistry.Get("class:String"),
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
-            CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod")
+            CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
+            SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger")
         };
     }
 
@@ -128,7 +133,7 @@ public class Loader
         RunPhase("Phase 3: Metaclass Wiring", () =>
         {
             var primitives = new ColdStartPrimitives(_heapManager);
-            var phase = new Phase3_MetaclassWiring(_bundle, _heapManager, primitives, _localIdToObjectId);
+            var phase = new Phase3_MetaclassWiring(_bundle, _heapManager, primitives, _localIdToObjectId, _initializedFields);
             phase.Run();
         });
 
@@ -136,7 +141,7 @@ public class Loader
         RunPhase("Phase 4: Class Resolution", () =>
         {
             var primitives = new ColdStartPrimitives(_heapManager);
-            var phase = new Phase4_ClassResolution(_bundle, _heapManager, primitives, _localIdToObjectId, _bundle.Symbols, _bundle.Strings);
+            var phase = new Phase4_ClassResolution(_bundle, _heapManager, primitives, _localIdToObjectId, _bundle.Symbols, _bundle.Strings, _initializedFields);
             phase.Run();
         });
 
@@ -165,7 +170,7 @@ public class Loader
         // Phase Y: Instance Variable Initialization (after class refs set)
         RunPhase("Phase Y: Instance Variable Initialization", () =>
         {
-            var phase = new PhaseY_InstanceVariableInitialization(_bundle, _allocator, _localIdToObjectId, _heapManager);
+            var phase = new PhaseY_InstanceVariableInitialization(_bundle, _allocator, _localIdToObjectId, _heapManager, _initializedFields);
             phase.Run();
         });
 

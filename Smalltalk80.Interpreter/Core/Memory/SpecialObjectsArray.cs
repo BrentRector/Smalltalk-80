@@ -97,7 +97,6 @@ public readonly struct SpecialObjectsArray
 
             // ProcessorScheduler.activeProcess is field index 1
             // TODO: Get actual field index from layout when LayoutManagement is implemented
-            const int activeProcessIndex = 1;
             // Note: This needs to be implemented via heap manager when available
             // For now return null as placeholder
             return SmalltalkOOP.Null;

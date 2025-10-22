@@ -18,8 +18,6 @@
 #pragma warning disable 1591
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
-// CLSCompliant attribute not needed
-#pragma warning disable 3021
 
 namespace Smalltalk80.Compiler.Generated {
 using System;

@@ -27,4 +27,5 @@ public class VMMetadata
     public SmalltalkOOP StringClassOOP { get; init; }
     public SmalltalkOOP ArrayClassOOP { get; init; }
     public SmalltalkOOP CompiledMethodClassOOP { get; init; }
+    public SmalltalkOOP SmallIntegerClassOOP { get; init; }
 }

@@ -18,7 +18,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     
     // GC root management
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
-    private int _debugCount = 0; // For CompiledMethod debug tracking
     
     // Class name field index (determined from coldstart.json during initialization)
     private int _classNameFieldIndex = -1;

@@ -381,7 +381,7 @@ public class VirtualMachine : IPrimitiveContext
             int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
             var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
             // TODO: Implement GetSymbolName in heap manager or add helper method
-            string? keyName = null; // GetSymbolName(keyOOP);
+            // string? keyName = GetSymbolName(keyOOP);
 
             Push(valueOOP);
             return true;
@@ -439,7 +439,7 @@ public class VirtualMachine : IPrimitiveContext
                         var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                         Push(homeReceiverOOP);
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         throw;
                     }
@@ -766,14 +766,11 @@ public class VirtualMachine : IPrimitiveContext
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     
-                    Console.WriteLine($"[DEBUG] Bytecode 0x09: Storing value={valueOOP} to assoc={associationOOP}");
-                    
                     // Store the value in the Association using write-barrier (runtime mode)
                     SetAssociationValue(associationOOP, valueOOP, loaderMode: false);
                     
                     // Add Association to classPool if it's a class variable (lazy initialization)
                     // For class-side methods, receiver IS the class object which has the classPool
-                    Console.WriteLine($"[DEBUG] Bytecode 0x09: receiver={receiverOOP}");
                     AddAssociationToClassPoolIfNeeded(receiverOOP, associationOOP);
                     
                     return true;
@@ -1244,7 +1241,7 @@ public class VirtualMachine : IPrimitiveContext
         {
             return InvokeBlockInternal(blockMethodOOP, args);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }
@@ -1701,14 +1698,39 @@ public class VirtualMachine : IPrimitiveContext
 
     private SmalltalkOOP GetClass(SmalltalkOOP objectOOP)
     {
-        var classOOP = _heapManager.GetSlot(objectOOP, 0); // Class is in slot 0
+        // SmallIntegers are immediate values - return their class directly
+        if (objectOOP.IsSmallInteger)
+            return _metadata.SmallIntegerClassOOP;
+
+        // For heap objects, class is in slot 0
+        var classOOP = _heapManager.GetSlot(objectOOP, 0);
         return classOOP;
     }
 
     private string GetClassName(SmalltalkOOP classOOP)
     {
-        var nameSymbolOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.ClassNameFieldIndex);
-        return GetSymbolName(nameSymbolOOP) ?? $"<unnamed class {classOOP}>";
+        // Check if this is a metaclass by trying to read thisClass field
+        // All metaclass instances (meta:X) have thisClass pointing to their instance class (class:X)
+        try
+        {
+            var thisClassOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.MetaclassThisClassFieldIndex);
+            if (thisClassOOP != GlobalRegistry.NilOOP && thisClassOOP.RawValue != 0)
+            {
+                // This is a metaclass - get the name from its thisClass field
+                var nameSymbolOOP = _heapManager.GetInstanceVariable(thisClassOOP, _metadata.ClassNameFieldIndex);
+                var baseName = GetSymbolName(nameSymbolOOP);
+                if (baseName != null)
+                    return baseName + " class";
+            }
+        }
+        catch
+        {
+            // Not a metaclass or field doesn't exist - fall through to regular class handling
+        }
+
+        // Regular class - get name directly
+        var nameSymbolOOP2 = _heapManager.GetInstanceVariable(classOOP, _metadata.ClassNameFieldIndex);
+        return GetSymbolName(nameSymbolOOP2) ?? $"<unnamed class {classOOP}>";
     }
 
     private string? GetSymbolName(SmalltalkOOP symbolOOP)
@@ -1733,63 +1755,87 @@ public class VirtualMachine : IPrimitiveContext
     private MethodInfo? GetMethod(SmalltalkOOP classOOP, string selectorName)
     {
         var currentClassOOP = classOOP;
-        
-        // Walk up the inheritance chain until we find the method or reach nil
-        while (currentClassOOP != GlobalRegistry.NilOOP)
+        int depth = 0;
+        const int maxDepth = 20; // Prevent infinite loops
+
+        // Print index info on first call
+        if (depth == 0 && classOOP.RawValue == 8530)
         {
+            int superclassIdx = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+            Console.WriteLine($"  [GetMethod] Index check: superclass index from LayoutResolver = {superclassIdx}");
+        }
+
+        // Walk up the inheritance chain until we find the method or reach nil
+        while (currentClassOOP != GlobalRegistry.NilOOP && depth < maxDepth)
+        {
+            Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassOOP} ({GetClassName(currentClassOOP)}), looking for '{selectorName}'");
+
             // Get the method dictionary from the class
             int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
             var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
-            
+            Console.WriteLine($"    methodDict={methodDictOOP}");
+
             if (methodDictOOP == GlobalRegistry.NilOOP)
             {
                 // No method dictionary, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-                currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                Console.WriteLine($"    no methodDict, trying superclass={superclassOOP}");
+                currentClassOOP = superclassOOP;
+                depth++;
                 continue;
             }
-            
+
             // MethodDictionary structure (IdentityDictionary):
             // - Instance variable [0] = valuesArray (Array of methods)
-            // - Instance variable [1] = tally (SmallInteger)  
+            // - Instance variable [1] = tally (SmallInteger)
             // - Indexed fields = keys (selectors)
             // To find a method: search indexed fields for selector, then get method from valuesArray at same index
-            
+
             var valuesArrayOOP = _heapManager.GetInstanceVariable(methodDictOOP, 0);
             if (valuesArrayOOP == GlobalRegistry.NilOOP)
             {
                 // No values array, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-                currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                Console.WriteLine($"    no valuesArray, trying superclass={superclassOOP}");
+                currentClassOOP = superclassOOP;
+                depth++;
                 continue;
             }
-            
+
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
-            
+            Console.WriteLine($"    searching methodDict with {dictSize} entries");
+
             for (int i = 0; i < dictSize; i++)
             {
                 var selectorOOP = _heapManager.GetIndexedOOP(methodDictOOP, i);
-                
+
                 // Skip nil entries (empty slots in the hash table)
                 if (selectorOOP == GlobalRegistry.NilOOP)
                     continue;
-                
+
                 // Check if this is the selector we're looking for
                 string? currentSelectorName = GetSymbolName(selectorOOP);
-                
+
                 if (currentSelectorName == selectorName)
                 {
                     // Found it! Get the method from the valuesArray at the same index
                     var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                    Console.WriteLine($"    FOUND '{selectorName}' at index {i}, method={methodOOP}");
                     return new MethodInfo { MethodOOP = methodOOP };
                 }
             }
-            
+
             // Not found in this class, try superclass
             int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-            currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
+            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
+            Console.WriteLine($"    '{selectorName}' not found, trying superclass={nextSuperclassOOP}");
+            currentClassOOP = nextSuperclassOOP;
+            depth++;
         }
-        
+
+        Console.WriteLine($"  [GetMethod] FAILED: '{selectorName}' not found after {depth} levels");
         return null;
     }
 
@@ -1983,8 +2029,6 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
     {
-        Console.WriteLine($"[DEBUG] AddAssociationToClassPoolIfNeeded ENTRY: class={classOOP}, assoc={associationOOP}");
-        
         // For metaclasses, class variables are stored in the non-meta class's classPool
         // e.g., Float class (metaclass) shares class variables with Float (regular class)
         var actualClassOOP = classOOP;
@@ -2001,17 +2045,13 @@ public class VirtualMachine : IPrimitiveContext
                 try
                 {
                     int thisClassIndex = _layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
-                    Console.WriteLine($"[DEBUG] Metaclass detected: classOOP={classOOP}, thisClassIndex={thisClassIndex}");
                     actualClassOOP = _heapManager.GetInstanceVariable(classOOP, thisClassIndex);
-                    Console.WriteLine($"[DEBUG] Got thisClass: actualClassOOP={actualClassOOP}");
                     
                     // Check actualClassOOP's instance variable count
                     var actualFormat = _heapManager.GetObjectFormat(actualClassOOP);
-                    Console.WriteLine($"[DEBUG] actualClassOOP format={actualFormat}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DEBUG] Return 1: Failed to get thisClass - {ex.Message}");
                     return;
                 }
             }
@@ -2026,7 +2066,6 @@ public class VirtualMachine : IPrimitiveContext
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DEBUG] Return 2: Failed to get classPool index - {ex.Message}");
             // Not a Class object - skip (likely a global variable)
             return;
         }
@@ -2035,7 +2074,6 @@ public class VirtualMachine : IPrimitiveContext
         var format = _heapManager.GetObjectFormat(actualClassOOP);
         if (format != ObjectFormat.Pointer && format != ObjectFormat.PointerIndexed)
         {
-            Console.WriteLine($"[DEBUG] Return 3: actualClass format={format} not Pointer/PointerIndexed");
             // Not an object with instance variables - skip
             return;
         }
@@ -2048,7 +2086,6 @@ public class VirtualMachine : IPrimitiveContext
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DEBUG] Return 4: Failed to get classPool var - {ex.Message}");
             // classPool index out of range - not a Class object (likely global variable access)
             return;
         }
@@ -2057,12 +2094,8 @@ public class VirtualMachine : IPrimitiveContext
         var nilOOP = GlobalRegistry.NilOOP;
         if (classPoolOOP == nilOOP)
         {
-            Console.WriteLine($"ERROR: classPool is nil for class {actualClassOOP} - Phase4 should have created it!");
             return;
         }
-        
-        // DEBUG: Check if this method is even being called
-        Console.WriteLine($"[AddAssociationToClassPool] class={actualClassOOP}, classPool={classPoolOOP}, assoc={associationOOP}");
         
         // Get the Association's key (variable name Symbol)
         int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
@@ -2082,12 +2115,6 @@ public class VirtualMachine : IPrimitiveContext
             // 2. Someone created a non-canonical Association at runtime (illegal)
             // 
             // We keep the existing winner (first-writer-wins) but this indicates a serious bug
-            Console.WriteLine(
-                $"WARNING: Canonicalization violation detected!\n" +
-                $"  Key: {keyOOP}\n" +
-                $"  Expected Association: {associationOOP}\n" +
-                $"  Existing Association: {winnerAssocOOP}\n" +
-                $"  Phase8 should have ensured all methods share the same canonical Association.");
         }
     }
     
@@ -2166,10 +2193,8 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP DictionaryAtomicInsertIfAbsent(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP associationOOP)
     {
-        Console.WriteLine($"[DEBUG] DictionaryAtomicInsertIfAbsent: dict={dictionaryOOP}, key={keyOOP}, assoc={associationOOP}");
         int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
         int size = _heapManager.GetIndexedSize(dictionaryOOP);
-        Console.WriteLine($"[DEBUG] Dictionary size={size}, keyIndex={keyIndex}");
         
         // NOTE: Smalltalk-80 VM is single-threaded, so we don't need actual atomics.
         // However, this API provides the correct semantics for future concurrent VMs.
@@ -2177,9 +2202,7 @@ public class VirtualMachine : IPrimitiveContext
         // PHASE 1: Check if key already exists
         for (int i = 0; i < size; i++)
         {
-            Console.WriteLine($"[DEBUG] Checking slot {i}");
             var existingAssocOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            Console.WriteLine($"[DEBUG] Slot {i} contains: {existingAssocOOP}");
             if (existingAssocOOP == GlobalRegistry.NilOOP)
                 continue;
                 

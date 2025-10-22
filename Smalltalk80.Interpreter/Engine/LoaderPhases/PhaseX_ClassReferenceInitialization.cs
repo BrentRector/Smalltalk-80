@@ -42,43 +42,67 @@ public class PhaseX_ClassReferenceInitialization
         int classReferencesSet = 0;
 
         // Step 1: Set class references for all class objects themselves
-        // Each class object's slot 0 should point to its metaclass
+        // IMPORTANT: For class objects, there are TWO different "slot 0" concepts:
+        //   - Header slot 0 (memory offset 0): The class reference (set here)
+        //   - Instance variable 0 (memory offset 4): The superclass field (set in Phase 3)
+        //
+        // SetSlot(obj, 0) sets the class reference header (memory offset 0)
+        // SetInstanceVariable(obj, 0) sets the first instance variable (memory offset 4)
+        //
+        // These are DIFFERENT slots and both need to be set!
         foreach (var cls in _bundle.Classes)
         {
             if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
                 continue;
-            
-            // DIAGNOSTIC: Check if classOOP is a SmallInteger (should NEVER happen)
-            if (classOOP.IsSmallInteger)
-            {
-                throw new InvalidOperationException(
-                    $"CRITICAL BUG: Class '{cls.LocalId}' has SmallInteger OOP {classOOP} in _localIdToObjectId! " +
-                    $"Classes must be object pointers, not immediate values. " +
-                    $"SmallInteger value: {classOOP.AsSmallInteger()}");
-            }
-            
+
             if (cls.IsMetaclass)
             {
+                // Debug: Check superclass BEFORE setting class reference
+                if (classOOP.RawValue == 8530)
+                {
+                    var superclassBefore = _heapManager.GetInstanceVariable(classOOP, 0);
+                    Console.WriteLine($"  PhaseX: BEFORE SetSlot: meta:Point superclass = {superclassBefore}");
+                }
+
                 // Metaclass objects point to the Metaclass class
                 var metaclassClassOOP = GlobalRegistry.LookupClassOOP("Metaclass");
-                _allocator.SetSlot(classOOP, 0, metaclassClassOOP);
+                _allocator.SetSlot(classOOP, 0, metaclassClassOOP); // Sets header, NOT instance variable
+
+                // Debug: Check superclass AFTER setting class reference
+                if (classOOP.RawValue == 8530)
+                {
+                    var superclassAfter = _heapManager.GetInstanceVariable(classOOP, 0);
+                    Console.WriteLine($"  PhaseX: AFTER SetSlot: meta:Point superclass = {superclassAfter}");
+                }
+
+                // Debug: Show first few and OOP 8530 specifically
+                if (classReferencesSet < 5 || classOOP.RawValue == 8530)
+                {
+                    Console.WriteLine($"  PhaseX: {cls.LocalId} (OOP={classOOP}).class = meta:Metaclass (OOP={metaclassClassOOP})");
+                }
             }
             else
             {
                 // Instance class objects point to their metaclass
                 string instanceClassName = GetClassNameFromLocalId(cls.LocalId);
                 string metaclassLocalId = $"meta:{instanceClassName}";
-                
+
                 if (_localIdToObjectId.TryGetValue(metaclassLocalId, out SmalltalkOOP metaclassOOP))
                 {
-                    _allocator.SetSlot(classOOP, 0, metaclassOOP);
+                    _allocator.SetSlot(classOOP, 0, metaclassOOP); // Sets header, NOT instance variable
+
+                    // Debug: Show first few and class:Point specifically
+                    if (classReferencesSet < 5 || instanceClassName == "Point")
+                    {
+                        Console.WriteLine($"  PhaseX: {cls.LocalId} (OOP={classOOP}).class = {metaclassLocalId} (OOP={metaclassOOP})");
+                    }
                 }
                 else
                 {
                     Console.WriteLine($"WARNING: Could not find metaclass for {instanceClassName}");
                 }
             }
-            
+
             classReferencesSet++;
         }
 
@@ -109,6 +133,12 @@ public class PhaseX_ClassReferenceInitialization
         // This catches dynamically allocated objects like Associations that weren't tracked
         FixRemainingNullClassReferences();
 
+        // Debug: Verify superclass field is still intact for meta:Point after Phase X
+        if (_localIdToObjectId.TryGetValue("meta:Point", out SmalltalkOOP metaPointOOP))
+        {
+            var superclassOOP = _heapManager.GetInstanceVariable(metaPointOOP, 0);
+            Console.WriteLine($"  PhaseX Complete: Verified meta:Point (OOP={metaPointOOP}) superclass = {superclassOOP}");
+        }
     }
 
     private void SetSingletonClassReference(string globalName, string className)

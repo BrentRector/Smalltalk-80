@@ -59,12 +59,11 @@ public static class Program
             var loader = new Loader(bundle, heapManager);
             loader.Run();
 
-            // Execute init expressions - ONLY Float>>initialize for testing
+            // Execute init expressions
             if (bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle");
-                Console.WriteLine($"  ⚠️  TEST MODE: Only executing Float>>initialize (init:123)");
                 
                 if (loader.LayoutResolver == null)
                 {
@@ -90,9 +89,11 @@ public static class Program
                     allocator: loader.Allocator
                 );
                 
-                // Filter to only execute Float>>initialize (init:123)
-                var floatInitExpr = bundle.InitExpressions.FirstOrDefault(e => e.LocalId == "init:123");
-                if (floatInitExpr != null)
+                // Filter to execute Float, Cursor, and Character initialize expressions
+                string[] targetInits = new[] { "init:123", "init:086", "init:057" }; // Float, Cursor, Character
+                var targetExprs = bundle.InitExpressions.Where(e => targetInits.Contains(e.LocalId)).ToArray();
+
+                if (targetExprs.Length > 0)
                 {
                     var filteredBundle = new ColdStartBundle
                     {
@@ -103,32 +104,55 @@ public static class Program
                         Classes = bundle.Classes,
                         Objects = bundle.Objects,
                         Methods = bundle.Methods,
-                        InitExpressions = new[] { floatInitExpr },
+                        InitExpressions = targetExprs,
                         InstallOrder = bundle.InstallOrder,
                         Patches = bundle.Patches
                     };
-                    
+
                     var report = executor.ExecuteFromBundle(filteredBundle, loader.Allocator);
-                    
-                    Console.WriteLine($"  Executed: {report.Succeeded}/1");
+
+                    Console.WriteLine($"  Executed: {report.Succeeded}/{targetExprs.Length}");
                     if (report.Failed > 0)
                     {
                         Console.WriteLine($"  ⚠️  Failed: {report.Failed}");
-                        foreach (var result in report.Results.Where(r => r.Status != InitStatus.Success))
+                    }
+                    Console.WriteLine();
+
+                    // Create lookup for source code
+                    var initSourceLookup = targetExprs.ToDictionary(e => e.LocalId, e => e.Source ?? "<no source>");
+
+                    // Show all results
+                    foreach (var result in report.Results)
+                    {
+                        var source = initSourceLookup.TryGetValue(result.InitLocalId, out var src) ? src : "<source not found>";
+
+                        if (result.Status == InitStatus.Success)
                         {
-                            Console.WriteLine($"    - {result.InitLocalId}: {result.Status} - {result.Diagnostic?.Message}");
+                            Console.WriteLine($"  ✓ {result.InitLocalId}: {source}");
+                            Console.WriteLine($"      Success ({result.ElapsedMilliseconds}ms) → OOP={result.ReturnValueOop}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  ✗ {result.InitLocalId}: {source}");
+                            Console.WriteLine($"      {result.Status} ({result.ElapsedMilliseconds}ms)");
+                            if (result.Diagnostic?.Message != null)
+                            {
+                                Console.WriteLine($"      {result.Diagnostic.Message}");
+                            }
                         }
                     }
-                    else
-                    {
-                        // Diagnose Float class variables after successful initialization
-                        Console.WriteLine("\n=== Float Class Variable Diagnostics ===");
-                        DiagnoseFloatClassVariables(heapManager, loader, bundle);
-                    }
+
+                    // Diagnose Float class variables (whether init succeeded or failed)
+                    Console.WriteLine("\n=== Float Class Variable Diagnostics ===");
+                    DiagnoseFloatClassVariables(heapManager, loader, bundle);
+
+                    // Diagnose Cursor class variables
+                    Console.WriteLine("\n=== Cursor Class Variable Diagnostics ===");
+                    DiagnoseCursorClassVariables(heapManager, loader, bundle);
                 }
                 else
                 {
-                    Console.WriteLine("  ⚠️  Float>>initialize (init:123) not found in bundle");
+                    Console.WriteLine("  ⚠️  Target init expressions not found in bundle");
                 }
             }
 
@@ -371,6 +395,101 @@ public static class Program
         catch (Exception ex)
         {
             return $"<Error: {ex.Message}>";
+        }
+    }
+
+    private static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, Loader loader, ColdStartBundle bundle)
+    {
+        try
+        {
+            // Cursor class variables (based on typical Smalltalk-80 Cursor implementation)
+            // Note: Actual variables may vary - this is a diagnostic to see what's actually created
+            var expectedVariables = new[] 
+            { 
+                "Normal", "Read", "Write", "Execute", "Move", "Copy", "Corner", "CrossHair",
+                "Marker", "Origin", "Down", "Up", "Frame", "BlankCursor", "CurrentCursor"
+            };
+
+            // Get Cursor class OOP
+            if (!GlobalRegistry.TryGet("class:Cursor", out SmalltalkOOP cursorClassId))
+            {
+                Console.WriteLine("  ⚠️  Cursor class not found in GlobalRegistry");
+                return;
+            }
+            var cursorClassOOP = cursorClassId;
+
+            // Get the metaclass (Cursor class)
+            var cursorMetaclassOOP = heapManager.GetClassOOP(cursorClassOOP);
+
+            Console.WriteLine($"Cursor class: OOP={cursorClassOOP} (index={cursorClassId})");
+            Console.WriteLine($"Cursor metaclass: OOP={cursorMetaclassOOP}");
+            Console.WriteLine();
+
+            // Get classPool instance variable (Dictionary containing class variables)
+            // Class hierarchy: Behavior (4 vars) + ClassDescription (2 vars) + Class (name, classPool, sharedPools)
+            // classPool is at index 7
+            var classPoolOOP = heapManager.GetInstanceVariable(cursorClassOOP, 7);
+            
+            if (classPoolOOP == GlobalRegistry.NilOOP)
+            {
+                Console.WriteLine("  classPool is nil - no class variables created yet");
+                return;
+            }
+
+            // Check tally to see if dictionary is empty
+            int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", bundle);
+            if (tallyIndex >= 0)
+            {
+                var tallyOOP = heapManager.GetInstanceVariable(classPoolOOP, tallyIndex);
+                if (tallyOOP.IsSmallInteger && tallyOOP.AsSmallInteger() == 0)
+                {
+                    Console.WriteLine("  classPool empty (tally=0) - no class variables created yet");
+                    return;
+                }
+                else if (tallyOOP.IsSmallInteger)
+                {
+                    Console.WriteLine($"  classPool contains {tallyOOP.AsSmallInteger()} class variable(s)");
+                }
+            }
+
+            // Enumerate all class variables found in classPool
+            int size = heapManager.GetIndexedSize(classPoolOOP);
+            Console.WriteLine($"  Scanning {size} dictionary slots...");
+            Console.WriteLine();
+
+            var foundVariables = new List<string>();
+            for (int i = 0; i < size; i++)
+            {
+                var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
+                if (assocOOP == GlobalRegistry.NilOOP)
+                    continue;
+
+                // Association has key at slot 1, value at slot 2
+                var keyOOP = heapManager.GetSlot(assocOOP, 1);
+                var keyName = GetSymbolName(heapManager, bundle, keyOOP);
+                var valueOOP = heapManager.GetSlot(assocOOP, 2);
+                var value = FormatValue(heapManager, bundle, valueOOP);
+                
+                foundVariables.Add(keyName);
+                Console.WriteLine($"{keyName}:");
+                Console.WriteLine($"  Value: {value}");
+                Console.WriteLine();
+            }
+
+            // Report on expected vs found
+            if (foundVariables.Count == 0)
+            {
+                Console.WriteLine("  ⚠️  No class variables found (dictionary has entries but none were readable)");
+            }
+            else
+            {
+                Console.WriteLine($"Summary: Found {foundVariables.Count} class variable(s): {string.Join(", ", foundVariables)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ⚠️  Error diagnosing Cursor class variables: {ex.Message}");
+            Console.WriteLine($"     {ex.StackTrace}");
         }
     }
 }

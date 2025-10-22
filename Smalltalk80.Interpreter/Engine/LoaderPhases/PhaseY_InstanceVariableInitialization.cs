@@ -23,17 +23,20 @@ public class PhaseY_InstanceVariableInitialization
     private readonly SemanticAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
+    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields;
 
     public PhaseY_InstanceVariableInitialization(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
-        ISmalltalkHeapManager heapManager)
+        ISmalltalkHeapManager heapManager,
+        HashSet<(int objectOOP, int fieldIndex)> initializedFields)
     {
         _bundle = bundle;
         _allocator = allocator;
         _heapManager = heapManager;
         _localIdToObjectId = localIdToObjectId;
+        _initializedFields = initializedFields;
     }
 
     public void Run()
@@ -52,12 +55,11 @@ public class PhaseY_InstanceVariableInitialization
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
             
-            // Initialize ONLY uninitialized instance variables to nil (slots 1..N, slot 0 is class reference)
-            // Don't overwrite instance variables that were already set in Phase 4 (like the name field)
+            // Initialize ONLY uninitialized instance variables to nil
+            // Check _initializedFields set to see which fields were already set by Phase 3 or 4
             for (int i = 0; i < instVarCount; i++)
             {
-                var currentOOP = _allocator.GetInstanceVariable(classOOP, i);
-                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                if (!_initializedFields.Contains((classOOP.RawValue, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(classOOP, i, nilOOP);
                     instanceVariablesInitialized++;
@@ -125,8 +127,7 @@ public class PhaseY_InstanceVariableInitialization
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                var currentOOP = _allocator.GetInstanceVariable(objectOOP, i);
-                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                if (!_initializedFields.Contains((objectOOP.RawValue, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(objectOOP, i, nilOOP);
                 }
@@ -145,8 +146,7 @@ public class PhaseY_InstanceVariableInitialization
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                var currentOOP = _allocator.GetInstanceVariable(systemDictOOP, i);
-                if (currentOOP.RawValue == 0) // Only set if still uninitialized
+                if (!_initializedFields.Contains((systemDictOOP.RawValue, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(systemDictOOP, i, nilOOP);
                 }
@@ -369,14 +369,11 @@ public class PhaseY_InstanceVariableInitialization
                 continue; // Not a Dictionary
             
             // Initialize all indexed slots to nil
+            // Indexed slots don't need tracking since they can only be initialized here
             int indexedSize = _allocator.GetIndexedSize(classPoolOOP);
             for (int i = 0; i < indexedSize; i++)
             {
-                var currentOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                if (currentOOP.RawValue == 0) // Only set if still uninitialized
-                {
-                    _allocator.SetIndexedOOP(classPoolOOP, i, nilOOP);
-                }
+                _allocator.SetIndexedOOP(classPoolOOP, i, nilOOP);
             }
         }
     }

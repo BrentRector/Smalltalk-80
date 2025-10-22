@@ -18,6 +18,7 @@ public class Phase4_ClassResolution
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
+    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields;
 
     public Phase4_ClassResolution(
         ColdStartBundle bundle,
@@ -25,7 +26,8 @@ public class Phase4_ClassResolution
         IColdStartPrimitives primitives,
         Dictionary<string, SmalltalkOOP> localIdMap,
         IReadOnlyList<string> symbols,
-        IReadOnlyList<string> strings)
+        IReadOnlyList<string> strings,
+        HashSet<(int objectOOP, int fieldIndex)> initializedFields)
     {
         _bundle = bundle;
         _heapManager = heapManager;
@@ -33,6 +35,7 @@ public class Phase4_ClassResolution
         _localIdToObjectId = localIdMap;
         _symbols = symbols;
         _strings = strings;
+        _initializedFields = initializedFields;
     }
 
     public void Run()
@@ -54,18 +57,17 @@ public class Phase4_ClassResolution
             }
         }
 
-        // Second pass: Initialize instance variables for class objects
+        // Second pass: Set specific class fields
+        // IMPORTANT: Do NOT initialize to nil here - that's Phase Y's job!
+        // Phase Y will initialize unset fields to nil AFTER tracking what was already set.
         foreach (var cls in _bundle.Classes)
         {
             SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
             string className = _symbols[cls.NameIndex];
-            
+
             // Determine the template class for this object from JSON data
             string templateClassName = GetTemplateClassNameFromBundle(cls);
-            
-            // First, initialize ALL instance variables to nil (user requirement)
-            InitializeAllInstanceVariablesToNil(classOOP, templateClassName);
-            
+
             // Set name instance variable (all Class objects have this)
             if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "name", _bundle))
             {
@@ -158,22 +160,24 @@ public class Phase4_ClassResolution
                 // else: pool not yet allocated, will be wired in patch phase
             }
         }
-        
-        // Final step: Ensure ALL remaining instance variables are set to nil (never OOP 0)
-        // This is critical for validation - any uninitialized variables must be nil, not OOP 0
-        EnsureAllInstanceVariablesNil();
+
+        // Phase Y will initialize all unset fields to nil
     }
 
     /// <summary>
     /// Sets an instance variable using primitive interface to match Smalltalk semantics.
     /// Uses instVarAt:put: primitive (1-based indexing) instead of direct heap manager calls.
+    /// Tracks the field as initialized for Phase Y.
     /// </summary>
     private void SetInstanceVariableUsingPrimitive(SmalltalkOOP objectOOP, int zeroBasedIndex, SmalltalkOOP valueOOP)
     {
-        
+
         // Use primitive interface with 1-based indexing (Smalltalk convention)
         int oneBasedIndex = zeroBasedIndex + 1;
         _primitives.InstVarAtPut(objectOOP, oneBasedIndex, valueOOP);
+
+        // Track this field as initialized
+        _initializedFields.Add((objectOOP.RawValue, zeroBasedIndex));
     }
 
     /// <summary>
