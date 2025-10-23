@@ -1,12 +1,51 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-15
-**Status**: 🎉 ZERO UNREACHABLE OBJECTS - Literal Handling Fixed & Perfect GC
+**Last Updated**: 2025-01-23
+**Status**: 🎉 Block Closures Implemented - Lexical Scoping Fixed
 **Compiler Status**: ✅ Fully operational - generates valid JSON from Smalltalk-80.st
-**Validator Status**: ✅ 100% validation passing (10,059 methods validate correctly)  
-**Interpreter Status**: 🎉 PERFECT MILESTONE - 0 unreachable objects, 31,925/31,925 reachable, 14/14 phases complete
+**Validator Status**: ✅ 100% validation passing (10,059 methods validate correctly)
+**Interpreter Status**: ✅ Block execution working - lexical fidelity achieved, BlockClosure class defined
 
-## Recent Accomplishments (2025-01-15)
+## Recent Accomplishments (2025-01-23)
+
+### 🎉 Block Closure Lexical Scoping Fixed
+
+**Problem**: Blocks defined in one method (e.g., Point>>=) but invoked from another (e.g., True>>ifTrue:ifFalse:) were accessing the wrong lexical environment, causing "Instance variable index out of range" errors.
+
+**Root Causes**:
+1. **Wrong home context**: InvokeBlockInternal used `FindMethodContext(_activeContextOOP)` which returned the CALLING method's context instead of the DEFINING method's context
+2. **Uninitialized temps**: BlockContext allocated indexed slots but never initialized them to nil
+3. **Incorrect temp access**: pushTemporary tried to read from BlockContext instead of the active MethodContext
+
+**Solutions**:
+1. Use `FindMethodContextByLocalId(ownerLocalId)` to find the method context where the block was actually defined, using blockOwnerMap
+2. Initialize temp slots to nil in InvokeBlockInternal
+3. Simplified pushTemporary to always read from _activeContextOOP
+
+**BlockClosure Class**: Defined formal BlockClosure class in Smalltalk-80 system image:
+- Instance variables: `method`, `homeContext`, `returnContext`, `numArgs`
+- Supports: `value`, `value:`, `value:value:`, `valueWithArguments:`
+- Control structures: `whileTrue:`, `whileFalse:`, `fork`, `forkAt:`
+- Future-proof for non-local returns and exception handling
+
+**Validation**: Created BlockValidatorTest with comprehensive test suite:
+- Simple blocks, nested blocks, lexical scope
+- Block passing through multiple methods
+- Instance variable and receiver access
+- Control flow (whileTrue, whileFalse)
+
+**Phase 0X**: Added Block Ownership Validation phase to coldstart:
+- Validates every block has valid ownerLocalId in blockOwnerMap
+- Checks ownership chains for nested blocks
+- Detects orphaned blocks and circular references
+- Generates detailed ownership reports
+
+**Results**:
+- ✅ **Lexical fidelity**: Blocks correctly access receiver and instance variables from defining method
+- ✅ **init#3 progress**: Now passes block execution, reaches new error (primitive not implemented)
+- ✅ **Architecture**: BlockClosure class ready for future extensions (non-local returns, continuations)
+
+## Previous Accomplishments (2025-01-15)
 
 ### 🎉 Zero Unreachable Objects Achievement - Literal Handling Bug Fixed
 
