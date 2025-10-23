@@ -126,4 +126,46 @@ public interface IPrimitiveContext
     /// <param name="oop1">First object pointer.</param>
     /// <param name="oop2">Second object pointer.</param>
     void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
+
+    // BlockClosure support
+
+    /// <summary>
+    /// Invokes a block closure with given arguments and home context.
+    /// </summary>
+    /// <param name="blockMethodOOP">CompiledMethod of the block.</param>
+    /// <param name="arguments">Array of argument OOPs.</param>
+    /// <param name="homeContextOOP">Home context for lexical scoping.</param>
+    /// <returns>Result of block execution.</returns>
+    SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP);
+
+    /// <summary>
+    /// Gets a field index from a class using the layout resolver.
+    /// </summary>
+    /// <param name="className">Class name (e.g., "class:BlockClosure").</param>
+    /// <param name="fieldName">Field name (e.g., "method").</param>
+    /// <returns>Field index.</returns>
+    int GetFieldIndex(string className, string fieldName);
+
+    /// <summary>
+    /// Gets an instance variable from an object.
+    /// </summary>
+    /// <param name="objectOOP">Object pointer.</param>
+    /// <param name="index">Instance variable index.</param>
+    /// <returns>Instance variable value as SmalltalkOOP.</returns>
+    SmalltalkOOP GetInstanceVariable(SmalltalkOOP objectOOP, int index);
+
+    /// <summary>
+    /// Gets the indexed size of an indexed object (e.g., Array).
+    /// </summary>
+    /// <param name="objectOOP">Object pointer.</param>
+    /// <returns>Number of indexed elements.</returns>
+    int GetIndexedSize(SmalltalkOOP objectOOP);
+
+    /// <summary>
+    /// Gets an indexed OOP from an indexed object (e.g., Array).
+    /// </summary>
+    /// <param name="objectOOP">Object pointer.</param>
+    /// <param name="index">Index.</param>
+    /// <returns>Indexed element as SmalltalkOOP.</returns>
+    SmalltalkOOP GetIndexedOOP(SmalltalkOOP objectOOP, int index);
 }

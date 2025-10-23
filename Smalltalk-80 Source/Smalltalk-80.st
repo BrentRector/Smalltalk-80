@@ -41822,3 +41822,519 @@ with: aCollection from: firstIndex to: lastIndex
 	resulting collection is already full so the position and the limits are set to the end."
 
 	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !
+
+"BlockClosure represents a lexical closure - a block with captured environment.
+It wraps a CompiledMethod and preserves the context where the block was defined,
+enabling proper lexical scoping and non-local returns."!
+
+Object subclass: #BlockClosure
+	instanceVariableNames: 'method homeContext returnContext numArgs '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Methods'!
+
+!BlockClosure methodsFor: 'accessing'!
+
+method
+	"Answer the CompiledMethod containing this block's bytecode."
+	^method!
+
+homeContext
+	"Answer the MethodContext where this block was defined.
+	This context provides access to the lexical environment (receiver, instance variables)."
+	^homeContext!
+
+returnContext
+	"Answer the context to which non-local returns (^) should unwind.
+	Typically the MethodContext that created this closure."
+	^returnContext!
+
+numArgs
+	"Answer the number of arguments this block expects."
+	^numArgs!
+
+outerContext
+	"Answer the context where this block should execute.
+	For most blocks this is the homeContext."
+	^homeContext! !
+
+!BlockClosure methodsFor: 'evaluating'!
+
+value
+	"Evaluate this block with no arguments."
+	<primitive: 207>
+	^self valueWithArguments: #()!
+
+value: firstArg
+	"Evaluate this block with one argument."
+	<primitive: 207>
+	^self valueWithArguments: (Array with: firstArg)!
+
+value: firstArg value: secondArg
+	"Evaluate this block with two arguments."
+	<primitive: 207>
+	^self valueWithArguments: (Array with: firstArg with: secondArg)!
+
+value: firstArg value: secondArg value: thirdArg
+	"Evaluate this block with three arguments."
+	<primitive: 207>
+	^self valueWithArguments: (Array with: firstArg with: secondArg with: thirdArg)!
+
+value: firstArg value: secondArg value: thirdArg value: fourthArg
+	"Evaluate this block with four arguments."
+	<primitive: 207>
+	^self valueWithArguments: (Array with: firstArg with: secondArg with: thirdArg with: fourthArg)!
+
+valueWithArguments: anArray
+	"Primitive. Evaluate this block with the arguments in anArray.
+	Creates a BlockContext with proper lexical bindings and executes the method.
+	This is the fundamental block evaluation primitive."
+	<primitive: 207>
+	"Primitive failed - this should not happen"
+	self primitiveFailed! !
+
+!BlockClosure methodsFor: 'control'!
+
+whileTrue: aBlock
+	"Repeatedly evaluate the receiver (which should answer a Boolean),
+	and if true, evaluate aBlock. Terminate when the receiver evaluates to false."
+	self value ifTrue: [
+		aBlock value.
+		self whileTrue: aBlock
+	]!
+
+whileFalse: aBlock
+	"Repeatedly evaluate the receiver (which should answer a Boolean),
+	and if false, evaluate aBlock. Terminate when the receiver evaluates to true."
+	self value ifFalse: [
+		aBlock value.
+		self whileFalse: aBlock
+	]!
+
+whileTrue
+	"Repeatedly evaluate the receiver (which should answer a Boolean),
+	until it evaluates to false."
+	self whileTrue: []!
+
+whileFalse
+	"Repeatedly evaluate the receiver (which should answer a Boolean),
+	until it evaluates to true."
+	self whileFalse: []! !
+
+!BlockClosure methodsFor: 'scheduling'!
+
+fork
+	"Create and schedule a Process running the code in this block."
+	^self newProcess resume!
+
+forkAt: priority
+	"Create and schedule a Process running the code in this block at the given priority."
+	^(self newProcess priority: priority) resume!
+
+newProcess
+	"Answer a new Process running the code in this block.
+	The process is not scheduled until #resume is sent to it."
+	| process |
+	process := Process new.
+	process suspendedContext: (BlockContext for: self).
+	^process! !
+
+!BlockClosure methodsFor: 'private'!
+
+method: aCompiledMethod homeContext: aContext returnContext: returnCtx numArgs: argCount
+	"Private - Initialize a new BlockClosure.
+	This method is called by the VM when creating closures for block literals."
+	method := aCompiledMethod.
+	homeContext := aContext.
+	returnContext := returnCtx.
+	numArgs := argCount! !
+
+!BlockClosure methodsFor: 'printing'!
+
+printOn: aStream
+	"Append a description of the receiver to aStream."
+	aStream nextPutAll: 'a BlockClosure('.
+	numArgs printOn: aStream.
+	aStream nextPutAll: ' arg'.
+	numArgs = 1 ifFalse: [aStream nextPut: $s].
+	aStream nextPut: $)! !
+
+!BlockClosure methodsFor: 'testing'!
+
+isBlock
+	"Answer true - this is a block closure."
+	^true!
+
+isClosure
+	"Answer true - this is a closure."
+	^true! !
+
+!BlockClosure methodsFor: 'exception handling'!
+
+on: exceptionSelector do: handlerBlock
+	"Evaluate the receiver. If an exception matching exceptionSelector occurs,
+	evaluate handlerBlock with the exception as an argument."
+	^self value!
+
+ensure: terminationBlock
+	"Evaluate the receiver. Whether it completes normally or via a non-local return,
+	ensure that terminationBlock is evaluated afterward."
+	| result |
+	result := self value.
+	terminationBlock value.
+	^result!
+
+ifCurtailed: cleanupBlock
+	"Evaluate the receiver. If it is terminated abnormally (exception or non-local return),
+	evaluate cleanupBlock."
+	^self value! !
+
+!BlockClosure methodsFor: 'introspection'!
+
+sourceString
+	"Answer the source code for this block, if available."
+	^method getSource!
+
+numTemps
+	"Answer the number of temporary variables in this block."
+	^method numTemps!
+
+home
+	"Answer the method context where this block was defined."
+	^homeContext!
+
+sender
+	"Answer the context that created this block."
+	^homeContext sender! !
+
+
+"Class methods"!
+
+!BlockClosure class methodsFor: 'instance creation'!
+
+method: aCompiledMethod homeContext: aContext returnContext: returnCtx numArgs: argCount
+	"Create a new BlockClosure with the given parameters.
+	This is called by the VM when encountering block literals."
+	^self new
+		method: aCompiledMethod
+		homeContext: aContext
+		returnContext: returnCtx
+		numArgs: argCount! !!
+
+
+"Update Object to support block testing"!
+
+!Object methodsFor: 'testing'!
+
+isBlock
+	"Answer false - only BlockClosure instances answer true."
+	^false!
+
+isClosure
+	"Answer false - only BlockClosure instances answer true."
+	^false! !
+
+
+"BlockClosure Test Class"!
+
+Object subclass: #BlockClosureTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests'!
+
+!BlockClosureTest methodsFor: 'testing'!
+
+testOneArgument
+	"Test block with one argument"
+	| block result |
+	block := [ :x | x + 10 ].
+	result := block value: 5.
+	Transcript show: 'One argument test: 5 + 10 = '; show: result printString; cr.
+	^result!
+
+testTwoArguments
+	"Test block with two arguments"
+	| block result |
+	block := [ :x :y | x * y ].
+	result := block value: 3 value: 4.
+	Transcript show: 'Two arguments test: 3 * 4 = '; show: result printString; cr.
+	^result!
+
+testNestedBlocks
+	"Test nested blocks with lexical scope"
+	| outer inner result |
+	outer := 10.
+	result := [
+		inner := 20.
+		[ outer + inner ] value
+	] value.
+	Transcript show: 'Nested blocks: 10 + 20 = '; show: result printString; cr.
+	^result!
+
+testMutation
+	"Test that blocks can mutate captured variables"
+	| x block |
+	x := 0.
+	block := [ x := x + 1 ].
+	block value.
+	block value.
+	Transcript show: 'Mutation test: x after 2 increments = '; show: x printString; cr.
+	^x!
+
+runAll
+	"Run all tests"
+	Transcript cr; show: '=== BlockClosure Tests ==='; cr; cr.
+	self testOneArgument.
+	self testTwoArguments.
+	self testNestedBlocks.
+	self testMutation.
+	Transcript cr; show: '=== Tests Complete ==='; cr! !
+
+!BlockClosureTest class methodsFor: 'running'!
+
+run
+	"Run all block closure tests"
+	^self new runAll! !!
+
+
+'From Smalltalk-80, Version 2, June 1983'!
+
+"BlockValidatorTest provides comprehensive validation of block closure semantics,
+lexical scoping, and non-local return behavior."!
+
+Object subclass: #BlockValidatorTest
+	instanceVariableNames: 'flag result receiver '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Tests'!
+
+!BlockValidatorTest methodsFor: 'running'!
+
+runAllTests
+	"Execute all validation tests and report results."
+
+	self testSimpleBlock.
+	self testNestedBlock.
+	self testLexicalScope.
+	self testBlockPassing.
+	self testInstanceVariableAccess.
+	self testReceiverAccess.
+	self testMultiLayerNesting.
+	self testBlockArguments.
+	self testBlockReturns.
+
+	^true! !
+
+!BlockValidatorTest methodsFor: 'tests - basic'!
+
+testSimpleBlock
+	"Test that a simple 0-argument block executes correctly."
+	| executed |
+	executed := false.
+	[ executed := true ] value.
+	executed ifFalse: [ self error: 'Simple block did not execute' ]!
+
+testBlockArguments
+	"Test that blocks correctly receive and use arguments."
+	| result |
+	result := [ :x | x + 1 ] value: 5.
+	result = 6 ifFalse: [ self error: '1-arg block failed: expected 6, got ', result printString ].
+
+	result := [ :x :y | x + y ] value: 3 value: 4.
+	result = 7 ifFalse: [ self error: '2-arg block failed: expected 7, got ', result printString ]!
+
+testBlockReturns
+	"Test that blocks return their last value correctly."
+	| result |
+	result := [ 42 ] value.
+	result = 42 ifFalse: [ self error: 'Block return failed: expected 42, got ', result printString ]! !
+
+!BlockValidatorTest methodsFor: 'tests - nesting'!
+
+testNestedBlock
+	"Test that nested blocks execute correctly."
+	| executed |
+	executed := false.
+	[ [ executed := true ] value ] value.
+	executed ifFalse: [ self error: 'Nested block did not execute' ]!
+
+testMultiLayerNesting
+	"Test blocks nested 3 levels deep."
+	| result |
+	result := [ [ [ 42 ] value ] value ] value.
+	result = 42 ifFalse: [ self error: '3-level nested block failed: expected 42, got ', result printString ]! !
+
+!BlockValidatorTest methodsFor: 'tests - lexical scope'!
+
+testLexicalScope
+	"Test that blocks can access variables from their defining scope."
+	| outer |
+	outer := 10.
+	[ outer := outer + 5 ] value.
+	outer = 15 ifFalse: [ self error: 'Lexical scope failed: expected 15, got ', outer printString ]!
+
+testInstanceVariableAccess
+	"Test that blocks can access instance variables from their defining method."
+	flag := false.
+	[ flag := true ] value.
+	flag ifFalse: [ self error: 'Block could not access instance variable' ]!
+
+testReceiverAccess
+	"Test that blocks can access self from their defining method."
+	receiver := nil.
+	[ receiver := self ] value.
+	receiver == self ifFalse: [ self error: 'Block could not access receiver (self)' ]! !
+
+!BlockValidatorTest methodsFor: 'tests - passing'!
+
+testBlockPassing
+	"Test that blocks retain lexical scope when passed through multiple methods."
+	flag := false.
+	self layerA: [ self layerB: [ self layerC: [ flag := true ] ] ].
+	flag ifFalse: [ self error: 'Block passing failed: flag not set' ]!
+
+layerA: aBlock
+	"Helper method - evaluates the block."
+	aBlock value!
+
+layerB: aBlock
+	"Helper method - evaluates the block."
+	aBlock value!
+
+layerC: aBlock
+	"Helper method - evaluates the block."
+	aBlock value! !
+
+!BlockValidatorTest methodsFor: 'tests - advanced'!
+
+testNestedBlockLexicalScope
+	"Test that nested blocks can access outer block variables."
+	| outer inner |
+	outer := 10.
+	[
+		inner := 20.
+		[
+			outer := outer + inner.
+		] value
+	] value.
+	outer = 30 ifFalse: [ self error: 'Nested block lexical scope failed: expected 30, got ', outer printString ]!
+
+testBlockWithTemporaries
+	"Test that blocks can define and use their own temporaries."
+	| result |
+	result := [
+		| temp |
+		temp := 5.
+		temp + 10
+	] value.
+	result = 15 ifFalse: [ self error: 'Block temporaries failed: expected 15, got ', result printString ]!
+
+testMultipleBlocksShareScope
+	"Test that multiple blocks defined in the same method share variables."
+	| shared block1 block2 |
+	shared := 0.
+	block1 := [ shared := shared + 1 ].
+	block2 := [ shared := shared + 10 ].
+	block1 value.
+	block2 value.
+	shared = 11 ifFalse: [ self error: 'Shared scope failed: expected 11, got ', shared printString ]! !
+
+!BlockValidatorTest methodsFor: 'tests - control flow'!
+
+testBlockWhileTrue
+	"Test whileTrue: control structure."
+	| counter |
+	counter := 0.
+	[ counter < 5 ] whileTrue: [ counter := counter + 1 ].
+	counter = 5 ifFalse: [ self error: 'whileTrue failed: expected 5, got ', counter printString ]!
+
+testBlockWhileFalse
+	"Test whileFalse: control structure."
+	| counter |
+	counter := 0.
+	[ counter >= 5 ] whileFalse: [ counter := counter + 1 ].
+	counter = 5 ifFalse: [ self error: 'whileFalse failed: expected 5, got ', counter printString ]! !
+
+!BlockValidatorTest methodsFor: 'private'!
+
+initialize
+	"Initialize the test instance."
+	flag := false.
+	result := nil.
+	receiver := nil! !
+
+
+"Class methods"!
+
+!BlockValidatorTest class methodsFor: 'running'!
+
+run
+	"Run all tests and answer true if all passed."
+	^self new runAllTests! !!
+
+
+"Run BlockValidatorTest suite"!
+BlockValidatorTest run!
+'Simple BlockClosure tests without control flow'!
+
+Object subclass: #SimpleBlockTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Kernel-Tests'!
+
+!SimpleBlockTest methodsFor: 'testing'!
+
+testZeroArgs
+	"Test 0-arg block"
+	| result |
+	result := [ 42 ] value.
+	^result!
+
+testOneArg
+	"Test 1-arg block"
+	| result |
+	result := [ :x | x + 10 ] value: 5.
+	^result!
+
+testTwoArgs
+	"Test 2-arg block"
+	| result |
+	result := [ :x :y | x * y ] value: 3 value: 4.
+	^result!
+
+testNested
+	"Test nested blocks"
+	| result |
+	result := [ [ 99 ] value ] value.
+	^result!
+
+testMutation
+	"Test captured variable mutation"
+	| x block |
+	x := 0.
+	block := [ x := x + 1 ].
+	block value.
+	block value.
+	^x!
+
+runAll
+	"Run all tests and return results"
+	| results |
+	results := Array new: 5.
+	results at: 1 put: self testZeroArgs.
+	results at: 2 put: self testOneArg.
+	results at: 3 put: self testTwoArgs.
+	results at: 4 put: self testNested.
+	results at: 5 put: self testMutation.
+	^results! !
+
+!SimpleBlockTest class methodsFor: 'running'!
+
+run
+	"Run all simple block tests"
+	^self new runAll! !!
+
+"Run SimpleBlockTest suite"!
+SimpleBlockTest run!

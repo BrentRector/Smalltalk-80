@@ -1736,9 +1736,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             var argumentNames = new List<string>();
             if (blockArgs != null)
             {
+                // Extract ArgumentNameContext nodes (each contains one IDENTIFIER)
                 var argNodes = blockArgs.children
-                    .Where(c => c is ITerminalNode term && term.Symbol.Type == Smalltalk80Lexer.IDENTIFIER)
-                    .Cast<ITerminalNode>()
+                    .OfType<Smalltalk80Parser.ArgumentNameContext>()
+                    .Select(ctx => ctx.IDENTIFIER())
                     .ToList();
 
                 for (int i = 0; i < argNodes.Count; i++)

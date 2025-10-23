@@ -1,6 +1,7 @@
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Primitives;
+using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.VM;
 using System.Text;
 
 namespace Smalltalk80.Interpreter.Engine.ColdStart;
@@ -19,18 +20,14 @@ namespace Smalltalk80.Interpreter.Engine.ColdStart;
 public class Phase0X_BlockOwnershipValidation
 {
     private readonly SmalltalkHeapManager _heapManager;
-    private readonly GlobalRegistry _globalRegistry;
     private readonly Dictionary<string, string> _blockOwnerMap;
     private readonly StringBuilder _errors;
     private readonly StringBuilder _warnings;
 
-    public Phase0X_BlockOwnershipValidation(
-        SmalltalkHeapManager heapManager,
-        GlobalRegistry globalRegistry)
+    public Phase0X_BlockOwnershipValidation(SmalltalkHeapManager heapManager)
     {
         _heapManager = heapManager;
-        _globalRegistry = globalRegistry;
-        _blockOwnerMap = globalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap")
+        _blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap")
             ?? throw new InvalidOperationException("blockOwnerMap not found in GlobalRegistry");
         _errors = new StringBuilder();
         _warnings = new StringBuilder();
@@ -57,7 +54,7 @@ public class Phase0X_BlockOwnershipValidation
             totalBlocks++;
 
             // Validate that the block exists in the heap
-            if (!_globalRegistry.TryGet(blockLocalId, out SmalltalkOOP blockOOP))
+            if (!GlobalRegistry.TryGet(blockLocalId, out SmalltalkOOP blockOOP))
             {
                 _errors.AppendLine($"  ERROR: Block {blockLocalId} in blockOwnerMap not found in heap");
                 orphanedBlocks++;
@@ -65,7 +62,7 @@ public class Phase0X_BlockOwnershipValidation
             }
 
             // Validate that the owner method exists
-            if (!_globalRegistry.TryGet(ownerLocalId, out SmalltalkOOP ownerOOP))
+            if (!GlobalRegistry.TryGet(ownerLocalId, out SmalltalkOOP ownerOOP))
             {
                 _errors.AppendLine($"  ERROR: Owner {ownerLocalId} for block {blockLocalId} not found in heap");
                 missingOwners++;
@@ -105,7 +102,7 @@ public class Phase0X_BlockOwnershipValidation
                 currentId = parentId;
 
                 // Ensure parent exists
-                if (!_globalRegistry.TryGet(parentId, out SmalltalkOOP _))
+                if (!GlobalRegistry.TryGet(parentId, out SmalltalkOOP _))
                 {
                     _errors.AppendLine($"  ERROR: Parent {parentId} in ownership chain for {blockLocalId} not found");
                     break;
@@ -223,7 +220,7 @@ public class Phase0X_BlockOwnershipValidation
     private string? GetLocalId(SmalltalkOOP oop)
     {
         // Try to find the local ID in the GlobalRegistry
-        foreach (var kvp in _globalRegistry.GetAllEntries())
+        foreach (var kvp in GlobalRegistry.GetAllEntries())
         {
             if (kvp.Value.Equals(oop))
             {
@@ -238,7 +235,7 @@ public class Phase0X_BlockOwnershipValidation
         try
         {
             // Try to get the class name from GlobalRegistry
-            foreach (var kvp in _globalRegistry.GetAllEntries())
+            foreach (var kvp in GlobalRegistry.GetAllEntries())
             {
                 if (kvp.Value.Equals(classOOP) && kvp.Key.StartsWith("class:"))
                 {

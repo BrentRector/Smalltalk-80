@@ -328,7 +328,17 @@ public class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
             var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-            Push(literal);
+
+            // Check if this literal is a block - wrap in BlockClosure
+            if (IsBlockLiteral(literal))
+            {
+                var closureOOP = CreateBlockClosure(literal, _activeContextOOP);
+                Push(closureOOP);
+            }
+            else
+            {
+                Push(literal);
+            }
             return true;
         }
 
@@ -1227,15 +1237,18 @@ public class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
+            Console.WriteLine($"[SendMessage] Executing primitive {primitiveNumber} for {selectorName}");
             // Try to execute the primitive
             var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
             if (_primitiveSuccess)
             {
+                Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 // Primitive succeeded - return result directly
                 return primitiveResult;
             }
 
+            Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
             // Primitive failed - execute method bytecodes as fallback
         }
 
@@ -1493,18 +1506,11 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Step 3: Parse block method header for metadata
+        // NOTE: Argument count validation is done by Primitive 207 using BlockClosure.numArgs
+        // We just need temp count from the block header
         var blockHeader = ParseMethodHeader(blockMethodOOP);
-        int argCount = blockHeader.NumArgs;
+        int argCount = args.Length;  // Use actual args length, already validated by caller
         int tempCount = blockHeader.NumTemps;
-
-        Console.WriteLine($"[DEBUG InvokeBlock] blockMethodOOP={blockMethodOOP}, argCount={argCount}, tempCount={tempCount}");
-
-        // Validate argument count
-        if (args.Length != argCount)
-        {
-            throw new InvalidOperationException(
-                $"Block argument count mismatch: expected {argCount}, got {args.Length}");
-        }
 
         // Step 4: Create BlockContext
         // Get field indices using LayoutResolver (VirtualMachine responsibility)
@@ -1548,6 +1554,19 @@ public class VirtualMachine : IPrimitiveContext
         // Step 7: Create execution MethodContext backed by BlockContext
         var executionContextOOP = CreateBlockExecutionContext(
             blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP);
+
+        // Step 7a: Copy arguments to MethodContext indexed slots
+        // The MethodContext's indexed slots 0..(argCount-1) hold the arguments
+        for (int i = 0; i < args.Length; i++)
+        {
+            _heapManager.SetIndexedOOP(executionContextOOP, i, args[i]);
+        }
+
+        // Step 7b: Initialize temps to nil (after arguments)
+        for (int i = argCount; i < argCount + tempCount; i++)
+        {
+            _heapManager.SetIndexedOOP(executionContextOOP, i, GlobalRegistry.NilOOP);
+        }
 
         // Step 8: Execute block with GC protection
         // Root the BlockContext during execution to prevent GC
@@ -1805,6 +1824,15 @@ public class VirtualMachine : IPrimitiveContext
     private MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP)
     {
         var headerOop = GetMethodLiteral(methodOOP, 0);
+
+        // DEBUG: Check if headerOop is SmallInteger
+        if (!headerOop.IsSmallInteger)
+        {
+            Console.WriteLine($"[ParseMethodHeader] WARNING: Header is not SmallInteger: {headerOop}");
+            // Return default values
+            return new MethodHeaderInfo(0, false, 0, 0, 0, 0, false, false, 0);
+        }
+
         int header = headerOop.AsSmallInteger();
 
         // Method header word format per docs/Interpreter-Architecture.md lines 5015-5020:
@@ -1839,10 +1867,18 @@ public class VirtualMachine : IPrimitiveContext
                 // - Indexed slot N+1 = bytecode array (hidden)
                 // So last literal (literalN) is at indexed slot numLiterals
                 var lastLiteralOop = GetMethodLiteral(methodOOP, numLiterals);
-                int lastLiteral = lastLiteralOop.AsSmallInteger();
 
-                primitive = lastLiteral & 0xFF;           // Low byte
-                numArgs = (lastLiteral >> 8) & 0x1F;     // High bits
+                if (!lastLiteralOop.IsSmallInteger)
+                {
+                    numArgs = 0;
+                    primitive = 0;
+                }
+                else
+                {
+                    int lastLiteral = lastLiteralOop.AsSmallInteger();
+                    primitive = lastLiteral & 0xFF;           // Low byte
+                    numArgs = (lastLiteral >> 8) & 0x1F;     // High bits
+                }
             }
             else
             {
@@ -2496,6 +2532,94 @@ public class VirtualMachine : IPrimitiveContext
             $"Dictionary {dictionaryOOP} is full (size={size}). Rehashing not yet implemented.");
     }
 
+    /// <summary>
+    /// Checks if an OOP references a block literal (CompiledMethod with localId starting with "block:").
+    /// </summary>
+    private bool IsBlockLiteral(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+            return false;
+
+        // Check if this OOP has a localId starting with "block:"
+        string? localId = GetLocalId(oop);
+        return localId != null && localId.StartsWith("block:");
+    }
+
+    /// <summary>
+    /// Creates a BlockClosure instance wrapping a block CompiledMethod.
+    /// Captures the current active context as the homeContext for lexical scoping.
+    /// </summary>
+    private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
+    {
+        // Get BlockClosure class
+        if (!GlobalRegistry.TryGet("class:BlockClosure", out SmalltalkOOP blockClosureClassOOP))
+        {
+            throw new InvalidOperationException("BlockClosure class not found in GlobalRegistry");
+        }
+
+        // Get argument count from block method header
+        int numArgs = GetBlockArgCount(blockMethodOOP);
+
+        // Allocate BlockClosure instance (4 instance variables)
+        var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 4, 0);
+        _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
+
+        // Get field indices for BlockClosure instance variables
+        int methodIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "method");
+        int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+        int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
+
+        // Initialize instance variables
+        _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);
+        _heapManager.SetInstanceVariable(closureOOP, homeContextIndex, homeContextOOP);
+        _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, homeContextOOP);
+        _heapManager.SetInstanceVariable(closureOOP, numArgsIndex, SmalltalkOOP.FromSmallInteger(numArgs));
+
+        return closureOOP;
+    }
+
+    /// <summary>
+    /// Extracts the argument count from a block CompiledMethod's header.
+    /// </summary>
+    private int GetBlockArgCount(SmalltalkOOP blockMethodOOP)
+    {
+        // Get the method header (first indexed slot)
+        var headerOOP = _heapManager.GetIndexedOOP(blockMethodOOP, 0);
+        if (!headerOOP.IsSmallInteger)
+        {
+            throw new InvalidOperationException($"Block method header is not a SmallInteger: {headerOOP}");
+        }
+
+        int header = headerOOP.AsSmallInteger();
+
+        // Check header format - blocks use extended form with flags=7
+        int flags = (header >> 12) & 0x7;
+
+        if (flags == 7)
+        {
+            // Extended form - arg count is in last literal (high byte)
+            int numLiterals = header & 0x3F;
+
+            if (numLiterals > 0)
+            {
+                // Last literal contains: low byte = primitive, high byte = arg count
+                var lastLiteralOOP = _heapManager.GetIndexedOOP(blockMethodOOP, numLiterals);
+
+                if (lastLiteralOOP.IsSmallInteger)
+                {
+                    int lastLiteral = lastLiteralOOP.AsSmallInteger();
+                    int argCount = (lastLiteral >> 8) & 0x1F;
+                    return argCount;
+                }
+            }
+        }
+
+        // Simple form (flags 0-4): argCount is encoded directly in flags field (bits 12-14)
+        // For blocks with 0-4 arguments and no primitive, flags = argCount
+        return flags;
+    }
+
     IEnumerable<SmalltalkOOP> IPrimitiveContext.GetAllObjects()
     {
         // TODO: Implement proper enumeration of all objects in the object table
@@ -2513,5 +2637,31 @@ public class VirtualMachine : IPrimitiveContext
     {
         // TODO: Implement BecomeTwoWay in heap manager
         // This needs to swap all references between oop1 and oop2
+    }
+
+    SmalltalkOOP IPrimitiveContext.InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP)
+    {
+        // Note: homeContextOOP parameter is ignored - InvokeBlockInternal finds it via blockOwnerMap
+        return InvokeBlockInternal(blockMethodOOP, arguments);
+    }
+
+    int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
+    {
+        return _layoutResolver.GetFieldIndex(className, fieldName);
+    }
+
+    SmalltalkOOP IPrimitiveContext.GetInstanceVariable(SmalltalkOOP objectOOP, int index)
+    {
+        return _heapManager.GetInstanceVariable(objectOOP, index);
+    }
+
+    int IPrimitiveContext.GetIndexedSize(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetIndexedSize(objectOOP);
+    }
+
+    SmalltalkOOP IPrimitiveContext.GetIndexedOOP(SmalltalkOOP objectOOP, int index)
+    {
+        return _heapManager.GetIndexedOOP(objectOOP, index);
     }
 }

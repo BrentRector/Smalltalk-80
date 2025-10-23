@@ -24,10 +24,12 @@ This document provides the canonical architectural documentation for the Smallta
 7. [Bytecode Execution](#bytecode-execution)
 8. [Primitive Operations](#primitive-operations)
 9. [BlockContext Support](#blockcontext-support)
-10. [Graphics Support](#graphics-support)
-11. [Process and Scheduling Infrastructure](#process-and-scheduling-infrastructure)
-12. [Blue Book Compliance](#blue-book-compliance)
-13. [Multi-VM Architecture](#multi-vm-architecture)
+10. [BlockClosure Support](#blockclosure-support)
+11. [BlockContext to BlockClosure Migration](#blockcontext-to-blockclosure-migration)
+12. [Graphics Support](#graphics-support)
+13. [Process and Scheduling Infrastructure](#process-and-scheduling-infrastructure)
+14. [Blue Book Compliance](#blue-book-compliance)
+15. [Multi-VM Architecture](#multi-vm-architecture)
 14. [Key Design Principles](#key-design-principles)
 15. [Technical Specifications](#technical-specifications)
 
@@ -1466,6 +1468,1482 @@ GC Efficiency:     0.0% (nothing to collect)
   - USTable: Array of all symbols
   - Processor: ProcessorScheduler singleton
   - Other globals as needed
+
+---
+
+## BlockClosure Support
+
+**Status**: ✅ Phase 2 Complete (2025-01-23)
+**Implementation**: Runtime wrapping with Primitive 207
+**Documentation**: See `BlockClosure-Phase2-Complete.md` for detailed implementation guide
+
+### Overview
+
+BlockClosure is the modern block representation that provides proper lexical scoping by capturing the homeContext at block creation time. Unlike BlockContext (the Blue Book model), BlockClosure is a first-class object that explicitly stores its defining context.
+
+### Architecture
+
+**BlockClosure Instance Structure**:
+```
+Class: BlockClosure
+Instance Variables:
+  - method         (CompiledMethod OOP) - the block's executable code
+  - homeContext    (MethodContext OOP) - lexical scope capture
+  - returnContext  (MethodContext OOP) - where non-local return goes
+  - numArgs        (SmallInteger) - number of block arguments
+```
+
+### Runtime Wrapping
+
+Blocks are created at runtime when block literals are pushed onto the stack:
+
+**VirtualMachine.cs:327-340** - pushLiteral bytecode handler:
+```csharp
+if (BytecodeUtil.IsPushLiteralConst(bytecode))
+{
+    int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
+    var literal = GetMethodLiteral(methodOOP, index + 1);
+
+    if (IsBlockLiteral(literal))
+    {
+        // Wrap block in BlockClosure, capturing current context
+        var closureOOP = CreateBlockClosure(literal, _activeContextOOP);
+        Push(closureOOP);
+    }
+    else
+    {
+        Push(literal);
+    }
+    return true;
+}
+```
+
+**Key Helper Methods**:
+
+1. **IsBlockLiteral(SmalltalkOOP oop)** - Checks if literal is a block:
+```csharp
+private bool IsBlockLiteral(SmalltalkOOP oop)
+{
+    if (oop.IsSmallInteger)
+        return false;
+    string? localId = GetLocalId(oop);
+    return localId != null && localId.StartsWith("block:");
+}
+```
+
+2. **CreateBlockClosure(blockMethodOOP, homeContextOOP)** - Allocates BlockClosure:
+```csharp
+private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
+{
+    if (!GlobalRegistry.TryGet("class:BlockClosure", out SmalltalkOOP blockClosureClassOOP))
+    {
+        throw new InvalidOperationException("BlockClosure class not found");
+    }
+
+    int numArgs = GetBlockArgCount(blockMethodOOP);
+    var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 4, 0);
+    _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
+
+    // Get field indices from layout resolver
+    int methodIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "method");
+    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+    int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+    int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
+
+    // Set instance variables
+    _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);
+    _heapManager.SetInstanceVariable(closureOOP, homeContextIndex, homeContextOOP);
+    _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, homeContextOOP);
+    _heapManager.SetInstanceVariable(closureOOP, numArgsIndex, SmalltalkOOP.FromSmallInteger(numArgs));
+
+    return closureOOP;
+}
+```
+
+3. **GetBlockArgCount(blockMethodOOP)** - Extracts argument count from header:
+```csharp
+private int GetBlockArgCount(SmalltalkOOP blockMethodOOP)
+{
+    var headerOOP = _heapManager.GetIndexedOOP(blockMethodOOP, 0);
+    if (!headerOOP.IsSmallInteger)
+        return 0;
+
+    int header = headerOOP.AsSmallInteger();
+    int flags = (header >> 12) & 0x7;
+
+    if (flags < 5)
+        return flags;  // Simple form
+    else if (flags == 7)
+    {
+        // Extended form - read from last literal
+        int numLiterals = header & 0x3F;
+        var lastLiteralOOP = GetMethodLiteral(blockMethodOOP, numLiterals);
+        if (lastLiteralOOP.IsSmallInteger)
+        {
+            int lastLiteral = lastLiteralOOP.AsSmallInteger();
+            return (lastLiteral >> 8) & 0x1F;
+        }
+    }
+
+    return 0;
+}
+```
+
+### Primitive 207: Block Evaluation
+
+**BlockClosurePrimitives.cs** - Implements block evaluation:
+```csharp
+public static SmalltalkOOP ValueWithArguments(IPrimitiveContext ctx,
+    SmalltalkOOP receiver, SmalltalkOOP[] args)
+{
+    // Handle two cases:
+    // 1. value (0 args) - treat as empty array
+    // 2. valueWithArguments: (1 arg) - use the provided array
+    SmalltalkOOP argsArrayOOP;
+
+    if (args.Length == 0)
+    {
+        argsArrayOOP = ctx.AllocateObject("class:Array", 0);
+    }
+    else if (args.Length == 1)
+    {
+        argsArrayOOP = args[0];
+    }
+    else
+    {
+        ctx.PrimitiveSuccess = false;
+        return GlobalRegistry.NilOOP;
+    }
+
+    // Extract block method from BlockClosure
+    var methodIndex = ctx.GetFieldIndex("class:BlockClosure", "method");
+    var blockMethodOOP = ctx.GetInstanceVariable(receiver, methodIndex);
+
+    // Extract homeContext from BlockClosure
+    var homeContextIndex = ctx.GetFieldIndex("class:BlockClosure", "homeContext");
+    var homeContextOOP = ctx.GetInstanceVariable(receiver, homeContextIndex);
+
+    // Extract arguments from array
+    var blockArgs = ExtractArrayElements(ctx, argsArrayOOP);
+
+    // Invoke block with captured homeContext
+    var result = ctx.InvokeBlock(blockMethodOOP, blockArgs, homeContextOOP);
+
+    return result;
+}
+```
+
+### Execution Flow
+
+1. **Block Creation**: When `pushLiteral` executes for a block literal:
+   - VM detects block (localId starts with "block:")
+   - Creates BlockClosure instance
+   - **Captures current activeContext as homeContext**
+   - Pushes BlockClosure OOP onto stack
+
+2. **Block Evaluation**: When `BlockClosure>>value` is sent:
+   - Method lookup finds `BlockClosure>>value`
+   - Method has `<primitive: 207>` annotation
+   - Primitive 207 executes:
+     - Extracts `method` and `homeContext` from BlockClosure
+     - Calls `InvokeBlockInternal` with captured homeContext
+     - Returns result to caller
+
+3. **Lexical Scope**: Block accesses variables from **homeContext**, not calling context:
+   - Outer temps/args resolved in homeContext
+   - `self` is homeContext's receiver
+   - Proper lexical scoping guaranteed
+
+### Critical Design Decisions
+
+**Why Capture homeContext at Creation Time?**
+
+This ensures blocks access variables from their **defining** context (lexical scope), not their **calling** context (dynamic scope):
+
+```smalltalk
+| x block |
+x := 10.
+block := [ x printString ].  "homeContext captured here"
+x := 20.
+[ block value ] value.       "prints '20' - sees updated x in homeContext"
+```
+
+The homeContext is captured when the block literal is pushed, not when it's evaluated. This is the fundamental principle of lexical scoping.
+
+**Why Not Store Copied Variables?**
+
+Alternatives like copying captured variables would break mutation semantics:
+
+```smalltalk
+| x |
+x := 0.
+[ x := x + 1 ] value.
+[ x := x + 1 ] value.
+x.  "Should be 2, not 0!"
+```
+
+By keeping homeContext alive, blocks can mutate shared variables correctly.
+
+### Image-Level API
+
+BlockClosure responds to standard block messages:
+
+```smalltalk
+value
+    "Evaluate this block with no arguments."
+    <primitive: 207>
+    ^self valueWithArguments: #()
+
+value: arg1
+    "Evaluate this block with one argument."
+    <primitive: 207>
+    ^self valueWithArguments: {arg1}
+
+value: arg1 value: arg2
+    "Evaluate this block with two arguments."
+    <primitive: 207>
+    ^self valueWithArguments: {arg1. arg2}
+
+valueWithArguments: anArray
+    "Evaluate this block with arguments from array."
+    <primitive: 207>
+    self primitiveFailed
+```
+
+### Performance Considerations
+
+**Memory Overhead**:
+- BlockClosure: 4 instance variables (method, homeContext, returnContext, numArgs)
+- homeContext kept alive for block lifetime
+- No variable copying - references only
+
+**GC Impact**:
+- homeContext prevents MethodContext from being collected
+- Nested blocks keep entire context chain alive
+- Future optimization: copy only captured variables
+
+### Testing Evidence
+
+**Cold Start Success**:
+```
+✓ BlockClosure class created
+✓ BlockClosure metaclass created
+✓ Init #1 and #2 pass with BlockClosure evaluation
+```
+
+**Runtime Evidence**:
+```
+[GetMethod] depth=0, BlockClosure, looking for 'value'
+[SendMessage] Executing primitive 207 for value
+  arg0 = BlockClosure(oop=56220)
+  arg1 = BlockClosure(oop=56222)
+```
+
+### Coexistence with BlockContext
+
+Both BlockContext (primitives 80-82) and BlockClosure (primitive 207) coexist safely:
+
+- **Compiler emits**: BlockClosure by default
+- **VM supports**: Both models simultaneously
+- **Legacy code**: Can still use BlockContext
+- **Migration**: Planned for future (see next section)
+
+See `BlockContext-to-BlockClosure-Migration.md` for coexistence details.
+
+---
+
+## BlockContext to BlockClosure Migration
+
+**Status**: Planning Phase
+**Target**: Future (post-Phase 3 non-local returns)
+**Scope**: Migrate all legacy Smalltalk code from BlockContext to BlockClosure
+
+### Migration Overview
+
+This roadmap converts legacy Smalltalk code that relies on BlockContext semantics (Blue Book model with primitives 80-82) to the canonical BlockClosure model (modern model with primitive 207) while preserving runtime behavior and enabling phased consolidation.
+
+**Key Principle**: Smalltalk blocks and closures are first-class objects that capture surrounding variables and are evaluated with messages like `value:` and `value:value:`. Closure behavior and implementation details vary between VMs and images, so validate VM-level guarantees before changing image code.
+
+**Reference**: Stack Overflow discussions on Smalltalk closure semantics and VM variations.
+
+### Why Migrate?
+
+**BlockContext Issues**:
+- Primitives 80-82 are VM-dependent and non-portable
+- No explicit lexical scope capture (relies on stack frames)
+- Debugging and inspection require VM-specific knowledge
+- Cannot serialize blocks easily (context stack dependencies)
+
+**BlockClosure Benefits**:
+- Explicit homeContext capture (lexical scoping guaranteed)
+- First-class objects with standard instance variables
+- VM-independent API (primitive 207 is well-defined)
+- Easier debugging (context chain is explicit)
+- Serialization-friendly (self-contained objects)
+
+### Preparation and Discovery
+
+#### 1. Inventory
+
+Create comprehensive inventory of all block-related code:
+
+**Classes to Audit**:
+```smalltalk
+BlockContext
+BlockClosure
+MethodContext
+Process
+CompiledMethod
+Compiler/Decompiler/Debugger classes that inspect blocks
+```
+
+**Methods to Catalog**:
+- Block creation sites (`[ ... ]` syntax in methods)
+- Block manipulation (inspecting/modifying block internals)
+- Primitive invocations (80-82 for BlockContext, 207 for BlockClosure)
+- Control structures (`whileTrue:`, `whileFalse:`, `ifTrue:ifFalse:`, etc.)
+
+**Tools**:
+```bash
+# Find all block creation sites
+grep -n "^\s*\[" *.st
+
+# Find primitive 80-82 usage
+grep -n "primitive: 8[0-2]" *.st
+
+# Find BlockContext references
+grep -n "BlockContext" *.st
+```
+
+**Output**: Spreadsheet with columns:
+- File/Class/Method
+- Line number
+- Block usage pattern
+- Dependency on BlockContext internals
+- Test coverage (Y/N)
+- Migration complexity (Low/Medium/High)
+
+#### 2. Classify Block Usage
+
+**Categories**:
+
+1. **Creation-only**: Blocks created and immediately evaluated
+   ```smalltalk
+   [ self doSomething ] value
+   ```
+   *Migration*: Trivial - already works with BlockClosure
+
+2. **Passed-as-parameter**: Blocks passed to control structures
+   ```smalltalk
+   collection do: [ :each | each print ]
+   ```
+   *Migration*: Trivial - API identical
+
+3. **Stored in objects**: Blocks stored in instance variables
+   ```smalltalk
+   button := Button new action: [ self onClick ]
+   ```
+   *Migration*: Medium - ensure BlockClosure lifetime correct
+
+4. **Inspected/reflected**: Code that examines block internals
+   ```smalltalk
+   block homeContext tempAt: 1
+   ```
+   *Migration*: High - requires façade API
+
+5. **Control structures**: `whileTrue:`, `whileFalse:`, etc.
+   ```smalltalk
+   [ x < 10 ] whileTrue: [ x := x + 1 ]
+   ```
+   *Migration*: Medium - ensure semantics preserved
+
+6. **Mutated-capture patterns**: Blocks that mutate captured variables
+   ```smalltalk
+   | sum |
+   sum := 0.
+   collection do: [ :each | sum := sum + each ].
+   sum
+   ```
+   *Migration*: Critical - must preserve mutation semantics
+
+#### 3. Identify VM Primitives and Extensions
+
+**Primitive Audit**:
+- Primitive 80: `BlockContext>>value`
+- Primitive 81: `BlockContext>>value:`
+- Primitive 82: `BlockContext>>valueWithArguments:`
+- Primitive 207: `BlockClosure>>valueWithArguments:`
+
+**VM Extensions to Check**:
+- Stack frame layout assumptions
+- Bytecode formats for block creation
+- Context swapping mechanisms
+- Non-local return handling
+
+**Tool**: Primitive usage scanner:
+```bash
+# Scan for primitive 80-82
+python scan_primitives.py --range 80-82 --input Smalltalk-80.st
+
+# Expected output:
+# BlockContext>>value: primitive 80 (12 call sites)
+# BlockContext>>value:: primitive 81 (8 call sites)
+# BlockContext>>valueWithArguments:: primitive 82 (3 call sites)
+```
+
+#### 4. Establish Regression Harness
+
+**Components**:
+
+1. **Deterministic Image Restore**:
+   ```bash
+   # Save baseline image before migration
+   cp coldstart.json coldstart.baseline.json
+
+   # Restore baseline
+   cp coldstart.baseline.json coldstart.json
+   dotnet run --project Smalltalk80.Interpreter
+   ```
+
+2. **Fast Test Runner**:
+   ```smalltalk
+   TestRunner new
+       runSuite: BlockMigrationTestSuite;
+       reportFailuresTo: 'migration-failures.txt'
+   ```
+
+3. **Snapshot Points**:
+   - Pre-migration: Full image with BlockContext
+   - Post-façade: Image with compatibility layer
+   - Post-migration: Image with BlockClosure only
+   - Post-cleanup: Image with legacy code removed
+
+4. **Test Categories**:
+   - Unit tests (BlockClosure behavior)
+   - Integration tests (control structures)
+   - Compatibility tests (BlockContext emulation)
+   - Performance benchmarks (block creation/evaluation)
+
+#### 5. Preserve Stable Fallback
+
+**Compatibility VM**:
+- Create VM branch `legacy-blockcontext`
+- Tag release: `v1.0-blockcontext-stable`
+- Document fallback procedure
+
+**Runtime Flag**:
+```csharp
+// VirtualMachine.cs
+public static bool UseLegacyBlockContext = false;
+
+private SmalltalkOOP CreateBlock(...)
+{
+    if (UseLegacyBlockContext)
+        return CreateBlockContext(...);
+    else
+        return CreateBlockClosure(...);
+}
+```
+
+**Environment Variable**:
+```bash
+# Run in legacy mode
+SMALLTALK_BLOCK_MODE=legacy dotnet run
+
+# Run in canonical mode
+SMALLTALK_BLOCK_MODE=canonical dotnet run
+```
+
+### Design the Compatibility Layer
+
+#### 1. BlockClosure Façade
+
+Define complete runtime API that legacy code expects:
+
+**Smalltalk-80.st - BlockClosure class (extended)**:
+```smalltalk
+BlockClosure subclass: #BlockContext
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Kernel-Methods'
+
+"Compatibility façade for legacy BlockContext code"
+
+BlockClosure>>homeContext
+    "Legacy API: return the captured context"
+    ^homeContext
+
+BlockClosure>>sender
+    "Legacy API: return the calling context"
+    ^returnContext
+
+BlockClosure>>tempAt: index
+    "Legacy API: access temp variable in homeContext"
+    ^homeContext tempAt: index
+
+BlockClosure>>tempAt: index put: value
+    "Legacy API: modify temp variable in homeContext"
+    ^homeContext tempAt: index put: value
+
+BlockClosure>>receiver
+    "Legacy API: return homeContext receiver"
+    ^homeContext receiver
+
+BlockClosure>>method
+    "Already defined - return the block CompiledMethod"
+    ^method
+
+BlockClosure>>argumentCount
+    "Legacy API: return number of block arguments"
+    ^numArgs
+```
+
+**Missing Selectors**: Add compatibility methods for any selectors sent to BlockContext in legacy code.
+
+#### 2. Primitive Trampolines
+
+Implement trampolines at primitive boundary to translate legacy calls:
+
+**PrimitiveTable.cs**:
+```csharp
+// Legacy primitives (80-82) trampoline to BlockClosure API
+_primitives[80] = (ctx, receiver, args) =>
+{
+    // BlockContext>>value -> BlockClosure>>value
+    if (UseLegacyBlockContext)
+        return BlockContextPrimitives.Value(ctx, receiver, args);
+    else
+        return BlockClosurePrimitives.ValueWithArguments(ctx, receiver, new SmalltalkOOP[0]);
+};
+
+_primitives[81] = (ctx, receiver, args) =>
+{
+    // BlockContext>>value: -> BlockClosure>>value:
+    if (UseLegacyBlockContext)
+        return BlockContextPrimitives.ValueWith(ctx, receiver, args);
+    else
+    {
+        var argsArray = ctx.AllocateObject("class:Array", 1);
+        ctx.SetIndexedOOP(argsArray, 0, args[0]);
+        return BlockClosurePrimitives.ValueWithArguments(ctx, receiver, new[] { argsArray });
+    }
+};
+
+_primitives[82] = (ctx, receiver, args) =>
+{
+    // BlockContext>>valueWithArguments: -> BlockClosure>>valueWithArguments:
+    if (UseLegacyBlockContext)
+        return BlockContextPrimitives.ValueWithArguments(ctx, receiver, args);
+    else
+        return BlockClosurePrimitives.ValueWithArguments(ctx, receiver, args);
+};
+```
+
+**Trampoline Behavior**:
+- In Compatibility Mode: call legacy BlockContext primitives
+- In Canonical Mode: translate to BlockClosure primitive 207
+- API identical at call site (no code changes needed)
+
+#### 3. Inspection Shims
+
+Legacy inspectors/debuggers expect BlockContext layout:
+
+**Inspector.st**:
+```smalltalk
+Inspector>>fieldsForBlock: aBlock
+    "Return inspectable fields for a block"
+
+    (aBlock isKindOf: BlockClosure) ifTrue: [
+        ^#(method homeContext returnContext numArgs)
+    ].
+
+    (aBlock isKindOf: BlockContext) ifTrue: [
+        ^#(method sender receiver argumentCount)
+    ].
+
+    self error: 'Unknown block type'
+```
+
+**Debugger.st**:
+```smalltalk
+Debugger>>contextChainFor: aBlock
+    "Build context chain for debugging"
+
+    | contexts current |
+    contexts := OrderedCollection new.
+    current := aBlock homeContext.  "Works for both BlockContext and BlockClosure"
+
+    [ current notNil ] whileTrue: [
+        contexts add: current.
+        current := current sender
+    ].
+
+    ^contexts
+```
+
+#### 4. Two-Mode Operation
+
+**Compatibility Mode** (legacy semantics):
+- VM creates BlockContext objects
+- Primitives 80-82 execute legacy behavior
+- Inspector/debugger use BlockContext layout
+
+**Canonical Mode** (modern semantics):
+- VM creates BlockClosure objects
+- Primitives 80-82 trampoline to primitive 207
+- Inspector/debugger use BlockClosure layout
+
+**Toggle Mechanism**:
+```csharp
+// Runtime flag in VirtualMachine.cs
+public static BlockMode CurrentBlockMode = BlockMode.Canonical;
+
+public enum BlockMode
+{
+    Legacy,      // BlockContext with primitives 80-82
+    Canonical    // BlockClosure with primitive 207
+}
+```
+
+**Image-Level Toggle**:
+```smalltalk
+Smalltalk blockMode: #canonical.   "Use BlockClosure"
+Smalltalk blockMode: #legacy.      "Use BlockContext"
+Smalltalk blockMode.                "Query current mode"
+```
+
+### Stepwise Migration Plan
+
+#### Phase 0: Test Infrastructure
+
+**Goal**: Ensure comprehensive test coverage before migration.
+
+**Tasks**:
+1. Create `BlockMigrationTestSuite` with categories:
+   - Block creation and evaluation
+   - Argument passing (0-N args)
+   - Capture semantics (lexical scope)
+   - Mutation patterns (captured variable updates)
+   - Nested blocks
+   - Re-entrancy and recursion
+   - Control structures (`whileTrue:`, `ifTrue:ifFalse:`, etc.)
+   - Non-local returns
+
+2. Run baseline tests in Compatibility Mode:
+   ```bash
+   SMALLTALK_BLOCK_MODE=legacy dotnet run --test BlockMigrationTestSuite
+   ```
+
+3. Document all failures (expected baseline)
+
+4. Achieve 100% pass rate for basic block operations
+
+**Success Criteria**:
+- [ ] 200+ tests covering all block patterns
+- [ ] All tests pass in Compatibility Mode
+- [ ] Test execution time < 10 seconds
+- [ ] Automated regression detection
+
+#### Phase 1: Implement BlockClosure Façade
+
+**Goal**: Add compatibility methods to BlockClosure so legacy code can call BlockContext APIs.
+
+**Tasks**:
+1. Add façade methods to BlockClosure class:
+   ```smalltalk
+   homeContext
+   sender
+   tempAt:
+   tempAt:put:
+   receiver
+   argumentCount
+   ```
+
+2. Ensure all selectors sent to BlockContext are implemented on BlockClosure
+
+3. Run tests in Canonical Mode with façade:
+   ```bash
+   SMALLTALK_BLOCK_MODE=canonical dotnet run --test BlockMigrationTestSuite
+   ```
+
+4. Fix any failures by adding missing façade methods
+
+**Success Criteria**:
+- [ ] All BlockContext selectors implemented on BlockClosure
+- [ ] Tests pass in both Legacy and Canonical modes
+- [ ] No API-level changes required in user code
+
+#### Phase 2: Introduce Primitive Trampolines
+
+**Goal**: Replace direct BlockContext primitive usage with trampolines that work in both modes.
+
+**Tasks**:
+1. Implement trampolines for primitives 80-82 (see Design section)
+
+2. Add mode detection to trampoline logic
+
+3. Test trampoline behavior:
+   ```csharp
+   // Test: Legacy mode uses BlockContext primitives
+   VirtualMachine.CurrentBlockMode = BlockMode.Legacy;
+   var result = ExecutePrimitive(80, blockOOP, args);
+   Assert(result came from BlockContextPrimitives.Value);
+
+   // Test: Canonical mode uses BlockClosure primitive
+   VirtualMachine.CurrentBlockMode = BlockMode.Canonical;
+   var result = ExecutePrimitive(80, blockOOP, args);
+   Assert(result came from BlockClosurePrimitives.ValueWithArguments);
+   ```
+
+4. Run full test suite in both modes
+
+**Success Criteria**:
+- [ ] Primitives 80-82 work in both modes
+- [ ] No performance degradation (< 5% overhead)
+- [ ] All tests pass in both modes
+
+#### Phase 3: Convert Non-Invasive Call Sites
+
+**Goal**: Replace simple block creation/evaluation patterns with BlockClosure-only code.
+
+**Pattern**: Ephemeral blocks (created and immediately evaluated):
+```smalltalk
+"Before (BlockContext-compatible)"
+[ self doSomething ] value
+
+"After (BlockClosure-native)"
+[ self doSomething ] value   "No change - works with both!"
+```
+
+**Tasks**:
+1. Identify all "creation-only" block sites from inventory
+
+2. Run in Canonical Mode to verify compatibility
+
+3. Remove any unnecessary BlockContext type checks:
+   ```smalltalk
+   "Before"
+   (block isKindOf: BlockContext) ifTrue: [ ... ]
+
+   "After"
+   (block isKindOf: BlockClosure) ifTrue: [ ... ]
+   ```
+
+4. Run regression tests after each batch
+
+**Batch Strategy**:
+- Batch 1: Core library classes (Collection, Stream, Magnitude)
+- Batch 2: GUI framework classes (View, Controller)
+- Batch 3: System classes (Compiler, Debugger)
+- Batch 4: Application code
+
+**Success Criteria**:
+- [ ] 80% of block sites migrated to BlockClosure-native
+- [ ] All tests pass after each batch
+- [ ] No functional regressions
+
+#### Phase 4: Convert Stored and Inspected Blocks
+
+**Goal**: Migrate code that stores blocks in instance variables or inspects block internals.
+
+**Pattern**: Stored blocks:
+```smalltalk
+"Before"
+button action: [ self onClick ].   "Returns BlockContext"
+
+"After"
+button action: [ self onClick ].   "Returns BlockClosure"
+```
+
+**Tasks**:
+1. Find all classes with block-valued instance variables
+
+2. Update accessor methods to accept BlockClosure:
+   ```smalltalk
+   Button>>action: aBlock
+       "Set the action block (accepts BlockContext or BlockClosure)"
+       action := aBlock
+   ```
+
+3. Update inspection code to handle both types:
+   ```smalltalk
+   Button>>inspectAction
+       | blockType |
+       blockType := action class name.
+       blockType = 'BlockContext' ifTrue: [ ^self inspectBlockContext ].
+       blockType = 'BlockClosure' ifTrue: [ ^self inspectBlockClosure ].
+       self error: 'Unknown block type'
+   ```
+
+4. Test stored block lifetime and GC behavior
+
+**Critical Cases**:
+- Buttons/menu items with action blocks
+- Delayed evaluation (Delay, Process)
+- Error handlers with exception blocks
+- Observers/callbacks with notification blocks
+
+**Success Criteria**:
+- [ ] All stored blocks work with BlockClosure
+- [ ] GC correctly handles BlockClosure lifetimes
+- [ ] Inspector shows BlockClosure internals correctly
+
+#### Phase 5: Replace VM-Level Block Creation
+
+**Goal**: Make VM produce BlockClosure instances by default.
+
+**Tasks**:
+1. Change default block creation mode:
+   ```csharp
+   // VirtualMachine.cs
+   public static BlockMode CurrentBlockMode = BlockMode.Canonical;  // Was: Legacy
+   ```
+
+2. Update bytecode compiler to emit BlockClosure metadata:
+   ```csharp
+   // BytecodeCompiler.cs - block compilation
+   var blockMethod = CompileBlockBody(blockNode);
+   blockMethod.SetLocalId($"block:{blockId}");  // Marks as BlockClosure target
+   ```
+
+3. Ensure pushLiteral creates BlockClosure (already implemented):
+   ```csharp
+   if (IsBlockLiteral(literal))
+   {
+       var closureOOP = CreateBlockClosure(literal, _activeContextOOP);
+       Push(closureOOP);
+   }
+   ```
+
+4. Run full image with Canonical Mode as default
+
+5. Monitor for any BlockContext creation (should be zero)
+
+**Verification**:
+```bash
+# Run and check for BlockContext instances
+dotnet run --project Smalltalk80.Interpreter | grep "BlockContext(" | wc -l
+# Expected: 0
+```
+
+**Success Criteria**:
+- [ ] VM creates only BlockClosure objects
+- [ ] No BlockContext instances in image
+- [ ] All tests pass with Canonical Mode default
+
+#### Phase 6: Retire Trampolines and Compatibility Flags
+
+**Goal**: Remove legacy code paths once all image code runs in Canonical Mode.
+
+**Tasks**:
+1. Remove Compatibility Mode toggle:
+   ```csharp
+   // DELETE: VirtualMachine.cs
+   public static BlockMode CurrentBlockMode = ...;
+   ```
+
+2. Replace trampolines with direct primitive 207 calls:
+   ```csharp
+   // DELETE: Trampolines for 80-82
+   _primitives[80] = (ctx, receiver, args) => { ... };
+
+   // KEEP: Only primitive 207
+   _primitives[207] = BlockClosurePrimitives.ValueWithArguments;
+   ```
+
+3. Remove BlockContext class from image:
+   ```smalltalk
+   "Remove from Smalltalk-80.st"
+   Object subclass: #BlockContext ... "DELETE entire class"
+   ```
+
+4. Update documentation to reflect BlockClosure-only model
+
+5. Run full test suite to verify no regressions
+
+**Success Criteria**:
+- [ ] Compatibility Mode code removed
+- [ ] Primitives 80-82 removed from primitive table
+- [ ] BlockContext class removed from image
+- [ ] All tests pass
+- [ ] Documentation updated
+
+### Handling Tricky Cases
+
+#### 1. Mutating Captured Variables Across Nested Closures
+
+**Problem**: Nested blocks that mutate shared variables require homeContext preservation:
+
+```smalltalk
+| x outerBlock innerBlock |
+x := 0.
+outerBlock := [
+    innerBlock := [ x := x + 1 ].
+    innerBlock value.
+    innerBlock value
+].
+outerBlock value.
+x.  "Should be 2"
+```
+
+**BlockContext Behavior**: Relies on stack frame for `x` variable slot.
+
+**BlockClosure Behavior**: Both blocks capture same homeContext, mutations visible.
+
+**Migration**: No code changes needed - BlockClosure semantics preserve mutations automatically.
+
+**Test**:
+```smalltalk
+testNestedBlockMutation
+    | x outer inner |
+    x := 0.
+    outer := [
+        inner := [ x := x + 1 ].
+        inner value.
+        inner value
+    ].
+    outer value.
+    self assert: x equals: 2.
+```
+
+#### 2. Self-Referential Blocks and Re-entrancy
+
+**Problem**: Recursive blocks that reference themselves:
+
+```smalltalk
+| factorial |
+factorial := [ :n |
+    n = 0
+        ifTrue: [ 1 ]
+        ifFalse: [ n * (factorial value: n - 1) ]
+].
+factorial value: 5.  "Should be 120"
+```
+
+**BlockContext Behavior**: Captures stack frame where `factorial` variable lives.
+
+**BlockClosure Behavior**: Captures homeContext containing `factorial` temp variable.
+
+**Migration**: Works correctly with BlockClosure - homeContext contains `factorial` binding.
+
+**Edge Case**: Ensure homeContext not collected during recursion (GC roots must include active contexts).
+
+**Test**:
+```smalltalk
+testRecursiveBlock
+    | factorial |
+    factorial := [ :n |
+        n = 0
+            ifTrue: [ 1 ]
+            ifFalse: [ n * (factorial value: n - 1) ]
+    ].
+    self assert: (factorial value: 5) equals: 120.
+```
+
+#### 3. Bytecode or Debugger Expectations
+
+**Problem**: Debugger expects specific stack frame layout for BlockContext.
+
+**Migration Strategy**:
+
+1. Update `Debugger>>contextChain` to recognize BlockClosure:
+   ```smalltalk
+   Debugger>>contextChain
+       | chain current |
+       chain := OrderedCollection new.
+       current := thisContext.
+
+       [ current notNil ] whileTrue: [
+           chain add: current.
+           current := current sender.
+
+           "Handle BlockClosure homeContext chain"
+           (current isNil and: [ thisContext receiver isKindOf: BlockClosure ])
+               ifTrue: [ current := thisContext receiver homeContext ]
+       ].
+
+       ^chain
+   ```
+
+2. Update `Inspector>>fieldsFor:` to show BlockClosure structure:
+   ```smalltalk
+   Inspector>>fieldsFor: anObject
+       (anObject isKindOf: BlockClosure) ifTrue: [
+           ^#(method homeContext returnContext numArgs)
+       ].
+       ...
+   ```
+
+3. Update `MethodContext>>printOn:` to show BlockClosure frames:
+   ```smalltalk
+   MethodContext>>printOn: aStream
+       | blockClosure |
+
+       "Check if this context is referenced by a BlockClosure"
+       blockClosure := self findBlockClosureReferencing: self.
+       blockClosure notNil
+           ifTrue: [ aStream nextPutAll: '[block in '; print: blockClosure method; nextPut: $] ]
+           ifFalse: [ super printOn: aStream ]
+   ```
+
+**Success Criteria**:
+- [ ] Debugger shows correct context chain for BlockClosure
+- [ ] Inspector displays BlockClosure instance variables
+- [ ] Stack traces include block source locations
+
+#### 4. Serialization and Image Format
+
+**Problem**: Old images may have serialized BlockContext objects.
+
+**Migration Script**:
+
+```smalltalk
+"ImageMigrator.st"
+ImageMigrator class>>migrateBlockContextToBlockClosure
+    "Convert all BlockContext objects to BlockClosure"
+
+    | oldBlocks newBlocks |
+    oldBlocks := OrderedCollection new.
+    newBlocks := OrderedCollection new.
+
+    "Find all BlockContext instances"
+    BlockContext allInstances do: [ :oldBlock |
+        | newBlock |
+        oldBlocks add: oldBlock.
+
+        "Create equivalent BlockClosure"
+        newBlock := BlockClosure new
+            method: oldBlock method;
+            homeContext: oldBlock homeContext;
+            returnContext: oldBlock sender;
+            numArgs: oldBlock argumentCount.
+
+        newBlocks add: newBlock.
+
+        "Replace references in image"
+        self replaceAllReferencesTo: oldBlock with: newBlock
+    ].
+
+    Transcript show: 'Migrated ', oldBlocks size printString, ' blocks'; cr.
+    ^newBlocks
+```
+
+**Image Load Hook**:
+```smalltalk
+"Run migration on image load if legacy blocks detected"
+Smalltalk addToStartUpList: ImageMigrator.
+
+ImageMigrator class>>startUp
+    BlockContext allInstances isEmpty
+        ifFalse: [ self migrateBlockContextToBlockClosure ]
+```
+
+**Success Criteria**:
+- [ ] Migration script converts all BlockContext to BlockClosure
+- [ ] All object references updated correctly
+- [ ] Migrated image runs without errors
+
+### Validation and Rollout
+
+#### 1. Continuous Compatibility Tests
+
+**Test Suite Categories**:
+
+1. **Compatibility-mode smoke tests**:
+   ```bash
+   # Legacy mode basic functionality
+   SMALLTALK_BLOCK_MODE=legacy dotnet run --test SmokeSuite
+   ```
+
+2. **User-facing acceptance tests**:
+   ```smalltalk
+   AcceptanceTestSuite>>testBlockBasics
+   AcceptanceTestSuite>>testControlStructures
+   AcceptanceTestSuite>>testCollectionIterators
+   ```
+
+3. **Performance benchmarks**:
+   ```smalltalk
+   BenchmarkSuite>>benchmarkBlockCreation
+   BenchmarkSuite>>benchmarkBlockEvaluation
+   BenchmarkSuite>>benchmarkNestedBlocks
+   ```
+
+**Automated Regression Detection**:
+```bash
+# Run before migration (baseline)
+dotnet run --test BlockMigrationTestSuite --output baseline.json
+
+# Run after migration (comparison)
+dotnet run --test BlockMigrationTestSuite --output migrated.json
+
+# Compare results
+diff baseline.json migrated.json
+```
+
+#### 2. Canary Image
+
+**Strategy**: Deploy Canonical Mode to non-critical services first.
+
+**Canary Deployment**:
+```bash
+# Create canary image with Canonical Mode
+dotnet run --project Smalltalk80.Interpreter --config Canary
+
+# Monitor metrics
+watch -n 5 'curl http://canary-service/metrics | grep block'
+```
+
+**Metrics to Monitor**:
+- Block creation rate (blocks/second)
+- Block evaluation latency (ms)
+- GC pressure (homeContext retention)
+- Error rate (block-related exceptions)
+
+**Rollback Criteria**:
+- Error rate increase > 5%
+- Latency increase > 10%
+- GC pause time increase > 20%
+
+#### 3. Gradual Rollout
+
+**Rollout Phases**:
+
+1. **Phase A: Core Libraries** (10% rollout)
+   - Collection classes
+   - Stream classes
+   - String/Number classes
+   - **Monitor**: 1 week
+
+2. **Phase B: System Classes** (25% rollout)
+   - Compiler/Decompiler
+   - Inspector/Debugger
+   - Process/Delay
+   - **Monitor**: 2 weeks
+
+3. **Phase C: GUI Framework** (50% rollout)
+   - View/Controller
+   - Window/Menu
+   - Event handling
+   - **Monitor**: 2 weeks
+
+4. **Phase D: Application Code** (100% rollout)
+   - User applications
+   - Custom tools
+   - Scripts
+   - **Monitor**: 4 weeks
+
+**Rollout Command**:
+```bash
+# Deploy to specific components
+dotnet run --config Production --block-mode canonical --components "core,system"
+```
+
+#### 4. Monitor and Iterate
+
+**Monitoring Dashboard**:
+- Block creation rate (live graph)
+- Primitive 207 execution count
+- homeContext GC retention metrics
+- Error logs filtered for block-related exceptions
+
+**Incident Response**:
+1. Detect regression (automated alert)
+2. Capture minimal repro case
+3. Create test case in `BlockMigrationTestSuite`
+4. Fix façade or image code
+5. Verify fix in canary environment
+6. Deploy fix to production
+
+**Feedback Loop**:
+```
+User Reports Issue
+    ↓
+Create Test Case
+    ↓
+Fix Façade/Code
+    ↓
+Verify in Canary
+    ↓
+Deploy to Production
+    ↓
+Monitor for Regression
+```
+
+#### 5. Final Consolidation
+
+**Prerequisites**:
+- [ ] All components running Canonical Mode
+- [ ] 4+ weeks of production monitoring
+- [ ] Zero block-related incidents
+- [ ] Performance metrics within 5% of baseline
+
+**Final Steps**:
+1. Remove compatibility code (Phase 6 tasks)
+2. Archive legacy VM branch
+3. Update all documentation
+4. Publish migration post-mortem
+5. Announce BlockContext deprecation
+
+**Success Announcement**:
+```
+🎉 BlockClosure Migration Complete!
+
+- All 472 classes migrated
+- 10,091 methods using BlockClosure
+- 0 BlockContext instances remaining
+- Performance: +2% (faster block creation)
+- Memory: -5% (more efficient homeContext GC)
+
+Legacy BlockContext support has been removed.
+```
+
+### Checklist for Each Migrated Unit
+
+**Before Migration**:
+- [ ] Tests covering argument arity (0-N args)
+- [ ] Tests covering nested captures
+- [ ] Tests covering re-entrancy
+- [ ] Tests covering block lifetime and GC
+- [ ] Performance baseline captured
+
+**During Migration**:
+- [ ] No direct references to BlockContext internals
+- [ ] All block creation uses BlockClosure
+- [ ] Debugger shows correct context chain
+- [ ] Inspector displays BlockClosure fields
+
+**After Migration**:
+- [ ] All tests pass in Canonical Mode
+- [ ] Performance within 5% of baseline
+- [ ] No BlockContext instances created
+- [ ] Serialization/deserialization works
+- [ ] Documentation updated
+
+### Appendix: Recommended Artifacts
+
+#### 1. Compatibility Matrix
+
+**BlockContext API → BlockClosure Method Mapping**:
+
+| BlockContext Selector | BlockClosure Equivalent | Notes |
+|-----------------------|-------------------------|-------|
+| `value` | `value` | Primitive 207 |
+| `value:` | `value:` | Primitive 207 |
+| `valueWithArguments:` | `valueWithArguments:` | Primitive 207 |
+| `homeContext` | `homeContext` | Instance variable accessor |
+| `sender` | `returnContext` | Renamed |
+| `receiver` | `homeContext receiver` | Indirect access |
+| `tempAt:` | `homeContext tempAt:` | Delegated to context |
+| `tempAt:put:` | `homeContext tempAt:put:` | Delegated to context |
+| `argumentCount` | `numArgs` | Instance variable accessor |
+| `method` | `method` | Instance variable accessor |
+
+#### 2. Trampoline Specification
+
+**Primitive 80: BlockContext>>value**
+
+- **Input**: BlockContext or BlockClosure receiver, 0 arguments
+- **Output**: Result of block evaluation
+- **Failure Mode**: PrimitiveFailed if receiver not a block
+- **Layout**: Extracts method and homeContext, calls InvokeBlock
+- **Canonical Mode**: Calls BlockClosurePrimitives.ValueWithArguments with empty array
+
+**Primitive 81: BlockContext>>value:**
+
+- **Input**: BlockContext or BlockClosure receiver, 1 argument
+- **Output**: Result of block evaluation with argument
+- **Failure Mode**: PrimitiveFailed if argumentCount ≠ 1
+- **Layout**: Creates Array[1], sets arg, calls InvokeBlock
+- **Canonical Mode**: Wraps argument in array, calls primitive 207
+
+**Primitive 82: BlockContext>>valueWithArguments:**
+
+- **Input**: BlockContext or BlockClosure receiver, Array argument
+- **Output**: Result of block evaluation with arguments
+- **Failure Mode**: PrimitiveFailed if args not Array or argumentCount mismatch
+- **Layout**: Extracts arguments from array, calls InvokeBlock
+- **Canonical Mode**: Directly calls primitive 207 with array
+
+#### 3. Test Harness Additions
+
+**Deterministic Image Restoration**:
+```bash
+#!/bin/bash
+# restore-image.sh
+
+# Save current image
+cp coldstart.json "coldstart.$(date +%s).backup.json"
+
+# Restore baseline
+cp coldstart.baseline.json coldstart.json
+
+echo "Image restored to baseline"
+```
+
+**Focused Block Behavior Tests**:
+```smalltalk
+BlockMigrationTestSuite>>testBlockCreation
+    | block |
+    block := [ 42 ].
+    self assert: (block isKindOf: BlockClosure).
+    self assert: block numArgs equals: 0.
+
+BlockMigrationTestSuite>>testBlockEvaluation
+    | result |
+    result := [ 1 + 1 ] value.
+    self assert: result equals: 2.
+
+BlockMigrationTestSuite>>testBlockWithArguments
+    | result |
+    result := [ :x :y | x + y ] value: 10 value: 20.
+    self assert: result equals: 30.
+
+BlockMigrationTestSuite>>testNestedBlocks
+    | outer inner result |
+    outer := [ inner := [ 42 ]. inner value ].
+    result := outer value.
+    self assert: result equals: 42.
+
+BlockMigrationTestSuite>>testCapturedVariableMutation
+    | x block |
+    x := 0.
+    block := [ x := x + 1 ].
+    block value.
+    block value.
+    self assert: x equals: 2.
+
+BlockMigrationTestSuite>>testRecursiveBlock
+    | factorial |
+    factorial := [ :n | n = 0 ifTrue: [ 1 ] ifFalse: [ n * (factorial value: n - 1) ] ].
+    self assert: (factorial value: 5) equals: 120.
+```
+
+#### 4. Migration Scanner Script
+
+**scan-blocks.py**:
+```python
+import re
+import json
+
+def scan_file(filepath):
+    """Scan Smalltalk file for legacy block usage"""
+    results = []
+
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+
+    for i, line in enumerate(lines, 1):
+        # Find BlockContext references
+        if 'BlockContext' in line:
+            results.append({
+                'file': filepath,
+                'line': i,
+                'type': 'BlockContext reference',
+                'code': line.strip()
+            })
+
+        # Find primitive 80-82 usage
+        if match := re.search(r'primitive:\s*(8[0-2])', line):
+            results.append({
+                'file': filepath,
+                'line': i,
+                'type': f'Primitive {match.group(1)}',
+                'code': line.strip()
+            })
+
+    return results
+
+def main():
+    files = ['Smalltalk-80.st']  # Add more files
+    all_results = []
+
+    for file in files:
+        all_results.extend(scan_file(file))
+
+    with open('block-scan-results.json', 'w') as f:
+        json.dump(all_results, f, indent=2)
+
+    print(f"Found {len(all_results)} legacy block references")
+
+if __name__ == '__main__':
+    main()
+```
+
+**Usage**:
+```bash
+python scan-blocks.py
+cat block-scan-results.json
+```
+
+#### 5. Rollback Plan
+
+**Prerequisites**:
+- Baseline image snapshot (coldstart.baseline.json)
+- Legacy VM branch tagged (v1.0-blockcontext-stable)
+- Compatibility Mode toggle functional
+
+**Rollback Procedure**:
+
+1. **Immediate Rollback** (< 5 minutes):
+   ```bash
+   # Switch to legacy mode
+   export SMALLTALK_BLOCK_MODE=legacy
+   dotnet run --project Smalltalk80.Interpreter
+   ```
+
+2. **Image Rollback** (< 15 minutes):
+   ```bash
+   # Restore baseline image
+   cp coldstart.baseline.json coldstart.json
+   dotnet run --project Smalltalk80.Interpreter
+   ```
+
+3. **VM Rollback** (< 30 minutes):
+   ```bash
+   # Checkout legacy VM
+   git checkout v1.0-blockcontext-stable
+   dotnet build Smalltalk80.Interpreter
+   dotnet run --project Smalltalk80.Interpreter
+   ```
+
+4. **Verify Rollback**:
+   ```bash
+   # Run smoke tests
+   dotnet run --test SmokeSuite
+
+   # Check for BlockContext instances
+   dotnet run | grep "BlockContext(" | wc -l
+   # Expected: > 0 (legacy mode)
+   ```
+
+**Post-Rollback Actions**:
+- Notify team of rollback
+- Capture incident details
+- Create blocking issue
+- Schedule post-mortem
+- Plan fix and retry
+
+### Migration Timeline Estimate
+
+**Total Duration**: 12-16 weeks
+
+- **Week 1-2**: Preparation (inventory, tests, baseline)
+- **Week 3-4**: Façade implementation
+- **Week 5-6**: Trampoline implementation
+- **Week 7-8**: Non-invasive migration (80% of code)
+- **Week 9-10**: Complex migration (stored blocks, inspectors)
+- **Week 11-12**: VM block creation switch
+- **Week 13-14**: Canary deployment and monitoring
+- **Week 15-16**: Full rollout and consolidation
+
+**Risk Factors**:
+- Unknown edge cases in application code (+2-4 weeks)
+- Performance regressions requiring optimization (+1-2 weeks)
+- Debugger/inspector incompatibilities (+1 week)
+
+**Success Probability**: 90% (high confidence with phased approach)
 
 ---
 
