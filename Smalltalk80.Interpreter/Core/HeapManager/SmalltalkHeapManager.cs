@@ -267,10 +267,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             throw new ArgumentException("Cannot get instance variable of SmallInteger");
 
         var entry = GetObjectTableEntry(objectOOP);
-        
+
         // Get instance variable count from ObjectTableEntry
         int instanceVarCount = entry.InstanceVariableCount;
 
+        // DEBUG: Track calls to GetInstanceVariable on oop=8952 (true singleton)
+        if (objectOOP.RawValue == 8952)
+        {
+            Console.WriteLine($"[DEBUG GetInstanceVariable] Called on oop=8952 (true), index={index}, instanceVarCount={instanceVarCount}");
+            Console.WriteLine($"[DEBUG GetInstanceVariable] Stack trace:");
+            Console.WriteLine(Environment.StackTrace);
+        }
 
         // Validate index
         if (index < 0 || index >= instanceVarCount)

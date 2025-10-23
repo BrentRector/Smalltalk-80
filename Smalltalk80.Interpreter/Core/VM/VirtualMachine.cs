@@ -274,6 +274,12 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
+        // DEBUG: Track bytecode execution for debugging
+        if (bytecode == 0x10)
+        {
+            Console.WriteLine($"[DEBUG ExecuteBytecode] bytecode=0x{bytecode:X2}, IsPushIvar={BytecodeUtil.IsPushIvar(bytecode)}, IsPushTemp={BytecodeUtil.IsPushTemp(bytecode)}");
+        }
+
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
@@ -281,7 +287,9 @@ public class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPushIvar(bytecode))
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
-            
+
+            Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}");
+
             // For blocks, receiver should be the home context receiver
             var actualReceiverOOP = receiverOOP;
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var ivarBlockContextOOP))
@@ -289,30 +297,27 @@ public class VirtualMachine : IPrimitiveContext
                 int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                 var homeContextOOP = _heapManager.GetInstanceVariable(ivarBlockContextOOP, homeIndex);
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                Console.WriteLine($"[DEBUG IsPushIvar] Block context - actualReceiverOOP={actualReceiverOOP}");
             }
-            
+
             var valueOOP = _heapManager.GetInstanceVariable(actualReceiverOOP, index);
             Push(valueOOP);
             return true;
         }
 
         // Push temporary variable 0-15 (0x10-0x1F)
+        // Temporaries are ALWAYS in the active MethodContext's indexed slots (args + temps)
+        // They are NOT affected by BlockContext - blocks share the home method's temporaries
         if (BytecodeUtil.IsPushTemp(bytecode))
         {
             int index = BytecodeUtil.PushTempIndex(bytecode);
-            SmalltalkOOP valueOOP;
-            
-            // For blocks, read from BlockContext indexed fields
-            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
-            {
-                valueOOP = _heapManager.GetIndexedOOP(blockContextOOP, index);
-            }
-            else
-            {
-                // Normal method - read from MethodContext indexed fields
-                valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
-            }
-            
+
+            Console.WriteLine($"[DEBUG pushTemp] index={index}, _activeContextOOP={_activeContextOOP}");
+
+            // Always read from the active context's indexed fields
+            // This works for both regular methods and block execution contexts
+            var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+
             Push(valueOOP);
             return true;
         }
@@ -1479,20 +1484,20 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Step 2: Determine contexts
-        // homeContext = find the actual method context (not a block context) by walking the sender chain
-        var homeContextOOP = FindMethodContext(_activeContextOOP);
+        // homeContext = find the method context where the block was DEFINED (using blockOwnerMap)
+        // This is the context that owns the block's lexical environment (receiver, instance variables)
+        var homeContextOOP = FindMethodContextByLocalId(ownerLocalId);
         if (homeContextOOP == default)
         {
-            throw new InvalidOperationException("No method context found - blocks must be invoked within method execution");
+            throw new InvalidOperationException($"No method context found for block owner {ownerLocalId} - context may have already returned");
         }
-
-        // outerContext = resolve to root method by walking blockOwnerMap
-        var outerContextOOP = ResolveOuterContext(ownerLocalId, blockOwnerMap);
 
         // Step 3: Parse block method header for metadata
         var blockHeader = ParseMethodHeader(blockMethodOOP);
         int argCount = blockHeader.NumArgs;
         int tempCount = blockHeader.NumTemps;
+
+        Console.WriteLine($"[DEBUG InvokeBlock] blockMethodOOP={blockMethodOOP}, argCount={argCount}, tempCount={tempCount}");
 
         // Validate argument count
         if (args.Length != argCount)
@@ -1528,6 +1533,12 @@ public class VirtualMachine : IPrimitiveContext
         for (int i = 0; i < args.Length; i++)
         {
             _heapManager.SetIndexedOOP(blockContextOOP, i, args[i]);
+        }
+
+        // Initialize temps to nil (after arguments)
+        for (int i = argCount; i < argCount + tempCount; i++)
+        {
+            _heapManager.SetIndexedOOP(blockContextOOP, i, GlobalRegistry.NilOOP);
         }
 
         // Step 6: Get home context receiver for proper self resolution
@@ -1725,20 +1736,24 @@ public class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP FindMethodContext(SmalltalkOOP startContextOOP)
     {
         var currentContextOOP = startContextOOP;
-        
+
+        Console.WriteLine($"[DEBUG FindMethodContext] Starting from {startContextOOP}");
+
         while (currentContextOOP != default && currentContextOOP != GlobalRegistry.NilOOP)
         {
-            
+
             // Check if this context is a block execution context
             if (_blockContextMapping.ContainsKey(currentContextOOP))
             {
+                Console.WriteLine($"[DEBUG FindMethodContext] {currentContextOOP} is block context, following sender");
                 // This is a block execution context, get its sender
                 int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
                 var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
                 currentContextOOP = senderContextOOP;
                 continue;
             }
-            
+
+            Console.WriteLine($"[DEBUG FindMethodContext] Found method context: {currentContextOOP}");
             // This should be a regular method context
             return currentContextOOP;
         }
