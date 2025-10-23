@@ -151,6 +151,42 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 
 - **No Hard-Coded OOP Value Checks**: No code should ever check for a hard-coded OOP value, e.g. checking for zero to determine if it's the Nil object. First, OOP zero is a valid reference that can be to any object. Second, OOP values can change build to build as the Smalltalk source code changes.
 
+### Runtime Index Resolution - CRITICAL REQUIREMENT
+
+**NEVER use hardcoded indices in the interpreter during runtime execution.**
+
+**Context**: The JSON coldstart bundle represents a frozen-in-time snapshot of Smalltalk classes. During cold start (Phases 0-14), indices from the JSON are valid and safe to use. However, once the system begins running (during init expression execution), the Smalltalk system can dynamically alter any class, changing the indices of fields, literals, variables, etc.
+
+**Rules**:
+1. **Cold Start (Phases 0-14)**: Hardcoded indices from JSON are valid - classes are frozen
+2. **Runtime Execution (Init expressions onward)**: ALL indices must be resolved dynamically from the live Smalltalk heap
+3. **No Magic Numbers**: Never hardcode field counts (e.g., `6` for MethodContext instance variables)
+4. **Use LayoutResolver**: Always query `_layoutResolver.GetInstanceVariableCount()` for field counts
+5. **Use Field Lookups**: Always use `_layoutResolver.GetFieldIndex()` for field positions
+6. **Trust the Heap**: The running Smalltalk system is the source of truth, not the JSON
+
+**Examples of VIOLATIONS**:
+```csharp
+// WRONG - hardcoded instance variable count
+var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+
+// WRONG - hardcoded field index
+var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP, 3);
+```
+
+**Examples of CORRECT code**:
+```csharp
+// CORRECT - query LayoutResolver for instance variable count
+int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+
+// CORRECT - use LayoutResolver to get field index
+int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+```
+
+**Rationale**: Once the system is running, Smalltalk can modify class definitions, add/remove instance variables, and change field ordering. Hardcoded indices will break when the live system's structure differs from the frozen JSON snapshot.
+
 ### Methodology and Problem-Solving
 
 - Never perform "workaround". Always find and fix the root cause of any error.
