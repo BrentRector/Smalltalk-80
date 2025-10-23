@@ -312,11 +312,28 @@ public class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PushTempIndex(bytecode);
 
-            Console.WriteLine($"[DEBUG pushTemp] index={index}, _activeContextOOP={_activeContextOOP}");
+            // For block execution contexts, check if we need to access home context temps
+            SmalltalkOOP contextToReadFrom = _activeContextOOP;
 
-            // Always read from the active context's indexed fields
-            // This works for both regular methods and block execution contexts
-            var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+            // Check if current context is a block execution context
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+            {
+                // This is a block - check if index is out of range for block's own temps
+                // Get the method to check arg+temp count
+                var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                var header = ParseMethodHeader(blockMethodOOP);
+                int blockLocalCount = header.NumArgs + header.NumTemps;
+
+                // If accessing beyond block's local scope, read from home context
+                if (index >= blockLocalCount)
+                {
+                    var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                }
+            }
+
+            var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
 
             Push(valueOOP);
             return true;
@@ -426,17 +443,28 @@ public class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PopStoreTempIndex(bytecode);
             var valueOOP = Pop();
-            
-            // For blocks, store in BlockContext indexed fields
+
+            // For block execution contexts, check if we need to store to home context
+            SmalltalkOOP contextToStoreTo = _activeContextOOP;
+
+            // Check if current context is a block execution context
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
             {
-                _heapManager.SetIndexedOOP(blockContextOOP, index, valueOOP);
+                // This is a block - check if index is out of range for block's own temps
+                var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                var header = ParseMethodHeader(blockMethodOOP);
+                int blockLocalCount = header.NumArgs + header.NumTemps;
+
+                // If storing beyond block's local scope, store to home context
+                if (index >= blockLocalCount)
+                {
+                    var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                }
             }
-            else
-            {
-                // Normal method - store in MethodContext indexed fields
-                _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
-            }
+
+            _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
             
             return true;
         }
@@ -722,7 +750,24 @@ public class VirtualMachine : IPrimitiveContext
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+
+                    // For block execution contexts, check if we need to access home context temps
+                    SmalltalkOOP contextToReadFrom = _activeContextOOP;
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    {
+                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                        var header = ParseMethodHeader(blockMethodOOP);
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
+
+                        if (index >= blockLocalCount)
+                        {
+                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                            contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                        }
+                    }
+
+                    var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
                     Push(valueOOP);
                     return true;
                 }
@@ -732,7 +777,24 @@ public class VirtualMachine : IPrimitiveContext
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
-                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
+
+                    // For block execution contexts, check if we need to store to home context
+                    SmalltalkOOP contextToStoreTo = _activeContextOOP;
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    {
+                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                        var header = ParseMethodHeader(blockMethodOOP);
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
+
+                        if (index >= blockLocalCount)
+                        {
+                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                            contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                        }
+                    }
+
+                    _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
                     Push(valueOOP); // Leave value on stack
                     return true;
                 }
@@ -742,7 +804,24 @@ public class VirtualMachine : IPrimitiveContext
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
-                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
+
+                    // For block execution contexts, check if we need to store to home context
+                    SmalltalkOOP contextToStoreTo = _activeContextOOP;
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    {
+                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                        var header = ParseMethodHeader(blockMethodOOP);
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
+
+                        if (index >= blockLocalCount)
+                        {
+                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                            contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                        }
+                    }
+
+                    _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
                     return true;
                 }
 
