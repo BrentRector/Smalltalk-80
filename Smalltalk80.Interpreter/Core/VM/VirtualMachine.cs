@@ -166,7 +166,8 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Step 4: Allocate MethodContext using AllocateObject
-        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
         // Step 5: Get field indices using LayoutResolver
@@ -1507,9 +1508,10 @@ public class VirtualMachine : IPrimitiveContext
         {
             throw new InvalidOperationException("BlockContext class not found");
         }
-        
+
         // Allocate BlockContext
-        var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 4, argCount + tempCount);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockContext");
+        var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, argCount + tempCount);
         _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
         
         // Initialize BlockContext fields
@@ -1572,7 +1574,8 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Allocate MethodContext
-        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
         // Get field indices
