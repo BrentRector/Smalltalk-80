@@ -286,7 +286,8 @@ public class VirtualMachine : IPrimitiveContext
             var actualReceiverOOP = receiverOOP;
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var ivarBlockContextOOP))
             {
-                var homeContextOOP = _heapManager.GetInstanceVariable(ivarBlockContextOOP, 3); // homeContext field
+                int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                var homeContextOOP = _heapManager.GetInstanceVariable(ivarBlockContextOOP, homeIndex);
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
             }
             
@@ -396,7 +397,8 @@ public class VirtualMachine : IPrimitiveContext
             var actualReceiverOOP = receiverOOP;
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var storeIvarBlockContextOOP))
             {
-                var homeContextOOP = _heapManager.GetInstanceVariable(storeIvarBlockContextOOP, 3); // homeContext field
+                int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                var homeContextOOP = _heapManager.GetInstanceVariable(storeIvarBlockContextOOP, homeIndex);
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
             }
             
@@ -434,7 +436,8 @@ public class VirtualMachine : IPrimitiveContext
                     try
                     {
                         // This is a block execution - get self from home context
-                        var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP2, 3); // homeContext field
+                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP2, homeIndex);
                         var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                         Push(homeReceiverOOP);
                     }
@@ -482,7 +485,8 @@ public class VirtualMachine : IPrimitiveContext
                 // For blocks, return home context receiver as self
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnBlockContextOOP))
                 {
-                    var homeContextOOP = _heapManager.GetInstanceVariable(returnBlockContextOOP, 3); // homeContext field
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    var homeContextOOP = _heapManager.GetInstanceVariable(returnBlockContextOOP, homeIndex);
                     var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                     Push(homeReceiverOOP);
                 }
@@ -513,7 +517,8 @@ public class VirtualMachine : IPrimitiveContext
                 // Variant of RETURN_SELF for block contexts
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnSelfPopBlockContextOOP))
                 {
-                    var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockContextOOP, 3); // homeContext field
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockContextOOP, homeIndex);
                     var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                     Push(homeReceiverOOP);
                 }
@@ -1623,6 +1628,20 @@ public class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP GetHomeContextReceiver(SmalltalkOOP homeContextOOP)
     {
+        // Check if homeContextOOP is valid
+        if (homeContextOOP.IsSmallInteger || homeContextOOP == GlobalRegistry.NilOOP || homeContextOOP == default)
+        {
+            throw new InvalidOperationException($"Invalid home context OOP: {homeContextOOP}");
+        }
+
+        // Debug: Check the class of homeContextOOP
+        var homeContextClass = GetClass(homeContextOOP);
+        var homeContextClassName = GetClassName(homeContextClass);
+        if (homeContextClassName != "MethodContext")
+        {
+            throw new InvalidOperationException($"Home context is not a MethodContext: {homeContextClassName} (OOP={homeContextOOP})");
+        }
+
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
         var result = _heapManager.GetInstanceVariable(homeContextOOP, receiverIndex);
         return result;
