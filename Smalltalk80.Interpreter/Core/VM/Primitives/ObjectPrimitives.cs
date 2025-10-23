@@ -635,9 +635,8 @@ public static class ObjectPrimitives
         
         // Return the raw object table index as a SmallInteger
         // This is a special case where we need the raw index value for identity
-        // Extract just the index portion of the OOP (bits 1-30, bit 0 is tag)
-        int rawIndex = receiver.RawValue >> 1;
-        return SmalltalkOOP.FromSmallInteger(rawIndex);
+        int objectTableIndex = receiver.ToObjectTableIndex();
+        return SmalltalkOOP.FromSmallInteger(objectTableIndex);
     }
 
     // Primitive 75 alternative: Object hash (for backward compatibility)
@@ -658,9 +657,9 @@ public static class ObjectPrimitives
         else
         {
             // Object ID is already a good hash
-            // Extract raw index from the OOP value for hashing
-            int rawIndex = receiver.RawValue >> 1;
-            return SmalltalkOOP.FromSmallInteger(rawIndex & 0x1FFFFFFF);
+            // Use object table index for hashing
+            int objectTableIndex = receiver.ToObjectTableIndex();
+            return SmalltalkOOP.FromSmallInteger(objectTableIndex & 0x1FFFFFFF);
         }
     }
 }

@@ -85,7 +85,7 @@ public class Phase12_GlobalVariableInstallation
 
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
-        if (associationOOP.RawValue != 0)
+        if (associationOOP != SmalltalkOOP.Null)
         {
             // Found existing canonical Association - update its value
             _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
@@ -112,7 +112,7 @@ public class Phase12_GlobalVariableInstallation
         // First, try to find an existing canonical Association created by Phase 8
         SmalltalkOOP associationOOP = FindCanonicalAssociation("USTable");
 
-        if (associationOOP.RawValue != 0)
+        if (associationOOP != SmalltalkOOP.Null)
         {
             // Found existing canonical Association - update its value
             _allocator.SetInstanceVariable(associationOOP, 1, ustableOOP);
@@ -140,7 +140,7 @@ public class Phase12_GlobalVariableInstallation
         // First, try to find an existing canonical Association created by Phase 8
         SmalltalkOOP associationOOP = FindCanonicalAssociation("Processor");
 
-        if (associationOOP.RawValue != 0)
+        if (associationOOP != SmalltalkOOP.Null)
         {
             // Found existing canonical Association - update its value
             _allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
@@ -167,7 +167,7 @@ public class Phase12_GlobalVariableInstallation
         // First, try to find an existing canonical Association created by Phase 8
         SmalltalkOOP associationOOP = FindCanonicalAssociation(className);
 
-        if (associationOOP.RawValue != 0)
+        if (associationOOP != SmalltalkOOP.Null)
         {
             // Found existing canonical Association - update its value
             _allocator.SetInstanceVariable(associationOOP, 1, classOOP);
@@ -200,7 +200,7 @@ public class Phase12_GlobalVariableInstallation
             var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
             
             
-            if (slotOOP == nilOOP || slotOOP.RawValue == 0)
+            if (slotOOP == nilOOP || slotOOP == SmalltalkOOP.Null)
             {
                 // Found empty slot - handle both nil and any uninitialized cases during architectural transition
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);

@@ -18,7 +18,7 @@ public class Phase4_ClassResolution
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
-    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields;
+    private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields;
 
     public Phase4_ClassResolution(
         ColdStartBundle bundle,
@@ -27,7 +27,7 @@ public class Phase4_ClassResolution
         Dictionary<string, SmalltalkOOP> localIdMap,
         IReadOnlyList<string> symbols,
         IReadOnlyList<string> strings,
-        HashSet<(int objectOOP, int fieldIndex)> initializedFields)
+        HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> initializedFields)
     {
         _bundle = bundle;
         _heapManager = heapManager;
@@ -124,7 +124,7 @@ public class Phase4_ClassResolution
                     // Debug Number class specifically
                     if (className == "Number")
                     {
-                        Console.WriteLine($"[Phase4] Setting Number.superclass = {superName} (superOOP={superOOP}, superLocalId={superLocalId})");
+                        Console.WriteLine($"[Phase4] Setting Number.superclass = {superName}");
                     }
                     SetInstanceVariableUsingPrimitive(classOOP, superclassIndex, superOOP);
                 }
@@ -189,7 +189,7 @@ public class Phase4_ClassResolution
         _primitives.InstVarAtPut(objectOOP, oneBasedIndex, valueOOP);
 
         // Track this field as initialized
-        _initializedFields.Add((objectOOP.RawValue, zeroBasedIndex));
+        _initializedFields.Add((objectOOP, zeroBasedIndex));
     }
 
     /// <summary>
@@ -201,7 +201,7 @@ public class Phase4_ClassResolution
     {
         
         // Find which template this object was allocated with
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectOOP).Key;
         if (localId == null)
         {
             throw new InvalidOperationException($"Cannot find localId for object {objectOOP}");
@@ -233,7 +233,7 @@ public class Phase4_ClassResolution
     private ClassDescriptor? FindClassDefinitionForObject(SmalltalkOOP objectOOP)
     {
         // Find the localId for this object
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectOOP).Key;
         if (localId == null) return null;
         
         // Find the class definition in the bundle
@@ -339,7 +339,7 @@ public class Phase4_ClassResolution
             for (int i = 0; i < totalInstanceVars; i++)
             {
                 var currentOOP = _heapManager.GetInstanceVariable(classOOP, i);
-                if (currentOOP.RawValue == 0) // If still uninitialized (OOP 0)
+                if (currentOOP == SmalltalkOOP.Null) // If still uninitialized (OOP 0)
                 {
                     SetInstanceVariableUsingPrimitive(classOOP, i, nilOOP);
                 }

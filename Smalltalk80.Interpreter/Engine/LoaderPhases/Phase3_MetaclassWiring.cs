@@ -17,9 +17,9 @@ public class Phase3_MetaclassWiring
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly IColdStartPrimitives _primitives;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
-    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields;
+    private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields;
 
-    public Phase3_MetaclassWiring(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, IColdStartPrimitives primitives, Dictionary<string, SmalltalkOOP> localIdMap, HashSet<(int objectOOP, int fieldIndex)> initializedFields)
+    public Phase3_MetaclassWiring(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, IColdStartPrimitives primitives, Dictionary<string, SmalltalkOOP> localIdMap, HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> initializedFields)
     {
         _bundle = bundle;
         _heapManager = heapManager;
@@ -136,7 +136,7 @@ public class Phase3_MetaclassWiring
     private ClassDescriptor? FindClassDefinitionForObject(SmalltalkOOP objectOOP)
     {
         // Find the localId for this object
-        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value.RawValue == objectOOP.RawValue).Key;
+        var localId = _localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectOOP).Key;
         if (localId == null) return null;
         
         // Find the class definition in the bundle
@@ -327,7 +327,7 @@ public class Phase3_MetaclassWiring
 
                 if (!_localIdToObjectId.TryGetValue(superMetaLocalId, out SmalltalkOOP superMetaOOP))
                 {
-                    Console.WriteLine($"    WARNING: Super-metaclass {superMetaLocalId} not found for {metaCls.LocalId} (OOP={metaOOP})!");
+                    Console.WriteLine($"    WARNING: Super-metaclass {superMetaLocalId} not found for {metaCls.LocalId}");
                     skippedCount++;
                     continue;
                 }
@@ -341,10 +341,6 @@ public class Phase3_MetaclassWiring
                 // Instance class has no superclass - this metaclass should remain with nil superclass
                 // (Only Object and ProtoObject should be in this category)
                 string instanceClassName = symbols[instanceCls.NameIndex];
-                if (skippedCount == 0 || metaOOP.RawValue == 8530)
-                {
-                    Console.WriteLine($"    {metaCls.LocalId} (OOP={metaOOP}) for {instanceClassName}: no superclass (expected for root classes)");
-                }
                 skippedCount++;
             }
         }
@@ -358,6 +354,6 @@ public class Phase3_MetaclassWiring
     private void SetAndTrackInstanceVariable(SmalltalkOOP objectOOP, int fieldIndex, SmalltalkOOP value)
     {
         _heapManager.SetInstanceVariable(objectOOP, fieldIndex, value);
-        _initializedFields.Add((objectOOP.RawValue, fieldIndex));
+        _initializedFields.Add((objectOOP, fieldIndex));
     }
 }

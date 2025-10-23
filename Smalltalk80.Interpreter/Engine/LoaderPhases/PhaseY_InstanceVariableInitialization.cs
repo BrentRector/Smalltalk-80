@@ -23,14 +23,14 @@ public class PhaseY_InstanceVariableInitialization
     private readonly SemanticAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
-    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields;
+    private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields;
 
     public PhaseY_InstanceVariableInitialization(
         ColdStartBundle bundle,
         SemanticAllocator allocator,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         ISmalltalkHeapManager heapManager,
-        HashSet<(int objectOOP, int fieldIndex)> initializedFields)
+        HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> initializedFields)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -59,7 +59,7 @@ public class PhaseY_InstanceVariableInitialization
             // Check _initializedFields set to see which fields were already set by Phase 3 or 4
             for (int i = 0; i < instVarCount; i++)
             {
-                if (!_initializedFields.Contains((classOOP.RawValue, i))) // Only set if not already initialized
+                if (!_initializedFields.Contains((classOOP, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(classOOP, i, nilOOP);
                     instanceVariablesInitialized++;
@@ -127,7 +127,7 @@ public class PhaseY_InstanceVariableInitialization
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                if (!_initializedFields.Contains((objectOOP.RawValue, i))) // Only set if not already initialized
+                if (!_initializedFields.Contains((objectOOP, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(objectOOP, i, nilOOP);
                 }
@@ -146,7 +146,7 @@ public class PhaseY_InstanceVariableInitialization
             // Only initialize uninitialized instance variables
             for (int i = 0; i < instVarCount; i++)
             {
-                if (!_initializedFields.Contains((systemDictOOP.RawValue, i))) // Only set if not already initialized
+                if (!_initializedFields.Contains((systemDictOOP, i))) // Only set if not already initialized
                 {
                     _allocator.SetInstanceVariable(systemDictOOP, i, nilOOP);
                 }
@@ -360,12 +360,12 @@ public class PhaseY_InstanceVariableInitialization
             
             // Get the classPool Dictionary OOP
             var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
-            if (classPoolOOP.RawValue == 0)
+            if (classPoolOOP == SmalltalkOOP.Null)
                 continue; // No classPool allocated
-            
+
             // Check if this object is a Dictionary by checking its class OOP
             var objectClassOOP = _heapManager.GetClassOOP(classPoolOOP);
-            if (objectClassOOP.RawValue != dictClassOOP.RawValue)
+            if (objectClassOOP != dictClassOOP)
                 continue; // Not a Dictionary
             
             // Initialize all indexed slots to nil

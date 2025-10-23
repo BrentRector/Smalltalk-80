@@ -108,13 +108,25 @@ public class Phase8_MethodInstallation
         foreach (var method in _bundle.Methods)
         {
             if (method.Literals.Length == 0) continue;
-            
+
             var methodOOP = _localIdToObjectId[method.LocalId];
             for (int i = 0; i < method.Literals.Length; i++)
             {
-                var literalOOP = ResolveLiteralValueAsOOP(method.Literals[i]);
-                // Patch literal in CompiledMethod: literals start at indexed slot 1 (slot 0 is header)
-                _allocator.SetIndexedOOP(methodOOP, i + 1, literalOOP);
+                try
+                {
+                    var literalOOP = ResolveLiteralValueAsOOP(method.Literals[i]);
+                    // Patch literal in CompiledMethod: literals start at indexed slot 1 (slot 0 is header)
+                    _allocator.SetIndexedOOP(methodOOP, i + 1, literalOOP);
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine($"ERROR resolving literal {i} in method {method.LocalId}");
+                    Console.WriteLine($"  Literal type: {method.Literals[i].Type}");
+                    var index = method.Literals[i].Index;
+                    if (index.HasValue)
+                        Console.WriteLine($"  Index: {index.Value}");
+                    throw;
+                }
             }
         }
 

@@ -57,29 +57,9 @@ public class PhaseX_ClassReferenceInitialization
 
             if (cls.IsMetaclass)
             {
-                // Debug: Check superclass BEFORE setting class reference
-                if (classOOP.RawValue == 8530)
-                {
-                    var superclassBefore = _heapManager.GetInstanceVariable(classOOP, 0);
-                    Console.WriteLine($"  PhaseX: BEFORE SetSlot: meta:Point superclass = {superclassBefore}");
-                }
-
                 // Metaclass objects point to the Metaclass class
                 var metaclassClassOOP = GlobalRegistry.LookupClassOOP("Metaclass");
                 _allocator.SetSlot(classOOP, 0, metaclassClassOOP); // Sets header, NOT instance variable
-
-                // Debug: Check superclass AFTER setting class reference
-                if (classOOP.RawValue == 8530)
-                {
-                    var superclassAfter = _heapManager.GetInstanceVariable(classOOP, 0);
-                    Console.WriteLine($"  PhaseX: AFTER SetSlot: meta:Point superclass = {superclassAfter}");
-                }
-
-                // Debug: Show first few and OOP 8530 specifically
-                if (classReferencesSet < 5 || classOOP.RawValue == 8530)
-                {
-                    Console.WriteLine($"  PhaseX: {cls.LocalId} (OOP={classOOP}).class = meta:Metaclass (OOP={metaclassClassOOP})");
-                }
             }
             else
             {
@@ -94,7 +74,7 @@ public class PhaseX_ClassReferenceInitialization
                     // Debug: Show first few and class:Point specifically
                     if (classReferencesSet < 5 || instanceClassName == "Point")
                     {
-                        Console.WriteLine($"  PhaseX: {cls.LocalId} (OOP={classOOP}).class = {metaclassLocalId} (OOP={metaclassOOP})");
+                        Console.WriteLine($"  PhaseX: {cls.LocalId}.class = {metaclassLocalId}");
                     }
                 }
                 else
@@ -137,7 +117,8 @@ public class PhaseX_ClassReferenceInitialization
         if (_localIdToObjectId.TryGetValue("meta:Point", out SmalltalkOOP metaPointOOP))
         {
             var superclassOOP = _heapManager.GetInstanceVariable(metaPointOOP, 0);
-            Console.WriteLine($"  PhaseX Complete: Verified meta:Point (OOP={metaPointOOP}) superclass = {superclassOOP}");
+            var superclassName = _heapManager.GetClassName(superclassOOP);
+            Console.WriteLine($"  PhaseX Complete: Verified meta:Point.superclass = {superclassName}");
         }
     }
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Smalltalk80.Compiler;
 using Smalltalk80.Compiler.AST;
 
 namespace Smalltalk80.Compiler.CodeGen;
@@ -224,6 +225,15 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
                 case List<object> array:
                     ExtractStringsFromLiterals(array, strings);
+                    break;
+
+                case CompiledMethodData block:
+                    // Blocks are CompiledMethodData objects stored as literals
+                    // Recursively extract strings from block literals
+                    if (block.Literals != null && block.Literals.Length > 0)
+                    {
+                        ExtractStringsFromLiterals(block.Literals.ToList(), strings);
+                    }
                     break;
             }
         }

@@ -52,9 +52,9 @@ public readonly struct SmalltalkOOP
     /// <summary>Null/zero OOP constant.</summary>
     public static readonly SmalltalkOOP Null = new(0);
 
-    public override string ToString() => IsSmallInteger 
-        ? $"SmallInteger({AsSmallInteger()})" 
-        : $"ObjectPointer(oop={RawValue})";
+    public override string ToString() => IsSmallInteger
+        ? $"SmallInteger({AsSmallInteger()})"
+        : $"oop={_value}";
 
     public override bool Equals(object? obj) => obj is SmalltalkOOP other && _value == other._value;
     public override int GetHashCode() => _value.GetHashCode();

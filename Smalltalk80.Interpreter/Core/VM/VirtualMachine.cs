@@ -1197,7 +1197,7 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Debug: check for classId 0 on "comment:" send
-        if (classOOP == SmalltalkOOP.Null || classOOP.RawValue == 0)
+        if (classOOP == SmalltalkOOP.Null)
         {
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP}, receiverId has classId 0!)");
@@ -1299,11 +1299,10 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Get literals
-        int[] literalIds = new int[literalCount];
+        SmalltalkOOP[] literalOOPs = new SmalltalkOOP[literalCount];
         for (int i = 0; i < literalCount; i++)
         {
-            var litOOP = _heapManager.GetIndexedOOP(methodOOP, i + 1);
-            literalIds[i] = litOOP.RawValue;
+            literalOOPs[i] = _heapManager.GetIndexedOOP(methodOOP, i + 1);
         }
 
         // Display source code if available
@@ -1316,8 +1315,8 @@ public class VirtualMachine : IPrimitiveContext
 
         // Display bytecode disassembly
         Console.WriteLine("BYTECODE DISASSEMBLY:");
-        string disassembly = BytecodeDisassembler.Disassemble(bytecodes, literalIds,
-            (litId) => DescribeLiteral(new SmalltalkOOP(litId)),
+        string disassembly = BytecodeDisassembler.Disassemble(bytecodes, literalOOPs,
+            (litOOP) => DescribeLiteral(litOOP),
             Array.Empty<string>());
         Console.WriteLine(disassembly);
 
@@ -1727,12 +1726,12 @@ public class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Gets the local ID for an object (used for blockOwnerMap lookup).
-    /// Uses the reverse mapping built during Phase6.
+    /// Uses the reverse mapping built during Phase8.
     /// </summary>
     private string? GetLocalId(SmalltalkOOP objectOOP)
     {
-        var objectIdToLocalId = GlobalRegistry.GetObject<Dictionary<int, string>>("objectIdToLocalId");
-        if (objectIdToLocalId?.TryGetValue(objectOOP.RawValue, out string? localId) == true)
+        var objectIdToLocalId = GlobalRegistry.GetObject<Dictionary<SmalltalkOOP, string>>("objectIdToLocalId");
+        if (objectIdToLocalId?.TryGetValue(objectOOP, out string? localId) == true)
         {
             return localId;
         }
@@ -1924,7 +1923,7 @@ public class VirtualMachine : IPrimitiveContext
         try
         {
             var thisClassOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.MetaclassThisClassFieldIndex);
-            if (thisClassOOP != GlobalRegistry.NilOOP && thisClassOOP.RawValue != 0)
+            if (thisClassOOP != GlobalRegistry.NilOOP && thisClassOOP != SmalltalkOOP.Null)
             {
                 // This is a metaclass - get the name from its thisClass field
                 var nameSymbolOOP = _heapManager.GetInstanceVariable(thisClassOOP, _metadata.ClassNameFieldIndex);
@@ -1968,12 +1967,6 @@ public class VirtualMachine : IPrimitiveContext
         int depth = 0;
         const int maxDepth = 20; // Prevent infinite loops
 
-        // Print index info on first call
-        if (depth == 0 && classOOP.RawValue == 8530)
-        {
-            int superclassIdx = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-            Console.WriteLine($"  [GetMethod] Index check: superclass index from LayoutResolver = {superclassIdx}");
-        }
 
         // Walk up the inheritance chain until we find the method or reach nil
         while (currentClassOOP != GlobalRegistry.NilOOP && depth < maxDepth)
@@ -2277,7 +2270,7 @@ public class VirtualMachine : IPrimitiveContext
                     // Check actualClassOOP's instance variable count
                     var actualFormat = _heapManager.GetObjectFormat(actualClassOOP);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     return;
                 }
@@ -2291,7 +2284,7 @@ public class VirtualMachine : IPrimitiveContext
         {
             classPoolIndex = _layoutResolver.GetFieldIndex("class:Class", "classPool");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Not a Class object - skip (likely a global variable)
             return;
@@ -2311,7 +2304,7 @@ public class VirtualMachine : IPrimitiveContext
         {
             classPoolOOP = _heapManager.GetInstanceVariable(actualClassOOP, classPoolIndex);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // classPool index out of range - not a Class object (likely global variable access)
             return;

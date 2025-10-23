@@ -1,4 +1,5 @@
 using Smalltalk80.Core.Bytecodes;
+using Smalltalk80.Interpreter.Core.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -10,7 +11,7 @@ public static class BytecodeDisassembler
     /// <summary>
     /// Disassembles a bytecode array into human-readable symbolic format.
     /// </summary>
-    public static string Disassemble(byte[] bytecodes, int[] literalIds, Func<int, string> getLiteralDisplay, string[] optimizedSelectors)
+    public static string Disassemble(byte[] bytecodes, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, string[] optimizedSelectors)
     {
         var output = new System.Text.StringBuilder();
         int pc = 0;
@@ -21,7 +22,7 @@ public static class BytecodeDisassembler
             byte b = bytecodes[pc];
             output.Append($"  {pc,3}: ");
 
-            string instruction = DisassembleInstruction(b, bytecodes, ref pc, literalIds, getLiteralDisplay, optimizedSelectors, out int bytesConsumed);
+            string instruction = DisassembleInstruction(b, bytecodes, ref pc, literalOOPs, getLiteralDisplay, optimizedSelectors, out int bytesConsumed);
 
             // Append hex bytes for this instruction
             var hexBytes = new System.Text.StringBuilder();
@@ -39,7 +40,20 @@ public static class BytecodeDisassembler
         return output.ToString();
     }
 
-    private static string DisassembleInstruction(byte b, byte[] bytecodes, ref int pc, int[] literalIds, Func<int, string> getLiteralDisplay, string[] optimizedSelectors, out int bytesConsumed)
+    // Overload for backward compatibility (will be removed later)
+    public static string Disassemble(byte[] bytecodes, int[] literalIds, Func<int, string> getLiteralDisplay, string[] optimizedSelectors)
+    {
+        // Convert int[] to SmalltalkOOP[]
+        var literalOOPs = new SmalltalkOOP[literalIds.Length];
+        for (int i = 0; i < literalIds.Length; i++)
+        {
+            literalOOPs[i] = new SmalltalkOOP(literalIds[i]);
+        }
+
+        return Disassemble(bytecodes, literalOOPs, oop => getLiteralDisplay(oop.RawValue), optimizedSelectors);
+    }
+
+    private static string DisassembleInstruction(byte b, byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, string[] optimizedSelectors, out int bytesConsumed)
     {
         bytesConsumed = 1; // Default: single byte instruction
         string result;
@@ -55,18 +69,18 @@ public static class BytecodeDisassembler
             result = $"pushTemporary {BytecodeUtil.PushTempIndex(b)}";
         }
         // Push literal constant (0x20-0x3F)
-        // Note: Bytecode literal indices skip the header at literalIds[0]
+        // Note: Bytecode literal indices skip the header at literalOOPs[0]
         else if (BytecodeUtil.IsPushLiteralConst(b))
         {
             int litIndex = BytecodeUtil.PushLiteralConstIndex(b) + 1; // +1 to skip header at index 0
-            string litValue = litIndex < literalIds.Length ? getLiteralDisplay(literalIds[litIndex]) : "???";
+            string litValue = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : "???";
             result = $"pushLiteral {litIndex - 1} ({litValue})";
         }
         // Push literal variable (0x40-0x5F)
         else if (BytecodeUtil.IsPushLiteralVar(b))
         {
             int litIndex = BytecodeUtil.PushLiteralVarIndex(b) + 1; // +1 to skip header at index 0
-            string litValue = litIndex < literalIds.Length ? getLiteralDisplay(literalIds[litIndex]) : "???";
+            string litValue = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : "???";
             result = $"pushLiteralVariable {litIndex - 1} ({litValue})";
         }
         // Pop and store receiver variable (0x60-0x67)
@@ -114,19 +128,19 @@ public static class BytecodeDisassembler
         // Extended bytecodes (0x80-0xFF)
         else
         {
-            result = DisassembleExtended(b, bytecodes, ref pc, literalIds, getLiteralDisplay, optimizedSelectors, ref bytesConsumed);
+            result = DisassembleExtended(b, bytecodes, ref pc, literalOOPs, getLiteralDisplay, optimizedSelectors, ref bytesConsumed);
         }
 
         pc++;
         return result;
     }
 
-    private static string DisassembleExtended(byte b, byte[] bytecodes, ref int pc, int[] literalIds, Func<int, string> getLiteralDisplay, string[] optimizedSelectors, ref int bytesConsumed)
+    private static string DisassembleExtended(byte b, byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, string[] optimizedSelectors, ref int bytesConsumed)
     {
         // Extended prefix (0x80)
         if (BytecodeUtil.IsExtended(b))
         {
-            return DisassembleExtendedPrefix(bytecodes, ref pc, literalIds, getLiteralDisplay, ref bytesConsumed);
+            return DisassembleExtendedPrefix(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed);
         }
         // Send arithmetic (0xB0-0xBF)
         else if (BytecodeUtil.IsSendArithmetic(b))
@@ -153,22 +167,22 @@ public static class BytecodeDisassembler
         // Send literal selector with 0 args (0xD0-0xDF)
         else if (BytecodeUtil.IsSend0(b))
         {
-            int litIndex = BytecodeUtil.Send0Index(b) + 1; // +1 to skip header at literalIds[0]
-            string selector = litIndex < literalIds.Length ? getLiteralDisplay(literalIds[litIndex]) : $"lit[{litIndex - 1}]";
+            int litIndex = BytecodeUtil.Send0Index(b) + 1; // +1 to skip header at literalOOPs[0]
+            string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
         // Send literal selector with 1 arg (0xE0-0xEF)
         else if (BytecodeUtil.IsSend1(b))
         {
-            int litIndex = BytecodeUtil.Send1Index(b) + 1; // +1 to skip header at literalIds[0]
-            string selector = litIndex < literalIds.Length ? getLiteralDisplay(literalIds[litIndex]) : $"lit[{litIndex - 1}]";
+            int litIndex = BytecodeUtil.Send1Index(b) + 1; // +1 to skip header at literalOOPs[0]
+            string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
         // Send literal selector with 2 args (0xF0-0xFF)
         else if (BytecodeUtil.IsSend2(b))
         {
-            int litIndex = BytecodeUtil.Send2Index(b) + 1; // +1 to skip header at literalIds[0]
-            string selector = litIndex < literalIds.Length ? getLiteralDisplay(literalIds[litIndex]) : $"lit[{litIndex - 1}]";
+            int litIndex = BytecodeUtil.Send2Index(b) + 1; // +1 to skip header at literalOOPs[0]
+            string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
         else
@@ -177,7 +191,7 @@ public static class BytecodeDisassembler
         }
     }
 
-    private static string DisassembleExtendedPrefix(byte[] bytecodes, ref int pc, int[] literalIds, Func<int, string> getLiteralDisplay, ref int bytesConsumed)
+    private static string DisassembleExtendedPrefix(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed)
     {
         // Extended prefix (0x80) followed by sub-operation byte
         if (pc + 1 >= bytecodes.Length)

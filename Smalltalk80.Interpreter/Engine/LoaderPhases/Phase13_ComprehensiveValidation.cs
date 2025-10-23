@@ -224,17 +224,19 @@ public class Phase13_ComprehensiveValidation
     private void ValidateSpecialObjects(ValidationResults results)
     {
         Console.WriteLine("  Validating special objects...");
-        
+
+        // Validate 5 special objects (note: only 4 are GC roots - USTable is not a GC root)
+
         // Validate nil
         ValidateSpecialObject("nil", GlobalRegistry.NilOOP, results);
-        
+
         // Validate true/false
         ValidateSpecialObject("true", GlobalRegistry.TrueOOP, results);
         ValidateSpecialObject("false", GlobalRegistry.FalseOOP, results);
-        
+
         // Validate SystemDictionary
         ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryOOP, results);
-        
+
         // Validate USTable
         if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
         {

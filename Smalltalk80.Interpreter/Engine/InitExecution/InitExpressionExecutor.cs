@@ -396,7 +396,7 @@ public class InitExpressionExecutor
             for (int i = 0; i < count; i++)
             {
                 var methodOOP = _heapManager.GetIndexedOOP(initArrayOOP, i);
-                if (methodOOP.RawValue == targetMethodOOP.RawValue)
+                if (methodOOP == targetMethodOOP)
                 {
                     targetIndex = i;
                     break;
@@ -521,8 +521,8 @@ public class InitExpressionExecutor
     {
         error = null;
 
-        // Basic validation - check it's not null or zero
-        if (methodOOP == SmalltalkOOP.Null || methodOOP.RawValue == 0)
+        // Basic validation - check it's not null
+        if (methodOOP == SmalltalkOOP.Null)
         {
             error = "Method OOP is null (0)";
             return false;

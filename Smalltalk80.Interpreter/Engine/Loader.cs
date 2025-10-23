@@ -18,7 +18,7 @@ public class Loader
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly SemanticAllocator _allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = new();
-    private readonly HashSet<(int objectOOP, int fieldIndex)> _initializedFields = new();
+    private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields = new();
     private LayoutResolver? _layoutResolver;
     private int _initExpressionsArrayId = 0;
 
@@ -223,7 +223,7 @@ public class Loader
         {
             var phase = new Phase13_ComprehensiveValidation(_bundle, _allocator, _localIdToObjectId, _bundle.Symbols);
             phase.Run();
-            Console.WriteLine("✓");
+            // Note: Phase prints its own ✓ after validation summary
         }
         catch (Exception ex)
         {
@@ -254,7 +254,7 @@ public class Loader
             foreach (var (name, oop) in gcRootsList)
             {
                 var className = _heapManager.GetClassName(oop);
-                Console.WriteLine($"    {name} (oop={oop}, class={className})");
+                Console.WriteLine($"    {name} ({oop}, class={className})");
             }
         }
         Console.WriteLine("✓");
