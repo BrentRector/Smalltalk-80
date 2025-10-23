@@ -23,7 +23,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -34,6 +34,7 @@ public static class Program
                 Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
                 Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
                 Console.Error.WriteLine("                         after cold start completes");
+                Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Environment.Exit(1);
                 return;
             }
@@ -73,6 +74,9 @@ public static class Program
 
                 var vmMetadata = loader.BuildVMMetadata();
                 var vm = new VirtualMachine(heapManager, loader.LayoutResolver, vmMetadata, bundle.Symbols);
+
+                // Enable verbose debugging if requested
+                vm.VerboseDebug = verboseDebug;
 
                 // Initialize selector caches after cold start completes
                 vm.InitializeSelectorCaches();
@@ -658,10 +662,11 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
+        bool verboseDebug = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -675,6 +680,10 @@ public static class Program
                 dumpClassName = args[i + 1];
                 i++; // Skip the next argument
             }
+            else if (args[i] == "--verbose" || args[i] == "-v")
+            {
+                verboseDebug = true;
+            }
         }
 
         // Default: coldstart.json in the executable directory
@@ -684,7 +693,7 @@ public static class Program
             coldStartFile = Path.Combine(exeDir, "coldstart.json");
         }
 
-        return (coldStartFile, dumpClassName);
+        return (coldStartFile, dumpClassName, verboseDebug);
     }
 
     private static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, Loader loader, ColdStartBundle bundle)

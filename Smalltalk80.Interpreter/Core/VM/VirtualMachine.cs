@@ -32,6 +32,11 @@ public class VirtualMachine : IPrimitiveContext
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
+    // Verbose debugging support
+    public bool VerboseDebug { get; set; } = false;
+    private int _callDepth = 0;
+    private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
+
     public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, string[] symbols)
     {
         _heapManager = heapManager;
@@ -327,7 +332,6 @@ public class VirtualMachine : IPrimitiveContext
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-            
             // Handle blocks with nil literals - resolve from home context
             if (associationOOP == GlobalRegistry.NilOOP) // nil
             {
@@ -376,12 +380,6 @@ public class VirtualMachine : IPrimitiveContext
             // Association has layout: [key, value]
             int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
             var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
-
-            // Debug: Check if this is ActionMenu and log its classId
-            int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
-            var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
-            // TODO: Implement GetSymbolName in heap manager or add helper method
-            // string? keyName = GetSymbolName(keyOOP);
 
             Push(valueOOP);
             return true;
@@ -1011,6 +1009,15 @@ public class VirtualMachine : IPrimitiveContext
         var argOOP = Pop();
         var receiverOOP = Pop();
 
+        // DEBUG: Only log when @ is sent to non-SmallInteger (error case)
+        if (bytecode == 187 && (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger))
+        {
+            string recClass = receiverOOP.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(receiverOOP);
+            string argClass = argOOP.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(argOOP);
+            string? recSymbol = recClass == "Symbol" ? GetSymbolName(receiverOOP) : null;
+            Console.WriteLine($"[@ ERROR] receiver={receiverOOP} ({recClass}{(recSymbol != null ? $" #{recSymbol}" : "")}), arg={argOOP} ({argClass})");
+        }
+
         // Try primitive arithmetic for SmallIntegers
         if (receiverOOP.IsSmallInteger && argOOP.IsSmallInteger)
         {
@@ -1164,9 +1171,18 @@ public class VirtualMachine : IPrimitiveContext
     {
         // Look up the method in the receiver's class
         var classOOP = GetClass(receiverOOP);
-        
+
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
+
+        // Verbose debug: log method entry
+        if (VerboseDebug)
+        {
+            string className = GetClassName(classOOP) ?? "?";
+            string indent = new string(' ', _callDepth * 2);
+            Console.WriteLine($"{indent}>> {className}>>{selectorName} (args={args.Length})");
+            _callDepth++;
+        }
         // SPECIAL CASE: Block CompiledMethods responding to value/value:/value:value:
         // In v1.0.3, blocks are separate CompiledMethod objects that respond to value messages
         // by creating proper BlockContext and executing with closure semantics
@@ -1219,13 +1235,207 @@ public class VirtualMachine : IPrimitiveContext
         // Create new context with current context as sender
         _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, previousContextOOP);
 
-        // Execute the new context
-        var result = ExecuteBytecodeLoop();
+        try
+        {
+            // Execute the new context
+            var result = ExecuteBytecodeLoop();
 
-        // Restore previous context
-        _activeContextOOP = previousContextOOP;
+            // Verbose debug: log method exit
+            if (VerboseDebug)
+            {
+                _callDepth--;
+                string indent = new string(' ', _callDepth * 2);
+                string resultStr = result.IsSmallInteger ? $"SmallInteger({result.AsSmallInteger()})" : $"OOP({result})";
+                Console.WriteLine($"{indent}<< {GetClassName(classOOP)}>>{selectorName} => {resultStr}");
+            }
 
-        return result;
+            // Restore previous context
+            _activeContextOOP = previousContextOOP;
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            if (VerboseDebug)
+            {
+                _callDepth--;
+            }
+
+            // On error, dump detailed method state
+            DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, classOOP, selectorName!, ex);
+
+            // Restore previous context
+            _activeContextOOP = previousContextOOP;
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Dumps detailed method state when an error occurs during execution.
+    /// Shows bytecode disassembly, source code, literals, and local variables.
+    /// </summary>
+    private void DumpMethodStateOnError(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] args, SmalltalkOOP classOOP, string selectorName, Exception ex)
+    {
+        Console.WriteLine("\n" + new string('=', 80));
+        Console.WriteLine($"ERROR IN: {GetClassName(classOOP)}>>{selectorName}");
+        Console.WriteLine(new string('=', 80));
+        Console.WriteLine($"Exception: {ex.Message}\n");
+
+        // Get method header using correct custom format
+        var headerInfo = ParseMethodHeader(methodOOP);
+        int literalCount = headerInfo.NumLiterals;
+        int tempCount = headerInfo.NumTemps;
+        int argCount = headerInfo.NumArgs;
+
+        // Get bytecodes
+        int literalFrameSize = literalCount + 1; // +1 for header
+        var bytecodeArrayOOP = _heapManager.GetIndexedOOP(methodOOP, literalFrameSize);
+        int bytecodeCount = _heapManager.GetIndexedSize(bytecodeArrayOOP);
+        byte[] bytecodes = new byte[bytecodeCount];
+        for (int i = 0; i < bytecodeCount; i++)
+        {
+            bytecodes[i] = _heapManager.GetIndexedByte(bytecodeArrayOOP, i);
+        }
+
+        // Get literals
+        int[] literalIds = new int[literalCount];
+        for (int i = 0; i < literalCount; i++)
+        {
+            var litOOP = _heapManager.GetIndexedOOP(methodOOP, i + 1);
+            literalIds[i] = litOOP.RawValue;
+        }
+
+        // Display source code if available
+        if (_methodSources.TryGetValue(methodOOP, out string? source))
+        {
+            Console.WriteLine("SOURCE CODE:");
+            Console.WriteLine(source);
+            Console.WriteLine();
+        }
+
+        // Display bytecode disassembly
+        Console.WriteLine("BYTECODE DISASSEMBLY:");
+        string disassembly = BytecodeDisassembler.Disassemble(bytecodes, literalIds,
+            (litId) => DescribeLiteral(new SmalltalkOOP(litId)),
+            Array.Empty<string>());
+        Console.WriteLine(disassembly);
+
+        // Display literals
+        Console.WriteLine("LITERALS:");
+        for (int i = 0; i < literalCount; i++)
+        {
+            var litOOP = _heapManager.GetIndexedOOP(methodOOP, i + 1);
+            Console.WriteLine($"  [{i}] = {DescribeLiteral(litOOP)}");
+        }
+        Console.WriteLine();
+
+        // Display arguments
+        Console.WriteLine($"ARGUMENTS ({args.Length}):");
+        for (int i = 0; i < args.Length; i++)
+        {
+            Console.WriteLine($"  arg{i} = {DescribeValue(args[i])}");
+        }
+        Console.WriteLine();
+
+        // Display receiver
+        Console.WriteLine("RECEIVER:");
+        Console.WriteLine($"  self = {DescribeValue(receiverOOP)}");
+        Console.WriteLine();
+
+        // Display temps (if in active context)
+        if (_activeContextOOP != SmalltalkOOP.Null)
+        {
+            Console.WriteLine($"TEMPORARIES ({tempCount}):");
+            for (int i = 0; i < tempCount; i++)
+            {
+                var tempOOP = _heapManager.GetIndexedOOP(_activeContextOOP, i);
+                Console.WriteLine($"  temp{i} = {DescribeValue(tempOOP)}");
+            }
+            Console.WriteLine();
+        }
+
+        // Display stack
+        if (_activeContextOOP != SmalltalkOOP.Null)
+        {
+            int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
+            var stackpOOP = _heapManager.GetInstanceVariable(_activeContextOOP, stackpIndex);
+            int stackp = stackpOOP.AsSmallInteger();
+
+            Console.WriteLine($"STACK (sp={stackp}):");
+            int stackStart = tempCount;
+            for (int i = stackStart; i < stackp; i++)
+            {
+                var stackOOP = _heapManager.GetIndexedOOP(_activeContextOOP, i);
+                Console.WriteLine($"  [{i - stackStart}] = {DescribeValue(stackOOP)}");
+            }
+        }
+
+        Console.WriteLine(new string('=', 80) + "\n");
+    }
+
+    private string DescribeLiteral(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+        {
+            return $"SmallInteger({oop.AsSmallInteger()})";
+        }
+
+        string className = _heapManager.GetClassName(oop);
+
+        if (className == "Symbol")
+        {
+            string? name = GetSymbolName(oop);
+            return $"Symbol(#{name})";
+        }
+
+        if (className == "Association")
+        {
+            int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+            var keyOOP = _heapManager.GetInstanceVariable(oop, keyIndex);
+            string? keyName = GetSymbolName(keyOOP);
+            return $"Association(#{keyName})";
+        }
+
+        if (className == "CompiledMethod")
+        {
+            return $"CompiledMethod(block)";
+        }
+
+        return $"{className}({oop})";
+    }
+
+    private string DescribeValue(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+        {
+            return $"SmallInteger({oop.AsSmallInteger()})";
+        }
+
+        if (oop == GlobalRegistry.NilOOP)
+        {
+            return "nil";
+        }
+
+        if (oop == GlobalRegistry.TrueOOP)
+        {
+            return "true";
+        }
+
+        if (oop == GlobalRegistry.FalseOOP)
+        {
+            return "false";
+        }
+
+        string className = _heapManager.GetClassName(oop);
+
+        if (className == "Symbol")
+        {
+            string? name = GetSymbolName(oop);
+            return $"#{name}";
+        }
+
+        return $"{className}({oop})";
     }
 
     /// <summary>

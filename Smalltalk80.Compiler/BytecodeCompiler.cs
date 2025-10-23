@@ -955,7 +955,7 @@ namespace Smalltalk80.Compiler
             {
                 // Process method header
                 ProcessMethodHeader(methodDef.methodHeader());
-                
+
                 // Process temporaries
                 if (methodDef.temporaries() != null)
                 {
@@ -1801,8 +1801,39 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 environment.PoolVariables[kvp.Key] = kvp.Value;
             }
 
+            // Copy parent's arguments and temporaries so blocks can access them
+            // In Smalltalk-80, blocks can access their enclosing method's variables.
+            // We copy these to the block's environment so the compiler generates correct
+            // bytecodes (PUSH_TEMP instead of PUSH_LIT_VAR for parent scope variables).
+            foreach (var kvp in savedEnvironment.Arguments)
+            {
+                // Only add if block doesn't shadow this variable with its own argument
+                if (!environment.Arguments.ContainsKey(kvp.Key))
+                {
+                    environment.Arguments[kvp.Key] = kvp.Value;
+                }
+            }
+
+            foreach (var kvp in savedEnvironment.Temporaries)
+            {
+                // Only add if block doesn't shadow this variable with its own temp
+                if (!environment.Temporaries.ContainsKey(kvp.Key))
+                {
+                    environment.Temporaries[kvp.Key] = kvp.Value;
+                }
+            }
+
             // Set scope depth to indicate we're in a block
             environment.ScopeDepth = savedEnvironment.ScopeDepth + 1;
+
+            // IMPORTANT: Collect literals for the block first (just like methods)
+            // This ensures all literals are in the frame before we generate bytecodes
+            var blockStatements = block.statements();
+            if (blockStatements != null)
+            {
+                var visitor = new LiteralCollector(this, emitter, environment);
+                visitor.Visit(blockStatements);
+            }
 
             // Compile the block body
             var statements = block.statements();
@@ -2791,9 +2822,11 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             
             public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
             {
-                // Let base implementation handle visiting all children, including statements
-                // This ensures blocks are properly traversed for global variable references
-                return base.VisitBlock(context);
+                // DO NOT visit block contents during literal collection!
+                // Blocks have their own separate literal frames and are compiled separately.
+                // If we visit block contents here, we'll add block literals to the main method's
+                // literal frame, causing index mismatches during compilation.
+                return null; // Don't traverse into blocks
             }
             
             public override object? VisitNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext context)
