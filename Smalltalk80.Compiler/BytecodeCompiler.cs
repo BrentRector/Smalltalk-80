@@ -1435,7 +1435,20 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             var keywordMessage = expr.keywordMessage();
             if (keywordMessage != null)
             {
-                CompileKeywordMessage(keywordMessage, false); // Super handling done in binaryExpr
+                // Pass receiverIsSuper flag to handle super sends correctly
+                // This is necessary when there are no binary messages but the receiver is super
+                // (e.g., "^super extent:fromArray:offset:")
+                var receiverIsSuper = false;
+                if (binaryExpr != null)
+                {
+                    var unaryExpr = binaryExpr.unaryExpr();
+                    if (unaryExpr != null)
+                    {
+                        var messageBase = unaryExpr.messageBase();
+                        receiverIsSuper = IsReceiverSuper(messageBase);
+                    }
+                }
+                CompileKeywordMessage(keywordMessage, receiverIsSuper);
             }
         }
 

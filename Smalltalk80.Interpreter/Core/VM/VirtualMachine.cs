@@ -10,7 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 /// </summary>
-public class VirtualMachine : IPrimitiveContext
+public partial class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
@@ -22,6 +22,36 @@ public class VirtualMachine : IPrimitiveContext
 
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
+
+    // Context depth tracking to prevent CLR stack overflow
+    private int _activeContextCount = 0;
+    private const int MAX_CONTEXT_DEPTH = 500;  // Lowered to capture diagnostics before CLR overflow
+
+    // Cursor creation loop diagnostics
+    private int _cursorCreationCount = 0;
+
+    // Call outcome used for NLR propagation between SendMessage and bytecode loop
+    private enum CallOutcomeKind { Normal, NonLocalReturn, VMException }
+
+    private readonly struct CallOutcome
+    {
+        public readonly CallOutcomeKind Kind;
+        public readonly SmalltalkOOP Value;
+        public readonly SmalltalkOOP TargetContextOop;
+        public readonly Exception? VMEx;
+
+        private CallOutcome(CallOutcomeKind kind, SmalltalkOOP value, SmalltalkOOP target, Exception? vmEx)
+        {
+            Kind = kind;
+            Value = value;
+            TargetContextOop = target;
+            VMEx = vmEx;
+        }
+
+        public static CallOutcome Normal(SmalltalkOOP value) => new(CallOutcomeKind.Normal, value, SmalltalkOOP.Null, null);
+        public static CallOutcome NonLocalReturn(SmalltalkOOP target, SmalltalkOOP value) => new(CallOutcomeKind.NonLocalReturn, value, target, null);
+        public static CallOutcome VMException(Exception ex) => new(CallOutcomeKind.VMException, SmalltalkOOP.Null, SmalltalkOOP.Null, ex);
+    }
 
     // Track block contexts: contextOOP -> blockContextOOP mapping - now using SmalltalkOOP
     private readonly Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping = new();
@@ -170,6 +200,27 @@ public class VirtualMachine : IPrimitiveContext
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
+        // Increment context depth and check limit
+        _activeContextCount++;
+
+        // Diagnostic snapshots at key thresholds
+        if (_activeContextCount == 100 || _activeContextCount == 250 || _activeContextCount == 400)
+        {
+            Console.WriteLine($"\n[DEPTH SNAPSHOT] Context depth reached {_activeContextCount}");
+            DumpSenderChain(callerContextOOP, 20);
+        }
+
+        if (_activeContextCount > MAX_CONTEXT_DEPTH)
+        {
+            Console.WriteLine($"\n[CONTEXT DEPTH EXCEEDED] Depth: {_activeContextCount}, Limit: {MAX_CONTEXT_DEPTH}");
+            Console.WriteLine($"Current receiver: {receiverOOP}, method: {methodOOP}");
+            DumpSenderChain(callerContextOOP, 30);
+
+            throw new InvalidOperationException(
+                $"Context depth limit exceeded: {_activeContextCount} contexts (limit: {MAX_CONTEXT_DEPTH}). " +
+                $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
+        }
+
         // Step 5: Get field indices using LayoutResolver
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
         int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
@@ -245,6 +296,8 @@ public class VirtualMachine : IPrimitiveContext
         {
             byte bytecode = bytecodes[ip++];
 
+            Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}");
+
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
@@ -253,13 +306,19 @@ public class VirtualMachine : IPrimitiveContext
 
             if (!continueExecution)
             {
+                Console.WriteLine($"[BYTECODE RETURN] context={_activeContextOOP}, returning from bytecode loop");
                 // Method returned, pop the result and return it
                 return Pop();
             }
 
             // Re-read IP in case bytecode modified it (jumps)
             ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
-            ip = ipOOP.AsSmallInteger();
+            int newIp = ipOOP.AsSmallInteger();
+            if (newIp != ip)
+            {
+                Console.WriteLine($"[BYTECODE JUMP] context={_activeContextOOP}, ip changed from {ip} to {newIp}");
+            }
+            ip = newIp;
         }
 
         // If we fall off the end, return self
@@ -292,15 +351,33 @@ public class VirtualMachine : IPrimitiveContext
 
             // For blocks, receiver should be the home context receiver
             var actualReceiverOOP = receiverOOP;
-            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var ivarBlockContextOOP))
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOOP))
             {
-                int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                var homeContextOOP = _heapManager.GetInstanceVariable(ivarBlockContextOOP, homeIndex);
+                // Check if this is a BlockClosure or BlockContext
+                var blockClass = GetClassName(GetClass(blockOOP));
+                SmalltalkOOP homeContextOOP;
+
+                if (blockClass == "BlockClosure")
+                {
+                    // New BlockClosure path - get homeContext from BlockClosure
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
+                    Console.WriteLine($"[DEBUG IsPushIvar] BlockClosure path - homeContext={homeContextOOP}");
+                }
+                else
+                {
+                    // Legacy BlockContext path
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
+                    Console.WriteLine($"[DEBUG IsPushIvar] BlockContext path - homeContext={homeContextOOP}");
+                }
+
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
-                Console.WriteLine($"[DEBUG IsPushIvar] Block context - actualReceiverOOP={actualReceiverOOP}");
+                Console.WriteLine($"[DEBUG IsPushIvar] Block - actualReceiverOOP={actualReceiverOOP}");
             }
 
             var valueOOP = _heapManager.GetInstanceVariable(actualReceiverOOP, index);
+            Console.WriteLine($"[DEBUG IsPushIvar] Retrieved value: {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
             Push(valueOOP);
             return true;
         }
@@ -325,15 +402,34 @@ public class VirtualMachine : IPrimitiveContext
                 var header = ParseMethodHeader(blockMethodOOP);
                 int blockLocalCount = header.NumArgs + header.NumTemps;
 
+                Console.WriteLine($"[DEBUG pushTemp] index={index}, blockLocalCount={blockLocalCount}");
+
                 // If accessing beyond block's local scope, read from home context
                 if (index >= blockLocalCount)
                 {
-                    var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                    contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                    // Check if blockContextOOP is a BlockClosure or BlockContext
+                    var blockClass = GetClassName(GetClass(blockContextOOP));
+                    if (blockClass == "BlockClosure")
+                    {
+                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                        Console.WriteLine($"[DEBUG pushTemp] BlockClosure: Reading from home context: {contextToReadFrom}");
+                    }
+                    else
+                    {
+                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                        Console.WriteLine($"[DEBUG pushTemp] BlockContext: Reading from home context: {contextToReadFrom}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[DEBUG pushTemp] Reading from block's own stack");
                 }
             }
 
             var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
+            Console.WriteLine($"[DEBUG pushTemp] Retrieved temp[{index}] = {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
 
             Push(valueOOP);
             return true;
@@ -349,7 +445,28 @@ public class VirtualMachine : IPrimitiveContext
             // Check if this literal is a block - wrap in BlockClosure
             if (IsBlockLiteral(literal))
             {
-                var closureOOP = CreateBlockClosure(literal, _activeContextOOP);
+                // Determine the home context for this block
+                SmalltalkOOP homeContextOOP = _activeContextOOP;
+
+                // If we're currently executing inside a block, use that block's homeContext
+                // instead of the block's own execution context. This ensures nested blocks
+                // share the same home context as their parent.
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var parentBlockClosureOOP))
+                {
+                    var parentClass = GetClassName(GetClass(parentBlockClosureOOP));
+                    Console.WriteLine($"[DEBUG CreateBlock] Found parent object: {parentBlockClosureOOP}, class={parentClass}");
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    Console.WriteLine($"[DEBUG CreateBlock] homeContext field index: {homeIndex}");
+                    var parentHomeContextOOP = _heapManager.GetInstanceVariable(parentBlockClosureOOP, homeIndex);
+                    Console.WriteLine($"[DEBUG CreateBlock] Active context is block - using parent's home: {_activeContextOOP} -> {parentHomeContextOOP}");
+                    homeContextOOP = parentHomeContextOOP;
+                }
+                else
+                {
+                    Console.WriteLine($"[DEBUG CreateBlock] Active context is method - using directly: {homeContextOOP}");
+                }
+
+                var closureOOP = CreateBlockClosure(literal, homeContextOOP);
                 Push(closureOOP);
             }
             else
@@ -474,20 +591,25 @@ public class VirtualMachine : IPrimitiveContext
         {
             case Bytecode.PUSH_SELF:
                 // For blocks, self should be the home context receiver, not the block itself
-                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP2))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOOP2))
                 {
-                    try
+                    var blockClass = GetClassName(GetClass(blockOOP2));
+                    SmalltalkOOP homeContextOOP;
+
+                    if (blockClass == "BlockClosure")
                     {
-                        // This is a block execution - get self from home context
+                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        homeContextOOP = _heapManager.GetInstanceVariable(blockOOP2, homeIndex);
+                    }
+                    else
+                    {
+                        // Legacy BlockContext path
                         int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                        var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP2, homeIndex);
-                        var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
-                        Push(homeReceiverOOP);
+                        homeContextOOP = _heapManager.GetInstanceVariable(blockOOP2, homeIndex);
                     }
-                    catch (Exception)
-                    {
-                        throw;
-                    }
+
+                    var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                    Push(homeReceiverOOP);
                 }
                 else
                 {
@@ -526,10 +648,23 @@ public class VirtualMachine : IPrimitiveContext
 
             case Bytecode.RETURN_SELF:
                 // For blocks, return home context receiver as self
-                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnBlockContextOOP))
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnBlockOOP))
                 {
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                    var homeContextOOP = _heapManager.GetInstanceVariable(returnBlockContextOOP, homeIndex);
+                    var blockClass = GetClassName(GetClass(returnBlockOOP));
+                    SmalltalkOOP homeContextOOP;
+
+                    if (blockClass == "BlockClosure")
+                    {
+                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        homeContextOOP = _heapManager.GetInstanceVariable(returnBlockOOP, homeIndex);
+                    }
+                    else
+                    {
+                        // Legacy BlockContext path
+                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        homeContextOOP = _heapManager.GetInstanceVariable(returnBlockOOP, homeIndex);
+                    }
+
                     var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                     Push(homeReceiverOOP);
                 }
@@ -557,25 +692,64 @@ public class VirtualMachine : IPrimitiveContext
 
             case Bytecode.RETURN_SELF_POP:
                 // Return self from block context to caller's caller (0x7D)
-                // Variant of RETURN_SELF for block contexts
-                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnSelfPopBlockContextOOP))
+                // Non-local return - unwind to block's return context
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnSelfPopBlockOOP))
                 {
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                    var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockContextOOP, homeIndex);
-                    var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
-                    Push(homeReceiverOOP);
+                    var blockClass = GetClassName(GetClass(returnSelfPopBlockOOP));
+                    if (blockClass == "BlockClosure")
+                    {
+                        // Get self from home context
+                        int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeContextIndex);
+                        var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+
+                        // Get return context and throw non-local return exception
+                        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+                        var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
+                        throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
+                    }
+                    else
+                    {
+                        // Legacy BlockContext path - treat as normal return
+                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeIndex);
+                        var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
+                        Push(homeReceiverOOP);
+                        return false;
+                    }
                 }
                 else
                 {
+                    // Normal method - return self
                     Push(receiverOOP);
                 }
-                return false; // TODO: Implement proper block return (non-local return)
+                return false;
 
             case Bytecode.RETURN_TOP_POP:
                 // Pop and return from block context to caller's caller (0x7E)
-                // Variant of RETURN_TOP for block contexts
-                // Value already on stack
-                return false; // TODO: Implement proper block return (non-local return)
+                // Non-local return - unwind to block's return context
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var returnTopPopBlockOOP))
+                {
+                    var blockClass = GetClassName(GetClass(returnTopPopBlockOOP));
+                    if (blockClass == "BlockClosure")
+                    {
+                        // Value already on stack
+                        var returnValue = Pop();
+
+                        // Get return context and throw non-local return exception
+                        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+                        var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
+                        Console.WriteLine($"[NLR THROW] value={returnValue}, target={returnContextOOP}, currentContext={_activeContextOOP}");
+                        throw new NonLocalReturnException(returnValue, returnContextOOP);
+                    }
+                    else
+                    {
+                        // Legacy BlockContext path - treat as normal return
+                        return false;
+                    }
+                }
+                // Value already on stack, normal method return
+                return false;
 
             case Bytecode.RESERVED_RETURN:
                 // No operation / reserved (0x7F)
@@ -690,8 +864,8 @@ public class VirtualMachine : IPrimitiveContext
             }
 
             var receiverOOP2 = Pop();
-            var resultOOP = SendMessage(receiverOOP2, selectorOOP, Array.Empty<SmalltalkOOP>());
-            Push(resultOOP);
+            var outcome0 = SendMessage(receiverOOP2, selectorOOP, Array.Empty<SmalltalkOOP>());
+            if (!ConsumeCallOutcome(outcome0)) return false;
             return true;
         }
 
@@ -734,8 +908,11 @@ public class VirtualMachine : IPrimitiveContext
 
             var argOOP = Pop();
             var receiverOOP2 = Pop();
-            var resultOOP = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
-            Push(resultOOP);
+            Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            var outcome1 = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
+            Console.WriteLine($"[SEND1 AFTER] Message outcome.Kind={outcome1.Kind}, context={_activeContextOOP}");
+            if (!ConsumeCallOutcome(outcome1)) return false;
+            Console.WriteLine($"[SEND1 PUSHED] Pushed result onto stack");
             return true;
         }
 
@@ -776,8 +953,11 @@ public class VirtualMachine : IPrimitiveContext
             var arg2OOP = Pop();
             var arg1OOP = Pop();
             var receiverOOP2 = Pop();
-            var resultOOP = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
-            Push(resultOOP);
+            Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            var outcome2 = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
+            Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_activeContextOOP}");
+            if (!ConsumeCallOutcome(outcome2)) return false;
+            Console.WriteLine($"[SEND2 PUSHED] Pushed result onto stack");
             return true;
         }
 
@@ -964,8 +1144,8 @@ public class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
-                    var result = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
-                    Push(result);
+                    var outcome = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -976,8 +1156,8 @@ public class VirtualMachine : IPrimitiveContext
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg = Pop();
                     var receiver = Pop();
-                    var result = SendMessage(receiver, selectorOOP, new[] { arg });
-                    Push(result);
+                    var outcome = SendMessage(receiver, selectorOOP, new[] { arg });
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -989,8 +1169,8 @@ public class VirtualMachine : IPrimitiveContext
                     var arg2 = Pop();
                     var arg1 = Pop();
                     var receiver = Pop();
-                    var result = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
-                    Push(result);
+                    var outcome = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1007,8 +1187,8 @@ public class VirtualMachine : IPrimitiveContext
                         args[i] = Pop();
                     }
                     var receiver = Pop();
-                    var result = SendMessage(receiver, selectorOOP, args);
-                    Push(result);
+                    var outcome = SendMessage(receiver, selectorOOP, args);
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1018,9 +1198,8 @@ public class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
-                    // TODO: Implement super send (lookup in superclass)
-                    var result = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
-                    Push(result);
+                    var outcome = SendSuperMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1031,9 +1210,8 @@ public class VirtualMachine : IPrimitiveContext
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg = Pop();
                     var receiver = Pop();
-                    // TODO: Implement super send (lookup in superclass)
-                    var result = SendMessage(receiver, selectorOOP, new[] { arg });
-                    Push(result);
+                    var outcome = SendSuperMessage(receiver, selectorOOP, new[] { arg });
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1045,9 +1223,8 @@ public class VirtualMachine : IPrimitiveContext
                     var arg2 = Pop();
                     var arg1 = Pop();
                     var receiver = Pop();
-                    // TODO: Implement super send (lookup in superclass)
-                    var result = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
-                    Push(result);
+                    var outcome = SendSuperMessage(receiver, selectorOOP, new[] { arg1, arg2 });
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1064,9 +1241,8 @@ public class VirtualMachine : IPrimitiveContext
                         args[i] = Pop();
                     }
                     var receiver = Pop();
-                    // TODO: Implement super send (lookup in superclass)
-                    var result = SendMessage(receiver, selectorOOP, args);
-                    Push(result);
+                    var outcome = SendSuperMessage(receiver, selectorOOP, args);
+                    if (!ConsumeCallOutcome(outcome)) return true;
                     return true;
                 }
 
@@ -1239,8 +1415,9 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Fall back to message send using cached selector OOP
-        var sendResult = SendMessage(receiverOOP, selectorOOP, new[] { argOOP });
-        Push(sendResult);
+        var outcome = SendMessage(receiverOOP, selectorOOP, new[] { argOOP });
+        if (!ConsumeCallOutcome(outcome))
+            return; // method returned via NLR targeting this context
     }
 
     /// <summary>
@@ -1303,8 +1480,9 @@ public class VirtualMachine : IPrimitiveContext
         }
 
         // Fall back to message send using cached selector OOP
-        var result = SendMessage(receiverOOP, selectorOOP, args);
-        Push(result);
+        var outcome = SendMessage(receiverOOP, selectorOOP, args);
+        if (!ConsumeCallOutcome(outcome))
+            return; // method returned via NLR targeting this context
     }
 
     /// <summary>
@@ -1348,10 +1526,99 @@ public class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
+    /// Sends a super message to a receiver.
+    /// Looks up the method starting from the superclass of the currently executing method's home class.
+    /// Returns a CallOutcome that signals whether a non-local return occurred.
+    /// </summary>
+    private CallOutcome SendSuperMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        // For super sends, we need to start method lookup from the superclass of the class
+        // that contains the currently executing method, NOT from the receiver's class.
+
+        // Get the currently executing method from the active context
+        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+        var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+
+        // Get the class that owns this method (the home class)
+        // For CompiledMethod, the class reference is in the last literal (by convention)
+        int literalCount = _heapManager.GetIndexedSize(currentMethodOOP);
+        var homeClassOOP = _heapManager.GetIndexedOOP(currentMethodOOP, literalCount - 1);
+
+        // Get the superclass of the home class
+        int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+        var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, superclassIndex);
+
+        // Get selector name for diagnostics
+        string? selectorName = GetSymbolName(selectorOOP);
+
+        Console.WriteLine($"[SUPER SEND] selector={selectorName}, homeClass={GetClassName(homeClassOOP)}, superclass={GetClassName(superclassOOP)}");
+
+        // Now look up the method starting from the superclass
+        var methodInfo = GetMethod(superclassOOP, selectorName!);
+
+        if (methodInfo == null)
+        {
+            string? superclassName = GetClassName(superclassOOP);
+            throw new InvalidOperationException(
+                $"Super method not found: {selectorName ?? "<unknown>"} in superclass {superclassName} (superclassOOP={superclassOOP})");
+        }
+
+        // Check if the method has a primitive
+        int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
+        if (primitiveNumber > 0)
+        {
+            Console.WriteLine($"[SendSuperMessage] Executing primitive {primitiveNumber} for {selectorName}");
+            var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
+
+            if (_primitiveSuccess)
+            {
+                Console.WriteLine($"[SendSuperMessage] Primitive {primitiveNumber} succeeded");
+                return CallOutcome.Normal(primitiveResult);
+            }
+
+            Console.WriteLine($"[SendSuperMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
+        }
+
+        // Execute the method with proper context chaining
+        var previousContextOOP = _activeContextOOP;
+        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, previousContextOOP);
+
+        try
+        {
+            var result = ExecuteBytecodeLoop();
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+
+            if (_activeContextCount % 50 == 0 && _activeContextCount > 0)
+            {
+                Console.WriteLine($"[CONTEXT EXIT] Normal return from super send, depth now={_activeContextCount}");
+            }
+
+            return CallOutcome.Normal(result);
+        }
+        catch (NonLocalReturnException ex)
+        {
+            Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
+        }
+        catch (Exception ex)
+        {
+            DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, superclassOOP, selectorName!, ex);
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Sends a message to a receiver.
     /// Looks up the method in the receiver's class and executes it.
+    /// Returns a CallOutcome that signals whether a non-local return occurred.
     /// </summary>
-    private SmalltalkOOP SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    private CallOutcome SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
     {
         // Look up the method in the receiver's class
         var classOOP = GetClass(receiverOOP);
@@ -1365,6 +1632,20 @@ public class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"[SendMessage] WARNING: selectorOOP={selectorOOP} does not resolve to a Symbol!");
             Console.WriteLine($"  receiverOOP={receiverOOP}, classOOP={classOOP}, className={GetClassName(classOOP)}");
             Console.WriteLine($"  selectorOOP.IsSmallInteger={selectorOOP.IsSmallInteger}, selectorOOP.RawValue=0x{selectorOOP.RawValue:X}");
+        }
+
+        // DIAGNOSTIC: Track repeated Cursor creation to diagnose loop
+        if (selectorName == "extent:fromArray:offset:")
+        {
+            _cursorCreationCount++;
+            Console.WriteLine($"\n[CURSOR DIAGNOSTIC #{_cursorCreationCount}] depth={_activeContextCount}, receiver={receiverOOP}, class={GetClassName(classOOP)}");
+            Console.WriteLine($"  selectorOOP={selectorOOP}, activeContext={_activeContextOOP}");
+
+            // Show sender chain for first 10 calls
+            if (_cursorCreationCount <= 10)
+            {
+                DumpSenderChain(_activeContextOOP, 6);
+            }
         }
 
         // Verbose debug: log method entry
@@ -1384,7 +1665,7 @@ public class VirtualMachine : IPrimitiveContext
             if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
             {
                 // Execute the block with proper BlockContext wrapping
-                return InvokeBlock(receiverOOP, args);
+                return CallOutcome.Normal(InvokeBlock(receiverOOP, args));
             }
         }
 
@@ -1416,7 +1697,7 @@ public class VirtualMachine : IPrimitiveContext
             {
                 Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 // Primitive succeeded - return result directly
-                return primitiveResult;
+                return CallOutcome.Normal(primitiveResult);
             }
 
             Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
@@ -1446,8 +1727,34 @@ public class VirtualMachine : IPrimitiveContext
 
             // Restore previous context
             _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
 
-            return result;
+            if (_activeContextCount % 50 == 0 && _activeContextCount > 0)
+            {
+                Console.WriteLine($"[CONTEXT EXIT] Normal return, depth now={_activeContextCount}");
+            }
+
+            return CallOutcome.Normal(result);
+        }
+        catch (NonLocalReturnException ex)
+        {
+            // Non-local return from a block - convert to CallOutcome
+            // DO NOT convert to normal return - let caller decide based on target
+            Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
+
+            // Restore previous context BEFORE returning outcome
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+
+            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+
+            if (VerboseDebug)
+            {
+                _callDepth--;
+            }
+
+            // Return NonLocalReturn outcome - caller will check if target matches its context
+            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
         }
         catch (Exception ex)
         {
@@ -1461,9 +1768,50 @@ public class VirtualMachine : IPrimitiveContext
 
             // Restore previous context
             _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
 
             throw;
         }
+    }
+
+    /// <summary>
+    /// Consume a CallOutcome in the bytecode loop / caller.
+    /// Returns true to continue execution (normal), false to indicate that the current method/context has returned (stop loop).
+    /// If the outcome is a VMException, throws it. If the outcome is a NonLocalReturn targeted at another context, rethrows as NonLocalReturnException for propagation.
+    /// </summary>
+    private bool ConsumeCallOutcome(CallOutcome outcome)
+    {
+        if (outcome.Kind == CallOutcomeKind.Normal)
+        {
+            Push(outcome.Value);
+            return true;
+        }
+
+        if (outcome.Kind == CallOutcomeKind.VMException)
+        {
+            throw outcome.VMEx!;
+        }
+
+        // Non-local return
+        if (outcome.Kind == CallOutcomeKind.NonLocalReturn)
+        {
+            Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_activeContextOOP}, match={outcome.TargetContextOop == _activeContextOOP}");
+
+            // If NLR targets this context, this context must return immediately with the provided value.
+            if (outcome.TargetContextOop == _activeContextOOP)
+            {
+                Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
+                // push the return value and signal method-return
+                Push(outcome.Value);
+                return false;
+            }
+
+            Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding");
+            // Otherwise propagate as exception for callers to handle / continue unwinding
+            throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+        }
+
+        throw new InvalidOperationException("Unhandled CallOutcome kind");
     }
 
     /// <summary>
@@ -1568,6 +1916,62 @@ public class VirtualMachine : IPrimitiveContext
         Console.WriteLine(new string('=', 80) + "\n");
     }
 
+    private void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)
+    {
+        Console.WriteLine($"  SENDER CHAIN (showing up to {maxDepth} contexts):");
+
+        int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
+        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+
+        var currentOOP = contextOOP;
+        int depth = 0;
+
+        while (currentOOP != SmalltalkOOP.Null && currentOOP != GlobalRegistry.NilOOP && depth < maxDepth)
+        {
+            if (currentOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"    [{depth}] INVALID - SmallInteger {currentOOP.AsSmallInteger()}");
+                break;
+            }
+
+            try
+            {
+                var methodOOP = _heapManager.GetInstanceVariable(currentOOP, methodIndex);
+
+                // Get selector from method's second literal (index 1, after header at index 0)
+                string selectorName = "<unknown>";
+                try
+                {
+                    var selectorOOP = _heapManager.GetIndexedOOP(methodOOP, 1);
+                    selectorName = GetSymbolName(selectorOOP) ?? "<unknown>";
+                }
+                catch
+                {
+                    // If we can't get the selector, just use unknown
+                }
+
+                var classOOP = _heapManager.GetClassOOP(currentOOP);
+                var className = GetClassName(classOOP) ?? "?";
+
+                Console.WriteLine($"    [{depth}] {className}>>{selectorName} (context={currentOOP}, method={methodOOP})");
+
+                var senderOOP = _heapManager.GetInstanceVariable(currentOOP, senderIndex);
+                currentOOP = senderOOP;
+                depth++;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    [{depth}] ERROR reading context: {ex.Message}");
+                break;
+            }
+        }
+
+        if (depth >= maxDepth)
+        {
+            Console.WriteLine($"    ... (truncated, chain continues)");
+        }
+    }
+
     private string DescribeLiteral(SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger)
@@ -1639,11 +2043,11 @@ public class VirtualMachine : IPrimitiveContext
     /// <param name="blockMethodOOP">The block CompiledMethod to invoke</param>
     /// <param name="args">Arguments to pass to the block</param>
     /// <returns>The result of block execution</returns>
-    private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
+    private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
     {
         try
         {
-            return InvokeBlockInternal(blockMethodOOP, args);
+            return InvokeBlockInternal(blockMethodOOP, args, blockClosureOOP);
         }
         catch (Exception)
         {
@@ -1651,7 +2055,7 @@ public class VirtualMachine : IPrimitiveContext
         }
     }
 
-    private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
+    private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
     {
         // Step 1: Resolve block ownership from blockOwnerMap
         var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
@@ -1724,7 +2128,7 @@ public class VirtualMachine : IPrimitiveContext
 
         // Step 7: Create execution MethodContext backed by BlockContext
         var executionContextOOP = CreateBlockExecutionContext(
-            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP);
+            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP, blockClosureOOP);
 
         // Step 7a: Copy arguments to MethodContext indexed slots
         // The MethodContext's indexed slots 0..(argCount-1) hold the arguments
@@ -1765,7 +2169,7 @@ public class VirtualMachine : IPrimitiveContext
     /// Creates a MethodContext for executing a block, backed by a BlockContext.
     /// This implements Approach B from the documentation.
     /// </summary>
-    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP)
+    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP, SmalltalkOOP blockClosureOOP)
     {
         var header = ParseMethodHeader(blockMethodOOP);
 
@@ -1800,8 +2204,19 @@ public class VirtualMachine : IPrimitiveContext
         _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, GlobalRegistry.NilOOP);
         _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP); // self = home context receiver
 
-        // Store blockContext backreference in our mapping
-        _blockContextMapping[contextOOP] = blockContextOOP;
+        // CRITICAL: Store BlockClosure (not BlockContext) in mapping for nested block support
+        // This allows nested blocks to access the parent BlockClosure's homeContext
+        if (blockClosureOOP != default)
+        {
+            _blockContextMapping[contextOOP] = blockClosureOOP;
+            Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockClosure {blockClosureOOP}");
+        }
+        else
+        {
+            // Fallback for legacy code paths that don't provide BlockClosure
+            _blockContextMapping[contextOOP] = blockContextOOP;
+            Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockContext {blockContextOOP} (legacy)");
+        }
 
         return contextOOP;
     }
@@ -2375,8 +2790,21 @@ public class VirtualMachine : IPrimitiveContext
             args[i] = _heapManager.GetIndexedOOP(argumentsArray, i);
         }
 
-        // Call the private SendMessage method
-        return SendMessage(receiverOop, selectorOop, args);
+        // Call the private SendMessage method and convert Normal outcome to OOP,
+        // or throw/propagate a NonLocalReturnException for non-local returns so primitives that expect OOP behave.
+        var outcome = SendMessage(receiverOop, selectorOop, args);
+        switch (outcome.Kind)
+        {
+            case CallOutcomeKind.Normal:
+                return outcome.Value;
+            case CallOutcomeKind.NonLocalReturn:
+                // Convert to exception to preserve primitive contract (primitives expect raw OOP returns)
+                throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+            case CallOutcomeKind.VMException:
+                throw outcome.VMEx!;
+            default:
+                throw new InvalidOperationException("Unknown CallOutcome kind");
+        }
     }
 
     SmalltalkOOP IPrimitiveContext.GetActiveContext()
@@ -2744,8 +3172,18 @@ public class VirtualMachine : IPrimitiveContext
         // Initialize instance variables
         _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);
         _heapManager.SetInstanceVariable(closureOOP, homeContextIndex, homeContextOOP);
-        _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, homeContextOOP);
+
+        // Ensure the returnContext is the enclosing MethodContext (skip block execution contexts)
+        var returnContextOOP = FindMethodContext(homeContextOOP);
+        if (returnContextOOP == default)
+        {
+            // Fallback to the homeContextOOP if no method context can be found
+            returnContextOOP = homeContextOOP;
+        }
+        _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, returnContextOOP);
         _heapManager.SetInstanceVariable(closureOOP, numArgsIndex, SmalltalkOOP.FromSmallInteger(numArgs));
+
+        Console.WriteLine($"[DEBUG CreateBlockClosure] Created closure {closureOOP} with homeContext={homeContextOOP}, returnContext={returnContextOOP}");
 
         return closureOOP;
     }
@@ -2810,10 +3248,11 @@ public class VirtualMachine : IPrimitiveContext
         // This needs to swap all references between oop1 and oop2
     }
 
-    SmalltalkOOP IPrimitiveContext.InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP)
+    SmalltalkOOP IPrimitiveContext.InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP, SmalltalkOOP blockClosureOOP)
     {
-        // Note: homeContextOOP parameter is ignored - InvokeBlockInternal finds it via blockOwnerMap
-        return InvokeBlockInternal(blockMethodOOP, arguments);
+        // Canonical Primitive 207 implementation: all metadata is in the BlockClosure
+        // The blockMethodOOP and homeContextOOP parameters are redundant but kept for compatibility
+        return ExecuteBlockClosure(blockClosureOOP, arguments);
     }
 
     int IPrimitiveContext.GetFieldIndex(string className, string fieldName)

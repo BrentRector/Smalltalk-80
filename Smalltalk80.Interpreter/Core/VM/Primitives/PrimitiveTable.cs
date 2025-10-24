@@ -62,6 +62,9 @@ public static class PrimitiveTable
         _primitives[16] = ArithmeticPrimitives.BitShift;
         _primitives[17] = ArithmeticPrimitives.Div;
 
+        // Point primitives (18)
+        _primitives[18] = PointPrimitives.MakePoint;
+
         // LargeInteger primitives (21-37)
         _primitives[21] = LargeIntegerPrimitives.Add;
         _primitives[22] = LargeIntegerPrimitives.Subtract;
