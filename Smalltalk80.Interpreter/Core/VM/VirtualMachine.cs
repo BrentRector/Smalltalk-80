@@ -662,6 +662,33 @@ public class VirtualMachine : IPrimitiveContext
             int selectorIndex = BytecodeUtil.Send0Index(bytecode);
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
+            // Handle blocks with nil literals - resolve from home context
+            if (selectorOOP == GlobalRegistry.NilOOP)
+            {
+                // Check if this is a block execution context using our mapping
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
+                {
+                    // Get the home context from the block
+                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
+
+                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    {
+                        // Get the method from home context
+                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
+
+                        // Try to get the selector from home method's literals
+                        var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
+
+                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        {
+                            selectorOOP = homeSelectorOOP;
+                        }
+                    }
+                }
+            }
+
             var receiverOOP2 = Pop();
             var resultOOP = SendMessage(receiverOOP2, selectorOOP, Array.Empty<SmalltalkOOP>());
             Push(resultOOP);
@@ -674,6 +701,36 @@ public class VirtualMachine : IPrimitiveContext
         {
             int selectorIndex = BytecodeUtil.Send1Index(bytecode);
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+
+            // Handle blocks with nil literals - resolve from home context
+            if (selectorOOP == GlobalRegistry.NilOOP)
+            {
+                // Check if this is a block execution context using our mapping
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
+                {
+                    // Get the home context from the block
+                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
+
+                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    {
+                        // Get the method from home context
+                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
+
+                        // Try to get the selector from home method's literals
+                        var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
+
+                        Console.WriteLine($"[SEND1] Block literal fallback: blockMethod={GetLocalId(methodOOP)}, homeMethod={GetLocalId(homeMethodOOP)}");
+                        Console.WriteLine($"  Accessing homeMethod literal[{selectorIndex + 1}] = {homeSelectorOOP}, symbolName={GetSymbolName(homeSelectorOOP)}");
+
+                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        {
+                            selectorOOP = homeSelectorOOP;
+                        }
+                    }
+                }
+            }
 
             var argOOP = Pop();
             var receiverOOP2 = Pop();
@@ -688,6 +745,33 @@ public class VirtualMachine : IPrimitiveContext
         {
             int selectorIndex = BytecodeUtil.Send2Index(bytecode);
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
+
+            // Handle blocks with nil literals - resolve from home context
+            if (selectorOOP == GlobalRegistry.NilOOP)
+            {
+                // Check if this is a block execution context using our mapping
+                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
+                {
+                    // Get the home context from the block
+                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
+
+                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    {
+                        // Get the method from home context
+                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
+
+                        // Try to get the selector from home method's literals
+                        var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
+
+                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        {
+                            selectorOOP = homeSelectorOOP;
+                        }
+                    }
+                }
+            }
 
             var arg2OOP = Pop();
             var arg1OOP = Pop();
@@ -1274,6 +1358,14 @@ public class VirtualMachine : IPrimitiveContext
 
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
+
+        // DEBUG: Log when selector is <unknown>
+        if (selectorName == null)
+        {
+            Console.WriteLine($"[SendMessage] WARNING: selectorOOP={selectorOOP} does not resolve to a Symbol!");
+            Console.WriteLine($"  receiverOOP={receiverOOP}, classOOP={classOOP}, className={GetClassName(classOOP)}");
+            Console.WriteLine($"  selectorOOP.IsSmallInteger={selectorOOP.IsSmallInteger}, selectorOOP.RawValue=0x{selectorOOP.RawValue:X}");
+        }
 
         // Verbose debug: log method entry
         if (VerboseDebug)

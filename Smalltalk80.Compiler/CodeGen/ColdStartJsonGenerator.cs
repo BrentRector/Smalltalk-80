@@ -137,6 +137,27 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
         {
             switch (literal)
             {
+                case Symbol symbol:
+                    // Symbol object (added by LiteralCollector for selectors)
+                    symbols.Add(symbol.Value);
+                    break;
+
+                case Association assoc:
+                    // Association object - extract the key
+                    if (assoc.Key is Symbol keySymbol)
+                    {
+                        symbols.Add(keySymbol.Value);
+                    }
+                    break;
+
+                case CompiledMethodData block when block.IsBlock:
+                    // Recursively extract symbols from block literals
+                    if (block.Literals != null && block.Literals.Length > 0)
+                    {
+                        ExtractSymbolsFromLiterals(block.Literals.ToList(), symbols);
+                    }
+                    break;
+
                 case string str when str.StartsWith("#"):
                     // Symbol literal
                     symbols.Add(str[1..]);
@@ -155,6 +176,10 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
                 case List<object> array:
                     ExtractSymbolsFromLiterals(array, symbols);
+                    break;
+
+                case object[] objArray:
+                    ExtractSymbolsFromLiterals(objArray.ToList(), symbols);
                     break;
             }
         }
@@ -742,6 +767,25 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // Blocks are stored as separate CompiledMethod objects per Blue Book spec
             CompiledMethodData block when block.IsBlock => ConvertBlockToMethod(block),
 
+            // Symbol object (added by LiteralCollector for selectors)
+            Symbol symbol => new Dictionary<string, object>
+            {
+                ["type"] = "symbol",
+                ["index"] = _symbolTable.GetValueOrDefault(symbol.Value, -1)
+            },
+
+            // Association object
+            Association assoc => new Dictionary<string, object>
+            {
+                ["type"] = "association",
+                ["association"] = new Dictionary<string, object?>
+                {
+                    ["keyType"] = "symbol",
+                    ["keyIndex"] = _symbolTable.GetValueOrDefault(((Symbol)assoc.Key).Value, -1),
+                    ["valueRef"] = null // Will be patched later
+                }
+            },
+
             // Symbol literal in "#symbolName" format
             string str when str.StartsWith("#") => new Dictionary<string, object>
             {
@@ -785,6 +829,13 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             {
                 ["type"] = "array",
                 ["elements"] = arr.Select(ConvertLiteral).ToList()
+            },
+
+            // Array (object array from LiteralCollector)
+            object[] objArr => new Dictionary<string, object>
+            {
+                ["type"] = "array",
+                ["elements"] = objArr.Select(ConvertLiteral).ToList()
             },
 
             // Nil or unknown

@@ -2843,6 +2843,69 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 // We need to visit all of them
                 return base.VisitMessageBase(context);
             }
+
+            public override object? VisitStatements(Smalltalk80Parser.StatementsContext context)
+            {
+                // Statements contains multiple statement nodes
+                // Must traverse all to collect literals from each statement
+                return base.VisitStatements(context);
+            }
+
+            public override object? VisitStatement(Smalltalk80Parser.StatementContext context)
+            {
+                // Statement can be either returnStatement or expressionStatement
+                // Must traverse to reach the actual expressions
+                return base.VisitStatement(context);
+            }
+
+            public override object? VisitExpressionStatement(Smalltalk80Parser.ExpressionStatementContext context)
+            {
+                // ExpressionStatement just wraps an expression
+                // Must traverse to reach the expression
+                return base.VisitExpressionStatement(context);
+            }
+
+            public override object? VisitReturnStatement(Smalltalk80Parser.ReturnStatementContext context)
+            {
+                // Return statements contain expressions that may have message sends
+                // Base visitor will properly traverse the expression tree
+                return base.VisitReturnStatement(context);
+            }
+
+            public override object? VisitExpression(Smalltalk80Parser.ExpressionContext context)
+            {
+                // Expression contains assignmentExpr
+                // Must traverse down to reach message sends
+                return base.VisitExpression(context);
+            }
+
+            public override object? VisitCascadeExpr(Smalltalk80Parser.CascadeExprContext context)
+            {
+                // CascadeExpr contains messageExpr and cascade parts
+                // Must traverse to collect all selectors in cascades
+                return base.VisitCascadeExpr(context);
+            }
+
+            public override object? VisitMessageExpr(Smalltalk80Parser.MessageExprContext context)
+            {
+                // MessageExpr contains binaryExpr and optional keywordMessage
+                // Must traverse to reach the actual message sends
+                return base.VisitMessageExpr(context);
+            }
+
+            public override object? VisitBinaryExpr(Smalltalk80Parser.BinaryExprContext context)
+            {
+                // BinaryExpr contains unaryExpr and binary messages
+                // Must traverse to collect binary selectors
+                return base.VisitBinaryExpr(context);
+            }
+
+            public override object? VisitUnaryExpr(Smalltalk80Parser.UnaryExprContext context)
+            {
+                // UnaryExpr contains messageBase and unary messages
+                // Must traverse to collect unary selectors
+                return base.VisitUnaryExpr(context);
+            }
         }
     }
 }
