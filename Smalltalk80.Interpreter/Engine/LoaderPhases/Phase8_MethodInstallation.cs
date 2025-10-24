@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
@@ -91,7 +93,7 @@ public class Phase8_MethodInstallation
         foreach (var method in _bundle.Methods)
         {
             var bytecodes = ClassHierarchyUtils.DecodeBytecodes(method.Bytecodes);
-            var nilOOP = GlobalRegistry.NilOOP;
+            var nilOOP = SpecialObjectsArray.Instance.Nil;
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
             {
@@ -170,7 +172,7 @@ public class Phase8_MethodInstallation
                 
                 // VALUE MIGRATION VALIDATION: Check if Association has non-nil value
                 var valueOOP = _allocator.GetInstanceVariable(assocOOP, 1);
-                if (valueOOP != GlobalRegistry.NilOOP)
+                if (valueOOP != SpecialObjectsArray.Instance.Nil)
                 {
                     nonNilValueCount++;
                 }
@@ -281,7 +283,7 @@ public class Phase8_MethodInstallation
             for (int i = 0; i < sysDictSize; i++)
             {
                 var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                if (assocOOP != GlobalRegistry.NilOOP)
+                if (assocOOP != SpecialObjectsArray.Instance.Nil)
                 {
                     reachableAssociations.Add(assocOOP);
                 }
@@ -301,14 +303,14 @@ public class Phase8_MethodInstallation
                 int classPoolIndex = 7; // Standard classPool index
                 var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
                 
-                if (classPoolOOP == GlobalRegistry.NilOOP)
+                if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
                     continue;
                     
                 int poolSize = _allocator.GetIndexedSize(classPoolOOP);
                 for (int i = 0; i < poolSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                    if (assocOOP != GlobalRegistry.NilOOP)
+                    if (assocOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         reachableAssociations.Add(assocOOP);
                     }
@@ -415,9 +417,9 @@ public class Phase8_MethodInstallation
             "string" => InternString(_strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.NilOOP,
-            "true" => GlobalRegistry.TrueOOP,
-            "false" => GlobalRegistry.FalseOOP,
+            "nil" => SpecialObjectsArray.Instance.Nil,
+            "true" => SpecialObjectsArray.Instance.True,
+            "false" => SpecialObjectsArray.Instance.False,
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
             "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
             "character" => AllocateCharacter(literal.CodePoint!.Value),
@@ -698,7 +700,7 @@ public class Phase8_MethodInstallation
         // Any non-nil valueRef indicates compiler bug or corrupted JSON.
         var incomingValueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.NilOOP;
+            : SpecialObjectsArray.Instance.Nil;
 
         // STEP 1: Check canonical association cache first
         // This ensures all methods share the same Association object for the same variable
@@ -706,12 +708,12 @@ public class Phase8_MethodInstallation
         {
             // CANONICALIZATION CONFLICT: Validate value migration semantics
             // Policy: STRICT NIL ENFORCEMENT - detect any non-nil values and warn/fail
-            if (incomingValueOOP != GlobalRegistry.NilOOP)
+            if (incomingValueOOP != SpecialObjectsArray.Instance.Nil)
             {
                 // Read canonical Association's current value for diagnostics
                 var canonicalValueOOP = _allocator.GetInstanceVariable(cachedAssocOOP, 1);
                 
-                if (canonicalValueOOP == GlobalRegistry.NilOOP)
+                if (canonicalValueOOP == SpecialObjectsArray.Instance.Nil)
                 {
                     // Canonical has nil, incoming has non-nil - WARNING but not fatal
                     Console.WriteLine(
@@ -751,7 +753,7 @@ public class Phase8_MethodInstallation
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == GlobalRegistry.NilOOP) continue;
+                    if (assocOOP == SpecialObjectsArray.Instance.Nil) continue;
 
                     var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)

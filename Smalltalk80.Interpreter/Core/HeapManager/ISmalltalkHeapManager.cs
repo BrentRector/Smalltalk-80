@@ -109,6 +109,14 @@ public interface ISmalltalkHeapManager
     SmalltalkOOP GetClassOOP(SmalltalkOOP objectOOP);
 
     /// <summary>
+    /// Sets the class reference of an object (slot 0).
+    /// Used by primitives that create instances of dynamically determined classes.
+    /// </summary>
+    /// <param name="objectOOP">Object to modify</param>
+    /// <param name="classOOP">Class OOP to set</param>
+    void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP);
+
+    /// <summary>
     /// Gets the object format from ObjectTableEntry.
     /// </summary>
     ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP);
@@ -211,4 +219,11 @@ public interface ISmalltalkHeapManager
     /// Reports objects with invalid class OOPs for diagnostic purposes.
     /// </summary>
     void ValidateAllObjectClasses(Dictionary<string, int> localIdToObjectId);
+
+    /// <summary>
+    /// Enumerates all valid objects in the object table in canonical order.
+    /// Yields only non-null entries, skipping freed slots.
+    /// Useful for VM primitives like someInstance, nextObject, allInstances.
+    /// </summary>
+    IEnumerable<SmalltalkOOP> EnumerateObjectTable();
 }

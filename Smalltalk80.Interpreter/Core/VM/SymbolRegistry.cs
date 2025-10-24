@@ -6,16 +6,41 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <summary>
 /// Registry for tracking symbol OOPs during cold start.
 /// Maps symbol indices to their allocated SmalltalkOOPs.
+///
+/// ARCHITECTURAL ENFORCEMENT: After Freeze() is called (after Phase 1),
+/// Register() will throw exceptions. Runtime code must access the Smalltalk
+/// heap directly via USTable, not this cold start proxy structure.
 /// </summary>
 public static class SymbolRegistry
 {
     private static readonly Dictionary<int, SmalltalkOOP> _symbolIndexToOOP = new();
+    private static bool _isFrozen = false;
+
+    /// <summary>
+    /// Freezes the registry to prevent runtime modifications.
+    /// Call this at the end of Phase 1 (Symbol Interning).
+    /// Once frozen, Register() will throw exceptions.
+    /// Read-only operations (GetSymbolOOP, AllSymbols) remain allowed.
+    /// </summary>
+    public static void Freeze()
+    {
+        _isFrozen = true;
+        Console.WriteLine($"[SymbolRegistry] Frozen with {_symbolIndexToOOP.Count} symbols");
+    }
 
     /// <summary>
     /// Registers a symbol OOP for a given symbol index.
+    /// THROWS after Freeze() - only for Phase 1 use.
     /// </summary>
     public static void Register(int symbolIndex, SmalltalkOOP symbolOOP)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"SymbolRegistry.Register() called after freeze. " +
+                $"Runtime code must access heap directly via USTable. Attempted to register symbol index: {symbolIndex}");
+        }
+
         _symbolIndexToOOP[symbolIndex] = symbolOOP;
     }
 

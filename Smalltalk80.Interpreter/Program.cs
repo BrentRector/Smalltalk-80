@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Engine.LoaderPhases.ClassHierarchyUtils;
 
 namespace Smalltalk80.Interpreter;
@@ -75,7 +76,7 @@ public static class Program
                 }
 
                 var vmMetadata = loader.BuildVMMetadata();
-                var vm = new VirtualMachine(heapManager, loader.LayoutResolver, vmMetadata, bundle.Symbols);
+                var vm = new VirtualMachine(heapManager, loader.LayoutResolver, vmMetadata);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -186,7 +187,7 @@ public static class Program
                         {
                             succeeded++;
                             Console.WriteLine($"✓ Success ({result.ElapsedMilliseconds}ms)");
-                            Console.WriteLine($"  Returned: {FormatReturnValue(heapManager, bundle, result.ReturnValueOop ?? GlobalRegistry.NilOOP)}");
+                            Console.WriteLine($"  Returned: {FormatReturnValue(heapManager, bundle, result.ReturnValueOop ?? SpecialObjectsArray.Instance.Nil)}");
                         }
                         else
                         {
@@ -343,9 +344,9 @@ public static class Program
             "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.NilOOP,
-            "true" => GlobalRegistry.TrueOOP,
-            "false" => GlobalRegistry.FalseOOP,
+            "nil" => SpecialObjectsArray.Instance.Nil,
+            "true" => SpecialObjectsArray.Instance.True,
+            "false" => SpecialObjectsArray.Instance.False,
             "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
                 ? objOOP1
                 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
@@ -409,7 +410,7 @@ public static class Program
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == GlobalRegistry.NilOOP) continue;
+                    if (assocOOP == SpecialObjectsArray.Instance.Nil) continue;
 
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -422,7 +423,7 @@ public static class Program
 
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.NilOOP;
+            : SpecialObjectsArray.Instance.Nil;
 
         var associationOOP = allocator.AllocateFixedObject("Association");
         allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -473,13 +474,13 @@ public static class Program
         if (returnOOP.IsSmallInteger)
             return $"SmallInteger({returnOOP.AsSmallInteger()})";
 
-        if (returnOOP == GlobalRegistry.NilOOP)
+        if (returnOOP == SpecialObjectsArray.Instance.Nil)
             return "nil";
 
-        if (returnOOP == GlobalRegistry.TrueOOP)
+        if (returnOOP == SpecialObjectsArray.Instance.True)
             return "true";
 
-        if (returnOOP == GlobalRegistry.FalseOOP)
+        if (returnOOP == SpecialObjectsArray.Instance.False)
             return "false";
 
         try
@@ -820,7 +821,7 @@ public static class Program
             // Get the classPool instance variable (Dictionary containing class variables)
             var classPoolOOP = heapManager.GetInstanceVariable(floatClassOOP, 7);
             
-            if (classPoolOOP == GlobalRegistry.NilOOP)
+            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
             {
                 return "classPool is nil";
             }
@@ -843,7 +844,7 @@ public static class Program
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == GlobalRegistry.NilOOP)
+                if (assocOOP == SpecialObjectsArray.Instance.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2
@@ -967,7 +968,7 @@ public static class Program
             // classPool is at index 7
             var classPoolOOP = heapManager.GetInstanceVariable(cursorClassOOP, 7);
             
-            if (classPoolOOP == GlobalRegistry.NilOOP)
+            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
             {
                 Console.WriteLine("  classPool is nil - no class variables created yet");
                 return;
@@ -998,7 +999,7 @@ public static class Program
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == GlobalRegistry.NilOOP)
+                if (assocOOP == SpecialObjectsArray.Instance.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2

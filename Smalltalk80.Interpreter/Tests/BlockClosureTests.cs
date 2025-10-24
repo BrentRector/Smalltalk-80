@@ -1,7 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Compiler;
-using Smalltalk80.ColdStart;
 
 namespace Smalltalk80.Interpreter.Tests;
 

@@ -104,9 +104,7 @@ public static class ControlPrimitives
 
         // Create arguments array with one element
         SmalltalkOOP argsArrayOop = ctx.AllocateObject("class:Array", 1);
-        // Note: This requires HeapManager to have SetIndexedOOP method
-        // For now we'll leave this as a stub - needs heap manager support
-        // ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[0]);
+        ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[0]);
 
         // Activate the block
         SmalltalkOOP resultOop = ctx.ActivateBlockContext(receiver, argsArrayOop);
@@ -174,9 +172,7 @@ public static class ControlPrimitives
 
         // Create arguments array with one element
         SmalltalkOOP argsArrayOop = ctx.AllocateObject("class:Array", 1);
-        // Note: This requires HeapManager to have SetIndexedOOP method
-        // For now we'll leave this as a stub - needs heap manager support
-        // ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[1]);
+        ctx.HeapManager.SetIndexedOOP(argsArrayOop, 0, args[1]);
 
         // Send the message using VM's message dispatch
         SmalltalkOOP resultOop = ctx.SendMessage(receiver, selectorOop, argsArrayOop);

@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -27,7 +28,7 @@ public class ProcessPrimitives
         int activeProcessIndex = _layoutResolver.GetFieldIndex("class:ProcessorScheduler", "activeProcess");
         var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
         
-        if (currentActiveOOP != GlobalRegistry.NilOOP)
+        if (currentActiveOOP != SpecialObjectsArray.Instance.Nil)
         {
             throw new InvalidOperationException("Process switching not yet implemented");
         }
@@ -46,7 +47,7 @@ public class ProcessPrimitives
         _heapManager.SetInstanceVariable(
             schedulerOOP, 
             activeProcessIndex, 
-            GlobalRegistry.NilOOP
+            SpecialObjectsArray.Instance.Nil
         );
         
         return resultOOP;

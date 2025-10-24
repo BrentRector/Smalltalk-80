@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
@@ -103,16 +105,16 @@ public class Phase6_ObjectAllocation
     {
         return value.Type switch
         {
-            "nil" => GlobalRegistry.NilOOP,
-            "true" => GlobalRegistry.TrueOOP,
-            "false" => GlobalRegistry.FalseOOP,
+            "nil" => SpecialObjectsArray.Instance.Nil,
+            "true" => SpecialObjectsArray.Instance.True,
+            "false" => SpecialObjectsArray.Instance.False,
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
             "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
             "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
             "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.NilOOP,  // Forward reference: use nil as placeholder, will be patched later
+            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : SpecialObjectsArray.Instance.Nil,  // Forward reference: use nil as placeholder, will be patched later
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
@@ -353,7 +355,7 @@ public class Phase6_ObjectAllocation
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = GlobalRegistry.NilOOP;
+        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
         
         // Find first available nil slot
         for (int i = 0; i < systemDictSize; i++)

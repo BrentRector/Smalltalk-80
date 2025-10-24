@@ -323,8 +323,7 @@ public class Phase16_InitExecution
         {
             throw new InvalidOperationException("Association class not found in bundle");
         }
-        
-        var placeholderClassOOP = SmalltalkOOP.FromObjectTableIndex(0); // Will be fixed later
+
         var associationOOP = _allocator.AllocateFixedObject("Association");
         
         // Set instance variables: [0] = key, [1] = value

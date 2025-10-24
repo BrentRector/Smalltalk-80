@@ -176,6 +176,8 @@ public static class StringPrimitives
     /// <summary>
     /// Primitive 106: String asSymbol
     /// Converts a string to a unique symbol.
+    /// Returns the existing Symbol if the string is already interned, otherwise fails
+    /// and lets Smalltalk create a new Symbol.
     /// </summary>
     public static SmalltalkOOP AsSymbol(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -191,9 +193,30 @@ public static class StringPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // TODO: Need symbol interning infrastructure
-        // For now, fail - will implement when symbol table is added
-        ctx.PrimitiveSuccess = false;
-        return SpecialObjectsArray.Instance.Nil;
+        // Extract the string value from the receiver
+        var stringBytes = ctx.GetByteArray(receiver);
+        if (stringBytes.Length == 0)
+        {
+            // Empty or invalid string
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Convert bytes to string (Smalltalk strings are ASCII/Latin-1)
+        string stringValue = System.Text.Encoding.Latin1.GetString(stringBytes.Span);
+
+        // Attempt to intern the symbol
+        var symbolOOP = ctx.InternSymbol(stringValue);
+
+        // If InternSymbol returns Nil, the symbol doesn't exist yet
+        // Signal primitive failure so Smalltalk can create it
+        if (symbolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Found existing symbol - return it
+        return symbolOOP;
     }
 }

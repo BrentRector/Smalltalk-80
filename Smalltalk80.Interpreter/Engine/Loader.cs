@@ -1,9 +1,12 @@
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Engine;
 
@@ -11,7 +14,11 @@ namespace Smalltalk80.Interpreter.Engine;
 /// Orchestrates the cold start loader.
 /// Executes phases in order to build up the Smalltalk-80 object memory from the JSON bundle.
 /// Bytecode Validation is optional and runs after GC verification; can be skipped by setting SKIP_BYTECODE_VALIDATION=1.
+///
+/// COLD START ONLY: This class builds the heap from ColdStartBundle and modifies registries.
+/// Runtime code must NOT use this class.
 /// </summary>
+[ColdStartOnly(Reason = "Builds heap from ColdStartBundle, modifies frozen registries")]
 public class Loader
 {
     private readonly ColdStartBundle _bundle;
@@ -113,6 +120,9 @@ public class Loader
         {
             var phase = new Phase1_SymbolInterning(_bundle, _allocator);
             phase.Run();
+
+            // Freeze symbol registry - no more symbol registration after this point
+            SymbolRegistry.Freeze();
 
             // TODO: Store optimized selectors in heap manager when needed for bytecode disassembly
             // For now, this will be handled differently since the new heap manager doesn't have high-level methods
@@ -239,9 +249,9 @@ public class Loader
             // USTable is reachable via SystemDictionary, no need for direct root
             var gcRootsList = new List<(string name, SmalltalkOOP oop)>
             {
-                ("nil", GlobalRegistry.NilOOP),
-                ("false", GlobalRegistry.FalseOOP),
-                ("true", GlobalRegistry.TrueOOP),
+                ("nil", SpecialObjectsArray.Instance.Nil),
+                ("false", SpecialObjectsArray.Instance.False),
+                ("true", SpecialObjectsArray.Instance.True),
                 ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
             };
 
@@ -283,6 +293,9 @@ public class Loader
         }
         
         Console.WriteLine("✓");
+
+        // Freeze global registry - no more registrations after this point
+        GlobalRegistry.Freeze();
 
         Console.WriteLine("\n=== Cold Start Complete ===");
     }

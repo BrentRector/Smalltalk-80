@@ -289,9 +289,6 @@ public class Phase4_ClassResolution
     /// </summary>
     private SmalltalkOOP InternString(string value)
     {
-        // Use placeholder class (will be fixed later when String class exists)
-        var placeholderClassOOP = SmalltalkOOP.FromObjectTableIndex(0);
-        
         // Encode string as UTF-8 bytes
         byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
         

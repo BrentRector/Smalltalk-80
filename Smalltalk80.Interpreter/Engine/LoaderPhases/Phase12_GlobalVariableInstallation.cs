@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
@@ -192,7 +194,7 @@ public class Phase12_GlobalVariableInstallation
         
         
         int usedSlots = 0;
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         
         // Find first nil slot in SystemDictionary
         for (int i = 0; i < systemDictSize; i++)

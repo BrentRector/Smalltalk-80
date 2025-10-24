@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
@@ -103,7 +105,7 @@ public class Phase7_MethodDictionaryAllocation
         _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
 
         // Initialize all indexed fields (keys) to nil
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < capacity; i++)
         {
             _allocator.SetIndexedOOP(methodDictOOP, i, nilOOP);
@@ -128,7 +130,7 @@ public class Phase7_MethodDictionaryAllocation
         var arrayOOP = _allocator.AllocateArray(arrayClassOOP, size);
 
         // Initialize all elements to nil
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < size; i++)
         {
             _allocator.SetIndexedOOP(arrayOOP, i, nilOOP);

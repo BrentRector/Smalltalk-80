@@ -32,8 +32,10 @@ public readonly struct SmalltalkOOP
     /// <summary>
     /// Extracts object table index from an object pointer OOP. Throws if OOP is a SmallInteger.
     /// IMPORTANT: Only use this for object pointers, never for SmallIntegers.
+    /// INTERNAL USE ONLY: This method exposes heap manager implementation details.
+    /// External code should treat the heap manager as a black box.
     /// </summary>
-    public int ToObjectTableIndex()
+    internal int ToObjectTableIndex()
     {
         if (IsSmallInteger)
             throw new InvalidOperationException($"Cannot extract object table index from SmallInteger OOP. SmallInteger value: {_value >> 1}");
@@ -43,8 +45,12 @@ public readonly struct SmalltalkOOP
     /// <summary>Creates a SmallInteger OOP from an integer value.</summary>
     public static SmalltalkOOP FromSmallInteger(int value) => new((value << 1) | 1);
 
-    /// <summary>Creates an object pointer OOP from an ObjectTable index.</summary>
-    public static SmalltalkOOP FromObjectTableIndex(int index) => new(index << 1);
+    /// <summary>
+    /// Creates an object pointer OOP from an ObjectTable index.
+    /// INTERNAL USE ONLY: This method exposes heap manager implementation details.
+    /// External code should treat the heap manager as a black box and use heap manager allocation APIs.
+    /// </summary>
+    internal static SmalltalkOOP FromObjectTableIndex(int index) => new(index << 1);
 
     /// <summary>Returns the raw tagged value.</summary>
     public int RawValue => _value;

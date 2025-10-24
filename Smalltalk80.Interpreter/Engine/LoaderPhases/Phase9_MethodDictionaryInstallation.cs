@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
@@ -73,7 +75,7 @@ public class Phase9_MethodDictionaryInstallation
             // Get the class's method dictionary (instance variable 1 in Behavior)
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at index 1
 
-            if (methodDictOOP == GlobalRegistry.NilOOP)
+            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
                 Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
                 skippedMethods++;
@@ -121,7 +123,7 @@ public class Phase9_MethodDictionaryInstallation
         var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
         var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
 
-        if (valuesArrayOOP == GlobalRegistry.NilOOP)
+        if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
         {
             throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
         }
@@ -140,7 +142,7 @@ public class Phase9_MethodDictionaryInstallation
         {
             var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
             
-            if (keyOOP == GlobalRegistry.NilOOP)
+            if (keyOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Empty slot found
                 targetIndex = i;
@@ -161,7 +163,7 @@ public class Phase9_MethodDictionaryInstallation
 
         // Check if this is a new entry (for tally update)
         var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP == GlobalRegistry.NilOOP;
+        bool isNewEntry = existingKeyOOP == SpecialObjectsArray.Instance.Nil;
 
         // Install the method
         _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);

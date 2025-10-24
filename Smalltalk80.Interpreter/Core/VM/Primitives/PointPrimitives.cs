@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -16,7 +17,7 @@ public static class PointPrimitives
         if (args == null || args.Length != 1)
         {
             ctx.PrimitiveSuccess = false;
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
         var xOop = receiver;
@@ -26,14 +27,14 @@ public static class PointPrimitives
         if (!xOop.IsSmallInteger || !yOop.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
         // Get Point class from global registry
         if (!GlobalRegistry.TryGet("class:Point", out SmalltalkOOP pointClassOOP))
         {
             ctx.PrimitiveSuccess = false;
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
         // Allocate new Point instance (no indexed fields, just x and y instance variables)

@@ -33,28 +33,48 @@ public static class LargeIntegerPrimitives
     /// </summary>
     private static SmalltalkOOP FromBigInteger(IPrimitiveContext ctx, BigInteger value)
     {
-        byte[] bytes = value.ToByteArray();
+        // Optimization: If value fits in SmallInteger range, return SmallInteger instead
+        // SmallInteger range: -2^30 to 2^30-1 (30-bit signed integer)
+        const int SmallIntegerMin = -(1 << 30);
+        const int SmallIntegerMax = (1 << 30) - 1;
 
-        // TODO: Need class lookup infrastructure
-        // For now, use placeholder (will fail until infrastructure is added)
-        int classId = GetLargeIntegerClass(ctx, value >= BigInteger.Zero);
+        if (value >= SmallIntegerMin && value <= SmallIntegerMax)
+        {
+            return SmalltalkOOP.FromSmallInteger((int)value);
+        }
 
-        // Allocate LargeInteger object with ByteIndexed format
+        byte[] bytes = value.ToByteArray(); // little-endian two's complement
+
+        // Trim leading sign-extension bytes for canonical representation
+        // BigInteger.ToByteArray can return bytes like: [0x34, 0x12, 0x00, 0x00]
+        // We want to trim trailing 0x00 (positive) or 0xFF (negative) bytes
+        // Keep at least one byte even for zero
+        int len = bytes.Length;
+        byte signByte = (value.Sign < 0) ? (byte)0xFF : (byte)0x00;
+        while (len > 1 && bytes[len - 1] == signByte)
+            len--;
+
+        // Determine proper class based on sign
+        SmalltalkOOP classOOP = GetLargeIntegerClass(ctx, value.Sign >= 0);
+
+        // Allocate byte-indexed object
+        // Use low-level allocation since we need to set class explicitly afterward
         SmalltalkOOP largeIntOop = ctx.HeapManager.AllocateObject(
             format: ObjectFormat.ByteIndexed,
             fixedSlots: 0,
-            indexedSize: bytes.Length
+            indexedSize: len
         );
 
-        for (int i = 0; i < bytes.Length; i++)
+        // Store trimmed bytes
+        for (int i = 0; i < len; i++)
         {
             ctx.HeapManager.SetIndexedByte(largeIntOop, i, bytes[i]);
         }
 
-        // Set the class reference
-        SmalltalkOOP classOOP = classId;
-        ctx.HeapManager.SetSlot(largeIntOop, 0, classOOP);
-        
+        // Set class reference using the new SetClassOOP method
+        // This ensures proper class pointer handling and maintains heap invariants
+        ctx.HeapManager.SetClassOOP(largeIntOop, classOOP);
+
         return largeIntOop;
     }
 
@@ -67,9 +87,14 @@ public static class LargeIntegerPrimitives
             return false;
 
         SmalltalkOOP classOOP = ctx.HeapManager.GetClassOOP(objectOop);
-        // TODO: Check if classOOP is LargePositiveInteger or LargeNegativeInteger
-        // For now, assume any non-SmallInteger numeric type might be LargeInteger
-        return true; // Temporary - needs proper class checking
+
+        // Check against both LargeInteger classes
+        if (GlobalRegistry.TryGet("class:LargePositiveInteger", out var posClass) && classOOP == posClass)
+            return true;
+        if (GlobalRegistry.TryGet("class:LargeNegativeInteger", out var negClass) && classOOP == negClass)
+            return true;
+
+        return false;
     }
 
     /// <summary>
@@ -81,14 +106,21 @@ public static class LargeIntegerPrimitives
     }
 
     /// <summary>
-    /// Gets the LargeInteger class ID.
+    /// Gets the LargeInteger class OOP based on sign.
     /// </summary>
-    private static int GetLargeIntegerClass(IPrimitiveContext ctx, bool isPositive)
+    private static SmalltalkOOP GetLargeIntegerClass(IPrimitiveContext ctx, bool isPositive)
     {
-        // In Smalltalk-80, there are two classes: LargePositiveInteger and LargeNegativeInteger
-        // TODO: Need to get LargeInteger classes from well-known objects or context
-        // For now, this is a stub that needs proper implementation
-        throw new NotImplementedException("GetLargeIntegerClass needs implementation with proper class lookup");
+        string className = isPositive
+            ? "class:LargePositiveInteger"
+            : "class:LargeNegativeInteger";
+
+        if (GlobalRegistry.TryGet(className, out var classOOP))
+            return classOOP;
+
+        throw new InvalidOperationException(
+            $"{className} not registered in GlobalRegistry during cold start. " +
+            "This indicates a bootstrap phase error - LargeInteger classes must be " +
+            "registered during Phase 2 (Class Shells) of the cold start process.");
     }
 
     // Primitive 21: LargeInteger + (addition)

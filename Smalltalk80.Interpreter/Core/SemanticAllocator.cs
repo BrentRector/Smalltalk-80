@@ -2,6 +2,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Core;
 
@@ -9,7 +10,11 @@ namespace Smalltalk80.Interpreter.Core;
 /// Semantic allocator that wraps the semantic-agnostic heap manager.
 /// Provides high-level allocation methods with knowledge of Smalltalk object structure.
 /// This layer handles all semantic knowledge about object formats, slot calculations, etc.
+///
+/// COLD START ONLY: This class uses ColdStartBundle which is stale after cold start completes.
+/// Runtime code must NOT use this allocator.
 /// </summary>
+[ColdStartOnly(Reason = "Uses ColdStartBundle which is stale after cold start")]
 public class SemanticAllocator
 {
     private readonly ISmalltalkHeapManager _heapManager;

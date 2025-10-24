@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -6,11 +7,16 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Registry for well-known global OOPs during cold start.
 /// Tracks singleton objects, system objects, and class objects by name.
 /// CRITICAL: Stores SmalltalkOOP values, NEVER object table indices.
+///
+/// ARCHITECTURAL ENFORCEMENT: After Freeze() is called, all write operations
+/// (Register, RegisterClass, Set) will throw exceptions. Runtime code must access
+/// the Smalltalk heap directly, not these cold start proxy structures.
 /// </summary>
 public static class GlobalRegistry
 {
     private static readonly Dictionary<string, SmalltalkOOP> _globals = new();
     private static readonly Dictionary<string, object> _objects = new();
+    private static bool _isFrozen = false;
 
     // Well-known singleton OOPs
     public static SmalltalkOOP NilOOP { get; private set; }
@@ -19,27 +25,55 @@ public static class GlobalRegistry
     public static SmalltalkOOP SystemDictionaryOOP { get; private set; }
 
     /// <summary>
+    /// Freezes the registry to prevent runtime modifications.
+    /// Call this at the end of cold start (after Loader.Run()).
+    /// Once frozen, Register/RegisterClass/Set will throw exceptions.
+    /// Read-only operations (Get, TryGet) remain allowed.
+    /// </summary>
+    public static void Freeze()
+    {
+        _isFrozen = true;
+        Console.WriteLine($"[GlobalRegistry] Frozen with {_globals.Count} global entries, {_objects.Count} object entries");
+    }
+
+    /// <summary>
     /// Registers a well-known global object OOP.
+    /// Also updates SpecialObjectsArray.Instance for singleton values.
+    /// THROWS after Freeze() - only for cold start use.
     /// </summary>
     public static void Register(string name, SmalltalkOOP oop)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.Register() called after freeze. " +
+                $"Runtime code must access heap directly. Attempted to register: '{name}'");
+        }
+
         _globals[name] = oop;
 
-        // Update well-known properties
+        // Update well-known properties AND SpecialObjectsArray
         switch (name)
         {
             case "nil":
                 NilOOP = oop;
+                SpecialObjectsArray.SetNil(oop);
                 break;
             case "true":
                 TrueOOP = oop;
+                SpecialObjectsArray.SetTrue(oop);
                 break;
             case "false":
                 FalseOOP = oop;
+                SpecialObjectsArray.SetFalse(oop);
                 break;
             case "SystemDictionary":
             case "Smalltalk":
                 SystemDictionaryOOP = oop;
+                SpecialObjectsArray.SetSmalltalk(oop);
+                break;
+            case "ProcessorScheduler":
+                SpecialObjectsArray.SetProcessorScheduler(oop);
                 break;
         }
     }
@@ -57,9 +91,17 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Registers a class object by name.
+    /// THROWS after Freeze() - only for cold start use.
     /// </summary>
     public static void RegisterClass(string className, SmalltalkOOP oop)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.RegisterClass() called after freeze. " +
+                $"Runtime code must access heap directly. Attempted to register: '{className}'");
+        }
+
         _globals[$"class:{className}"] = oop;
     }
 
@@ -81,9 +123,17 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Sets a generic object in the registry (for non-OOP data like maps, lists, etc.)
+    /// THROWS after Freeze() - only for cold start use.
     /// </summary>
     public static void Set(string name, object value)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.Set() called after freeze. " +
+                $"Runtime code must access heap directly. Attempted to set: '{name}'");
+        }
+
         _objects[name] = value;
     }
 

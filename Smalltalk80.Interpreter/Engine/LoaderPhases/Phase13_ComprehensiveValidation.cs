@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
@@ -228,11 +230,11 @@ public class Phase13_ComprehensiveValidation
         // Validate 5 special objects (note: only 4 are GC roots - USTable is not a GC root)
 
         // Validate nil
-        ValidateSpecialObject("nil", GlobalRegistry.NilOOP, results);
+        ValidateSpecialObject("nil", SpecialObjectsArray.Instance.Nil, results);
 
         // Validate true/false
-        ValidateSpecialObject("true", GlobalRegistry.TrueOOP, results);
-        ValidateSpecialObject("false", GlobalRegistry.FalseOOP, results);
+        ValidateSpecialObject("true", SpecialObjectsArray.Instance.True, results);
+        ValidateSpecialObject("false", SpecialObjectsArray.Instance.False, results);
 
         // Validate SystemDictionary
         ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryOOP, results);

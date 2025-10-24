@@ -1,4 +1,6 @@
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
@@ -62,7 +64,7 @@ public class Phase11_USTablePopulation
         _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
         // Initialize all slots to nil
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < size; i++)
         {
             _allocator.SetIndexedOOP(ustableOOP, i, nilOOP);
@@ -83,7 +85,7 @@ public class Phase11_USTablePopulation
         while (true)
         {
             var slotOOP = _allocator.GetIndexedOOP(ustableOOP, index);
-            if (slotOOP == GlobalRegistry.NilOOP)
+            if (slotOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Found empty slot
                 _allocator.SetIndexedOOP(ustableOOP, index, symbolOOP);

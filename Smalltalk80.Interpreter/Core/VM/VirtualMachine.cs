@@ -2,6 +2,8 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -9,13 +11,16 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// The Smalltalk-80 Virtual Machine - handles bytecode execution, message sending, and method dispatch.
 /// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
+///
+/// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeapManager.
+/// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
+[RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
 public partial class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
-    private readonly string[] _symbols;
 
     // Active context (current MethodContext being executed) - now using SmalltalkOOP
     private SmalltalkOOP _activeContextOOP;
@@ -67,12 +72,11 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, string[] symbols)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
         _metadata = metadata;
-        _symbols = symbols;
     }
 
     /// <summary>
@@ -110,20 +114,54 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Looks up a symbol in the Smalltalk heap by searching the symbol table.
-    /// This accesses Smalltalk heap structures (SymbolRegistry) not C# objects.
+    /// Looks up a symbol in the Smalltalk heap by searching USTable.
+    /// CRITICAL: Uses heap-only access, no C# proxy data.
     /// </summary>
     private SmalltalkOOP LookupSymbolInHeap(string symbolName)
     {
-        // Search the symbol table to find the symbol by name
-        for (int i = 0; i < _symbols.Length; i++)
+        // Get USTable from GlobalRegistry (points to Smalltalk heap)
+        if (!GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
         {
-            if (_symbols[i] == symbolName)
+            throw new InvalidOperationException("USTable not found - cannot initialize selector caches");
+        }
+
+        // USTable is an Array in the Smalltalk heap containing Symbol OOPs
+        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Convert search string to bytes (Latin-1 encoding)
+        byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
+
+        // Search through USTable
+        for (int i = 0; i < ustableSize; i++)
+        {
+            var symbolOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
+
+            // Skip nil slots
+            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
+                continue;
+
+            // Compare Symbol bytes in heap
+            int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
+            if (symbolLength == searchBytes.Length)
             {
-                return SymbolRegistry.GetSymbolOOP(i);
+                bool match = true;
+                for (int j = 0; j < searchBytes.Length; j++)
+                {
+                    byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
+                    if (symbolByte != searchBytes[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                    return symbolOOP;
             }
         }
-        throw new InvalidOperationException($"Symbol '{symbolName}' not found in symbol table during selector cache initialization");
+
+        throw new InvalidOperationException($"Symbol '{symbolName}' not found in USTable during selector cache initialization");
     }
 
     /// <summary>
@@ -232,7 +270,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Step 6: Initialize MethodContext fixed fields
 
         // sender: caller context or nil for top-level DoIts
-        var callerOOP = callerContextOOP == default ? GlobalRegistry.NilOOP : callerContextOOP;
+        var callerOOP = callerContextOOP == default ? SpecialObjectsArray.Instance.Nil : callerContextOOP;
         _heapManager.SetInstanceVariable(contextOOP, senderIndex, callerOOP);
 
         // pc: start at bytecode offset 0
@@ -245,7 +283,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
 
         // receiverMap: used for multiple inheritance (not implemented yet, set to nil)
-        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, GlobalRegistry.NilOOP);
+        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, SpecialObjectsArray.Instance.Nil);
 
         // receiver: the object receiving this message
         _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
@@ -261,13 +299,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // Initialize temps to nil
         for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
-            _heapManager.SetIndexedOOP(contextOOP, i, GlobalRegistry.NilOOP);
+            _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
         // Initialize execution stack slots to nil
         for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
         {
-            _heapManager.SetIndexedOOP(contextOOP, i, GlobalRegistry.NilOOP);
+            _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
         // Note: GC root registration is implicit - the VM's _activeContextOOP field keeps the context alive
@@ -484,7 +522,7 @@ public partial class VirtualMachine : IPrimitiveContext
             var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
             // Handle blocks with nil literals - resolve from home context
-            if (associationOOP == GlobalRegistry.NilOOP) // nil
+            if (associationOOP == SpecialObjectsArray.Instance.Nil) // nil
             {
                 
                 // Check if this is a block execution context using our mapping
@@ -495,7 +533,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
                     
-                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
                         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -505,25 +543,25 @@ public partial class VirtualMachine : IPrimitiveContext
                         var homeAssociationOOP = GetMethodLiteral(homeMethodOOP, index + 1);
                         
                         
-                        if (homeAssociationOOP != GlobalRegistry.NilOOP)
+                        if (homeAssociationOOP != SpecialObjectsArray.Instance.Nil)
                         {
                             associationOOP = homeAssociationOOP;
                         }
                         else
                         {
-                            Push(GlobalRegistry.NilOOP);
+                            Push(SpecialObjectsArray.Instance.Nil);
                             return true;
                         }
                     }
                     else
                     {
-                        Push(GlobalRegistry.NilOOP);
+                        Push(SpecialObjectsArray.Instance.Nil);
                         return true;
                     }
                 }
                 else
                 {
-                    Push(GlobalRegistry.NilOOP);
+                    Push(SpecialObjectsArray.Instance.Nil);
                     return true;
                 }
             }
@@ -619,15 +657,15 @@ public partial class VirtualMachine : IPrimitiveContext
                 return true;
 
             case Bytecode.PUSH_TRUE:
-                Push(GlobalRegistry.TrueOOP);
+                Push(SpecialObjectsArray.Instance.True);
                 return true;
 
             case Bytecode.PUSH_FALSE:
-                Push(GlobalRegistry.FalseOOP);
+                Push(SpecialObjectsArray.Instance.False);
                 return true;
 
             case Bytecode.PUSH_NIL:
-                Push(GlobalRegistry.NilOOP);
+                Push(SpecialObjectsArray.Instance.Nil);
                 return true;
 
             case Bytecode.PUSH_MINUS_ONE:
@@ -675,15 +713,15 @@ public partial class VirtualMachine : IPrimitiveContext
                 return false; // Return from method
 
             case Bytecode.RETURN_TRUE:
-                Push(GlobalRegistry.TrueOOP);
+                Push(SpecialObjectsArray.Instance.True);
                 return false;
 
             case Bytecode.RETURN_FALSE:
-                Push(GlobalRegistry.FalseOOP);
+                Push(SpecialObjectsArray.Instance.False);
                 return false;
 
             case Bytecode.RETURN_NIL:
-                Push(GlobalRegistry.NilOOP);
+                Push(SpecialObjectsArray.Instance.Nil);
                 return false;
 
             case Bytecode.RETURN_TOP:
@@ -698,15 +736,19 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(returnSelfPopBlockOOP));
                     if (blockClass == "BlockClosure")
                     {
+                        // TODO: Non-local return support for BlockClosure (Phase 3)
                         // Get self from home context
                         int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
                         var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeContextIndex);
                         var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
 
-                        // Get return context and throw non-local return exception
+                        // Get return context
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
-                        throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
+
+                        // Temporarily treat as normal return until NonLocalReturnException is implemented
+                        // throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
+                        Console.WriteLine($"[WARN] Non-local return attempted but not yet supported - treating as normal return");
                     }
                     else
                     {
@@ -733,14 +775,19 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(returnTopPopBlockOOP));
                     if (blockClass == "BlockClosure")
                     {
+                        // TODO: Non-local return support for BlockClosure (Phase 3)
                         // Value already on stack
                         var returnValue = Pop();
 
-                        // Get return context and throw non-local return exception
+                        // Get return context
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
-                        Console.WriteLine($"[NLR THROW] value={returnValue}, target={returnContextOOP}, currentContext={_activeContextOOP}");
-                        throw new NonLocalReturnException(returnValue, returnContextOOP);
+                        Console.WriteLine($"[WARN] Non-local return attempted (value={returnValue}, target={returnContextOOP}) - not yet supported, treating as normal return");
+                        // throw new NonLocalReturnException(returnValue, returnContextOOP);
+
+                        // Temporarily treat as normal return
+                        Push(returnValue);
+                        return false;
                     }
                     else
                     {
@@ -837,7 +884,7 @@ public partial class VirtualMachine : IPrimitiveContext
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
             // Handle blocks with nil literals - resolve from home context
-            if (selectorOOP == GlobalRegistry.NilOOP)
+            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Check if this is a block execution context using our mapping
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
@@ -846,7 +893,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
-                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
                         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -855,7 +902,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         // Try to get the selector from home method's literals
                         var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
 
-                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        if (homeSelectorOOP != SpecialObjectsArray.Instance.Nil)
                         {
                             selectorOOP = homeSelectorOOP;
                         }
@@ -877,7 +924,7 @@ public partial class VirtualMachine : IPrimitiveContext
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
             // Handle blocks with nil literals - resolve from home context
-            if (selectorOOP == GlobalRegistry.NilOOP)
+            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Check if this is a block execution context using our mapping
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
@@ -886,7 +933,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
-                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
                         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -898,7 +945,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         Console.WriteLine($"[SEND1] Block literal fallback: blockMethod={GetLocalId(methodOOP)}, homeMethod={GetLocalId(homeMethodOOP)}");
                         Console.WriteLine($"  Accessing homeMethod literal[{selectorIndex + 1}] = {homeSelectorOOP}, symbolName={GetSymbolName(homeSelectorOOP)}");
 
-                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        if (homeSelectorOOP != SpecialObjectsArray.Instance.Nil)
                         {
                             selectorOOP = homeSelectorOOP;
                         }
@@ -924,7 +971,7 @@ public partial class VirtualMachine : IPrimitiveContext
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
             // Handle blocks with nil literals - resolve from home context
-            if (selectorOOP == GlobalRegistry.NilOOP)
+            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Check if this is a block execution context using our mapping
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
@@ -933,7 +980,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
-                    if (homeContextOOP != GlobalRegistry.NilOOP)
+                    if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
                         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -942,7 +989,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         // Try to get the selector from home method's literals
                         var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
 
-                        if (homeSelectorOOP != GlobalRegistry.NilOOP)
+                        if (homeSelectorOOP != SpecialObjectsArray.Instance.Nil)
                         {
                             selectorOOP = homeSelectorOOP;
                         }
@@ -1275,7 +1322,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
-                    if (valueOOP == GlobalRegistry.TrueOOP)
+                    if (valueOOP == SpecialObjectsArray.Instance.True)
                     {
                         _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -1291,7 +1338,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
-                    if (valueOOP == GlobalRegistry.FalseOOP)
+                    if (valueOOP == SpecialObjectsArray.Instance.False)
                     {
                         _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -1316,7 +1363,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
-                    if (valueOOP == GlobalRegistry.TrueOOP)
+                    if (valueOOP == SpecialObjectsArray.Instance.True)
                     {
                         _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -1332,7 +1379,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
-                    if (valueOOP == GlobalRegistry.FalseOOP)
+                    if (valueOOP == SpecialObjectsArray.Instance.False)
                     {
                         _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -1404,7 +1451,7 @@ public partial class VirtualMachine : IPrimitiveContext
             };
 
             var resultOOP = ExecuteIntegerArithmetic(receiverOOP, selector, argOOP);
-            if (resultOOP != GlobalRegistry.NilOOP ||
+            if (resultOOP != SpecialObjectsArray.Instance.Nil ||
                 selector == "=" || selector == "~=" ||
                 selector == "<" || selector == ">" ||
                 selector == "<=" || selector == ">=")
@@ -1468,7 +1515,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (selectorIndex == 6) // ==
         {
             bool isIdentical = receiverOOP == args[0];
-            Push(isIdentical ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP);
+            Push(isIdentical ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False);
             return;
         }
 
@@ -1492,7 +1539,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
     {
         if (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger)
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
 
         int a = receiverOOP.AsSmallInteger();
         int b = argOOP.AsSmallInteger();
@@ -1504,24 +1551,24 @@ public partial class VirtualMachine : IPrimitiveContext
                 "+" => SmalltalkOOP.FromSmallInteger(a + b),
                 "-" => SmalltalkOOP.FromSmallInteger(a - b),
                 "*" => SmalltalkOOP.FromSmallInteger(a * b),
-                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : GlobalRegistry.NilOOP,
-                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : GlobalRegistry.NilOOP,
-                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : GlobalRegistry.NilOOP,
-                "<" => a < b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
-                ">" => a > b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
-                "<=" => a <= b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
-                ">=" => a >= b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
-                "=" => a == b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
-                "~=" => a != b ? GlobalRegistry.TrueOOP : GlobalRegistry.FalseOOP,
+                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SpecialObjectsArray.Instance.Nil,
+                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : SpecialObjectsArray.Instance.Nil,
+                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SpecialObjectsArray.Instance.Nil,
+                "<" => a < b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                ">" => a > b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                "<=" => a <= b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                ">=" => a >= b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                "=" => a == b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                "~=" => a != b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
                 "bitAnd:" => SmalltalkOOP.FromSmallInteger(a & b),
                 "bitOr:" => SmalltalkOOP.FromSmallInteger(a | b),
                 "bitShift:" => b >= 0 ? SmalltalkOOP.FromSmallInteger(a << b) : SmalltalkOOP.FromSmallInteger(a >> (-b)),
-                _ => GlobalRegistry.NilOOP
+                _ => SpecialObjectsArray.Instance.Nil
             };
         }
         catch
         {
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
     }
 
@@ -1596,14 +1643,15 @@ public partial class VirtualMachine : IPrimitiveContext
 
             return CallOutcome.Normal(result);
         }
-        catch (NonLocalReturnException ex)
-        {
-            Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        }
+        // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
+        // catch (NonLocalReturnException ex)
+        // {
+        //     Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
+        //     _activeContextOOP = previousContextOOP;
+        //     _activeContextCount--;
+        //     Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+        //     return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
+        // }
         catch (Exception ex)
         {
             DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, superclassOOP, selectorName!, ex);
@@ -1736,26 +1784,27 @@ public partial class VirtualMachine : IPrimitiveContext
 
             return CallOutcome.Normal(result);
         }
-        catch (NonLocalReturnException ex)
-        {
-            // Non-local return from a block - convert to CallOutcome
-            // DO NOT convert to normal return - let caller decide based on target
-            Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
-
-            // Restore previous context BEFORE returning outcome
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-
-            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-
-            if (VerboseDebug)
-            {
-                _callDepth--;
-            }
-
-            // Return NonLocalReturn outcome - caller will check if target matches its context
-            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        }
+        // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
+        // catch (NonLocalReturnException ex)
+        // {
+        //     // Non-local return from a block - convert to CallOutcome
+        //     // DO NOT convert to normal return - let caller decide based on target
+        //     Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
+        //
+        //     // Restore previous context BEFORE returning outcome
+        //     _activeContextOOP = previousContextOOP;
+        //     _activeContextCount--;
+        //
+        //     Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+        //
+        //     if (VerboseDebug)
+        //     {
+        //         _callDepth--;
+        //     }
+        //
+        //     // Return NonLocalReturn outcome - caller will check if target matches its context
+        //     return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
+        // }
         catch (Exception ex)
         {
             if (VerboseDebug)
@@ -1806,9 +1855,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 return false;
             }
 
-            Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding");
+            // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
+            Console.WriteLine($"[NLR PROPAGATE] Would rethrow exception to continue unwinding, but NLR not implemented - treating as normal return");
             // Otherwise propagate as exception for callers to handle / continue unwinding
-            throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+            // throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+
+            // Temporarily push value and continue
+            Push(outcome.Value);
         }
 
         throw new InvalidOperationException("Unhandled CallOutcome kind");
@@ -1926,7 +1979,7 @@ public partial class VirtualMachine : IPrimitiveContext
         var currentOOP = contextOOP;
         int depth = 0;
 
-        while (currentOOP != SmalltalkOOP.Null && currentOOP != GlobalRegistry.NilOOP && depth < maxDepth)
+        while (currentOOP != SmalltalkOOP.Null && currentOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             if (currentOOP.IsSmallInteger)
             {
@@ -2010,17 +2063,17 @@ public partial class VirtualMachine : IPrimitiveContext
             return $"SmallInteger({oop.AsSmallInteger()})";
         }
 
-        if (oop == GlobalRegistry.NilOOP)
+        if (oop == SpecialObjectsArray.Instance.Nil)
         {
             return "nil";
         }
 
-        if (oop == GlobalRegistry.TrueOOP)
+        if (oop == SpecialObjectsArray.Instance.True)
         {
             return "true";
         }
 
-        if (oop == GlobalRegistry.FalseOOP)
+        if (oop == SpecialObjectsArray.Instance.False)
         {
             return "false";
         }
@@ -2042,6 +2095,7 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     /// <param name="blockMethodOOP">The block CompiledMethod to invoke</param>
     /// <param name="args">Arguments to pass to the block</param>
+    /// <param name="blockClosureOOP">Optional BlockClosure object for Primitive 207 support</param>
     /// <returns>The result of block execution</returns>
     private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
     {
@@ -2119,7 +2173,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Initialize temps to nil (after arguments)
         for (int i = argCount; i < argCount + tempCount; i++)
         {
-            _heapManager.SetIndexedOOP(blockContextOOP, i, GlobalRegistry.NilOOP);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
         // Step 6: Get home context receiver for proper self resolution
@@ -2140,7 +2194,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Step 7b: Initialize temps to nil (after arguments)
         for (int i = argCount; i < argCount + tempCount; i++)
         {
-            _heapManager.SetIndexedOOP(executionContextOOP, i, GlobalRegistry.NilOOP);
+            _heapManager.SetIndexedOOP(executionContextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
         // Step 8: Execute block with GC protection
@@ -2201,7 +2255,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
         _heapManager.SetInstanceVariable(contextOOP, methodIndex, blockMethodOOP);
-        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, GlobalRegistry.NilOOP);
+        _heapManager.SetInstanceVariable(contextOOP, receiverMapIndex, SpecialObjectsArray.Instance.Nil);
         _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP); // self = home context receiver
 
         // CRITICAL: Store BlockClosure (not BlockContext) in mapping for nested block support
@@ -2245,7 +2299,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP GetHomeContextReceiver(SmalltalkOOP homeContextOOP)
     {
         // Check if homeContextOOP is valid
-        if (homeContextOOP.IsSmallInteger || homeContextOOP == GlobalRegistry.NilOOP || homeContextOOP == default)
+        if (homeContextOOP.IsSmallInteger || homeContextOOP == SpecialObjectsArray.Instance.Nil || homeContextOOP == default)
         {
             throw new InvalidOperationException($"Invalid home context OOP: {homeContextOOP}");
         }
@@ -2311,7 +2365,7 @@ public partial class VirtualMachine : IPrimitiveContext
         
         var currentContextOOP = _activeContextOOP;
         
-        while (currentContextOOP != default && currentContextOOP != GlobalRegistry.NilOOP)
+        while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
         {
             // Get the method from this context
             int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -2344,7 +2398,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
         Console.WriteLine($"[DEBUG FindMethodContext] Starting from {startContextOOP}");
 
-        while (currentContextOOP != default && currentContextOOP != GlobalRegistry.NilOOP)
+        while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
         {
 
             // Check if this context is a block execution context
@@ -2582,7 +2636,7 @@ public partial class VirtualMachine : IPrimitiveContext
         try
         {
             var thisClassOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.MetaclassThisClassFieldIndex);
-            if (thisClassOOP != GlobalRegistry.NilOOP && thisClassOOP != SmalltalkOOP.Null)
+            if (thisClassOOP != SpecialObjectsArray.Instance.Nil && thisClassOOP != SmalltalkOOP.Null)
             {
                 // This is a metaclass - get the name from its thisClass field
                 var nameSymbolOOP = _heapManager.GetInstanceVariable(thisClassOOP, _metadata.ClassNameFieldIndex);
@@ -2628,7 +2682,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
 
         // Walk up the inheritance chain until we find the method or reach nil
-        while (currentClassOOP != GlobalRegistry.NilOOP && depth < maxDepth)
+        while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             string currentClassName = GetClassName(currentClassOOP);
             Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
@@ -2637,13 +2691,13 @@ public partial class VirtualMachine : IPrimitiveContext
             int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
             var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
 
-            if (methodDictOOP == GlobalRegistry.NilOOP)
+            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No method dictionary, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
                 var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
 
-                if (superclassOOP == GlobalRegistry.NilOOP)
+                if (superclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
                     Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
                     break; // Reached root of class hierarchy
@@ -2663,7 +2717,7 @@ public partial class VirtualMachine : IPrimitiveContext
             // To find a method: search indexed fields for selector, then get method from valuesArray at same index
 
             var valuesArrayOOP = _heapManager.GetInstanceVariable(methodDictOOP, 0);
-            if (valuesArrayOOP == GlobalRegistry.NilOOP)
+            if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No values array, try superclass
                 int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
@@ -2682,7 +2736,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 var selectorOOP = _heapManager.GetIndexedOOP(methodDictOOP, i);
 
                 // Skip nil entries (empty slots in the hash table)
-                if (selectorOOP == GlobalRegistry.NilOOP)
+                if (selectorOOP == SpecialObjectsArray.Instance.Nil)
                     continue;
 
                 // Check if this is the selector we're looking for
@@ -2700,7 +2754,7 @@ public partial class VirtualMachine : IPrimitiveContext
             int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
 
-            if (nextSuperclassOOP == GlobalRegistry.NilOOP)
+            if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
             {
                 Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
             }
@@ -2798,8 +2852,10 @@ public partial class VirtualMachine : IPrimitiveContext
             case CallOutcomeKind.Normal:
                 return outcome.Value;
             case CallOutcomeKind.NonLocalReturn:
-                // Convert to exception to preserve primitive contract (primitives expect raw OOP returns)
-                throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+                // TODO: Phase 3 - Implement NonLocalReturnException
+                // For now, treat non-local returns as normal returns
+                // throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+                return outcome.Value;
             case CallOutcomeKind.VMException:
                 throw outcome.VMEx!;
             default:
@@ -2857,7 +2913,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Initialize indexed fields to nil
         for (int i = 0; i < stackSize; i++)
         {
-            _heapManager.SetIndexedOOP(blockContextOOP, i, GlobalRegistry.NilOOP);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
         return blockContextOOP;
@@ -2887,7 +2943,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (providedArgCount != expectedArgCount)
         {
             // Argument count mismatch - this will cause primitive to fail
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
         // Copy arguments into the block context's indexed fields
@@ -2983,7 +3039,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
         
         // Check if classPool is nil (shouldn't happen - Phase4 should have created it)
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         if (classPoolOOP == nilOOP)
         {
             return;
@@ -3065,7 +3121,7 @@ public partial class VirtualMachine : IPrimitiveContext
             _heapManager.SetInstanceVariable(dictOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
         }
         
-        var nilOOP = GlobalRegistry.NilOOP;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < initialSize; i++)
         {
             _heapManager.SetIndexedOOP(dictOOP, i, nilOOP);
@@ -3095,7 +3151,7 @@ public partial class VirtualMachine : IPrimitiveContext
         for (int i = 0; i < size; i++)
         {
             var existingAssocOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            if (existingAssocOOP == GlobalRegistry.NilOOP)
+            if (existingAssocOOP == SpecialObjectsArray.Instance.Nil)
                 continue;
                 
             var existingKeyOOP = _heapManager.GetInstanceVariable(existingAssocOOP, keyIndex);
@@ -3110,7 +3166,7 @@ public partial class VirtualMachine : IPrimitiveContext
         for (int i = 0; i < size; i++)
         {
             var slotOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            if (slotOOP == GlobalRegistry.NilOOP)
+            if (slotOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // Found empty slot - insert here
                 _heapManager.SetIndexedOOP(dictionaryOOP, i, associationOOP);
@@ -3252,7 +3308,7 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         // Canonical Primitive 207 implementation: all metadata is in the BlockClosure
         // The blockMethodOOP and homeContextOOP parameters are redundant but kept for compatibility
-        return ExecuteBlockClosure(blockClosureOOP, arguments);
+        return InvokeBlockInternal(blockMethodOOP, arguments, blockClosureOOP);
     }
 
     int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
@@ -3273,5 +3329,64 @@ public partial class VirtualMachine : IPrimitiveContext
     SmalltalkOOP IPrimitiveContext.GetIndexedOOP(SmalltalkOOP objectOOP, int index)
     {
         return _heapManager.GetIndexedOOP(objectOOP, index);
+    }
+
+    SmalltalkOOP IPrimitiveContext.InternSymbol(string symbolName)
+    {
+        // CRITICAL: Must access USTable from Smalltalk heap, NOT from C# proxy data
+        // The _symbols array and SymbolRegistry are coldstart-time snapshots that become
+        // stale as soon as the Smalltalk interpreter begins running and creates new symbols.
+
+        // Get USTable (Universal Symbol Table) from GlobalRegistry
+        if (!GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
+        {
+            // USTable not yet created (shouldn't happen after cold start)
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // USTable is an Array of Symbol OOPs (with nils for empty slots)
+        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Convert input string to bytes for comparison (Latin-1 encoding)
+        byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
+
+        // Iterate through all slots in USTable
+        for (int i = 0; i < ustableSize; i++)
+        {
+            var symbolOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
+
+            // Skip nil slots (empty entries in hash table)
+            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
+                continue;
+
+            // Get the Symbol's string length from its indexed fields in the Smalltalk heap
+            int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
+
+            // Compare byte-by-byte
+            if (symbolLength == searchBytes.Length)
+            {
+                bool match = true;
+                for (int j = 0; j < searchBytes.Length; j++)
+                {
+                    byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
+                    if (symbolByte != searchBytes[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                {
+                    // Found matching symbol in the Smalltalk heap
+                    return symbolOOP;
+                }
+            }
+        }
+
+        // Symbol not found - return Nil to signal primitive failure
+        // The Smalltalk fallback code will create a new Symbol if needed
+        return SpecialObjectsArray.Instance.Nil;
     }
 }

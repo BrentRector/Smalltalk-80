@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using Smalltalk80.Interpreter.Core.Memory;
+
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -155,9 +157,9 @@ public class InitExpressionExecutor
             "string" => InternString(bundle.Strings[literal.Index!.Value], allocator),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => AllocateFloat(GetFloatValue(literal.Value!), allocator),
-            "nil" => GlobalRegistry.NilOOP,
-            "true" => GlobalRegistry.TrueOOP,
-            "false" => GlobalRegistry.FalseOOP,
+            "nil" => SpecialObjectsArray.Instance.Nil,
+            "true" => SpecialObjectsArray.Instance.True,
+            "false" => SpecialObjectsArray.Instance.False,
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) 
                 ? objOOP1 
                 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
@@ -277,7 +279,7 @@ public class InitExpressionExecutor
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == GlobalRegistry.NilOOP) continue;
+                    if (assocOOP == SpecialObjectsArray.Instance.Nil) continue;
                     
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -291,7 +293,7 @@ public class InitExpressionExecutor
         // Create new association
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.NilOOP;
+            : SpecialObjectsArray.Instance.Nil;
         
         return AllocateAssociation(keyOOP, valueOOP, allocator);
     }
@@ -554,7 +556,7 @@ public class InitExpressionExecutor
         }
 
         // Fall back to nil
-        return GlobalRegistry.NilOOP;
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
@@ -578,17 +580,17 @@ public class InitExpressionExecutor
         int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
         
-        _allocator.SetInstanceVariable(contextOOP, senderIndex, GlobalRegistry.NilOOP);
+        _allocator.SetInstanceVariable(contextOOP, senderIndex, SpecialObjectsArray.Instance.Nil);
         _allocator.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         _allocator.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
         _allocator.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
-        _allocator.SetInstanceVariable(contextOOP, receiverMapIndex, GlobalRegistry.NilOOP);
+        _allocator.SetInstanceVariable(contextOOP, receiverMapIndex, SpecialObjectsArray.Instance.Nil);
         _allocator.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
         
         // Initialize indexed portion (stack) with nil
         for (int i = 0; i < 12; i++)
         {
-            _allocator.SetIndexedOOP(contextOOP, i, GlobalRegistry.NilOOP);
+            _allocator.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
         
         return contextOOP;
@@ -609,7 +611,7 @@ public class InitExpressionExecutor
         
         _allocator.SetInstanceVariable(processOOP, suspendedContextIndex, suspendedContextOOP);
         _allocator.SetInstanceVariable(processOOP, priorityIndex, SmalltalkOOP.FromSmallInteger(priority));
-        _allocator.SetInstanceVariable(processOOP, myListIndex, GlobalRegistry.NilOOP);
+        _allocator.SetInstanceVariable(processOOP, myListIndex, SpecialObjectsArray.Instance.Nil);
         
         return processOOP;
     }

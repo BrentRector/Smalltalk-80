@@ -17,5 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Core\Smalltalk80.Interpreter.Core.csproj" />
     <ProjectReference Include="..\Engine\Smalltalk80.Interpreter.Engine.csproj" />
+    <ProjectReference Include="..\..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Interpreter.csproj" />
   </ItemGroup>
 </Project>

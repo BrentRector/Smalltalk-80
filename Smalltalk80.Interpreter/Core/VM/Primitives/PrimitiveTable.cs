@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -38,7 +39,7 @@ public static class PrimitiveTable
 
         // Primitive not found - signal failure
         ctx.PrimitiveSuccess = false;
-        return GlobalRegistry.NilOOP;
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     private static void RegisterPrimitives()

@@ -377,22 +377,23 @@ public static class ObjectPrimitives
             SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
             SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
 
-            // Decode SmallIntegers
+            // Decode SmallIntegers (both are 1-based Smalltalk indexes)
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            // Check if at end
-            if (position >= readLimit)
+            // Check if at end (position is 1-based; when > readLimit, stream is at end)
+            if (position > readLimit)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
-            // Read element at position (1-indexed in Smalltalk)
-            // Streams typically work with PointerIndexed collections
-            SmalltalkOOP element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position);
+            // Read element from collection
+            // Stored position is 1-based, but heap manager GetIndexedOOP is 0-based
+            // Convert: Smalltalk index 1 -> C# index 0
+            SmalltalkOOP element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
 
-            // Increment position
+            // Increment position (remains 1-based for Smalltalk)
             ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
             return element;
@@ -428,22 +429,21 @@ public static class ObjectPrimitives
             SmalltalkOOP writeLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "writeLimit");
             SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
 
-            // Decode SmallIntegers
+            // Decode SmallIntegers (both are 1-based)
             int position = positionOOP.AsSmallInteger();
             int writeLimit = writeLimitOOP.AsSmallInteger();
 
-            // Check if at limit
-            if (position >= writeLimit)
+            // Check if at limit (position is 1-based; when > writeLimit, at end)
+            if (position > writeLimit)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
-            // Write element at position (0-indexed internally)
-            // Streams typically work with PointerIndexed collections
-            ctx.HeapManager.SetIndexedOOP(collectionOOP, position, value);
+            // Write element to collection (convert 1-based to 0-based)
+            ctx.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
 
-            // Increment position
+            // Increment position (remains 1-based)
             ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
             return value;
@@ -476,12 +476,13 @@ public static class ObjectPrimitives
             SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
             SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
 
-            // Decode SmallIntegers
+            // Decode SmallIntegers (both are 1-based)
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            // Return true if at or past limit
-            return position >= readLimit
+            // Return true if past limit (both position and readLimit are 1-based)
+            // At position == readLimit, stream is NOT yet at end
+            return position > readLimit
                 ? SpecialObjectsArray.Instance.True
                 : SpecialObjectsArray.Instance.False;
         }
@@ -616,7 +617,7 @@ public static class ObjectPrimitives
         }
     }
 
-    // Primitive 75: Object asOop - Get object pointer as integer
+    // Primitive 75: Object asOop - Get object pointer as identity value
     public static SmalltalkOOP AsOop(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
@@ -625,18 +626,15 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Return the object pointer as an integer (unique object ID)
         // For SmallIntegers, this fails (they don't have object pointers)
         if (receiver.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
-        
-        // Return the raw object table index as a SmallInteger
-        // This is a special case where we need the raw index value for identity
-        int objectTableIndex = receiver.ToObjectTableIndex();
-        return SmalltalkOOP.FromSmallInteger(objectTableIndex);
+
+        // The OOP itself IS the identity - just return it
+        return receiver;
     }
 
     // Primitive 75 alternative: Object hash (for backward compatibility)
@@ -648,18 +646,7 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Use object ID as hash for heap objects
-        // For SmallIntegers, use the value itself
-        if (receiver.IsSmallInteger)
-        {
-            return receiver;
-        }
-        else
-        {
-            // Object ID is already a good hash
-            // Use object table index for hashing
-            int objectTableIndex = receiver.ToObjectTableIndex();
-            return SmalltalkOOP.FromSmallInteger(objectTableIndex & 0x1FFFFFFF);
-        }
+        // The OOP itself IS the hash - just return the receiver
+        return receiver;
     }
 }

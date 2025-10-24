@@ -288,6 +288,112 @@ var homeContextOOP = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex
 
 **Rationale**: Once the system is running, Smalltalk can modify class definitions, add/remove instance variables, and change field ordering. Hardcoded indices will break when the live system's structure differs from the frozen JSON snapshot.
 
+### Cold Start vs Runtime Separation - CRITICAL ARCHITECTURAL PRINCIPLE
+
+**FUNDAMENTAL RULE**: All operations performed by a primitive or VM runtime code must reference ONLY Smalltalk data resident in the Smalltalk heap.
+
+**The Problem**: Cold start creates C# proxy data structures (registries, arrays) to build the Smalltalk heap. Once the heap is built and the system begins running, these proxies become **stale** - new objects created at runtime exist only in the heap, not in the proxies.
+
+**The Solution: Structural Enforcement**
+
+Instead of relying on discipline ("don't use stale data"), we make stale data **structurally inaccessible**:
+
+1. **Removed `_symbols` field** from VirtualMachine - cannot be accessed (✅ Done 2025-01-24)
+2. **Removed `string[]` parameter** from VirtualMachine constructor - cannot be received (✅ Done 2025-01-24)
+3. **Frozen registries** after cold start - writes throw exceptions (✅ Done 2025-01-24)
+4. **Custom attributes** document architectural boundaries (✅ Done 2025-01-24)
+
+### Cold Start Phase (Phases 0-15)
+
+**Components**: `Loader`, `SemanticAllocator`, Phase classes
+**Data Access**: Can use `ColdStartBundle`, registries (write), `_symbols[]`
+**Marked with**: `[ColdStartOnly]` attribute
+
+**Example**:
+```csharp
+[ColdStartOnly(Reason = "Uses ColdStartBundle which is stale after cold start")]
+public class SemanticAllocator
+{
+    private readonly ColdStartBundle _bundle;  // OK during cold start
+}
+```
+
+### Runtime Phase (Init Expressions Onward)
+
+**Components**: `VirtualMachine`, primitives
+**Data Access**: ONLY `ISmalltalkHeapManager` and `LayoutResolver`
+**Marked with**: `[RuntimeOnly]` attribute
+
+**Example**:
+```csharp
+[RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
+public partial class VirtualMachine : IPrimitiveContext
+{
+    // NO _symbols field!
+    // NO _bundle field!
+    // ONLY heap access via _heapManager
+}
+```
+
+### Enforcement Mechanisms
+
+1. **Compile-Time**: Type system prevents access to removed fields
+   - `_symbols` field removed → compile error if accessed
+   - Constructor parameter removed → compile error if provided
+
+2. **Runtime**: Registries throw exceptions if modified after freeze
+   ```csharp
+   // After Loader.Run() completes:
+   SymbolRegistry.Freeze();   // After Phase 1
+   GlobalRegistry.Freeze();   // After Phase 15
+
+   // Later attempts to modify:
+   GlobalRegistry.Register("test", oop);  // THROWS InvalidOperationException
+   ```
+
+3. **Documentation**: Custom attributes mark architectural boundaries
+   - `[ColdStartOnly]` - Used during heap construction
+   - `[RuntimeOnly]` - Used during bytecode execution
+
+### Registry Freezing
+
+After `Loader.Run()` completes:
+- **SymbolRegistry.Freeze()** called after Phase 1 (3,834 symbols)
+- **GlobalRegistry.Freeze()** called after Phase 15 (246 globals)
+
+Any attempts to modify frozen registries throw `InvalidOperationException` with descriptive message:
+```
+GlobalRegistry.Register() called after freeze.
+Runtime code must access heap directly. Attempted to register: 'ClassName'
+```
+
+**Read-only access remains allowed**: `TryGet()`, `Get()` operations work at runtime (safe for OOP lookups during VM initialization like selector caches).
+
+### Why This Matters
+
+**Before (Dangerous)**:
+```csharp
+// Could accidentally use stale data
+private readonly string[] _symbols;
+var symbolName = _symbols[index];  // STALE if new symbols created!
+```
+
+**After (Safe)**:
+```csharp
+// Must use heap - always current
+SmalltalkOOP InternSymbol(string symbolName)
+{
+    var ustableOOP = GlobalRegistry.Get("USTable");
+    // Search through heap Array, compare bytes...
+}
+```
+
+**Key Benefits**:
+- ✅ **Impossible to access stale data** - removed from VM entirely
+- ✅ **Runtime safety** - frozen registries throw on modifications
+- ✅ **Self-documenting** - attributes mark cold-start vs runtime code
+- ✅ **Future-proof** - pattern established for all new code
+
 ### Methodology and Problem-Solving
 
 - Never perform "workaround". Always find and fix the root cause of any error.

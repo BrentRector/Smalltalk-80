@@ -79,7 +79,7 @@ public class Phase10_PatchApplication
             "objectField" => _localIdToObjectId[target.ObjectLocalId!],
             "methodLiteral" => GetMethodLiteral(target.MethodLocalId!, target.LiteralIndex!.Value),
             "classSlot" => _localIdToObjectId[target.ClassLocalId!],
-            "metaclassWiring" => SmalltalkOOP.FromObjectTableIndex(0), // Should be skipped in Run(), but return dummy value
+            "metaclassWiring" => throw new InvalidOperationException("metaclassWiring patches should be skipped in Run() - this code path should never execute"),
             _ => throw new NotSupportedException($"Unsupported patch target: {target.Kind}")
         };
     }

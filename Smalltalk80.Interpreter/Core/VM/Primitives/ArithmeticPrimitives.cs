@@ -299,8 +299,16 @@ public static class ArithmeticPrimitives
 
         try
         {
-            int result = a % b;
-            return SmalltalkOOP.FromSmallInteger(result);
+            // C# % gives remainder with sign of dividend
+            int rem = a % b;
+
+            // Smalltalk \\ (mod) has remainder sign follow divisor
+            // Blue Book: a \\ b has same sign as b
+            // Adjust when signs differ and remainder is non-zero
+            if (rem != 0 && ((a < 0) != (b < 0)))
+                rem += b;
+
+            return SmalltalkOOP.FromSmallInteger(rem);
         }
         catch
         {
@@ -429,9 +437,20 @@ public static class ArithmeticPrimitives
         int a = receiver.AsSmallInteger();
         int shift = args[0].AsSmallInteger();
 
+        // SmallInteger is 30-bit; limit shifts to safe range
+        // Shifts >= 30 bits will overflow SmallInteger range
+        // Shifts >= 32 bits have undefined behavior in C#
+        // Fail primitive for large shifts to allow fallback to LargeInteger
+        if (shift > 30 || shift < -30)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         try
         {
-            int result = shift >= 0 ? a << shift : a >> (-shift);
+            // Safe to shift since we validated bounds above
+            int result = shift >= 0 ? (a << shift) : (a >> (-shift));
             return SmalltalkOOP.FromSmallInteger(result);
         }
         catch
@@ -442,6 +461,8 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 17: SmallInteger div:
+    // Blue Book semantics: Floor division (toward -infinity)
+    // Different from quo: which truncates toward zero
     public static SmalltalkOOP Div(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
@@ -467,8 +488,16 @@ public static class ArithmeticPrimitives
 
         try
         {
-            int result = a / b;
-            return SmalltalkOOP.FromSmallInteger(result);
+            // Floor division: always round toward -infinity
+            int quot = a / b;  // C# truncates toward zero
+            int rem = a % b;
+
+            // Adjust quotient if signs differ and remainder is non-zero
+            // Examples: -7 div: 3 = -3 (not -2), 7 div: -3 = -3 (not -2)
+            if (rem != 0 && ((a < 0) != (b < 0)))
+                quot--;
+
+            return SmalltalkOOP.FromSmallInteger(quot);
         }
         catch
         {

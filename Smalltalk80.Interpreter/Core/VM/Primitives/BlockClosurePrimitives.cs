@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -24,15 +25,26 @@ public static class BlockClosurePrimitives
         }
         else if (args.Length == 1 && !args[0].IsSmallInteger)
         {
-            // Check if args[0] is an Array (for valueWithArguments:)
-            // Try to extract elements - if it fails, treat as direct argument
+            // Distinguish between value: (direct arg) and valueWithArguments: (array arg)
+            // by checking if argument has indexed size (is array-like)
+            int indexedSize = 0;
             try
             {
-                blockArgs = ExtractArrayElements(ctx, args[0]);
+                indexedSize = ctx.GetIndexedSize(args[0]);
             }
             catch
             {
-                // Not an array, treat as direct argument (from value:)
+                indexedSize = 0; // Not an indexed object
+            }
+
+            if (indexedSize > 0)
+            {
+                // valueWithArguments: - arg is an Array, extract elements
+                blockArgs = ExtractArrayElements(ctx, args[0]);
+            }
+            else
+            {
+                // value: - arg is a direct parameter
                 blockArgs = args;
             }
         }
@@ -59,11 +71,13 @@ public static class BlockClosurePrimitives
         if (blockArgs.Length != expectedArgCount)
         {
             ctx.PrimitiveSuccess = false;
-            return GlobalRegistry.NilOOP;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Invoke the block using the existing VM method
-        var result = ctx.InvokeBlock(blockMethodOOP, blockArgs, homeContextOOP);
+        // Invoke the block using the VM method
+        // Pass the BlockClosure instance (receiver) as the 4th parameter for nested-block
+        // support and proper lexical scoping
+        var result = ctx.InvokeBlock(blockMethodOOP, blockArgs, homeContextOOP, receiver);
 
         return result;
     }

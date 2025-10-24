@@ -4,38 +4,87 @@ namespace Smalltalk80.Interpreter.Core.HeapManager;
 
 /// <summary>
 /// Object table entry structure for the Smalltalk-80 heap.
-/// Each object in the heap has an entry containing metadata and memory pointer.
+/// Each object in the heap has an entry containing metadata and managed storage.
 /// This is the lowest-level representation from the heap manager's perspective.
 /// </summary>
 public sealed class ObjectTableEntry
 {
-    /// <summary>Pointer to allocated object memory in .NET heap.</summary>
+    /// <summary>Managed storage for object data (byte[], SmalltalkOOP[], ushort[], or int[]).</summary>
+    public object? ManagedStorage { get; set; }
+
+    /// <summary>
+    /// DEPRECATED: Use ManagedStorage instead. This will be removed after migration is complete.
+    /// Pointer to allocated object memory in .NET heap (pinned byte[]).
+    /// </summary>
+    [Obsolete("Use ManagedStorage instead. MemoryPointer will be removed after migration.")]
     public IntPtr MemoryPointer { get; set; }
-    
+
     /// <summary>Packed metadata word for space efficiency (size + format + GC flags + other metadata).</summary>
     public uint PackedMetadata { get; set; }
-    
+
     /// <summary>Extended size field for objects larger than 65535 words. Only used when needed.</summary>
     public uint? ExtendedSize { get; set; }
-    
+
     /// <summary>Original indexed size for ByteIndexed objects (before word alignment). Only used for ByteIndexed format.</summary>
     public int? OriginalIndexedSize { get; set; }
-    
+
     /// <summary>GC mark bit for mark-and-sweep collection.</summary>
     public bool IsMarked { get; set; }
-    
+
     /// <summary>Dynamic named slots for bootstrap and class metadata (legacy compatibility).</summary>
     public Dictionary<string, int>? NamedSlots { get; set; }
 
-    /// <summary>Creates a new object table entry.</summary>
-    public ObjectTableEntry(IntPtr memoryPointer, ObjectFormat format, int sizeInWords, int instanceVariableCount = 0, int? originalIndexedSize = null)
+    // Explicit metadata fields (cached for hot-path access, bypassing PackedMetadata)
+
+    /// <summary>Object format (cached for hot-path access).</summary>
+    public ObjectFormat FormatExplicit { get; set; }
+
+    /// <summary>Total size in words (cached for hot-path access).</summary>
+    public int SizeInWordsExplicit { get; set; }
+
+    /// <summary>Instance variable count (cached for hot-path access).</summary>
+    public int InstanceVariableCountExplicit { get; set; }
+
+    /// <summary>
+    /// Class reference (stored separately for ByteIndexed/WordIndexed objects).
+    /// For Pointer/PointerIndexed, this is stored in slot 0 of the OOP array.
+    /// </summary>
+    public SmalltalkOOP ClassOOP { get; set; }
+
+    // Typed accessor methods for managed storage
+
+    /// <summary>Gets storage as byte array (for ByteIndexed format).</summary>
+    public byte[]? AsByteArray() => ManagedStorage as byte[];
+
+    /// <summary>Gets storage as OOP array (for PointerIndexed/Pointer formats).</summary>
+    public SmalltalkOOP[]? AsOopArray() => ManagedStorage as SmalltalkOOP[];
+
+    /// <summary>Gets storage as word array (for WordIndexed format).</summary>
+    public ushort[]? AsWordArray() => ManagedStorage as ushort[];
+
+    /// <summary>Gets storage as int array (for specialized formats).</summary>
+    public int[]? AsIntArray() => ManagedStorage as int[];
+
+    // Constructors
+
+    /// <summary>Creates a new object table entry with managed storage (preferred constructor).</summary>
+    public ObjectTableEntry(
+        object? managedStorage,
+        ObjectFormat format,
+        int sizeInWords,
+        int instanceVariableCount = 0,
+        int? originalIndexedSize = null)
     {
-        MemoryPointer = memoryPointer;
-        
-        // Handle very large objects with ExtendedSize
+        ManagedStorage = managedStorage;
+        FormatExplicit = format;
+        SizeInWordsExplicit = sizeInWords;
+        InstanceVariableCountExplicit = instanceVariableCount;
+        OriginalIndexedSize = (format == ObjectFormat.ByteIndexed) ? originalIndexedSize : null;
+
+        // Still encode PackedMetadata for cold-start compatibility
         if (sizeInWords > 65535)
         {
-            PackedMetadata = EncodePackedMetadata(format, 65535, instanceVariableCount, 0, 0); // Use max value as indicator
+            PackedMetadata = EncodePackedMetadata(format, 65535, instanceVariableCount, 0, 0);
             ExtendedSize = (uint)sizeInWords;
         }
         else
@@ -43,19 +92,48 @@ public sealed class ObjectTableEntry
             PackedMetadata = EncodePackedMetadata(format, sizeInWords, instanceVariableCount, 0, 0);
             ExtendedSize = null;
         }
-        
-        // Store original indexed size for ByteIndexed objects
-        OriginalIndexedSize = (format == ObjectFormat.ByteIndexed) ? originalIndexedSize : null;
-        
+
         IsMarked = false;
         NamedSlots = null;
     }
 
-    /// <summary>Creates a new object table entry with full metadata control.</summary>
+    /// <summary>Creates a new object table entry with legacy IntPtr (DEPRECATED).</summary>
+    [Obsolete("Use constructor with managed storage instead.")]
+    public ObjectTableEntry(IntPtr memoryPointer, ObjectFormat format, int sizeInWords, int instanceVariableCount = 0, int? originalIndexedSize = null)
+    {
+        MemoryPointer = memoryPointer;
+        FormatExplicit = format;
+        SizeInWordsExplicit = sizeInWords;
+        InstanceVariableCountExplicit = instanceVariableCount;
+
+        // Handle very large objects with ExtendedSize
+        if (sizeInWords > 65535)
+        {
+            PackedMetadata = EncodePackedMetadata(format, 65535, instanceVariableCount, 0, 0);
+            ExtendedSize = (uint)sizeInWords;
+        }
+        else
+        {
+            PackedMetadata = EncodePackedMetadata(format, sizeInWords, instanceVariableCount, 0, 0);
+            ExtendedSize = null;
+        }
+
+        // Store original indexed size for ByteIndexed objects
+        OriginalIndexedSize = (format == ObjectFormat.ByteIndexed) ? originalIndexedSize : null;
+
+        IsMarked = false;
+        NamedSlots = null;
+    }
+
+    /// <summary>Creates a new object table entry with full metadata control (DEPRECATED).</summary>
+    [Obsolete("Use constructor with managed storage instead.")]
     public ObjectTableEntry(IntPtr memoryPointer, uint packedMetadata)
     {
         MemoryPointer = memoryPointer;
         PackedMetadata = packedMetadata;
+        FormatExplicit = (ObjectFormat)((packedMetadata >> 12) & 0xF);
+        SizeInWordsExplicit = (int)((packedMetadata >> 16) & 0xFFFF);
+        InstanceVariableCountExplicit = (int)((packedMetadata >> 4) & 0xFF);
         IsMarked = false;
         NamedSlots = null;
     }
@@ -67,17 +145,17 @@ public sealed class ObjectTableEntry
     // Bits 3-0:   GC Flags (4 bits) - mark bits, generation, pin status
     // Note: Moved GC flags to lower bits and expanded size field for large objects
 
-    /// <summary>Extracts ObjectFormat from PackedMetadata.</summary>
-    public ObjectFormat Format => (ObjectFormat)((PackedMetadata >> 12) & 0xF);
+    /// <summary>Gets object format from explicit field (hot-path optimized).</summary>
+    public ObjectFormat Format => FormatExplicit;
 
-    /// <summary>Extracts size in words from PackedMetadata (with extended size support).</summary>
-    public int SizeInWords => ExtendedSize.HasValue ? (int)ExtendedSize.Value : (int)((PackedMetadata >> 16) & 0xFFFF);
+    /// <summary>Gets size in words from explicit field (hot-path optimized).</summary>
+    public int SizeInWords => SizeInWordsExplicit;
 
-    /// <summary>Extracts size in bytes from PackedMetadata.</summary>
-    public int SizeInBytes => SizeInWords * 4;
+    /// <summary>Gets size in bytes (computed from explicit field).</summary>
+    public int SizeInBytes => SizeInWordsExplicit * 4;
 
-    /// <summary>Extracts instance variable count from PackedMetadata.</summary>
-    public int InstanceVariableCount => (int)((PackedMetadata >> 4) & 0xFF);
+    /// <summary>Gets instance variable count from explicit field (hot-path optimized).</summary>
+    public int InstanceVariableCount => InstanceVariableCountExplicit;
 
     /// <summary>Extracts GC flags from PackedMetadata.</summary>
     public byte GCFlags => (byte)(PackedMetadata & 0xF);
@@ -141,13 +219,21 @@ public sealed class ObjectTableEntry
     /// <summary>Gets debugging information about this entry.</summary>
     public string GetDebugInfo()
     {
+        string storageInfo = ManagedStorage switch
+        {
+            byte[] ba => $"byte[{ba.Length}]",
+            SmalltalkOOP[] oa => $"SmalltalkOOP[{oa.Length}]",
+            ushort[] wa => $"ushort[{wa.Length}]",
+            int[] ia => $"int[{ia.Length}]",
+            null => "null",
+            _ => ManagedStorage.GetType().Name
+        };
+
         return $"ObjectTableEntry {{ " +
-               $"MemoryPointer: 0x{MemoryPointer:X8}, " +
-               $"Format: {Format}, " +
-               $"Size: {SizeInWords} words ({SizeInBytes} bytes), " +
-               $"IsMarked: {IsMarked}, " +
-               $"GCFlags: 0x{GCFlags:X2}, " +
-               $"Flags: 0x{Flags:X}, " +
-               $"HasNamedSlots: {NamedSlots != null} }}";
+               $"Storage: {storageInfo}, " +
+               $"Format: {FormatExplicit}, " +
+               $"Size: {SizeInWordsExplicit} words, " +
+               $"InstanceVars: {InstanceVariableCountExplicit}, " +
+               $"IsMarked: {IsMarked} }}";
     }
 }
