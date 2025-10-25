@@ -29,399 +29,54 @@ public class InitExpressionExecutor
     private readonly VirtualMachine _vm;
     private readonly LayoutResolver _layoutResolver;
     private readonly ProcessPrimitives _processPrimitives;
-    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
-    private readonly IReadOnlyList<string>? _symbols;
-    private readonly IReadOnlyList<string>? _strings;
-    private readonly SemanticAllocator? _allocator;
 
     public InitExpressionExecutor(
         ISmalltalkHeapManager heapManager,
         VirtualMachine vm,
         LayoutResolver layoutResolver,
-        Dictionary<string, SmalltalkOOP> localIdToObjectId,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
-        int defaultTimeoutMs = 5000,
-        IReadOnlyList<string>? symbols = null,
-        IReadOnlyList<string>? strings = null,
-        SemanticAllocator? allocator = null)
+        int defaultTimeoutMs = 5000)
     {
         _heapManager = heapManager;
         _vm = vm;
         _layoutResolver = layoutResolver;
-        _localIdToObjectId = localIdToObjectId;
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
-        _symbols = symbols;
-        _strings = strings;
-        _allocator = allocator;
         _processPrimitives = new ProcessPrimitives(heapManager, layoutResolver, vm);
     }
 
+
     /// <summary>
-    /// Executes init expressions from a ColdStartBundle by creating temporary CompiledMethod objects.
-    /// The temporary methods are not stored in _localIdToObjectId and will be garbage collected after execution.
+    /// Executes all init expressions from SpecialObjectsArray.InitExpressionMethods.
     /// </summary>
-    public InitExecutionReport ExecuteFromBundle(ColdStartBundle bundle, SemanticAllocator allocator, CancellationToken cancellationToken = default)
+    public InitExecutionReport ExecuteAll(CancellationToken cancellationToken = default)
     {
         var results = new List<InitResult>();
         var totalStopwatch = Stopwatch.StartNew();
 
-        // Get CompiledMethod and ByteArray class OOPs at the start
-        if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
+        // Get init expression array from SpecialObjectsArray
+        var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+        if (initArrayOOP == SmalltalkOOP.Null)
         {
-            throw new InvalidOperationException("CompiledMethod class not found in localIdToObjectId");
-        }
-        
-        if (!_localIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
-        {
-            throw new InvalidOperationException("ByteArray class not found in localIdToObjectId");
+            throw new InvalidOperationException("Init expression methods not found in SpecialObjectsArray - coldstart must complete first");
         }
 
-        // Iterate through all init expressions
-        foreach (var initExpression in bundle.InitExpressions)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-
-            try
-            {
-                // Decode bytecodes using LoaderPhases.ClassHierarchyUtils
-                var bytecodes = LoaderPhases.ClassHierarchyUtils.DecodeBytecodes(initExpression.Bytecodes);
-
-                // Resolve literals from the init expression
-                var literalOOPs = new SmalltalkOOP[initExpression.Literals.Length];
-                for (int i = 0; i < initExpression.Literals.Length; i++)
-                {
-                    literalOOPs[i] = ResolveLiteralValueAsOOP(initExpression.Literals[i], bundle, allocator);
-                }
-
-                // Create temporary CompiledMethod using allocator
-                var tempMethodOOP = allocator.AllocateCompiledMethod(
-                    compiledMethodClassOOP,
-                    byteArrayClassOOP,
-                    initExpression.Header.Word,
-                    literalOOPs,
-                    bytecodes);
-
-                // Execute using existing ExecuteInitExpression method
-                var result = ExecuteInitExpression(
-                    initExpression.LocalId,
-                    tempMethodOOP);
-                
-                results.Add(result);
-
-                // Check policy for early abort
-                if (result.Status != InitStatus.Success && _policy == InitPolicy.AbortOnFirstError)
-                {
-                    break;
-                }
-            }
-            catch (Exception ex)
-            {
-                // Handle any exceptions during compilation/preparation
-                var errorResult = InitResult.FatalError(
-                    initExpression.LocalId,
-                    $"Failed to prepare init expression: {ex.Message}");
-                results.Add(errorResult);
-
-                if (_policy == InitPolicy.AbortOnFirstError)
-                {
-                    break;
-                }
-            }
-        }
-
-        totalStopwatch.Stop();
-
-        return new InitExecutionReport
-        {
-            Total = bundle.InitExpressions.Length,
-            Succeeded = results.Count(r => r.Status == InitStatus.Success),
-            Failed = results.Count(r => r.Status != InitStatus.Success),
-            Results = results,
-            TotalElapsedMilliseconds = totalStopwatch.ElapsedMilliseconds
-        };
-    }
-
-    /// <summary>
-    /// Resolves a literal value from the discriminated union to a SmalltalkOOP.
-    /// Based on Phase8_MethodInstallation.cs's ResolveLiteralValueAsOOP method.
-    /// </summary>
-    private SmalltalkOOP ResolveLiteralValueAsOOP(LiteralValue literal, ColdStartBundle bundle, SemanticAllocator allocator)
-    {
-        return literal.Type switch
-        {
-            "symbol" => InternSymbol(bundle.Symbols[literal.Index!.Value], bundle),
-            "string" => InternString(bundle.Strings[literal.Index!.Value], allocator),
-            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => AllocateFloat(GetFloatValue(literal.Value!), allocator),
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
-            "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) 
-                ? objOOP1 
-                : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
-            "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) 
-                ? objOOP2 
-                : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
-            "character" => AllocateCharacter(literal.CodePoint!.Value, allocator),
-            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!, allocator),
-            "association" => ResolveAssociation(literal.Association!, bundle, allocator),
-            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l, bundle, allocator)).ToArray(), allocator),
-            _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
-        };
-    }
-
-    /// <summary>
-    /// Interns a symbol using the symbol table from Phase 1.
-    /// </summary>
-    private SmalltalkOOP InternSymbol(string symbolText, ColdStartBundle bundle)
-    {
-        // Find the symbol in the SymbolRegistry (created in Phase 1)
-        for (int i = 0; i < bundle.Symbols.Length; i++)
-        {
-            if (bundle.Symbols[i] == symbolText)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-        
-        throw new InvalidOperationException($"Symbol '{symbolText}' not found in symbol table. Ensure Phase 1 (Symbol Interning) completed successfully.");
-    }
-
-    /// <summary>
-    /// Interns a string object.
-    /// </summary>
-    private SmalltalkOOP InternString(string stringText, SemanticAllocator allocator)
-    {
-        return allocator.AllocateString(stringText);
-    }
-
-    /// <summary>
-    /// Allocates a Float object.
-    /// Float is stored as ByteIndexed with 8 bytes containing IEEE 754 double precision value.
-    /// </summary>
-    private SmalltalkOOP AllocateFloat(double value, SemanticAllocator allocator)
-    {
-        return allocator.AllocateFloat(value);
-    }
-
-    /// <summary>
-    /// Allocates a Character object.
-    /// </summary>
-    private SmalltalkOOP AllocateCharacter(int codePoint, SemanticAllocator allocator)
-    {
-        var characterOOP = allocator.AllocateFixedObject("Character");
-        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        allocator.SetObjectClass(characterOOP, characterClassOOP);
-        
-        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
-        allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-        
-        return characterOOP;
-    }
-
-    /// <summary>
-    /// Allocates a ByteArray object.
-    /// </summary>
-    private SmalltalkOOP AllocateByteArray(string encoding, string data, SemanticAllocator allocator)
-    {
-        byte[] bytes = encoding.ToLower() switch
-        {
-            "base64" => Convert.FromBase64String(data),
-            "hex" => ConvertHexStringToBytes(data),
-            _ => throw new InvalidOperationException($"Unsupported byte array encoding: {encoding}")
-        };
-        
-        var byteArrayOOP = allocator.AllocateByteArray("ByteArray", bytes);
-        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
-        
-        return byteArrayOOP;
-    }
-
-    /// <summary>
-    /// Allocates an Array object.
-    /// </summary>
-    private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, SemanticAllocator allocator)
-    {
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var arrayOOP = allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
-        
-        for (int i = 0; i < elementOOPs.Length; i++)
-        {
-            allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
-        }
-        
-        return arrayOOP;
-    }
-
-    /// <summary>
-    /// Resolves an association literal (key/value pair).
-    /// </summary>
-    private SmalltalkOOP ResolveAssociation(AssociationLiteral assoc, ColdStartBundle bundle, SemanticAllocator allocator)
-    {
-        var keyOOP = InternSymbol(bundle.Symbols[assoc.KeyIndex], bundle);
-        string keyName = bundle.Symbols[assoc.KeyIndex];
-        
-        // If this is a class association and valueRef is None,
-        // look up the existing association from SystemDictionary
-        if (assoc.ValueRef?.LocalId == null)
-        {
-            if (GlobalRegistry.TryGet($"class:{keyName}", out SmalltalkOOP classOop))
-            {
-                var sysDictId = GlobalRegistry.SystemDictionaryOOP;
-                var sysDictOOP = sysDictId;
-                int sysDictSize = allocator.GetIndexedSize(sysDictOOP);
-                
-                for (int i = 0; i < sysDictSize; i++)
-                {
-                    var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == SpecialObjectsArray.Instance.Nil) continue;
-                    
-                    var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
-                    if (assocKeyOOP == keyOOP)
-                    {
-                        return assocOOP;
-                    }
-                }
-            }
-        }
-        
-        // Create new association
-        var valueOOP = assoc.ValueRef?.LocalId != null
-            ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : SpecialObjectsArray.Instance.Nil;
-        
-        return AllocateAssociation(keyOOP, valueOOP, allocator);
-    }
-
-    /// <summary>
-    /// Allocates an Association object (key-value pair).
-    /// </summary>
-    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP, SemanticAllocator allocator)
-    {
-        var associationOOP = allocator.AllocateFixedObject("Association");
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        allocator.SetObjectClass(associationOOP, associationClassOOP);
-        
-        allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-        
-        return associationOOP;
-    }
-
-    /// <summary>
-    /// Extracts an integer value from a JsonElement or int.
-    /// </summary>
-    private int GetIntValue(object value)
-    {
-        return value switch
-        {
-            JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
-    }
-
-    /// <summary>
-    /// Extracts a double value from a JsonElement or double.
-    /// </summary>
-    private double GetFloatValue(object value)
-    {
-        return value switch
-        {
-            JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
-    }
-
-    /// <summary>
-    /// Converts a hex string to byte array.
-    /// </summary>
-    private byte[] ConvertHexStringToBytes(string hex)
-    {
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-        
-        if (hex.Length % 2 != 0)
-            throw new InvalidOperationException("Hex string must have even number of characters");
-        
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        
-        return bytes;
-    }
-
-    /// <summary>
-    /// Executes all init expressions from the provided array object.
-    /// </summary>
-    public InitExecutionReport ExecuteAll(int initArrayOop, CancellationToken cancellationToken = default)
-    {
-        var results = new List<InitResult>();
-        var totalStopwatch = Stopwatch.StartNew();
-
-        // Get init expression array size
-        var initArrayOOP = initArrayOop;
         int count = _heapManager.GetIndexedSize(initArrayOOP);
 
-        // TEMPORARY: Execute Float initialize, Cursor initialize, and Character initialize for testing
-        string[] targetInitLocalIds = new[] { "init:123", "init:086", "init:057" }; // Float initialize, Cursor initialize, Character initialize
-
-        foreach (var targetInitLocalId in targetInitLocalIds)
+        // Execute all init expressions
+        for (int i = 0; i < count; i++)
         {
             if (cancellationToken.IsCancellationRequested)
                 break;
 
+            var methodOOP = _heapManager.GetIndexedOOP(initArrayOOP, i);
 
-            // Find the target init expression
-            if (!_localIdToObjectId.TryGetValue(targetInitLocalId, out SmalltalkOOP targetMethodOOP))
-            {
-                Console.WriteLine($"ERROR: Could not find {targetInitLocalId} in localId map");
-                var errorResult = InitResult.ValidationFailed(targetInitLocalId, $"LocalId not found in map");
-                results.Add(errorResult);
-
-                if (_policy == InitPolicy.AbortOnFirstError)
-                    break;
-
-                continue;
-            }
-
-            // Find its index in the init array
-            int targetIndex = -1;
-            for (int i = 0; i < count; i++)
-            {
-                var methodOOP = _heapManager.GetIndexedOOP(initArrayOOP, i);
-                if (methodOOP == targetMethodOOP)
-                {
-                    targetIndex = i;
-                    break;
-                }
-            }
-
-            if (targetIndex < 0)
-            {
-                Console.WriteLine($"ERROR: {targetInitLocalId} not found in init expressions array");
-                var errorResult = InitResult.ValidationFailed(targetInitLocalId, $"Not found in init array");
-                results.Add(errorResult);
-
-                if (_policy == InitPolicy.AbortOnFirstError)
-                    break;
-
-                continue;
-            }
-
-
-            // Execute the target init expression
-            var result = ExecuteInitExpression(targetInitLocalId, targetMethodOOP);
+            // Use index as identifier (runtime has no localId concept)
+            string initId = $"init:{i}";
+            var result = ExecuteInitExpression(initId, methodOOP);
             results.Add(result);
-
 
             if (result.Status != InitStatus.Success && _policy == InitPolicy.AbortOnFirstError)
             {
@@ -433,7 +88,7 @@ public class InitExpressionExecutor
 
         return new InitExecutionReport
         {
-            Total = count, // Report actual total, not just what we executed
+            Total = count,
             Succeeded = results.Count(r => r.Status == InitStatus.Success),
             Failed = results.Count(r => r.Status != InitStatus.Success),
             Results = results,
@@ -540,38 +195,32 @@ public class InitExpressionExecutor
 
     /// <summary>
     /// Gets the canonical receiver for DoIt expressions.
-    /// Per Smalltalk-80 semantics: use Smalltalk global if available, otherwise nil.
+    /// Per Smalltalk-80 semantics: use Smalltalk global (from SpecialObjectsArray).
     /// </summary>
     private SmalltalkOOP GetCanonicalReceiverForDoIt()
     {
-        // Try to get Smalltalk global (SystemDictionary)
-        if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP smalltalkOop))
-        {
-            return smalltalkOop;
-        }
-
-        if (GlobalRegistry.TryGet("SystemDictionary", out SmalltalkOOP sysDictOop))
-        {
-            return sysDictOop;
-        }
-
-        // Fall back to nil
-        return SpecialObjectsArray.Instance.Nil;
+        // Get Smalltalk global (SystemDictionary) from SpecialObjectsArray
+        return SpecialObjectsArray.Instance.Smalltalk;
     }
 
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
-        if (_allocator == null)
-            throw new InvalidOperationException("Allocator not provided to InitExpressionExecutor");
-        
-        // Use SemanticAllocator to create MethodContext with proper size based on class definition
-        // MethodContext needs indexed slots for the stack/temporaries - use SmallFrame (12) for init expressions
-        var contextOOP = _allocator.AllocateObject("MethodContext", ObjectFormat.PointerIndexed, indexedSize: 12);
-        
-        // Set class reference
-        var methodContextClassOOP = GlobalRegistry.LookupClassOOP("MethodContext");
-        _allocator.SetObjectClass(contextOOP, methodContextClassOOP);
-        
+        // Get MethodContext class OOP - lookup from live heap
+        // Find MethodContext class by querying Smalltalk dictionary
+        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
+        if (methodContextClassOOP == SmalltalkOOP.Null)
+        {
+            throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
+        }
+
+        // Get instance variable count from class
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+
+        // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 12);
+        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+
         // Set instance variables using LayoutResolver indices
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
         int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
@@ -579,40 +228,121 @@ public class InitExpressionExecutor
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        
-        _allocator.SetInstanceVariable(contextOOP, senderIndex, SpecialObjectsArray.Instance.Nil);
-        _allocator.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
-        _allocator.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
-        _allocator.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
-        _allocator.SetInstanceVariable(contextOOP, receiverMapIndex, SpecialObjectsArray.Instance.Nil);
-        _allocator.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
-        
+
+        _heapManager.SetSlot(contextOOP, senderIndex + 1, SpecialObjectsArray.Instance.Nil);
+        _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetSlot(contextOOP, stackpIndex + 1, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetSlot(contextOOP, methodIndex + 1, methodOOP);
+        _heapManager.SetSlot(contextOOP, receiverMapIndex + 1, SpecialObjectsArray.Instance.Nil);
+        _heapManager.SetSlot(contextOOP, receiverIndex + 1, receiverOOP);
+
         // Initialize indexed portion (stack) with nil
+        int indexedBase = instanceVarCount + 1; // +1 for class slot
         for (int i = 0; i < 12; i++)
         {
-            _allocator.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
+            _heapManager.SetSlot(contextOOP, indexedBase + i, SpecialObjectsArray.Instance.Nil);
         }
-        
+
         return contextOOP;
+    }
+
+    /// <summary>
+    /// Looks up a global variable in the SystemDictionary.
+    /// </summary>
+    private SmalltalkOOP LookupGlobal(SmalltalkOOP systemDictOOP, string globalName)
+    {
+        // SystemDictionary is an array of Associations
+        int size = _heapManager.GetIndexedSize(systemDictOOP);
+
+        // Find the symbol OOP for the global name by searching USTable
+        var symbolOOP = FindSymbol(globalName);
+        if (symbolOOP == SmalltalkOOP.Null)
+        {
+            return SmalltalkOOP.Null;
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
+            if (assocOOP == SpecialObjectsArray.Instance.Nil)
+                continue;
+
+            // Association has key at slot 0 (after class slot)
+            var keyOOP = _heapManager.GetSlot(assocOOP, 1);
+            if (keyOOP == symbolOOP)
+            {
+                // Return value at slot 1 (after class slot)
+                return _heapManager.GetSlot(assocOOP, 2);
+            }
+        }
+
+        return SmalltalkOOP.Null;
+    }
+
+    /// <summary>
+    /// Finds a symbol OOP by searching through all registered symbols.
+    /// This is a runtime-safe alternative to SymbolRegistry.GetSymbolOOP(string).
+    /// </summary>
+    private SmalltalkOOP FindSymbol(string symbolText)
+    {
+        // Search through all symbols registered during Phase 1
+        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
+        {
+            // Compare the symbol's string contents with the search text
+            // Symbols are String objects, so read their bytes
+            var symbolString = ReadSymbolString(symbolOOP);
+            if (symbolString == symbolText)
+            {
+                return symbolOOP;
+            }
+        }
+
+        return SmalltalkOOP.Null;
+    }
+
+    /// <summary>
+    /// Reads a Symbol object's string value from the heap.
+    /// </summary>
+    private string ReadSymbolString(SmalltalkOOP symbolOOP)
+    {
+        // Symbol is a String subclass, so it's stored as ByteIndexed
+        int size = _heapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+        }
+
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
     private SmalltalkOOP CreateProcess(SmalltalkOOP suspendedContextOOP, int priority)
     {
-        if (_allocator == null)
-            throw new InvalidOperationException("Allocator not provided to InitExpressionExecutor");
-        
-        // Use SemanticAllocator to create Process with proper size based on class definition
-        var processOOP = _allocator.AllocateFixedObject("Process");
-        
+        // Get Process class OOP - lookup from live heap
+        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var processClassOOP = LookupGlobal(smalltalkOOP, "Process");
+        if (processClassOOP == SmalltalkOOP.Null)
+        {
+            throw new InvalidOperationException("Process class not found in Smalltalk dictionary");
+        }
+
+        // Get instance variable count from class
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:Process");
+
+        // Allocate Process object
+        var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 0);
+        _heapManager.SetSlot(processOOP, 0, processClassOOP);
+
         // Set instance variables using LayoutResolver indices
         int suspendedContextIndex = _layoutResolver.GetFieldIndex("class:Process", "suspendedContext");
         int priorityIndex = _layoutResolver.GetFieldIndex("class:Process", "priority");
         int myListIndex = _layoutResolver.GetFieldIndex("class:Process", "myList");
-        
-        _allocator.SetInstanceVariable(processOOP, suspendedContextIndex, suspendedContextOOP);
-        _allocator.SetInstanceVariable(processOOP, priorityIndex, SmalltalkOOP.FromSmallInteger(priority));
-        _allocator.SetInstanceVariable(processOOP, myListIndex, SpecialObjectsArray.Instance.Nil);
-        
+
+        _heapManager.SetSlot(processOOP, suspendedContextIndex + 1, suspendedContextOOP);
+        _heapManager.SetSlot(processOOP, priorityIndex + 1, SmalltalkOOP.FromSmallInteger(priority));
+        _heapManager.SetSlot(processOOP, myListIndex + 1, SpecialObjectsArray.Instance.Nil);
+
         return processOOP;
     }
 

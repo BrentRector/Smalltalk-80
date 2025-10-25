@@ -21,6 +21,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
+    private readonly IPlatformBridge? _platformBridge;
 
     // Active context (current MethodContext being executed) - now using SmalltalkOOP
     private SmalltalkOOP _activeContextOOP;
@@ -72,11 +73,12 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
         _metadata = metadata;
+        _platformBridge = platformBridge;
     }
 
     /// <summary>
@@ -334,7 +336,29 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             byte bytecode = bytecodes[ip++];
 
-            Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}");
+            // For extended opcodes, peek ahead and show the full instruction
+            string opcodeName;
+            string opcodeBytes;
+            if (bytecode == 0x80 && ip < bytecodes.Length)
+            {
+                byte subOp = bytecodes[ip];
+                string[] extendedNames = new[] {
+                    "PUSH_IVAR", "STORE_IVAR", "POP_STORE_IVAR", "PUSH_TEMP", "STORE_TEMP", "POP_STORE_TEMP",
+                    "PUSH_LITERAL", "PUSH_LITERAL_VAR", "STORE_LITERAL_VAR", "POP_STORE_LITERAL_VAR",
+                    "SEND_0", "SEND_1", "SEND_2", "SEND_N", "SEND_SUPER_0", "SEND_SUPER_1",
+                    "SEND_SUPER_2", "SEND_SUPER_N", "POP", "DUP", "JUMP_TRUE", "JUMP_FALSE",
+                    "JUMP", "JUMP_LONG_TRUE", "JUMP_LONG_FALSE", "JUMP_LONG"
+                };
+                opcodeName = subOp < extendedNames.Length ? extendedNames[subOp] : $"EXTENDED_UNKNOWN";
+                opcodeBytes = $"0x{bytecode:X2} 0x{subOp:X2}";
+            }
+            else
+            {
+                opcodeName = BytecodeDisassembler.GetOpcodeName(bytecode);
+                opcodeBytes = $"0x{bytecode:X2}";
+            }
+
+            Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
 
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
@@ -351,12 +375,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Re-read IP in case bytecode modified it (jumps)
             ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
-            int newIp = ipOOP.AsSmallInteger();
-            if (newIp != ip)
-            {
-                Console.WriteLine($"[BYTECODE JUMP] context={_activeContextOOP}, ip changed from {ip} to {newIp}");
-            }
-            ip = newIp;
+            ip = ipOOP.AsSmallInteger();
         }
 
         // If we fall off the end, return self
@@ -2780,6 +2799,7 @@ public partial class VirtualMachine : IPrimitiveContext
     // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
     ISmalltalkHeapManager IPrimitiveContext.HeapManager => _heapManager;
     LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
+    IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
     SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
@@ -3387,6 +3407,88 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Symbol not found - return Nil to signal primitive failure
         // The Smalltalk fallback code will create a new Symbol if needed
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    SmalltalkOOP IPrimitiveContext.GetGlobalObjectByName(string globalName)
+    {
+        // HEAP-ONLY IMPLEMENTATION: Access Smalltalk global dictionary from heap,
+        // NOT from GlobalRegistry (which is a cold start snapshot that becomes stale)
+
+        // Get Smalltalk SystemDictionary from SpecialObjectsArray
+        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        if (smalltalkOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            // SystemDictionary not yet created (shouldn't happen after cold start)
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Determine what we're looking for based on the prefix
+        string lookupKey;
+        if (globalName.StartsWith("class:"))
+        {
+            // Strip "class:" prefix - the key in Smalltalk is just the class name
+            lookupKey = globalName.Substring(6);
+        }
+        else if (globalName.StartsWith("global:"))
+        {
+            // Strip "global:" prefix
+            lookupKey = globalName.Substring(7);
+        }
+        else
+        {
+            // No prefix - use as-is
+            lookupKey = globalName;
+        }
+
+        // First, intern the key as a Symbol (required for dictionary lookup)
+        var keySymbolOOP = ((IPrimitiveContext)this).InternSymbol(lookupKey);
+        if (keySymbolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            // Symbol not found - global doesn't exist
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // SystemDictionary is a Dictionary with an Association array stored in instance variable
+        // Dictionary instance variables (from Smalltalk-80 spec):
+        //   0: tally (SmallInteger count of entries)
+        //   1: array (PointerIndexed Array of Association objects)
+
+        int arrayIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "array");
+        var associationArrayOOP = _heapManager.GetInstanceVariable(smalltalkOOP, arrayIndex);
+
+        if (associationArrayOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Search the association array for matching key
+        int arraySize = _heapManager.GetIndexedSize(associationArrayOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        for (int i = 0; i < arraySize; i++)
+        {
+            var associationOOP = _heapManager.GetIndexedOOP(associationArrayOOP, i);
+
+            // Skip nil slots (empty hash table slots)
+            if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
+                continue;
+
+            // Association has two instance variables: key and value
+            // Instance variable 0: key (Symbol)
+            // Instance variable 1: value (Object)
+            var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
+
+            // Check if key matches
+            if (assocKeyOOP == keySymbolOOP)
+            {
+                // Found it! Return the value
+                var valueOOP = _heapManager.GetInstanceVariable(associationOOP, 1);
+                return valueOOP;
+            }
+        }
+
+        // Global not found
         return SpecialObjectsArray.Instance.Nil;
     }
 }

@@ -27,15 +27,8 @@ public static class BlockClosurePrimitives
         {
             // Distinguish between value: (direct arg) and valueWithArguments: (array arg)
             // by checking if argument has indexed size (is array-like)
-            int indexedSize = 0;
-            try
-            {
-                indexedSize = ctx.GetIndexedSize(args[0]);
-            }
-            catch
-            {
-                indexedSize = 0; // Not an indexed object
-            }
+            // GetIndexedSize returns 0 for objects without indexed slots
+            int indexedSize = ctx.GetIndexedSize(args[0]);
 
             if (indexedSize > 0)
             {

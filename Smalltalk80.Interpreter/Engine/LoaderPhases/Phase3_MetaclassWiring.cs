@@ -338,14 +338,22 @@ public class Phase3_MetaclassWiring
             }
             else
             {
-                // Instance class has no superclass - this metaclass should remain with nil superclass
-                // (Only Object and ProtoObject should be in this category)
+                // Instance class has no superclass - this metaclass was already wired in WireFundamentalMetaclassHierarchy()
+                // Only meta:Object should be in this category (Object has no superclass)
+                // meta:Object.superclass = class:Class (wired in fundamental hierarchy)
                 string instanceClassName = symbols[instanceCls.NameIndex];
+
+                // Verify this is meta:Object
+                if (instanceClassName != "Object")
+                {
+                    Console.WriteLine($"    WARNING: Unexpected class without superclass: {instanceClassName}");
+                }
+
                 skippedCount++;
             }
         }
 
-        Console.WriteLine($"  Wired {wiredCount} metaclass superclass relationships ({skippedCount} skipped)");
+        Console.WriteLine($"  Wired {wiredCount} metaclass superclass relationships ({skippedCount} skipped - meta:Object already wired in fundamental hierarchy)");
     }
 
     /// <summary>

@@ -152,11 +152,9 @@ public static class PrimitiveTable
         _primitives[103] = GraphicsPrimitives.Beep;
         _primitives[104] = GraphicsPrimitives.ClipboardText;
 
-        // String primitives (105-106, also 103 for StringReplace)
-        _primitives[105] = StringPrimitives.StringCompare;
+        // String primitives (105-106)
+        _primitives[105] = StringPrimitives.StringReplace;
         _primitives[106] = StringPrimitives.AsSymbol;
-        // Note: 103 conflicts - Graphics uses it for Beep, String uses it for StringReplace
-        // Keeping Graphics.Beep at 103 for now
 
         // System primitives (112-139) - mix of working and stubs
         _primitives[112] = SystemPrimitives.CoreLeft;

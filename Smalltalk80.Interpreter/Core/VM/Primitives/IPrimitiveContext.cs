@@ -19,6 +19,12 @@ public interface IPrimitiveContext
     LayoutResolver LayoutResolver { get; }
 
     /// <summary>
+    /// Gets the platform bridge for platform-exempt primitives (graphics, input, clipboard, etc.).
+    /// May be null if running in headless/test mode.
+    /// </summary>
+    IPlatformBridge? PlatformBridge { get; }
+
+    /// <summary>
     /// Gets or sets the primitive success flag.
     /// Primitives set this to false to signal failure, causing the VM to execute fallback bytecodes.
     /// The VM sets this to true before calling each primitive.
@@ -180,4 +186,14 @@ public interface IPrimitiveContext
     /// <param name="symbolName">String to intern as a symbol.</param>
     /// <returns>Symbol OOP if found, Nil if not found.</returns>
     SmalltalkOOP InternSymbol(string symbolName);
+
+    // Global object lookup support
+
+    /// <summary>
+    /// Gets a global object by name from the Smalltalk global dictionary (heap-only).
+    /// Used to look up class objects, special globals, etc. without using CLR proxies.
+    /// </summary>
+    /// <param name="globalName">Global name (e.g., "class:LargePositiveInteger", "global:Transcript").</param>
+    /// <returns>Global object OOP if found, Nil if not found.</returns>
+    SmalltalkOOP GetGlobalObjectByName(string globalName);
 }

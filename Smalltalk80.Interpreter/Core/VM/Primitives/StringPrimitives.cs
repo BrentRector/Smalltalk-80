@@ -5,15 +5,16 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
-/// String and ByteArray primitives (103-106).
+/// String and ByteArray primitives (105-106).
 /// Handles character-based operations and string comparisons.
-/// Based on Blue Book specification for String and ByteArray operations.
+/// Based on Smalltalk-80 specification for String and ByteArray operations.
 /// </summary>
 public static class StringPrimitives
 {
     /// <summary>
-    /// Primitive 103: replaceFrom:to:with:startingAt:
+    /// Primitive 105: replaceFrom:to:with:startingAt:
     /// Efficiently copies a range of elements from one collection to another.
+    /// Uses heap-only operations with overlap-safe copying.
     /// </summary>
     public static SmalltalkOOP StringReplace(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -59,14 +60,26 @@ public static class StringPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Copy elements
+        // Copy elements - handle overlapping regions safely
         try
         {
-            for (int i = 0; i < copyCount; i++)
+            if (receiver == sourceOop && startIndex > sourceStart && startIndex < sourceStart + copyCount)
             {
-                // String/ByteArray use ByteIndexed format
-                byte value = ctx.HeapManager.GetIndexedByte(sourceOop, sourceStart + i);
-                ctx.HeapManager.SetIndexedByte(receiver, startIndex + i, value);
+                // Overlapping region - copy backwards to avoid overwriting source data
+                for (int i = copyCount - 1; i >= 0; i--)
+                {
+                    byte value = ctx.HeapManager.GetIndexedByte(sourceOop, sourceStart + i);
+                    ctx.HeapManager.SetIndexedByte(receiver, startIndex + i, value);
+                }
+            }
+            else
+            {
+                // Non-overlapping or safe overlap - copy forward
+                for (int i = 0; i < copyCount; i++)
+                {
+                    byte value = ctx.HeapManager.GetIndexedByte(sourceOop, sourceStart + i);
+                    ctx.HeapManager.SetIndexedByte(receiver, startIndex + i, value);
+                }
             }
             return receiver;
         }

@@ -1,12 +1,99 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-23
-**Status**: 🎉 BlockClosure Phase 2 Complete - Runtime Wrapping with Primitive 207
-**Compiler Status**: ✅ Fully operational - generates valid JSON from Smalltalk-80.st
-**Validator Status**: ✅ 100% validation passing (10,091 methods validate correctly)
-**Interpreter Status**: ✅ BlockClosure working - runtime wrapping, lexical scoping, Primitive 207 operational
+**Last Updated**: 2025-01-25
+**Status**: 🎉 Bundle Schema v1.0.6 - Precomputed Class Layouts
+**Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
+**Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
+**Interpreter Status**: ✅ All 15 phases working - loads v1.0.6 bundles successfully
 
-## Recent Accomplishments (2025-01-23)
+## Recent Accomplishments (2025-01-25)
+
+### 🎉 Bundle Schema v1.0.6 - Precomputed Class Layouts
+
+**Status**: Cold start Phase 5 dramatically optimized by moving layout computation from runtime to compile time.
+
+**Performance Improvement**:
+- **v1.0.5 (Runtime Computation)**: ~20-25ms (topological sort + inheritance traversal)
+- **v1.0.6 (Precomputed Loading)**: ~2-5ms (simple array iteration)
+- **Improvement**: ~18ms faster (~80-90% reduction in Phase 5 time)
+
+**Implementation**:
+1. ✅ Schema v1.0.6 created with `totalInstanceVarCount` and `fieldLayout[]` fields
+2. ✅ Compiler updated to compute field layouts during bundle generation
+3. ✅ Interpreter updated to load precomputed layouts (no runtime computation)
+4. ✅ Phase 0 validation added to verify layout consistency
+5. ✅ Bundle version check enforces v1.0.6+ requirement
+6. ✅ All 480 classes processed successfully with correct inheritance
+7. ✅ 29,513 objects allocated, 0 unreachable after GC
+
+**Key Changes**:
+
+**Schema** (`coldstart-v1.0.6.schema.json`):
+```json
+{
+  "totalInstanceVarCount": {
+    "type": "integer",
+    "description": "Total instance variables including all inherited fields"
+  },
+  "fieldLayout": {
+    "type": "array",
+    "description": "Complete ordered field layout: inherited fields first, then own",
+    "items": {
+      "nameIndex": { "type": "integer" },
+      "slotIndex": { "type": "integer" },
+      "inheritedFrom": { "type": ["string", "null"] }
+    }
+  }
+}
+```
+
+**Compiler** (`ColdStartJsonGenerator.cs`):
+- Added `ComputeFieldLayout()` - walks inheritance chain and computes complete field list
+- Added `ComputeMetaclassFieldLayout()` - handles metaclass chain (Behavior → ClassDescription → Class → Metaclass)
+- Updated bundle version to "1.0.6"
+
+**Interpreter** (`LayoutResolver.cs`):
+- Replaced `ComputeLayouts()` with `LoadLayouts()` - simplified from 106 lines to 58 lines
+- Removed topological sort algorithm (no longer needed)
+- Removed inheritance chain traversal (already done by compiler)
+
+**Example Layout** (class:Class with 9 total fields):
+```
+slot 0: superclass         (inherited from class:Behavior)
+slot 1: methodDict         (inherited from class:Behavior)
+slot 2: format             (inherited from class:Behavior)
+slot 3: subclasses         (inherited from class:Behavior)
+slot 4: instanceVariables  (inherited from class:ClassDescription)
+slot 5: organization       (inherited from class:ClassDescription)
+slot 6: name               (owned by class:Class)
+slot 7: classPool          (owned by class:Class)
+slot 8: sharedPools        (owned by class:Class)
+```
+
+**Files Modified**:
+- `docs/schemas/coldstart-v1.0.6.schema.json` - NEW: v1.0.6 schema definition
+- `Smalltalk80.Interpreter/Core/Schema/FieldLayoutEntry.cs` - NEW: Field layout entry record
+- `Smalltalk80.Interpreter/Core/Schema/ClassDescriptor.cs` - Added TotalInstanceVarCount and FieldLayout properties
+- `Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs` - Added layout computation logic, updated version
+- `Smalltalk80.Interpreter/Core/VM/LayoutResolver.cs` - Replaced computation with simple loading
+- `Smalltalk80.Interpreter/Engine/Loader.cs` - Updated Phase 5 name and method call
+- `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase0_Preflight.cs` - Added version check and layout validation
+- `docs/COLDSTART-PHASES-DETAILED.md` - Updated Phase 5 documentation with v1.0.6 approach
+
+**Testing Results**:
+- ✅ Compiler generates valid v1.0.6 bundles (480 classes, 10,182 methods)
+- ✅ Interpreter successfully loads v1.0.6 bundles
+- ✅ All 15 cold start phases complete successfully
+- ✅ GC verification: 29,513 objects allocated, 0 unreachable
+- ✅ Phase 5 validation passes for all 480 classes
+
+**Benefits**:
+- **Performance**: Faster cold start (Phase 5 reduced from ~20-25ms to ~2-5ms)
+- **Simplicity**: Removed complex topological sort and inheritance traversal code
+- **Correctness**: Layouts computed once by compiler, guaranteed consistent
+- **Debuggability**: Field layouts visible in JSON for inspection
+
+## Previous Accomplishments (2025-01-23)
 
 ### 🎉 BlockClosure Phase 2 Complete - Runtime Wrapping with Primitive 207
 

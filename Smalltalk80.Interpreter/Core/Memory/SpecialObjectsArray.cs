@@ -33,9 +33,9 @@ using Smalltalk80.Interpreter.Core.Objects;
 public readonly struct SpecialObjectsArray
 {
     /// <summary>
-    /// Total number of roots in the Special Objects Array (5).
+    /// Total number of roots in the Special Objects Array (6).
     /// </summary>
-    public const int Count = 5;
+    public const int Count = 6;
 
     /// <summary>
     /// OOP of nil singleton (instance of UndefinedObject).
@@ -68,20 +68,29 @@ public readonly struct SpecialObjectsArray
     public readonly SmalltalkOOP ProcessorScheduler;
 
     /// <summary>
-    /// Creates a new Special Objects Array with the 5 GC roots.
+    /// OOP of Array containing all init expression CompiledMethod objects.
+    /// Allocated during coldstart Phase 8b, accessible at runtime.
+    /// Init expressions are executed at startup before entering main loop.
+    /// </summary>
+    public readonly SmalltalkOOP InitExpressionMethods;
+
+    /// <summary>
+    /// Creates a new Special Objects Array with the 6 GC roots.
     /// </summary>
     public SpecialObjectsArray(
         SmalltalkOOP nil,
         SmalltalkOOP @false,
         SmalltalkOOP @true,
         SmalltalkOOP smalltalk,
-        SmalltalkOOP processorScheduler)
+        SmalltalkOOP processorScheduler,
+        SmalltalkOOP initExpressionMethods = default)
     {
         Nil = nil;
         False = @false;
         True = @true;
         Smalltalk = smalltalk;
         ProcessorScheduler = processorScheduler;
+        InitExpressionMethods = initExpressionMethods;
     }
 
     /// <summary>
@@ -104,26 +113,38 @@ public readonly struct SpecialObjectsArray
     }
 
     /// <summary>
-    /// Returns the 5 GC roots as an array for garbage collection marking.
+    /// Returns the 6 GC roots as an array for garbage collection marking.
     /// Allocates a new array each time - only called during GC.
     /// </summary>
     public SmalltalkOOP[] GetRootsForGC()
     {
+        // Include InitExpressionMethods if it's set (not null)
+        if (InitExpressionMethods != SmalltalkOOP.Null)
+        {
+            return new[] { Nil, False, True, Smalltalk, ProcessorScheduler, InitExpressionMethods };
+        }
         return new[] { Nil, False, True, Smalltalk, ProcessorScheduler };
     }
 
     /// <summary>
-    /// Returns all roots including ActiveProcess (6 total) for comprehensive GC.
+    /// Returns all roots including ActiveProcess for comprehensive GC.
     /// </summary>
     public SmalltalkOOP[] GetAllRootsForGC()
     {
         var activeProcess = ActiveProcess;
-        if (activeProcess == SmalltalkOOP.Null)
+        var roots = new List<SmalltalkOOP> { Nil, False, True, Smalltalk, ProcessorScheduler };
+
+        if (InitExpressionMethods != SmalltalkOOP.Null)
         {
-            return GetRootsForGC();
+            roots.Add(InitExpressionMethods);
         }
 
-        return new[] { Nil, False, True, Smalltalk, ProcessorScheduler, activeProcess };
+        if (activeProcess != SmalltalkOOP.Null)
+        {
+            roots.Add(activeProcess);
+        }
+
+        return roots.ToArray();
     }
 
     /// <summary>
@@ -195,7 +216,8 @@ public readonly struct SpecialObjectsArray
             _instance.False,
             _instance.True,
             _instance.Smalltalk,
-            _instance.ProcessorScheduler
+            _instance.ProcessorScheduler,
+            _instance.InitExpressionMethods
         );
     }
 
@@ -209,7 +231,8 @@ public readonly struct SpecialObjectsArray
             falseObject,
             _instance.True,
             _instance.Smalltalk,
-            _instance.ProcessorScheduler
+            _instance.ProcessorScheduler,
+            _instance.InitExpressionMethods
         );
     }
 
@@ -223,7 +246,8 @@ public readonly struct SpecialObjectsArray
             _instance.False,
             trueObject,
             _instance.Smalltalk,
-            _instance.ProcessorScheduler
+            _instance.ProcessorScheduler,
+            _instance.InitExpressionMethods
         );
     }
 
@@ -237,7 +261,8 @@ public readonly struct SpecialObjectsArray
             _instance.False,
             _instance.True,
             smalltalkObject,
-            _instance.ProcessorScheduler
+            _instance.ProcessorScheduler,
+            _instance.InitExpressionMethods
         );
     }
 
@@ -251,7 +276,8 @@ public readonly struct SpecialObjectsArray
             _instance.False,
             _instance.True,
             _instance.Smalltalk,
-            processorSchedulerObject
+            processorSchedulerObject,
+            _instance.InitExpressionMethods
         );
     }
 
@@ -263,6 +289,21 @@ public readonly struct SpecialObjectsArray
     {
         // No-op: ActiveProcess is not stored in SOA, it's ProcessorScheduler.activeProcess
         // This method exists for compatibility during migration
+    }
+
+    /// <summary>
+    /// Sets the init expression methods array (allocated during Phase 8b).
+    /// </summary>
+    public static void SetInitExpressionMethods(SmalltalkOOP initExpressionMethodsArray)
+    {
+        _instance = new SpecialObjectsArray(
+            _instance.Nil,
+            _instance.False,
+            _instance.True,
+            _instance.Smalltalk,
+            _instance.ProcessorScheduler,
+            initExpressionMethodsArray
+        );
     }
 
 }

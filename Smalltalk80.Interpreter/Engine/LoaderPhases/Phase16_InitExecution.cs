@@ -224,19 +224,19 @@ public class Phase16_InitExecution
     /// </summary>
     private SmalltalkOOP InternString(string value)
     {
-        
-        // Look up String class layout from bundle data
-        var stringClassDefinition = FindClassDefinition("String");
-        if (stringClassDefinition == null)
+        // Look up String class OOP (should be available after Phase 2)
+        if (!_localIdToObjectId.TryGetValue("class:String", out var stringClassOOP))
         {
-            throw new InvalidOperationException("String class not found in bundle");
+            throw new InvalidOperationException("String class not found in _localIdToObjectId - Phase 2 must run first");
         }
-        
-        // Use placeholder class (will be fixed later when String class exists)
-        
-        // Allocate string object (AllocateString handles the bytes internally)
-        var stringOOP = _allocator.AllocateString(value);
-        
+
+        Console.WriteLine($"[DEBUG InternString] About to allocate string, classOOP={stringClassOOP}, value.Length={value.Length}");
+
+        // Allocate string object with class reference set
+        var stringOOP = _allocator.AllocateString(stringClassOOP, value);
+
+        Console.WriteLine($"[DEBUG InternString] Allocated stringOOP={stringOOP}");
+
         return stringOOP;
     }
 

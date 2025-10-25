@@ -22,9 +22,11 @@ public class ProcessPrimitives
     
     public SmalltalkOOP Resume(SmalltalkOOP processOOP)
     {
-        if (!GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP schedulerOOP))
-            throw new InvalidOperationException("ProcessorScheduler not found");
-        
+        // Get ProcessorScheduler from SpecialObjectsArray (heap-only access)
+        var schedulerOOP = SpecialObjectsArray.Instance.ProcessorScheduler;
+        if (schedulerOOP == SpecialObjectsArray.Instance.Nil)
+            throw new InvalidOperationException("ProcessorScheduler not found in SpecialObjectsArray");
+
         int activeProcessIndex = _layoutResolver.GetFieldIndex("class:ProcessorScheduler", "activeProcess");
         var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
         

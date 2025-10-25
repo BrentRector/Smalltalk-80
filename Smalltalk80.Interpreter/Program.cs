@@ -88,135 +88,34 @@ public static class Program
                     heapManager,
                     vm,
                     loader.LayoutResolver,
-                    loader.LocalIdToObjectId.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
-                    defaultTimeoutMs: 5000,
-                    symbols: bundle.Symbols,
-                    strings: bundle.Strings,
-                    allocator: loader.Allocator
+                    defaultTimeoutMs: 5000
                 );
 
-                // Filter init expressions if test filter is specified
-                var filteredExprs = bundle.InitExpressions.AsEnumerable();
-                if (!string.IsNullOrEmpty(testFilter))
+                // Note: Init expressions are pre-allocated during coldstart Phase 8b
+                // and stored in SpecialObjectsArray.InitExpressionMethods.
+                // ExecuteAll() will retrieve and execute them from there.
+
+                Console.WriteLine("\nExecuting ONLY init:0 for debugging...\n");
+
+                // TEMPORARY: Execute only init:0 (first init expression)
+                var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+                var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, 0);
+
+                var result = executor.ExecuteInitExpression("init:0", initMethodOOP);
+
+                Console.WriteLine($"\nResult: {result.Status}");
+                if (result.Status != InitStatus.Success)
                 {
-                    filteredExprs = filteredExprs.Where(e =>
-                        e.LocalId?.Contains(testFilter, StringComparison.OrdinalIgnoreCase) == true ||
-                        e.Source?.Contains(testFilter, StringComparison.OrdinalIgnoreCase) == true);
-                    Console.WriteLine($"\n  Filter: '{testFilter}'");
+                    Console.WriteLine($"Error: {result.Diagnostic?.Message}");
                 }
 
-                // Sort init expressions by instruction count (simplest first)
-                var sortedExprs = filteredExprs
-                    .Select(e => new {
-                        Expr = e,
-                        InstructionCount = CountInstructions(ClassHierarchyUtils.DecodeBytecodes(e.Bytecodes))
-                    })
-                    .OrderBy(x => x.InstructionCount)
-                    .Select(x => x.Expr)
-                    .ToArray();
-
-                if (sortedExprs.Length == 0)
-                {
-                    Console.WriteLine($"\n  No init expressions match filter '{testFilter}'");
-                }
-                else
-                {
-                    Console.WriteLine($"\n  Found {sortedExprs.Length} matching init expression(s)");
-                    Console.WriteLine($"  Sorted by instruction count (simplest to most complex)");
-                    Console.WriteLine($"  Execution mode: AUTOMATIC (use --test-filter for focused testing)\n");
-                }
-
-                int executed = 0;
-                int succeeded = 0;
-                int failed = 0;
-
-                foreach (var initExpr in sortedExprs)
-                {
-                    var bytecodes = ClassHierarchyUtils.DecodeBytecodes(initExpr.Bytecodes);
-                    int instrCount = CountInstructions(bytecodes);
-
-                    Console.WriteLine($"[{executed + 1}/{sortedExprs.Length}] {initExpr.LocalId} ({instrCount} instructions)");
-                    Console.WriteLine($"Source: {initExpr.Source ?? "<no source>"}");
-
-                    // Wait for user input only if no filter (interactive mode)
-                    if (string.IsNullOrEmpty(testFilter))
-                    {
-                        Console.Write("Press Enter to execute (or 'q' to quit): ");
-                        string? input = Console.ReadLine();
-                        if (input?.ToLower() == "q")
-                        {
-                            Console.WriteLine("\n⚠️  Execution stopped by user");
-                            break;
-                        }
-                    }
-
-                    try
-                    {
-                        // Resolve literals from the init expression
-                        var literalOOPs = new SmalltalkOOP[initExpr.Literals.Length];
-                        for (int i = 0; i < initExpr.Literals.Length; i++)
-                        {
-                            literalOOPs[i] = ResolveLiteralValueAsOOP(initExpr.Literals[i], bundle, loader.Allocator, loader.LocalIdToObjectId);
-                        }
-
-                        // Create temporary CompiledMethod using allocator
-                        if (!loader.LocalIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
-                        {
-                            throw new InvalidOperationException("CompiledMethod class not found");
-                        }
-
-                        if (!loader.LocalIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
-                        {
-                            throw new InvalidOperationException("ByteArray class not found");
-                        }
-
-                        var tempMethodOOP = loader.Allocator.AllocateCompiledMethod(
-                            compiledMethodClassOOP,
-                            byteArrayClassOOP,
-                            initExpr.Header.Word,
-                            literalOOPs,
-                            bytecodes);
-
-                        // Execute the init expression
-                        var result = executor.ExecuteInitExpression(initExpr.LocalId, tempMethodOOP);
-
-                        executed++;
-
-                        if (result.Status == InitStatus.Success)
-                        {
-                            succeeded++;
-                            Console.WriteLine($"✓ Success ({result.ElapsedMilliseconds}ms)");
-                            Console.WriteLine($"  Returned: {FormatReturnValue(heapManager, bundle, result.ReturnValueOop ?? SpecialObjectsArray.Instance.Nil)}");
-                        }
-                        else
-                        {
-                            failed++;
-                            Console.WriteLine($"✗ FAILED: {result.Status} ({result.ElapsedMilliseconds}ms)");
-
-                            // Verbose debugging output on failure
-                            DumpInitExpressionDebugInfo(initExpr, bytecodes, literalOOPs, result, heapManager, bundle);
-
-                            // Continue with remaining init expressions (ContinueAndCollect policy)
-                            Console.WriteLine("\n⚠️  Error logged, continuing with remaining init expressions...");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        failed++;
-                        Console.WriteLine($"✗ FATAL ERROR: {ex.Message}");
-                        Console.WriteLine($"\nStack trace:\n{ex.StackTrace}");
-                        Console.WriteLine("\n⚠️  Execution stopped due to fatal error");
-                        break;
-                    }
-
-                    Console.WriteLine(); // Blank line between executions
-                }
+                var report = new { Total = 1, Succeeded = result.Status == InitStatus.Success ? 1 : 0, Failed = result.Status == InitStatus.Success ? 0 : 1 };
 
                 Console.WriteLine($"\n=== Execution Summary ===");
-                Console.WriteLine($"  Executed: {executed}/{sortedExprs.Length}");
-                Console.WriteLine($"  Succeeded: {succeeded}");
-                Console.WriteLine($"  Failed: {failed}");
+                Console.WriteLine($"  Executed: {report.Total}/{report.Total}");
+                Console.WriteLine($"  Succeeded: {report.Succeeded}");
+                Console.WriteLine($"  Failed: {report.Failed}");
 
                 // BlockClosure test summary
                 Console.WriteLine();

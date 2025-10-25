@@ -347,7 +347,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 : null;
 
             // Generate instance class
-            // Use TotalInstanceVariableCount (computed in AST builder) for format word
+            // v1.0.6+: Compute precomputed field layout (eliminates runtime topological sort)
+            var instanceLayout = ComputeFieldLayout(classNode.Name, ast);
+
             var instanceClass = new JsonClass
             {
                 LocalId = $"class:{classNode.Name}",
@@ -365,16 +367,20 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 CommentStringIndex = string.IsNullOrEmpty(classNode.Comment)
                     ? null
                     : _stringTable.GetValueOrDefault(classNode.Comment, -1),
-                ClassSideInitMethodLocalId = classSideInitMethodLocalId
+                ClassSideInitMethodLocalId = classSideInitMethodLocalId,
+
+                // v1.0.6+: Precomputed layout
+                TotalInstanceVarCount = instanceLayout.Count,
+                FieldLayout = instanceLayout
             };
 
             _classes.Add(instanceClass);
 
             // Generate metaclass
-            // All metaclasses are instances of Metaclass, which inherits:
-            // Object (0) -> Behavior (4) -> ClassDescription (2) -> Metaclass (1) = 7 inst vars
-            // Format: instanceSpec=01 (pointers), fixedFields=7, not indexable
-            var metaclassFormat = CalculateFormatWord("subclass:", 7);
+            // v1.0.6+: Compute precomputed layout for metaclass
+            // All metaclasses have the same layout: Behavior → ClassDescription → Class → Metaclass fields
+            var metaclassLayout = ComputeMetaclassFieldLayout(ast);
+            var metaclassFormat = CalculateFormatWord("subclass:", metaclassLayout.Count);
 
             var metaclass = new JsonClass
             {
@@ -382,7 +388,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 NameIndex = _symbolTable[classNode.Name],
                 IsMetaclass = true,
                 MetaclassOfLocalId = $"class:{classNode.Name}",
-                Format = metaclassFormat, // All metaclasses have same format (7 inst vars, pointers only)
+                Format = metaclassFormat,
                 InstVarNames = [], // Metaclasses don't declare additional instance variables beyond Metaclass
                 ClassVarNames = [], // Class variables belong to the instance side
                 PoolLocalIds = [],
@@ -391,7 +397,11 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     : _symbolTable.GetValueOrDefault(classNode.Superclass, -1),
                 Category = classNode.Category ?? "",
                 CommentStringIndex = null,
-                ClassSideInitMethodLocalId = null
+                ClassSideInitMethodLocalId = null,
+
+                // v1.0.6+: Precomputed layout for metaclass
+                TotalInstanceVarCount = metaclassLayout.Count,
+                FieldLayout = metaclassLayout
             };
 
             _classes.Add(metaclass);
@@ -460,6 +470,85 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             format |= 0x08;
 
         return format;
+    }
+
+    /// <summary>
+    /// v1.0.6+: Computes the complete field layout for a class including inherited fields.
+    /// Returns fields in the correct slot order: inherited fields first, then own fields.
+    /// </summary>
+    private List<JsonFieldLayoutEntry> ComputeFieldLayout(string className, CompilationResult ast)
+    {
+        var layout = new List<JsonFieldLayoutEntry>();
+        var classChain = new List<ClassDefinitionNode>();
+
+        // Build inheritance chain (bottom-up: subclass → superclass)
+        var currentClassName = className;
+        while (!string.IsNullOrEmpty(currentClassName) && currentClassName != "nil")
+        {
+            var classNode = ast.Classes.FirstOrDefault(c => c.Name == currentClassName);
+            if (classNode == null)
+                break;
+
+            classChain.Add(classNode);
+            currentClassName = classNode.Superclass;
+        }
+
+        // Process in reverse order (superclass → subclass) to get correct slot indices
+        int slotIndex = 0;
+        for (int i = classChain.Count - 1; i >= 0; i--)
+        {
+            var cls = classChain[i];
+            // inheritedFrom is null for the target class (i=0), non-null for inherited fields
+            string? inheritedFrom = (i > 0) ? $"class:{cls.Name}" : null;
+
+            foreach (var instVarName in cls.InstanceVariables)
+            {
+                int nameIndex = _symbolTable[instVarName];
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = nameIndex,
+                    SlotIndex = slotIndex++,
+                    InheritedFrom = inheritedFrom
+                });
+            }
+        }
+
+        return layout;
+    }
+
+    /// <summary>
+    /// v1.0.6+: Computes field layout for a metaclass.
+    /// All metaclasses follow the chain: meta:Foo → meta:Bar → ... → meta:Object → class:Class → ... → class:Behavior
+    /// The layout includes fields from class:Behavior → class:ClassDescription → class:Class → class:Metaclass
+    /// </summary>
+    private List<JsonFieldLayoutEntry> ComputeMetaclassFieldLayout(CompilationResult ast)
+    {
+        var layout = new List<JsonFieldLayoutEntry>();
+
+        // All metaclasses have the same layout: Behavior + ClassDescription + Class + Metaclass fields
+        // Build the chain: Behavior → ClassDescription → Class → Metaclass
+        var metaclassChain = new[] { "Behavior", "ClassDescription", "Class", "Metaclass" };
+
+        int slotIndex = 0;
+        foreach (var className in metaclassChain)
+        {
+            var classNode = ast.Classes.FirstOrDefault(c => c.Name == className);
+            if (classNode == null)
+                continue;
+
+            foreach (var instVarName in classNode.InstanceVariables)
+            {
+                int nameIndex = _symbolTable[instVarName];
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = nameIndex,
+                    SlotIndex = slotIndex++,
+                    InheritedFrom = $"class:{className}"
+                });
+            }
+        }
+
+        return layout;
     }
 
     /// <summary>
@@ -1181,7 +1270,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
 
         return new Metadata
         {
-            Version = "1.0.5",
+            Version = "1.0.6",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = Path.GetFileName(_sourceFilePath),
@@ -1240,6 +1329,17 @@ internal sealed record BlockContextMetadata
     public string? OuterContext { get; init; }
 }
 
+/// <summary>
+/// v1.0.6+: Represents a single field in a class's precomputed layout.
+/// Emitted by compiler to eliminate runtime topological sort in interpreter.
+/// </summary>
+internal sealed record JsonFieldLayoutEntry
+{
+    public required int NameIndex { get; init; }
+    public required int SlotIndex { get; init; }
+    public string? InheritedFrom { get; init; }
+}
+
 internal sealed record JsonClass
 {
     public required string LocalId { get; init; }
@@ -1254,6 +1354,10 @@ internal sealed record JsonClass
     public required string Category { get; init; }
     public int? CommentStringIndex { get; init; }
     public string? ClassSideInitMethodLocalId { get; init; }
+
+    // v1.0.6+: Precomputed layout (eliminates runtime topological sort)
+    public required int TotalInstanceVarCount { get; init; }
+    public required List<JsonFieldLayoutEntry> FieldLayout { get; init; }
 }
 
 internal sealed record JsonObject

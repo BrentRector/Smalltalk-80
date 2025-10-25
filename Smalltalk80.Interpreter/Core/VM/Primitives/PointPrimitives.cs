@@ -30,14 +30,8 @@ public static class PointPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Get Point class from global registry
-        if (!GlobalRegistry.TryGet("class:Point", out SmalltalkOOP pointClassOOP))
-        {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
-        }
-
         // Allocate new Point instance (no indexed fields, just x and y instance variables)
+        // ctx.AllocateObject handles class lookup internally (heap-only access)
         var pointOOP = ctx.AllocateObject("class:Point", 0);
 
         // Get field indices for x and y
@@ -48,8 +42,6 @@ public static class PointPrimitives
         ctx.HeapManager.SetInstanceVariable(pointOOP, xIndex, xOop);
         ctx.HeapManager.SetInstanceVariable(pointOOP, yIndex, yOop);
 
-        // Signal success
-        ctx.PrimitiveSuccess = true;
         return pointOOP;
     }
 }

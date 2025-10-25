@@ -134,11 +134,70 @@ public class Phase8_MethodInstallation
 
         // Store the reverse mapping in GlobalRegistry for runtime access
         GlobalRegistry.Set("objectIdToLocalId", objectIdToLocalId);
-        
+
+        // PROCESS INIT EXPRESSIONS (merged from Phase 8b)
+        // Init expressions use the same canonicalization mechanism as regular methods
+        ProcessInitExpressions(compiledMethodClassOOP, byteArrayClassOOP);
+
         // VALIDATION PASS: Verify Association canonicalization
         ValidateAssociationCanonicalization();
     }
-    
+
+    /// <summary>
+    /// Processes init expressions and creates CompiledMethod objects for them.
+    /// Merged from Phase 8b - uses the same Association canonicalization as regular methods.
+    /// Returns an Array OOP containing all init expression methods for runtime execution.
+    /// </summary>
+    private void ProcessInitExpressions(SmalltalkOOP compiledMethodClassOOP, SmalltalkOOP byteArrayClassOOP)
+    {
+        if (_bundle.InitExpressions.Length == 0)
+        {
+            // No init expressions - store nil
+            SpecialObjectsArray.SetInitExpressionMethods(SpecialObjectsArray.Instance.Nil);
+            return;
+        }
+
+        var initExprMethods = new List<SmalltalkOOP>();
+
+        foreach (var expr in _bundle.InitExpressions)
+        {
+            // Resolve literals using the SAME canonicalization mechanism as regular methods
+            var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
+
+            // Create a CompiledMethod object for the init expression
+            var bytecodes = ClassHierarchyUtils.DecodeBytecodes(expr.Bytecodes);
+            SmalltalkOOP initMethodOOP = CreateCompiledMethod(
+                new MethodDescriptor
+                {
+                    LocalId = expr.LocalId,
+                    HomeClassLocalId = "class:UndefinedObject", // placeholder
+                    SelectorIndex = 0,
+                    Header = expr.Header,
+                    Literals = Array.Empty<LiteralValue>(), // already resolved
+                    Bytecodes = expr.Bytecodes
+                },
+                literalOOPs,
+                bytecodes,
+                compiledMethodClassOOP,
+                byteArrayClassOOP);
+
+            initExprMethods.Add(initMethodOOP);
+            _localIdToObjectId[expr.LocalId] = initMethodOOP;
+        }
+
+        // Create array to hold all init expression methods
+        var arrayClassOOP = _localIdToObjectId["class:Array"];
+        var initArrayOOP = _allocator.AllocateArray(arrayClassOOP, initExprMethods.Count);
+
+        for (int i = 0; i < initExprMethods.Count; i++)
+        {
+            _allocator.SetIndexedOOP(initArrayOOP, i, initExprMethods[i]);
+        }
+
+        // Store in SpecialObjectsArray for runtime access
+        SpecialObjectsArray.SetInitExpressionMethods(initArrayOOP);
+    }
+
     /// <summary>
     /// Validates that all Association literals are properly canonicalized.
     /// Ensures no duplicate Association objects exist for the same variable name.
@@ -559,16 +618,9 @@ public class Phase8_MethodInstallation
     /// </summary>
     private SmalltalkOOP InternString(string value)
     {
-        // Look up String class layout from bundle data
-        var stringClassDefinition = ClassHierarchyUtils.FindClassDefinition("String", _bundle);
-        if (stringClassDefinition == null)
-        {
-            throw new InvalidOperationException("String class not found in bundle");
-        }
-        
         // Allocate string object (AllocateString handles the bytes internally)
         var stringOOP = _allocator.AllocateString(value);
-        // Set String class reference (since Phase 8 runs after Phase Y)
+        // Set String class reference (coldstart phases can use GlobalRegistry)
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         _allocator.SetObjectClass(stringOOP, stringClassOOP);
         return stringOOP;

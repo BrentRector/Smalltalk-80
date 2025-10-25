@@ -5,7 +5,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Control flow primitives for blocks, message sending, and process management (primitives 80-88).
-/// Stubs for now - require BlockContext, Process scheduler, and Semaphore infrastructure.
+/// Implements BlockContext creation/activation, dynamic message sending, and process synchronization.
 /// </summary>
 public static class ControlPrimitives
 {
@@ -433,14 +433,14 @@ public static class ControlPrimitives
         // Clear the removed link's nextLink pointer
         ctx.SetFieldValue(firstLinkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil);
 
-        // If it's a Process, clear myList field
-        try
+        // If it's a Process (subclass of Link), clear myList field
+        // Check class to determine if this is a Process or just a Link
+        SmalltalkOOP linkClassOop = ctx.HeapManager.GetClassOOP(firstLinkOop);
+        SmalltalkOOP processClassOop = ctx.GetGlobalObjectByName("class:Process");
+
+        if (linkClassOop == processClassOop)
         {
             ctx.SetFieldValue(firstLinkOop, "class:Process", "myList", SpecialObjectsArray.Instance.Nil);
-        }
-        catch
-        {
-            // Not a Process, just a Link - that's fine
         }
 
         return firstLinkOop;
@@ -469,14 +469,14 @@ public static class ControlPrimitives
         // Clear new link's nextLink pointer
         ctx.SetFieldValue(linkOop, "class:Link", "nextLink", SpecialObjectsArray.Instance.Nil);
 
-        // Set myList if this is a Process
-        try
+        // Set myList if this is a Process (subclass of Link)
+        // Check class to determine if this is a Process or just a Link
+        SmalltalkOOP linkClassOop = ctx.HeapManager.GetClassOOP(linkOop);
+        SmalltalkOOP processClassOop = ctx.GetGlobalObjectByName("class:Process");
+
+        if (linkClassOop == processClassOop)
         {
             ctx.SetFieldValue(linkOop, "class:Process", "myList", listOop);
-        }
-        catch
-        {
-            // Not a Process, just a Link - that's fine
         }
     }
 
@@ -513,16 +513,14 @@ public static class ControlPrimitives
         int index = priority - 1;
 
         // Get the LinkedList at the priority level
-        // Note: This requires HeapManager to have GetIndexedOOP method
-        // For now we'll leave this as a stub - needs heap manager support
-        // SmalltalkOOP priorityListOop = ctx.HeapManager.GetIndexedOOP(processListsOop, index);
-        // if (priorityListOop == SpecialObjectsArray.Instance.Nil)
-        //     return false;
+        SmalltalkOOP priorityListOop = ctx.HeapManager.GetIndexedOOP(processListsOop, index);
+        if (priorityListOop == SpecialObjectsArray.Instance.Nil)
+            return false;
 
         // Add process to the priority queue
-        // AddLastLink(ctx, priorityListOop, "class:LinkedList", processOop);
+        AddLastLink(ctx, priorityListOop, "class:LinkedList", processOop);
 
-        return false; // Stub for now
+        return true;
     }
 
     /// <summary>

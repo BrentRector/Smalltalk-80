@@ -70,6 +70,23 @@ public static class BitBltEngine
         int sourceStride = (sourceWidth + 7) / 8;
         int halftoneStride = halftoneWidth > 0 ? (halftoneWidth + 7) / 8 : 0;
 
+        // Validate buffer lengths before accessing
+        int destRequiredBytes = destStride * destHeight;
+        int sourceRequiredBytes = sourceStride * sourceHeight;
+
+        if (destBits.Length < destRequiredBytes)
+            return;  // Dest buffer too small - abort operation
+
+        if (sourceBits.Length < sourceRequiredBytes)
+            return;  // Source buffer too small - abort operation
+
+        if (halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
+        {
+            int halftoneRequiredBytes = halftoneStride * halftoneHeight;
+            if (halftone.Length < halftoneRequiredBytes)
+                return;  // Halftone buffer too small - abort operation
+        }
+
         // Step 3: Main loop - process each pixel
         for (int y = 0; y < clippedHeight; y++)
         {

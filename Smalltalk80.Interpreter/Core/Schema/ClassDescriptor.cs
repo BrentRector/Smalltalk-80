@@ -2,7 +2,8 @@ namespace Smalltalk80.Interpreter.Core.Schema;
 
 /// <summary>
 /// Class and metaclass descriptor.
-/// Matches coldstart-v1.0.2.schema.json classes items schema.
+/// Matches coldstart-v1.0.6.schema.json classes items schema.
+/// v1.0.6+: Added TotalInstanceVarCount and FieldLayout for precomputed layouts.
 /// </summary>
 public class ClassDescriptor
 {
@@ -19,4 +20,8 @@ public class ClassDescriptor
     public int? CommentStringIndex { get; init; }
     public string? ClassSideInitMethodLocalId { get; init; }
     public string? Notes { get; init; }
+
+    // v1.0.6+: Precomputed layout (eliminates runtime topological sort)
+    public required int TotalInstanceVarCount { get; init; }
+    public required FieldLayoutEntry[] FieldLayout { get; init; }
 }

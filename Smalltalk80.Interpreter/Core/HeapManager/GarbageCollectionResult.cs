@@ -30,8 +30,8 @@ public sealed class GCStatistics
     
     /// <summary>Breakdown of collected objects by format type.</summary>
     public Dictionary<ObjectFormat, int> CollectedByFormat { get; init; } = new();
-    
-    /// <summary>Number of ObjectTable entries with null MemoryPointer after collection.</summary>
+
+    /// <summary>Number of ObjectTable entries freed after collection.</summary>
     public int FreeObjectTableEntries { get; init; }
 
     /// <summary>Collection efficiency as percentage of total objects collected.</summary>

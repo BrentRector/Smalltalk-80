@@ -52,11 +52,11 @@ public class PhaseY_InstanceVariableInitialization
         {
             if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
                 continue;
-            
+
             // Get the number of instance variables for this type of class object
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
-            
+
             // Initialize ONLY uninitialized instance variables to nil
             // Check _initializedFields set to see which fields were already set by Phase 3 or 4
             for (int i = 0; i < instVarCount; i++)
@@ -65,6 +65,16 @@ public class PhaseY_InstanceVariableInitialization
                 {
                     _allocator.SetInstanceVariable(classOOP, i, nilOOP);
                     instanceVariablesInitialized++;
+
+                    // Verify Object.superclass is being set to nil
+                    if (!cls.IsMetaclass && _bundle.Symbols[cls.NameIndex] == "Object")
+                    {
+                        int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
+                        if (i == superclassIndex)
+                        {
+                            Console.WriteLine($"  ✓ Initialized class:Object.superclass = nil (field index {i})");
+                        }
+                    }
                 }
             }
         }

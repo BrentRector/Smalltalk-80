@@ -238,4 +238,95 @@ public static class BytecodeDisassembler
         bytesConsumed = 3; // 0x80 + subOp + operand
         return $"{mnemonic} {operand}";
     }
+
+    /// <summary>
+    /// Gets a short symbolic name for a single bytecode (for debug logging).
+    /// Returns just the opcode name without operands or hex formatting.
+    /// </summary>
+    public static string GetOpcodeName(byte bytecode)
+    {
+        // Push receiver instance variable (0x00-0x0F)
+        if (BytecodeUtil.IsPushIvar(bytecode))
+            return "PUSH_IVAR";
+
+        // Push temporary variable (0x10-0x1F)
+        if (BytecodeUtil.IsPushTemp(bytecode))
+            return "PUSH_TEMP";
+
+        // Push literal constant (0x20-0x3F)
+        if (BytecodeUtil.IsPushLiteralConst(bytecode))
+            return "PUSH_LITERAL";
+
+        // Push literal variable (0x40-0x5F)
+        if (BytecodeUtil.IsPushLiteralVar(bytecode))
+            return "PUSH_LITERAL_VAR";
+
+        // Pop and store receiver variable (0x60-0x67)
+        if (BytecodeUtil.IsPopStoreIvar(bytecode))
+            return "POP_STORE_IVAR";
+
+        // Pop and store temporary variable (0x68-0x6F)
+        if (BytecodeUtil.IsPopStoreTemp(bytecode))
+            return "POP_STORE_TEMP";
+
+        // Push specials (0x70-0x77)
+        if (BytecodeUtil.IsPushSpecial(bytecode))
+        {
+            return ((Bytecode)bytecode) switch
+            {
+                Bytecode.PUSH_SELF => "PUSH_SELF",
+                Bytecode.PUSH_TRUE => "PUSH_TRUE",
+                Bytecode.PUSH_FALSE => "PUSH_FALSE",
+                Bytecode.PUSH_NIL => "PUSH_NIL",
+                Bytecode.PUSH_MINUS_ONE => "PUSH_MINUS_ONE",
+                Bytecode.PUSH_ZERO => "PUSH_ZERO",
+                Bytecode.PUSH_ONE => "PUSH_ONE",
+                Bytecode.PUSH_TWO => "PUSH_TWO",
+                _ => "PUSH_SPECIAL"
+            };
+        }
+
+        // Return variants (0x78-0x7F)
+        if (BytecodeUtil.IsReturn(bytecode))
+        {
+            return ((Bytecode)bytecode) switch
+            {
+                Bytecode.RETURN_TOP => "RETURN_TOP",
+                Bytecode.RETURN_SELF => "RETURN_SELF",
+                Bytecode.RETURN_FALSE => "RETURN_FALSE",
+                Bytecode.RETURN_TRUE => "RETURN_TRUE",
+                Bytecode.RETURN_NIL => "RETURN_NIL",
+                Bytecode.RETURN_SELF_POP => "BLOCK_RETURN_SELF",
+                Bytecode.RETURN_TOP_POP => "BLOCK_RETURN_TOP",
+                Bytecode.RESERVED_RETURN => "NOP",
+                _ => "RETURN"
+            };
+        }
+
+        // Extended prefix (0x80)
+        if (BytecodeUtil.IsExtended(bytecode))
+            return "EXTENDED";
+
+        // Send arithmetic (0xB0-0xBF)
+        if (BytecodeUtil.IsSendArithmetic(bytecode))
+            return "SEND_ARITH";
+
+        // Send special selector (0xC0-0xCF)
+        if (BytecodeUtil.IsSendSpecial(bytecode))
+            return "SEND_SPECIAL";
+
+        // Send literal selector with 0 args (0xD0-0xDF)
+        if (BytecodeUtil.IsSend0(bytecode))
+            return "SEND_0";
+
+        // Send literal selector with 1 arg (0xE0-0xEF)
+        if (BytecodeUtil.IsSend1(bytecode))
+            return "SEND_1";
+
+        // Send literal selector with 2 args (0xF0-0xFF)
+        if (BytecodeUtil.IsSend2(bytecode))
+            return "SEND_2";
+
+        return "UNKNOWN";
+    }
 }

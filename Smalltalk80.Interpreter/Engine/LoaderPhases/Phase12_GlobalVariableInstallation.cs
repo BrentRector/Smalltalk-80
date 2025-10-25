@@ -297,10 +297,13 @@ public class Phase12_GlobalVariableInstallation
     ///
     /// The Association canonicalization system ensures only one Association object exists
     /// per variable name across the entire system. Phase 8 creates these canonical Associations
-    /// with nil values when compiling methods. Phase 12 must find and update these same
-    /// Associations with proper class values.
+    /// with nil values when compiling both regular methods and init expressions.
+    /// Phase 12 must find and update these same Associations with proper class values.
     ///
-    /// Returns SmalltalkOOP.Nil if no canonical Association exists for the key.
+    /// Note: Init expressions are processed by Phase 8 (merged from Phase 8b) and share
+    /// the same canonical Associations as regular methods, so we only need to search methods.
+    ///
+    /// Returns SmalltalkOOP.Null if no canonical Association exists for the key.
     /// </summary>
     private SmalltalkOOP FindCanonicalAssociation(string keyName)
     {
@@ -308,6 +311,7 @@ public class Phase12_GlobalVariableInstallation
         SmalltalkOOP targetKeyOOP = GetSymbolOOP(keyName);
 
         // Scan all methods to find Association literals with matching key
+        // Note: This includes both regular methods and init expressions (processed by Phase 8)
         foreach (var method in _bundle.Methods)
         {
             if (method.Literals.Length == 0) continue;
@@ -336,7 +340,36 @@ public class Phase12_GlobalVariableInstallation
             }
         }
 
+        // Also scan init expressions (they have their own method entries created by Phase 8)
+        foreach (var initExpr in _bundle.InitExpressions)
+        {
+            if (initExpr.Literals.Length == 0) continue;
+
+            // Get the CompiledMethod OOP for the init expression
+            if (!_localIdToObjectId.TryGetValue(initExpr.LocalId, out SmalltalkOOP methodOOP))
+                continue;
+
+            // Check each literal in the init expression method
+            for (int i = 0; i < initExpr.Literals.Length; i++)
+            {
+                var literal = initExpr.Literals[i];
+                if (literal.Type != "association") continue;
+
+                // Get the Association OOP from the method's literal array
+                // Literals start at indexed slot 1 (slot 0 is header)
+                var assocOOP = _allocator.GetIndexedOOP(methodOOP, i + 1);
+
+                // Check if this Association has the key we're looking for
+                var assocKeyOOP = _allocator.GetInstanceVariable(assocOOP, 0);
+                if (assocKeyOOP == targetKeyOOP)
+                {
+                    // Found the canonical Association for this key in an init expression
+                    return assocOOP;
+                }
+            }
+        }
+
         // No canonical Association found for this key
-        return new SmalltalkOOP(0);
+        return SmalltalkOOP.Null;
     }
 }

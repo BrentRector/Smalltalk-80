@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
@@ -371,10 +372,12 @@ public static class FloatPrimitives
             return SmalltalkOOP.FromSmallInteger((int)truncated);
         }
 
-        // TODO: Create LargeInteger for values outside SmallInteger range
-        // For now, fail if too large
-        ctx.PrimitiveSuccess = false;
-        return SpecialObjectsArray.Instance.Nil;
+        // Value is outside SmallInteger range - create LargeInteger (heap-only)
+        // Convert double to BigInteger (which truncates automatically)
+        BigInteger bigInt = (BigInteger)truncated;
+
+        // Use LargeIntegerPrimitives to create heap-resident LargeInteger object
+        return LargeIntegerPrimitives.FromBigInteger(ctx, bigInt);
     }
 
     /// <summary>

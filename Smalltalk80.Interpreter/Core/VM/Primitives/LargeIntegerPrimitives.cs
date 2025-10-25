@@ -30,8 +30,9 @@ public static class LargeIntegerPrimitives
 
     /// <summary>
     /// Creates a LargeInteger object from a BigInteger.
+    /// Internal visibility allows FloatPrimitives to use this for Truncated conversion.
     /// </summary>
-    private static SmalltalkOOP FromBigInteger(IPrimitiveContext ctx, BigInteger value)
+    internal static SmalltalkOOP FromBigInteger(IPrimitiveContext ctx, BigInteger value)
     {
         // Optimization: If value fits in SmallInteger range, return SmallInteger instead
         // SmallInteger range: -2^30 to 2^30-1 (30-bit signed integer)
@@ -88,10 +89,13 @@ public static class LargeIntegerPrimitives
 
         SmalltalkOOP classOOP = ctx.HeapManager.GetClassOOP(objectOop);
 
-        // Check against both LargeInteger classes
-        if (GlobalRegistry.TryGet("class:LargePositiveInteger", out var posClass) && classOOP == posClass)
+        // Check against both LargeInteger classes (heap-only access)
+        var posClass = ctx.GetGlobalObjectByName("class:LargePositiveInteger");
+        if (posClass != SpecialObjectsArray.Instance.Nil && classOOP == posClass)
             return true;
-        if (GlobalRegistry.TryGet("class:LargeNegativeInteger", out var negClass) && classOOP == negClass)
+
+        var negClass = ctx.GetGlobalObjectByName("class:LargeNegativeInteger");
+        if (negClass != SpecialObjectsArray.Instance.Nil && classOOP == negClass)
             return true;
 
         return false;
@@ -106,7 +110,7 @@ public static class LargeIntegerPrimitives
     }
 
     /// <summary>
-    /// Gets the LargeInteger class OOP based on sign.
+    /// Gets the LargeInteger class OOP based on sign (heap-only access).
     /// </summary>
     private static SmalltalkOOP GetLargeIntegerClass(IPrimitiveContext ctx, bool isPositive)
     {
@@ -114,13 +118,15 @@ public static class LargeIntegerPrimitives
             ? "class:LargePositiveInteger"
             : "class:LargeNegativeInteger";
 
-        if (GlobalRegistry.TryGet(className, out var classOOP))
+        var classOOP = ctx.GetGlobalObjectByName(className);
+
+        if (classOOP != SpecialObjectsArray.Instance.Nil)
             return classOOP;
 
         throw new InvalidOperationException(
-            $"{className} not registered in GlobalRegistry during cold start. " +
+            $"{className} not found in Smalltalk global dictionary. " +
             "This indicates a bootstrap phase error - LargeInteger classes must be " +
-            "registered during Phase 2 (Class Shells) of the cold start process.");
+            "installed during cold start process.");
     }
 
     // Primitive 21: LargeInteger + (addition)

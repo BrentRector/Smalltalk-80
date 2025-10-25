@@ -9,11 +9,11 @@ public sealed class HeapStatistics
 {
     /// <summary>Total ObjectTable entries allocated.</summary>
     public int TotalObjectTableEntries { get; init; }
-    
-    /// <summary>ObjectTable entries with valid objects (non-null MemoryPointer).</summary>
+
+    /// <summary>ObjectTable entries with valid objects.</summary>
     public int ActiveObjects { get; init; }
-    
-    /// <summary>ObjectTable entries with null MemoryPointer (available for reuse).</summary>
+
+    /// <summary>ObjectTable entries available for reuse.</summary>
     public int FreeObjectTableEntries { get; init; }
     
     /// <summary>Breakdown of active objects by format type.</summary>

@@ -606,7 +606,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             throw new ArgumentException("SmallIntegers don't have header slot");
 
         var entry = GetObjectTableEntry(objectOOP);
-        return ReadSlot(entry, 0); // Slot 0 is always the class reference
+        var classOOP = ReadSlot(entry, 0); // Slot 0 is always the class reference
+        return classOOP;
     }
 
     /// <summary>
@@ -1038,8 +1039,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         {
             if (objectOOP.IsSmallInteger)
                 return "SmallInteger";
-            
-            if (!IsValidObjectOOP(objectOOP))
+
+            bool isValid = IsValidObjectOOP(objectOOP);
+            if (!isValid)
                 return "Invalid";
 
             // Get class OOP from object header (slot 0)

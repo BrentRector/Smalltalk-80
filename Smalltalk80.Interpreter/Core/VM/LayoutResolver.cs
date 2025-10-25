@@ -3,43 +3,34 @@ using Smalltalk80.Interpreter.Core.Schema;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Resolves field layouts for classes by computing the complete field order
-/// including inherited fields from superclasses.
+/// Resolves field layouts for classes by loading precomputed layouts from the JSON bundle.
+/// v1.0.6+: No longer computes layouts at runtime - simply loads precomputed data.
 /// </summary>
 public class LayoutResolver
 {
     private readonly Dictionary<string, List<string>> _fieldMap = new();
 
     /// <summary>
-    /// Computes the complete field layouts for all classes in topological order.
-    /// Each class's layout includes inherited fields followed by its own instance variables.
+    /// v1.0.6+: Loads precomputed field layouts for all classes.
+    /// Each class's layout is already computed by the compiler and includes inherited fields followed by own instance variables.
+    /// This eliminates the need for topological sort and inheritance chain traversal.
     /// </summary>
-    /// <param name="classes">Collection of class descriptors</param>
+    /// <param name="classes">Collection of class descriptors with precomputed layouts</param>
     /// <param name="symbols">Symbol table for looking up field names by index</param>
-    public void ComputeLayouts(IEnumerable<ClassDescriptor> classes, IReadOnlyList<string> symbols)
+    public void LoadLayouts(IEnumerable<ClassDescriptor> classes, IReadOnlyList<string> symbols)
     {
-        var classMap = classes.ToDictionary(c => c.LocalId);
-
-        foreach (var cls in TopologicalSort(classes, symbols))
+        foreach (var cls in classes)
         {
-            // Get inherited fields from superclass (if any)
-            List<string> inherited;
-            if (cls.SuperNameIndex.HasValue)
+            // v1.0.6+: Load precomputed field layout (already in correct order)
+            var fields = new List<string>(cls.FieldLayout.Length);
+
+            foreach (var entry in cls.FieldLayout)
             {
-                string superName = symbols[cls.SuperNameIndex.Value];
-                var superClass = classMap.Values.FirstOrDefault(c => symbols[c.NameIndex] == superName);
-                inherited = superClass != null ? _fieldMap[superClass.LocalId] : new List<string>();
-            }
-            else
-            {
-                inherited = new List<string>();
+                string fieldName = symbols[entry.NameIndex];
+                fields.Add(fieldName);
             }
 
-            // Get this class's own instance variables
-            var own = cls.InstVarNames.Select(i => symbols[i]).ToList();
-
-            // Combine: inherited fields first, then own fields
-            _fieldMap[cls.LocalId] = inherited.Concat(own).ToList();
+            _fieldMap[cls.LocalId] = fields;
         }
     }
 
@@ -62,45 +53,5 @@ public class LayoutResolver
     public int GetInstanceVariableCount(string classLocalId)
     {
         return _fieldMap.TryGetValue(classLocalId, out var fields) ? fields.Count : 0;
-    }
-
-    /// <summary>
-    /// Topologically sorts classes so that superclasses appear before subclasses.
-    /// This ensures we process parent layouts before child layouts.
-    /// </summary>
-    private IEnumerable<ClassDescriptor> TopologicalSort(IEnumerable<ClassDescriptor> classes, IReadOnlyList<string> symbols)
-    {
-        var classArray = classes.ToArray();
-        var visited = new HashSet<string>();
-        var result = new List<ClassDescriptor>();
-
-        void Visit(ClassDescriptor cls)
-        {
-            if (visited.Contains(cls.LocalId))
-                return;
-
-            visited.Add(cls.LocalId);
-
-            // Visit superclass first (if it exists)
-            if (cls.SuperNameIndex.HasValue)
-            {
-                string superName = symbols[cls.SuperNameIndex.Value];
-                var superClass = classArray.FirstOrDefault(c => symbols[c.NameIndex] == superName);
-                if (superClass != null)
-                {
-                    Visit(superClass);
-                }
-            }
-
-            result.Add(cls);
-        }
-
-        // Visit all classes, which will recursively visit their superclasses first
-        foreach (var cls in classArray)
-        {
-            Visit(cls);
-        }
-
-        return result;
     }
 }

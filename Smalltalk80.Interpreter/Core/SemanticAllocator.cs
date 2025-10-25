@@ -62,13 +62,37 @@ public class SemanticAllocator
     }
 
     /// <summary>
+    /// Allocates a string object (ByteIndexed format) with class reference set.
+    /// Use this version when the String class is available (Phase 7 onwards).
+    /// </summary>
+    public SmalltalkOOP AllocateString(SmalltalkOOP classOOP, string value)
+    {
+        int fixedSlots = CalculateInstanceVariableCount("String");
+        byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
+
+        // Allocate ByteIndexed object
+        var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
+
+        // Set class reference
+        _heapManager.SetSlot(stringOOP, 0, classOOP);
+
+        // Store the string bytes
+        for (int i = 0; i < stringBytes.Length; i++)
+        {
+            _heapManager.SetIndexedByte(stringOOP, i, stringBytes[i]);
+        }
+
+        return stringOOP;
+    }
+
+    /// <summary>
     /// Allocates a string object (ByteIndexed format) with specific class name.
     /// Overload for backward compatibility.
     /// </summary>
     public SmalltalkOOP AllocateString(string className, int stringLength)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Just allocate - no cross-references set
         return _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringLength);
     }

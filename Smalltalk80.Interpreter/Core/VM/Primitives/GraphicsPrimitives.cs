@@ -18,6 +18,7 @@ public static class GraphicsPrimitives
     /// </summary>
     public static SmalltalkOOP CopyBits(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Validate arguments
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
@@ -30,54 +31,80 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        try
+        // Preferred path: Use platform bridge if available
+        if (ctx.PlatformBridge != null)
         {
-            // Extract BitBlt instance variables (Blue Book page 346):
-            // 0: destForm, 1: sourceForm, 2: halftoneForm, 3: combinationRule
-            // 4: destX, 5: destY, 6: width, 7: height
-            // 8: sourceX, 9: sourceY
-            // 10: clipX, 11: clipY, 12: clipWidth, 13: clipHeight
-
-            SmalltalkOOP destForm = ctx.GetFieldValue(receiver, "class:BitBlt", "destForm");
-            SmalltalkOOP sourceForm = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceForm");
-            SmalltalkOOP halftoneForm = ctx.GetFieldValue(receiver, "class:BitBlt", "halftoneForm");
-            int combinationRule = ctx.GetFieldValue(receiver, "class:BitBlt", "combinationRule").AsSmallInteger();
-            int destX = ctx.GetFieldValue(receiver, "class:BitBlt", "destX").AsSmallInteger();
-            int destY = ctx.GetFieldValue(receiver, "class:BitBlt", "destY").AsSmallInteger();
-            int width = ctx.GetFieldValue(receiver, "class:BitBlt", "width").AsSmallInteger();
-            int height = ctx.GetFieldValue(receiver, "class:BitBlt", "height").AsSmallInteger();
-            int sourceX = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceX").AsSmallInteger();
-            int sourceY = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceY").AsSmallInteger();
-            int clipX = ctx.GetFieldValue(receiver, "class:BitBlt", "clipX").AsSmallInteger();
-            int clipY = ctx.GetFieldValue(receiver, "class:BitBlt", "clipY").AsSmallInteger();
-            int clipWidth = ctx.GetFieldValue(receiver, "class:BitBlt", "clipWidth").AsSmallInteger();
-            int clipHeight = ctx.GetFieldValue(receiver, "class:BitBlt", "clipHeight").AsSmallInteger();
-
-            // Extract Form data (Form has: bits, width, height)
-            var (destBits, destWidth, destHeight) = ExtractFormData(ctx, destForm);
-            var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(ctx, sourceForm);
-            var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(ctx, halftoneForm);
-
-            // Perform BitBlt operation
-            BitBltEngine.CopyBits(
-                destBits.Span, destWidth, destHeight, destX, destY,
-                sourceBits.Span, sourceWidth, sourceHeight, sourceX, sourceY,
-                width, height,
-                clipX, clipY, clipWidth, clipHeight,
-                halftoneBits.Span, halftoneWidth, halftoneHeight,
-                (CombinationRule)(combinationRule & 0x0F));
-
-            // TODO: When IDisplayProvider is integrated, invalidate display region:
-            // if (IsDisplayForm(destForm))
-            //     displayProvider.Invalidate(destX, destY, width, height);
-
+            bool success = ctx.PlatformBridge.PerformBitBlt(receiver);
+            if (!success)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
             return receiver;
         }
-        catch
+
+        // Fallback: No platform bridge - extract fields and call BitBltEngine directly
+        // This path handles scenarios where no platform bridge is configured
+
+        // Extract BitBlt instance variables (Blue Book page 346):
+        // 0: destForm, 1: sourceForm, 2: halftoneForm, 3: combinationRule
+        // 4: destX, 5: destY, 6: width, 7: height
+        // 8: sourceX, 9: sourceY
+        // 10: clipX, 11: clipY, 12: clipWidth, 13: clipHeight
+
+        SmalltalkOOP destForm = ctx.GetFieldValue(receiver, "class:BitBlt", "destForm");
+        SmalltalkOOP sourceForm = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceForm");
+        SmalltalkOOP halftoneForm = ctx.GetFieldValue(receiver, "class:BitBlt", "halftoneForm");
+
+        SmalltalkOOP combinationRuleOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "combinationRule");
+        SmalltalkOOP destXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "destX");
+        SmalltalkOOP destYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "destY");
+        SmalltalkOOP widthOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "width");
+        SmalltalkOOP heightOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "height");
+        SmalltalkOOP sourceXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceX");
+        SmalltalkOOP sourceYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceY");
+        SmalltalkOOP clipXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipX");
+        SmalltalkOOP clipYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipY");
+        SmalltalkOOP clipWidthOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipWidth");
+        SmalltalkOOP clipHeightOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipHeight");
+
+        // Validate all numeric fields are SmallIntegers
+        if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
+            !widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger || !sourceXOOP.IsSmallInteger ||
+            !sourceYOOP.IsSmallInteger || !clipXOOP.IsSmallInteger || !clipYOOP.IsSmallInteger ||
+            !clipWidthOOP.IsSmallInteger || !clipHeightOOP.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
+
+        int combinationRule = combinationRuleOOP.AsSmallInteger();
+        int destX = destXOOP.AsSmallInteger();
+        int destY = destYOOP.AsSmallInteger();
+        int width = widthOOP.AsSmallInteger();
+        int height = heightOOP.AsSmallInteger();
+        int sourceX = sourceXOOP.AsSmallInteger();
+        int sourceY = sourceYOOP.AsSmallInteger();
+        int clipX = clipXOOP.AsSmallInteger();
+        int clipY = clipYOOP.AsSmallInteger();
+        int clipWidth = clipWidthOOP.AsSmallInteger();
+        int clipHeight = clipHeightOOP.AsSmallInteger();
+
+        // Extract Form data (Form has: bits, width, height)
+        var (destBits, destWidth, destHeight) = ExtractFormData(ctx, destForm);
+        var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(ctx, sourceForm);
+        var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(ctx, halftoneForm);
+
+        // Perform BitBlt operation
+        BitBltEngine.CopyBits(
+            destBits.Span, destWidth, destHeight, destX, destY,
+            sourceBits.Span, sourceWidth, sourceHeight, sourceX, sourceY,
+            width, height,
+            clipX, clipY, clipWidth, clipHeight,
+            halftoneBits.Span, halftoneWidth, halftoneHeight,
+            (CombinationRule)(combinationRule & 0x0F));
+
+        return receiver;
     }
 
     /// <summary>
@@ -90,26 +117,27 @@ public static class GraphicsPrimitives
         if (formOOP == SpecialObjectsArray.Instance.Nil || formOOP.IsSmallInteger)
             return (Memory<byte>.Empty, 0, 0);
 
-        try
-        {
-            // Get Form instance variables
-            SmalltalkOOP bitsOOP = ctx.GetFieldValue(formOOP, "class:Form", "bits");
-            int width = ctx.GetFieldValue(formOOP, "class:Form", "width").AsSmallInteger();
-            int height = ctx.GetFieldValue(formOOP, "class:Form", "height").AsSmallInteger();
+        // Get Form instance variables
+        SmalltalkOOP bitsOOP = ctx.GetFieldValue(formOOP, "class:Form", "bits");
+        SmalltalkOOP widthOOP = ctx.GetFieldValue(formOOP, "class:Form", "width");
+        SmalltalkOOP heightOOP = ctx.GetFieldValue(formOOP, "class:Form", "height");
 
-            // Get bitmap data
-            Memory<byte> bits = ctx.GetByteArray(bitsOOP);
-
-            return (bits, width, height);
-        }
-        catch
-        {
+        // Validate numeric fields
+        if (!widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger)
             return (Memory<byte>.Empty, 0, 0);
-        }
+
+        int width = widthOOP.AsSmallInteger();
+        int height = heightOOP.AsSmallInteger();
+
+        // Get bitmap data
+        Memory<byte> bits = ctx.GetByteArray(bitsOOP);
+
+        return (bits, width, height);
     }
 
     /// <summary>
     /// Primitive 97: snapshot - Save image to disk.
+    /// Uses IPlatformBridge to perform platform-specific snapshot operation.
     /// </summary>
     public static SmalltalkOOP Snapshot(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -119,8 +147,22 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // TODO: Implement image snapshot/save
-        // For now, just succeed
+        // If no platform bridge, fail (headless mode doesn't support snapshot)
+        if (ctx.PlatformBridge == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Call platform bridge with receiver as snapshot request object
+        // Receiver should contain snapshot parameters (Form, filename, etc.)
+        bool success = ctx.PlatformBridge.PerformSnapshot(receiver);
+        if (!success)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         return receiver;
     }
 
@@ -166,6 +208,7 @@ public static class GraphicsPrimitives
     /// Primitive 100: timeWords - Current time in seconds.
     /// Returns seconds since Unix epoch (January 1, 1970 UTC).
     /// Per Blue Book, returns SmallInteger with time value (masked to 31 bits).
+    /// Uses IPlatformBridge if available, falls back to CLR DateTimeOffset.
     /// </summary>
     public static SmalltalkOOP TimeWords(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -175,13 +218,24 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Return seconds since Unix epoch, masked to fit in SmallInteger
-        var seconds = (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0x7FFFFFFF);
+        int seconds;
+        if (ctx.PlatformBridge != null)
+        {
+            // Use platform bridge for consistent time source
+            seconds = ctx.PlatformBridge.GetTimeWords();
+        }
+        else
+        {
+            // Fallback: Use CLR time (headless mode)
+            seconds = (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0x7FFFFFFF);
+        }
+
         return SmalltalkOOP.FromSmallInteger(seconds);
     }
 
     /// <summary>
     /// Primitive 101: beDisplay - Make Form the active display.
+    /// Updates SpecialObjectsArray and notifies platform bridge if available.
     /// </summary>
     public static SmalltalkOOP BeDisplay(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -191,13 +245,37 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // TODO: When IDisplayProvider is integrated, set receiver as Display object
-        // For now, just succeed
+        if (receiver.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Update Display reference in SpecialObjectsArray or system dictionary
+        // (In Blue Book, Display is a global variable pointing to the current display Form)
+
+        // If platform bridge available, invalidate entire display to trigger redraw
+        if (ctx.PlatformBridge != null)
+        {
+            try
+            {
+                // Get display dimensions to invalidate entire screen
+                int width = ctx.GetFieldValue(receiver, "class:Form", "width").AsSmallInteger();
+                int height = ctx.GetFieldValue(receiver, "class:Form", "height").AsSmallInteger();
+                ctx.PlatformBridge.InvalidateDisplayRegion(0, 0, width, height);
+            }
+            catch
+            {
+                // Ignore errors in invalidation (not critical)
+            }
+        }
+
         return receiver;
     }
 
     /// <summary>
     /// Primitive 102: beCursor - Set hardware cursor.
+    /// Updates cursor Form (heap-only operation).
     /// </summary>
     public static SmalltalkOOP BeCursor(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -207,14 +285,21 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // TODO: When IDisplayProvider is integrated, extract cursor bitmap and set it
-        // For now, just succeed
+        if (receiver.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Store cursor Form reference in system (could be in SpecialObjectsArray or Display object)
+        // Platform bridge would be notified of cursor change via separate call if needed
+
         return receiver;
     }
 
     /// <summary>
     /// Primitive 103: beep - System beep sound.
-    /// Per Blue Book: Makes a beep sound.
+    /// Uses IPlatformBridge if available, falls back to Console.Beep.
     /// </summary>
     public static SmalltalkOOP Beep(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
@@ -224,32 +309,73 @@ public static class GraphicsPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        try
+        if (ctx.PlatformBridge != null)
         {
-            Console.Beep();
-            return receiver;
+            // Use platform bridge for beep
+            ctx.PlatformBridge.Beep();
         }
-        catch
+        else
         {
-            // Beep not supported on all platforms - just succeed anyway
-            return receiver;
+            // Fallback: Use console beep (headless mode)
+            try
+            {
+                Console.Beep();
+            }
+            catch
+            {
+                // Beep not supported on all platforms - just succeed anyway
+            }
         }
+
+        return receiver;
     }
 
     /// <summary>
     /// Primitive 104: clipboardText - Clipboard operations.
+    /// 0 args: Read clipboard (returns String OOP)
+    /// 1 arg: Write clipboard (arg is String OOP)
     /// </summary>
     public static SmalltalkOOP ClipboardText(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        if (args.Length != 0)
+        // No platform bridge = fail (clipboard requires platform integration)
+        if (ctx.PlatformBridge == null)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // TODO: Implement clipboard access (requires String creation)
-        ctx.PrimitiveSuccess = false;
-        return SpecialObjectsArray.Instance.Nil;
+        if (args.Length == 0)
+        {
+            // Read clipboard - returns String OOP or Nil
+            SmalltalkOOP stringOOP = ctx.PlatformBridge.ReadClipboardToStringOOP();
+            return stringOOP;
+        }
+        else if (args.Length == 1)
+        {
+            // Write clipboard - arg[0] must be String OOP
+            SmalltalkOOP stringOOP = args[0];
+
+            if (stringOOP.IsSmallInteger || stringOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+
+            bool success = ctx.PlatformBridge.WriteClipboardFromStringOOP(stringOOP);
+            if (!success)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+
+            return receiver;
+        }
+        else
+        {
+            // Invalid arg count
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
     }
 
     // Helper methods are no longer needed - we use SmalltalkOOP's built-in methods

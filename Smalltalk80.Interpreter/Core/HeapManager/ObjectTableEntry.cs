@@ -12,13 +12,6 @@ public sealed class ObjectTableEntry
     /// <summary>Managed storage for object data (byte[], SmalltalkOOP[], ushort[], or int[]).</summary>
     public object? ManagedStorage { get; set; }
 
-    /// <summary>
-    /// DEPRECATED: Use ManagedStorage instead. This will be removed after migration is complete.
-    /// Pointer to allocated object memory in .NET heap (pinned byte[]).
-    /// </summary>
-    [Obsolete("Use ManagedStorage instead. MemoryPointer will be removed after migration.")]
-    public IntPtr MemoryPointer { get; set; }
-
     /// <summary>Packed metadata word for space efficiency (size + format + GC flags + other metadata).</summary>
     public uint PackedMetadata { get; set; }
 
@@ -97,46 +90,6 @@ public sealed class ObjectTableEntry
         NamedSlots = null;
     }
 
-    /// <summary>Creates a new object table entry with legacy IntPtr (DEPRECATED).</summary>
-    [Obsolete("Use constructor with managed storage instead.")]
-    public ObjectTableEntry(IntPtr memoryPointer, ObjectFormat format, int sizeInWords, int instanceVariableCount = 0, int? originalIndexedSize = null)
-    {
-        MemoryPointer = memoryPointer;
-        FormatExplicit = format;
-        SizeInWordsExplicit = sizeInWords;
-        InstanceVariableCountExplicit = instanceVariableCount;
-
-        // Handle very large objects with ExtendedSize
-        if (sizeInWords > 65535)
-        {
-            PackedMetadata = EncodePackedMetadata(format, 65535, instanceVariableCount, 0, 0);
-            ExtendedSize = (uint)sizeInWords;
-        }
-        else
-        {
-            PackedMetadata = EncodePackedMetadata(format, sizeInWords, instanceVariableCount, 0, 0);
-            ExtendedSize = null;
-        }
-
-        // Store original indexed size for ByteIndexed objects
-        OriginalIndexedSize = (format == ObjectFormat.ByteIndexed) ? originalIndexedSize : null;
-
-        IsMarked = false;
-        NamedSlots = null;
-    }
-
-    /// <summary>Creates a new object table entry with full metadata control (DEPRECATED).</summary>
-    [Obsolete("Use constructor with managed storage instead.")]
-    public ObjectTableEntry(IntPtr memoryPointer, uint packedMetadata)
-    {
-        MemoryPointer = memoryPointer;
-        PackedMetadata = packedMetadata;
-        FormatExplicit = (ObjectFormat)((packedMetadata >> 12) & 0xF);
-        SizeInWordsExplicit = (int)((packedMetadata >> 16) & 0xFFFF);
-        InstanceVariableCountExplicit = (int)((packedMetadata >> 4) & 0xFF);
-        IsMarked = false;
-        NamedSlots = null;
-    }
 
     // PackedMetadata bit layout (32-bit word):
     // Bits 31-16: Size in words (16 bits) - 0-65535 words = 0-256KB objects  

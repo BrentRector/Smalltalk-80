@@ -155,11 +155,11 @@ public class Loader
             phase.Run();
         });
 
-        // Phase 5: Layout Computation
-        RunPhase("Phase 5: Layout Computation", () =>
+        // Phase 5: Layout Loading (v1.0.6+: loads precomputed layouts)
+        RunPhase("Phase 5: Layout Loading", () =>
         {
             _layoutResolver = new LayoutResolver();
-            _layoutResolver.ComputeLayouts(_bundle.Classes, _bundle.Symbols);
+            _layoutResolver.LoadLayouts(_bundle.Classes, _bundle.Symbols);
         });
 
         // Phase 6: Object Allocation (includes nil/true/false singletons)
@@ -192,11 +192,12 @@ public class Loader
             phase.Run();
         });
 
-        // Phase 8: Method Installation
+        // Phase 8: Method Installation (includes init expressions - merged from Phase 8b)
         RunPhase("Phase 8: Method Installation", () =>
         {
             var phase = new Phase8_MethodInstallation(_bundle, _allocator, _localIdToObjectId, _bundle.Symbols, _bundle.Strings);
             phase.Run();
+            // Note: Phase 8 now processes init expressions internally using shared Association canonicalization
         });
 
         // Phase 9: Method Dictionary Installation (CRITICAL - was missing!)
@@ -255,10 +256,16 @@ public class Loader
                 ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
             };
 
+            // Add init expression methods if allocated (Phase 8b)
+            if (SpecialObjectsArray.Instance.InitExpressionMethods != SmalltalkOOP.Null)
+            {
+                gcRootsList.Add(("InitExpressionMethods", SpecialObjectsArray.Instance.InitExpressionMethods));
+            }
+
             // Set as GC roots
             var gcRoots = gcRootsList.Select(r => r.oop).ToArray();
             _heapManager.SetGCRoots(gcRoots);
-            
+
             // Display GC roots
             Console.WriteLine($"  GC Roots ({gcRootsList.Count} objects):");
             foreach (var (name, oop) in gcRootsList)
