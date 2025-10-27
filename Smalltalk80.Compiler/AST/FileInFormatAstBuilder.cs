@@ -21,6 +21,7 @@ namespace Smalltalk80.Compiler.AST
         private readonly CompilationResult _result;
         private string? _currentClass;
         private bool _isMetaclass;
+        private bool _collectingClassesOnly = false; // Two-pass compilation: pass 1 = collect classes, pass 2 = compile methods
         private string _currentCategory = "";
         private readonly Dictionary<string, ClassDefinitionNode> _classes;
         private readonly List<InitializationExpression> _initExpressions;
@@ -43,11 +44,27 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitFileIn(Smalltalk80Parser.FileInContext context)
         {
-            // Process all chunks in the file
+            // TWO-PASS COMPILATION:
+            // Pass 1: Collect all class definitions (populate _classes dictionary)
+            // This ensures all classes are known before we compile any methods
+            Console.WriteLine("[AST] Pass 1: Collecting class definitions...");
+            _collectingClassesOnly = true;
             foreach (var chunk in context.chunk())
             {
                 Visit(chunk);
             }
+            Console.WriteLine($"[AST] Pass 1 complete: {_classes.Count} classes collected");
+
+            // Pass 2: Compile all methods
+            // Now that all classes are in _classes, ComputeInheritedInstanceVariables will work correctly
+            Console.WriteLine("[AST] Pass 2: Compiling methods...");
+            _collectingClassesOnly = false;
+            foreach (var chunk in context.chunk())
+            {
+                Visit(chunk);
+            }
+            var totalMethods = _classes.Values.Sum(c => c.Methods.Count + c.ClassMethods.Count);
+            Console.WriteLine($"[AST] Pass 2 complete: {totalMethods} methods compiled");
 
             // Build the final result
             _result.Classes = _classes.Values.ToList();
@@ -191,6 +208,10 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
         {
+            // Skip method compilation during pass 1 (class collection phase)
+            if (_collectingClassesOnly)
+                return null;
+
             // Extract the class name from the chunk - this is critical!
             // The grammar has: className (cls = IDENTIFIER)?
             if (context.className() != null)
@@ -201,9 +222,9 @@ namespace Smalltalk80.Compiler.AST
                     _currentClass = classNameNode.IDENTIFIER().GetText();
                 }
             }
-            
+
             // Only proceed if we have a valid current class
-            if (_currentClass == null || !_classes.ContainsKey(_currentClass)) 
+            if (_currentClass == null || !_classes.ContainsKey(_currentClass))
                 return null;
             
             // Check if this is a class-side method category using the cls token
@@ -290,9 +311,13 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
         {
+            // Skip init expression compilation during pass 1 (class collection phase)
+            if (_collectingClassesOnly)
+                return null;
+
             // ALL expression chunks are executable code that should be evaluated during file-in
             // This includes "ClassName comment: '...'" which sends the comment: message to store class documentation
-            
+
             var sourceText = GetOriginalText(context.expression());
             
             // Extract receiver and selector info for documentation
@@ -341,10 +366,10 @@ namespace Smalltalk80.Compiler.AST
 
             var classNode = _classes[_currentClass];
 
-            // Compute inherited instance variables for instance methods
-            var instanceVars = (_isMetaclass)
-                ? new List<string>() // Class methods don't have access to instance variables
-                : ComputeInheritedInstanceVariables(_currentClass);
+            // Compute inherited instance variables
+            // Two-pass compilation ensures all classes are parsed before we compile any methods,
+            // so ComputeInheritedInstanceVariables will work correctly for both instances and metaclasses
+            var instanceVars = ComputeInheritedInstanceVariables(_currentClass);
 
             // Get class and pool variables
             var classVars = GetClassVariables(classNode);
@@ -952,6 +977,7 @@ namespace Smalltalk80.Compiler.AST
 
             return instanceVars;
         }
+
 
         /// <summary>
         /// Gets class variables for a class.
