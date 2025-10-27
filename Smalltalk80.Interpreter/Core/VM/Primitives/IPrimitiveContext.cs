@@ -196,4 +196,11 @@ public interface IPrimitiveContext
     /// <param name="globalName">Global name (e.g., "class:LargePositiveInteger", "global:Transcript").</param>
     /// <returns>Global object OOP if found, Nil if not found.</returns>
     SmalltalkOOP GetGlobalObjectByName(string globalName);
+
+    /// <summary>
+    /// Gets the class name for an object (e.g., "class:WriteStream", "class:Point").
+    /// </summary>
+    /// <param name="objectOOP">Object pointer.</param>
+    /// <returns>Class name string, or null if object is invalid.</returns>
+    string? GetClassNameForObject(SmalltalkOOP objectOOP);
 }
