@@ -200,9 +200,18 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        // Get the receiver's actual class name (e.g., "class:Semaphore" or any Semaphore subclass)
+        // This ensures the primitive works correctly with Semaphore subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         // Get Semaphore fields: firstLink, lastLink, excessSignals
-        SmalltalkOOP firstLinkOop = ctx.GetFieldValue(receiver, "class:Semaphore", "firstLink");
-        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, "class:Semaphore", "excessSignals");
+        SmalltalkOOP firstLinkOop = ctx.GetFieldValue(receiver, className, "firstLink");
+        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, className, "excessSignals");
 
         // Check if any processes are waiting (firstLink is not nil)
         if (firstLinkOop == SpecialObjectsArray.Instance.Nil)
@@ -215,12 +224,12 @@ public static class ControlPrimitives
             }
 
             int excessCount = excessSignalsOop.AsSmallInteger();
-            ctx.SetFieldValue(receiver, "class:Semaphore", "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount + 1));
+            ctx.SetFieldValue(receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount + 1));
         }
         else
         {
             // Remove first waiting process from semaphore's linked list
-            SmalltalkOOP processOop = RemoveFirstLink(ctx, receiver, "class:Semaphore");
+            SmalltalkOOP processOop = RemoveFirstLink(ctx, receiver, className);
 
             if (processOop == SpecialObjectsArray.Instance.Nil)
             {
@@ -258,8 +267,17 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        // Get the receiver's actual class name (e.g., "class:Semaphore" or any Semaphore subclass)
+        // This ensures the primitive works correctly with Semaphore subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         // Get excessSignals field
-        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, "class:Semaphore", "excessSignals");
+        SmalltalkOOP excessSignalsOop = ctx.GetFieldValue(receiver, className, "excessSignals");
 
         if (!excessSignalsOop.IsSmallInteger)
         {
@@ -272,7 +290,7 @@ public static class ControlPrimitives
         if (excessCount > 0)
         {
             // Signal available - decrement and continue
-            ctx.SetFieldValue(receiver, "class:Semaphore", "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount - 1));
+            ctx.SetFieldValue(receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount - 1));
             return receiver;
         }
         else
@@ -287,7 +305,7 @@ public static class ControlPrimitives
             }
 
             // Add active process to semaphore's waiting list
-            AddLastLink(ctx, receiver, "class:Semaphore", activeProcessOop);
+            AddLastLink(ctx, receiver, className, activeProcessOop);
 
             // NOTE: Actual process suspension requires VM context switching
             // This primitive sets up the data structures, but the VM must handle the context switch
@@ -316,8 +334,17 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        // Get the receiver's actual class name (e.g., "class:Process" or any Process subclass)
+        // This ensures the primitive works correctly with Process subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         // Get Process fields: myList must be nil (not already scheduled)
-        SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, "class:Process", "myList");
+        SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, className, "myList");
 
         // Fail if already on a list (already scheduled)
         if (myListOop != SpecialObjectsArray.Instance.Nil)
@@ -355,6 +382,15 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        // Get the receiver's actual class name (e.g., "class:Process" or any Process subclass)
+        // This ensures the primitive works correctly with Process subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         SmalltalkOOP activeProcessOop = GetActiveProcess(ctx);
 
         if (receiver == activeProcessOop)
@@ -368,7 +404,7 @@ public static class ControlPrimitives
         else
         {
             // Suspending a non-active process - remove it from its list
-            SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, "class:Process", "myList");
+            SmalltalkOOP myListOop = ctx.GetFieldValue(receiver, className, "myList");
 
             // Process must be on a list to suspend
             if (myListOop == SpecialObjectsArray.Instance.Nil)
@@ -385,7 +421,7 @@ public static class ControlPrimitives
             }
 
             // Clear myList reference
-            ctx.SetFieldValue(receiver, "class:Process", "myList", SpecialObjectsArray.Instance.Nil);
+            ctx.SetFieldValue(receiver, className, "myList", SpecialObjectsArray.Instance.Nil);
 
             return receiver;
         }
