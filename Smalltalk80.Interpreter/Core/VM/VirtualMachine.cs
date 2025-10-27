@@ -1649,9 +1649,18 @@ public partial class VirtualMachine : IPrimitiveContext
         // For super sends, we need to start method lookup from the superclass of the class
         // that contains the currently executing method, NOT from the receiver's class.
 
-        // Get the currently executing method from the active context
+        // CRITICAL: When executing inside a BlockContext, _activeContextOOP points to the BlockContext,
+        // not the enclosing MethodContext. We need to find the actual MethodContext to get the correct
+        // method for super send lookup.
+        var methodContextOOP = FindMethodContext(_activeContextOOP);
+        if (methodContextOOP == default)
+        {
+            throw new InvalidOperationException($"Cannot find MethodContext for super send - active context may be invalid");
+        }
+
+        // Get the currently executing method from the method context
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var currentMethodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
         // CompiledMethod structure: fixed slot 0 = homeClass, indexed slots = [header] [literals...] [bytecodeArray]
