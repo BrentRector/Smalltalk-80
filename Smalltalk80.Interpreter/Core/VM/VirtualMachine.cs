@@ -3564,4 +3564,22 @@ public partial class VirtualMachine : IPrimitiveContext
         // Global not found
         return SpecialObjectsArray.Instance.Nil;
     }
+
+    string? IPrimitiveContext.GetClassNameForObject(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+        {
+            return "class:SmallInteger";
+        }
+
+        // Get the class OOP from slot 0 of the object
+        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        if (classOOP == SpecialObjectsArray.Instance.Nil || classOOP == SmalltalkOOP.Null)
+        {
+            return null;
+        }
+
+        // Use the private GetClassName method to get the class name
+        return GetClassName(classOOP);
+    }
 }

@@ -393,10 +393,20 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Get Stream instance variables
-        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
-        SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
-        SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
+        // Get the receiver's actual class name (e.g., "class:ReadStream", "class:WriteStream")
+        // This is necessary because Stream has no instance variables - they're defined in subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get Stream instance variables from the receiver's actual class
+        // (these fields are inherited from PositionableStream)
+        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, className, "position");
+        SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, className, "readLimit");
+        SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, className, "collection");
 
         // Validate position and readLimit are SmallIntegers
         if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
@@ -437,7 +447,7 @@ public static class ObjectPrimitives
         SmalltalkOOP element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
 
         // Increment position (remains 1-based for Smalltalk)
-        ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
+        ctx.SetFieldValue(receiver, className, "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
         return element;
     }
@@ -459,10 +469,20 @@ public static class ObjectPrimitives
 
         SmalltalkOOP value = args[0];
 
-        // Get Stream instance variables
-        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
-        SmalltalkOOP writeLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "writeLimit");
-        SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, "class:Stream", "collection");
+        // Get the receiver's actual class name (e.g., "class:WriteStream", "class:ReadStream")
+        // This is necessary because Stream has no instance variables - they're defined in subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get Stream instance variables from the receiver's actual class
+        // (these fields are inherited from PositionableStream and WriteStream)
+        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, className, "position");
+        SmalltalkOOP writeLimitOOP = ctx.GetFieldValue(receiver, className, "writeLimit");
+        SmalltalkOOP collectionOOP = ctx.GetFieldValue(receiver, className, "collection");
 
         // Validate position and writeLimit are SmallIntegers
         if (!positionOOP.IsSmallInteger || !writeLimitOOP.IsSmallInteger)
@@ -501,7 +521,7 @@ public static class ObjectPrimitives
         ctx.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
 
         // Increment position (remains 1-based)
-        ctx.SetFieldValue(receiver, "class:Stream", "position", SmalltalkOOP.FromSmallInteger(position + 1));
+        ctx.SetFieldValue(receiver, className, "position", SmalltalkOOP.FromSmallInteger(position + 1));
 
         return value;
     }
@@ -521,9 +541,19 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Get Stream instance variables
-        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, "class:Stream", "position");
-        SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, "class:Stream", "readLimit");
+        // Get the receiver's actual class name (e.g., "class:ReadStream", "class:WriteStream")
+        // This is necessary because Stream has no instance variables - they're defined in subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get Stream instance variables from the receiver's actual class
+        // (these fields are inherited from PositionableStream)
+        SmalltalkOOP positionOOP = ctx.GetFieldValue(receiver, className, "position");
+        SmalltalkOOP readLimitOOP = ctx.GetFieldValue(receiver, className, "readLimit");
 
         // Validate position and readLimit are SmallIntegers
         if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
