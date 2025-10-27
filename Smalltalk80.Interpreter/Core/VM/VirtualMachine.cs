@@ -765,7 +765,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(returnSelfPopBlockOOP));
                     if (blockClass == "BlockClosure")
                     {
-                        // TODO: Non-local return support for BlockClosure (Phase 3)
+                        // Non-local return support for BlockClosure (return self)
                         // Get self from home context
                         int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
                         var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeContextIndex);
@@ -775,9 +775,11 @@ public partial class VirtualMachine : IPrimitiveContext
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
 
-                        // Temporarily treat as normal return until NonLocalReturnException is implemented
-                        // throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
-                        Console.WriteLine($"[WARN] Non-local return attempted but not yet supported - treating as normal return");
+                        Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value=self ({homeReceiverOOP})");
+
+                        // THROW NON-LOCAL RETURN EXCEPTION
+                        // This will unwind the call stack back to the target context
+                        throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
                     }
                     else
                     {
@@ -804,19 +806,19 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(returnTopPopBlockOOP));
                     if (blockClass == "BlockClosure")
                     {
-                        // TODO: Non-local return support for BlockClosure (Phase 3)
+                        // Non-local return support for BlockClosure
                         // Value already on stack
                         var returnValue = Pop();
 
                         // Get return context
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
-                        Console.WriteLine($"[WARN] Non-local return attempted (value={returnValue}, target={returnContextOOP}) - not yet supported, treating as normal return");
-                        // throw new NonLocalReturnException(returnValue, returnContextOOP);
 
-                        // Temporarily treat as normal return
-                        Push(returnValue);
-                        return false;
+                        Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value={returnValue}");
+
+                        // THROW NON-LOCAL RETURN EXCEPTION
+                        // This will unwind the call stack back to the target context
+                        throw new NonLocalReturnException(returnValue, returnContextOOP);
                     }
                     else
                     {
@@ -1708,15 +1710,14 @@ public partial class VirtualMachine : IPrimitiveContext
 
             return CallOutcome.Normal(result);
         }
-        // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
-        // catch (NonLocalReturnException ex)
-        // {
-        //     Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
-        //     _activeContextOOP = previousContextOOP;
-        //     _activeContextCount--;
-        //     Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-        //     return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        // }
+        catch (NonLocalReturnException ex)
+        {
+            Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
+        }
         catch (Exception ex)
         {
             DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, superclassOOP, selectorName!, ex);
@@ -1866,27 +1867,26 @@ public partial class VirtualMachine : IPrimitiveContext
 
             return CallOutcome.Normal(result);
         }
-        // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
-        // catch (NonLocalReturnException ex)
-        // {
-        //     // Non-local return from a block - convert to CallOutcome
-        //     // DO NOT convert to normal return - let caller decide based on target
-        //     Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
-        //
-        //     // Restore previous context BEFORE returning outcome
-        //     _activeContextOOP = previousContextOOP;
-        //     _activeContextCount--;
-        //
-        //     Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-        //
-        //     if (VerboseDebug)
-        //     {
-        //         _callDepth--;
-        //     }
-        //
-        //     // Return NonLocalReturn outcome - caller will check if target matches its context
-        //     return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        // }
+        catch (NonLocalReturnException ex)
+        {
+            // Non-local return from a block - convert to CallOutcome
+            // DO NOT convert to normal return - let caller decide based on target
+            Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
+
+            // Restore previous context BEFORE returning outcome
+            _activeContextOOP = previousContextOOP;
+            _activeContextCount--;
+
+            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+
+            if (VerboseDebug)
+            {
+                _callDepth--;
+            }
+
+            // Return NonLocalReturn outcome - caller will check if target matches its context
+            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
+        }
         catch (Exception ex)
         {
             if (VerboseDebug)
@@ -1937,13 +1937,9 @@ public partial class VirtualMachine : IPrimitiveContext
                 return false;
             }
 
-            // TODO: Non-local return support (Phase 3) - NonLocalReturnException not yet implemented
-            Console.WriteLine($"[NLR PROPAGATE] Would rethrow exception to continue unwinding, but NLR not implemented - treating as normal return");
             // Otherwise propagate as exception for callers to handle / continue unwinding
-            // throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
-
-            // Temporarily push value and continue
-            Push(outcome.Value);
+            Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContextOop}");
+            throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
         }
 
         throw new InvalidOperationException("Unhandled CallOutcome kind");
