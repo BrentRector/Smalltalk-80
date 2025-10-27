@@ -225,6 +225,27 @@ public static class BytecodeDisassembler
                 GetExtendedOperandString("storeLiteralVariable", bytecodes, ref pc, ref bytesConsumed),
             ExtendedSubOp.POP_STORE_LITERAL_VAR when pc + 1 < bytecodes.Length =>
                 GetExtendedOperandString("popStoreLiteralVariable", bytecodes, ref pc, ref bytesConsumed),
+
+            // Send operations with single operand (selector index)
+            ExtendedSubOp.SEND_0 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 0),
+            ExtendedSubOp.SEND_1 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 1),
+            ExtendedSubOp.SEND_2 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 2),
+            ExtendedSubOp.SEND_SUPER_0 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 0),
+            ExtendedSubOp.SEND_SUPER_1 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 1),
+            ExtendedSubOp.SEND_SUPER_2 when pc + 1 < bytecodes.Length =>
+                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 2),
+
+            // Send operations with two operands (selector index + arg count)
+            ExtendedSubOp.SEND_N when pc + 2 < bytecodes.Length =>
+                GetExtendedSendNString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay),
+            ExtendedSubOp.SEND_SUPER_N when pc + 2 < bytecodes.Length =>
+                GetExtendedSendNString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay),
+
             ExtendedSubOp.POP => "pop",
             ExtendedSubOp.DUP => "dup",
             _ => $"extended subOp 0x{subOp:X2}"
@@ -237,6 +258,29 @@ public static class BytecodeDisassembler
         pc++;
         bytesConsumed = 3; // 0x80 + subOp + operand
         return $"{mnemonic} {operand}";
+    }
+
+    private static string GetExtendedSendString(string mnemonic, byte[] bytecodes, ref int pc, ref int bytesConsumed, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, int argCount)
+    {
+        byte selectorIndex = bytecodes[pc + 1];
+        pc++;
+        bytesConsumed = 3; // 0x80 + subOp + selectorIndex
+
+        int litIndex = selectorIndex + 1; // +1 to skip header at literalOOPs[0]
+        string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{selectorIndex}]";
+        return $"{mnemonic} #{selector} ({argCount} args)";
+    }
+
+    private static string GetExtendedSendNString(string mnemonic, byte[] bytecodes, ref int pc, ref int bytesConsumed, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay)
+    {
+        byte selectorIndex = bytecodes[pc + 1];
+        byte argCount = bytecodes[pc + 2];
+        pc += 2;
+        bytesConsumed = 4; // 0x80 + subOp + selectorIndex + argCount
+
+        int litIndex = selectorIndex + 1; // +1 to skip header at literalOOPs[0]
+        string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{selectorIndex}]";
+        return $"{mnemonic} #{selector} ({argCount} args)";
     }
 
     /// <summary>
