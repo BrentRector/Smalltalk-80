@@ -25,11 +25,29 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     private readonly List<JsonMethod> _methods = [];
     private readonly List<JsonInitExpr> _initExprs = [];
     private readonly List<JsonObject> _objects = [];
-    private readonly List<JsonPatch> _patches = [];
+    private readonly List<PatchDescriptor> _patches = [];
     private readonly List<InstallPhase> _installPhases = [];
     private readonly Dictionary<string, int> _selectorFrequency = new();
     private readonly Dictionary<string, string> _blockToHomeMethod = new(); // Maps block localId → home method localId
     private string? _currentMethodLocalId; // Tracks the current method being processed
+
+    /// <summary>
+    /// Block buffer for post-order emission.
+    ///
+    /// WHY: The loader can only resolve block references in a single pass if blocks appear AFTER
+    /// their containing methods in the bundle (forward references). Previously, blocks were emitted
+    /// immediately when encountered during literal conversion, causing them to appear BEFORE their
+    /// parents (backward references), requiring a two-pass loader.
+    ///
+    /// HOW: When processing a method's literals, any blocks encountered are buffered here instead
+    /// of being immediately added to _methods. After the parent method is added to _methods, all
+    /// buffered blocks are added in post-order (parent first, then blocks).
+    ///
+    /// ACTIVATION: Set to non-null when processing a top-level method, null otherwise.
+    /// - Non-null: Buffer blocks for later emission
+    /// - Null: Emit blocks immediately (fallback for init expressions, etc.)
+    /// </summary>
+    private List<JsonMethod>? _blockBuffer;
 
     /// <summary>
     /// Generates the complete cold-start JSON bundle from the AST.
@@ -564,6 +582,14 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                 // Set current method context for block homeContext tracking
                 _currentMethodLocalId = $"method:{classNode.Name}>>{methodNode.Selector}";
 
+                // ACTIVATE BLOCK BUFFERING FOR POST-ORDER EMISSION
+                //
+                // Any blocks encountered in this method's literals will be buffered instead of
+                // immediately added to _methods. This ensures the parent method appears BEFORE
+                // its blocks in the bundle, creating forward references that enable single-pass
+                // method compilation in the loader.
+                _blockBuffer = new List<JsonMethod>();
+
                 // For extended form (flags=7), add encoded argCount+primitive as last literal
                 var literals = ConvertLiterals(methodNode.Literals);
                 int literalCount = methodNode.Literals.Count;
@@ -615,7 +641,21 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     TempNames = methodNode.TempNames.ToArray()
                 };
 
-                _methods.Add(method);
+                // POST-ORDER EMISSION: Parent method first, then buffered blocks
+                //
+                // Emit the parent method first, creating forward references from this method
+                // to any blocks it contains. Then emit all buffered blocks in the order they
+                // were encountered (depth-first post-order for nested blocks).
+                //
+                // RESULT: Bundle ordering will be [parent_method, block1, block2_nested, ...]
+                // instead of the previous [block2_nested, block1, parent_method].
+                _methods.Add(method);                 // Parent first
+                _methods.AddRange(_blockBuffer);      // Then blocks
+
+                // DEACTIVATE BUFFERING
+                // Clear the buffer for the next method. Setting to null also signals that
+                // any blocks processed outside of method context should be emitted immediately.
+                _blockBuffer = null;
             }
 
             // Convert class methods
@@ -623,6 +663,10 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             {
                 // Set current method context for block homeContext tracking
                 _currentMethodLocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}";
+
+                // ACTIVATE BLOCK BUFFERING FOR POST-ORDER EMISSION
+                // (Same as instance methods - see comments above for detailed explanation)
+                _blockBuffer = new List<JsonMethod>();
 
                 // For extended form (flags=7), add encoded argCount+primitive as last literal
                 var literals = ConvertLiterals(methodNode.Literals);
@@ -675,7 +719,11 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                     TempNames = methodNode.TempNames.ToArray()
                 };
 
-                _methods.Add(method);
+                // POST-ORDER EMISSION: Parent method first, then buffered blocks
+                // (Same as instance methods - see comments above for detailed explanation)
+                _methods.Add(method);                 // Parent first
+                _methods.AddRange(_blockBuffer);      // Then blocks
+                _blockBuffer = null;                  // Deactivate buffering
             }
         }
     }
@@ -953,12 +1001,24 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
         var savedMethodContext = _currentMethodLocalId;
         _currentMethodLocalId = blockLocalId;
 
+        // NESTED BLOCK HANDLING: Save current buffer and create a local buffer for nested blocks
+        //
+        // If this block contains nested blocks, we need to emit them AFTER this block,
+        // not before. Save the parent's buffer and create a fresh one for this block's
+        // nested children.
+        var savedBuffer = _blockBuffer;
+        _blockBuffer = new List<JsonMethod>();
+
         // Convert block's literals recursively (blocks can contain blocks)
-        // Nested blocks will see this block as their homeContext
+        // Nested blocks will be added to our local _blockBuffer
         var convertedLiterals = ConvertLiterals(block.Literals.ToList());
 
-        // Restore the parent context
+        // Capture nested blocks before restoring parent buffer
+        var nestedBlocks = _blockBuffer;
+
+        // Restore the parent context and buffer
         _currentMethodLocalId = savedMethodContext;
+        _blockBuffer = savedBuffer;
 
         // Create the JSON method object for the block
         var jsonMethod = new JsonMethod
@@ -990,8 +1050,24 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             TempNames = block.TemporaryNames.ToArray()
         };
 
-        // Add the block to the methods collection
-        _methods.Add(jsonMethod);
+        // POST-ORDER EMISSION: Buffer block and its nested blocks
+        //
+        // Add this block to the parent's buffer, then add all nested blocks that were
+        // collected during literal conversion. This ensures proper post-order:
+        //   [parent_method, outer_block, nested_block1, nested_block2, ...]
+        //
+        // If _blockBuffer is null, we're in init expression context - emit immediately.
+        if (_blockBuffer != null)
+        {
+            _blockBuffer.Add(jsonMethod);           // Add this block first
+            _blockBuffer.AddRange(nestedBlocks);    // Then add its nested blocks
+        }
+        else
+        {
+            // Fallback for init expressions - emit block and nested blocks immediately
+            _methods.Add(jsonMethod);
+            _methods.AddRange(nestedBlocks);
+        }
 
         // Return a reference to the block as a compiledMethod literal
         return new Dictionary<string, object>
@@ -1067,8 +1143,6 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     /// </summary>
     private void GeneratePatches(CompilationResult ast)
     {
-        int patchId = 0;
-
         // Build set of valid class names for filtering
         var validClassNames = new HashSet<string>(_classes.Select(c => GetClassNameFromLocalId(c.LocalId)));
 
@@ -1092,25 +1166,17 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
                         // Skip temp variables, method args, and other non-class symbols
                         if (!string.IsNullOrEmpty(keyName) && validClassNames.Contains(keyName))
                         {
-                            _patches.Add(new JsonPatch
+                            _patches.Add(new PatchDescriptor
                             {
-                                PatchId = $"patch:{patchId:D3}",
-                                Target = new PatchTarget
+                                Type = "ReplaceLiteral",
+                                MethodLocalId = method.LocalId,
+                                LiteralIndex = i,
+                                Value = new FieldValue
                                 {
-                                    Kind = "methodLiteral",
-                                    MethodLocalId = method.LocalId,
-                                    LiteralIndex = i
-                                },
-                                Operation = "setAssociationValue",
-                                Value = new Dictionary<string, object>
-                                {
-                                    ["type"] = "objectRef",
-                                    ["localId"] = $"class:{keyName}"
-                                },
-                                Description = $"Patch association value for class {keyName}"
+                                    Type = "objectRef",
+                                    LocalId = $"class:{keyName}"
+                                }
                             });
-
-                            patchId++;
                         }
                         // For non-class associations (temps, args, etc.), leave value as nil
                         // These will be resolved at runtime by the compiler/interpreter
@@ -1119,24 +1185,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             }
         }
 
-        // Generate patches for metaclass wiring
-        foreach (var cls in _classes.Where(c => c.IsMetaclass))
-        {
-            _patches.Add(new JsonPatch
-            {
-                PatchId = $"patch:{patchId:D3}",
-                Target = new PatchTarget
-                {
-                    Kind = "metaclassWiring",
-                    ClassLocalId = cls.LocalId
-                },
-                Operation = "wireMetaclass",
-                Value = null,
-                Description = $"Wire metaclass {cls.LocalId} to its instance class"
-            });
-
-            patchId++;
-        }
+        // Note: Metaclass wiring patches are no longer needed - handled automatically in Phase 2
+        // The interpreter's Phase 2 (Phase2_ClassShells.cs) now properly wires metaclasses
+        // during class shell creation, so we don't need explicit patches for this.
     }
 
     /// <summary>
@@ -1217,7 +1268,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             {
                 Name = "Patches",
                 Kind = "patches",
-                LocalIds = _patches.Select(p => p.PatchId).ToList()
+                LocalIds = _patches.Select((p, idx) => $"patch:{idx:D3}").ToList()
             });
         }
     }
@@ -1300,7 +1351,7 @@ internal sealed record ColdStartBundle
     public required List<JsonMethod> Methods { get; init; }
     public required List<JsonInitExpr> InitExpressions { get; init; }
     public required InstallOrder InstallOrder { get; init; }
-    public required List<JsonPatch> Patches { get; init; }
+    public required List<PatchDescriptor> Patches { get; init; }
 }
 
 internal sealed record Metadata
@@ -1414,23 +1465,57 @@ internal sealed record InstallPhase
     public required List<string> LocalIds { get; init; }
 }
 
-internal sealed record JsonPatch
+/// <summary>
+/// Patch descriptor matching the interpreter's PatchDescriptor schema.
+/// Used to patch forward references and circular dependencies after allocation.
+/// </summary>
+internal sealed record PatchDescriptor
 {
-    public required string PatchId { get; init; }
-    public required PatchTarget Target { get; init; }
-    public required string Operation { get; init; }
-    public object? Value { get; init; }
-    public string? Description { get; init; }
+    [JsonPropertyName("type")]
+    public required string Type { get; init; }
+
+    [JsonPropertyName("targetLocalId")]
+    public string? TargetLocalId { get; init; }
+
+    [JsonPropertyName("fieldName")]
+    public string? FieldName { get; init; }
+
+    [JsonPropertyName("value")]
+    public FieldValue? Value { get; init; }
+
+    [JsonPropertyName("classLocalId")]
+    public string? ClassLocalId { get; init; }
+
+    [JsonPropertyName("methodLocalId")]
+    public string? MethodLocalId { get; init; }
+
+    [JsonPropertyName("literalIndex")]
+    public int? LiteralIndex { get; init; }
 }
 
-internal sealed record PatchTarget
+/// <summary>
+/// Field value discriminated union matching the interpreter's FieldValue schema.
+/// </summary>
+internal sealed record FieldValue
 {
-    public required string Kind { get; init; }
-    public string? MethodLocalId { get; init; }
-    public int? LiteralIndex { get; init; }
-    public string? ObjectLocalId { get; init; }
-    public int? FieldIndex { get; init; }
-    public int? IndexedSlot { get; init; }
-    public string? ClassLocalId { get; init; }
-    public string? SlotName { get; init; }
+    [JsonPropertyName("type")]
+    public required string Type { get; init; }
+
+    [JsonPropertyName("value")]
+    public object? Value { get; init; }
+
+    [JsonPropertyName("index")]
+    public int? Index { get; init; }
+
+    [JsonPropertyName("localId")]
+    public string? LocalId { get; init; }
+
+    [JsonPropertyName("codePoint")]
+    public int? CodePoint { get; init; }
+
+    [JsonPropertyName("encoding")]
+    public string? Encoding { get; init; }
+
+    [JsonPropertyName("data")]
+    public string? Data { get; init; }
 }

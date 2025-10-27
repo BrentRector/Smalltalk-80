@@ -18,7 +18,7 @@ public class ColdStartBundle
     public required MethodDescriptor[] Methods { get; init; }
     public required InitExpression[] InitExpressions { get; init; }
     public InstallOrder? InstallOrder { get; init; }
-    public required PatchDescriptor[] Patches { get; init; }
+    public PatchDescriptor[]? Patches { get; init; }  // Optional for backward compatibility
     public SourceFile[]? SourceFiles { get; init; }
 
     /// <summary>
