@@ -305,10 +305,10 @@ public class Phase3_ObjectAllocation
                 {
                     _allocator.SetSlot(classOOP, 0, metaclassOOP);
 
-                    // Debug: Show first few and class:Point specifically
-                    if (classReferencesSet < 5 || instanceClassName == "Point")
+                    // Debug: Show first few and class:Point and class:MethodDictionary specifically
+                    if (classReferencesSet < 5 || instanceClassName == "Point" || instanceClassName == "MethodDictionary")
                     {
-                        Console.WriteLine($"    Set {cls.LocalId}.class = {metaclassLocalId}");
+                        Console.WriteLine($"    Set {cls.LocalId}.class = {metaclassLocalId} (classOOP={classOOP}, metaclassOOP={metaclassOOP})");
                     }
                 }
                 else

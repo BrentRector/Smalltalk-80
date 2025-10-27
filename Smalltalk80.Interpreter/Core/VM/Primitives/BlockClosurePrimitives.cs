@@ -49,14 +49,17 @@ public static class BlockClosurePrimitives
 
         // Extract block method from BlockClosure instance variable 'method'
         var methodIndex = ctx.GetFieldIndex("class:BlockClosure", "method");
+        Console.WriteLine($"[DEBUG Primitive207] receiver={receiver}, methodIndex={methodIndex}");
         var blockMethodOOP = ctx.GetInstanceVariable(receiver, methodIndex);
 
         // Extract homeContext from BlockClosure instance variable 'homeContext'
         var homeContextIndex = ctx.GetFieldIndex("class:BlockClosure", "homeContext");
+        Console.WriteLine($"[DEBUG Primitive207] homeContextIndex={homeContextIndex}");
         var homeContextOOP = ctx.GetInstanceVariable(receiver, homeContextIndex);
 
         // Extract numArgs from BlockClosure to validate argument count
         var numArgsIndex = ctx.GetFieldIndex("class:BlockClosure", "numArgs");
+        Console.WriteLine($"[DEBUG Primitive207] numArgsIndex={numArgsIndex}");
         var numArgsOOP = ctx.GetInstanceVariable(receiver, numArgsIndex);
         int expectedArgCount = numArgsOOP.IsSmallInteger ? numArgsOOP.AsSmallInteger() : 0;
 

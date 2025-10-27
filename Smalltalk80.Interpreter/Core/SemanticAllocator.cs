@@ -512,25 +512,27 @@ public class SemanticAllocator
 
     /// <summary>
     /// Allocates a CompiledMethod object following our C# design:
-    /// PointerIndexed: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
+    /// Fixed slot 0: homeClass (needed for super sends)
+    /// Indexed slots: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
     /// + Separate ByteArray for actual bytecodes
-    /// 
+    ///
     /// Smalltalk access patterns:
     /// - objectAt: 1 → header (our indexed slot 0)
-    /// - objectAt: 2 → literal1 (our indexed slot 1) 
+    /// - objectAt: 2 → literal1 (our indexed slot 1)
     /// - at: 1 → first bytecode (via hidden ByteArray reference)
     /// </summary>
     public SmalltalkOOP AllocateCompiledMethod(
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP,
-        int headerWord, 
-        SmalltalkOOP[] literalOOPs, 
+        SmalltalkOOP homeClassOOP,
+        int headerWord,
+        SmalltalkOOP[] literalOOPs,
         byte[] bytecodes)
     {
-        // CompiledMethod has no instance variables, only indexed slots
-        int fixedSlots = 0;
+        // CompiledMethod has 1 fixed slot (homeClass) plus indexed slots
+        int fixedSlots = 1;  // slot 0 = homeClass
         int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
-        
+
         // Step 1: Create separate ByteArray for bytecodes with proper class reference
         var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
         _heapManager.SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
@@ -538,26 +540,72 @@ public class SemanticAllocator
         {
             _heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
         }
-        
+
         // Step 2: Allocate PointerIndexed CompiledMethod with proper class reference
+        // Format is PointerIndexed because we have both fixed slots and indexed slots
         var methodOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
         _heapManager.SetSlot(methodOOP, 0, compiledMethodClassOOP);
-        
-        // Step 3: Populate indexed slots
+
+        // Step 3: Set fixed slot 0 (homeClass) - needed for super sends
+        _heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);
+
+        // Step 4: Populate indexed slots
         // Indexed slot 0: Method header (accessed via objectAt: 1)
         var headerOOP = SmalltalkOOP.FromSmallInteger(headerWord);
         _heapManager.SetIndexedOOP(methodOOP, 0, headerOOP);
-        
+
         // Slots 1..N: Literals (accessed via objectAt: 2, objectAt: 3, etc.)
         for (int i = 0; i < literalOOPs.Length; i++)
         {
             _heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOPs[i]);
         }
-        
+
         // Slot N+1: Hidden ByteArray reference (not accessible from Smalltalk)
         _heapManager.SetIndexedOOP(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
-        
+
         return methodOOP;
+    }
+
+    /// <summary>
+    /// Gets the class name of an object for debugging/validation purposes.
+    /// </summary>
+    public string GetClassName(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+        {
+            return "SmallInteger";
+        }
+
+        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        if (classOOP == SmalltalkOOP.Null)
+        {
+            return "NULL_CLASS";
+        }
+
+        // Get the class name from the class object (instance variable 6 in Class - the 'name' field)
+        var nameOOP = _heapManager.GetInstanceVariable(classOOP, 6);
+        return GetSymbolName(nameOOP);
+    }
+
+    /// <summary>
+    /// Gets the string value of a Symbol object.
+    /// </summary>
+    public string GetSymbolName(SmalltalkOOP symbolOOP)
+    {
+        if (symbolOOP == SmalltalkOOP.Null || symbolOOP.IsSmallInteger)
+        {
+            return "<invalid symbol>";
+        }
+
+        int byteCount = _heapManager.GetIndexedSize(symbolOOP);
+        byte[] bytes = new byte[byteCount];
+
+        for (int i = 0; i < byteCount; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+        }
+
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
 }

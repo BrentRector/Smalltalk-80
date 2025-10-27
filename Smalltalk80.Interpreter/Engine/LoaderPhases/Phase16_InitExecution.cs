@@ -134,31 +134,38 @@ public class Phase16_InitExecution
     }
 
     /// <summary>
-    /// Creates a CompiledMethod object using the new PointerIndexed design.
-    /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
+    /// Creates a CompiledMethod object with homeClass fixed slot.
+    /// Layout: Fixed slot 0 = homeClass, Indexed slots = [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
     private SmalltalkOOP CreateCompiledMethod(
-        MethodDescriptor method, 
-        SmalltalkOOP[] literalOOPs, 
+        MethodDescriptor method,
+        SmalltalkOOP[] literalOOPs,
         byte[] bytecodes,
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP)
     {
-        // Calculate OOP slots: header + literals + bytecode array reference  
+        // Calculate OOP slots: header + literals + bytecode array reference
         // (AllocateCompiledMethod will create the ByteArray internally)
         int oopSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
-        int totalWords = 0 + oopSlots; // CompiledMethod has no instance variables
-        
+        int totalWords = 1 + oopSlots; // 1 fixed slot (homeClass) + indexed slots
+
         if (totalWords > 255)
         {
             throw new InvalidOperationException($"Init expression {method.LocalId} too large: {totalWords} words (literals: {literalOOPs.Length}, bytecodes: {bytecodes.Length})");
         }
-        
+
+        // Resolve homeClass from HomeClassLocalId
+        if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP homeClassOOP))
+        {
+            throw new InvalidOperationException($"Cannot find home class '{method.HomeClassLocalId}' for init expression '{method.LocalId}'");
+        }
+
         var methodOOP = _allocator.AllocateCompiledMethod(
             compiledMethodClassOOP,
             byteArrayClassOOP,
-            method.Header.Word, 
-            literalOOPs, 
+            homeClassOOP,
+            method.Header.Word,
+            literalOOPs,
             bytecodes);
 
         return methodOOP;

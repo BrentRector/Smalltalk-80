@@ -521,22 +521,39 @@ public class Phase8_MethodInstallation
 
 
     /// <summary>
-    /// Creates a CompiledMethod object using PointerIndexed layout with separate ByteArray for bytecodes.
-    /// Layout: [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
+    /// Creates a CompiledMethod object with homeClass fixed slot and separate ByteArray for bytecodes.
+    /// Layout: Fixed slot 0 = homeClass, Indexed slots = [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
     private SmalltalkOOP CreateCompiledMethod(
-        MethodDescriptor method, 
-        SmalltalkOOP[] literalOOPs, 
+        MethodDescriptor method,
+        SmalltalkOOP[] literalOOPs,
         byte[] bytecodes,
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP)
     {
-        // Use AllocateCompiledMethod which handles all the setup including class reference
+        // Blocks are code literals embedded in methods, not standalone methods
+        // They use nil as homeClass since they inherit context from their enclosing method
+        SmalltalkOOP homeClassOOP;
+        if (method.LocalId.StartsWith("block:"))
+        {
+            homeClassOOP = SpecialObjectsArray.Instance.Nil;
+        }
+        else
+        {
+            // Resolve homeClass from HomeClassLocalId for regular methods
+            if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out homeClassOOP))
+            {
+                throw new InvalidOperationException($"Cannot find home class '{method.HomeClassLocalId}' for method '{method.LocalId}'");
+            }
+        }
+
+        // Use AllocateCompiledMethod which handles all the setup including homeClass fixed slot
         return _allocator.AllocateCompiledMethod(
-            compiledMethodClassOOP, 
+            compiledMethodClassOOP,
             byteArrayClassOOP,
-            method.Header.Word, 
-            literalOOPs, 
+            homeClassOOP,
+            method.Header.Word,
+            literalOOPs,
             bytecodes);
     }
 

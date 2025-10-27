@@ -9,6 +9,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public class LayoutResolver
 {
     private readonly Dictionary<string, List<string>> _fieldMap = new();
+    private bool _isFrozen = false;
 
     /// <summary>
     /// v1.0.6+: Loads precomputed field layouts for all classes.
@@ -54,4 +55,31 @@ public class LayoutResolver
     {
         return _fieldMap.TryGetValue(classLocalId, out var fields) ? fields.Count : 0;
     }
+
+    /// <summary>
+    /// Sets the field layout for a class manually (used by new loader).
+    /// </summary>
+    /// <param name="classLocalId">Local ID of the class</param>
+    /// <param name="fields">Ordered list of field names</param>
+    public void SetFieldLayout(string classLocalId, IReadOnlyList<string> fields)
+    {
+        if (_isFrozen)
+            throw new InvalidOperationException($"Cannot set field layout after LayoutResolver is frozen. Attempted to set layout for: {classLocalId}");
+
+        _fieldMap[classLocalId] = new List<string>(fields);
+    }
+
+    /// <summary>
+    /// Freezes the LayoutResolver, preventing further modifications.
+    /// Called after all layouts have been loaded during cold start.
+    /// </summary>
+    public void Freeze()
+    {
+        _isFrozen = true;
+    }
+
+    /// <summary>
+    /// Gets whether the LayoutResolver has been frozen.
+    /// </summary>
+    public bool IsFrozen => _isFrozen;
 }

@@ -40,22 +40,28 @@ public class Phase13_ComprehensiveValidation
     public void Run()
     {
         var results = new ValidationResults();
-        
+
         // 1. Validate all classes
         ValidateAllClasses(results);
-        
+
         // 2. Validate all methods (including CompiledMethod objects)
         ValidateAllMethods(results);
-        
+
         // 3. Validate special objects (nil, true, false, SystemDictionary, USTable)
         ValidateSpecialObjects(results);
-        
+
         // 4. Validate init expressions array
         ValidateInitExpressions(results);
-        
+
         // 5. Cross-reference validation (object references point to valid objects)
         ValidateCrossReferences(results);
-        
+
+        // 6. Validate SpecialObjectsArray integrity
+        ValidateSpecialObjectsArray(results);
+
+        // 7. Validate method dictionaries
+        ValidateMethodDictionaries(results);
+
         // Report results
         ReportValidationResults(results);
     }
@@ -442,6 +448,198 @@ public class Phase13_ComprehensiveValidation
 
     // DecodeBytecodes method moved to ClassHierarchyUtils to eliminate duplication
 
+    /// <summary>
+    /// Validates the SpecialObjectsArray integrity.
+    /// Ensures all required special object slots are populated with correct object types.
+    /// </summary>
+    private void ValidateSpecialObjectsArray(ValidationResults results)
+    {
+        Console.WriteLine("  Validating SpecialObjectsArray...");
+
+        int validatedSlots = 0;
+
+        // Validate nil singleton
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        if (nilOOP == SmalltalkOOP.Null || nilOOP.IsSmallInteger)
+        {
+            results.AddError("SpecialObjectsArray.Nil is null or SmallInteger");
+        }
+        else
+        {
+            var nilClassName = _allocator.GetClassName(nilOOP);
+            if (nilClassName != "UndefinedObject")
+            {
+                results.AddError($"SpecialObjectsArray.Nil has wrong class: {nilClassName}, expected UndefinedObject");
+            }
+            validatedSlots++;
+        }
+
+        // Validate false singleton
+        var falseOOP = SpecialObjectsArray.Instance.False;
+        if (falseOOP == SmalltalkOOP.Null || falseOOP.IsSmallInteger)
+        {
+            results.AddError("SpecialObjectsArray.False is null or SmallInteger");
+        }
+        else
+        {
+            var falseClassName = _allocator.GetClassName(falseOOP);
+            if (falseClassName != "False")
+            {
+                results.AddError($"SpecialObjectsArray.False has wrong class: {falseClassName}, expected False");
+            }
+            validatedSlots++;
+        }
+
+        // Validate true singleton
+        var trueOOP = SpecialObjectsArray.Instance.True;
+        if (trueOOP == SmalltalkOOP.Null || trueOOP.IsSmallInteger)
+        {
+            results.AddError("SpecialObjectsArray.True is null or SmallInteger");
+        }
+        else
+        {
+            var trueClassName = _allocator.GetClassName(trueOOP);
+            if (trueClassName != "True")
+            {
+                results.AddError($"SpecialObjectsArray.True has wrong class: {trueClassName}, expected True");
+            }
+            validatedSlots++;
+        }
+
+        // Validate SystemDictionary (registered as "Smalltalk" global)
+        if (!GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP systemDictOOP))
+        {
+            results.AddError("Smalltalk (SystemDictionary) not found in GlobalRegistry");
+        }
+        else if (systemDictOOP == SmalltalkOOP.Null || systemDictOOP.IsSmallInteger)
+        {
+            results.AddError("Smalltalk (SystemDictionary) is null or SmallInteger");
+        }
+        else
+        {
+            // SystemDictionary should be a SystemDictionary class
+            var systemDictClassName = _allocator.GetClassName(systemDictOOP);
+            if (systemDictClassName != "SystemDictionary")
+            {
+                // This is a warning, not an error - some systems might use a different class
+                Console.WriteLine($"    NOTE: Smalltalk global has class {systemDictClassName}, expected SystemDictionary");
+            }
+            validatedSlots++;
+        }
+
+        // Validate InitExpressionMethods array (may be null if no init expressions)
+        var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+        if (initMethodsOOP != SpecialObjectsArray.Instance.Nil && initMethodsOOP != SmalltalkOOP.Null)
+        {
+            var initMethodsClassName = _allocator.GetClassName(initMethodsOOP);
+            if (initMethodsClassName != "Array")
+            {
+                results.AddError($"SpecialObjectsArray.InitExpressionMethods has wrong class: {initMethodsClassName}, expected Array");
+            }
+            validatedSlots++;
+        }
+
+        Console.WriteLine($"    Validated {validatedSlots} special object slots");
+    }
+
+    /// <summary>
+    /// Validates method dictionary structure and integrity.
+    /// Ensures each class's method dictionary:
+    /// - Has correct capacity
+    /// - Has correct tally matching actual method count
+    /// - All installed methods are findable via lookup
+    /// </summary>
+    private void ValidateMethodDictionaries(ValidationResults results)
+    {
+        Console.WriteLine("  Validating method dictionaries...");
+
+        int classesWithMethodDict = 0;
+        int totalMethods = 0;
+        int methodsFound = 0;
+
+        foreach (var classDesc in _bundle.Classes)
+        {
+            if (!_localIdToObjectId.TryGetValue(classDesc.LocalId, out SmalltalkOOP classOOP))
+            {
+                continue; // Already reported in ValidateAllClasses
+            }
+
+            // Get the class's method dictionary (instance variable 1 in Behavior)
+            var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1);
+
+            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                // Class has no methods - this is valid for some classes
+                continue;
+            }
+
+            classesWithMethodDict++;
+
+            // Validate method dictionary structure
+            var format = _allocator.GetObjectFormat(methodDictOOP);
+            if (format != ObjectFormat.PointerIndexed)
+            {
+                results.AddError($"Class {GetClassName(classDesc)} methodDict has wrong format: {format}, expected PointerIndexed");
+                continue;
+            }
+
+            // Get tally (instance variable 1) and capacity (indexed size)
+            var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
+            int tally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
+            int capacity = _allocator.GetIndexedSize(methodDictOOP);
+
+            // Count actual methods for this class in the bundle
+            int expectedMethodCount = _bundle.Methods.Count(m => m.HomeClassLocalId == classDesc.LocalId);
+
+            if (tally != expectedMethodCount)
+            {
+                results.AddError(
+                    $"Class {GetClassName(classDesc)} methodDict tally mismatch: " +
+                    $"tally={tally}, bundle methods={expectedMethodCount}");
+            }
+
+            // Validate that all methods are findable in the dictionary
+            foreach (var method in _bundle.Methods.Where(m => m.HomeClassLocalId == classDesc.LocalId))
+            {
+                totalMethods++;
+
+                // Get selector symbol
+                string selectorName = _symbols[method.SelectorIndex];
+
+                // Try to find the method in the dictionary
+                bool found = false;
+                for (int i = 0; i < capacity; i++)
+                {
+                    var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
+                    if (keyOOP == SpecialObjectsArray.Instance.Nil)
+                        continue;
+
+                    var keySymbolName = _allocator.GetSymbolName(keyOOP);
+                    if (keySymbolName == selectorName)
+                    {
+                        found = true;
+                        methodsFound++;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    results.AddError(
+                        $"Class {GetClassName(classDesc)} method '{selectorName}' not found in methodDict");
+                }
+            }
+        }
+
+        Console.WriteLine($"    Validated {classesWithMethodDict} method dictionaries");
+        Console.WriteLine($"    Found {methodsFound}/{totalMethods} methods in dictionaries");
+
+        if (methodsFound < totalMethods)
+        {
+            results.AddError($"Method dictionary validation failed: {totalMethods - methodsFound} methods not found in dictionaries");
+        }
+    }
+
     private class ValidationResults
     {
         public List<string> Errors { get; } = new();
@@ -451,7 +649,7 @@ public class Phase13_ComprehensiveValidation
         public int InitExpressionsValidated { get; set; }
         public int CrossReferencesValidated { get; set; }
         public int InvalidReferences { get; set; }
-        
+
         public void AddError(string error)
         {
             Errors.Add(error);

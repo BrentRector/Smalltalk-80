@@ -622,7 +622,7 @@ public partial class VirtualMachine : IPrimitiveContext
             SmalltalkOOP contextToStoreTo = _activeContextOOP;
 
             // Check if current context is a block execution context
-            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
             {
                 // This is a block - check if index is out of range for block's own temps
                 var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
@@ -633,13 +633,23 @@ public partial class VirtualMachine : IPrimitiveContext
                 // If storing beyond block's local scope, store to home context
                 if (index >= blockLocalCount)
                 {
-                    var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                    contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                    // Check if it's a BlockClosure or BlockContext
+                    var blockClass = GetClassName(GetClass(blockOrClosureOOP));
+                    if (blockClass == "BlockClosure")
+                    {
+                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                    }
+                    else
+                    {
+                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                    }
                 }
             }
 
             _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
-            
+
             return true;
         }
 
@@ -1083,7 +1093,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     // For block execution contexts, check if we need to access home context temps
                     SmalltalkOOP contextToReadFrom = _activeContextOOP;
-                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
@@ -1092,8 +1102,20 @@ public partial class VirtualMachine : IPrimitiveContext
 
                         if (index >= blockLocalCount)
                         {
-                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                            contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                            // Check if it's a BlockClosure or BlockContext
+                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
+                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            {
+                                // It's a BlockClosure - get homeContext field
+                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
+                            }
+                            else
+                            {
+                                // It's a BlockContext - get home field
+                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                            }
                         }
                     }
 
@@ -1110,7 +1132,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     // For block execution contexts, check if we need to store to home context
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
-                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
@@ -1119,8 +1141,20 @@ public partial class VirtualMachine : IPrimitiveContext
 
                         if (index >= blockLocalCount)
                         {
-                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                            contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                            // Check if it's a BlockClosure or BlockContext
+                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
+                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            {
+                                // It's a BlockClosure - get homeContext field
+                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
+                            }
+                            else
+                            {
+                                // It's a BlockContext - get home field
+                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                            }
                         }
                     }
 
@@ -1137,7 +1171,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     // For block execution contexts, check if we need to store to home context
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
-                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
+                    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
@@ -1146,8 +1180,20 @@ public partial class VirtualMachine : IPrimitiveContext
 
                         if (index >= blockLocalCount)
                         {
-                            var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                            contextToStoreTo = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                            // Check if it's a BlockClosure or BlockContext
+                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
+                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            {
+                                // It's a BlockClosure - get homeContext field
+                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
+                            }
+                            else
+                            {
+                                // It's a BlockContext - get home field
+                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                            }
                         }
                     }
 
@@ -1606,9 +1652,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
-        // For CompiledMethod, the class reference is in the last literal (by convention)
-        int literalCount = _heapManager.GetIndexedSize(currentMethodOOP);
-        var homeClassOOP = _heapManager.GetIndexedOOP(currentMethodOOP, literalCount - 1);
+        // CompiledMethod structure: fixed slot 0 = homeClass, indexed slots = [header] [literals...] [bytecodeArray]
+        // The home class is stored in fixed slot 0
+        var homeClassOOP = _heapManager.GetInstanceVariable(currentMethodOOP, 0);
 
         // Get the superclass of the home class
         int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
@@ -1692,6 +1738,23 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
+
+        // DEBUG: Check if receiver is a class object
+        if (selectorName == "new:")
+        {
+            Console.WriteLine($"[DEBUG SendMessage] Sending new: to receiver={receiverOOP}");
+            Console.WriteLine($"  receiverClass={classOOP}, className={GetClassName(classOOP)}");
+            // Check if receiver is itself MethodDictionary class
+            if (GlobalRegistry.TryGet("class:MethodDictionary", out var mdClassOOP))
+            {
+                Console.WriteLine($"  class:MethodDictionary OOP = {mdClassOOP}");
+                Console.WriteLine($"  receiver == class:MethodDictionary? {receiverOOP == mdClassOOP}");
+                // Check receiver's indexed size (method dictionaries are indexed, classes are not)
+                int indexedSize = _heapManager.GetIndexedSize(receiverOOP);
+                Console.WriteLine($"  receiver indexedSize: {indexedSize}");
+                Console.WriteLine($"  receiver is a MethodDictionary INSTANCE (not class)!");
+            }
+        }
 
         // DEBUG: Log when selector is <unknown>
         if (selectorName == null)
@@ -3235,8 +3298,11 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get argument count from block method header
         int numArgs = GetBlockArgCount(blockMethodOOP);
 
-        // Allocate BlockClosure instance (4 instance variables)
-        var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 4, 0);
+        // Allocate BlockClosure instance with instance variable count from layout
+        // IMPORTANT: Do NOT hardcode instance variable count - query from LayoutResolver
+        // to match the precomputed layout in the JSON bundle
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockClosure");
+        var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, instanceVarCount, 0);
         _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
 
         // Get field indices for BlockClosure instance variables
@@ -3244,6 +3310,8 @@ public partial class VirtualMachine : IPrimitiveContext
         int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
         int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
+
+        Console.WriteLine($"[DEBUG CreateBlockClosure] BlockClosure instance var count={instanceVarCount}, field indices: method={methodIndex}, homeContext={homeContextIndex}, returnContext={returnContextIndex}, numArgs={numArgsIndex}");
 
         // Initialize instance variables
         _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);

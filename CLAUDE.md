@@ -335,6 +335,72 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 
 ## Developer Principles
 
+### Loader Invariants and Guarantees
+
+The cold start loader must satisfy these hard invariants and provide deterministic guarantees to ensure the loaded Smalltalk image matches the source file-out exactly.
+
+#### Minimal Hard Invariants (Must Be Enforced)
+
+These invariants are non-negotiable requirements that the loader must enforce:
+
+1. **Non-Zero Class Slots**: Every non-immediate object has a non-zero class slot (slot 0) that points to the exact class object the file-out expects.
+
+2. **Metaclass Circle and Superclass Chains**: The metaclass circle and all class superclass chains terminate exactly as in the file-out:
+   - `Object.superclass == nil`
+   - The metaclass circle closes at `Behavior → Object`
+
+3. **Class Layouts**: Every class's instance variable count and field name→slot mapping match the file-out exactly.
+
+4. **Instance Variable Initialization**: All instance variable slots are either:
+   - Explicitly set to the same object the file-out sets, OR
+   - Initialized to the nil singleton (not left as zero)
+
+5. **Canonical Objects**: Symbols, Strings, ByteArrays, CompiledMethods, and Bytecode arrays exist with the same contents and are canonical where the file-out uses canonical objects (e.g., Associations for globals).
+
+6. **Method Dictionaries**: Capacity, key/value placement (open-addressing invariants), and tally must match (or be provably equivalent for the VM hash scheme) so method lookup yields identical results.
+
+7. **SpecialObjectsArray**: Contains the same singletons in the same slots (nil, true, false, Smalltalk dictionary, USTable, InitMethods, ProcessorScheduler, etc.).
+
+8. **Garbage Collection**: GC roots and object reachability must match the file-out reachability graph (no unreachable objects that the file-out would have reachable).
+
+#### Deterministic Loader Guarantees (Ordered Checklist)
+
+The VM must provide these guarantees in the specified order:
+
+1. **Symbol Interning** (Phase 1): Deterministic symbol interning - same symbol indices → same symbol OOPs
+
+2. **Class Shell Allocation** (Phase 2): Allocate class shells for all classes/metaclasses before wiring any cross-class fields
+
+3. **Metaclass Wiring** (Phase 3): Wire `metaclass.thisClass` and the metaclass circle exactly as in the file-out (deterministic wiring order)
+
+4. **Class Metadata** (Phase 4): Populate class metadata (name, format, superclass references) using the file-out data; defer `Object.superclass` until nil exists
+
+5. **Layout Loading** (Phase 5): Load or compute class layouts deterministically (precomputed layout from file-out preferred)
+
+6. **Singleton Allocation** (Phase 6): Allocate nil/true/false singletons and register them in SpecialObjectsArray
+
+7. **Class Reference Initialization** (Phase X): Set every object's class slot (slot 0) deterministically:
+   - Classes → metaclasses
+   - Symbols → `class:Symbol`
+   - etc.
+
+8. **Instance Variable Initialization** (Phase Y): Initialize all remaining instance variable slots to nil only where not explicitly set by earlier phases
+
+9. **Method Dictionary Allocation** (Phase 7): Allocate method dictionaries with deterministic sizing
+
+10. **Method Installation** (Phase 8):
+    - Compile/allocate CompiledMethod and ByteArray objects exactly as described by the file-out
+    - Canonicalize Associations used by methods globally
+    - All CompiledMethods have valid homeClass reference in fixed slot 0 for correct super send semantics
+
+11. **Method Dictionary Installation** (Phase 9): Install methods into method dictionaries deterministically (hash probing must be deterministic or use file-out placement data)
+
+12. **USTable and Globals** (Phases 12-13): Populate USTable and Smalltalk dictionary using canonical Association objects
+
+13. **Init Expression Execution** (Phase 16): Execute init expressions (if the running image does) in the same order and environment the file-out expects
+
+**Validation**: Phase 14 performs comprehensive validation to verify all invariants are satisfied before runtime execution begins.
+
 ### Object-Oriented Design Principles
 
 - **No Hard-Coded OOP Value Checks**: No code should ever check for a hard-coded OOP value, e.g. checking for zero to determine if it's the Nil object. First, OOP zero is a valid reference that can be to any object. Second, OOP values can change build to build as the Smalltalk source code changes.

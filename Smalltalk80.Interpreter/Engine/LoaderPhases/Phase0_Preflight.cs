@@ -23,6 +23,9 @@ public class Phase0_Preflight
         ValidateSymbolIndices();
         ValidateObjectRefs();
         ValidatePrecomputedLayouts();
+        ValidateHomeClassMetadata();
+        ValidateMetaclassCircle();
+        ValidateSpecialObjectsArrayDefinition();
     }
 
     /// <summary>
@@ -69,7 +72,7 @@ public class Phase0_Preflight
         // Note: Some patches may reference objects not yet allocated (forward references)
         // so we just warn instead of throwing
         int unresolvedCount = 0;
-        foreach (var patch in _bundle.Patches)
+        foreach (var patch in _bundle.Patches ?? Array.Empty<PatchDescriptor>())
         {
             if (patch.Value?.LocalId is string id && !validIds.Contains(id))
             {
@@ -148,5 +151,178 @@ public class Phase0_Preflight
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Validates that all methods have HomeClassLocalId metadata.
+    /// This is required for super send semantics (method lookup must start at homeClass.superclass).
+    /// </summary>
+    private void ValidateHomeClassMetadata()
+    {
+        // Build set of all valid class localIds (both instance and meta)
+        var validClassIds = _bundle.Classes.Select(c => c.LocalId).ToHashSet();
+
+        int invalidCount = 0;
+        foreach (var method in _bundle.Methods)
+        {
+            // Skip block literals - they don't have home classes (they're embedded in methods)
+            if (method.LocalId.StartsWith("block:"))
+                continue;
+
+            if (string.IsNullOrEmpty(method.HomeClassLocalId))
+            {
+                if (invalidCount == 0)
+                    Console.WriteLine($"  Error: Found methods missing HomeClassLocalId:");
+                Console.WriteLine($"    - {method.LocalId}");
+                invalidCount++;
+            }
+            else if (!validClassIds.Contains(method.HomeClassLocalId))
+            {
+                if (invalidCount == 0)
+                    Console.WriteLine($"  Error: Found methods with invalid HomeClassLocalId:");
+                Console.WriteLine($"    - {method.LocalId} references unknown class '{method.HomeClassLocalId}'");
+                invalidCount++;
+            }
+        }
+
+        if (invalidCount > 0)
+        {
+            throw new InvalidOperationException(
+                $"Bundle validation failed: {invalidCount} methods/init expressions have missing or invalid HomeClassLocalId. " +
+                "All CompiledMethods require valid home class metadata for correct super send semantics. " +
+                "Please regenerate the bundle with the latest compiler.");
+        }
+    }
+
+    /// <summary>
+    /// Validates the metaclass circle and class superclass chains.
+    /// Ensures:
+    /// - All metaclasses have thisClass pointing to their instance-side class
+    /// - The metaclass circle closes: Behavior → Object → Class → ... → Behavior
+    /// - All superclass chains terminate at Object.superclass = nil
+    /// </summary>
+    private void ValidateMetaclassCircle()
+    {
+        // Build localId lookup
+        var classMap = _bundle.Classes.ToDictionary(c => c.LocalId, c => c);
+
+        // Find the fundamental classes
+        var objectClass = _bundle.Classes.FirstOrDefault(c => _bundle.Symbols[c.NameIndex] == "Object" && !c.LocalId.StartsWith("meta:"));
+        var behaviorClass = _bundle.Classes.FirstOrDefault(c => _bundle.Symbols[c.NameIndex] == "Behavior" && !c.LocalId.StartsWith("meta:"));
+        var classClass = _bundle.Classes.FirstOrDefault(c => _bundle.Symbols[c.NameIndex] == "Class" && !c.LocalId.StartsWith("meta:"));
+        var metaclassClass = _bundle.Classes.FirstOrDefault(c => _bundle.Symbols[c.NameIndex] == "Metaclass" && !c.LocalId.StartsWith("meta:"));
+
+        if (objectClass == null || behaviorClass == null || classClass == null || metaclassClass == null)
+        {
+            throw new InvalidOperationException(
+                "Bundle validation failed: Could not find fundamental classes (Object, Behavior, Class, Metaclass). " +
+                "These classes are required for the metaclass circle.");
+        }
+
+        // Validate all metaclasses have thisClass field
+        var metaclasses = _bundle.Classes.Where(c => c.LocalId.StartsWith("meta:")).ToList();
+        int missingThisClass = 0;
+
+        foreach (var metaclass in metaclasses)
+        {
+            // Find the 'thisClass' field in the metaclass layout
+            bool hasThisClass = metaclass.FieldLayout.Any(f => _bundle.Symbols[f.NameIndex] == "thisClass");
+
+            if (!hasThisClass)
+            {
+                Console.WriteLine($"  Error: Metaclass {metaclass.LocalId} missing 'thisClass' field");
+                missingThisClass++;
+            }
+        }
+
+        if (missingThisClass > 0)
+        {
+            throw new InvalidOperationException(
+                $"Bundle validation failed: {missingThisClass} metaclasses missing 'thisClass' field. " +
+                "All metaclasses must have thisClass pointing to their instance-side class.");
+        }
+
+        // Validate superclass chains terminate at Object.superclass = nil
+        // We can't validate the actual nil value here (it doesn't exist yet),
+        // but we can verify Object has no superclass reference in the bundle
+        if (objectClass.SuperNameIndex.HasValue)
+        {
+            string superName = _bundle.Symbols[objectClass.SuperNameIndex.Value];
+            throw new InvalidOperationException(
+                $"Bundle validation failed: Object.superclass should be nil, but references '{superName}'. " +
+                "The superclass chain must terminate at Object.");
+        }
+
+        // Validate metaclass circle structure
+        // NOTE: meta:Object.superclass is NOT stored in the bundle - it's wired dynamically in Phase 3
+        // Phase 3 sets meta:Object.superclass = class:Class programmatically
+        // Here we just verify that the fundamental classes exist for Phase 3 to wire up
+        var metaObject = classMap["meta:Object"];
+
+        // Verify the fundamental classes needed for metaclass circle exist
+        if (classClass == null)
+        {
+            throw new InvalidOperationException(
+                "Bundle validation failed: class:Class not found. " +
+                "This class is required for metaclass circle wiring in Phase 3.");
+        }
+
+        // meta:Object should NOT have a superclass in the bundle (it's wired in Phase 3)
+        if (metaObject.SuperNameIndex.HasValue)
+        {
+            string metaObjectSuperName = _bundle.Symbols[metaObject.SuperNameIndex.Value];
+            Console.WriteLine(
+                $"  NOTE: meta:Object.superclass is '{metaObjectSuperName}' in bundle. " +
+                "Typically this is wired dynamically in Phase 3.");
+        }
+    }
+
+    /// <summary>
+    /// Validates that the bundle defines all required classes for SpecialObjectsArray.
+    /// NOTE: Singleton objects (nil, true, false) are NOT in the bundle - they're created
+    /// programmatically in Phase 6 (Object Allocation).
+    /// Required classes:
+    /// - UndefinedObject, True, False, Boolean (singleton classes)
+    /// - Object, Behavior, Class, Metaclass (fundamental hierarchy)
+    /// - SmallInteger, Symbol, String, Array (basic types)
+    /// - CompiledMethod, MethodDictionary, MethodContext, BlockContext (VM internals)
+    /// </summary>
+    private void ValidateSpecialObjectsArrayDefinition()
+    {
+        // Build name lookup for classes
+        var classNames = new HashSet<string>();
+        foreach (var cls in _bundle.Classes)
+        {
+            classNames.Add(_bundle.Symbols[cls.NameIndex]);
+        }
+
+        // Required fundamental classes (must exist in bundle)
+        var requiredClasses = new[]
+        {
+            "Object", "Behavior", "Class", "Metaclass",
+            "UndefinedObject", "True", "False", "Boolean",
+            "SmallInteger", "Symbol", "String", "Array",
+            "CompiledMethod", "MethodDictionary", "MethodContext", "BlockContext"
+        };
+
+        var missingClasses = new List<string>();
+        foreach (var className in requiredClasses)
+        {
+            if (!classNames.Contains(className))
+            {
+                missingClasses.Add(className);
+            }
+        }
+
+        if (missingClasses.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Bundle validation failed: Missing required fundamental classes: {string.Join(", ", missingClasses)}. " +
+                "These classes are needed for SpecialObjectsArray and core VM operations.");
+        }
+
+        // NOTE: We do NOT check for singleton objects (nil, true, false) in the bundle's Objects section
+        // because they are created programmatically in Phase 6 (Object Allocation).
+        // The validation of actual singleton OOPs happens in Phase 13 (ValidateSpecialObjectsArray).
     }
 }
