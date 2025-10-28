@@ -96,6 +96,12 @@ public static class ObjectPrimitives
         // Check object format and use appropriate setter
         var format = ctx.HeapManager.GetObjectFormat(receiver);
 
+        // DIAGNOSTIC: Log what we're trying to do
+        if (format == ObjectFormat.WordIndexed || format == ObjectFormat.ByteIndexed)
+        {
+            Console.WriteLine($"[Primitive61 at:put:] receiver={receiver}, format={format}, index={index}, value={value}, zeroBasedIndex={zeroBasedIndex}");
+        }
+
         if (format == ObjectFormat.PointerIndexed)
         {
             // Arrays, OrderedCollections, etc. - indexed OOP slots
