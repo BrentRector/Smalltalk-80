@@ -121,11 +121,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         {
             0x00 => ObjectFormat.Pointer, // Fixed pointer objects
             0x01 => ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed, // Variable pointer objects
+            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed, // Variable pointer objects (variableSubclass:)
             0x02 when hasPointers && !isIndexable => ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when !hasPointers && isIndexable => ObjectFormat.ByteIndexed, // ByteIndexed objects
-            0x02 when !hasPointers && !isIndexable => ObjectFormat.WordIndexed, // Word objects
-            0x03 => ObjectFormat.ByteIndexed, // Byte objects
+            0x02 when !hasPointers && isIndexable => ObjectFormat.WordIndexed, // WordIndexed objects (variableWordSubclass:)
+            0x02 when !hasPointers && !isIndexable => ObjectFormat.Pointer, // Fixed non-pointer objects (rare)
+            0x03 => ObjectFormat.ByteIndexed, // Byte objects (variableByteSubclass:)
             _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}")
         };
 

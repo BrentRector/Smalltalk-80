@@ -90,11 +90,11 @@ public class Phase2_ClassShells
         {
             0x00 => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.Pointer, // Fixed pointer objects
             0x01 => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when hasPointers && isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed, // Variable pointer objects
+            0x02 when hasPointers && isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed, // Variable pointer objects (variableSubclass:)
             0x02 when hasPointers && !isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when !hasPointers && isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.ByteIndexed, // ByteIndexed objects
-            0x02 when !hasPointers && !isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.WordIndexed, // Word objects
-            0x03 => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.ByteIndexed, // Byte objects
+            0x02 when !hasPointers && isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.WordIndexed, // WordIndexed objects (variableWordSubclass:)
+            0x02 when !hasPointers && !isIndexable => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.Pointer, // Fixed non-pointer objects (rare)
+            0x03 => Smalltalk80.Interpreter.Core.Objects.ObjectFormat.ByteIndexed, // Byte objects (variableByteSubclass:)
             _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}, indexable={isIndexable}, pointers={hasPointers}")
         };
     }
