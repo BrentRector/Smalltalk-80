@@ -2786,8 +2786,24 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Additional validation: check if we accidentally read the bytecode array
         // (which is stored in the last indexed slot)
-        var literalFormat = _heapManager.GetObjectFormat(literalOOP);
-        Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP}, literalFormat={literalFormat}");
+        if (!literalOOP.IsSmallInteger)
+        {
+            var literalFormat = _heapManager.GetObjectFormat(literalOOP);
+            Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP}, literalFormat={literalFormat}");
+
+            // If we got a ByteIndexed object as a literal, this is suspicious
+            // (literals are usually Pointers, Symbols, Strings, or SmallIntegers)
+            if (literalFormat == ObjectFormat.ByteIndexed)
+            {
+                var literalClass = GetClassName(GetClass(literalOOP));
+                var literalLocalId = GetLocalId(literalOOP);
+                Console.WriteLine($"[WARNING] Literal at index {index} is ByteIndexed! class={literalClass}, localId={literalLocalId}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP} (SmallInteger={literalOOP.AsSmallInteger()})");
+        }
 
         return literalOOP;
     }
