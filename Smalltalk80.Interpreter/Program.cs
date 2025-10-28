@@ -24,7 +24,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput, debugOptions) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -40,6 +40,17 @@ public static class Program
                 Console.Error.WriteLine("                         (e.g., 'BlockValidator' or 'Test')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
+                Console.Error.WriteLine("\nDebug Options:");
+                Console.Error.WriteLine("  Cold start diagnostics:");
+                Console.Error.WriteLine("    --debug-patches        Show patch application details");
+                Console.Error.WriteLine("    --debug-associations   Show association scanning and validation");
+                Console.Error.WriteLine("    --debug-classes        Show class resolution details");
+                Console.Error.WriteLine("    --debug-methods        Show method installation details");
+                Console.Error.WriteLine("    --debug-globals        Show global variable installation details");
+                Console.Error.WriteLine("  Runtime VM diagnostics:");
+                Console.Error.WriteLine("    --debug-bytecode       Show bytecode execution trace");
+                Console.Error.WriteLine("    --debug-messages       Show message send and method lookup trace");
+                Console.Error.WriteLine("  --debug-all              Enable all debug output");
                 Environment.Exit(1);
                 return;
             }
@@ -66,13 +77,13 @@ public static class Program
             LayoutResolver? layoutResolver;
             if (useOldLoader)
             {
-                var loader = new Loader(bundle, heapManager);
+                var loader = new Loader(bundle, heapManager, debugOptions);
                 loader.Run();
                 layoutResolver = loader.LayoutResolver;
             }
             else
             {
-                var newLoader = new Loader_New(bundle, heapManager, coldStartFile);
+                var newLoader = new Loader_New(bundle, heapManager, coldStartFile, debugOptions);
                 newLoader.Run();
                 layoutResolver = newLoader.LayoutResolver;
 
@@ -105,7 +116,7 @@ public static class Program
                 }
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -718,7 +729,7 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, bool useOldLoader, string? reportOutput) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, bool useOldLoader, string? reportOutput, DebugOptions debugOptions) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -726,6 +737,7 @@ public static class Program
         string? testFilter = null;
         bool useOldLoader = false; // Default to new loader
         string? reportOutput = null;
+        var debugOptions = new DebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -756,6 +768,38 @@ public static class Program
             {
                 reportOutput = args[i].Substring("--coldstart-report=".Length);
             }
+            else if (args[i] == "--debug-all")
+            {
+                debugOptions.DebugAll = true;
+            }
+            else if (args[i] == "--debug-patches")
+            {
+                debugOptions.DebugPatches = true;
+            }
+            else if (args[i] == "--debug-associations")
+            {
+                debugOptions.DebugAssociations = true;
+            }
+            else if (args[i] == "--debug-classes")
+            {
+                debugOptions.DebugClasses = true;
+            }
+            else if (args[i] == "--debug-methods")
+            {
+                debugOptions.DebugMethods = true;
+            }
+            else if (args[i] == "--debug-globals")
+            {
+                debugOptions.DebugGlobals = true;
+            }
+            else if (args[i] == "--debug-bytecode")
+            {
+                debugOptions.DebugBytecode = true;
+            }
+            else if (args[i] == "--debug-messages")
+            {
+                debugOptions.DebugMessages = true;
+            }
         }
 
         // Default: coldstart.json in the executable directory
@@ -765,7 +809,7 @@ public static class Program
             coldStartFile = Path.Combine(exeDir, "coldstart.json");
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput, debugOptions);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)

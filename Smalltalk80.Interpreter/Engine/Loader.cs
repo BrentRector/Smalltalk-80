@@ -26,14 +26,16 @@ public class Loader
     private readonly SemanticAllocator _allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = new();
     private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields = new();
+    private readonly DebugOptions _debugOptions;
     private LayoutResolver? _layoutResolver;
     private int _initExpressionsArrayId = 0;
 
-    public Loader(ColdStartBundle bundle, ISmalltalkHeapManager heapManager)
+    public Loader(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, DebugOptions? debugOptions = null)
     {
         _bundle = bundle;
         _heapManager = heapManager;
         _allocator = new SemanticAllocator(heapManager, bundle);
+        _debugOptions = debugOptions ?? DebugOptions.None;
     }
 
     /// <summary>
