@@ -325,7 +325,37 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         var entry = GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
-            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support indexed OOP access");
+        {
+            // Enhanced error message with diagnostic info
+            var classOOP = GetSlot(objectOOP, 0); // Get class from slot 0
+            string className = "UnknownClass";
+            try
+            {
+                if (!classOOP.IsSmallInteger && classOOP != default)
+                {
+                    // Try to get class name for better diagnostics
+                    var classEntry = GetObjectTableEntry(classOOP);
+                    if (classEntry.FormatExplicit == ObjectFormat.Pointer || classEntry.FormatExplicit == ObjectFormat.PointerIndexed)
+                    {
+                        // Classes have a 'name' field - but we need the field index
+                        // For now, just show the classOOP
+                        className = $"class={classOOP}";
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors in diagnostic code
+            }
+
+            throw new InvalidOperationException(
+                $"GetIndexedOOP called on non-PointerIndexed object!\n" +
+                $"  objectOOP: {objectOOP}\n" +
+                $"  format: {entry.FormatExplicit} (expected PointerIndexed)\n" +
+                $"  {className}\n" +
+                $"  index: {index}\n" +
+                $"  This likely means a ByteIndexed Symbol/String or bytecode array is being used where a PointerIndexed object (like Array or MethodDictionary) was expected.");
+        }
 
         return ReadIndexedOop(entry, index);
     }
