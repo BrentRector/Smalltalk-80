@@ -24,7 +24,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput, debugOptions) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -33,7 +33,6 @@ public static class Program
                 Console.Error.WriteLine("Options:");
                 Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
                 Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
-                Console.Error.WriteLine("  --old-loader           Use the old 17-phase loader (default: new 6-phase)");
                 Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
                 Console.Error.WriteLine("                         after cold start completes");
                 Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
@@ -71,34 +70,24 @@ public static class Program
             Console.WriteLine("Initializing heap manager...");
             var heapManager = new SmalltalkHeapManager();
 
-            // Create and run the loader (new 6-phase by default, old 17-phase if requested)
-            Console.WriteLine($"Starting cold start loader ({(useOldLoader ? "old 17-phase" : "new 6-phase")})...");
+            // Create and run the loader
+            Console.WriteLine("Starting cold start loader (6-phase)...");
 
-            LayoutResolver? layoutResolver;
-            if (useOldLoader)
-            {
-                var loader = new Loader(bundle, heapManager, debugOptions);
-                loader.Run();
-                layoutResolver = loader.LayoutResolver;
-            }
-            else
-            {
-                var newLoader = new Loader_New(bundle, heapManager, coldStartFile, debugOptions);
-                newLoader.Run();
-                layoutResolver = newLoader.LayoutResolver;
+            var loader = new Loader(bundle, heapManager, coldStartFile, debugOptions);
+            loader.Run();
+            var layoutResolver = loader.LayoutResolver;
 
-                // Write report if requested
-                if (reportOutput != null)
+            // Write report if requested
+            if (reportOutput != null)
+            {
+                var reportJson = System.Text.Json.JsonSerializer.Serialize(loader.Report, new System.Text.Json.JsonSerializerOptions
                 {
-                    var reportJson = System.Text.Json.JsonSerializer.Serialize(newLoader.Report, new System.Text.Json.JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-                    });
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                });
 
-                    File.WriteAllText(reportOutput, reportJson);
-                    Console.WriteLine($"\nColdstart report written to: {reportOutput}");
-                }
+                File.WriteAllText(reportOutput, reportJson);
+                Console.WriteLine($"\nColdstart report written to: {reportOutput}");
             }
 
             Console.WriteLine("Cold start completed successfully!");
@@ -729,13 +718,12 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, bool useOldLoader, string? reportOutput, DebugOptions debugOptions) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, DebugOptions debugOptions) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
         bool verboseDebug = false;
         string? testFilter = null;
-        bool useOldLoader = false; // Default to new loader
         string? reportOutput = null;
         var debugOptions = new DebugOptions();
 
@@ -759,10 +747,6 @@ public static class Program
             else if (args[i] == "--verbose" || args[i] == "-v")
             {
                 verboseDebug = true;
-            }
-            else if (args[i] == "--old-loader")
-            {
-                useOldLoader = true;
             }
             else if (args[i].StartsWith("--coldstart-report="))
             {
@@ -809,7 +793,7 @@ public static class Program
             coldStartFile = Path.Combine(exeDir, "coldstart.json");
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput, debugOptions);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)

@@ -7,7 +7,7 @@ using Smalltalk80.Interpreter.Core;
 using System.Text;
 using System.Linq;
 
-namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New;
+namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
 /// Phase 3: Object Allocation and Initialization

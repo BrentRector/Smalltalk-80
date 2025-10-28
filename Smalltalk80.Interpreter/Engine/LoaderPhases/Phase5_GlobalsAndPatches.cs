@@ -6,7 +6,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core;
 using System;
 
-namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New;
+namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
 /// Phase 5: Globals and Patches

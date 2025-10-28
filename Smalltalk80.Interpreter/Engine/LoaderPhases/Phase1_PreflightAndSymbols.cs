@@ -11,7 +11,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
-namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New
+namespace Smalltalk80.Interpreter.Engine.LoaderPhases
 {
     /// <summary>
     /// Phase 1: Preflight Validation + Symbol Interning
@@ -72,7 +72,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New
                 SymbolRegistry.Register(i, symbolOOP);
             }
 
-            // Update symbol count in report (already set in Loader_New constructor, but verify)
+            // Update symbol count in report (already set in Loader constructor, but verify)
             _report.Metrics.SymbolCount = _bundle.Symbols.Length;
 
             // Freeze symbol registry after all symbols registered

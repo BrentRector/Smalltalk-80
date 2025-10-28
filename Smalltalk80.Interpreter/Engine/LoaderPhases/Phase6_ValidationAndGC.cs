@@ -6,7 +6,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core;
 
-namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New;
+namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
 /// Phase 6: Comprehensive Validation and GC Verification

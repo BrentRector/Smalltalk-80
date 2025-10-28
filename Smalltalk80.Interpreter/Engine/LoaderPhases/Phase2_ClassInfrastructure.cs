@@ -4,7 +4,7 @@ using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
-namespace Smalltalk80.Interpreter.Engine.LoaderPhases_New;
+namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 /// <summary>
 /// Phase 2: Complete Class Infrastructure
