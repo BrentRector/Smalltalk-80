@@ -55,6 +55,13 @@ public static class ObjectPrimitives
     // Primitive 61: Array at:put:
     public static SmalltalkOOP AtPut(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DIAGNOSTIC: Log entry to confirm primitive is being called
+        Console.WriteLine($"[Primitive61 ENTRY] receiver={receiver}, args.Length={args.Length}");
+        if (args.Length >= 2)
+        {
+            Console.WriteLine($"[Primitive61 ENTRY] arg0={args[0]}, arg1={args[1]}");
+        }
+
         if (args.Length != 2)
         {
             ctx.PrimitiveSuccess = false;
@@ -96,28 +103,29 @@ public static class ObjectPrimitives
         // Check object format and use appropriate setter
         var format = ctx.HeapManager.GetObjectFormat(receiver);
 
-        // DIAGNOSTIC: Log what we're trying to do
-        if (format == ObjectFormat.WordIndexed || format == ObjectFormat.ByteIndexed)
-        {
-            Console.WriteLine($"[Primitive61 at:put:] receiver={receiver}, format={format}, index={index}, value={value}, zeroBasedIndex={zeroBasedIndex}");
-        }
+        // DIAGNOSTIC: Log format for all objects
+        Console.WriteLine($"[Primitive61 FORMAT] receiver={receiver}, format={format}, index={index}, value={value}, zeroBasedIndex={zeroBasedIndex}");
 
         if (format == ObjectFormat.PointerIndexed)
         {
             // Arrays, OrderedCollections, etc. - indexed OOP slots
+            Console.WriteLine($"[Primitive61] PointerIndexed path");
             ctx.HeapManager.SetIndexedOOP(receiver, zeroBasedIndex, value);
         }
         else if (format == ObjectFormat.ByteIndexed)
         {
             // Strings, Symbols, ByteArrays - indexed byte slots
+            Console.WriteLine($"[Primitive61] ByteIndexed path");
             if (!value.IsSmallInteger)
             {
+                Console.WriteLine($"[Primitive61] ByteIndexed FAIL: value not SmallInteger");
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
             int byteValue = value.AsSmallInteger();
             if (byteValue < 0 || byteValue > 255)
             {
+                Console.WriteLine($"[Primitive61] ByteIndexed FAIL: value {byteValue} out of range [0,255]");
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
@@ -126,14 +134,17 @@ public static class ObjectPrimitives
         else if (format == ObjectFormat.WordIndexed)
         {
             // WordArrays - indexed 16-bit word slots
+            Console.WriteLine($"[Primitive61] WordIndexed path");
             if (!value.IsSmallInteger)
             {
+                Console.WriteLine($"[Primitive61] WordIndexed FAIL: value not SmallInteger");
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
             int wordValue = value.AsSmallInteger();
             if (wordValue < 0 || wordValue > 65535)
             {
+                Console.WriteLine($"[Primitive61] WordIndexed FAIL: value {wordValue} out of range [0,65535]");
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
@@ -142,10 +153,12 @@ public static class ObjectPrimitives
         else
         {
             // Unsupported format for at:put:
+            Console.WriteLine($"[Primitive61] Unsupported format: {format}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        Console.WriteLine($"[Primitive61] SUCCESS - returning value={value}");
         return value;
     }
 
