@@ -1,13 +1,60 @@
 # Claude Development Guidelines
 
 **Last Updated**: 2025-01-28
-**Status**: 🎉 Init Expression Execution Strategy Defined - Phase-Based Bootstrap
+**Status**: 🚧 Init Expression Skip List Implemented - Bypassing Bootstrap Dependency Issues
 **Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
-**Interpreter Status**: ✅ All 15 phases working - loads v1.0.6 bundles successfully
+**Interpreter Status**: ✅ All 6 phases working - loads v1.0.6 bundles successfully (new loader)
 **Test Status**: ✅ Test classes extracted to separate files for optional validation
+**Init Execution Status**: 🚧 Skip list active - BitEditor initialize bypassed due to TextStyle dependency
 
 ## Recent Accomplishments (2025-01-28)
+
+### 🚧 Init Expression Skip List - Pragmatic Bootstrap Solution
+
+**Status**: Implemented skip list mechanism to bypass init expressions with unresolved dependencies.
+
+**Problem**:
+- Even after phase-based sorting (initialize! → comment:), some init expressions fail due to missing infrastructure
+- `BitEditor initialize` (init:33) requires `TextStyle`/`DefaultTextStyle` which isn't created by any initialize! expression
+- Error handling code itself triggers errors when infrastructure is missing (recursive error scenario)
+- Stack overflow in `SmallInteger>>max:` during error message formatting
+
+**Solution**:
+Implemented pragmatic skip list in `Program.cs` to temporarily bypass problematic init expressions:
+
+```csharp
+// Skip list for problematic init expressions during bootstrap
+var skipList = new HashSet<string>
+{
+    "BitEditor initialize",      // Requires TextStyle/DefaultTextStyle (not created yet)
+    // Add more problematic expressions here as discovered
+};
+```
+
+**Benefits**:
+- ✅ Allows cold start to proceed past bootstrap roadblocks
+- ✅ Clearly documents which expressions have dependency issues
+- ✅ Easy to extend as more problematic expressions are discovered
+- ✅ Provides diagnostic output showing which expressions were skipped
+
+**Output Example**:
+```
+=== Skipped Init Expressions (Bootstrap Issues) ===
+  1 expression(s) skipped due to missing dependencies:
+    [33] BitEditor initialize
+```
+
+**Next Steps**:
+1. Identify root cause of TextStyle/DefaultTextStyle missing
+2. Determine if DefaultTextStyle should be created as static object or via init expression
+3. Once resolved, remove from skip list
+4. Continue executing remaining init expressions to identify other bootstrap issues
+
+**Files Modified**:
+- `Smalltalk80.Interpreter/Program.cs` (lines 135-183) - Added skip list mechanism and diagnostic output
+
+## Previous Accomplishments (2025-01-28)
 
 ### 🎉 Init Expression Execution Strategy - Phase-Based Bootstrap
 

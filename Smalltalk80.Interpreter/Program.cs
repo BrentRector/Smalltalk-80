@@ -132,15 +132,31 @@ public static class Program
                 var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                 int totalExpressions = bundle.InitExpressions.Length;
 
+                // Skip list for problematic init expressions during bootstrap
+                // These expressions require infrastructure that isn't ready during cold start
+                var skipList = new HashSet<string>
+                {
+                    "BitEditor initialize",      // Requires TextStyle/DefaultTextStyle (not created yet)
+                    // Add more problematic expressions here as discovered
+                };
+
                 // Build index lists for each phase (preserving source file order)
                 var phase1Indices = new List<int>(); // initialize! expressions
                 var phase2Indices = new List<int>(); // comment: expressions
+                var skippedIndices = new List<int>(); // skipped expressions
 
                 for (int i = 0; i < totalExpressions; i++)
                 {
                     var expr = bundle.InitExpressions[i];
                     if (expr.Source != null)
                     {
+                        // Check if this expression should be skipped
+                        if (skipList.Contains(expr.Source))
+                        {
+                            skippedIndices.Add(i);
+                            continue;
+                        }
+
                         // Match "ClassName initialize" (no exclamation mark in bundle)
                         if (expr.Source.EndsWith(" initialize"))
                         {
@@ -152,6 +168,18 @@ public static class Program
                             phase2Indices.Add(i);
                         }
                     }
+                }
+
+                // Report skipped expressions
+                if (skippedIndices.Count > 0)
+                {
+                    Console.WriteLine($"\n=== Skipped Init Expressions (Bootstrap Issues) ===");
+                    Console.WriteLine($"  {skippedIndices.Count} expression(s) skipped due to missing dependencies:");
+                    foreach (int index in skippedIndices)
+                    {
+                        Console.WriteLine($"    [{index}] {bundle.InitExpressions[index].Source}");
+                    }
+                    Console.WriteLine();
                 }
 
                 Console.WriteLine($"\n=== Phase 1: Infrastructure Initialization ===");
