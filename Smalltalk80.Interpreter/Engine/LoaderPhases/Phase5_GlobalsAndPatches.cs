@@ -70,7 +70,6 @@ public class Phase5_GlobalsAndPatches
             Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
             var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
             int totalAssociations = 0;
-            int corruptedCount = 0;
             int registeredCount = AssociationRegistry.GetAll().Count;
 
             // Scan entire heap for Association objects
@@ -83,13 +82,6 @@ public class Phase5_GlobalsAndPatches
                     if (classOOP == associationClassOOP)
                     {
                         totalAssociations++;
-                        var valueOOP = _heapManager.GetInstanceVariable(objOOP, 1);
-                        if (valueOOP.RawValue == 10776)
-                        {
-                            var keyOOP = _heapManager.GetInstanceVariable(objOOP, 0);
-                            Console.WriteLine($"  [ERROR] Found corrupted Association: OOP={objOOP}, keyOOP={keyOOP}, value=10776");
-                            corruptedCount++;
-                        }
                     }
                 }
                 catch
@@ -101,14 +93,6 @@ public class Phase5_GlobalsAndPatches
             Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
             Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
             Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
-            if (corruptedCount == 0)
-            {
-                Console.WriteLine($"  No corrupted Associations found in entire heap (good!)");
-            }
-            else
-            {
-                Console.WriteLine($"  [ERROR] Found {corruptedCount} corrupted Associations in heap!");
-            }
         }
     }
 
@@ -236,14 +220,10 @@ public class Phase5_GlobalsAndPatches
         if (value.Type == "objectRef")
         {
             var resolvedOOP = _localIdToObjectId[value.LocalId!];
-            // DEBUG: Check if String class is being resolved to wrong OOP
+            // DEBUG: Check if String class is being resolved correctly
             if (_debugOptions.ShouldDebugPatches && value.LocalId == "class:String")
             {
                 Console.WriteLine($"      [DEBUG] Resolving class:String -> {resolvedOOP}");
-                if (resolvedOOP.RawValue == 10776)
-                {
-                    Console.WriteLine($"      [ERROR] class:String mapped to OOP 10776 (should be String class)!");
-                }
             }
             return resolvedOOP;
         }

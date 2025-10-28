@@ -553,27 +553,6 @@ public class Phase4_MethodCompilation
         Console.WriteLine($"[Phase4] Association reachability validation PASSED:");
         Console.WriteLine($"  All {associationsByKey.Sum(kvp => kvp.Value.Count)} Association literals are reachable from canonical sources.");
 
-        // DEBUG: Check if any Association has value=10776
-        Console.WriteLine($"[Phase4] Checking for corrupted Associations...");
-        int corruptedCount = 0;
-        foreach (var assocOOP in AssociationRegistry.GetAll().Values)
-        {
-            var valueOOP = _heapManager.GetInstanceVariable(assocOOP, 1);
-            if (valueOOP.RawValue == 10776)
-            {
-                var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
-                Console.WriteLine($"  [ERROR] Found Association with value=10776: assocOOP={assocOOP}, keyOOP={keyOOP}");
-                corruptedCount++;
-            }
-        }
-        if (corruptedCount == 0)
-        {
-            Console.WriteLine($"  No corrupted Associations found at end of Phase 4 (good!)");
-        }
-        else
-        {
-            Console.WriteLine($"  [ERROR] Found {corruptedCount} corrupted Associations at end of Phase 4!");
-        }
     }
 
     /// <summary>
@@ -1047,13 +1026,6 @@ public class Phase4_MethodCompilation
         // Set instance variables: [0] = key, [1] = value
         _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
         _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        // DEBUG: Check if value is the problematic OOP 10776
-        if (valueOOP.RawValue == 10776)
-        {
-            Console.WriteLine($"[ERROR] AllocateAssociation: Creating Association with value=OOP 10776!");
-            Console.WriteLine($"  keyOOP={keyOOP}, This is wrong - valueOOP should be nil!");
-        }
 
         return associationOOP;
     }
