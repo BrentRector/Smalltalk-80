@@ -179,6 +179,28 @@ public static class Program
                     }
                 }
 
+                // EXPERIMENT: Reorder to test call stack unwinding
+                // Run Float initialize first (simple, no deep calls)
+                // Then WindowsFileSystem initialize (was causing depth issues)
+                // This tests if .NET call stack unwinds properly between init expressions
+                var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
+                var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
+
+                if (floatInitIndex > 0 && windowsInitIndex > 0)
+                {
+                    phase1Indices.Remove(floatInitIndex);
+                    phase1Indices.Remove(windowsInitIndex);
+
+                    // Insert at beginning: Float first, then WindowsFileSystem, then rest
+                    phase1Indices.Insert(0, windowsInitIndex);
+                    phase1Indices.Insert(0, floatInitIndex);
+
+                    Console.WriteLine($"\n=== EXPERIMENT: Reordered init expressions ===");
+                    Console.WriteLine($"  Running Float initialize first, then WindowsFileSystem initialize");
+                    Console.WriteLine($"  This tests if .NET call stack unwinds properly between expressions");
+                    Console.WriteLine();
+                }
+
                 // Report skipped expressions
                 if (skippedIndices.Count > 0)
                 {
@@ -206,6 +228,12 @@ public static class Program
 
                     Console.WriteLine($"[{index}] {expr.Source}");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                    // EXPERIMENT: Log successful completion to verify call stack unwound
+                    if (result.Status == InitStatus.Success)
+                    {
+                        Console.WriteLine($"  ✓ Completed successfully - .NET call stack should be unwound");
+                    }
 
                     if (result.Status != InitStatus.Success)
                     {
