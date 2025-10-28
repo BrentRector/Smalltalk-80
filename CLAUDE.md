@@ -1,18 +1,61 @@
 # Claude Development Guidelines
 
 **Last Updated**: 2025-10-28
-**Status**: 🎉 Runtime Instance Variable Initialization Fixed - Stack Overflow Resolved
+**Status**: 🔧 Debugging OOP(0) initialization bug - SpecialObjectsArray.Initialize() fix in progress
 **Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
 **Interpreter Status**: ✅ All 6 phases working - loads v1.0.6 bundles successfully (new loader)
 **Test Status**: ✅ Test classes extracted to separate files for optional validation
-**Init Execution Status**: 🎯 Testing in progress - Primitives 79 and 70/71 working, init expressions executing
+**Init Execution Status**: ⚠️ Stack overflow still occurring - need to rebuild to test SpecialObjectsArray fix
 
-## Recent Accomplishments (2025-10-28)
+## Recent Debugging (2025-10-28)
 
-### 🎉 Runtime Instance Variable Initialization Fixed - Stack Overflow Resolved
+### ⚠️ SpecialObjectsArray Initialization Bug - Fix Pending Rebuild
 
-**Status**: Fixed critical bug causing stack overflow during init expression execution.
+**Status**: Added SpecialObjectsArray.Initialize() call and diagnostic check - **REBUILD REQUIRED**.
+
+**Problem**:
+Stack overflow still occurring during init expression execution. Instance variables contain `OOP(0)` instead of nil, causing:
+- `WriteStream>>reset` calls `readLimit max: position` with OOP(0) values
+- `max:` fails because OOP(0) isn't a valid SmallInteger
+- Error handling enters infinite recursion → stack overflow
+
+**Root Cause Identified**:
+The new 6-phase loader never called `SpecialObjectsArray.Initialize()`, so `SpecialObjectsArray.Instance` had default struct values (all fields = `OOP(0)`). When `AllocateInstanceOf` tried to initialize instance variables to nil:
+
+```csharp
+SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;  // Returns OOP(0)!
+```
+
+**Fixes Applied** (commits 86f6891 and 35777fc):
+
+1. **Loader.cs:81** - Added `SpecialObjectsArray.Initialize()` in constructor
+2. **SmalltalkHeapManager.cs:144-151** - Added defensive check:
+   ```csharp
+   if (nilOOP.RawValue == 0)
+   {
+       throw new InvalidOperationException(
+           "FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)! ...");
+   }
+   ```
+
+**Next Steps**:
+1. **REBUILD**: `dotnet build -c Debug`
+2. **RUN**: `.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader`
+3. If the defensive check triggers → SpecialObjectsArray architecture issue
+4. If it doesn't trigger → initialization working, look for other OOP(0) sources
+
+**Files Modified**:
+- `Smalltalk80.Interpreter/Engine/Loader.cs` (line 81) - Added SpecialObjectsArray.Initialize() call
+- `Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs` (lines 144-151) - Added OOP(0) check
+
+---
+
+## Previous Accomplishments (2025-10-28)
+
+### 🎉 Runtime Instance Variable Initialization Code Added
+
+**Status**: Initialization code present, but SpecialObjectsArray wasn't initialized (see fix above).
 
 **Problem**:
 - `AllocateInstanceOf` (primitives 70/71: new/new:) allocated objects but didn't initialize instance variables
