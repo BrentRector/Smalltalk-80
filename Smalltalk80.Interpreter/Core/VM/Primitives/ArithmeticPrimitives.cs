@@ -116,17 +116,40 @@ public static class ArithmeticPrimitives
             : SpecialObjectsArray.Instance.False;
     }
 
+    // DEBUG: Primitive 4 call counter
+    private static int _prim4CallCount = 0;
+
     // Primitive 4: SmallInteger >
     public static SmalltalkOOP GreaterThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DEBUG: Log first 20 calls to see what's failing
+        System.Threading.Interlocked.Increment(ref _prim4CallCount);
+        bool shouldLog = _prim4CallCount <= 20;
+
+        if (shouldLog)
+        {
+            Console.WriteLine($"[Prim4 #{_prim4CallCount}] > called: receiver={receiver}, " +
+                            $"receiverIsSmallInt={receiver.IsSmallInteger}, " +
+                            $"args.Length={args.Length}");
+            if (args.Length > 0)
+            {
+                Console.WriteLine($"[Prim4 #{_prim4CallCount}]   arg0={args[0]}, " +
+                                $"arg0IsSmallInt={args[0].IsSmallInteger}");
+            }
+        }
+
         if (args.Length != 1)
         {
+            if (shouldLog)
+                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: wrong arg count");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
+            if (shouldLog)
+                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: not SmallIntegers");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -134,7 +157,11 @@ public static class ArithmeticPrimitives
         int a = receiver.AsSmallInteger();
         int b = args[0].AsSmallInteger();
 
-        return a > b
+        bool result = a > b;
+        if (shouldLog)
+            Console.WriteLine($"[Prim4 #{_prim4CallCount}] SUCCESS: {a} > {b} = {result}");
+
+        return result
             ? SpecialObjectsArray.Instance.True
             : SpecialObjectsArray.Instance.False;
     }
