@@ -2914,6 +2914,47 @@ public partial class VirtualMachine : IPrimitiveContext
             // DIAGNOSTIC: Get format once for both validation blocks
             var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
 
+            // DIAGNOSTIC: Validate methodDictOOP format FIRST (before we try to access its indexed slots)
+            if (methodDictFormat != ObjectFormat.PointerIndexed)
+            {
+                var methodDictClass = GetClassName(GetClass(methodDictOOP));
+                Console.WriteLine($"[ERROR] methodDictOOP has wrong format!");
+                Console.WriteLine($"  methodDictOOP: {methodDictOOP}");
+                Console.WriteLine($"  Expected: PointerIndexed (MethodDictionary)");
+                Console.WriteLine($"  Actual: {methodDictFormat}");
+                Console.WriteLine($"  Class: {methodDictClass}");
+                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
+                Console.WriteLine($"  Looking for selector: {selectorName}");
+
+                // Check ALL instance variables in the class
+                Console.WriteLine($"  Checking class instance variables:");
+                try
+                {
+                    int instanceVarCount = _layoutResolver.GetInstanceVariableCount(GetClassName(currentClassOOP));
+                    Console.WriteLine($"    Instance variable count: {instanceVarCount}");
+                    for (int slot = 0; slot < instanceVarCount; slot++)
+                    {
+                        try
+                        {
+                            var slotValue = _heapManager.GetInstanceVariable(currentClassOOP, slot);
+                            var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
+                            var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
+                            Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"    ERROR getting instance variables: {ex.Message}");
+                }
+
+                throw new InvalidOperationException($"Class methodDict field contains {methodDictFormat} object (class={methodDictClass}) instead of PointerIndexed MethodDictionary");
+            }
+
             // DIAGNOSTIC: Validate valuesArrayOOP format BEFORE using it
             var valuesArrayFormat = _heapManager.GetObjectFormat(valuesArrayOOP);
             if (valuesArrayFormat != ObjectFormat.PointerIndexed)
@@ -2950,8 +2991,8 @@ public partial class VirtualMachine : IPrimitiveContext
 
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
 
-            // Diagnostic: Check what format methodDictOOP actually is (already declared above)
-            if (methodDictFormat != ObjectFormat.PointerIndexed)
+            // Diagnostic code already ran above, so we know methodDictFormat is PointerIndexed here
+            if (false)
             {
                 var methodDictClass = GetClassName(GetClass(methodDictOOP));
                 Console.WriteLine($"[ERROR] methodDictOOP={methodDictOOP} has wrong format!");
