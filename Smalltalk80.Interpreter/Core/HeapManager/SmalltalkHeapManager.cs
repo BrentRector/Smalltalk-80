@@ -147,13 +147,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
         if (_runtimeAllocationCount <= 50)
         {
-            Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] classOOP={classOOP}, format={format}, " +
-                             $"instanceVarCount={instanceVariableCount}, indexedSize={indexedSize}, " +
-                             $"nilOOP={nilOOP}, newOOP={newInstanceOOP}");
+            Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
         }
         else if (_runtimeAllocationCount == 51)
         {
-            Console.WriteLine($"[AllocateInstanceOf] Suppressing further diagnostics (50 allocations logged)");
+            Console.WriteLine($"[AllocateInstanceOf] (suppressing after 50 allocations)");
         }
 
         // DEBUG: Verify nil OOP is not zero
@@ -328,11 +326,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             System.Threading.Interlocked.Increment(ref _setInstanceVarCallCount);
             if (_setInstanceVarCallCount <= 200)  // Increased to 200 to see allocations up to #35
             {
-                Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] WriteStream oop={objectOOP}, index={index}, value={value}");
+                Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] {objectOOP}[{index}] ← {value}");
             }
             else if (_setInstanceVarCallCount == 201)
             {
-                Console.WriteLine($"[SetInstVar] Suppressing further WriteStream diagnostics (200 logged)");
+                Console.WriteLine($"[SetInstVar] (suppressing after 200)");
             }
         }
 

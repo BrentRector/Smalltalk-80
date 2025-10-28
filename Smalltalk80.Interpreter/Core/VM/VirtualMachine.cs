@@ -1802,18 +1802,11 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Check if receiver is a class object
         if (selectorName == "new:")
         {
-            Console.WriteLine($"\n[new: DIAGNOSTIC] Sending new: to receiver={receiverOOP}");
-            Console.WriteLine($"  receiver's class={classOOP}, className={GetClassName(classOOP)}");
-
-            // Show detailed info about classOOP (should be a metaclass)
+            var className = GetClassName(classOOP);
             var classFormat = _heapManager.GetObjectFormat(classOOP);
             var classOfClass = _heapManager.GetClassOOP(classOOP);
             var classOfClassName = GetClassName(classOfClass);
-            Console.WriteLine($"  classOOP={classOOP} details:");
-            Console.WriteLine($"    format={classFormat}");
-            Console.WriteLine($"    class of classOOP={classOfClass}, name={classOfClassName}");
-            Console.WriteLine($"    indexedSize={_heapManager.GetIndexedSize(classOOP)}");
-            Console.WriteLine($"    instanceVarCount={_heapManager.GetInstanceVariableCount(classOOP)}");
+            Console.WriteLine($"\n[new:] receiver \"{className}\" {receiverOOP} | class \"{classOfClassName}\" {classOOP} | format={classFormat}, iVars={_heapManager.GetInstanceVariableCount(classOOP)}");
         }
 
         // DEBUG: Log when selector is <unknown>
@@ -1831,8 +1824,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (selectorName == "extent:fromArray:offset:")
         {
             _cursorCreationCount++;
-            Console.WriteLine($"\n[CURSOR DIAGNOSTIC #{_cursorCreationCount}] depth={_activeContextCount}, receiver={receiverOOP}, class={GetClassName(classOOP)}");
-            Console.WriteLine($"  selectorOOP={selectorOOP}, activeContext={_activeContextOOP}");
+            Console.WriteLine($"\n[CURSOR #{_cursorCreationCount}] depth={_activeContextCount}, receiver \"{GetClassName(classOOP)}\" {receiverOOP}");
 
             // Show sender chain for first 10 calls
             if (_cursorCreationCount <= 10)
@@ -1844,11 +1836,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // DIAGNOSTIC: Track > message sends to diagnose why primitive 4 isn't being called
         if (selectorName == ">")
         {
-            Console.WriteLine($"\n[> DIAGNOSTIC] Sending > to receiver={receiverOOP}");
-            Console.WriteLine($"  receiver.IsSmallInteger={receiverOOP.IsSmallInteger}");
-            if (args.Length > 0)
-                Console.WriteLine($"  arg0={args[0]}, arg0.IsSmallInteger={args[0].IsSmallInteger}");
-            Console.WriteLine($"  receiver's class={classOOP}, className={GetClassName(classOOP)}");
+            var argInfo = args.Length > 0 ? $"{args[0]} (SmallInt={args[0].IsSmallInteger})" : "none";
+            Console.WriteLine($"\n[>] receiver {receiverOOP} (SmallInt={receiverOOP.IsSmallInteger}, class=\"{GetClassName(classOOP)}\") | arg={argInfo}");
         }
 
         // Verbose debug: log method entry

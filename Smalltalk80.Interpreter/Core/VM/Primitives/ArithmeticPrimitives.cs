@@ -126,18 +126,6 @@ public static class ArithmeticPrimitives
         System.Threading.Interlocked.Increment(ref _prim4CallCount);
         bool shouldLog = _prim4CallCount <= 20;
 
-        if (shouldLog)
-        {
-            Console.WriteLine($"[Prim4 #{_prim4CallCount}] > called: receiver={receiver}, " +
-                            $"receiverIsSmallInt={receiver.IsSmallInteger}, " +
-                            $"args.Length={args.Length}");
-            if (args.Length > 0)
-            {
-                Console.WriteLine($"[Prim4 #{_prim4CallCount}]   arg0={args[0]}, " +
-                                $"arg0IsSmallInt={args[0].IsSmallInteger}");
-            }
-        }
-
         if (args.Length != 1)
         {
             if (shouldLog)
@@ -149,7 +137,7 @@ public static class ArithmeticPrimitives
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
             if (shouldLog)
-                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: not SmallIntegers");
+                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: not SmallIntegers (receiver={receiver}, arg={args[0]})");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -159,7 +147,7 @@ public static class ArithmeticPrimitives
 
         bool result = a > b;
         if (shouldLog)
-            Console.WriteLine($"[Prim4 #{_prim4CallCount}] SUCCESS: {a} > {b} = {result}");
+            Console.WriteLine($"[Prim4 #{_prim4CallCount}] {a} > {b} = {result}");
 
         return result
             ? SpecialObjectsArray.Instance.True
