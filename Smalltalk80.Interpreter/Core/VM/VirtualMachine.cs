@@ -1315,8 +1315,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
                     var outcome = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x0B: // SEND_1 - Send with 1 arg
@@ -1327,8 +1326,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var arg = Pop();
                     var receiver = Pop();
                     var outcome = SendMessage(receiver, selectorOOP, new[] { arg });
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x0C: // SEND_2 - Send with 2 args
@@ -1340,8 +1338,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var arg1 = Pop();
                     var receiver = Pop();
                     var outcome = SendMessage(receiver, selectorOOP, new[] { arg1, arg2 });
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x0D: // SEND_N - Send with N args (N >= 3)
@@ -1358,8 +1355,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     }
                     var receiver = Pop();
                     var outcome = SendMessage(receiver, selectorOOP, args);
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x0E: // SEND_SUPER_0 - Send to super with 0 args
@@ -1369,8 +1365,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
                     var outcome = SendSuperMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x0F: // SEND_SUPER_1 - Send to super with 1 arg
@@ -1381,8 +1376,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var arg = Pop();
                     var receiver = Pop();
                     var outcome = SendSuperMessage(receiver, selectorOOP, new[] { arg });
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x10: // SEND_SUPER_2 - Send to super with 2 args
@@ -1394,8 +1388,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var arg1 = Pop();
                     var receiver = Pop();
                     var outcome = SendSuperMessage(receiver, selectorOOP, new[] { arg1, arg2 });
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x11: // SEND_SUPER_N - Send to super with N args (N >= 3)
@@ -1412,8 +1405,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     }
                     var receiver = Pop();
                     var outcome = SendSuperMessage(receiver, selectorOOP, args);
-                    if (!ConsumeCallOutcome(outcome)) return true;
-                    return true;
+                    return ConsumeCallOutcome(outcome);
                 }
 
             case 0x12: // POP - Pop and discard top of stack
