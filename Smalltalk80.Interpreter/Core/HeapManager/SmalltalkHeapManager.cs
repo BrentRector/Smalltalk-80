@@ -135,6 +135,23 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Set the new instance's class reference (slot 0) to the class
         SetSlot(newInstanceOOP, 0, classOOP);
 
+        // Initialize all instance variables (slots 1+) to nil
+        // C# arrays default to SmalltalkOOP(0), but we need nil
+        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        for (int i = 1; i <= instanceVariableCount; i++)
+        {
+            SetSlot(newInstanceOOP, i, nilOOP);
+        }
+
+        // Initialize indexed slots to nil for PointerIndexed objects
+        if (format == ObjectFormat.PointerIndexed && indexedSize > 0)
+        {
+            for (int i = 0; i < indexedSize; i++)
+            {
+                SetIndexedOOP(newInstanceOOP, i, nilOOP);
+            }
+        }
+
         return newInstanceOOP;
     }
 
