@@ -206,6 +206,12 @@ public partial class VirtualMachine : IPrimitiveContext
         Console.WriteLine($"\n[ROOT CAUSE CHECK] Starting ExecuteExistingContext with depth={_activeContextCount}");
         Console.WriteLine($"  Initial context: {contextOOP}");
 
+        // DIAGNOSTIC: Show the method we're about to execute
+        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+        var methodOOP = _heapManager.GetInstanceVariable(contextOOP, methodIndex);
+        var bytecodes = GetMethodBytecodes(methodOOP);
+        Console.WriteLine($"  Method: {methodOOP}, bytecodes[0]=0x{bytecodes[0]:X2} (first instruction)");
+
         var result = ExecuteBytecodeLoop();
 
         // DIAGNOSTIC: Log final context depth after execution completes
@@ -334,6 +340,8 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
+        Console.WriteLine($"[ExecuteBytecodeLoop] ENTERED - context={_activeContextOOP}, depth={_activeContextCount}");
+
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
 
