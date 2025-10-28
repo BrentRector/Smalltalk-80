@@ -2911,6 +2911,40 @@ public partial class VirtualMachine : IPrimitiveContext
                 continue;
             }
 
+            // DIAGNOSTIC: Validate valuesArrayOOP format BEFORE using it
+            var valuesArrayFormat = _heapManager.GetObjectFormat(valuesArrayOOP);
+            if (valuesArrayFormat != ObjectFormat.PointerIndexed)
+            {
+                var valuesArrayClass = GetClassName(GetClass(valuesArrayOOP));
+                Console.WriteLine($"[ERROR] valuesArrayOOP has wrong format!");
+                Console.WriteLine($"  valuesArrayOOP: {valuesArrayOOP}");
+                Console.WriteLine($"  Expected: PointerIndexed (Array)");
+                Console.WriteLine($"  Actual: {valuesArrayFormat}");
+                Console.WriteLine($"  Class: {valuesArrayClass}");
+                Console.WriteLine($"  methodDictOOP: {methodDictOOP}, format={methodDictFormat}");
+                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
+                Console.WriteLine($"  Looking for selector: {selectorName}");
+
+                // Check ALL instance variables in the MethodDictionary
+                Console.WriteLine($"  Checking MethodDictionary instance variables:");
+                for (int slot = 0; slot < 3; slot++)
+                {
+                    try
+                    {
+                        var slotValue = _heapManager.GetInstanceVariable(methodDictOOP, slot);
+                        var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
+                        var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
+                        Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
+                    }
+                }
+
+                throw new InvalidOperationException($"MethodDictionary slot[0] (valuesArray) contains {valuesArrayFormat} object (class={valuesArrayClass}) instead of PointerIndexed Array");
+            }
+
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
 
             // Diagnostic: Check what format methodDictOOP actually is
