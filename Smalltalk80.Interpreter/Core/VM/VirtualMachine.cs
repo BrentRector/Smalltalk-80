@@ -2339,6 +2339,22 @@ public partial class VirtualMachine : IPrimitiveContext
         var executionContextOOP = CreateBlockExecutionContext(
             blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP, blockClosureOOP);
 
+        // DIAGNOSTIC: Validate executionContextOOP format before using it
+        var execContextFormat = _heapManager.GetObjectFormat(executionContextOOP);
+        if (execContextFormat != ObjectFormat.PointerIndexed)
+        {
+            var execContextClass = GetClassName(GetClass(executionContextOOP));
+            Console.WriteLine($"[ERROR] executionContextOOP has wrong format!");
+            Console.WriteLine($"  executionContextOOP: {executionContextOOP}");
+            Console.WriteLine($"  Expected: PointerIndexed");
+            Console.WriteLine($"  Actual: {execContextFormat}");
+            Console.WriteLine($"  Class: {execContextClass}");
+            Console.WriteLine($"  blockClosureOOP: {blockClosureOOP}");
+            Console.WriteLine($"  blockMethodOOP: {blockMethodOOP}");
+            Console.WriteLine($"  About to copy {args.Length} arguments");
+            throw new InvalidOperationException($"CreateBlockExecutionContext returned {execContextFormat} object instead of PointerIndexed");
+        }
+
         // Step 7a: Copy arguments to MethodContext indexed slots
         // The MethodContext's indexed slots 0..(argCount-1) hold the arguments
         for (int i = 0; i < args.Length; i++)

@@ -371,7 +371,52 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         var entry = GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
-            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support indexed OOP access");
+        {
+            // Enhanced error message with diagnostic info
+            var classOOP = GetSlot(objectOOP, 0);
+            string className = "UnknownClass";
+            string valueClassName = "UnknownClass";
+            try
+            {
+                if (!classOOP.IsSmallInteger && classOOP != default)
+                {
+                    var classEntry = GetObjectTableEntry(classOOP);
+                    if (classEntry.FormatExplicit == ObjectFormat.Pointer || classEntry.FormatExplicit == ObjectFormat.PointerIndexed)
+                    {
+                        className = $"class={classOOP}";
+                    }
+                }
+
+                // Get info about the value we're trying to write
+                if (!value.IsSmallInteger && value != default)
+                {
+                    var valueClassOOP = GetSlot(value, 0);
+                    valueClassName = $"class={valueClassOOP}";
+                }
+                else if (value.IsSmallInteger)
+                {
+                    valueClassName = "SmallInteger";
+                }
+            }
+            catch
+            {
+                // Ignore errors in diagnostic code
+            }
+
+            throw new InvalidOperationException(
+                $"SetIndexedOOP called on non-PointerIndexed object!\n" +
+                $"  objectOOP: {objectOOP}\n" +
+                $"  format: {entry.FormatExplicit} (expected PointerIndexed)\n" +
+                $"  {className}\n" +
+                $"  index: {index}\n" +
+                $"  value: {value}\n" +
+                $"  value class: {valueClassName}\n" +
+                $"  This likely means we're trying to write to a ByteIndexed object (Symbol/String/ByteArray/WordArray) indexed slots, which is not allowed.\n" +
+                $"  Possible causes:\n" +
+                $"    - Context object has wrong format (should be PointerIndexed)\n" +
+                $"    - Wrong object being used as a context or array\n" +
+                $"    - Field layout error causing wrong object to be accessed");
+        }
 
         WriteIndexedOop(entry, index, value);
     }
