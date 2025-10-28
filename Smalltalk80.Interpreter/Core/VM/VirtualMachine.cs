@@ -2374,18 +2374,21 @@ public partial class VirtualMachine : IPrimitiveContext
         
         // Save current active context
         var previousContextOOP = _activeContextOOP;
-        
+
         // Set the block execution context as active
         _activeContextOOP = executionContextOOP;
+        Console.WriteLine($"[DEBUG Primitive207] Set _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
 
         // Execute the block bytecodes
         var result = ExecuteBytecodeLoop();
+        Console.WriteLine($"[DEBUG Primitive207] After ExecuteBytecodeLoop, _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
 
         // Clean up block context mapping
         _blockContextMapping.Remove(executionContextOOP);
 
         // Restore previous context
         _activeContextOOP = previousContextOOP;
+        Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
 
         return result;
     }
@@ -2731,6 +2734,23 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void Push(SmalltalkOOP valueOOP)
     {
+        // DIAGNOSTIC: Validate _activeContextOOP before using it
+        var activeContextFormat = _heapManager.GetObjectFormat(_activeContextOOP);
+        if (activeContextFormat != ObjectFormat.PointerIndexed)
+        {
+            var activeContextClass = GetClassName(GetClass(_activeContextOOP));
+            var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
+            Console.WriteLine($"[ERROR Push] _activeContextOOP has wrong format!");
+            Console.WriteLine($"  _activeContextOOP: {_activeContextOOP}");
+            Console.WriteLine($"  Expected format: PointerIndexed (MethodContext)");
+            Console.WriteLine($"  Actual format: {activeContextFormat}");
+            Console.WriteLine($"  Class: {activeContextClass}");
+            Console.WriteLine($"  Trying to push value: {valueOOP}");
+            Console.WriteLine($"  Value class: {valueClass}");
+            Console.WriteLine($"  CORRUPTION DETECTED: _activeContextOOP was overwritten with non-context object!");
+            throw new InvalidOperationException($"Push() called with corrupted _activeContextOOP={_activeContextOOP}, format={activeContextFormat}, class={activeContextClass}");
+        }
+
         int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
