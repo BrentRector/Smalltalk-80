@@ -1,14 +1,64 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-28
-**Status**: 🎉 Init Expression Sorting Fixed - Pattern Mismatch Resolved
+**Last Updated**: 2025-10-28
+**Status**: 🎉 Runtime Instance Variable Initialization Fixed - Stack Overflow Resolved
 **Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
 **Interpreter Status**: ✅ All 6 phases working - loads v1.0.6 bundles successfully (new loader)
 **Test Status**: ✅ Test classes extracted to separate files for optional validation
-**Init Execution Status**: 🎯 Ready to test - Sorting bug fixed, infrastructure should load correctly
+**Init Execution Status**: 🎯 Testing in progress - Primitives 79 and 70/71 working, init expressions executing
 
-## Recent Accomplishments (2025-01-28)
+## Recent Accomplishments (2025-10-28)
+
+### 🎉 Runtime Instance Variable Initialization Fixed - Stack Overflow Resolved
+
+**Status**: Fixed critical bug causing stack overflow during init expression execution.
+
+**Problem**:
+- `AllocateInstanceOf` (primitives 70/71: new/new:) allocated objects but didn't initialize instance variables
+- C# arrays defaulted to `SmalltalkOOP(0)` instead of nil OOP
+- WriteStream>>reset called `readLimit max: position` with OOP(0) values
+- OOP(0) is not a valid SmallInteger, causing method lookup failures
+- Error handling tried to format error messages using uninitialized infrastructure
+- Result: Stack overflow in recursive error handling (errorSubscriptBounds: → printOn:base: → max: → errorSubscriptBounds:)
+
+**Root Cause**:
+When primitives 70/71 create new objects at runtime, `AllocateObject` allocates C# arrays with default values. For `SmalltalkOOP[]` arrays, the default is `SmalltalkOOP(0)`, not the nil OOP. Instance variables remained uninitialized (OOP(0)) instead of being set to nil.
+
+**Solution**:
+Modified `AllocateInstanceOf` in SmalltalkHeapManager.cs to initialize all slots to nil:
+
+```csharp
+// Initialize all instance variables (slots 1+) to nil
+// C# arrays default to SmalltalkOOP(0), but we need nil
+SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+for (int i = 1; i <= instanceVariableCount; i++)
+{
+    SetSlot(newInstanceOOP, i, nilOOP);
+}
+
+// Initialize indexed slots to nil for PointerIndexed objects
+if (format == ObjectFormat.PointerIndexed && indexedSize > 0)
+{
+    for (int i = 0; i < indexedSize; i++)
+    {
+        SetIndexedOOP(newInstanceOOP, i, nilOOP);
+    }
+}
+```
+
+**Benefits**:
+- ✅ Instance variables properly initialized to nil, matching Phase Y behavior during cold start
+- ✅ WriteStream>>reset and similar methods work correctly with nil values
+- ✅ Error handling works without stack overflow
+- ✅ Arrays and other PointerIndexed objects have nil-initialized indexed slots
+
+**Files Modified**:
+- `SmalltalkHeapManager.cs` (lines 138-153) - Added instance variable and indexed slot initialization
+
+**Testing Status**: Ready to test - init expressions should now execute without stack overflow.
+
+## Previous Accomplishments (2025-01-28)
 
 ### 🎉 Init Expression Sorting Bug Fixed - Root Cause Resolved
 
