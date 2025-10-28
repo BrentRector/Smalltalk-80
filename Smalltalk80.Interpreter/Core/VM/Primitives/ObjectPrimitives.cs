@@ -184,23 +184,39 @@ public static class ObjectPrimitives
         return ctx.HeapManager.AllocateInstanceOf(receiver, 0);
     }
 
+    // DEBUG: Primitive 71 call counter
+    private static int _prim71CallCount = 0;
+
     // Primitive 71: Object new:
     public static SmalltalkOOP NewWithSize(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DEBUG: Log first 50 calls
+        System.Threading.Interlocked.Increment(ref _prim71CallCount);
+        bool shouldLog = _prim71CallCount <= 50;
+
+        if (shouldLog)
+            Console.WriteLine($"[Prim71 #{_prim71CallCount}] ENTRY: receiver={receiver}, args.Length={args.Length}");
+
         if (args.Length != 1)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: args.Length != 1");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
         if (!args[0].IsSmallInteger)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: arg not SmallInteger, arg={args[0]}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         int size = args[0].AsSmallInteger();
+        if (shouldLog)
+            Console.WriteLine($"[Prim71 #{_prim71CallCount}] size={size}");
+
         if (size < 0)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: size < 0");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -208,6 +224,7 @@ public static class ObjectPrimitives
         // Receiver must be a Class (not SmallInteger)
         if (receiver.IsSmallInteger)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: receiver is SmallInteger");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -216,7 +233,22 @@ public static class ObjectPrimitives
         // Uses heap data only - reads the class's format and instance variable count
         // Used for Array new: n, ByteArray new: n, etc.
         // AllocateInstanceOf handles validation internally, let any real errors propagate
-        return ctx.HeapManager.AllocateInstanceOf(receiver, size);
+        if (shouldLog)
+            Console.WriteLine($"[Prim71 #{_prim71CallCount}] Calling AllocateInstanceOf...");
+
+        try
+        {
+            var result = ctx.HeapManager.AllocateInstanceOf(receiver, size);
+            if (shouldLog)
+                Console.WriteLine($"[Prim71 #{_prim71CallCount}] SUCCESS: result={result}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            if (shouldLog)
+                Console.WriteLine($"[Prim71 #{_prim71CallCount}] EXCEPTION: {ex.Message}");
+            throw;
+        }
     }
 
     // Primitive 110: Object ==

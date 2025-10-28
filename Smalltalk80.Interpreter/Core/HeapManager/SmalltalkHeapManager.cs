@@ -16,12 +16,15 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     private readonly Stack<int> _freeObjectTableIndices = new();
     private int _nextObjectTableIndex = 1; // Start at 1, reserve 0 for null/special cases
     private const int ObjectTableBlockSize = 1024;
-    
+
     // GC root management
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
-    
+
     // Class name field index (determined from coldstart.json during initialization)
     private int _classNameFieldIndex = -1;
+
+    // DEBUG: Runtime allocation counter
+    private static int _runtimeAllocationCount = 0;
 
     /// <summary>Represents a block of ObjectTable entries for scalable growth.</summary>
     private sealed class ObjectTableBlock
@@ -140,12 +143,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // C# arrays default to SmalltalkOOP(0), but we need nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // DEBUG: ALWAYS log first few allocations to verify code is running
-        if (newInstanceOOP.RawValue < 60000)  // First ~31,000 objects are from cold start
+        // DEBUG: Log allocations (limit output to first 50 runtime allocations)
+        System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
+        if (_runtimeAllocationCount <= 50)
         {
-            Console.WriteLine($"[AllocateInstanceOf] classOOP={classOOP}, format={format}, " +
+            Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] classOOP={classOOP}, format={format}, " +
                              $"instanceVarCount={instanceVariableCount}, indexedSize={indexedSize}, " +
                              $"nilOOP={nilOOP}, newOOP={newInstanceOOP}");
+        }
+        else if (_runtimeAllocationCount == 51)
+        {
+            Console.WriteLine($"[AllocateInstanceOf] Suppressing further diagnostics (50 allocations logged)");
         }
 
         // DEBUG: Verify nil OOP is not zero
