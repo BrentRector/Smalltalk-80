@@ -140,6 +140,14 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // C# arrays default to SmalltalkOOP(0), but we need nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
+        // DEBUG: ALWAYS log first few allocations to verify code is running
+        if (newInstanceOOP.RawValue < 60000)  // First ~31,000 objects are from cold start
+        {
+            Console.WriteLine($"[AllocateInstanceOf] classOOP={classOOP}, format={format}, " +
+                             $"instanceVarCount={instanceVariableCount}, indexedSize={indexedSize}, " +
+                             $"nilOOP={nilOOP}, newOOP={newInstanceOOP}");
+        }
+
         // DEBUG: Verify nil OOP is not zero
         if (nilOOP.RawValue == 0)
         {
