@@ -326,9 +326,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (classOOP.RawValue == 8544)  // WriteStream class
         {
             System.Threading.Interlocked.Increment(ref _setInstanceVarCallCount);
-            if (_setInstanceVarCallCount <= 50)
+            if (_setInstanceVarCallCount <= 200)  // Increased to 200 to see allocations up to #35
             {
                 Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] WriteStream oop={objectOOP}, index={index}, value={value}");
+            }
+            else if (_setInstanceVarCallCount == 201)
+            {
+                Console.WriteLine($"[SetInstVar] Suppressing further WriteStream diagnostics (200 logged)");
             }
         }
 
