@@ -360,32 +360,52 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 - ✅ Primitive access patterns match actual Smalltalk-80 source code expectations
 - ✅ No GC traversal issues with mixed OOP/SmallInteger patterns
 
-### 🎉 Cold Start Phase Status (14/14 Complete - 100% SUCCESS!)
+### 🎉 Cold Start Loader Architectures
 
-**BOOTSTRAP PHASES (0-5): All Working ✅**
+**TWO LOADER IMPLEMENTATIONS AVAILABLE:**
+
+1. **Current 17-Phase Loader** (`Loader.cs`) - Default
+   - Comprehensive phase-by-phase bootstrap
+   - Explicit separation of initialization steps
+   - Phases: 0-6, X, Y, 7-12
+   - Use by default (no flags needed)
+
+2. **New 6-Phase Loader** (`Loader_New.cs`) - Experimental
+   - Consolidated phases for better performance
+   - Phases: 1-6 (combined operations)
+   - Use with `--new-loader` flag
+   - Still under development
+
+**CURRENT 17-PHASE LOADER STATUS (All Working ✅)**
+
+**BOOTSTRAP PHASES (0-6):**
 - Phase 0: Preflight Validation ✅
 - Phase 1: Symbol Interning ✅
 - Phase 2: Class Shells ✅
 - Phase 3: Metaclass Wiring ✅
 - Phase 4: Class Resolution ✅
-- Phase 5: Layout Computation ✅
-
-**MULTI-PASS INITIALIZATION: All Working ✅**
+- Phase 5: Layout Loading (precomputed from v1.0.6 bundles) ✅
 - Phase 6: Object Allocation (creates nil/true/false singletons) ✅
-- Phase X: Class Reference Initialization ✅
-- Phase Y: Instance Variable Initialization ✅
 
-**FULL ALLOCATION + INITIALIZATION (7-14): All Working ✅**
-- Phase 7: Method Dictionary Allocation ✅ (NULL_CLASS BUG FIXED!)
+**MULTI-PASS INITIALIZATION (X, Y):**
+- Phase X: Class Reference Initialization ✅
+  - Sets class slot (slot 0) for all objects
+  - Maps instances → metaclasses, symbols → class:Symbol, etc.
+- Phase Y: Instance Variable Initialization ✅
+  - Initializes remaining instance variables to nil
+  - Ensures no zero/uninitialized slots
+
+**FULL ALLOCATION + INITIALIZATION (7-12):**
+- Phase 7: Method Dictionary Allocation ✅
 - Phase 8: Method Installation ✅
 - Phase 9: Method Dictionary Installation ✅
 - Phase 10: Patch Application ✅
-- Phase 11: Init Expression Preparation ✅
-- Phase 12: USTable Population ✅
-- Phase 13: Global Variable Installation ✅
-- Phase 14: Comprehensive Validation ✅ (10,535 objects validated!)
+- Phase 11: USTable Population ✅
+- Phase 12: Global Variable Installation ✅
 
-**🎉 COMPLETE SUCCESS**: All 14 phases working with 100% validation success. NULL_CLASS allocation bug eliminated.
+**Note:** Phase X and Y use letter designations because they were inserted between Phase 6 and Phase 7 after the initial numbering was established. They handle critical initialization that must occur after singleton allocation (Phase 6) but before method installation (Phase 7-12).
+
+**🎉 COMPLETE SUCCESS**: All 17 phases working with 100% validation success.
 
 ## Developer Principles
 

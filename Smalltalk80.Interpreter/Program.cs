@@ -24,7 +24,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, useNewLoader, reportOutput) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -33,13 +33,13 @@ public static class Program
                 Console.Error.WriteLine("Options:");
                 Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
                 Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
-                Console.Error.WriteLine("  --new-loader           Use the new 6-phase loader (default: current 17-phase)");
+                Console.Error.WriteLine("  --old-loader           Use the old 17-phase loader (default: new 6-phase)");
                 Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
                 Console.Error.WriteLine("                         after cold start completes");
                 Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
                 Console.Error.WriteLine("                         (e.g., 'BlockValidator' or 'Test')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
-                Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file (requires --new-loader)");
+                Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
                 Environment.Exit(1);
                 return;
             }
@@ -60,11 +60,17 @@ public static class Program
             Console.WriteLine("Initializing heap manager...");
             var heapManager = new SmalltalkHeapManager();
 
-            // Create and run the loader (old or new based on flag)
-            Console.WriteLine($"Starting cold start loader ({(useNewLoader ? "NEW 6-phase" : "current 17-phase")})...");
+            // Create and run the loader (new 6-phase by default, old 17-phase if requested)
+            Console.WriteLine($"Starting cold start loader ({(useOldLoader ? "old 17-phase" : "new 6-phase")})...");
 
             LayoutResolver? layoutResolver;
-            if (useNewLoader)
+            if (useOldLoader)
+            {
+                var loader = new Loader(bundle, heapManager);
+                loader.Run();
+                layoutResolver = loader.LayoutResolver;
+            }
+            else
             {
                 var newLoader = new Loader_New(bundle, heapManager, coldStartFile);
                 newLoader.Run();
@@ -82,12 +88,6 @@ public static class Program
                     File.WriteAllText(reportOutput, reportJson);
                     Console.WriteLine($"\nColdstart report written to: {reportOutput}");
                 }
-            }
-            else
-            {
-                var loader = new Loader(bundle, heapManager);
-                loader.Run();
-                layoutResolver = loader.LayoutResolver;
             }
 
             Console.WriteLine("Cold start completed successfully!");
@@ -141,10 +141,12 @@ public static class Program
                     var expr = bundle.InitExpressions[i];
                     if (expr.Source != null)
                     {
-                        if (expr.Source.EndsWith(" initialize!"))
+                        // Match "ClassName initialize" (no exclamation mark in bundle)
+                        if (expr.Source.EndsWith(" initialize"))
                         {
                             phase1Indices.Add(i);
                         }
+                        // Match "ClassName comment:'...'"
                         else if (expr.Source.Contains(" comment:"))
                         {
                             phase2Indices.Add(i);
@@ -716,13 +718,13 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, bool useNewLoader, string? reportOutput) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, bool useOldLoader, string? reportOutput) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
         bool verboseDebug = false;
         string? testFilter = null;
-        bool useNewLoader = false;
+        bool useOldLoader = false; // Default to new loader
         string? reportOutput = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -746,9 +748,9 @@ public static class Program
             {
                 verboseDebug = true;
             }
-            else if (args[i] == "--new-loader")
+            else if (args[i] == "--old-loader")
             {
-                useNewLoader = true;
+                useOldLoader = true;
             }
             else if (args[i].StartsWith("--coldstart-report="))
             {
@@ -763,7 +765,7 @@ public static class Program
             coldStartFile = Path.Combine(exeDir, "coldstart.json");
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, useNewLoader, reportOutput);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, useOldLoader, reportOutput);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
