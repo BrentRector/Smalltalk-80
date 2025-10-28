@@ -116,7 +116,7 @@ public static class Program
                 }
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;

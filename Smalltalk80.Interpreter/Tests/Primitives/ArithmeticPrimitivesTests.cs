@@ -581,4 +581,5 @@ internal class TestPrimitiveContext : IPrimitiveContext
     public SmalltalkOOP ActivateBlockContext(SmalltalkOOP blockContextOop, SmalltalkOOP argumentsArray) => throw new NotImplementedException();
     public IEnumerable<SmalltalkOOP> GetAllObjects() => throw new NotImplementedException();
     public SmalltalkOOP InternSymbol(string symbolName) => throw new NotImplementedException();
+    public string GetClassNameForObject(SmalltalkOOP oop) => throw new NotImplementedException();
 }

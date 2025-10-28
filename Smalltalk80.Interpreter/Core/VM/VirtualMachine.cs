@@ -22,7 +22,6 @@ public partial class VirtualMachine : IPrimitiveContext
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
-    private readonly Engine.DebugOptions _debugOptions;
 
     // Active context (current MethodContext being executed) - now using SmalltalkOOP
     private SmalltalkOOP _activeContextOOP;
@@ -74,12 +73,11 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, Engine.DebugOptions? debugOptions = null, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
         _metadata = metadata;
-        _debugOptions = debugOptions ?? Engine.DebugOptions.None;
         _platformBridge = platformBridge;
     }
 
@@ -360,7 +358,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 opcodeBytes = $"0x{bytecode:X2}";
             }
 
-            if (_debugOptions.ShouldDebugBytecode)
+            if (false)
             {
                 Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
             }
@@ -373,7 +371,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (!continueExecution)
             {
-                if (_debugOptions.ShouldDebugBytecode)
+                if (false)
                 {
                     Console.WriteLine($"[BYTECODE RETURN] context={_activeContextOOP}, returning from bytecode loop");
                 }
@@ -401,7 +399,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Track bytecode execution for debugging
         if (bytecode == 0x10)
         {
-            if (_debugOptions.ShouldDebugBytecode)
+            if (false)
             {
                 Console.WriteLine($"[DEBUG ExecuteBytecode] bytecode=0x{bytecode:X2}, IsPushIvar={BytecodeUtil.IsPushIvar(bytecode)}, IsPushTemp={BytecodeUtil.IsPushTemp(bytecode)}");
             }
@@ -470,7 +468,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 var header = ParseMethodHeader(blockMethodOOP);
                 int blockLocalCount = header.NumArgs + header.NumTemps;
 
-                if (_debugOptions.ShouldDebugBytecode)
+                if (false)
                 {
                     Console.WriteLine($"[DEBUG pushTemp] index={index}, blockLocalCount={blockLocalCount}");
                 }
@@ -484,7 +482,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         var homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
-                        if (_debugOptions.ShouldDebugBytecode)
+                        if (false)
                         {
                             Console.WriteLine($"[DEBUG pushTemp] BlockClosure: Reading from home context: {contextToReadFrom}");
                         }
@@ -493,7 +491,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
-                        if (_debugOptions.ShouldDebugBytecode)
+                        if (false)
                         {
                             Console.WriteLine($"[DEBUG pushTemp] BlockContext: Reading from home context: {contextToReadFrom}");
                         }
@@ -501,7 +499,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 }
                 else
                 {
-                    if (_debugOptions.ShouldDebugBytecode)
+                    if (false)
                     {
                         Console.WriteLine($"[DEBUG pushTemp] Reading from block's own stack");
                     }
@@ -509,7 +507,7 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
-            if (_debugOptions.ShouldDebugBytecode)
+            if (false)
             {
                 Console.WriteLine($"[DEBUG pushTemp] Retrieved temp[{index}] = {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
             }
@@ -1810,7 +1808,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Log when selector is <unknown>
         if (selectorName == null)
         {
-            if (_debugOptions.ShouldDebugMessages)
+            if (false)
             {
                 Console.WriteLine($"[SendMessage] WARNING: selectorOOP={selectorOOP} does not resolve to a Symbol!");
             }
@@ -1873,7 +1871,7 @@ public partial class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            if (_debugOptions.ShouldDebugMessages)
+            if (false)
             {
                 Console.WriteLine($"[SendMessage] Executing primitive {primitiveNumber} for {selectorName}");
             }
@@ -1882,7 +1880,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (_primitiveSuccess)
             {
-                if (_debugOptions.ShouldDebugMessages)
+                if (false)
                 {
                     Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 }
@@ -1890,7 +1888,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 return CallOutcome.Normal(primitiveResult);
             }
 
-            if (_debugOptions.ShouldDebugMessages)
+            if (false)
             {
                 Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
             }
@@ -2825,7 +2823,7 @@ public partial class VirtualMachine : IPrimitiveContext
         while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             string currentClassName = GetClassName(currentClassOOP);
-            if (_debugOptions.ShouldDebugMessages)
+            if (false)
             {
                 Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
             }
@@ -2842,14 +2840,14 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 if (superclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
-                    if (_debugOptions.ShouldDebugMessages)
+                    if (false)
                     {
                         Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
                     }
                     break; // Reached root of class hierarchy
                 }
 
-                if (_debugOptions.ShouldDebugMessages)
+                if (false)
                 {
                     string superclassName = GetClassName(superclassOOP);
                     Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
@@ -2903,7 +2901,7 @@ public partial class VirtualMachine : IPrimitiveContext
             int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
 
-            if (_debugOptions.ShouldDebugMessages)
+            if (false)
             {
                 if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
@@ -2920,7 +2918,7 @@ public partial class VirtualMachine : IPrimitiveContext
             depth++;
         }
 
-        if (_debugOptions.ShouldDebugMessages)
+        if (false)
         {
             Console.WriteLine($"  [GetMethod] FAILED: '{selectorName}' not found after {depth} levels");
         }
