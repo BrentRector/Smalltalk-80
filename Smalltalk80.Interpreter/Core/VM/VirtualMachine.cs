@@ -2916,6 +2916,7 @@ public partial class VirtualMachine : IPrimitiveContext
             if (valuesArrayFormat != ObjectFormat.PointerIndexed)
             {
                 var valuesArrayClass = GetClassName(GetClass(valuesArrayOOP));
+                var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
                 Console.WriteLine($"[ERROR] valuesArrayOOP has wrong format!");
                 Console.WriteLine($"  valuesArrayOOP: {valuesArrayOOP}");
                 Console.WriteLine($"  Expected: PointerIndexed (Array)");
