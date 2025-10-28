@@ -200,8 +200,18 @@ public partial class VirtualMachine : IPrimitiveContext
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
         _activeContextOOP = contextOOP;
-        
-        return ExecuteBytecodeLoop();
+
+        // DIAGNOSTIC: Log initial context depth when starting init expression execution
+        // This reveals if we already have a deep context chain BEFORE bytecode executes
+        Console.WriteLine($"\n[ROOT CAUSE CHECK] Starting ExecuteExistingContext with depth={_activeContextCount}");
+        Console.WriteLine($"  Initial context: {contextOOP}");
+
+        var result = ExecuteBytecodeLoop();
+
+        // DIAGNOSTIC: Log final context depth after execution completes
+        Console.WriteLine($"[ROOT CAUSE CHECK] Completed ExecuteExistingContext with depth={_activeContextCount}");
+
+        return result;
     }
 
     /// <summary>
