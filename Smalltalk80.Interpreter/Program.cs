@@ -136,8 +136,7 @@ public static class Program
                 // These expressions require infrastructure that isn't ready during cold start
                 var skipList = new HashSet<string>
                 {
-                    "BitEditor initialize",           // Requires TextStyle/DefaultTextStyle (not created yet)
-                    "CompiledMethod initialize",      // Calls primitives that fail; error handling needs thisContext
+                    "BitEditor initialize",      // Requires TextStyle/DefaultTextStyle (not created yet)
                     // Add more problematic expressions here as discovered
                 };
 
