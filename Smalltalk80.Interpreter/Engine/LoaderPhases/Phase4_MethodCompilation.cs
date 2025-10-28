@@ -651,13 +651,14 @@ public class Phase4_MethodCompilation
         }
 
         // CRITICAL: Sort init expressions by phase to prevent bootstrap failures
-        // Phase 1: initialize! expressions (infrastructure setup - creates Digitbuffer, CharacterTable, etc.)
+        // Phase 1: initialize expressions (infrastructure setup - creates Digitbuffer, CharacterTable, etc.)
         // Phase 2: comment: expressions (documentation - safe after infrastructure ready)
         // Phase 3: Other expressions (tests, run!, etc.)
         //
         // This prevents errors like: ActionMenu comment: → error handling → printString → needs Digitbuffer → nil crash
+        // Note: Bundle contains " initialize" (without exclamation mark)
         var initializeExpressions = _bundle.InitExpressions
-            .Where(e => e.Source?.EndsWith(" initialize!") ?? false)
+            .Where(e => e.Source?.EndsWith(" initialize") ?? false)
             .ToList();
 
         var commentExpressions = _bundle.InitExpressions
@@ -665,7 +666,7 @@ public class Phase4_MethodCompilation
             .ToList();
 
         var otherExpressions = _bundle.InitExpressions
-            .Where(e => !(e.Source?.EndsWith(" initialize!") ?? false) &&
+            .Where(e => !(e.Source?.EndsWith(" initialize") ?? false) &&
                        !(e.Source?.Contains(" comment:") ?? false))
             .ToList();
 
