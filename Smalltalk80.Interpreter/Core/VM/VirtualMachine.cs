@@ -1800,18 +1800,18 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Check if receiver is a class object
         if (selectorName == "new:")
         {
-            // Console.WriteLine($"[DEBUG SendMessage] Sending new: to receiver={receiverOOP}");
-            Console.WriteLine($"  receiverClass={classOOP}, className={GetClassName(classOOP)}");
-            // Check if receiver is itself MethodDictionary class
-            if (GlobalRegistry.TryGet("class:MethodDictionary", out var mdClassOOP))
-            {
-                Console.WriteLine($"  class:MethodDictionary OOP = {mdClassOOP}");
-                Console.WriteLine($"  receiver == class:MethodDictionary? {receiverOOP == mdClassOOP}");
-                // Check receiver's indexed size (method dictionaries are indexed, classes are not)
-                int indexedSize = _heapManager.GetIndexedSize(receiverOOP);
-                Console.WriteLine($"  receiver indexedSize: {indexedSize}");
-                Console.WriteLine($"  receiver is a MethodDictionary INSTANCE (not class)!");
-            }
+            Console.WriteLine($"\n[new: DIAGNOSTIC] Sending new: to receiver={receiverOOP}");
+            Console.WriteLine($"  receiver's class={classOOP}, className={GetClassName(classOOP)}");
+
+            // Show detailed info about classOOP (should be a metaclass)
+            var classFormat = _heapManager.GetObjectFormat(classOOP);
+            var classOfClass = _heapManager.GetClassOOP(classOOP);
+            var classOfClassName = GetClassName(classOfClass);
+            Console.WriteLine($"  classOOP={classOOP} details:");
+            Console.WriteLine($"    format={classFormat}");
+            Console.WriteLine($"    class of classOOP={classOfClass}, name={classOfClassName}");
+            Console.WriteLine($"    indexedSize={_heapManager.GetIndexedSize(classOOP)}");
+            Console.WriteLine($"    instanceVarCount={_heapManager.GetInstanceVariableCount(classOOP)}");
         }
 
         // DEBUG: Log when selector is <unknown>
