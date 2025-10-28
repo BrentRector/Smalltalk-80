@@ -1841,6 +1841,16 @@ public partial class VirtualMachine : IPrimitiveContext
             }
         }
 
+        // DIAGNOSTIC: Track > message sends to diagnose why primitive 4 isn't being called
+        if (selectorName == ">")
+        {
+            Console.WriteLine($"\n[> DIAGNOSTIC] Sending > to receiver={receiverOOP}");
+            Console.WriteLine($"  receiver.IsSmallInteger={receiverOOP.IsSmallInteger}");
+            if (args.Length > 0)
+                Console.WriteLine($"  arg0={args[0]}, arg0.IsSmallInteger={args[0].IsSmallInteger}");
+            Console.WriteLine($"  receiver's class={classOOP}, className={GetClassName(classOOP)}");
+        }
+
         // Verbose debug: log method entry
         if (VerboseDebug)
         {
@@ -1882,7 +1892,8 @@ public partial class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            if (_debugOptions.ShouldDebugMessages)
+            // DEBUG: Always log primitive 4 (>) to diagnose why it's not being called
+            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
             {
                 Console.WriteLine($"[SendMessage] Executing primitive {primitiveNumber} for {selectorName}");
             }
@@ -1891,7 +1902,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (_primitiveSuccess)
             {
-                if (_debugOptions.ShouldDebugMessages)
+                if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
                 {
                     Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 }
@@ -1899,7 +1910,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 return CallOutcome.Normal(primitiveResult);
             }
 
-            if (_debugOptions.ShouldDebugMessages)
+            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
             {
                 Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
             }
