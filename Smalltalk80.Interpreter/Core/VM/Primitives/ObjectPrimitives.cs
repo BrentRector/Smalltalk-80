@@ -91,8 +91,55 @@ public static class ObjectPrimitives
         SmalltalkOOP value = args[1];
 
         // Convert to 0-based index
-        // Arrays use PointerIndexed format - set OOP directly
-        ctx.HeapManager.SetIndexedOOP(receiver, index - 1, value);
+        int zeroBasedIndex = index - 1;
+
+        // Check object format and use appropriate setter
+        var format = ctx.HeapManager.GetObjectFormat(receiver);
+
+        if (format == ObjectFormat.PointerIndexed)
+        {
+            // Arrays, OrderedCollections, etc. - indexed OOP slots
+            ctx.HeapManager.SetIndexedOOP(receiver, zeroBasedIndex, value);
+        }
+        else if (format == ObjectFormat.ByteIndexed)
+        {
+            // Strings, Symbols, ByteArrays - indexed byte slots
+            if (!value.IsSmallInteger)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            int byteValue = value.AsSmallInteger();
+            if (byteValue < 0 || byteValue > 255)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            ctx.HeapManager.SetIndexedByte(receiver, zeroBasedIndex, (byte)byteValue);
+        }
+        else if (format == ObjectFormat.WordIndexed)
+        {
+            // WordArrays - indexed 16-bit word slots
+            if (!value.IsSmallInteger)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            int wordValue = value.AsSmallInteger();
+            if (wordValue < 0 || wordValue > 65535)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            ctx.HeapManager.SetIndexedWord(receiver, zeroBasedIndex, (ushort)wordValue);
+        }
+        else
+        {
+            // Unsupported format for at:put:
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         return value;
     }
 
