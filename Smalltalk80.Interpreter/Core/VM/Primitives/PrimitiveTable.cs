@@ -122,6 +122,9 @@ public static class PrimitiveTable
         _primitives[110] = ObjectPrimitives.IdentityEquals;
         _primitives[111] = ObjectPrimitives.Class;
 
+        // CompiledMethod primitives (79)
+        _primitives[79] = CompiledMethodPrimitives.NewMethodHeader;
+
         // Control/Block primitives (80-88) - stubs, require BlockContext/Process infrastructure
         _primitives[80] = ControlPrimitives.BlockCopy;
         _primitives[81] = ControlPrimitives.Value;
