@@ -650,9 +650,39 @@ public class Phase4_MethodCompilation
             throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId");
         }
 
+        // CRITICAL: Sort init expressions by phase to prevent bootstrap failures
+        // Phase 1: initialize! expressions (infrastructure setup - creates Digitbuffer, CharacterTable, etc.)
+        // Phase 2: comment: expressions (documentation - safe after infrastructure ready)
+        // Phase 3: Other expressions (tests, run!, etc.)
+        //
+        // This prevents errors like: ActionMenu comment: → error handling → printString → needs Digitbuffer → nil crash
+        var initializeExpressions = _bundle.InitExpressions
+            .Where(e => e.Source?.EndsWith(" initialize!") ?? false)
+            .ToList();
+
+        var commentExpressions = _bundle.InitExpressions
+            .Where(e => e.Source?.Contains(" comment:") ?? false)
+            .ToList();
+
+        var otherExpressions = _bundle.InitExpressions
+            .Where(e => !(e.Source?.EndsWith(" initialize!") ?? false) &&
+                       !(e.Source?.Contains(" comment:") ?? false))
+            .ToList();
+
+        Console.WriteLine($"[Phase4] Init expression sorting:");
+        Console.WriteLine($"  Phase 1 (initialize!): {initializeExpressions.Count} expressions");
+        Console.WriteLine($"  Phase 2 (comment:): {commentExpressions.Count} expressions");
+        Console.WriteLine($"  Phase 3 (other): {otherExpressions.Count} expressions");
+
+        // Concatenate in correct execution order
+        var sortedExpressions = initializeExpressions
+            .Concat(commentExpressions)
+            .Concat(otherExpressions)
+            .ToList();
+
         var initExprMethods = new List<SmalltalkOOP>();
 
-        foreach (var expr in _bundle.InitExpressions)
+        foreach (var expr in sortedExpressions)
         {
             // Resolve literals using the SAME canonicalization mechanism as regular methods
             var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
