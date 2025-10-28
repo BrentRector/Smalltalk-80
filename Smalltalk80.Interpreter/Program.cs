@@ -40,13 +40,17 @@ public static class Program
                 Console.Error.WriteLine("                         (e.g., 'BlockValidator' or 'Test')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
-                Console.Error.WriteLine("\nDebug Options (cold start diagnostics):");
-                Console.Error.WriteLine("  --debug-all            Enable all debug output");
-                Console.Error.WriteLine("  --debug-patches        Show patch application details");
-                Console.Error.WriteLine("  --debug-associations   Show association scanning and validation");
-                Console.Error.WriteLine("  --debug-classes        Show class resolution details");
-                Console.Error.WriteLine("  --debug-methods        Show method installation details");
-                Console.Error.WriteLine("  --debug-globals        Show global variable installation details");
+                Console.Error.WriteLine("\nDebug Options:");
+                Console.Error.WriteLine("  Cold start diagnostics:");
+                Console.Error.WriteLine("    --debug-patches        Show patch application details");
+                Console.Error.WriteLine("    --debug-associations   Show association scanning and validation");
+                Console.Error.WriteLine("    --debug-classes        Show class resolution details");
+                Console.Error.WriteLine("    --debug-methods        Show method installation details");
+                Console.Error.WriteLine("    --debug-globals        Show global variable installation details");
+                Console.Error.WriteLine("  Runtime VM diagnostics:");
+                Console.Error.WriteLine("    --debug-bytecode       Show bytecode execution trace");
+                Console.Error.WriteLine("    --debug-messages       Show message send and method lookup trace");
+                Console.Error.WriteLine("  --debug-all              Enable all debug output");
                 Environment.Exit(1);
                 return;
             }
@@ -112,7 +116,7 @@ public static class Program
                 }
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -787,6 +791,14 @@ public static class Program
             else if (args[i] == "--debug-globals")
             {
                 debugOptions.DebugGlobals = true;
+            }
+            else if (args[i] == "--debug-bytecode")
+            {
+                debugOptions.DebugBytecode = true;
+            }
+            else if (args[i] == "--debug-messages")
+            {
+                debugOptions.DebugMessages = true;
             }
         }
 

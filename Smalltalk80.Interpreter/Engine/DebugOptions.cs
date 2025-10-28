@@ -37,6 +37,18 @@ public class DebugOptions
     public bool DebugGlobals { get; set; }
 
     /// <summary>
+    /// Enable bytecode execution trace output
+    /// Command line: --debug-bytecode
+    /// </summary>
+    public bool DebugBytecode { get; set; }
+
+    /// <summary>
+    /// Enable message send and method lookup debug output
+    /// Command line: --debug-messages
+    /// </summary>
+    public bool DebugMessages { get; set; }
+
+    /// <summary>
     /// Enable all debug output (equivalent to specifying all --debug-* flags)
     /// Command line: --debug-all
     /// </summary>
@@ -57,7 +69,9 @@ public class DebugOptions
         DebugAssociations = true,
         DebugClasses = true,
         DebugMethods = true,
-        DebugGlobals = true
+        DebugGlobals = true,
+        DebugBytecode = true,
+        DebugMessages = true
     };
 
     /// <summary>
@@ -84,4 +98,14 @@ public class DebugOptions
     /// Checks if globals debug output should be enabled.
     /// </summary>
     public bool ShouldDebugGlobals => DebugAll || DebugGlobals;
+
+    /// <summary>
+    /// Checks if bytecode execution trace output should be enabled.
+    /// </summary>
+    public bool ShouldDebugBytecode => DebugAll || DebugBytecode;
+
+    /// <summary>
+    /// Checks if message send and method lookup debug output should be enabled.
+    /// </summary>
+    public bool ShouldDebugMessages => DebugAll || DebugMessages;
 }
