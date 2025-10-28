@@ -2784,26 +2784,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get the literal from indexed slots
         var literalOOP = _heapManager.GetIndexedOOP(methodOOP, index);
 
-        // Additional validation: check if we accidentally read the bytecode array
-        // (which is stored in the last indexed slot)
-        if (!literalOOP.IsSmallInteger)
-        {
-            var literalFormat = _heapManager.GetObjectFormat(literalOOP);
-            Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP}, literalFormat={literalFormat}");
-
-            // If we got a ByteIndexed object as a literal, this is suspicious
-            // (literals are usually Pointers, Symbols, Strings, or SmallIntegers)
-            if (literalFormat == ObjectFormat.ByteIndexed)
-            {
-                var literalClass = GetClassName(GetClass(literalOOP));
-                var literalLocalId = GetLocalId(literalOOP);
-                Console.WriteLine($"[WARNING] Literal at index {index} is ByteIndexed! class={literalClass}, localId={literalLocalId}");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP} (SmallInteger={literalOOP.AsSmallInteger()})");
-        }
+        // Note: Literals can be Symbols (ByteIndexed), Strings (ByteIndexed),
+        // SmallIntegers, Arrays (PointerIndexed), CompiledMethods (PointerIndexed), etc.
+        // ByteIndexed literals (Symbols/Strings) are normal and expected.
 
         return literalOOP;
     }
@@ -2929,6 +2912,39 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
+
+            // Diagnostic: Check what format methodDictOOP actually is
+            var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
+            if (methodDictFormat != ObjectFormat.PointerIndexed)
+            {
+                var methodDictClass = GetClassName(GetClass(methodDictOOP));
+                Console.WriteLine($"[ERROR] methodDictOOP={methodDictOOP} has wrong format!");
+                Console.WriteLine($"  Expected: PointerIndexed (MethodDictionary)");
+                Console.WriteLine($"  Actual: {methodDictFormat}");
+                Console.WriteLine($"  Class: {methodDictClass}");
+                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
+                Console.WriteLine($"  methodDictIndex={methodDictIndex} (from GetFieldIndex('class:Class', 'methodDict'))");
+                Console.WriteLine($"  Looking for selector: {selectorName}");
+
+                // Check what's in the other slots to diagnose field index issue
+                Console.WriteLine($"  Checking class instance variables:");
+                for (int slot = 0; slot < 7; slot++)
+                {
+                    try
+                    {
+                        var slotValue = _heapManager.GetInstanceVariable(currentClassOOP, slot);
+                        var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
+                        var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
+                        Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
+                    }
+                }
+
+                throw new InvalidOperationException($"methodDict field contains {methodDictFormat} object (class={methodDictClass}) instead of PointerIndexed MethodDictionary");
+            }
 
             for (int i = 0; i < dictSize; i++)
             {
