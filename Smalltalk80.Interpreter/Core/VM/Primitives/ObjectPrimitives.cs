@@ -441,10 +441,28 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Read element from collection
-        // Stored position is 1-based, but heap manager GetIndexedOOP is 0-based
+        // Read element from collection - handle both ByteIndexed and PointerIndexed formats
+        // Stored position is 1-based, but heap manager is 0-based
         // Convert: Smalltalk index 1 -> C# index 0
-        SmalltalkOOP element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
+        SmalltalkOOP element;
+        var collectionFormat = ctx.HeapManager.GetObjectFormat(collectionOOP);
+        if (collectionFormat == ObjectFormat.ByteIndexed)
+        {
+            // ByteIndexed (String, ByteArray) - read byte and convert to SmallInteger
+            byte byteValue = ctx.HeapManager.GetIndexedByte(collectionOOP, position - 1);
+            element = SmalltalkOOP.FromSmallInteger(byteValue);
+        }
+        else if (collectionFormat == ObjectFormat.PointerIndexed)
+        {
+            // PointerIndexed (Array, OrderedCollection) - read OOP directly
+            element = ctx.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
+        }
+        else
+        {
+            // Unsupported format for stream reading
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Increment position (remains 1-based for Smalltalk)
         ctx.SetFieldValue(receiver, className, "position", SmalltalkOOP.FromSmallInteger(position + 1));
@@ -517,8 +535,37 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Write element to collection (convert 1-based to 0-based)
-        ctx.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
+        // Write element to collection - handle both ByteIndexed and PointerIndexed formats
+        // Stored position is 1-based, but heap manager is 0-based
+        // Convert: Smalltalk index 1 -> C# index 0
+        var collectionFormat = ctx.HeapManager.GetObjectFormat(collectionOOP);
+        if (collectionFormat == ObjectFormat.ByteIndexed)
+        {
+            // ByteIndexed (String, ByteArray) - value must be SmallInteger (character code)
+            if (!value.IsSmallInteger)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            int charValue = value.AsSmallInteger();
+            if (charValue < 0 || charValue > 255)
+            {
+                ctx.PrimitiveSuccess = false;
+                return SpecialObjectsArray.Instance.Nil;
+            }
+            ctx.HeapManager.SetIndexedByte(collectionOOP, position - 1, (byte)charValue);
+        }
+        else if (collectionFormat == ObjectFormat.PointerIndexed)
+        {
+            // PointerIndexed (Array, OrderedCollection) - write OOP directly
+            ctx.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
+        }
+        else
+        {
+            // Unsupported format for stream writing
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Increment position (remains 1-based)
         ctx.SetFieldValue(receiver, className, "position", SmalltalkOOP.FromSmallInteger(position + 1));
