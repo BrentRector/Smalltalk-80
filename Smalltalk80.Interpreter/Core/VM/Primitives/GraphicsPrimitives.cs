@@ -46,27 +46,36 @@ public static class GraphicsPrimitives
         // Fallback: No platform bridge - extract fields and call BitBltEngine directly
         // This path handles scenarios where no platform bridge is configured
 
+        // Get the receiver's actual class name (e.g., "class:BitBlt" or any BitBlt subclass)
+        // This ensures the primitive works correctly with BitBlt subclasses
+        string? className = ctx.GetClassNameForObject(receiver);
+        if (className == null)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
         // Extract BitBlt instance variables (Blue Book page 346):
         // 0: destForm, 1: sourceForm, 2: halftoneForm, 3: combinationRule
         // 4: destX, 5: destY, 6: width, 7: height
         // 8: sourceX, 9: sourceY
         // 10: clipX, 11: clipY, 12: clipWidth, 13: clipHeight
 
-        SmalltalkOOP destForm = ctx.GetFieldValue(receiver, "class:BitBlt", "destForm");
-        SmalltalkOOP sourceForm = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceForm");
-        SmalltalkOOP halftoneForm = ctx.GetFieldValue(receiver, "class:BitBlt", "halftoneForm");
+        SmalltalkOOP destForm = ctx.GetFieldValue(receiver, className, "destForm");
+        SmalltalkOOP sourceForm = ctx.GetFieldValue(receiver, className, "sourceForm");
+        SmalltalkOOP halftoneForm = ctx.GetFieldValue(receiver, className, "halftoneForm");
 
-        SmalltalkOOP combinationRuleOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "combinationRule");
-        SmalltalkOOP destXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "destX");
-        SmalltalkOOP destYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "destY");
-        SmalltalkOOP widthOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "width");
-        SmalltalkOOP heightOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "height");
-        SmalltalkOOP sourceXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceX");
-        SmalltalkOOP sourceYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "sourceY");
-        SmalltalkOOP clipXOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipX");
-        SmalltalkOOP clipYOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipY");
-        SmalltalkOOP clipWidthOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipWidth");
-        SmalltalkOOP clipHeightOOP = ctx.GetFieldValue(receiver, "class:BitBlt", "clipHeight");
+        SmalltalkOOP combinationRuleOOP = ctx.GetFieldValue(receiver, className, "combinationRule");
+        SmalltalkOOP destXOOP = ctx.GetFieldValue(receiver, className, "destX");
+        SmalltalkOOP destYOOP = ctx.GetFieldValue(receiver, className, "destY");
+        SmalltalkOOP widthOOP = ctx.GetFieldValue(receiver, className, "width");
+        SmalltalkOOP heightOOP = ctx.GetFieldValue(receiver, className, "height");
+        SmalltalkOOP sourceXOOP = ctx.GetFieldValue(receiver, className, "sourceX");
+        SmalltalkOOP sourceYOOP = ctx.GetFieldValue(receiver, className, "sourceY");
+        SmalltalkOOP clipXOOP = ctx.GetFieldValue(receiver, className, "clipX");
+        SmalltalkOOP clipYOOP = ctx.GetFieldValue(receiver, className, "clipY");
+        SmalltalkOOP clipWidthOOP = ctx.GetFieldValue(receiver, className, "clipWidth");
+        SmalltalkOOP clipHeightOOP = ctx.GetFieldValue(receiver, className, "clipHeight");
 
         // Validate all numeric fields are SmallIntegers
         if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
@@ -117,10 +126,15 @@ public static class GraphicsPrimitives
         if (formOOP == SpecialObjectsArray.Instance.Nil || formOOP.IsSmallInteger)
             return (Memory<byte>.Empty, 0, 0);
 
+        // Get the Form's actual class name (e.g., "class:Form" or any Form subclass)
+        string? formClassName = ctx.GetClassNameForObject(formOOP);
+        if (formClassName == null)
+            return (Memory<byte>.Empty, 0, 0);
+
         // Get Form instance variables
-        SmalltalkOOP bitsOOP = ctx.GetFieldValue(formOOP, "class:Form", "bits");
-        SmalltalkOOP widthOOP = ctx.GetFieldValue(formOOP, "class:Form", "width");
-        SmalltalkOOP heightOOP = ctx.GetFieldValue(formOOP, "class:Form", "height");
+        SmalltalkOOP bitsOOP = ctx.GetFieldValue(formOOP, formClassName, "bits");
+        SmalltalkOOP widthOOP = ctx.GetFieldValue(formOOP, formClassName, "width");
+        SmalltalkOOP heightOOP = ctx.GetFieldValue(formOOP, formClassName, "height");
 
         // Validate numeric fields
         if (!widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger)
@@ -259,9 +273,17 @@ public static class GraphicsPrimitives
         {
             try
             {
+                // Get the receiver's actual class name (e.g., "class:Form" or any Form subclass)
+                string? className = ctx.GetClassNameForObject(receiver);
+                if (className == null)
+                {
+                    ctx.PrimitiveSuccess = false;
+                    return SpecialObjectsArray.Instance.Nil;
+                }
+
                 // Get display dimensions to invalidate entire screen
-                int width = ctx.GetFieldValue(receiver, "class:Form", "width").AsSmallInteger();
-                int height = ctx.GetFieldValue(receiver, "class:Form", "height").AsSmallInteger();
+                int width = ctx.GetFieldValue(receiver, className, "width").AsSmallInteger();
+                int height = ctx.GetFieldValue(receiver, className, "height").AsSmallInteger();
                 ctx.PlatformBridge.InvalidateDisplayRegion(0, 0, width, height);
             }
             catch
