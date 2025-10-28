@@ -6,7 +6,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
-using ClassHierarchyUtils = Smalltalk80.Interpreter.Engine.LoaderPhases.ClassHierarchyUtils;
+using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
 
 namespace Smalltalk80.Interpreter;
 

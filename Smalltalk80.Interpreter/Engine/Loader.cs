@@ -243,7 +243,7 @@ public class Loader
         if (_heapManager is SmalltalkHeapManager concreteHeapManager)
         {
             // Find the index of the 'name' field in Class
-            int nameFieldIndex = LoaderPhases.ClassHierarchyUtils.FindInstanceVariableIndex("Class", "name", _bundle);
+            int nameFieldIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "name", _bundle);
             if (nameFieldIndex >= 0)
             {
                 concreteHeapManager.SetClassNameFieldIndex(nameFieldIndex);
