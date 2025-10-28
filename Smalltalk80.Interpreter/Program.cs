@@ -105,7 +105,16 @@ public static class Program
                 }
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+
+                // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
+                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                {
+                    ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
+                    ShouldDebugMessages = debugOptions.ShouldDebugMessages,
+                    ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages // Method lookup is part of message debugging
+                };
+
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -746,14 +755,14 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, DebugOptions debugOptions) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
         bool verboseDebug = false;
         string? testFilter = null;
         string? reportOutput = null;
-        var debugOptions = new DebugOptions();
+        var debugOptions = new Smalltalk80.Interpreter.Engine.DebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
