@@ -326,6 +326,23 @@ public partial class VirtualMachine : IPrimitiveContext
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+
+        // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
+        var methodFormat = _heapManager.GetObjectFormat(methodOOP);
+        if (methodFormat != ObjectFormat.PointerIndexed)
+        {
+            var className = GetClassName(GetClass(methodOOP));
+            var localId = GetLocalId(methodOOP);
+            var contextClass = GetClassName(GetClass(_activeContextOOP));
+            throw new InvalidOperationException(
+                $"ExecuteBytecodeLoop: method field in context contains non-PointerIndexed object!\n" +
+                $"  Context: {_activeContextOOP}, contextClass={contextClass}\n" +
+                $"  Method field (index {methodIndex}): {methodOOP}\n" +
+                $"  Method format: {methodFormat} (expected PointerIndexed)\n" +
+                $"  Method class: {className}\n" +
+                $"  Method localId: {localId}\n" +
+                $"  This suggests the bytecode array was stored in the context instead of the CompiledMethod.");
+        }
         // TODO: Implement GetMethodBytecodes in heap manager or add helper method
         byte[] bytecodes = GetMethodBytecodes(methodOOP);
 
@@ -2751,8 +2768,27 @@ public partial class VirtualMachine : IPrimitiveContext
 
     private SmalltalkOOP GetMethodLiteral(SmalltalkOOP methodOOP, int index)
     {
-        // TODO: Implement GetMethodLiteral - access literal from CompiledMethod
+        // Validate that methodOOP is a CompiledMethod (PointerIndexed)
+        var format = _heapManager.GetObjectFormat(methodOOP);
+        if (format != ObjectFormat.PointerIndexed)
+        {
+            var className = GetClassName(GetClass(methodOOP));
+            var localId = GetLocalId(methodOOP);
+            throw new InvalidOperationException(
+                $"GetMethodLiteral called on non-PointerIndexed object: {methodOOP}, " +
+                $"format={format}, class={className}, localId={localId}. " +
+                $"Expected CompiledMethod (PointerIndexed), got {format}. " +
+                $"Index={index}");
+        }
+
+        // Get the literal from indexed slots
         var literalOOP = _heapManager.GetIndexedOOP(methodOOP, index);
+
+        // Additional validation: check if we accidentally read the bytecode array
+        // (which is stored in the last indexed slot)
+        var literalFormat = _heapManager.GetObjectFormat(literalOOP);
+        Console.WriteLine($"[DEBUG GetMethodLiteral] method={methodOOP}, index={index}, literal={literalOOP}, literalFormat={literalFormat}");
+
         return literalOOP;
     }
 
@@ -3418,6 +3454,21 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private int GetBlockArgCount(SmalltalkOOP blockMethodOOP)
     {
+        // Validate that blockMethodOOP is a CompiledMethod (PointerIndexed format)
+        var format = _heapManager.GetObjectFormat(blockMethodOOP);
+        var className = GetClassName(GetClass(blockMethodOOP));
+        var localId = GetLocalId(blockMethodOOP);
+
+        Console.WriteLine($"[DEBUG GetBlockArgCount] blockMethodOOP={blockMethodOOP}, format={format}, class={className}, localId={localId}");
+
+        if (format != ObjectFormat.PointerIndexed)
+        {
+            throw new InvalidOperationException(
+                $"GetBlockArgCount called on non-PointerIndexed object: {blockMethodOOP}, " +
+                $"format={format}, class={className}, localId={localId}. " +
+                $"Expected CompiledMethod (PointerIndexed), got {format}.");
+        }
+
         // Get the method header (first indexed slot)
         var headerOOP = _heapManager.GetIndexedOOP(blockMethodOOP, 0);
         if (!headerOOP.IsSmallInteger)
