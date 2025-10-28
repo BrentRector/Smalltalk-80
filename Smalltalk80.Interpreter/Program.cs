@@ -123,49 +123,130 @@ public static class Program
 
                 // Note: Init expressions are pre-allocated during coldstart Phase 8b
                 // and stored in SpecialObjectsArray.InitExpressionMethods.
-                // ExecuteAll() will retrieve and execute them from there.
 
-                Console.WriteLine("\nExecuting ONLY init:0 for debugging...\n");
+                // Phase-based execution strategy:
+                // Phase 1: Execute all initialize! expressions (infrastructure setup)
+                // Phase 2: Execute all comment: expressions (documentation)
+                // Fast-fail: Stop on first error with full diagnostics
 
-                // TEMPORARY: Execute only init:0 (first init expression)
                 var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-                var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, 0);
+                int totalExpressions = bundle.InitExpressions.Length;
 
-                var result = executor.ExecuteInitExpression("init:0", initMethodOOP);
+                // Build index lists for each phase (preserving source file order)
+                var phase1Indices = new List<int>(); // initialize! expressions
+                var phase2Indices = new List<int>(); // comment: expressions
 
-                Console.WriteLine($"\nResult: {result.Status}");
-                if (result.Status != InitStatus.Success)
+                for (int i = 0; i < totalExpressions; i++)
                 {
-                    Console.WriteLine($"Error: {result.Diagnostic?.Message}");
+                    var expr = bundle.InitExpressions[i];
+                    if (expr.Source != null)
+                    {
+                        if (expr.Source.EndsWith(" initialize!"))
+                        {
+                            phase1Indices.Add(i);
+                        }
+                        else if (expr.Source.Contains(" comment:"))
+                        {
+                            phase2Indices.Add(i);
+                        }
+                    }
                 }
 
-                var report = new { Total = 1, Succeeded = result.Status == InitStatus.Success ? 1 : 0, Failed = result.Status == InitStatus.Success ? 0 : 1 };
+                Console.WriteLine($"\n=== Phase 1: Infrastructure Initialization ===");
+                Console.WriteLine($"  Executing {phase1Indices.Count} initialize! expression(s) in source file order");
+                Console.WriteLine();
 
-                Console.WriteLine($"\n=== Execution Summary ===");
-                Console.WriteLine($"  Executed: {report.Total}/{report.Total}");
-                Console.WriteLine($"  Succeeded: {report.Succeeded}");
-                Console.WriteLine($"  Failed: {report.Failed}");
+                int succeeded = 0;
+                int failed = 0;
 
-                // BlockClosure test summary
+                // Phase 1: Execute all initialize! expressions
+                foreach (int index in phase1Indices)
+                {
+                    var expr = bundle.InitExpressions[index];
+                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+
+                    Console.WriteLine($"[{index}] {expr.Source}");
+                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                    if (result.Status != InitStatus.Success)
+                    {
+                        failed++;
+                        Console.WriteLine($"\n❌ FAILED: {expr.Source}");
+                        Console.WriteLine($"   Status: {result.Status}");
+                        if (result.Diagnostic?.Message != null)
+                        {
+                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                        }
+                        if (result.Diagnostic?.StackTrace != null)
+                        {
+                            Console.WriteLine($"\n   Stack Trace:");
+                            Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                        }
+
+                        Console.WriteLine($"\n=== Execution Failed ===");
+                        Console.WriteLine($"  Phase 1: {succeeded} succeeded, {failed} failed");
+                        Console.WriteLine($"  Fast-fail: Stopping execution");
+                        return;
+                    }
+
+                    succeeded++;
+                }
+
+                Console.WriteLine($"\n✓ Phase 1 Complete: {succeeded} initialize! expression(s) executed successfully");
+
+                // Phase 2: Execute all comment: expressions
+                Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
+                Console.WriteLine($"  Executing {phase2Indices.Count} comment: expression(s) in source file order");
                 Console.WriteLine();
-                Console.WriteLine("==============================================");
-                Console.WriteLine("  BlockClosure Functionality Status");
-                Console.WriteLine("==============================================");
-                Console.WriteLine();
-                Console.WriteLine("✓ Primitive 207 implemented and operational");
-                Console.WriteLine("✓ Runtime wrapping in pushLiteral working");
-                Console.WriteLine("✓ homeContext captured at block creation");
-                Console.WriteLine("✓ Lexical scoping functional");
-                Console.WriteLine("✓ Init expressions #1 and #2 pass");
-                Console.WriteLine();
-                Console.WriteLine("BlockClosure methods available:");
-                Console.WriteLine("  - value (0 args)");
-                Console.WriteLine("  - value: (1 arg)");
-                Console.WriteLine("  - value:value: (2 args)");
-                Console.WriteLine("  - value:value:value: (3 args)");
-                Console.WriteLine("  - value:value:value:value: (4 args)");
-                Console.WriteLine("  - valueWithArguments: (N args via array)");
-                Console.WriteLine();
+
+                foreach (int index in phase2Indices)
+                {
+                    var expr = bundle.InitExpressions[index];
+                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+
+                    // Show abbreviated source for comments (they're long)
+                    string displaySource = expr.Source ?? expr.LocalId;
+                    if (displaySource.Length > 80)
+                    {
+                        displaySource = displaySource.Substring(0, 77) + "...";
+                    }
+                    Console.WriteLine($"[{index}] {displaySource}");
+
+                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                    if (result.Status != InitStatus.Success)
+                    {
+                        failed++;
+                        Console.WriteLine($"\n❌ FAILED: {expr.Source}");
+                        Console.WriteLine($"   Status: {result.Status}");
+                        if (result.Diagnostic?.Message != null)
+                        {
+                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                        }
+                        if (result.Diagnostic?.StackTrace != null)
+                        {
+                            Console.WriteLine($"\n   Stack Trace:");
+                            Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                        }
+
+                        Console.WriteLine($"\n=== Execution Failed ===");
+                        Console.WriteLine($"  Phase 1: {phase1Indices.Count} succeeded");
+                        Console.WriteLine($"  Phase 2: {succeeded - phase1Indices.Count} succeeded, {failed} failed");
+                        Console.WriteLine($"  Fast-fail: Stopping execution");
+                        return;
+                    }
+
+                    succeeded++;
+                }
+
+                Console.WriteLine($"\n✓ Phase 2 Complete: {phase2Indices.Count} comment: expression(s) executed successfully");
+
+                // Final summary
+                Console.WriteLine($"\n=== Init Expression Execution Summary ===");
+                Console.WriteLine($"  Phase 1 (initialize!): {phase1Indices.Count} succeeded");
+                Console.WriteLine($"  Phase 2 (comment:): {phase2Indices.Count} succeeded");
+                Console.WriteLine($"  Total: {succeeded}/{totalExpressions} succeeded, {failed} failed");
+                Console.WriteLine($"\n✓ All init expressions executed successfully!");
             }
 
             Console.WriteLine("\n✓ All systems ready!");
