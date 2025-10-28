@@ -612,7 +612,53 @@ The VM must provide these guarantees in the specified order:
 
 ### Object-Oriented Design Principles
 
-- **No Hard-Coded OOP Value Checks**: No code should ever check for a hard-coded OOP value, e.g. checking for zero to determine if it's the Nil object. First, OOP zero is a valid reference that can be to any object. Second, OOP values can change build to build as the Smalltalk source code changes.
+#### No Hard-Coded OOP Values - CRITICAL RULE
+
+**ABSOLUTE PROHIBITION**: No code should ever create, return, or compare against a hard-coded SmalltalkOOP value.
+
+**Why This Rule Exists**:
+1. **OOP(0) is not reserved**: It's a valid object table index that can reference any object
+2. **OOPs are mutable**: Object table indices change between builds as Smalltalk source changes
+3. **Nil is not zero**: The nil singleton has a dynamically-assigned OOP, not a fixed value
+
+**Prohibited Patterns**:
+```csharp
+// WRONG - Never create hardcoded OOPs
+return new SmalltalkOOP(0);
+var nilOOP = new SmalltalkOOP(0);
+SmalltalkOOP emptyValue = default(SmalltalkOOP);
+
+// WRONG - Never compare against hardcoded OOPs
+if (oop == new SmalltalkOOP(0)) { ... }
+if (oop.RawValue == 0) { ... }
+
+// WRONG - Never use FromObjectTableIndex with constants
+var nilOOP = SmalltalkOOP.FromObjectTableIndex(0);
+```
+
+**Correct Patterns**:
+```csharp
+// CORRECT - Use SpecialObjectsArray for singletons
+return SpecialObjectsArray.Instance.Nil;
+var nilOOP = SpecialObjectsArray.Instance.Nil;
+var trueOOP = SpecialObjectsArray.Instance.True;
+var falseOOP = SpecialObjectsArray.Instance.False;
+
+// CORRECT - Use identity comparison between OOPs
+if (oop == nilOOP) { ... }
+if (receiver == SpecialObjectsArray.Instance.Nil) { ... }
+
+// CORRECT - Use GlobalRegistry for known objects
+var smalltalkDictOOP = GlobalRegistry.Get("Smalltalk");
+```
+
+**Array Initialization Rule**: When allocating `new SmalltalkOOP[size]` arrays:
+- C# initializes to `default(SmalltalkOOP)` which is OOP(0) - NOT nil
+- MUST immediately fill array with valid OOPs before use
+- For object instance variables, use initialization loops to set nil
+- For temporary args/local arrays, fill from stack/parameters before passing to methods
+
+**Recent Fix (2025-10-28)**: Fixed `Program.cs:368` which returned `new SmalltalkOOP(0)` instead of nil.
 
 ### Init Expression Execution Strategy - CRITICAL ORDERING REQUIREMENT
 

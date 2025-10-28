@@ -365,7 +365,7 @@ public static class Program
         {
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
-        return new SmalltalkOOP(0);
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     /// <summary>
