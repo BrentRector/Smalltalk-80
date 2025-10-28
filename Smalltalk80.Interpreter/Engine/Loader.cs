@@ -77,6 +77,9 @@ public class Loader
         _bundlePath = bundlePath ?? "coldstart.json";
         _debugOptions = debugOptions ?? DebugOptions.None;
 
+        // Initialize SpecialObjectsArray (will be populated during Phase 3)
+        SpecialObjectsArray.Initialize();
+
         // Initialize the report with bundle metadata
         _report = new ColdstartReport
         {
