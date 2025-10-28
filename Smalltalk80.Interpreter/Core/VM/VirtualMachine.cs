@@ -1833,11 +1833,16 @@ public partial class VirtualMachine : IPrimitiveContext
             }
         }
 
-        // DIAGNOSTIC: Track > message sends to diagnose why primitive 4 isn't being called
+        // DIAGNOSTIC: Track > and max: message sends
         if (selectorName == ">")
         {
             var argInfo = args.Length > 0 ? $"{args[0]} (SmallInt={args[0].IsSmallInteger})" : "none";
             Console.WriteLine($"\n[>] receiver {receiverOOP} (SmallInt={receiverOOP.IsSmallInteger}, class=\"{GetClassName(classOOP)}\") | arg={argInfo}");
+        }
+        if (selectorName == "max:")
+        {
+            var argInfo = args.Length > 0 ? $"{args[0]}" : "none";
+            Console.WriteLine($"\n[max:] receiver {receiverOOP} | arg={argInfo} | class=\"{GetClassName(classOOP)}\"");
         }
 
         // Verbose debug: log method entry
