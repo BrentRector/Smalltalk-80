@@ -306,6 +306,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         SetInstanceVariableWithBarrier(objectOOP, index, value);
     }
 
+    // DEBUG: Counter for SetInstanceVariable calls
+    private static int _setInstanceVarCallCount = 0;
+
     public void SetInstanceVariableWithBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
@@ -317,6 +320,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+
+        // DEBUG: Log WriteStream instance variable assignments (classOOP=oop=8544)
+        var classOOP = GetSlot(objectOOP, 0);
+        if (classOOP.RawValue == 8544)  // WriteStream class
+        {
+            System.Threading.Interlocked.Increment(ref _setInstanceVarCallCount);
+            if (_setInstanceVarCallCount <= 50)
+            {
+                Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] WriteStream oop={objectOOP}, index={index}, value={value}");
+            }
+        }
+
         // Slot layout: [0]=header, [1..N]=instance variables
         WriteSlot(entry, 1 + index, value);
 
