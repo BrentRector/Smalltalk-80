@@ -1,18 +1,56 @@
 # Claude Development Guidelines
 
 **Last Updated**: 2025-01-28
-**Status**: 🚧 Init Expression Skip List Implemented - Bypassing Bootstrap Dependency Issues
+**Status**: 🎉 Init Expression Sorting Fixed - Pattern Mismatch Resolved
 **Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
 **Interpreter Status**: ✅ All 6 phases working - loads v1.0.6 bundles successfully (new loader)
 **Test Status**: ✅ Test classes extracted to separate files for optional validation
-**Init Execution Status**: 🚧 Skip list active - BitEditor initialize bypassed due to TextStyle dependency
+**Init Execution Status**: 🎯 Ready to test - Sorting bug fixed, infrastructure should load correctly
 
 ## Recent Accomplishments (2025-01-28)
 
-### 🚧 Init Expression Skip List - Pragmatic Bootstrap Solution
+### 🎉 Init Expression Sorting Bug Fixed - Root Cause Resolved
 
-**Status**: Implemented skip list mechanism to bypass init expressions with unresolved dependencies.
+**Status**: Fixed critical bug causing init expressions to execute in wrong order.
+
+**Problem**:
+- Phase4 looked for `" initialize!"` (with exclamation mark)
+- Program.cs looked for `" initialize"` (without exclamation mark)
+- Bundle contains `" initialize"` (without !) - compiler strips the exclamation mark
+- Result: Phase4 found **0 initialize expressions**, categorized all 46 as "other"
+- They were sorted AFTER 234 comments instead of BEFORE
+- WindowsFileSystem initialize (index 2) ran before infrastructure was ready
+- Array bounds error triggered infinite recursion in error handling
+
+**Root Cause**:
+The bundle compiler removes the exclamation mark from init expression sources during compilation, so "WindowsFileSystem initialize!" becomes "WindowsFileSystem initialize" in the JSON. Phase4 was looking for the wrong pattern, causing all initialize expressions to be miscategorized.
+
+**Solution**:
+Changed Phase4 to match Program.cs pattern:
+```csharp
+// OLD (wrong - looked for exclamation mark):
+.Where(e => e.Source?.EndsWith(" initialize!") ?? false)
+
+// NEW (correct - no exclamation mark):
+.Where(e => e.Source?.EndsWith(" initialize") ?? false)
+```
+
+**Expected Results After Fix**:
+- Phase 4 now correctly finds all 46 initialize expressions
+- They're sorted FIRST (indices 0-45) before comments (indices 46-279)
+- Infrastructure (Digitbuffer, CharacterTable, Symbol table, etc.) created before needed
+- No more array bounds errors during init expression execution
+- Error handling will work correctly because infrastructure is ready
+
+**Files Modified**:
+- `Phase4_MethodCompilation.cs` (lines 660, 669) - Fixed pattern matching
+
+**Next Step**: Rebuild and test to verify init expressions execute in correct order.
+
+### 🚧 Init Expression Skip List - Pragmatic Bootstrap Solution (SUPERSEDED)
+
+**Status**: Skip list still in place, but may no longer be needed after sorting fix.
 
 **Problem**:
 - Even after phase-based sorting (initialize! → comment:), some init expressions fail due to missing infrastructure
