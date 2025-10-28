@@ -2911,12 +2911,14 @@ public partial class VirtualMachine : IPrimitiveContext
                 continue;
             }
 
+            // DIAGNOSTIC: Get format once for both validation blocks
+            var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
+
             // DIAGNOSTIC: Validate valuesArrayOOP format BEFORE using it
             var valuesArrayFormat = _heapManager.GetObjectFormat(valuesArrayOOP);
             if (valuesArrayFormat != ObjectFormat.PointerIndexed)
             {
                 var valuesArrayClass = GetClassName(GetClass(valuesArrayOOP));
-                var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
                 Console.WriteLine($"[ERROR] valuesArrayOOP has wrong format!");
                 Console.WriteLine($"  valuesArrayOOP: {valuesArrayOOP}");
                 Console.WriteLine($"  Expected: PointerIndexed (Array)");
@@ -2948,8 +2950,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
 
-            // Diagnostic: Check what format methodDictOOP actually is
-            var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
+            // Diagnostic: Check what format methodDictOOP actually is (already declared above)
             if (methodDictFormat != ObjectFormat.PointerIndexed)
             {
                 var methodDictClass = GetClassName(GetClass(methodDictOOP));
