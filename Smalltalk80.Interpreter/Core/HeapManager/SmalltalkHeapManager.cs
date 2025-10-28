@@ -272,16 +272,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
-
-        // DEBUG: Detect when OOP 10776 is being written
-        if (value.RawValue == 10776)
-        {
-            Console.WriteLine($"[MEMORY WRITE] Setting {objectOOP}[{index}] = OOP 10776 (MethodDictionary instance)");
-            Console.WriteLine($"  Object class slot: {GetSlot(objectOOP, 0)}");
-            Console.WriteLine($"  Stack trace:");
-            Console.WriteLine(Environment.StackTrace);
-        }
-
         // Slot layout: [0]=header, [1..N]=instance variables
         WriteSlot(entry, 1 + index, value);
 
