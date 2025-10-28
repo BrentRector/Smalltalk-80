@@ -26,6 +26,7 @@ public class Phase5_GlobalsAndPatches
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
+    private readonly DebugOptions _debugOptions;
 
     public Phase5_GlobalsAndPatches(
         ColdStartBundle bundle,
@@ -34,7 +35,8 @@ public class Phase5_GlobalsAndPatches
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-        ColdstartReport report)
+        ColdstartReport report,
+        DebugOptions? debugOptions = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -44,6 +46,7 @@ public class Phase5_GlobalsAndPatches
         _initializedFields = initializedFields;
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _debugOptions = debugOptions ?? DebugOptions.None;
     }
 
     public void Run()
@@ -62,47 +65,50 @@ public class Phase5_GlobalsAndPatches
         Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
 
         // DEBUG: Check ALL Associations in the heap, not just those in AssociationRegistry
-        Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        int totalAssociations = 0;
-        int corruptedCount = 0;
-        int registeredCount = AssociationRegistry.GetAll().Count;
-
-        // Scan entire heap for Association objects
-        for (int oop = 0; oop < 100000; oop += 2) // Scan first 100000 OOPs (even numbers only for object pointers)
+        if (_debugOptions.ShouldDebugAssociations)
         {
-            try
+            Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
+            var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+            int totalAssociations = 0;
+            int corruptedCount = 0;
+            int registeredCount = AssociationRegistry.GetAll().Count;
+
+            // Scan entire heap for Association objects
+            for (int oop = 0; oop < 100000; oop += 2) // Scan first 100000 OOPs (even numbers only for object pointers)
             {
-                var objOOP = new SmalltalkOOP(oop);
-                var classOOP = _heapManager.GetSlot(objOOP, 0);
-                if (classOOP == associationClassOOP)
+                try
                 {
-                    totalAssociations++;
-                    var valueOOP = _heapManager.GetInstanceVariable(objOOP, 1);
-                    if (valueOOP.RawValue == 10776)
+                    var objOOP = new SmalltalkOOP(oop);
+                    var classOOP = _heapManager.GetSlot(objOOP, 0);
+                    if (classOOP == associationClassOOP)
                     {
-                        var keyOOP = _heapManager.GetInstanceVariable(objOOP, 0);
-                        Console.WriteLine($"  [ERROR] Found corrupted Association: OOP={objOOP}, keyOOP={keyOOP}, value=10776");
-                        corruptedCount++;
+                        totalAssociations++;
+                        var valueOOP = _heapManager.GetInstanceVariable(objOOP, 1);
+                        if (valueOOP.RawValue == 10776)
+                        {
+                            var keyOOP = _heapManager.GetInstanceVariable(objOOP, 0);
+                            Console.WriteLine($"  [ERROR] Found corrupted Association: OOP={objOOP}, keyOOP={keyOOP}, value=10776");
+                            corruptedCount++;
+                        }
                     }
                 }
+                catch
+                {
+                    // Skip invalid OOPs
+                }
             }
-            catch
-            {
-                // Skip invalid OOPs
-            }
-        }
 
-        Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
-        Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
-        Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
-        if (corruptedCount == 0)
-        {
-            Console.WriteLine($"  No corrupted Associations found in entire heap (good!)");
-        }
-        else
-        {
-            Console.WriteLine($"  [ERROR] Found {corruptedCount} corrupted Associations in heap!");
+            Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
+            Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
+            Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
+            if (corruptedCount == 0)
+            {
+                Console.WriteLine($"  No corrupted Associations found in entire heap (good!)");
+            }
+            else
+            {
+                Console.WriteLine($"  [ERROR] Found {corruptedCount} corrupted Associations in heap!");
+            }
         }
     }
 
@@ -150,8 +156,12 @@ public class Phase5_GlobalsAndPatches
         var targetOOP = _localIdToObjectId[patch.TargetLocalId!];
         int fieldIndex = _layoutResolver.GetFieldIndex(patch.TargetLocalId!, patch.FieldName!);
 
-        // Get before value for logging
-        var beforeOOP = _heapManager.GetInstanceVariable(targetOOP, fieldIndex);
+        // Get before value for logging (if debug enabled)
+        SmalltalkOOP? beforeOOP = null;
+        if (_debugOptions.ShouldDebugPatches)
+        {
+            beforeOOP = _heapManager.GetInstanceVariable(targetOOP, fieldIndex);
+        }
 
         // Resolve new value
         var valueOOP = ResolveFieldValue(patch.Value);
@@ -159,7 +169,11 @@ public class Phase5_GlobalsAndPatches
         // Apply patch
         _heapManager.SetInstanceVariable(targetOOP, fieldIndex, valueOOP);
 
-        Console.WriteLine($"    [PATCH] SetInstanceVariable: {patch.TargetLocalId}.{patch.FieldName} = {valueOOP} (before: {beforeOOP})");
+        // Debug output only if enabled
+        if (_debugOptions.ShouldDebugPatches)
+        {
+            Console.WriteLine($"    [PATCH] SetInstanceVariable: {patch.TargetLocalId}.{patch.FieldName} = {valueOOP} (before: {beforeOOP})");
+        }
     }
 
     private void ApplyInstallMethodDictionaryPatch(PatchDescriptor patch)
@@ -169,7 +183,10 @@ public class Phase5_GlobalsAndPatches
         // Method dictionary should already exist from Phase 4
         // This patch type is for forward compatibility
 
-        Console.WriteLine($"    [PATCH] InstallMethodDictionary: {patch.ClassLocalId} (already installed in Phase 4)");
+        if (_debugOptions.ShouldDebugPatches)
+        {
+            Console.WriteLine($"    [PATCH] InstallMethodDictionary: {patch.ClassLocalId} (already installed in Phase 4)");
+        }
     }
 
     private void ApplyReplaceLiteralPatch(PatchDescriptor patch)
@@ -186,15 +203,28 @@ public class Phase5_GlobalsAndPatches
         if (literalClassOOP == associationClassOOP)
         {
             // It's an Association - set its VALUE field (index 1), don't replace the Association itself
-            var beforeValue = _heapManager.GetInstanceVariable(literalOOP, 1);
+            SmalltalkOOP? beforeValue = null;
+            if (_debugOptions.ShouldDebugPatches)
+            {
+                beforeValue = _heapManager.GetInstanceVariable(literalOOP, 1);
+            }
+
             _heapManager.SetInstanceVariable(literalOOP, 1, newValueOOP);
-            Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] Association.value = {newValueOOP} (before: {beforeValue})");
+
+            if (_debugOptions.ShouldDebugPatches)
+            {
+                Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] Association.value = {newValueOOP} (before: {beforeValue})");
+            }
         }
         else
         {
             // Not an Association - replace the literal itself
             _heapManager.SetIndexedOOP(methodOOP, patch.LiteralIndex.Value + 1, newValueOOP);
-            Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] = {newValueOOP} (before: {literalOOP})");
+
+            if (_debugOptions.ShouldDebugPatches)
+            {
+                Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] = {newValueOOP} (before: {literalOOP})");
+            }
         }
     }
 
@@ -207,7 +237,7 @@ public class Phase5_GlobalsAndPatches
         {
             var resolvedOOP = _localIdToObjectId[value.LocalId!];
             // DEBUG: Check if String class is being resolved to wrong OOP
-            if (value.LocalId == "class:String")
+            if (_debugOptions.ShouldDebugPatches && value.LocalId == "class:String")
             {
                 Console.WriteLine($"      [DEBUG] Resolving class:String -> {resolvedOOP}");
                 if (resolvedOOP.RawValue == 10776)
