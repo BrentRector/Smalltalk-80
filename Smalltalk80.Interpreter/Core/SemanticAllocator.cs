@@ -2,6 +2,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Core;
@@ -529,41 +530,15 @@ public class SemanticAllocator
         SmalltalkOOP[] literalOOPs,
         byte[] bytecodes)
     {
-        // CompiledMethod has 1 fixed slot (homeClass) plus indexed slots
-        int fixedSlots = 1;  // slot 0 = homeClass
-        int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
-
-        // Step 1: Create separate ByteArray for bytecodes with proper class reference
-        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
-        _heapManager.SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
-        for (int i = 0; i < bytecodes.Length; i++)
-        {
-            _heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
-        }
-
-        // Step 2: Allocate PointerIndexed CompiledMethod with proper class reference
-        // Format is PointerIndexed because we have both fixed slots and indexed slots
-        var methodOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
-        _heapManager.SetSlot(methodOOP, 0, compiledMethodClassOOP);
-
-        // Step 3: Set fixed slot 0 (homeClass) - needed for super sends
-        _heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);
-
-        // Step 4: Populate indexed slots
-        // Indexed slot 0: Method header (accessed via objectAt: 1)
-        var headerOOP = SmalltalkOOP.FromSmallInteger(headerWord);
-        _heapManager.SetIndexedOOP(methodOOP, 0, headerOOP);
-
-        // Slots 1..N: Literals (accessed via objectAt: 2, objectAt: 3, etc.)
-        for (int i = 0; i < literalOOPs.Length; i++)
-        {
-            _heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOPs[i]);
-        }
-
-        // Slot N+1: Hidden ByteArray reference (not accessible from Smalltalk)
-        _heapManager.SetIndexedOOP(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
-
-        return methodOOP;
+        // Delegate to shared helper (eliminates code duplication with primitive 79)
+        return CompiledMethodPrimitives.AllocateCompiledMethodInternal(
+            _heapManager,
+            compiledMethodClassOOP,
+            byteArrayClassOOP,
+            homeClassOOP,
+            headerWord,
+            literalOOPs,
+            bytecodes);
     }
 
     /// <summary>
