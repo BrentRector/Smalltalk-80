@@ -139,6 +139,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Initialize all instance variables (slots 1+) to nil
         // C# arrays default to SmalltalkOOP(0), but we need nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // DEBUG: Verify nil OOP is not zero
+        if (nilOOP.RawValue == 0)
+        {
+            throw new InvalidOperationException(
+                $"FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)! " +
+                $"This means SpecialObjectsArray was not properly initialized. " +
+                $"Loader must call SpecialObjectsArray.Initialize() in constructor, " +
+                $"and GlobalRegistry.Register('nil', ...) must be called before runtime allocation.");
+        }
+
         for (int i = 1; i <= instanceVariableCount; i++)
         {
             SetSlot(newInstanceOOP, i, nilOOP);
