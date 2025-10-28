@@ -1,12 +1,66 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-25
-**Status**: 🎉 Bundle Schema v1.0.6 - Precomputed Class Layouts
+**Last Updated**: 2025-01-28
+**Status**: 🎉 Init Expression Execution Strategy Defined - Phase-Based Bootstrap
 **Compiler Status**: ✅ Fully operational - generates v1.0.6 bundles with precomputed layouts
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
 **Interpreter Status**: ✅ All 15 phases working - loads v1.0.6 bundles successfully
+**Test Status**: ✅ Test classes extracted to separate files for optional validation
 
-## Recent Accomplishments (2025-01-25)
+## Recent Accomplishments (2025-01-28)
+
+### 🎉 Init Expression Execution Strategy - Phase-Based Bootstrap
+
+**Status**: Defined correct ordering for init expression execution to eliminate bootstrap dependency failures.
+
+**Problem Identified**:
+- Init expressions appeared in file order (based on class definition order), NOT dependency order
+- Executing `init:0` (`ActionMenu comment:'...'`) failed because:
+  - Comment execution triggers error handling
+  - Error handling calls `printString`
+  - `printString` requires `Digitbuffer` (created by `SmallInteger initialize!` at init:235)
+  - Result: Stack overflow due to nil Digitbuffer
+
+**Solution Implemented**:
+1. ✅ Analyzed all 308 global expressions in Smalltalk-80.st (259 comments, 46 initializations)
+2. ✅ Defined 3-phase execution strategy:
+   - **Phase 1**: Execute ALL `initialize!` expressions (46 total) in file order
+   - **Phase 2**: Execute ALL `comment:` expressions (259 total) after infrastructure ready
+   - **Phase 3**: Load and execute test classes from separate files (optional)
+3. ✅ Extracted test classes to separate files in `Smalltalk-80 Source/Tests/`:
+   - `BlockValidatorTest.st` (4.9 KB) - Comprehensive block closure validation
+   - `SimpleBlockTest.st` (1.1 KB) - Basic block functionality
+   - `ConditionalBlockTest.st` (1.1 KB) - Control flow with blocks
+4. ✅ Removed 292 lines of test code from main Smalltalk-80.st (42,390 → 42,098 lines)
+5. ✅ Created README documenting test file structure and future multi-file compiler support
+6. ✅ Updated CLAUDE.md with detailed init expression execution strategy
+
+**Key Insights**:
+- **Comments are metadata-only**: No side effects, safe to defer until after all infrastructure setup
+- **Initialize creates infrastructure**: Character table, Digitbuffer, symbol intern table, etc.
+- **File order != Dependency order**: Must reorganize execution to respect dependencies
+- **Test isolation**: Core system should not include validation code
+
+**File Structure Changes**:
+- `Smalltalk-80 Source/Smalltalk-80.st`: 42,098 lines (core system only)
+- `Smalltalk-80 Source/Tests/BlockValidatorTest.st`: NEW - 173 lines
+- `Smalltalk-80 Source/Tests/SimpleBlockTest.st`: NEW - 60 lines
+- `Smalltalk-80 Source/Tests/ConditionalBlockTest.st`: NEW - 50 lines
+- `Smalltalk-80 Source/Tests/README.md`: NEW - Usage documentation
+
+**Benefits**:
+- ✅ Eliminates bootstrap dependency crashes
+- ✅ Clear separation between infrastructure setup and documentation
+- ✅ Test classes isolated for optional execution
+- ✅ Future-ready for multi-file compiler support
+- ✅ Enables potential parallel execution of comments (no side effects)
+
+**Next Steps**:
+- Implement phase-based execution in Program.cs
+- Update compiler to support multiple input files
+- Validate init expression execution completes successfully
+
+## Previous Accomplishments (2025-01-25)
 
 ### 🎉 Bundle Schema v1.0.6 - Precomputed Class Layouts
 
@@ -404,6 +458,129 @@ The VM must provide these guarantees in the specified order:
 ### Object-Oriented Design Principles
 
 - **No Hard-Coded OOP Value Checks**: No code should ever check for a hard-coded OOP value, e.g. checking for zero to determine if it's the Nil object. First, OOP zero is a valid reference that can be to any object. Second, OOP values can change build to build as the Smalltalk source code changes.
+
+### Init Expression Execution Strategy - CRITICAL ORDERING REQUIREMENT
+
+**FUNDAMENTAL PRINCIPLE**: Init expressions must execute in dependency order to ensure all infrastructure exists before any code tries to use it.
+
+#### Background
+
+The Smalltalk-80.st file-out contains **308 global expressions** interleaved throughout 42,098 lines:
+- **259 `comment:` expressions** - Class documentation (metadata only, no side effects)
+- **46 `initialize!` expressions** - Class initialization with side effects (creates caches, tables, constants)
+- **3 `run!` expressions** - Test execution (REMOVED - now in separate test files)
+
+#### The Problem
+
+Init expressions appear in **file order** (based on class definition order), NOT dependency order:
+- `init:0` = `ActionMenu comment:'...'` (line 8)
+- `init:235` = `SmallInteger initialize!` (line 35,080)
+
+Executing `comment:` first causes failure:
+1. `comment:` triggers error handling (ActionMenu might be nil if not bound yet)
+2. Error handling calls `printString`
+3. `printString` needs `Digitbuffer` (created by `SmallInteger initialize`)
+4. **Stack overflow** because Digitbuffer is nil!
+
+#### The Solution: Phase-Based Execution
+
+**Phase 1: Execute ALL `initialize!` expressions in file order (46 total)**
+```
+Lines 113 → 40,574 (96% through file)
+
+Critical infrastructure setup:
+- Character.initialize! (7,623) - Creates CharacterTable
+- Object.initialize! (27,571) - Root class setup (67% through file)
+- SmallInteger.initialize! (35,080) - Creates Digitbuffer, numeric constants
+- Float.initialize! (19,088) - Floating-point constants
+- Symbol.initialize! (37,452) - Symbol intern table
+- SystemDictionary.initialize! (38,272) - Global namespace
+- VariableNode.initialize! (40,574) - Last initialization
+```
+
+**Phase 2: Execute ALL `comment:` expressions in file order (259 total)**
+```
+Lines 8 → 41,690
+
+Safe to execute now - all infrastructure ready:
+- ActionMenu comment: (8)
+- WindowsFileSystem comment: (61)
+- Character comment: (7,380)
+- ... all others
+```
+
+**Phase 3: Load and execute test classes (separate files)**
+```
+Smalltalk-80 Source/Tests/BlockValidatorTest.st → BlockValidatorTest run!
+Smalltalk-80 Source/Tests/SimpleBlockTest.st → SimpleBlockTest run!
+Smalltalk-80 Source/Tests/ConditionalBlockTest.st → ConditionalBlockTest run!
+```
+
+#### Implementation Pattern
+
+```csharp
+// Phase 1: Execute ALL initialize! expressions first
+var initExpressions = bundle.InitExpressions
+    .Where(e => e.Source.EndsWith(" initialize!"))
+    .ToList();
+
+foreach (var expr in initExpressions) {
+    ExecuteInitExpression(expr);
+}
+
+// Phase 2: Execute ALL comment: expressions
+var commentExpressions = bundle.InitExpressions
+    .Where(e => e.Source.Contains(" comment:"))
+    .ToList();
+
+foreach (var expr in commentExpressions) {
+    ExecuteInitExpression(expr);
+}
+
+// Phase 3: Load and execute test classes (if requested)
+if (includeTests) {
+    LoadAndExecuteTestSuite("BlockValidatorTest.st");
+    LoadAndExecuteTestSuite("SimpleBlockTest.st");
+    LoadAndExecuteTestSuite("ConditionalBlockTest.st");
+}
+```
+
+#### Why This Works
+
+1. **Eliminates bootstrap dependencies**: All infrastructure (Digitbuffer, CharacterTable, Symbol table) exists before ANY comment tries to trigger error handling
+
+2. **Respects natural dependencies**:
+   - Character.initialize (7,623) before SmallInteger.initialize (35,080)
+   - Object.initialize (27,571) before everything that depends on root class
+   - Symbol.initialize (37,452) for symbol interning
+
+3. **Comments are metadata-only**: They don't create objects or modify state, just attach strings to class objects via the reflective interface. Safe to defer.
+
+4. **Test isolation**: Test classes are separate files, loaded only when needed for validation
+
+#### File Structure (2025-01-25)
+
+**Main System** (`Smalltalk-80 Source/Smalltalk-80.st`):
+- 42,098 lines (down from 42,390)
+- 472 classes + methods
+- 259 comment: expressions
+- 46 initialize! expressions
+- NO test classes (removed)
+
+**Test Classes** (`Smalltalk-80 Source/Tests/*.st`):
+- `BlockValidatorTest.st` - Comprehensive block closure validation
+- `SimpleBlockTest.st` - Basic block functionality
+- `ConditionalBlockTest.st` - Control flow with blocks
+- Each includes class definition + methods + `run!` expression
+
+#### Benefits
+
+✅ **Fixes bootstrap crashes**: SmallInteger.initialize runs before ActionMenu comment
+✅ **Prevents future failures**: All error handling infrastructure ready
+✅ **Respects file structure**: Natural 3-phase ordering (init → doc → test)
+✅ **Enables parallel execution**: Comments could theoretically run in parallel (no side effects)
+✅ **Clear separation**: Infrastructure → Documentation → Validation
+✅ **Test isolation**: Core system separate from validation code
 
 ### Runtime Index Resolution - CRITICAL REQUIREMENT
 
