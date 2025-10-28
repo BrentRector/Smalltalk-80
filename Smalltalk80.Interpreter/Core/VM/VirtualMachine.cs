@@ -598,16 +598,31 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PopStoreIvarIndex(bytecode);
             var valueOOP = Pop();
-            
+
             // For blocks, store to home context receiver
             var actualReceiverOOP = receiverOOP;
-            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var storeIvarBlockContextOOP))
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOOP))
             {
-                int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-                var homeContextOOP = _heapManager.GetInstanceVariable(storeIvarBlockContextOOP, homeIndex);
+                // Check if this is a BlockClosure or BlockContext
+                var blockClass = GetClassName(GetClass(blockOOP));
+                SmalltalkOOP homeContextOOP;
+
+                if (blockClass == "BlockClosure")
+                {
+                    // New BlockClosure path - get homeContext from BlockClosure
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
+                }
+                else
+                {
+                    // Legacy BlockContext path
+                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
+                }
+
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
             }
-            
+
             _heapManager.SetInstanceVariable(actualReceiverOOP, index, valueOOP);
             return true;
         }
