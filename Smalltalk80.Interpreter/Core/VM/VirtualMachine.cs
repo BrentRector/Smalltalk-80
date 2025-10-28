@@ -2872,13 +2872,23 @@ public partial class VirtualMachine : IPrimitiveContext
 
     SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {
-        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        // Ensure className has "class:" prefix for LayoutResolver lookup
+        string classKey = className.StartsWith("class:") || className.StartsWith("meta:")
+            ? className
+            : $"class:{className}";
+
+        int fieldIndex = _layoutResolver.GetFieldIndex(classKey, fieldName);
         return _heapManager.GetInstanceVariable(oop, fieldIndex);
     }
 
     void IPrimitiveContext.SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
     {
-        int fieldIndex = _layoutResolver.GetFieldIndex(className, fieldName);
+        // Ensure className has "class:" prefix for LayoutResolver lookup
+        string classKey = className.StartsWith("class:") || className.StartsWith("meta:")
+            ? className
+            : $"class:{className}";
+
+        int fieldIndex = _layoutResolver.GetFieldIndex(classKey, fieldName);
         _heapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 
