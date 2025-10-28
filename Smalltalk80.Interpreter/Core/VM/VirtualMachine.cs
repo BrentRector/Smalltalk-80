@@ -418,7 +418,7 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             if (false)
             {
-                Console.WriteLine($"[DEBUG ExecuteBytecode] bytecode=0x{bytecode:X2}, IsPushIvar={BytecodeUtil.IsPushIvar(bytecode)}, IsPushTemp={BytecodeUtil.IsPushTemp(bytecode)}");
+                // Console.WriteLine($"[DEBUG ExecuteBytecode] bytecode=0x{bytecode:X2}, IsPushIvar={BytecodeUtil.IsPushIvar(bytecode)}, IsPushTemp={BytecodeUtil.IsPushTemp(bytecode)}");
             }
         }
 
@@ -430,7 +430,7 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
 
-            Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}");
+            // Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}");
 
             // For blocks, receiver should be the home context receiver
             var actualReceiverOOP = receiverOOP;
@@ -445,22 +445,22 @@ public partial class VirtualMachine : IPrimitiveContext
                     // New BlockClosure path - get homeContext from BlockClosure
                     int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
-                    Console.WriteLine($"[DEBUG IsPushIvar] BlockClosure path - homeContext={homeContextOOP}");
+                    // Console.WriteLine($"[DEBUG IsPushIvar] BlockClosure path - homeContext={homeContextOOP}");
                 }
                 else
                 {
                     // Legacy BlockContext path
                     int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
-                    Console.WriteLine($"[DEBUG IsPushIvar] BlockContext path - homeContext={homeContextOOP}");
+                    // Console.WriteLine($"[DEBUG IsPushIvar] BlockContext path - homeContext={homeContextOOP}");
                 }
 
                 actualReceiverOOP = GetHomeContextReceiver(homeContextOOP);
-                Console.WriteLine($"[DEBUG IsPushIvar] Block - actualReceiverOOP={actualReceiverOOP}");
+                // Console.WriteLine($"[DEBUG IsPushIvar] Block - actualReceiverOOP={actualReceiverOOP}");
             }
 
             var valueOOP = _heapManager.GetInstanceVariable(actualReceiverOOP, index);
-            Console.WriteLine($"[DEBUG IsPushIvar] Retrieved value: {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
+            // Console.WriteLine($"[DEBUG IsPushIvar] Retrieved value: {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
             Push(valueOOP);
             return true;
         }
@@ -487,7 +487,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 if (false)
                 {
-                    Console.WriteLine($"[DEBUG pushTemp] index={index}, blockLocalCount={blockLocalCount}");
+                    // Console.WriteLine($"[DEBUG pushTemp] index={index}, blockLocalCount={blockLocalCount}");
                 }
 
                 // If accessing beyond block's local scope, read from home context
@@ -501,7 +501,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
                         if (false)
                         {
-                            Console.WriteLine($"[DEBUG pushTemp] BlockClosure: Reading from home context: {contextToReadFrom}");
+                            // Console.WriteLine($"[DEBUG pushTemp] BlockClosure: Reading from home context: {contextToReadFrom}");
                         }
                     }
                     else
@@ -510,7 +510,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
                         if (false)
                         {
-                            Console.WriteLine($"[DEBUG pushTemp] BlockContext: Reading from home context: {contextToReadFrom}");
+                            // Console.WriteLine($"[DEBUG pushTemp] BlockContext: Reading from home context: {contextToReadFrom}");
                         }
                     }
                 }
@@ -518,7 +518,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     if (false)
                     {
-                        Console.WriteLine($"[DEBUG pushTemp] Reading from block's own stack");
+                        // Console.WriteLine($"[DEBUG pushTemp] Reading from block's own stack");
                     }
                 }
             }
@@ -526,7 +526,7 @@ public partial class VirtualMachine : IPrimitiveContext
             var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
             if (false)
             {
-                Console.WriteLine($"[DEBUG pushTemp] Retrieved temp[{index}] = {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
+                // Console.WriteLine($"[DEBUG pushTemp] Retrieved temp[{index}] = {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
             }
 
             Push(valueOOP);
@@ -552,16 +552,16 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var parentBlockClosureOOP))
                 {
                     var parentClass = GetClassName(GetClass(parentBlockClosureOOP));
-                    Console.WriteLine($"[DEBUG CreateBlock] Found parent object: {parentBlockClosureOOP}, class={parentClass}");
+                    // Console.WriteLine($"[DEBUG CreateBlock] Found parent object: {parentBlockClosureOOP}, class={parentClass}");
                     int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
-                    Console.WriteLine($"[DEBUG CreateBlock] homeContext field index: {homeIndex}");
+                    // Console.WriteLine($"[DEBUG CreateBlock] homeContext field index: {homeIndex}");
                     var parentHomeContextOOP = _heapManager.GetInstanceVariable(parentBlockClosureOOP, homeIndex);
-                    Console.WriteLine($"[DEBUG CreateBlock] Active context is block - using parent's home: {_activeContextOOP} -> {parentHomeContextOOP}");
+                    // Console.WriteLine($"[DEBUG CreateBlock] Active context is block - using parent's home: {_activeContextOOP} -> {parentHomeContextOOP}");
                     homeContextOOP = parentHomeContextOOP;
                 }
                 else
                 {
-                    Console.WriteLine($"[DEBUG CreateBlock] Active context is method - using directly: {homeContextOOP}");
+                    // Console.WriteLine($"[DEBUG CreateBlock] Active context is method - using directly: {homeContextOOP}");
                 }
 
                 var closureOOP = CreateBlockClosure(literal, homeContextOOP);
@@ -831,7 +831,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
 
-                        Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value=self ({homeReceiverOOP})");
+                        // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value=self ({homeReceiverOOP})");
 
                         // THROW NON-LOCAL RETURN EXCEPTION
                         // This will unwind the call stack back to the target context
@@ -870,7 +870,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
 
-                        Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value={returnValue}");
+                        // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value={returnValue}");
 
                         // THROW NON-LOCAL RETURN EXCEPTION
                         // This will unwind the call stack back to the target context
@@ -1029,7 +1029,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         // Try to get the selector from home method's literals
                         var homeSelectorOOP = GetMethodLiteral(homeMethodOOP, selectorIndex + 1);
 
-                        Console.WriteLine($"[SEND1] Block literal fallback: blockMethod={GetLocalId(methodOOP)}, homeMethod={GetLocalId(homeMethodOOP)}");
+                        // Console.WriteLine($"[SEND1] Block literal fallback: blockMethod={GetLocalId(methodOOP)}, homeMethod={GetLocalId(homeMethodOOP)}");
                         Console.WriteLine($"  Accessing homeMethod literal[{selectorIndex + 1}] = {homeSelectorOOP}, symbolName={GetSymbolName(homeSelectorOOP)}");
 
                         if (homeSelectorOOP != SpecialObjectsArray.Instance.Nil)
@@ -1042,11 +1042,11 @@ public partial class VirtualMachine : IPrimitiveContext
 
             var argOOP = Pop();
             var receiverOOP2 = Pop();
-            Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
             var outcome1 = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
-            Console.WriteLine($"[SEND1 AFTER] Message outcome.Kind={outcome1.Kind}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND1 AFTER] Message outcome.Kind={outcome1.Kind}, context={_activeContextOOP}");
             if (!ConsumeCallOutcome(outcome1)) return false;
-            Console.WriteLine($"[SEND1 PUSHED] Pushed result onto stack");
+            // Console.WriteLine($"[SEND1 PUSHED] Pushed result onto stack");
             return true;
         }
 
@@ -1087,11 +1087,11 @@ public partial class VirtualMachine : IPrimitiveContext
             var arg2OOP = Pop();
             var arg1OOP = Pop();
             var receiverOOP2 = Pop();
-            Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
             var outcome2 = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
-            Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_activeContextOOP}");
             if (!ConsumeCallOutcome(outcome2)) return false;
-            Console.WriteLine($"[SEND2 PUSHED] Pushed result onto stack");
+            // Console.WriteLine($"[SEND2 PUSHED] Pushed result onto stack");
             return true;
         }
 
@@ -1722,7 +1722,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
 
-        Console.WriteLine($"[SUPER SEND] selector={selectorName}, homeClass={GetClassName(homeClassOOP)}, superclass={GetClassName(superclassOOP)}");
+        // Console.WriteLine($"[SUPER SEND] selector={selectorName}, homeClass={GetClassName(homeClassOOP)}, superclass={GetClassName(superclassOOP)}");
 
         // Now look up the method starting from the superclass
         var methodInfo = GetMethod(superclassOOP, selectorName!);
@@ -1769,10 +1769,10 @@ public partial class VirtualMachine : IPrimitiveContext
         }
         catch (NonLocalReturnException ex)
         {
-            Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
+            // Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
             _activeContextOOP = previousContextOOP;
             _activeContextCount--;
-            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+            // Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
             return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
         }
         catch (Exception ex)
@@ -1800,7 +1800,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Check if receiver is a class object
         if (selectorName == "new:")
         {
-            Console.WriteLine($"[DEBUG SendMessage] Sending new: to receiver={receiverOOP}");
+            // Console.WriteLine($"[DEBUG SendMessage] Sending new: to receiver={receiverOOP}");
             Console.WriteLine($"  receiverClass={classOOP}, className={GetClassName(classOOP)}");
             // Check if receiver is itself MethodDictionary class
             if (GlobalRegistry.TryGet("class:MethodDictionary", out var mdClassOOP))
@@ -1940,13 +1940,13 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             // Non-local return from a block - convert to CallOutcome
             // DO NOT convert to normal return - let caller decide based on target
-            Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
+            // Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
 
             // Restore previous context BEFORE returning outcome
             _activeContextOOP = previousContextOOP;
             _activeContextCount--;
 
-            Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
+            // Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
 
             if (VerboseDebug)
             {
@@ -1995,19 +1995,19 @@ public partial class VirtualMachine : IPrimitiveContext
         // Non-local return
         if (outcome.Kind == CallOutcomeKind.NonLocalReturn)
         {
-            Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_activeContextOOP}, match={outcome.TargetContextOop == _activeContextOOP}");
+            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_activeContextOOP}, match={outcome.TargetContextOop == _activeContextOOP}");
 
             // If NLR targets this context, this context must return immediately with the provided value.
             if (outcome.TargetContextOop == _activeContextOOP)
             {
-                Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
+                // Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
                 // push the return value and signal method-return
                 Push(outcome.Value);
                 return false;
             }
 
             // Otherwise propagate as exception for callers to handle / continue unwinding
-            Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContextOop}");
+            // Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContextOop}");
             throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
         }
 
@@ -2369,18 +2369,18 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Set the block execution context as active
         _activeContextOOP = executionContextOOP;
-        Console.WriteLine($"[DEBUG Primitive207] Set _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
+        // Console.WriteLine($"[DEBUG Primitive207] Set _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
 
         // Execute the block bytecodes
         var result = ExecuteBytecodeLoop();
-        Console.WriteLine($"[DEBUG Primitive207] After ExecuteBytecodeLoop, _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
+        // Console.WriteLine($"[DEBUG Primitive207] After ExecuteBytecodeLoop, _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
 
         // Clean up block context mapping
         _blockContextMapping.Remove(executionContextOOP);
 
         // Restore previous context
         _activeContextOOP = previousContextOOP;
-        Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
+        // Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
 
         return result;
     }
@@ -2429,13 +2429,13 @@ public partial class VirtualMachine : IPrimitiveContext
         if (blockClosureOOP != default)
         {
             _blockContextMapping[contextOOP] = blockClosureOOP;
-            Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockClosure {blockClosureOOP}");
+            // Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockClosure {blockClosureOOP}");
         }
         else
         {
             // Fallback for legacy code paths that don't provide BlockClosure
             _blockContextMapping[contextOOP] = blockContextOOP;
-            Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockContext {blockContextOOP} (legacy)");
+            // Console.WriteLine($"[DEBUG CreateBlockExecutionContext] Mapped context {contextOOP} -> BlockContext {blockContextOOP} (legacy)");
         }
 
         return contextOOP;
@@ -2562,7 +2562,7 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         var currentContextOOP = startContextOOP;
 
-        Console.WriteLine($"[DEBUG FindMethodContext] Starting from {startContextOOP}");
+        // Console.WriteLine($"[DEBUG FindMethodContext] Starting from {startContextOOP}");
 
         while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
         {
@@ -2570,7 +2570,7 @@ public partial class VirtualMachine : IPrimitiveContext
             // Check if this context is a block execution context
             if (_blockContextMapping.ContainsKey(currentContextOOP))
             {
-                Console.WriteLine($"[DEBUG FindMethodContext] {currentContextOOP} is block context, following sender");
+                // Console.WriteLine($"[DEBUG FindMethodContext] {currentContextOOP} is block context, following sender");
                 // This is a block execution context, get its sender
                 int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
                 var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
@@ -2578,7 +2578,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 continue;
             }
 
-            Console.WriteLine($"[DEBUG FindMethodContext] Found method context: {currentContextOOP}");
+            // Console.WriteLine($"[DEBUG FindMethodContext] Found method context: {currentContextOOP}");
             // This should be a regular method context
             return currentContextOOP;
         }
@@ -3565,7 +3565,7 @@ public partial class VirtualMachine : IPrimitiveContext
         int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
         int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
 
-        Console.WriteLine($"[DEBUG CreateBlockClosure] BlockClosure instance var count={instanceVarCount}, field indices: method={methodIndex}, homeContext={homeContextIndex}, returnContext={returnContextIndex}, numArgs={numArgsIndex}");
+        // Console.WriteLine($"[DEBUG CreateBlockClosure] BlockClosure instance var count={instanceVarCount}, field indices: method={methodIndex}, homeContext={homeContextIndex}, returnContext={returnContextIndex}, numArgs={numArgsIndex}");
 
         // Initialize instance variables
         _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);
@@ -3581,7 +3581,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, returnContextOOP);
         _heapManager.SetInstanceVariable(closureOOP, numArgsIndex, SmalltalkOOP.FromSmallInteger(numArgs));
 
-        Console.WriteLine($"[DEBUG CreateBlockClosure] Created closure {closureOOP} with homeContext={homeContextOOP}, returnContext={returnContextOOP}");
+        // Console.WriteLine($"[DEBUG CreateBlockClosure] Created closure {closureOOP} with homeContext={homeContextOOP}, returnContext={returnContextOOP}");
 
         return closureOOP;
     }
@@ -3596,7 +3596,7 @@ public partial class VirtualMachine : IPrimitiveContext
         var className = GetClassName(GetClass(blockMethodOOP));
         var localId = GetLocalId(blockMethodOOP);
 
-        Console.WriteLine($"[DEBUG GetBlockArgCount] blockMethodOOP={blockMethodOOP}, format={format}, class={className}, localId={localId}");
+        // Console.WriteLine($"[DEBUG GetBlockArgCount] blockMethodOOP={blockMethodOOP}, format={format}, class={className}, localId={localId}");
 
         if (format != ObjectFormat.PointerIndexed)
         {
