@@ -519,15 +519,73 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // inheritedFrom is null for the target class (i=0), non-null for inherited fields
             string? inheritedFrom = (i > 0) ? $"class:{cls.Name}" : null;
 
-            foreach (var instVarName in cls.InstanceVariables)
+            // SPECIAL CASE: Behavior class must have superclass, methodDict, format at fixed indices 0, 1, 2
+            // This is a Blue Book architectural invariant that the VM depends on
+            if (cls.Name == "Behavior")
             {
-                int nameIndex = _symbolTable[instVarName];
+                // Verify Behavior has exactly the required fields
+                var requiredFields = new[] { "superclass", "methodDict", "format" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: Behavior class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires Behavior to define 'superclass', 'methodDict', and 'format' " +
+                        "at fixed indices 0, 1, and 2 respectively.");
+                }
+
+                // Force fixed indices regardless of declaration order
                 layout.Add(new JsonFieldLayoutEntry
                 {
-                    NameIndex = nameIndex,
-                    SlotIndex = slotIndex++,
+                    NameIndex = _symbolTable["superclass"],
+                    SlotIndex = 0,
                     InheritedFrom = inheritedFrom
                 });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["methodDict"],
+                    SlotIndex = 1,
+                    InheritedFrom = inheritedFrom
+                });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["format"],
+                    SlotIndex = 2,
+                    InheritedFrom = inheritedFrom
+                });
+
+                // Add remaining fields (e.g., subclasses) starting at index 3
+                slotIndex = 3;
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName))
+                        continue; // Skip - already added at fixed indices
+
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = inheritedFrom
+                    });
+                }
+            }
+            else
+            {
+                // Normal field layout for all other classes
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = inheritedFrom
+                    });
+                }
             }
         }
 
@@ -554,15 +612,73 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             if (classNode == null)
                 continue;
 
-            foreach (var instVarName in classNode.InstanceVariables)
+            // SPECIAL CASE: Behavior class must have superclass, methodDict, format at fixed indices 0, 1, 2
+            // This is a Blue Book architectural invariant that the VM depends on
+            if (className == "Behavior")
             {
-                int nameIndex = _symbolTable[instVarName];
+                // Verify Behavior has exactly the required fields
+                var requiredFields = new[] { "superclass", "methodDict", "format" };
+                var missingFields = requiredFields.Where(f => !classNode.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: Behavior class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires Behavior to define 'superclass', 'methodDict', and 'format' " +
+                        "at fixed indices 0, 1, and 2 respectively.");
+                }
+
+                // Force fixed indices regardless of declaration order
                 layout.Add(new JsonFieldLayoutEntry
                 {
-                    NameIndex = nameIndex,
-                    SlotIndex = slotIndex++,
+                    NameIndex = _symbolTable["superclass"],
+                    SlotIndex = 0,
                     InheritedFrom = $"class:{className}"
                 });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["methodDict"],
+                    SlotIndex = 1,
+                    InheritedFrom = $"class:{className}"
+                });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["format"],
+                    SlotIndex = 2,
+                    InheritedFrom = $"class:{className}"
+                });
+
+                // Add remaining fields (e.g., subclasses) starting at index 3
+                slotIndex = 3;
+                foreach (var instVarName in classNode.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName))
+                        continue; // Skip - already added at fixed indices
+
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = $"class:{className}"
+                    });
+                }
+            }
+            else
+            {
+                // Normal field layout for other classes in the metaclass chain
+                foreach (var instVarName in classNode.InstanceVariables)
+                {
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = $"class:{className}"
+                    });
+                }
             }
         }
 

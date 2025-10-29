@@ -69,6 +69,13 @@ public partial class VirtualMachine : IPrimitiveContext
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
+    // Blue Book architectural constants: Behavior field indices
+    // These are fixed by the Smalltalk-80 VM specification and cannot change at runtime
+    // Source: Blue Book Chapter 27 - "SuperclassIndex := 0. MessageDictionaryIndex := 1. InstanceSpecificationIndex := 2."
+    private const int BEHAVIOR_SUPERCLASS_INDEX = 0;
+    private const int BEHAVIOR_METHODDICT_INDEX = 1;
+    private const int BEHAVIOR_FORMAT_INDEX = 2;
+
     // Verbose debugging support
     public bool VerboseDebug { get; set; } = false;
     private int _callDepth = 0;
@@ -1745,15 +1752,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeClassOOP = _heapManager.GetInstanceVariable(currentMethodOOP, 0);
 
         // Get the superclass of the home class
-        // IMPORTANT: Dynamically determine the class of homeClassOOP (could be Class or Metaclass)
-        // then look up the superclass field in that class
-        var homeClassClassOOP = _heapManager.GetSlot(homeClassOOP, 0); // Get class of the class object
-        string homeClassClassName = GetClassName(homeClassClassOOP);   // e.g., "Class" or "Metaclass"
-        string homeClassClassKey = homeClassClassName.StartsWith("class:") || homeClassClassName.StartsWith("meta:")
-            ? homeClassClassName
-            : $"class:{homeClassClassName}";
-        int superclassIndex = _layoutResolver.GetFieldIndex(homeClassClassKey, "superclass");
-        var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, superclassIndex);
+        // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+        // This is guaranteed by the compiler which enforces this invariant
+        var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, BEHAVIOR_SUPERCLASS_INDEX);
 
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
@@ -2938,21 +2939,14 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Get the method dictionary from the class
-            // IMPORTANT: Dynamically determine the class of currentClassOOP (could be Class or Metaclass)
-            var currentClassClassOOP = _heapManager.GetSlot(currentClassOOP, 0);
-            string currentClassClassName = GetClassName(currentClassClassOOP);
-            string currentClassClassKey = currentClassClassName.StartsWith("class:") || currentClassClassName.StartsWith("meta:")
-                ? currentClassClassName
-                : $"class:{currentClassClassName}";
-
-            int methodDictIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "methodDict");
-            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
+            // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
+            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, BEHAVIOR_METHODDICT_INDEX);
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No method dictionary, try superclass
-                int superclassIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, BEHAVIOR_SUPERCLASS_INDEX);
 
                 if (superclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
@@ -2983,9 +2977,8 @@ public partial class VirtualMachine : IPrimitiveContext
             if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No values array, try superclass
-                // Reuse the currentClassClassKey computed earlier
-                int superclassIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, BEHAVIOR_SUPERCLASS_INDEX);
                 string superclassName = GetClassName(superclassOOP);
                 Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
                 currentClassOOP = superclassOOP;
@@ -3125,9 +3118,8 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Not found in this class, try superclass
-            // Reuse the currentClassClassKey computed earlier
-            int superclassIndex2 = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
-            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
+            // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, BEHAVIOR_SUPERCLASS_INDEX);
 
             if (_debugOptions.ShouldDebugMethodLookup)
             {
