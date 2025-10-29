@@ -332,14 +332,30 @@ public partial class VirtualMachine : IPrimitiveContext
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         // Diagnostic: Show method name when recursion depth > 10
-        if (_activeContextCount > 10)
+        if (_activeContextCount > 10 && _activeContextCount <= 15)  // Limit output
         {
             var selectorOOP = GetMethodLiteral(methodOOP, 0);
             var selectorName = GetSymbolName(selectorOOP);
             var receiverClass = GetClass(receiverOOP);
             var className = GetClassName(receiverClass);
 
-            Console.WriteLine($"[DEEP RECURSION depth={_activeContextCount}] {className}>>{selectorName}");
+            // Debug: show what literal[0] actually is
+            string literalInfo = "";
+            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                literalInfo = " [literal[0]=nil]";
+            }
+            else if (selectorOOP.IsSmallInteger)
+            {
+                literalInfo = $" [literal[0]=SmallInteger({selectorOOP.AsSmallInteger()})]";
+            }
+            else
+            {
+                var litClass = GetClassName(GetClass(selectorOOP));
+                literalInfo = $" [literal[0]={litClass}, name='{selectorName}']";
+            }
+
+            Console.WriteLine($"[DEPTH={_activeContextCount}] {className}>>{selectorName}{literalInfo}");
         }
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
