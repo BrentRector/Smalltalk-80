@@ -413,53 +413,62 @@ public static class ObjectPrimitives
         // Get Character class from Smalltalk global dictionary
         if (!GlobalRegistry.TryGet("Character", out var characterClassOOP))
         {
-            // If Character class not found (shouldn't happen after cold start), fail primitive
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class not found in GlobalRegistry");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         // Get classPool from Character class (instance variable index 7 - classPool)
-        // Character class structure: superclass, methodDict, format, subclasses, instanceVariables,
-        //                            organization, name, classPool, sharedPools
         var classPoolOOP = ctx.HeapManager.GetInstanceVariable(characterClassOOP, 7);
 
-        // CharacterTable is stored as an Association in the classPool Dictionary
-        // Look up #CharacterTable key in the Dictionary
-        // For now, we'll scan through the Dictionary's array to find the CharacterTable Association
-        // Dictionary structure: tally, array
-        var dictArrayOOP = ctx.HeapManager.GetInstanceVariable(classPoolOOP, 1); // array is at index 1
-        int dictSize = ctx.HeapManager.GetIndexedSize(dictArrayOOP);
-
-        for (int i = 0; i < dictSize; i++)
+        // DEFENSIVE: Check if classPool is nil
+        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
         {
-            var entryOOP = ctx.HeapManager.GetIndexedOOP(dictArrayOOP, i);
-            if (entryOOP == SpecialObjectsArray.Instance.Nil)
-                continue;
-
-            // Check if this Association's key is #CharacterTable
-            // Association structure: key (index 0), value (index 1)
-            var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0);
-
-            // Compare symbol bytes to "CharacterTable" (no class check needed - just compare bytes)
-            string symbolName = GetSymbolName(ctx, keyOOP);
-            if (symbolName == "CharacterTable")
-            {
-                // Found CharacterTable Association, get its value
-                var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1);
-
-                // CharacterTable is an Array with 256 Characters (0-indexed in heap)
-                // ASCII 0-255 maps directly to array indices 0-255
-                if (asciiValue < 0 || asciiValue > 255)
-                {
-                    ctx.PrimitiveSuccess = false;
-                    return SpecialObjectsArray.Instance.Nil;
-                }
-
-                return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
-            }
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class classPool is nil!");
+            Console.WriteLine($"  Character class oop={characterClassOOP}");
+            Console.WriteLine($"  Character initialize must run BEFORE ClassOrganizer initialize");
+            Console.WriteLine($"  But Character initialize ran at [52] and completed successfully!");
+            Console.WriteLine($"  This suggests classPool was never populated or index 7 is wrong");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
         }
 
-        // CharacterTable not found - this shouldn't happen after Character initialize
+        try
+        {
+            // Dictionary has 2 instance variables: tally (index 0), array (index 1)
+            var dictArrayOOP = ctx.HeapManager.GetInstanceVariable(classPoolOOP, 1);
+            int dictSize = ctx.HeapManager.GetIndexedSize(dictArrayOOP);
+
+            for (int i = 0; i < dictSize; i++)
+            {
+                var entryOOP = ctx.HeapManager.GetIndexedOOP(dictArrayOOP, i);
+                if (entryOOP == SpecialObjectsArray.Instance.Nil)
+                    continue;
+
+                var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0);
+                string symbolName = GetSymbolName(ctx, keyOOP);
+                if (symbolName == "CharacterTable")
+                {
+                    var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1);
+                    if (asciiValue < 0 || asciiValue > 255)
+                    {
+                        ctx.PrimitiveSuccess = false;
+                        return SpecialObjectsArray.Instance.Nil;
+                    }
+                    return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                }
+            }
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: classPool (oop={classPoolOOP}) access failed");
+            Console.WriteLine($"  Exception: {ex.Message}");
+            Console.WriteLine($"  classPool is not a Dictionary or is corrupted");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        Console.WriteLine($"[GetCharacterForAscii] ERROR: CharacterTable not found in Character classPool");
         ctx.PrimitiveSuccess = false;
         return SpecialObjectsArray.Instance.Nil;
     }
