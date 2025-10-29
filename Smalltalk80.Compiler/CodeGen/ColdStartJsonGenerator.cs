@@ -519,15 +519,168 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             // inheritedFrom is null for the target class (i=0), non-null for inherited fields
             string? inheritedFrom = (i > 0) ? $"class:{cls.Name}" : null;
 
-            foreach (var instVarName in cls.InstanceVariables)
+            // SPECIAL CASE: Blue Book architectural constants for VM-critical classes
+            // These field indices are fixed by the Smalltalk-80 specification and cannot change
+
+            if (cls.Name == "Behavior")
             {
-                int nameIndex = _symbolTable[instVarName];
-                layout.Add(new JsonFieldLayoutEntry
+                // Blue Book Chapter 27: SuperclassIndex := 0. MessageDictionaryIndex := 1. InstanceSpecificationIndex := 2.
+                var requiredFields = new[] { "superclass", "methodDict", "format" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
                 {
-                    NameIndex = nameIndex,
-                    SlotIndex = slotIndex++,
-                    InheritedFrom = inheritedFrom
-                });
+                    throw new InvalidOperationException(
+                        $"FATAL: Behavior class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires Behavior to define 'superclass', 'methodDict', and 'format' " +
+                        "at fixed indices 0, 1, and 2 respectively.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["superclass"], SlotIndex = 0, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["methodDict"], SlotIndex = 1, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["format"], SlotIndex = 2, InheritedFrom = inheritedFrom });
+
+                slotIndex = 3;
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else if (cls.Name == "InstructionStream")
+            {
+                // Blue Book Chapter 27: SenderIndex := 0. InstructionPointerIndex := 1.
+                var requiredFields = new[] { "sender", "pc" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: InstructionStream class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires InstructionStream to define 'sender' and 'pc' at fixed indices 0 and 1.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["sender"], SlotIndex = 0, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["pc"], SlotIndex = 1, InheritedFrom = inheritedFrom });
+
+                slotIndex = 2;
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else if (cls.Name == "ContextPart")
+            {
+                // Blue Book Chapter 27: StackPointerIndex := 2.
+                // ContextPart inherits sender(0) and pc(1) from InstructionStream
+                var requiredFields = new[] { "stackp" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: ContextPart class is missing required field 'stackp'. " +
+                        "The Blue Book VM architecture requires ContextPart to define 'stackp' at fixed index 2.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["stackp"], SlotIndex = 2, InheritedFrom = inheritedFrom });
+
+                slotIndex = 3;
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else if (cls.Name == "MethodContext")
+            {
+                // Blue Book Chapter 27: MethodIndex := 3. ReceiverIndex := 5.
+                // MethodContext inherits sender(0), pc(1), stackp(2) from ContextPart
+                var requiredFields = new[] { "method", "receiverMap", "receiver" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: MethodContext class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires MethodContext to define 'method', 'receiverMap', and 'receiver' at fixed indices 3, 4, and 5.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 3, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiverMap"], SlotIndex = 4, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiver"], SlotIndex = 5, InheritedFrom = inheritedFrom });
+
+                slotIndex = 6; // TempFrameStart
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else if (cls.Name == "BlockContext")
+            {
+                // Blue Book Chapter 27: BlockArgumentCountIndex := 3. InitialIPIndex := 4. HomeIndex := 5.
+                // BlockContext inherits sender(0), pc(1), stackp(2) from ContextPart
+                var requiredFields = new[] { "nargs", "startpc", "home" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: BlockContext class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires BlockContext to define 'nargs', 'startpc', and 'home' at fixed indices 3, 4, and 5.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["nargs"], SlotIndex = 3, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["startpc"], SlotIndex = 4, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["home"], SlotIndex = 5, InheritedFrom = inheritedFrom });
+
+                slotIndex = 6; // TempFrameStart
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else if (cls.Name == "BlockClosure")
+            {
+                // VM Extension: BlockClosure field indices are fixed by our VM implementation
+                var requiredFields = new[] { "method", "homeContext", "returnContext", "numArgs" };
+                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: BlockClosure class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The VM extension requires BlockClosure to define 'method', 'homeContext', 'returnContext', and 'numArgs' at fixed indices 0, 1, 2, and 3.");
+                }
+
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 0, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["homeContext"], SlotIndex = 1, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["returnContext"], SlotIndex = 2, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["numArgs"], SlotIndex = 3, InheritedFrom = inheritedFrom });
+
+                slotIndex = 4;
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName)) continue;
+                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
+                }
+            }
+            else
+            {
+                // Normal field layout for all other classes
+                foreach (var instVarName in cls.InstanceVariables)
+                {
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = inheritedFrom
+                    });
+                }
             }
         }
 
@@ -554,15 +707,73 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             if (classNode == null)
                 continue;
 
-            foreach (var instVarName in classNode.InstanceVariables)
+            // SPECIAL CASE: Behavior class must have superclass, methodDict, format at fixed indices 0, 1, 2
+            // This is a Blue Book architectural invariant that the VM depends on
+            if (className == "Behavior")
             {
-                int nameIndex = _symbolTable[instVarName];
+                // Verify Behavior has exactly the required fields
+                var requiredFields = new[] { "superclass", "methodDict", "format" };
+                var missingFields = requiredFields.Where(f => !classNode.InstanceVariables.Contains(f)).ToList();
+
+                if (missingFields.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"FATAL: Behavior class is missing required fields: {string.Join(", ", missingFields)}. " +
+                        "The Blue Book VM architecture requires Behavior to define 'superclass', 'methodDict', and 'format' " +
+                        "at fixed indices 0, 1, and 2 respectively.");
+                }
+
+                // Force fixed indices regardless of declaration order
                 layout.Add(new JsonFieldLayoutEntry
                 {
-                    NameIndex = nameIndex,
-                    SlotIndex = slotIndex++,
+                    NameIndex = _symbolTable["superclass"],
+                    SlotIndex = 0,
                     InheritedFrom = $"class:{className}"
                 });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["methodDict"],
+                    SlotIndex = 1,
+                    InheritedFrom = $"class:{className}"
+                });
+
+                layout.Add(new JsonFieldLayoutEntry
+                {
+                    NameIndex = _symbolTable["format"],
+                    SlotIndex = 2,
+                    InheritedFrom = $"class:{className}"
+                });
+
+                // Add remaining fields (e.g., subclasses) starting at index 3
+                slotIndex = 3;
+                foreach (var instVarName in classNode.InstanceVariables)
+                {
+                    if (requiredFields.Contains(instVarName))
+                        continue; // Skip - already added at fixed indices
+
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = $"class:{className}"
+                    });
+                }
+            }
+            else
+            {
+                // Normal field layout for other classes in the metaclass chain
+                foreach (var instVarName in classNode.InstanceVariables)
+                {
+                    int nameIndex = _symbolTable[instVarName];
+                    layout.Add(new JsonFieldLayoutEntry
+                    {
+                        NameIndex = nameIndex,
+                        SlotIndex = slotIndex++,
+                        InheritedFrom = $"class:{className}"
+                    });
+                }
             }
         }
 

@@ -69,6 +69,9 @@ public partial class VirtualMachine : IPrimitiveContext
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
+    // Blue Book architectural constants are defined in VMConstants.cs
+    // All context and BlockClosure field indices are now static constants shared across the VM
+
     // Verbose debugging support
     public bool VerboseDebug { get; set; } = false;
     private int _callDepth = 0;
@@ -264,12 +267,12 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Step 5: Get field indices using LayoutResolver
-        int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-        int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-        int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int receiverMapIndex = VMConstants.METHODCONTEXT_RECEIVERMAP_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         // Step 6: Initialize MethodContext fixed fields
 
@@ -324,9 +327,9 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
@@ -451,7 +454,7 @@ public partial class VirtualMachine : IPrimitiveContext
             }
         }
 
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         // Push receiver variable 0-15 (0x00-0x0F)
@@ -472,14 +475,14 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (blockClass == "BlockClosure")
                 {
                     // New BlockClosure path - get homeContext from BlockClosure
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
                     // Console.WriteLine($"[DEBUG IsPushIvar] BlockClosure path - homeContext={homeContextOOP}");
                 }
                 else
                 {
                     // Legacy BlockContext path
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
                     // Console.WriteLine($"[DEBUG IsPushIvar] BlockContext path - homeContext={homeContextOOP}");
                 }
@@ -509,7 +512,7 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 // This is a block - check if index is out of range for block's own temps
                 // Get the method to check arg+temp count
-                var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                 var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                 var header = ParseMethodHeader(blockMethodOOP);
                 int blockLocalCount = header.NumArgs + header.NumTemps;
@@ -526,7 +529,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(blockContextOOP));
                     if (blockClass == "BlockClosure")
                     {
-                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
                         if (_debugOptions.ShouldDebugBytecode)
                         {
@@ -535,7 +538,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     }
                     else
                     {
-                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
                         if (_debugOptions.ShouldDebugBytecode)
                         {
@@ -582,7 +585,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     var parentClass = GetClassName(GetClass(parentBlockClosureOOP));
                     // Console.WriteLine($"[DEBUG CreateBlock] Found parent object: {parentBlockClosureOOP}, class={parentClass}");
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                     // Console.WriteLine($"[DEBUG CreateBlock] homeContext field index: {homeIndex}");
                     var parentHomeContextOOP = _heapManager.GetInstanceVariable(parentBlockClosureOOP, homeIndex);
                     // Console.WriteLine($"[DEBUG CreateBlock] Active context is block - using parent's home: {_activeContextOOP} -> {parentHomeContextOOP}");
@@ -619,13 +622,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     
                     // Get the home context from the block
-                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeContextIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
                     
                     if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
-                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
                         
                         // Try to get the association from home method's literals
@@ -680,13 +683,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (blockClass == "BlockClosure")
                 {
                     // New BlockClosure path - get homeContext from BlockClosure
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                    int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
                 }
                 else
                 {
                     // Legacy BlockContext path
-                    int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     homeContextOOP = _heapManager.GetInstanceVariable(blockOOP, homeIndex);
                 }
 
@@ -710,7 +713,7 @@ public partial class VirtualMachine : IPrimitiveContext
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
             {
                 // This is a block - check if index is out of range for block's own temps
-                var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                 var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                 var header = ParseMethodHeader(blockMethodOOP);
                 int blockLocalCount = header.NumArgs + header.NumTemps;
@@ -722,12 +725,12 @@ public partial class VirtualMachine : IPrimitiveContext
                     var blockClass = GetClassName(GetClass(blockOrClosureOOP));
                     if (blockClass == "BlockClosure")
                     {
-                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                         contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                     }
                     else
                     {
-                        var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                     }
                 }
@@ -750,13 +753,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     if (blockClass == "BlockClosure")
                     {
-                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                         homeContextOOP = _heapManager.GetInstanceVariable(blockOOP2, homeIndex);
                     }
                     else
                     {
                         // Legacy BlockContext path
-                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         homeContextOOP = _heapManager.GetInstanceVariable(blockOOP2, homeIndex);
                     }
 
@@ -807,13 +810,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     if (blockClass == "BlockClosure")
                     {
-                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                         homeContextOOP = _heapManager.GetInstanceVariable(returnBlockOOP, homeIndex);
                     }
                     else
                     {
                         // Legacy BlockContext path
-                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         homeContextOOP = _heapManager.GetInstanceVariable(returnBlockOOP, homeIndex);
                     }
 
@@ -852,12 +855,12 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         // Non-local return support for BlockClosure (return self)
                         // Get self from home context
-                        int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                        int homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                         var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeContextIndex);
                         var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
 
                         // Get return context
-                        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+                        int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
 
                         // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value=self ({homeReceiverOOP})");
@@ -869,7 +872,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     else
                     {
                         // Legacy BlockContext path - treat as normal return
-                        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         var homeContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, homeIndex);
                         var homeReceiverOOP = GetHomeContextReceiver(homeContextOOP);
                         Push(homeReceiverOOP);
@@ -896,7 +899,7 @@ public partial class VirtualMachine : IPrimitiveContext
                         var returnValue = Pop();
 
                         // Get return context
-                        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
+                        int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
 
                         // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value={returnValue}");
@@ -936,7 +939,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (bytecode >= 0x90 && bytecode <= 0x97)
         {
             int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+            int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
             int currentIp = ipOOP.AsSmallInteger();
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
@@ -947,7 +950,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (bytecode == 0xA0)
         {
             byte[] bytecodes = GetMethodBytecodes(methodOOP);
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+            int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP2 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
             int currentIp = ipOOP2.AsSmallInteger();
 
@@ -962,7 +965,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (bytecode >= 0xA1 && bytecode <= 0xA7)
         {
             byte[] bytecodes = GetMethodBytecodes(methodOOP);
-            int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+            int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP3 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
             int currentIp = ipOOP3.AsSmallInteger();
 
@@ -1006,13 +1009,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
                 {
                     // Get the home context from the block
-                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeContextIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
                     if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
-                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
 
                         // Try to get the selector from home method's literals
@@ -1046,13 +1049,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
                 {
                     // Get the home context from the block
-                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeContextIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
                     if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
-                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
 
                         // Try to get the selector from home method's literals
@@ -1093,13 +1096,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockClosureOOP))
                 {
                     // Get the home context from the block
-                    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                    int homeContextIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                     var homeContextOOP = _heapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
 
                     if (homeContextOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         // Get the method from home context
-                        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var homeMethodOOP = _heapManager.GetInstanceVariable(homeContextOOP, methodIndex);
 
                         // Try to get the selector from home method's literals
@@ -1133,8 +1136,8 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool ExecuteExtendedBytecode(SmalltalkOOP methodOOP)
     {
         byte[] bytecodes = GetMethodBytecodes(methodOOP);
-        int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
         int ip = ipOOP.AsSmallInteger();
@@ -1182,7 +1185,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     SmalltalkOOP contextToReadFrom = _activeContextOOP;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
-                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
                         int blockLocalCount = header.NumArgs + header.NumTemps;
@@ -1194,13 +1197,13 @@ public partial class VirtualMachine : IPrimitiveContext
                             if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                                 contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
                             }
                             else
                             {
                                 // It's a BlockContext - get home field
-                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                                 contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                             }
                         }
@@ -1221,7 +1224,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
-                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
                         int blockLocalCount = header.NumArgs + header.NumTemps;
@@ -1233,13 +1236,13 @@ public partial class VirtualMachine : IPrimitiveContext
                             if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                                 contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
                             }
                             else
                             {
                                 // It's a BlockContext - get home field
-                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                                 contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                             }
                         }
@@ -1260,7 +1263,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
-                        var methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+                        var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
                         int blockLocalCount = header.NumArgs + header.NumTemps;
@@ -1272,13 +1275,13 @@ public partial class VirtualMachine : IPrimitiveContext
                             if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
+                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
                                 contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
                             }
                             else
                             {
                                 // It's a BlockContext - get home field
-                                var homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                                 contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                             }
                         }
@@ -1445,7 +1448,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             case 0x13: // DUP - Duplicate top of stack
                 {
-                    int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
+                    int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
                     var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
                     int sp = spOOP.AsSmallInteger();
                     if (sp <= 0)
@@ -1736,7 +1739,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Get the currently executing method from the method context
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
         var currentMethodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
@@ -1745,8 +1748,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeClassOOP = _heapManager.GetInstanceVariable(currentMethodOOP, 0);
 
         // Get the superclass of the home class
-        int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-        var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, superclassIndex);
+        // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+        // This is guaranteed by the compiler which enforces this invariant
+        var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
@@ -2134,7 +2138,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Display stack
         if (_activeContextOOP != SmalltalkOOP.Null)
         {
-            int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
+            int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
             var stackpOOP = _heapManager.GetInstanceVariable(_activeContextOOP, stackpIndex);
             int stackp = stackpOOP.AsSmallInteger();
 
@@ -2154,8 +2158,8 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         Console.WriteLine($"  SENDER CHAIN (showing up to {maxDepth} contexts):");
 
-        int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
 
         var currentOOP = contextOOP;
         int depth = 0;
@@ -2324,9 +2328,9 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Step 4: Create BlockContext
         // Get field indices using LayoutResolver (VirtualMachine responsibility)
-        int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
-        int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
-        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
+        int nargsIndex = VMConstants.BLOCKCONTEXT_NARGS_INDEX;
+        int startpcIndex = VMConstants.BLOCKCONTEXT_STARTPC_INDEX;
+        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
         
         // Call heap manager to create BlockContext with resolved field indices (proper architectural boundaries)
         // Get BlockContext class from GlobalRegistry
@@ -2448,12 +2452,12 @@ public partial class VirtualMachine : IPrimitiveContext
         _activeContextCount++;
 
         // Get field indices
-        int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-        int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-        int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int receiverMapIndex = VMConstants.METHODCONTEXT_RECEIVERMAP_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         // Initialize MethodContext fields
         _heapManager.SetInstanceVariable(contextOOP, senderIndex, senderContextOOP);
@@ -2517,7 +2521,7 @@ public partial class VirtualMachine : IPrimitiveContext
             throw new InvalidOperationException($"Home context is not a MethodContext: {homeContextClassName} (OOP={homeContextOOP})");
         }
 
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
         var result = _heapManager.GetInstanceVariable(homeContextOOP, receiverIndex);
         return result;
     }
@@ -2553,7 +2557,7 @@ public partial class VirtualMachine : IPrimitiveContext
         
         
         // Get the receiver from this method context
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
         var receiver = _heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         
         return receiver;
@@ -2573,7 +2577,7 @@ public partial class VirtualMachine : IPrimitiveContext
         while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
         {
             // Get the method from this context
-            int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
+            int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
             var methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, methodIndex);
             
             // Check if this matches our target method
@@ -2585,7 +2589,7 @@ public partial class VirtualMachine : IPrimitiveContext
             }
             
             // Move to sender
-            int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
+            int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
             var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
             currentContextOOP = senderContextOOP;
         }
@@ -2611,7 +2615,7 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 // Console.WriteLine($"[DEBUG FindMethodContext] {currentContextOOP} is block context, following sender");
                 // This is a block execution context, get its sender
-                int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
+                int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
                 var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
                 currentContextOOP = senderContextOOP;
                 continue;
@@ -2782,7 +2786,7 @@ public partial class VirtualMachine : IPrimitiveContext
             throw new InvalidOperationException($"Push() called with corrupted _activeContextOOP={_activeContextOOP}, format={activeContextFormat}, class={activeContextClass}");
         }
 
-        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
+        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
@@ -2795,7 +2799,7 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP Pop()
     {
-        int spIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
+        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
@@ -2931,14 +2935,14 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Get the method dictionary from the class
-            int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
-            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
+            // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
+            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No method dictionary, try superclass
-                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
                 if (superclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
@@ -2969,8 +2973,8 @@ public partial class VirtualMachine : IPrimitiveContext
             if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No values array, try superclass
-                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
+                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
                 string superclassName = GetClassName(superclassOOP);
                 Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
                 currentClassOOP = superclassOOP;
@@ -3110,8 +3114,8 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Not found in this class, try superclass
-            int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
-            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
+            // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
+            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
             if (_debugOptions.ShouldDebugMethodLookup)
             {
@@ -3247,7 +3251,7 @@ public partial class VirtualMachine : IPrimitiveContext
     int IPrimitiveContext.GetInstructionPointer()
     {
         // Get the instruction pointer from the active context
-        int ipIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
         var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
         return ipOOP.AsSmallInteger();
     }
@@ -3275,10 +3279,10 @@ public partial class VirtualMachine : IPrimitiveContext
         _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
 
         // Get field indices using LayoutResolver
-        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-        int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
-        int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
-        int stackpIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "stackp");
+        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+        int startpcIndex = VMConstants.BLOCKCONTEXT_STARTPC_INDEX;
+        int nargsIndex = VMConstants.BLOCKCONTEXT_NARGS_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
 
         // Initialize BlockContext fields
         _heapManager.SetInstanceVariable(blockContextOOP, homeIndex, actualHomeOOP);
@@ -3299,12 +3303,12 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         // Get block context fields
         var blockContextOOP = blockContextOop;
-        int homeIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "home");
-        int startpcIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "startpc");
-        int nargsIndex = _layoutResolver.GetFieldIndex("class:BlockContext", "nargs");
-        int stackpIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "stackp");
-        int senderIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "sender");
-        int pcIndex = _layoutResolver.GetFieldIndex("class:ContextPart", "pc");
+        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+        int startpcIndex = VMConstants.BLOCKCONTEXT_STARTPC_INDEX;
+        int nargsIndex = VMConstants.BLOCKCONTEXT_NARGS_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
 
         var homeOOP = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
         var startPcOOP = _heapManager.GetInstanceVariable(blockContextOOP, startpcIndex);
@@ -3599,10 +3603,10 @@ public partial class VirtualMachine : IPrimitiveContext
         _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
 
         // Get field indices for BlockClosure instance variables
-        int methodIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "method");
-        int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
-        int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
-        int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
+        int methodIndex = VMConstants.BLOCKCLOSURE_METHOD_INDEX;
+        int homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+        int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
+        int numArgsIndex = VMConstants.BLOCKCLOSURE_NUMARGS_INDEX;
 
         // Console.WriteLine($"[DEBUG CreateBlockClosure] BlockClosure instance var count={instanceVarCount}, field indices: method={methodIndex}, homeContext={homeContextIndex}, returnContext={returnContextIndex}, numArgs={numArgsIndex}");
 

@@ -222,12 +222,12 @@ public class InitExpressionExecutor
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
 
         // Set instance variables using LayoutResolver indices
-        int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
-        int pcIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
-        int stackpIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "stackp");
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        int receiverMapIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiverMap");
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int receiverMapIndex = VMConstants.METHODCONTEXT_RECEIVERMAP_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         _heapManager.SetSlot(contextOOP, senderIndex + 1, SpecialObjectsArray.Instance.Nil);
         _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
