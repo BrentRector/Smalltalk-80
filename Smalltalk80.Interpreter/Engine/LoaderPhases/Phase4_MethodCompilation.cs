@@ -265,12 +265,39 @@ public class Phase4_MethodCompilation
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP)
     {
-        // Blocks are code literals embedded in methods, not standalone methods
-        // They use nil as homeClass since they inherit context from their enclosing method
+        // CRITICAL: Both regular methods AND blocks need a valid homeClass for super sends
+        // Blocks inherit their homeClass from their owning method (via blockOwnerMap)
         SmalltalkOOP homeClassOOP;
         if (method.LocalId.StartsWith("block:"))
         {
-            homeClassOOP = SpecialObjectsArray.Instance.Nil;
+            // Get blockOwnerMap to find this block's owning method
+            var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
+            if (blockOwnerMap == null)
+            {
+                throw new InvalidOperationException("blockOwnerMap not found - should be built in CompileAndInstallMethods");
+            }
+
+            // Walk ownership chain to find root method (blocks can be nested)
+            string currentLocalId = method.LocalId;
+            while (blockOwnerMap.TryGetValue(currentLocalId, out string? ownerLocalId))
+            {
+                currentLocalId = ownerLocalId;
+                // If owner is not a block, we've found the root method
+                if (!ownerLocalId.StartsWith("block:"))
+                    break;
+            }
+
+            // Now get the root method's homeClass
+            var rootMethod = _bundle.Methods.FirstOrDefault(m => m.LocalId == currentLocalId);
+            if (rootMethod == null)
+            {
+                throw new InvalidOperationException($"Cannot find root method '{currentLocalId}' for block '{method.LocalId}'");
+            }
+
+            if (!_localIdToObjectId.TryGetValue(rootMethod.HomeClassLocalId, out homeClassOOP))
+            {
+                throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
+            }
         }
         else
         {

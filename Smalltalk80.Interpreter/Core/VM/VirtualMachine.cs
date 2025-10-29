@@ -2362,7 +2362,7 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
 
         // Step 7: Create execution MethodContext backed by BlockContext
-        // Sender should be the CURRENT active context (where the block was invoked), not homeContext
+        // Sender = where control returns (calling context), Home = where block was defined (lexical scope)
         var executionContextOOP = CreateBlockExecutionContext(
             blockMethodOOP, homeContextReceiverOOP, blockContextOOP, _activeContextOOP, blockClosureOOP);
 
