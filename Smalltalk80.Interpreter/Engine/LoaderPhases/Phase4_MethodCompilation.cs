@@ -874,6 +874,16 @@ public class Phase4_MethodCompilation
                 compiledMethodClassOOP,
                 byteArrayClassOOP);
 
+            // DIAGNOSTIC: Track init methods around oop=49952 or Cursor-related
+            bool isCursor = expr.Source?.Contains("Cursor") ?? false;
+            bool isTargetOOP = initMethodOOP.RawValue >= 49900 && initMethodOOP.RawValue <= 50000;
+            if (isCursor || isTargetOOP)
+            {
+                var homeClassOOP = _heapManager.GetInstanceVariable(initMethodOOP, 0);
+                var homeClassName = _allocator.GetClassName(homeClassOOP);
+                Console.WriteLine($"[CREATED INIT METHOD] oop={initMethodOOP}, homeClass={homeClassOOP} ({homeClassName}), source='{expr.Source?.Substring(0, Math.Min(40, expr.Source.Length ?? 0))}...'");
+            }
+
             initExprMethods.Add(initMethodOOP);
             _localIdToObjectId[expr.LocalId] = initMethodOOP;
         }

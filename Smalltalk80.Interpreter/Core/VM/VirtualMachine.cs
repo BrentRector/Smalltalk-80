@@ -1757,9 +1757,18 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // DIAGNOSTIC: Show super send details
         Console.WriteLine($"[SUPER SEND DIAGNOSTIC]");
+        Console.WriteLine($"  _activeContextOOP: {_activeContextOOP} (class: {GetClassName(_heapManager.GetSlot(_activeContextOOP, 0))})");
+        Console.WriteLine($"  methodContextOOP: {methodContextOOP} (class: {GetClassName(_heapManager.GetSlot(methodContextOOP, 0))})");
+        Console.WriteLine($"  MethodContext fields:");
+        Console.WriteLine($"    [0] sender: {_heapManager.GetInstanceVariable(methodContextOOP, 0)}");
+        Console.WriteLine($"    [1] pc: {_heapManager.GetInstanceVariable(methodContextOOP, 1)}");
+        Console.WriteLine($"    [2] stackp: {_heapManager.GetInstanceVariable(methodContextOOP, 2)}");
+        Console.WriteLine($"    [3] method: {_heapManager.GetInstanceVariable(methodContextOOP, 3)}");
+        Console.WriteLine($"    [4] receiverMap: {_heapManager.GetInstanceVariable(methodContextOOP, 4)}");
+        Console.WriteLine($"    [5] receiver: {_heapManager.GetInstanceVariable(methodContextOOP, 5)}");
         Console.WriteLine($"  selector: {selectorName}");
-        Console.WriteLine($"  currentMethodOOP: {currentMethodOOP}");
-        Console.WriteLine($"  homeClassOOP: {homeClassOOP} (class: {GetClassName(homeClassOOP)})");
+        Console.WriteLine($"  currentMethodOOP: {currentMethodOOP} (read from methodContext slot {methodIndex})");
+        Console.WriteLine($"  homeClassOOP: {homeClassOOP} (class: {GetClassName(homeClassOOP)}) (read from method slot 0)");
         Console.WriteLine($"  superclassOOP: {superclassOOP} (class: {GetClassName(superclassOOP)})");
         Console.WriteLine($"  receiverOOP: {receiverOOP} (class: {GetClassName(_heapManager.GetSlot(receiverOOP, 0))})");
 
