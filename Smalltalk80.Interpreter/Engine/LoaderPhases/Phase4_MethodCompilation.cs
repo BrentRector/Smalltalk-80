@@ -240,6 +240,17 @@ public class Phase4_MethodCompilation
             methodsCreated++;
         }
 
+        // DIAGNOSTIC: Check meta:Cursor after PASS 1
+        if (_localIdToObjectId.TryGetValue("meta:Cursor", out var metaCursorOOP))
+        {
+            var className = _allocator.GetClassName(metaCursorOOP);
+            Console.WriteLine($"[AFTER PASS1] _localIdToObjectId['meta:Cursor'] = {metaCursorOOP}, class={className}");
+        }
+        else
+        {
+            Console.WriteLine($"[AFTER PASS1] _localIdToObjectId['meta:Cursor'] NOT FOUND!");
+        }
+
         // PASS 2: Resolve and patch all literals now that all blocks exist
         foreach (var method in _bundle.Methods)
         {
@@ -395,15 +406,14 @@ public class Phase4_MethodCompilation
                     throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
                 }
 
-                // DIAGNOSTIC: Log when homeClass resolves to True/False/Boolean (WRONG!)
-                var homeClassName = _allocator.GetClassName(homeClassOOP);
-                if (homeClassName == "True" || homeClassName == "False" || homeClassName == "Boolean")
+                // DIAGNOSTIC: Log Cursor-related blocks
+                if (method.LocalId.Contains("Cursor") || rootMethod.LocalId.Contains("Cursor") || rootMethod.HomeClassLocalId.Contains("Cursor"))
                 {
-                    Console.WriteLine($"[BUG!] block={method.LocalId}");
+                    var homeClassName = _allocator.GetClassName(homeClassOOP);
+                    Console.WriteLine($"[CURSOR BLOCK] LocalId={method.LocalId}");
                     Console.WriteLine($"  owner={currentLocalId}");
                     Console.WriteLine($"  ownerHomeClass={rootMethod.HomeClassLocalId}");
-                    Console.WriteLine($"  _localIdToObjectId['{rootMethod.HomeClassLocalId}']={homeClassOOP}");
-                    Console.WriteLine($"  GetClassName({homeClassOOP})={homeClassName}");
+                    Console.WriteLine($"  resolved homeClassOOP={homeClassOOP}, class={homeClassName}");
                 }
             }
             else
