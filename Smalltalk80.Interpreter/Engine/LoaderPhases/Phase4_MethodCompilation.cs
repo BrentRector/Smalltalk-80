@@ -278,7 +278,8 @@ public class Phase4_MethodCompilation
     /// Init expressions like "BinaryChoiceView initialize" compile to:
     ///   pushLiteralVariable 0 (Association for BinaryChoiceView)
     ///   send #initialize
-    /// The Association's value is the class object, and its class is the metaclass.
+    /// We extract the class name from the Association's KEY (Symbol), then look up the metaclass.
+    /// CRITICAL: Cannot use Association's value - it's still nil in Phase 4 (populated in Phase 5).
     /// </summary>
     private string ExtractHomeClassFromInitExpression(InitExpression expr, SmalltalkOOP[] literalOOPs)
     {
@@ -302,25 +303,26 @@ public class Phase4_MethodCompilation
             return "class:UndefinedObject";
         }
 
-        // Get the Association's value (slot 1) - this is the class object
-        var classOOP = _heapManager.GetInstanceVariable(firstLiteralOOP, 1);
+        // Get the Association's key (slot 0) - this is a Symbol with the class name
+        // NOTE: We use the KEY, not the value! Association values are nil during Phase 4.
+        var keySymbolOOP = _heapManager.GetInstanceVariable(firstLiteralOOP, 0);
+        string className = _allocator.GetSymbolName(keySymbolOOP);
 
-        // Get the class of the class object - this is the metaclass
-        var metaclassOOP = _heapManager.GetSlot(classOOP, 0);
+        // Build the metaclass LocalId from the class name
+        // Init expressions execute on the metaclass (class-side methods)
+        string homeClassLocalId = "meta:" + className;
 
-        // Find the metaclass LocalId in _localIdToObjectId
-        foreach (var kvp in _localIdToObjectId)
+        Console.WriteLine($"[INIT EXPR HOMECLASS] expr={expr.LocalId}, extracted className='{className}' from Association key, homeClass={homeClassLocalId}");
+
+        // Verify the metaclass exists
+        if (!_localIdToObjectId.ContainsKey(homeClassLocalId))
         {
-            if (kvp.Value == metaclassOOP)
-            {
-                Console.WriteLine($"[INIT EXPR HOMECLASS] expr={expr.LocalId}, extracted homeClass={kvp.Key} from literals (not source parsing!)");
-                return kvp.Key;
-            }
+            Console.WriteLine($"WARNING: Metaclass {homeClassLocalId} not found in _localIdToObjectId for expr {expr.LocalId}");
+            // Fallback to source parsing
+            return "meta:" + ParseClassNameFromInitExpression(expr.Source);
         }
 
-        // Fallback: parse from source if we can't find it in the map
-        Console.WriteLine($"WARNING: Could not find metaclass OOP {metaclassOOP} in _localIdToObjectId, falling back to source parsing");
-        return "meta:" + ParseClassNameFromInitExpression(expr.Source);
+        return homeClassLocalId;
     }
 
     /// <summary>
