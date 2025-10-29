@@ -1729,18 +1729,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // For super sends, we need to start method lookup from the superclass of the class
         // that contains the currently executing method, NOT from the receiver's class.
 
-        // CRITICAL: When executing inside a BlockContext, _activeContextOOP points to the BlockContext,
-        // not the enclosing MethodContext. We need to find the actual MethodContext to get the correct
-        // method for super send lookup.
-        var methodContextOOP = FindMethodContext(_activeContextOOP);
-        if (methodContextOOP == default)
-        {
-            throw new InvalidOperationException($"Cannot find MethodContext for super send - active context may be invalid");
-        }
-
-        // Get the currently executing method from the method context
+        // CRITICAL FIX: Read the method directly from _activeContextOOP, not from FindMethodContext!
+        // When executing inside a block, _activeContextOOP is a MethodContext with the BLOCK's method in slot 3.
+        // The block's method has the correct homeClass for super sends.
+        // FindMethodContext() walks the sender chain and would return the CALLING method (wrong!).
+        // For super sends, we always want the method from the CURRENTLY EXECUTING context.
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        var currentMethodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
+        var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
         // CompiledMethod structure: fixed slot 0 = homeClass, indexed slots = [header] [literals...] [bytecodeArray]
@@ -1754,23 +1749,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
-
-        // DIAGNOSTIC: Show super send details
-        Console.WriteLine($"[SUPER SEND DIAGNOSTIC]");
-        Console.WriteLine($"  _activeContextOOP: {_activeContextOOP} (class: {GetClassName(_heapManager.GetSlot(_activeContextOOP, 0))})");
-        Console.WriteLine($"  methodContextOOP: {methodContextOOP} (class: {GetClassName(_heapManager.GetSlot(methodContextOOP, 0))})");
-        Console.WriteLine($"  MethodContext fields:");
-        Console.WriteLine($"    [0] sender: {_heapManager.GetInstanceVariable(methodContextOOP, 0)}");
-        Console.WriteLine($"    [1] pc: {_heapManager.GetInstanceVariable(methodContextOOP, 1)}");
-        Console.WriteLine($"    [2] stackp: {_heapManager.GetInstanceVariable(methodContextOOP, 2)}");
-        Console.WriteLine($"    [3] method: {_heapManager.GetInstanceVariable(methodContextOOP, 3)}");
-        Console.WriteLine($"    [4] receiverMap: {_heapManager.GetInstanceVariable(methodContextOOP, 4)}");
-        Console.WriteLine($"    [5] receiver: {_heapManager.GetInstanceVariable(methodContextOOP, 5)}");
-        Console.WriteLine($"  selector: {selectorName}");
-        Console.WriteLine($"  currentMethodOOP: {currentMethodOOP} (read from methodContext slot {methodIndex})");
-        Console.WriteLine($"  homeClassOOP: {homeClassOOP} (class: {GetClassName(homeClassOOP)}) (read from method slot 0)");
-        Console.WriteLine($"  superclassOOP: {superclassOOP} (class: {GetClassName(superclassOOP)})");
-        Console.WriteLine($"  receiverOOP: {receiverOOP} (class: {GetClassName(_heapManager.GetSlot(receiverOOP, 0))})");
 
         // Now look up the method starting from the superclass
         var methodInfo = GetMethod(superclassOOP, selectorName!);
@@ -1786,16 +1764,12 @@ public partial class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            Console.WriteLine($"[SendSuperMessage] Executing primitive {primitiveNumber} for {selectorName}");
             var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
             if (_primitiveSuccess)
             {
-                Console.WriteLine($"[SendSuperMessage] Primitive {primitiveNumber} succeeded");
                 return CallOutcome.Normal(primitiveResult);
             }
-
-            Console.WriteLine($"[SendSuperMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
         }
 
         // Execute the method with proper context chaining
@@ -1807,12 +1781,6 @@ public partial class VirtualMachine : IPrimitiveContext
             var result = ExecuteBytecodeLoop();
             _activeContextOOP = previousContextOOP;
             _activeContextCount--;
-
-            if (_activeContextCount % 50 == 0 && _activeContextCount > 0)
-            {
-                Console.WriteLine($"[CONTEXT EXIT] Normal return from super send, depth now={_activeContextCount}");
-            }
-
             return CallOutcome.Normal(result);
         }
         catch (NonLocalReturnException ex)
