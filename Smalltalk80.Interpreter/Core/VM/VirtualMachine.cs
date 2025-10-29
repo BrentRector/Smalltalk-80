@@ -1755,7 +1755,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
 
-        // Console.WriteLine($"[SUPER SEND] selector={selectorName}, homeClass={GetClassName(homeClassOOP)}, superclass={GetClassName(superclassOOP)}");
+        // DIAGNOSTIC: Show super send details
+        Console.WriteLine($"[SUPER SEND DIAGNOSTIC]");
+        Console.WriteLine($"  selector: {selectorName}");
+        Console.WriteLine($"  currentMethodOOP: {currentMethodOOP}");
+        Console.WriteLine($"  homeClassOOP: {homeClassOOP} (class: {GetClassName(homeClassOOP)})");
+        Console.WriteLine($"  superclassOOP: {superclassOOP} (class: {GetClassName(superclassOOP)})");
+        Console.WriteLine($"  receiverOOP: {receiverOOP} (class: {GetClassName(_heapManager.GetSlot(receiverOOP, 0))})");
 
         // Now look up the method starting from the superclass
         var methodInfo = GetMethod(superclassOOP, selectorName!);

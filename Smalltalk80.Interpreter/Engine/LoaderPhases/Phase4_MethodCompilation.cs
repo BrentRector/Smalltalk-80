@@ -177,8 +177,10 @@ public class Phase4_MethodCompilation
 
         // STEP 0: Build blockOwnerMap by scanning all method literals for block references
         // This map is needed at runtime to determine block home contexts
+        // IMPORTANT: Must include blocks from both regular methods AND init expressions!
         var blockOwnerMap = new Dictionary<string, string>(); // blockLocalId -> ownerMethodOrBlockLocalId
 
+        // Scan regular methods for block literals
         foreach (var method in _bundle.Methods)
         {
             string ownerLocalId = method.LocalId;
@@ -192,6 +194,23 @@ public class Phase4_MethodCompilation
                 }
             }
         }
+
+        // Scan init expressions for block literals
+        foreach (var expr in _bundle.InitExpressions)
+        {
+            string ownerLocalId = expr.LocalId;
+
+            foreach (var literal in expr.Literals)
+            {
+                if (literal.Type == "compiledMethod" && !string.IsNullOrEmpty(literal.LocalId))
+                {
+                    // This init expression contains a block as a literal - record ownership
+                    blockOwnerMap[literal.LocalId] = ownerLocalId;
+                }
+            }
+        }
+
+        Console.WriteLine($"[Phase4] Built blockOwnerMap with {blockOwnerMap.Count} block ownership entries");
 
         // Store blockOwnerMap in GlobalRegistry for runtime access
         GlobalRegistry.Set("blockOwnerMap", blockOwnerMap);
@@ -255,6 +274,40 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
+    /// Parses the class name from an init expression source string.
+    /// Examples:
+    /// "BinaryChoiceView initialize" -> "BinaryChoiceView"
+    /// "Cursor extent:fromArray:offset:" -> "Cursor"
+    /// "Float class initialize" -> "Float class" (explicit class-side)
+    /// </summary>
+    private string ParseClassNameFromInitExpression(string? source)
+    {
+        if (string.IsNullOrEmpty(source))
+        {
+            throw new InvalidOperationException("Init expression source is null or empty");
+        }
+
+        // Check for "Foo class selector" pattern (explicit class-side)
+        // E.g., "Float class initialize" -> "Float class"
+        var parts = source.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 3 && parts[1] == "class")
+        {
+            // Return "Foo class"
+            return parts[0] + " class";
+        }
+
+        // Normal pattern: "ClassName selector..."
+        // E.g., "BinaryChoiceView initialize" -> "BinaryChoiceView"
+        if (parts.Length >= 1)
+        {
+            return parts[0];
+        }
+
+        // Fallback (shouldn't happen)
+        return source;
+    }
+
+    /// <summary>
     /// Creates a CompiledMethod object with homeClass fixed slot and separate ByteArray for bytecodes.
     /// Layout: Fixed slot 0 = homeClass, Indexed slots = [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
@@ -287,16 +340,57 @@ public class Phase4_MethodCompilation
                     break;
             }
 
-            // Now get the root method's homeClass
+            // Now get the root method's or init expression's homeClass
+            // Check if the root is a regular method
             var rootMethod = _bundle.Methods.FirstOrDefault(m => m.LocalId == currentLocalId);
-            if (rootMethod == null)
+            if (rootMethod != null)
             {
-                throw new InvalidOperationException($"Cannot find root method '{currentLocalId}' for block '{method.LocalId}'");
-            }
+                // Block is owned by a regular method
+                Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, rootMethod={currentLocalId}, rootHomeClassLocalId={rootMethod.HomeClassLocalId}");
 
-            if (!_localIdToObjectId.TryGetValue(rootMethod.HomeClassLocalId, out homeClassOOP))
+                if (!_localIdToObjectId.TryGetValue(rootMethod.HomeClassLocalId, out homeClassOOP))
+                {
+                    throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
+                }
+
+                Console.WriteLine($"[BLOCK HOMECLASS DEBUG] resolved homeClassOOP={homeClassOOP}");
+            }
+            else
             {
-                throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
+                // Check if the root is an init expression
+                var rootInitExpr = _bundle.InitExpressions.FirstOrDefault(e => e.LocalId == currentLocalId);
+                if (rootInitExpr != null)
+                {
+                    // Block is owned by an init expression
+                    // Parse class name from init expression source (e.g., "BinaryChoiceView initialize" -> "BinaryChoiceView")
+                    string className = ParseClassNameFromInitExpression(rootInitExpr.Source);
+                    string homeClassLocalId;
+
+                    // Init expressions execute on the class side, so homeClass is the metaclass
+                    if (className.EndsWith(" class"))
+                    {
+                        // Explicit class-side expression (rare)
+                        homeClassLocalId = "meta:" + className.Substring(0, className.Length - 6);
+                    }
+                    else
+                    {
+                        // Normal class initialization - homeClass is the metaclass
+                        homeClassLocalId = "meta:" + className;
+                    }
+
+                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, rootInitExpr={currentLocalId}, source={rootInitExpr.Source}, homeClassLocalId={homeClassLocalId}");
+
+                    if (!_localIdToObjectId.TryGetValue(homeClassLocalId, out homeClassOOP))
+                    {
+                        throw new InvalidOperationException($"Cannot find home class '{homeClassLocalId}' for block '{method.LocalId}' via init expression '{currentLocalId}'");
+                    }
+
+                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] resolved homeClassOOP={homeClassOOP}");
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Cannot find root method or init expression '{currentLocalId}' for block '{method.LocalId}'");
+                }
             }
         }
         else
