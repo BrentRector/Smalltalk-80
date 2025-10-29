@@ -342,17 +342,16 @@ public partial class VirtualMachine : IPrimitiveContext
 
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         // Diagnostic: Show method name when recursion depth > 10
         if (_activeContextCount > 10)
         {
             var selectorOOP = GetMethodLiteral(methodOOP, 0);
             var selectorName = GetSymbolName(selectorOOP);
-
-            int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-            var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
             var receiverClass = GetClass(receiverOOP);
             var className = GetClassName(receiverClass);
 
@@ -433,9 +432,7 @@ public partial class VirtualMachine : IPrimitiveContext
             ip = ipOOP.AsSmallInteger();
         }
 
-        // If we fall off the end, return self
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        // If we fall off the end, return self (receiverIndex and receiverOOP already declared at top)
         return receiverOOP;
     }
 
