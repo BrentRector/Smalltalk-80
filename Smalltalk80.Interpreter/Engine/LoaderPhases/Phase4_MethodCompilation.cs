@@ -881,7 +881,9 @@ public class Phase4_MethodCompilation
             {
                 var homeClassOOP = _heapManager.GetInstanceVariable(initMethodOOP, 0);
                 var homeClassName = _allocator.GetClassName(homeClassOOP);
-                Console.WriteLine($"[CREATED INIT METHOD] oop={initMethodOOP}, homeClass={homeClassOOP} ({homeClassName}), source='{expr.Source?.Substring(0, Math.Min(40, expr.Source.Length ?? 0))}...'");
+                string source = expr.Source ?? "";
+                string sourcePreview = source.Substring(0, Math.Min(40, source.Length));
+                Console.WriteLine($"[CREATED INIT METHOD] oop={initMethodOOP}, homeClass={homeClassOOP} ({homeClassName}), source='{sourcePreview}...'");
             }
 
             initExprMethods.Add(initMethodOOP);
