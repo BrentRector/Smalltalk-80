@@ -437,29 +437,25 @@ public static class ObjectPrimitives
                 continue;
 
             // Check if this Association's key is #CharacterTable
-            var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0); // key is at index 0
-            var keyClass = ctx.HeapManager.GetSlot(keyOOP, 0); // class reference
-            var keyClassName = ctx.LayoutResolver.GetClassName(keyClass);
+            // Association structure: key (index 0), value (index 1)
+            var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0);
 
-            if (keyClassName == "Symbol")
+            // Compare symbol bytes to "CharacterTable" (no class check needed - just compare bytes)
+            string symbolName = GetSymbolName(ctx, keyOOP);
+            if (symbolName == "CharacterTable")
             {
-                // Compare symbol bytes to "CharacterTable"
-                string symbolName = GetSymbolName(ctx, keyOOP);
-                if (symbolName == "CharacterTable")
+                // Found CharacterTable Association, get its value
+                var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1);
+
+                // CharacterTable is an Array with 256 Characters (0-indexed in heap)
+                // ASCII 0-255 maps directly to array indices 0-255
+                if (asciiValue < 0 || asciiValue > 255)
                 {
-                    // Found CharacterTable Association, get its value
-                    var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1); // value is at index 1
-
-                    // CharacterTable is an Array with 256 Characters (1-indexed)
-                    // Return Character at asciiValue + 1 (convert 0-based ASCII to 1-based Smalltalk index)
-                    if (asciiValue < 0 || asciiValue > 255)
-                    {
-                        ctx.PrimitiveSuccess = false;
-                        return SpecialObjectsArray.Instance.Nil;
-                    }
-
-                    return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                    ctx.PrimitiveSuccess = false;
+                    return SpecialObjectsArray.Instance.Nil;
                 }
+
+                return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
             }
         }
 
