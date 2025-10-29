@@ -3071,7 +3071,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 Console.WriteLine($"  Actual: {methodDictFormat}");
                 Console.WriteLine($"  Class: {methodDictClass}");
                 Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
-                Console.WriteLine($"  methodDictIndex={methodDictIndex} (from GetFieldIndex('class:Class', 'methodDict'))");
+                Console.WriteLine($"  methodDictIndex={VMConstants.BEHAVIOR_METHODDICT_INDEX} (Blue Book architectural constant)");
                 Console.WriteLine($"  Looking for selector: {selectorName}");
 
                 // Check what's in the other slots to diagnose field index issue
