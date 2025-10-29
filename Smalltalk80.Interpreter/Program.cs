@@ -145,7 +145,8 @@ public static class Program
                 // These expressions require infrastructure that isn't ready during cold start
                 var skipList = new HashSet<string>
                 {
-                    "BitEditor initialize",      // Requires TextStyle/DefaultTextStyle (not created yet)
+                    "BitEditor initialize",              // Requires TextStyle/DefaultTextStyle (not created yet)
+                    "ChangeListController initialize",   // Requires TextStyle (calls TextStyle fontAt:)
                     // Add more problematic expressions here as discovered
                 };
 
