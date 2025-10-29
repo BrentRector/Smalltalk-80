@@ -1745,7 +1745,14 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeClassOOP = _heapManager.GetInstanceVariable(currentMethodOOP, 0);
 
         // Get the superclass of the home class
-        int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+        // IMPORTANT: Dynamically determine the class of homeClassOOP (could be Class or Metaclass)
+        // then look up the superclass field in that class
+        var homeClassClassOOP = _heapManager.GetSlot(homeClassOOP, 0); // Get class of the class object
+        string homeClassClassName = GetClassName(homeClassClassOOP);   // e.g., "Class" or "Metaclass"
+        string homeClassClassKey = homeClassClassName.StartsWith("class:") || homeClassClassName.StartsWith("meta:")
+            ? homeClassClassName
+            : $"class:{homeClassClassName}";
+        int superclassIndex = _layoutResolver.GetFieldIndex(homeClassClassKey, "superclass");
         var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, superclassIndex);
 
         // Get selector name for diagnostics
@@ -2931,13 +2938,20 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Get the method dictionary from the class
-            int methodDictIndex = _layoutResolver.GetFieldIndex("class:Class", "methodDict");
+            // IMPORTANT: Dynamically determine the class of currentClassOOP (could be Class or Metaclass)
+            var currentClassClassOOP = _heapManager.GetSlot(currentClassOOP, 0);
+            string currentClassClassName = GetClassName(currentClassClassOOP);
+            string currentClassClassKey = currentClassClassName.StartsWith("class:") || currentClassClassName.StartsWith("meta:")
+                ? currentClassClassName
+                : $"class:{currentClassClassName}";
+
+            int methodDictIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "methodDict");
             var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, methodDictIndex);
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No method dictionary, try superclass
-                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+                int superclassIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
                 var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
 
                 if (superclassOOP == SpecialObjectsArray.Instance.Nil)
@@ -2969,7 +2983,8 @@ public partial class VirtualMachine : IPrimitiveContext
             if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
             {
                 // No values array, try superclass
-                int superclassIndex = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+                // Reuse the currentClassClassKey computed earlier
+                int superclassIndex = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
                 var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex);
                 string superclassName = GetClassName(superclassOOP);
                 Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
@@ -3110,7 +3125,8 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Not found in this class, try superclass
-            int superclassIndex2 = _layoutResolver.GetFieldIndex("class:Class", "superclass");
+            // Reuse the currentClassClassKey computed earlier
+            int superclassIndex2 = _layoutResolver.GetFieldIndex(currentClassClassKey, "superclass");
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, superclassIndex2);
 
             if (_debugOptions.ShouldDebugMethodLookup)
