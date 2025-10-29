@@ -2362,8 +2362,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
 
         // Step 7: Create execution MethodContext backed by BlockContext
+        // Sender should be the CURRENT active context (where the block was invoked), not homeContext
         var executionContextOOP = CreateBlockExecutionContext(
-            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP, blockClosureOOP);
+            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, _activeContextOOP, blockClosureOOP);
 
         // DIAGNOSTIC: Validate executionContextOOP format before using it
         var execContextFormat = _heapManager.GetObjectFormat(executionContextOOP);
@@ -2412,8 +2413,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // Clean up block context mapping
         _blockContextMapping.Remove(executionContextOOP);
 
-        // Restore previous context
+        // Restore previous context and decrement depth
         _activeContextOOP = previousContextOOP;
+        _activeContextCount--;
         // Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
 
         return result;
@@ -2441,6 +2443,9 @@ public partial class VirtualMachine : IPrimitiveContext
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
+
+        // Increment context depth (matching CreateMethodContext behavior)
+        _activeContextCount++;
 
         // Get field indices
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
