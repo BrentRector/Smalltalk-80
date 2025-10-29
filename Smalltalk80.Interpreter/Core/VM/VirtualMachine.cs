@@ -324,22 +324,6 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
-        // Diagnostic: Show method name when recursion depth > 10
-        if (_activeContextCount > 10)
-        {
-            int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-            var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-            var selectorOOP = GetMethodLiteral(methodOOP, 0);
-            var selectorName = GetSymbolName(selectorOOP);
-
-            int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-            var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
-            var receiverClass = GetClass(receiverOOP);
-            var className = GetClassName(receiverClass);
-
-            Console.WriteLine($"[DEEP RECURSION depth={_activeContextCount}] {className}>>{selectorName}");
-        }
-
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
         int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
