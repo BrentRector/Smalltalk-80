@@ -2412,8 +2412,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // Clean up block context mapping
         _blockContextMapping.Remove(executionContextOOP);
 
-        // Restore previous context
+        // Restore previous context and decrement depth
         _activeContextOOP = previousContextOOP;
+        _activeContextCount--;
         // Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
 
         return result;
@@ -2441,6 +2442,9 @@ public partial class VirtualMachine : IPrimitiveContext
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
+
+        // Increment context depth (matching CreateMethodContext behavior)
+        _activeContextCount++;
 
         // Get field indices
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");
