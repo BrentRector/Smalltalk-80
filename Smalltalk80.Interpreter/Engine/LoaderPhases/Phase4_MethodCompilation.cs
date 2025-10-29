@@ -394,6 +394,16 @@ public class Phase4_MethodCompilation
                 {
                     throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
                 }
+
+                // DIAGNOSTIC: Log a sample of homeClass resolution
+                if (_localIdToObjectId.Count < 1000) // Only log during PASS 1
+                {
+                    var homeClassName = _allocator.GetClassName(homeClassOOP);
+                    if (homeClassName == "True" || homeClassName.Contains("Boolean"))
+                    {
+                        Console.WriteLine($"[BLOCK HOMECLASS WRONG!] block={method.LocalId}, owner={currentLocalId}, ownerHomeClass={rootMethod.HomeClassLocalId}, resolved homeClassOOP={homeClassOOP}, class={homeClassName}");
+                    }
+                }
             }
             else
             {
