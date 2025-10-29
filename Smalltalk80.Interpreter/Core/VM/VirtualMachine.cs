@@ -2362,8 +2362,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
 
         // Step 7: Create execution MethodContext backed by BlockContext
+        // Sender should be the CURRENT active context (where the block was invoked), not homeContext
         var executionContextOOP = CreateBlockExecutionContext(
-            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP, blockClosureOOP);
+            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, _activeContextOOP, blockClosureOOP);
 
         // DIAGNOSTIC: Validate executionContextOOP format before using it
         var execContextFormat = _heapManager.GetObjectFormat(executionContextOOP);
