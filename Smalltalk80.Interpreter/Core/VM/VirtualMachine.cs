@@ -222,7 +222,10 @@ public partial class VirtualMachine : IPrimitiveContext
         var className = GetClassName(receiverClass);
 
         Console.WriteLine($"  Method: {methodOOP} ({className}>>{selectorName})");
-        Console.WriteLine($"  Bytecodes[0]=0x{bytecodes[0]:X2}, [1]=0x{bytecodes[1]:X2}, [2]=0x{bytecodes[2]:X2}");
+
+        // DIAGNOSTIC: Show first 20 bytecodes to compare with JSON
+        var bytecodeDisplay = string.Join(", ", bytecodes.Take(20).Select(b => $"{b}(0x{b:X2})"));
+        Console.WriteLine($"  Bytecodes (first 20): {bytecodeDisplay}");
 
         var result = ExecuteBytecodeLoop();
 
