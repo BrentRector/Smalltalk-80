@@ -1,6 +1,7 @@
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.VM;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -397,7 +398,88 @@ public static class ObjectPrimitives
         // Convert to 0-based index
         // Strings use ByteIndexed format
         byte byteValue = ctx.HeapManager.GetIndexedByte(receiver, index - 1);
-        return SmalltalkOOP.FromSmallInteger(byteValue);
+
+        // CRITICAL: String>>at: must return Character objects, not SmallIntegers!
+        // Get Character from CharacterTable (Character class pool variable)
+        return GetCharacterForAscii(ctx, byteValue);
+    }
+
+    /// <summary>
+    /// Returns the Character object for a given ASCII code.
+    /// Accesses CharacterTable from Character class pool.
+    /// </summary>
+    private static SmalltalkOOP GetCharacterForAscii(IPrimitiveContext ctx, byte asciiValue)
+    {
+        // Get Character class from Smalltalk global dictionary
+        if (!GlobalRegistry.TryGet("Character", out var characterClassOOP))
+        {
+            // If Character class not found (shouldn't happen after cold start), fail primitive
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get classPool from Character class (instance variable index 7 - classPool)
+        // Character class structure: superclass, methodDict, format, subclasses, instanceVariables,
+        //                            organization, name, classPool, sharedPools
+        var classPoolOOP = ctx.HeapManager.GetInstanceVariable(characterClassOOP, 7);
+
+        // CharacterTable is stored as an Association in the classPool Dictionary
+        // Look up #CharacterTable key in the Dictionary
+        // For now, we'll scan through the Dictionary's array to find the CharacterTable Association
+        // Dictionary structure: tally, array
+        var dictArrayOOP = ctx.HeapManager.GetInstanceVariable(classPoolOOP, 1); // array is at index 1
+        int dictSize = ctx.HeapManager.GetIndexedSize(dictArrayOOP);
+
+        for (int i = 0; i < dictSize; i++)
+        {
+            var entryOOP = ctx.HeapManager.GetIndexedOOP(dictArrayOOP, i);
+            if (entryOOP == SpecialObjectsArray.Instance.Nil)
+                continue;
+
+            // Check if this Association's key is #CharacterTable
+            var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0); // key is at index 0
+            var keyClass = ctx.HeapManager.GetSlot(keyOOP, 0); // class reference
+            var keyClassName = ctx.LayoutResolver.GetClassName(keyClass);
+
+            if (keyClassName == "Symbol")
+            {
+                // Compare symbol bytes to "CharacterTable"
+                string symbolName = GetSymbolName(ctx, keyOOP);
+                if (symbolName == "CharacterTable")
+                {
+                    // Found CharacterTable Association, get its value
+                    var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1); // value is at index 1
+
+                    // CharacterTable is an Array with 256 Characters (1-indexed)
+                    // Return Character at asciiValue + 1 (convert 0-based ASCII to 1-based Smalltalk index)
+                    if (asciiValue < 0 || asciiValue > 255)
+                    {
+                        ctx.PrimitiveSuccess = false;
+                        return SpecialObjectsArray.Instance.Nil;
+                    }
+
+                    return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                }
+            }
+        }
+
+        // CharacterTable not found - this shouldn't happen after Character initialize
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Helper to get symbol name from symbol OOP.
+    /// </summary>
+    private static string GetSymbolName(IPrimitiveContext ctx, SmalltalkOOP symbolOOP)
+    {
+        int size = ctx.HeapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = ctx.HeapManager.GetIndexedByte(symbolOOP, i);
+        }
+        return System.Text.Encoding.ASCII.GetString(bytes);
     }
 
     // Primitive 64: String at:put: (character store for byte-indexed objects)
