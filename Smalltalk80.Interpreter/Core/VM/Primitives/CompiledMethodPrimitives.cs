@@ -31,6 +31,13 @@ public static class CompiledMethodPrimitives
         SmalltalkOOP[] literalOOPs,
         byte[] bytecodes)
     {
+        // DIAGNOSTIC: Log bytecodes received for methods starting with byte 33
+        if (bytecodes.Length > 0 && bytecodes[0] == 33)
+        {
+            Console.WriteLine($"[AllocateCompiledMethodInternal] Received bytecodes starting with 33:");
+            Console.WriteLine($"  Bytes[0-4]: {string.Join(", ", bytecodes.Take(5).Select(b => $"{b}(0x{b:X2})"))}");
+        }
+
         // CompiledMethod has 1 fixed slot (homeClass) plus indexed slots
         int fixedSlots = 1;  // slot 0 = homeClass
         int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
