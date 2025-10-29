@@ -440,13 +440,23 @@ public class Phase4_MethodCompilation
         }
 
         // Use AllocateCompiledMethod which handles all the setup including homeClass fixed slot
-        return _allocator.AllocateCompiledMethod(
+        var resultOOP = _allocator.AllocateCompiledMethod(
             compiledMethodClassOOP,
             byteArrayClassOOP,
             homeClassOOP,
             method.Header.Word,
             literalOOPs,
             bytecodes);
+
+        // DIAGNOSTIC: Track blocks in Cursor class>>extent:fromArray:offset: (the problem method)
+        if (method.LocalId.StartsWith("block:8eed95d4") || method.LocalId.StartsWith("block:8042a80d"))
+        {
+            var verifyHomeClass = _heapManager.GetInstanceVariable(resultOOP, 0);
+            var homeClassName = _allocator.GetClassName(verifyHomeClass);
+            Console.WriteLine($"[ALLOCATED CURSOR BLOCK] LocalId={method.LocalId} -> oop={resultOOP}, slot[0]={verifyHomeClass} ({homeClassName})");
+        }
+
+        return resultOOP;
     }
 
     /// <summary>
