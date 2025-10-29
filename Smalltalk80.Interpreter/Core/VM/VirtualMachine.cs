@@ -210,7 +210,19 @@ public partial class VirtualMachine : IPrimitiveContext
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         var methodOOP = _heapManager.GetInstanceVariable(contextOOP, methodIndex);
         var bytecodes = GetMethodBytecodes(methodOOP);
-        Console.WriteLine($"  Method: {methodOOP}, bytecodes[0]=0x{bytecodes[0]:X2} (first instruction)");
+
+        // Get method's selector and home class for identification
+        var selectorOOP = GetMethodLiteral(methodOOP, 0); // Selector at literal[0]
+        var selectorName = GetSymbolName(selectorOOP);
+
+        // Get receiver to determine class
+        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
+        var receiverOOP = _heapManager.GetInstanceVariable(contextOOP, receiverIndex);
+        var receiverClass = GetClass(receiverOOP);
+        var className = GetClassName(receiverClass);
+
+        Console.WriteLine($"  Method: {methodOOP} ({className}>>{selectorName})");
+        Console.WriteLine($"  Bytecodes[0]=0x{bytecodes[0]:X2}, [1]=0x{bytecodes[1]:X2}, [2]=0x{bytecodes[2]:X2}");
 
         var result = ExecuteBytecodeLoop();
 
