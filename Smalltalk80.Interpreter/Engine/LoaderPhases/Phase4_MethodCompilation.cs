@@ -274,7 +274,58 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
+    /// Extracts the homeClass LocalId from an init expression's resolved literals.
+    /// Init expressions like "BinaryChoiceView initialize" compile to:
+    ///   pushLiteralVariable 0 (Association for BinaryChoiceView)
+    ///   send #initialize
+    /// The Association's value is the class object, and its class is the metaclass.
+    /// </summary>
+    private string ExtractHomeClassFromInitExpression(InitExpression expr, SmalltalkOOP[] literalOOPs)
+    {
+        // Init expressions must have at least one literal (the receiver Association)
+        if (literalOOPs.Length == 0)
+        {
+            Console.WriteLine($"WARNING: Init expression {expr.LocalId} has no literals, using UndefinedObject");
+            return "class:UndefinedObject";
+        }
+
+        // Get the first literal (should be an Association for the receiver class)
+        var firstLiteralOOP = literalOOPs[0];
+
+        // Check if it's an Association
+        var literalClassOOP = _heapManager.GetSlot(firstLiteralOOP, 0);
+        var literalClassName = _allocator.GetClassName(literalClassOOP);
+
+        if (literalClassName != "Association")
+        {
+            Console.WriteLine($"WARNING: Init expression {expr.LocalId} first literal is {literalClassName}, not Association. Using UndefinedObject.");
+            return "class:UndefinedObject";
+        }
+
+        // Get the Association's value (slot 1) - this is the class object
+        var classOOP = _heapManager.GetInstanceVariable(firstLiteralOOP, 1);
+
+        // Get the class of the class object - this is the metaclass
+        var metaclassOOP = _heapManager.GetSlot(classOOP, 0);
+
+        // Find the metaclass LocalId in _localIdToObjectId
+        foreach (var kvp in _localIdToObjectId)
+        {
+            if (kvp.Value == metaclassOOP)
+            {
+                Console.WriteLine($"[INIT EXPR HOMECLASS] expr={expr.LocalId}, extracted homeClass={kvp.Key} from literals (not source parsing!)");
+                return kvp.Key;
+            }
+        }
+
+        // Fallback: parse from source if we can't find it in the map
+        Console.WriteLine($"WARNING: Could not find metaclass OOP {metaclassOOP} in _localIdToObjectId, falling back to source parsing");
+        return "meta:" + ParseClassNameFromInitExpression(expr.Source);
+    }
+
+    /// <summary>
     /// Parses the class name from an init expression source string.
+    /// FALLBACK ONLY - prefer ExtractHomeClassFromInitExpression which uses literals.
     /// Examples:
     /// "BinaryChoiceView initialize" -> "BinaryChoiceView"
     /// "Cursor extent:fromArray:offset:" -> "Cursor"
@@ -357,39 +408,16 @@ public class Phase4_MethodCompilation
             }
             else
             {
-                // Check if the root is an init expression
-                var rootInitExpr = _bundle.InitExpressions.FirstOrDefault(e => e.LocalId == currentLocalId);
-                if (rootInitExpr != null)
+                // Root might be an init expression - check if it was already created
+                if (_localIdToObjectId.TryGetValue(currentLocalId, out var ownerMethodOOP))
                 {
-                    // Block is owned by an init expression
-                    // Parse class name from init expression source (e.g., "BinaryChoiceView initialize" -> "BinaryChoiceView")
-                    string className = ParseClassNameFromInitExpression(rootInitExpr.Source);
-                    string homeClassLocalId;
-
-                    // Init expressions execute on the class side, so homeClass is the metaclass
-                    if (className.EndsWith(" class"))
-                    {
-                        // Explicit class-side expression (rare)
-                        homeClassLocalId = "meta:" + className.Substring(0, className.Length - 6);
-                    }
-                    else
-                    {
-                        // Normal class initialization - homeClass is the metaclass
-                        homeClassLocalId = "meta:" + className;
-                    }
-
-                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, rootInitExpr={currentLocalId}, source={rootInitExpr.Source}, homeClassLocalId={homeClassLocalId}");
-
-                    if (!_localIdToObjectId.TryGetValue(homeClassLocalId, out homeClassOOP))
-                    {
-                        throw new InvalidOperationException($"Cannot find home class '{homeClassLocalId}' for block '{method.LocalId}' via init expression '{currentLocalId}'");
-                    }
-
-                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] resolved homeClassOOP={homeClassOOP}");
+                    // Owner CompiledMethod exists - read its homeClass from slot 0
+                    homeClassOOP = _heapManager.GetInstanceVariable(ownerMethodOOP, 0);
+                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, owner={currentLocalId}, inherited homeClassOOP={homeClassOOP} from owner's slot 0");
                 }
                 else
                 {
-                    throw new InvalidOperationException($"Cannot find root method or init expression '{currentLocalId}' for block '{method.LocalId}'");
+                    throw new InvalidOperationException($"Cannot find owner method or init expression '{currentLocalId}' for block '{method.LocalId}' in _localIdToObjectId");
                 }
             }
         }
@@ -762,13 +790,18 @@ public class Phase4_MethodCompilation
             // Resolve literals using the SAME canonicalization mechanism as regular methods
             var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
 
+            // Determine homeClass from the resolved literals (not by parsing source!)
+            // Init expressions like "BinaryChoiceView initialize" have first literal = Association for the class
+            // We extract the metaclass from the Association's value
+            string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
+
             // Create a CompiledMethod object for the init expression
             var bytecodes = ClassHierarchyUtils.DecodeBytecodes(expr.Bytecodes);
             SmalltalkOOP initMethodOOP = CreateCompiledMethod(
                 new MethodDescriptor
                 {
                     LocalId = expr.LocalId,
-                    HomeClassLocalId = "class:UndefinedObject", // placeholder
+                    HomeClassLocalId = homeClassLocalId,
                     SelectorIndex = 0,
                     Header = expr.Header,
                     Literals = Array.Empty<LiteralValue>(), // already resolved
