@@ -274,60 +274,51 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
-    /// Extracts the homeClass LocalId from an init expression's resolved literals.
-    /// Init expressions like "BinaryChoiceView initialize" compile to:
-    ///   pushLiteralVariable 0 (Association for BinaryChoiceView)
-    ///   send #initialize
-    /// We extract the class name from the Association's KEY (Symbol), then look up the metaclass.
-    /// CRITICAL: Cannot use Association's value - it's still nil in Phase 4 (populated in Phase 5).
+    /// Extracts the homeClass LocalId from an init expression.
+    /// Primary approach: Parse from source (reliable and simple).
+    /// Fallback: Search literals for Association and extract class name from key.
     /// </summary>
     private string ExtractHomeClassFromInitExpression(InitExpression expr, SmalltalkOOP[] literalOOPs)
     {
-        // Init expressions must have at least one literal (the receiver Association)
-        if (literalOOPs.Length == 0)
+        // Primary: Parse from source if available
+        if (!string.IsNullOrEmpty(expr.Source))
         {
-            Console.WriteLine($"WARNING: Init expression {expr.LocalId} has no literals, using UndefinedObject");
-            return "class:UndefinedObject";
+            string className = ParseClassNameFromInitExpression(expr.Source);
+            string homeClassLocalId = "meta:" + className;
+
+            // Verify the metaclass exists
+            if (_localIdToObjectId.ContainsKey(homeClassLocalId))
+            {
+                return homeClassLocalId;
+            }
         }
 
-        // Get the first literal (should be an Association for the receiver class)
-        var firstLiteralOOP = literalOOPs[0];
-
-        // Check if it's an Association
-        var literalClassOOP = _heapManager.GetSlot(firstLiteralOOP, 0);
-        var literalClassName = _allocator.GetClassName(literalClassOOP);
-
-        if (literalClassName != "Association")
+        // Fallback: Search literals for an Association
+        foreach (var literalOOP in literalOOPs)
         {
-            Console.WriteLine($"WARNING: Init expression {expr.LocalId} first literal is {literalClassName}, not Association. Using UndefinedObject.");
-            return "class:UndefinedObject";
+            var literalClassOOP = _heapManager.GetSlot(literalOOP, 0);
+            var literalClassName = _allocator.GetClassName(literalClassOOP);
+
+            if (literalClassName == "Association")
+            {
+                // Extract class name from Association's key (Symbol)
+                var keySymbolOOP = _heapManager.GetInstanceVariable(literalOOP, 0);
+                string className = _allocator.GetSymbolName(keySymbolOOP);
+                string homeClassLocalId = "meta:" + className;
+
+                if (_localIdToObjectId.ContainsKey(homeClassLocalId))
+                {
+                    return homeClassLocalId;
+                }
+            }
         }
 
-        // Get the Association's key (slot 0) - this is a Symbol with the class name
-        // NOTE: We use the KEY, not the value! Association values are nil during Phase 4.
-        var keySymbolOOP = _heapManager.GetInstanceVariable(firstLiteralOOP, 0);
-        string className = _allocator.GetSymbolName(keySymbolOOP);
-
-        // Build the metaclass LocalId from the class name
-        // Init expressions execute on the metaclass (class-side methods)
-        string homeClassLocalId = "meta:" + className;
-
-        Console.WriteLine($"[INIT EXPR HOMECLASS] expr={expr.LocalId}, extracted className='{className}' from Association key, homeClass={homeClassLocalId}");
-
-        // Verify the metaclass exists
-        if (!_localIdToObjectId.ContainsKey(homeClassLocalId))
-        {
-            Console.WriteLine($"WARNING: Metaclass {homeClassLocalId} not found in _localIdToObjectId for expr {expr.LocalId}");
-            // Fallback to source parsing
-            return "meta:" + ParseClassNameFromInitExpression(expr.Source);
-        }
-
-        return homeClassLocalId;
+        // Last resort: UndefinedObject
+        return "class:UndefinedObject";
     }
 
     /// <summary>
     /// Parses the class name from an init expression source string.
-    /// FALLBACK ONLY - prefer ExtractHomeClassFromInitExpression which uses literals.
     /// Examples:
     /// "BinaryChoiceView initialize" -> "BinaryChoiceView"
     /// "Cursor extent:fromArray:offset:" -> "Cursor"
@@ -399,14 +390,10 @@ public class Phase4_MethodCompilation
             if (rootMethod != null)
             {
                 // Block is owned by a regular method
-                Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, rootMethod={currentLocalId}, rootHomeClassLocalId={rootMethod.HomeClassLocalId}");
-
                 if (!_localIdToObjectId.TryGetValue(rootMethod.HomeClassLocalId, out homeClassOOP))
                 {
                     throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
                 }
-
-                Console.WriteLine($"[BLOCK HOMECLASS DEBUG] resolved homeClassOOP={homeClassOOP}");
             }
             else
             {
@@ -415,7 +402,6 @@ public class Phase4_MethodCompilation
                 {
                     // Owner CompiledMethod exists - read its homeClass from slot 0
                     homeClassOOP = _heapManager.GetInstanceVariable(ownerMethodOOP, 0);
-                    Console.WriteLine($"[BLOCK HOMECLASS DEBUG] block={method.LocalId}, owner={currentLocalId}, inherited homeClassOOP={homeClassOOP} from owner's slot 0");
                 }
                 else
                 {
