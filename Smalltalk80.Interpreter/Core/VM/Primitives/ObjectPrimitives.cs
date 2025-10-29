@@ -1,6 +1,7 @@
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.VM;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -184,23 +185,34 @@ public static class ObjectPrimitives
         return ctx.HeapManager.AllocateInstanceOf(receiver, 0);
     }
 
+    // DEBUG: Primitive 71 call counter
+    private static int _prim71CallCount = 0;
+
     // Primitive 71: Object new:
     public static SmalltalkOOP NewWithSize(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DEBUG: Log first 50 calls
+        System.Threading.Interlocked.Increment(ref _prim71CallCount);
+        bool shouldLog = _prim71CallCount <= 50;
+
         if (args.Length != 1)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: args.Length != 1");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
         if (!args[0].IsSmallInteger)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: arg not SmallInteger, arg={args[0]}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         int size = args[0].AsSmallInteger();
+
         if (size < 0)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: size < 0");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -208,6 +220,7 @@ public static class ObjectPrimitives
         // Receiver must be a Class (not SmallInteger)
         if (receiver.IsSmallInteger)
         {
+            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: receiver is SmallInteger");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -216,7 +229,19 @@ public static class ObjectPrimitives
         // Uses heap data only - reads the class's format and instance variable count
         // Used for Array new: n, ByteArray new: n, etc.
         // AllocateInstanceOf handles validation internally, let any real errors propagate
-        return ctx.HeapManager.AllocateInstanceOf(receiver, size);
+        try
+        {
+            var result = ctx.HeapManager.AllocateInstanceOf(receiver, size);
+            if (shouldLog)
+                Console.WriteLine($"[Prim71 #{_prim71CallCount}] {receiver} new: {size} → {result}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            if (shouldLog)
+                Console.WriteLine($"[Prim71 #{_prim71CallCount}] EXCEPTION: {ex.Message}");
+            throw;
+        }
     }
 
     // Primitive 110: Object ==
@@ -373,7 +398,93 @@ public static class ObjectPrimitives
         // Convert to 0-based index
         // Strings use ByteIndexed format
         byte byteValue = ctx.HeapManager.GetIndexedByte(receiver, index - 1);
-        return SmalltalkOOP.FromSmallInteger(byteValue);
+
+        // CRITICAL: String>>at: must return Character objects, not SmallIntegers!
+        // Get Character from CharacterTable (Character class pool variable)
+        return GetCharacterForAscii(ctx, byteValue);
+    }
+
+    /// <summary>
+    /// Returns the Character object for a given ASCII code.
+    /// Accesses CharacterTable from Character class pool.
+    /// </summary>
+    private static SmalltalkOOP GetCharacterForAscii(IPrimitiveContext ctx, byte asciiValue)
+    {
+        // Get Character class from Smalltalk global dictionary
+        if (!GlobalRegistry.TryGet("Character", out var characterClassOOP))
+        {
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class not found in GlobalRegistry");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get classPool from Character class (instance variable index 7 - classPool)
+        var classPoolOOP = ctx.HeapManager.GetInstanceVariable(characterClassOOP, 7);
+
+        // DEFENSIVE: Check if classPool is nil
+        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class classPool is nil!");
+            Console.WriteLine($"  Character class oop={characterClassOOP}");
+            Console.WriteLine($"  Character initialize must run BEFORE ClassOrganizer initialize");
+            Console.WriteLine($"  But Character initialize ran at [52] and completed successfully!");
+            Console.WriteLine($"  This suggests classPool was never populated or index 7 is wrong");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        try
+        {
+            // Dictionary has 2 instance variables: tally (index 0), array (index 1)
+            var dictArrayOOP = ctx.HeapManager.GetInstanceVariable(classPoolOOP, 1);
+            int dictSize = ctx.HeapManager.GetIndexedSize(dictArrayOOP);
+
+            for (int i = 0; i < dictSize; i++)
+            {
+                var entryOOP = ctx.HeapManager.GetIndexedOOP(dictArrayOOP, i);
+                if (entryOOP == SpecialObjectsArray.Instance.Nil)
+                    continue;
+
+                var keyOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 0);
+                string symbolName = GetSymbolName(ctx, keyOOP);
+                if (symbolName == "CharacterTable")
+                {
+                    var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1);
+                    if (asciiValue < 0 || asciiValue > 255)
+                    {
+                        ctx.PrimitiveSuccess = false;
+                        return SpecialObjectsArray.Instance.Nil;
+                    }
+                    return ctx.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                }
+            }
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: classPool (oop={classPoolOOP}) access failed");
+            Console.WriteLine($"  Exception: {ex.Message}");
+            Console.WriteLine($"  classPool is not a Dictionary or is corrupted");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        Console.WriteLine($"[GetCharacterForAscii] ERROR: CharacterTable not found in Character classPool");
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Helper to get symbol name from symbol OOP.
+    /// </summary>
+    private static string GetSymbolName(IPrimitiveContext ctx, SmalltalkOOP symbolOOP)
+    {
+        int size = ctx.HeapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = ctx.HeapManager.GetIndexedByte(symbolOOP, i);
+        }
+        return System.Text.Encoding.ASCII.GetString(bytes);
     }
 
     // Primitive 64: String at:put: (character store for byte-indexed objects)

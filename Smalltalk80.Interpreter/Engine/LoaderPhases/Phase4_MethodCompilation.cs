@@ -265,12 +265,39 @@ public class Phase4_MethodCompilation
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP)
     {
-        // Blocks are code literals embedded in methods, not standalone methods
-        // They use nil as homeClass since they inherit context from their enclosing method
+        // CRITICAL: Both regular methods AND blocks need a valid homeClass for super sends
+        // Blocks inherit their homeClass from their owning method (via blockOwnerMap)
         SmalltalkOOP homeClassOOP;
         if (method.LocalId.StartsWith("block:"))
         {
-            homeClassOOP = SpecialObjectsArray.Instance.Nil;
+            // Get blockOwnerMap to find this block's owning method
+            var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
+            if (blockOwnerMap == null)
+            {
+                throw new InvalidOperationException("blockOwnerMap not found - should be built in CompileAndInstallMethods");
+            }
+
+            // Walk ownership chain to find root method (blocks can be nested)
+            string currentLocalId = method.LocalId;
+            while (blockOwnerMap.TryGetValue(currentLocalId, out string? ownerLocalId))
+            {
+                currentLocalId = ownerLocalId;
+                // If owner is not a block, we've found the root method
+                if (!ownerLocalId.StartsWith("block:"))
+                    break;
+            }
+
+            // Now get the root method's homeClass
+            var rootMethod = _bundle.Methods.FirstOrDefault(m => m.LocalId == currentLocalId);
+            if (rootMethod == null)
+            {
+                throw new InvalidOperationException($"Cannot find root method '{currentLocalId}' for block '{method.LocalId}'");
+            }
+
+            if (!_localIdToObjectId.TryGetValue(rootMethod.HomeClassLocalId, out homeClassOOP))
+            {
+                throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
+            }
         }
         else
         {
@@ -629,40 +656,14 @@ public class Phase4_MethodCompilation
             throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId");
         }
 
-        // CRITICAL: Sort init expressions by phase to prevent bootstrap failures
-        // Phase 1: initialize expressions (infrastructure setup - creates Digitbuffer, CharacterTable, etc.)
-        // Phase 2: comment: expressions (documentation - safe after infrastructure ready)
-        // Phase 3: Other expressions (tests, run!, etc.)
-        //
-        // This prevents errors like: ActionMenu comment: → error handling → printString → needs Digitbuffer → nil crash
-        // Note: Bundle contains " initialize" (without exclamation mark)
-        var initializeExpressions = _bundle.InitExpressions
-            .Where(e => e.Source?.EndsWith(" initialize") ?? false)
-            .ToList();
-
-        var commentExpressions = _bundle.InitExpressions
-            .Where(e => e.Source?.Contains(" comment:") ?? false)
-            .ToList();
-
-        var otherExpressions = _bundle.InitExpressions
-            .Where(e => !(e.Source?.EndsWith(" initialize") ?? false) &&
-                       !(e.Source?.Contains(" comment:") ?? false))
-            .ToList();
-
-        Console.WriteLine($"[Phase4] Init expression sorting:");
-        Console.WriteLine($"  Phase 1 (initialize!): {initializeExpressions.Count} expressions");
-        Console.WriteLine($"  Phase 2 (comment:): {commentExpressions.Count} expressions");
-        Console.WriteLine($"  Phase 3 (other): {otherExpressions.Count} expressions");
-
-        // Concatenate in correct execution order
-        var sortedExpressions = initializeExpressions
-            .Concat(commentExpressions)
-            .Concat(otherExpressions)
-            .ToList();
+        // NOTE: Store init expressions in ORIGINAL bundle order
+        // Program.cs handles the execution ordering (initialize → comments → other)
+        // We must maintain 1:1 index mapping between bundle.InitExpressions and InitExpressionMethods array
+        Console.WriteLine($"[Phase4] Creating {_bundle.InitExpressions.Length} init expression methods in bundle order");
 
         var initExprMethods = new List<SmalltalkOOP>();
 
-        foreach (var expr in sortedExpressions)
+        foreach (var expr in _bundle.InitExpressions)
         {
             // Resolve literals using the SAME canonicalization mechanism as regular methods
             var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();

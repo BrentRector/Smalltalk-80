@@ -77,6 +77,10 @@ public class Loader
         _bundlePath = bundlePath ?? "coldstart.json";
         _debugOptions = debugOptions ?? DebugOptions.None;
 
+        // Initialize SpecialObjectsArray (will be populated during Phase 3)
+        SpecialObjectsArray.Initialize();
+        Console.WriteLine($"[Loader] BUILD TIMESTAMP: 2025-10-28 13:45 UTC - SpecialObjectsArray.Initialize() called");
+
         // Initialize the report with bundle metadata
         _report = new ColdstartReport
         {

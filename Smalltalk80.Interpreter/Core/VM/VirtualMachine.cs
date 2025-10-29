@@ -200,8 +200,8 @@ public partial class VirtualMachine : IPrimitiveContext
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
         _activeContextOOP = contextOOP;
-        
-        return ExecuteBytecodeLoop();
+        var result = ExecuteBytecodeLoop();
+        return result;
     }
 
     /// <summary>
@@ -326,8 +326,37 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
+        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+
+        // Diagnostic: Show method name when recursion depth > 10
+        if (_activeContextCount > 10 && _activeContextCount <= 15)  // Limit output
+        {
+            var selectorOOP = GetMethodLiteral(methodOOP, 0);
+            var selectorName = GetSymbolName(selectorOOP);
+            var receiverClass = GetClass(receiverOOP);
+            var className = GetClassName(receiverClass);
+
+            // Debug: show what literal[0] actually is
+            string literalInfo = "";
+            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                literalInfo = " [literal[0]=nil]";
+            }
+            else if (selectorOOP.IsSmallInteger)
+            {
+                literalInfo = $" [literal[0]=SmallInteger({selectorOOP.AsSmallInteger()})]";
+            }
+            else
+            {
+                var litClass = GetClassName(GetClass(selectorOOP));
+                literalInfo = $" [literal[0]={litClass}, name='{selectorName}']";
+            }
+
+            Console.WriteLine($"[DEPTH={_activeContextCount}] {className}>>{selectorName}{literalInfo}");
+        }
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
         var methodFormat = _heapManager.GetObjectFormat(methodOOP);
@@ -403,9 +432,7 @@ public partial class VirtualMachine : IPrimitiveContext
             ip = ipOOP.AsSmallInteger();
         }
 
-        // If we fall off the end, return self
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        // If we fall off the end, return self (receiverIndex and receiverOOP already declared at top)
         return receiverOOP;
     }
 
@@ -1802,18 +1829,11 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Check if receiver is a class object
         if (selectorName == "new:")
         {
-            Console.WriteLine($"\n[new: DIAGNOSTIC] Sending new: to receiver={receiverOOP}");
-            Console.WriteLine($"  receiver's class={classOOP}, className={GetClassName(classOOP)}");
-
-            // Show detailed info about classOOP (should be a metaclass)
+            var className = GetClassName(classOOP);
             var classFormat = _heapManager.GetObjectFormat(classOOP);
             var classOfClass = _heapManager.GetClassOOP(classOOP);
             var classOfClassName = GetClassName(classOfClass);
-            Console.WriteLine($"  classOOP={classOOP} details:");
-            Console.WriteLine($"    format={classFormat}");
-            Console.WriteLine($"    class of classOOP={classOfClass}, name={classOfClassName}");
-            Console.WriteLine($"    indexedSize={_heapManager.GetIndexedSize(classOOP)}");
-            Console.WriteLine($"    instanceVarCount={_heapManager.GetInstanceVariableCount(classOOP)}");
+            Console.WriteLine($"\n[new:] receiver \"{className}\" {receiverOOP} | class \"{classOfClassName}\" {classOOP} | format={classFormat}, iVars={_heapManager.GetInstanceVariableCount(classOOP)}");
         }
 
         // DEBUG: Log when selector is <unknown>
@@ -1831,14 +1851,25 @@ public partial class VirtualMachine : IPrimitiveContext
         if (selectorName == "extent:fromArray:offset:")
         {
             _cursorCreationCount++;
-            Console.WriteLine($"\n[CURSOR DIAGNOSTIC #{_cursorCreationCount}] depth={_activeContextCount}, receiver={receiverOOP}, class={GetClassName(classOOP)}");
-            Console.WriteLine($"  selectorOOP={selectorOOP}, activeContext={_activeContextOOP}");
+            Console.WriteLine($"\n[CURSOR #{_cursorCreationCount}] depth={_activeContextCount}, receiver \"{GetClassName(classOOP)}\" {receiverOOP}");
 
             // Show sender chain for first 10 calls
             if (_cursorCreationCount <= 10)
             {
                 DumpSenderChain(_activeContextOOP, 6);
             }
+        }
+
+        // DIAGNOSTIC: Track > and max: message sends
+        if (selectorName == ">")
+        {
+            var argInfo = args.Length > 0 ? $"{args[0]} (SmallInt={args[0].IsSmallInteger})" : "none";
+            Console.WriteLine($"\n[>] receiver {receiverOOP} (SmallInt={receiverOOP.IsSmallInteger}, class=\"{GetClassName(classOOP)}\") | arg={argInfo}");
+        }
+        if (selectorName == "max:")
+        {
+            var argInfo = args.Length > 0 ? $"{args[0]}" : "none";
+            Console.WriteLine($"\n[max:] receiver {receiverOOP} | arg={argInfo} | class=\"{GetClassName(classOOP)}\"");
         }
 
         // Verbose debug: log method entry
@@ -1882,7 +1913,8 @@ public partial class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            if (_debugOptions.ShouldDebugMessages)
+            // DEBUG: Always log primitive 4 (>) to diagnose why it's not being called
+            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
             {
                 Console.WriteLine($"[SendMessage] Executing primitive {primitiveNumber} for {selectorName}");
             }
@@ -1891,7 +1923,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (_primitiveSuccess)
             {
-                if (_debugOptions.ShouldDebugMessages)
+                if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
                 {
                     Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 }
@@ -1899,7 +1931,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 return CallOutcome.Normal(primitiveResult);
             }
 
-            if (_debugOptions.ShouldDebugMessages)
+            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
             {
                 Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
             }
@@ -2330,8 +2362,9 @@ public partial class VirtualMachine : IPrimitiveContext
         var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
 
         // Step 7: Create execution MethodContext backed by BlockContext
+        // Sender = where control returns (calling context), Home = where block was defined (lexical scope)
         var executionContextOOP = CreateBlockExecutionContext(
-            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, homeContextOOP, blockClosureOOP);
+            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, _activeContextOOP, blockClosureOOP);
 
         // DIAGNOSTIC: Validate executionContextOOP format before using it
         var execContextFormat = _heapManager.GetObjectFormat(executionContextOOP);
@@ -2380,8 +2413,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // Clean up block context mapping
         _blockContextMapping.Remove(executionContextOOP);
 
-        // Restore previous context
+        // Restore previous context and decrement depth
         _activeContextOOP = previousContextOOP;
+        _activeContextCount--;
         // Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
 
         return result;
@@ -2409,6 +2443,9 @@ public partial class VirtualMachine : IPrimitiveContext
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
+
+        // Increment context depth (matching CreateMethodContext behavior)
+        _activeContextCount++;
 
         // Get field indices
         int senderIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "sender");

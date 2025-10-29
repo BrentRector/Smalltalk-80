@@ -16,12 +16,15 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     private readonly Stack<int> _freeObjectTableIndices = new();
     private int _nextObjectTableIndex = 1; // Start at 1, reserve 0 for null/special cases
     private const int ObjectTableBlockSize = 1024;
-    
+
     // GC root management
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
-    
+
     // Class name field index (determined from coldstart.json during initialization)
     private int _classNameFieldIndex = -1;
+
+    // DEBUG: Runtime allocation counter
+    private static int _runtimeAllocationCount = 0;
 
     /// <summary>Represents a block of ObjectTable entries for scalable growth.</summary>
     private sealed class ObjectTableBlock
@@ -139,6 +142,28 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Initialize all instance variables (slots 1+) to nil
         // C# arrays default to SmalltalkOOP(0), but we need nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // DEBUG: Log allocations (limit output to first 50 runtime allocations)
+        System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
+        if (_runtimeAllocationCount <= 50)
+        {
+            Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
+        }
+        else if (_runtimeAllocationCount == 51)
+        {
+            Console.WriteLine($"[AllocateInstanceOf] (suppressing after 50 allocations)");
+        }
+
+        // DEBUG: Verify nil OOP is not zero
+        if (nilOOP.RawValue == 0)
+        {
+            throw new InvalidOperationException(
+                $"FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)! " +
+                $"This means SpecialObjectsArray was not properly initialized. " +
+                $"Loader must call SpecialObjectsArray.Initialize() in constructor, " +
+                $"and GlobalRegistry.Register('nil', ...) must be called before runtime allocation.");
+        }
+
         for (int i = 1; i <= instanceVariableCount; i++)
         {
             SetSlot(newInstanceOOP, i, nilOOP);
@@ -279,6 +304,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         SetInstanceVariableWithBarrier(objectOOP, index, value);
     }
 
+    // DEBUG: Counter for SetInstanceVariable calls
+    private static int _setInstanceVarCallCount = 0;
+
     public void SetInstanceVariableWithBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
@@ -290,6 +318,22 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+
+        // DEBUG: Log WriteStream instance variable assignments (classOOP=oop=8544)
+        var classOOP = GetSlot(objectOOP, 0);
+        if (classOOP.RawValue == 8544)  // WriteStream class
+        {
+            System.Threading.Interlocked.Increment(ref _setInstanceVarCallCount);
+            if (_setInstanceVarCallCount <= 50)  // Reduced to 50 to avoid clutter
+            {
+                Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] {objectOOP}.field[{index}] ← {value}");
+            }
+            else if (_setInstanceVarCallCount == 51)
+            {
+                Console.WriteLine($"[SetInstVar] (suppressing after 50, reduces clutter)");
+            }
+        }
+
         // Slot layout: [0]=header, [1..N]=instance variables
         WriteSlot(entry, 1 + index, value);
 
