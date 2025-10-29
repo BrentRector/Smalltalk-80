@@ -212,7 +212,7 @@ public static class ClassHierarchyUtils
     /// </summary>
     public static byte[] DecodeBytecodes(object bytecodes)
     {
-        var result = bytecodes switch
+        return bytecodes switch
         {
             System.Text.Json.JsonElement e when e.ValueKind == System.Text.Json.JsonValueKind.Array =>
                 e.EnumerateArray().Select(b => (byte)b.GetInt32()).ToArray(),
@@ -220,14 +220,5 @@ public static class ClassHierarchyUtils
                 Convert.FromBase64String(e.GetString()!),
             _ => throw new InvalidOperationException("Invalid bytecode format")
         };
-
-        // DIAGNOSTIC: Log first few bytecodes for methods starting with byte 33
-        if (result.Length > 0 && result[0] == 33)
-        {
-            Console.WriteLine($"[DecodeBytecodes] Found method starting with byte 33 (0x21):");
-            Console.WriteLine($"  Bytes[0-4]: {string.Join(", ", result.Take(5).Select(b => $"{b}(0x{b:X2})"))}");
-        }
-
-        return result;
     }
 }

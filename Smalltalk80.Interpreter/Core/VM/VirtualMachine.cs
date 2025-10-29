@@ -200,38 +200,7 @@ public partial class VirtualMachine : IPrimitiveContext
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
         _activeContextOOP = contextOOP;
-
-        // DIAGNOSTIC: Log initial context depth when starting init expression execution
-        // This reveals if we already have a deep context chain BEFORE bytecode executes
-        Console.WriteLine($"\n[ROOT CAUSE CHECK] Starting ExecuteExistingContext with depth={_activeContextCount}");
-        Console.WriteLine($"  Initial context: {contextOOP}");
-
-        // DIAGNOSTIC: Show the method we're about to execute
-        int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
-        var methodOOP = _heapManager.GetInstanceVariable(contextOOP, methodIndex);
-        var bytecodes = GetMethodBytecodes(methodOOP);
-
-        // Get method's selector and home class for identification
-        var selectorOOP = GetMethodLiteral(methodOOP, 0); // Selector at literal[0]
-        var selectorName = GetSymbolName(selectorOOP);
-
-        // Get receiver to determine class
-        int receiverIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "receiver");
-        var receiverOOP = _heapManager.GetInstanceVariable(contextOOP, receiverIndex);
-        var receiverClass = GetClass(receiverOOP);
-        var className = GetClassName(receiverClass);
-
-        Console.WriteLine($"  Method: {methodOOP} ({className}>>{selectorName})");
-
-        // DIAGNOSTIC: Show first 20 bytecodes to compare with JSON
-        var bytecodeDisplay = string.Join(", ", bytecodes.Take(20).Select(b => $"{b}(0x{b:X2})"));
-        Console.WriteLine($"  Bytecodes (first 20): {bytecodeDisplay}");
-
         var result = ExecuteBytecodeLoop();
-
-        // DIAGNOSTIC: Log final context depth after execution completes
-        Console.WriteLine($"[ROOT CAUSE CHECK] Completed ExecuteExistingContext with depth={_activeContextCount}");
-
         return result;
     }
 
@@ -355,8 +324,6 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
-        Console.WriteLine($"[ExecuteBytecodeLoop] ENTERED - context={_activeContextOOP}, depth={_activeContextCount}");
-
         int methodIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "method");
         int ipIndex = _layoutResolver.GetFieldIndex("class:MethodContext", "pc");
 
