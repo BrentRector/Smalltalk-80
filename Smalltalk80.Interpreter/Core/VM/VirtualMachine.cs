@@ -266,7 +266,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
-        SmalltalkOOP contextOOP;
+        SmalltalkOOP contextOOP = default;
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
         // Try to find a pooled context with matching indexed size
