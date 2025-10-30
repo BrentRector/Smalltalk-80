@@ -35,7 +35,18 @@ public static class VMConstants
 
     // BlockContext-specific fields
     // BlockContext inherits: InstructionStream (sender, pc) -> ContextPart (stackp) -> BlockContext
-    public const int BLOCKCONTEXT_NARGS_INDEX = 3;       // BlockContext field - BlockArgumentCountIndex
+    //
+    // CRITICAL ARCHITECTURAL CONSTRAINT:
+    // MethodContext slot 3 = method (CompiledMethod)
+    // BlockContext slot 3 = nargs (SmallInteger)
+    //
+    // These are DIFFERENT and cannot be changed (defined by Smalltalk-80 Blue Book specification).
+    // Code that reads slot 3 MUST verify the context type first!
+    //
+    // Our VM uses MethodContext for block execution (CreateBlockExecutionContext creates MethodContext),
+    // so _activeContextOOP is always a MethodContext. BlockContext is only used as a data holder.
+    // This is validated at runtime in SendSuperMessage().
+    public const int BLOCKCONTEXT_NARGS_INDEX = 3;       // BlockContext field - BlockArgumentCountIndex (DIFFERENT from MethodContext!)
     public const int BLOCKCONTEXT_STARTPC_INDEX = 4;     // BlockContext field - InitialIPIndex
     public const int BLOCKCONTEXT_HOME_INDEX = 5;        // BlockContext field - HomeIndex
     public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;  // Start of indexed slots

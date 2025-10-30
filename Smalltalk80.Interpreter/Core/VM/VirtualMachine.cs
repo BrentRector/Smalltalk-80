@@ -1734,6 +1734,18 @@ public partial class VirtualMachine : IPrimitiveContext
         // The block's method has the correct homeClass for super sends.
         // FindMethodContext() walks the sender chain and would return the CALLING method (wrong!).
         // For super sends, we always want the method from the CURRENTLY EXECUTING context.
+
+        // ARCHITECTURAL INVARIANT: _activeContextOOP must be a MethodContext (not BlockContext)
+        // because MethodContext slot 3 = method, but BlockContext slot 3 = nargs (different!)
+        // This is guaranteed because CreateBlockExecutionContext() creates a MethodContext for block execution.
+        var contextClass = GetClassName(_heapManager.GetSlot(_activeContextOOP, 0));
+        if (contextClass != "MethodContext")
+        {
+            throw new InvalidOperationException(
+                $"Super send requires MethodContext but _activeContextOOP is {contextClass}. " +
+                $"Cannot safely read slot 3 (MethodContext=method, BlockContext=nargs).");
+        }
+
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
         var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
 
