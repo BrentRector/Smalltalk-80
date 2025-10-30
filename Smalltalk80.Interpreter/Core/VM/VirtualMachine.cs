@@ -453,6 +453,10 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private InterpreterStatus HandleReturn(SmalltalkOOP returnValue)
     {
+        // Declare common variables once for all code paths
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        SmalltalkOOP senderOOP;
+
         // Handle non-local returns (NLR)
         if (_nonLocalReturnPending)
         {
@@ -469,8 +473,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 _blockContextMapping.Remove(_activeContextOOP);
 
                 // Get sender to continue execution
-                int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-                var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+                senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
                 // Decrement context depth
                 _activeContextCount--;
@@ -490,8 +493,7 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Not the target - continue unwinding (don't push value)
-            int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-            var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+            senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
@@ -513,8 +515,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Normal return (not NLR)
-        int normalSenderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-        var normalSenderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, normalSenderIndex);
+        senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
         // Clean up block context mapping if this was a block
         _blockContextMapping.Remove(_activeContextOOP);
@@ -523,7 +524,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _activeContextCount--;
 
         // Check if we're returning to the initial context
-        if (normalSenderOOP == _initialContextOOP || normalSenderOOP == SpecialObjectsArray.Instance.Nil)
+        if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
         {
             // Execution complete - return to caller
             _returnValue = returnValue;
@@ -532,7 +533,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Switch to sender context and push return value
-        _activeContextOOP = normalSenderOOP;
+        _activeContextOOP = senderOOP;
         Push(returnValue);
 
         // Continue execution in sender context
