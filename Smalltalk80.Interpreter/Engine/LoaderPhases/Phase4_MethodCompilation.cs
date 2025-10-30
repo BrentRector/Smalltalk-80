@@ -251,16 +251,6 @@ public class Phase4_MethodCompilation
             methodsCreated++;
         }
 
-        // DIAGNOSTIC: Check Cursor blocks after PASS 1
-        if (_localIdToObjectId.TryGetValue("block:8eed95d4f4bb4cccbbf25d822ce44558", out var block1OOP))
-        {
-            Console.WriteLine($"[AFTER PASS1] block:8eed95d4... = {block1OOP}");
-        }
-        if (_localIdToObjectId.TryGetValue("block:8042a80dac674c94b6841391a4fb8a57", out var block2OOP))
-        {
-            Console.WriteLine($"[AFTER PASS1] block:8042a80d... = {block2OOP}");
-        }
-
         // PASS 2: Resolve and patch all literals now that all blocks exist
         foreach (var method in _bundle.Methods)
         {
@@ -301,9 +291,6 @@ public class Phase4_MethodCompilation
     /// </summary>
     private string ExtractHomeClassFromInitExpression(InitExpression expr, SmalltalkOOP[] literalOOPs)
     {
-        // DIAGNOSTIC: Track Cursor init expression
-        bool isCursor = expr.Source?.Contains("Cursor") ?? false;
-
         // Primary: Parse from source if available
         if (!string.IsNullOrEmpty(expr.Source))
         {
@@ -313,15 +300,7 @@ public class Phase4_MethodCompilation
             // Verify the metaclass exists
             if (_localIdToObjectId.ContainsKey(homeClassLocalId))
             {
-                if (isCursor)
-                {
-                    Console.WriteLine($"[INIT HOMECLASS] Source='{expr.Source}' -> className='{className}' -> homeClassLocalId='{homeClassLocalId}' (FOUND)");
-                }
                 return homeClassLocalId;
-            }
-            else if (isCursor)
-            {
-                Console.WriteLine($"[INIT HOMECLASS ERROR] Source='{expr.Source}' -> className='{className}' -> homeClassLocalId='{homeClassLocalId}' (NOT FOUND!)");
             }
         }
 
@@ -340,20 +319,12 @@ public class Phase4_MethodCompilation
 
                 if (_localIdToObjectId.ContainsKey(homeClassLocalId))
                 {
-                    if (isCursor)
-                    {
-                        Console.WriteLine($"[INIT HOMECLASS] Fallback: Association key='{className}' -> homeClassLocalId='{homeClassLocalId}' (FOUND)");
-                    }
                     return homeClassLocalId;
                 }
             }
         }
 
         // Last resort: UndefinedObject
-        if (isCursor)
-        {
-            Console.WriteLine($"[INIT HOMECLASS ERROR] Fallback to UndefinedObject for source='{expr.Source}'");
-        }
         return "class:UndefinedObject";
     }
 
@@ -434,16 +405,6 @@ public class Phase4_MethodCompilation
                 {
                     throw new InvalidOperationException($"Cannot find home class '{rootMethod.HomeClassLocalId}' for block '{method.LocalId}' via root method '{currentLocalId}'");
                 }
-
-                // DIAGNOSTIC: Log Cursor-related blocks
-                if (method.LocalId.Contains("Cursor") || rootMethod.LocalId.Contains("Cursor") || rootMethod.HomeClassLocalId.Contains("Cursor"))
-                {
-                    var homeClassName = _allocator.GetClassName(homeClassOOP);
-                    Console.WriteLine($"[CURSOR BLOCK] LocalId={method.LocalId}");
-                    Console.WriteLine($"  owner={currentLocalId}");
-                    Console.WriteLine($"  ownerHomeClass={rootMethod.HomeClassLocalId}");
-                    Console.WriteLine($"  resolved homeClassOOP={homeClassOOP}, class={homeClassName}");
-                }
             }
             else
             {
@@ -466,20 +427,6 @@ public class Phase4_MethodCompilation
             {
                 throw new InvalidOperationException($"Cannot find home class '{method.HomeClassLocalId}' for method '{method.LocalId}'");
             }
-
-            // DIAGNOSTIC: Track init expressions (they have LocalId starting with "init:")
-            if (method.LocalId.StartsWith("init:"))
-            {
-                var homeClassName = _allocator.GetClassName(homeClassOOP);
-                // Only log if homeClass is suspicious (True/False/Boolean instead of a metaclass)
-                if (homeClassName == "True" || homeClassName == "False" || homeClassName == "Boolean")
-                {
-                    Console.WriteLine($"[SUSPICIOUS INIT HOMECLASS]");
-                    Console.WriteLine($"  LocalId: {method.LocalId}");
-                    Console.WriteLine($"  HomeClassLocalId: {method.HomeClassLocalId}");
-                    Console.WriteLine($"  Resolved homeClassOOP: {homeClassOOP} (class: {homeClassName}) ← WRONG!");
-                }
-            }
         }
 
         // Use AllocateCompiledMethod which handles all the setup including homeClass fixed slot
@@ -490,14 +437,6 @@ public class Phase4_MethodCompilation
             method.Header.Word,
             literalOOPs,
             bytecodes);
-
-        // DIAGNOSTIC: Track blocks in Cursor class>>extent:fromArray:offset: (the problem method)
-        if (method.LocalId.StartsWith("block:8eed95d4") || method.LocalId.StartsWith("block:8042a80d"))
-        {
-            var verifyHomeClass = _heapManager.GetInstanceVariable(resultOOP, 0);
-            var homeClassName = _allocator.GetClassName(verifyHomeClass);
-            Console.WriteLine($"[ALLOCATED CURSOR BLOCK] LocalId={method.LocalId} -> oop={resultOOP}, slot[0]={verifyHomeClass} ({homeClassName})");
-        }
 
         return resultOOP;
     }
@@ -873,18 +812,6 @@ public class Phase4_MethodCompilation
                 bytecodes,
                 compiledMethodClassOOP,
                 byteArrayClassOOP);
-
-            // DIAGNOSTIC: Track init methods around oop=49952 or Cursor-related
-            bool isCursor = expr.Source?.Contains("Cursor") ?? false;
-            bool isTargetOOP = initMethodOOP.RawValue >= 49900 && initMethodOOP.RawValue <= 50000;
-            if (isCursor || isTargetOOP)
-            {
-                var homeClassOOP = _heapManager.GetInstanceVariable(initMethodOOP, 0);
-                var homeClassName = _allocator.GetClassName(homeClassOOP);
-                string source = expr.Source ?? "";
-                string sourcePreview = source.Substring(0, Math.Min(40, source.Length));
-                Console.WriteLine($"[CREATED INIT METHOD] oop={initMethodOOP}, homeClass={homeClassOOP} ({homeClassName}), source='{sourcePreview}...'");
-            }
 
             initExprMethods.Add(initMethodOOP);
             _localIdToObjectId[expr.LocalId] = initMethodOOP;

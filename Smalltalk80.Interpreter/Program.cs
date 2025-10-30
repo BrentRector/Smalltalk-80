@@ -181,24 +181,26 @@ public static class Program
                 }
 
                 // EXPERIMENT: Reorder to test call stack unwinding
-                // Run Float initialize first (simple, no deep calls)
-                // Then WindowsFileSystem initialize (was causing depth issues)
-                // This tests if .NET call stack unwinds properly between init expressions
+                // Run fundamental infrastructure first: Float, Character, then WindowsFileSystem
+                // Character must run early because String/Symbol operations need CharacterTable
                 var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
+                var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
                 var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
 
-                if (floatInitIndex > 0 && windowsInitIndex > 0)
+                if (floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
                 {
                     phase1Indices.Remove(floatInitIndex);
+                    phase1Indices.Remove(characterInitIndex);
                     phase1Indices.Remove(windowsInitIndex);
 
-                    // Insert at beginning: Float first, then WindowsFileSystem, then rest
+                    // Insert at beginning: Float, Character, WindowsFileSystem, then rest
                     phase1Indices.Insert(0, windowsInitIndex);
+                    phase1Indices.Insert(0, characterInitIndex);
                     phase1Indices.Insert(0, floatInitIndex);
 
-                    Console.WriteLine($"\n=== EXPERIMENT: Reordered init expressions ===");
-                    Console.WriteLine($"  Running Float initialize first, then WindowsFileSystem initialize");
-                    Console.WriteLine($"  This tests if .NET call stack unwinds properly between expressions");
+                    Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
+                    Console.WriteLine($"  Running: Float → Character → WindowsFileSystem");
+                    Console.WriteLine($"  Character must run early (CharacterTable needed by String/Symbol)");
                     Console.WriteLine();
                 }
 
