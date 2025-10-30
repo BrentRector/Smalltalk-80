@@ -76,6 +76,10 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
+    // Context pooling - reuse recently returned contexts to reduce GC pressure
+    private Stack<SmalltalkOOP> _contextPool = new Stack<SmalltalkOOP>();
+    private const int MAX_POOLED_CONTEXTS = 50;
+
     // Non-local return state (replaces exception-based unwinding)
     private bool _nonLocalReturnPending;  // NLR in progress
     private SmalltalkOOP _nlrValue;  // Value to return
@@ -261,10 +265,23 @@ public partial class VirtualMachine : IPrimitiveContext
                 "MethodContext class not found - ensure cold start completed Phase 2");
         }
 
-        // Step 4: Allocate MethodContext using AllocateObject
+        // Step 4: Try to reuse a pooled context, otherwise allocate new
+        SmalltalkOOP contextOOP;
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
-        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
-        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
+
+        if (_contextPool.Count > 0)
+        {
+            // Reuse a pooled context
+            contextOOP = _contextPool.Pop();
+            Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} (pool size now: {_contextPool.Count})");
+        }
+        else
+        {
+            // Allocate new context
+            contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+            _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
+            Console.WriteLine($"[POOL] Allocated new context {contextOOP} (pool was empty)");
+        }
 
         // Increment context depth and check limit
         _activeContextCount++;
@@ -483,6 +500,12 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
+                // Add context to pool for reuse (if pool not full)
+                if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+                {
+                    _contextPool.Push(_activeContextOOP);
+                }
+
                 // Decrement context depth
                 _activeContextCount--;
 
@@ -505,6 +528,12 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
+
+            // Add context to pool for reuse (if pool not full)
+            if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+            {
+                _contextPool.Push(_activeContextOOP);
+            }
 
             // Decrement context depth
             _activeContextCount--;
@@ -534,6 +563,12 @@ public partial class VirtualMachine : IPrimitiveContext
         if (wasBlock)
         {
             Console.WriteLine($"  Was a block context");
+        }
+
+        // Add context to pool for reuse (if pool not full)
+        if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+        {
+            _contextPool.Push(_activeContextOOP);
         }
 
         // Decrement context depth
@@ -2180,6 +2215,16 @@ public partial class VirtualMachine : IPrimitiveContext
         // TRAMPOLINE MODE: Create context and signal context switch (don't recurse)
         // The InterpreterLoop will continue execution in the new context
 
+        // TAIL CALL OPTIMIZATION: If next bytecode is a return, reuse current context
+        if (IsAtTailCallPosition())
+        {
+            Console.WriteLine($"[TAIL CALL] Reusing context for {selectorName}");
+            ReuseContextForTailCall(methodInfo.MethodOOP, receiverOOP, args);
+
+            // Signal context switch so ExecuteBytecodeStep restarts with new method
+            return CallOutcome.ContextSwitch();
+        }
+
         // Create new context with current context as sender
         _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
 
@@ -2348,6 +2393,96 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         Console.WriteLine(new string('=', 80) + "\n");
+    }
+
+    /// <summary>
+    /// Reuses the current context for a tail call by replacing method, receiver, and arguments.
+    /// This prevents context accumulation in recursive patterns like whileTrue:.
+    /// </summary>
+    private void ReuseContextForTailCall(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments)
+    {
+        var header = ParseMethodHeader(methodOOP);
+
+        // Validate argument count
+        if (arguments.Length != header.NumArgs)
+        {
+            throw new InvalidOperationException(
+                $"Tail call argument count mismatch: method expects {header.NumArgs} args, got {arguments.Length}");
+        }
+
+        // Get field indices
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+
+        // Replace method and receiver
+        _heapManager.SetInstanceVariable(_activeContextOOP, methodIndex, methodOOP);
+        _heapManager.SetInstanceVariable(_activeContextOOP, receiverIndex, receiverOOP);
+
+        // Reset PC to start of method
+        _heapManager.SetInstanceVariable(_activeContextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+
+        // Reset stack pointer to after args+temps
+        _heapManager.SetInstanceVariable(_activeContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
+
+        // Replace arguments
+        for (int i = 0; i < header.NumArgs; i++)
+        {
+            _heapManager.SetIndexedOOP(_activeContextOOP, i, arguments[i]);
+        }
+
+        // Clear temps to nil
+        for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
+        {
+            _heapManager.SetIndexedOOP(_activeContextOOP, i, SpecialObjectsArray.Instance.Nil);
+        }
+
+        // Note: sender stays the same - we return to the same place
+        // Note: we don't increment _activeContextCount since we're reusing a context
+    }
+
+    /// <summary>
+    /// Checks if the current instruction pointer is at a tail call position.
+    /// A tail call occurs when the next bytecode after a message send is a return.
+    /// </summary>
+    private bool IsAtTailCallPosition()
+    {
+        try
+        {
+            // Get current PC
+            int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+            var pcOOP = _heapManager.GetInstanceVariable(_activeContextOOP, pcIndex);
+            if (!pcOOP.IsSmallInteger) return false;
+            int currentPC = pcOOP.AsSmallInteger();
+
+            // Get method
+            int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+            var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+
+            // Get bytecodes from method (last indexed item is the bytecode array OOP)
+            int literalCount = _heapManager.GetIndexedSize(methodOOP);
+            if (literalCount == 0) return false;
+            var bytecodeArrayOOP = _heapManager.GetIndexedOOP(methodOOP, literalCount - 1);
+
+            // Get bytecode array bytes
+            var bytecodes = _heapManager.GetByteArray(bytecodeArrayOOP);
+            if (bytecodes == null || bytecodes.Length == 0) return false;
+
+            // Check if next bytecode (after current send completes) is a return
+            // The send bytecode we just executed consumed some bytes, so we check currentPC+1
+            int nextPC = currentPC + 1;
+            if (nextPC >= bytecodes.Length) return false;
+
+            byte nextBytecode = bytecodes[nextPC];
+
+            // Check if it's a return bytecode
+            return BytecodeUtil.IsReturn(nextBytecode);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)
