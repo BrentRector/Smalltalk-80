@@ -30,9 +30,10 @@ public partial class VirtualMachine : IPrimitiveContext
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
 
-    // Context depth tracking to prevent CLR stack overflow
+    // Context depth tracking to detect infinite recursion
+    // (Trampoline architecture prevents CLR stack overflow, so this limit is only for detecting logic errors)
     private int _activeContextCount = 0;
-    private const int MAX_CONTEXT_DEPTH = 500;  // Lowered to capture diagnostics before CLR overflow
+    private const int MAX_CONTEXT_DEPTH = 2000;  // Sufficient for Character initialize (needs ~512 contexts)
 
     // Cursor creation loop diagnostics
     private int _cursorCreationCount = 0;
