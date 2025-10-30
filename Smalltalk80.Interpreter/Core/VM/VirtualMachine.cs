@@ -73,6 +73,12 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP _returnValue;  // Return value from execution
     private SmalltalkOOP _initialContextOOP;  // Starting context for this execution
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
+    private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
+
+    // Non-local return state (replaces exception-based unwinding)
+    private bool _nonLocalReturnPending;  // NLR in progress
+    private SmalltalkOOP _nlrValue;  // Value to return
+    private SmalltalkOOP _nlrTargetContext;  // Context to unwind to
 
     // Track block contexts: contextOOP -> blockContextOOP mapping - now using SmalltalkOOP
     private readonly Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping = new();
@@ -442,12 +448,73 @@ public partial class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Handles a method/block return. Switches back to sender context.
+    /// Handles non-local returns by unwinding contexts until reaching target.
     /// Returns InterpreterStatus indicating whether to continue or complete.
     /// </summary>
     private InterpreterStatus HandleReturn(SmalltalkOOP returnValue)
     {
-        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-        var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+        // Handle non-local returns (NLR)
+        if (_nonLocalReturnPending)
+        {
+            // Check if current context is the NLR target
+            if (_activeContextOOP == _nlrTargetContext)
+            {
+                // Target reached - clear NLR state and push value
+                _nonLocalReturnPending = false;
+                SmalltalkOOP nlrValue = _nlrValue;
+                _nlrValue = default;
+                _nlrTargetContext = default;
+
+                // Clean up block context mapping
+                _blockContextMapping.Remove(_activeContextOOP);
+
+                // Get sender to continue execution
+                int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+                var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+
+                // Decrement context depth
+                _activeContextCount--;
+
+                // Check if target was the initial context
+                if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
+                {
+                    _returnValue = nlrValue;
+                    _activeContextOOP = _initialContextOOP;
+                    return InterpreterStatus.Return;
+                }
+
+                // Switch to sender and push NLR value
+                _activeContextOOP = senderOOP;
+                Push(nlrValue);
+                return InterpreterStatus.Continue;
+            }
+
+            // Not the target - continue unwinding (don't push value)
+            int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+            var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+
+            // Clean up block context mapping
+            _blockContextMapping.Remove(_activeContextOOP);
+
+            // Decrement context depth
+            _activeContextCount--;
+
+            // Check if we ran out of contexts (error case)
+            if (senderOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                throw new InvalidOperationException(
+                    $"Non-local return target context {_nlrTargetContext} not found in sender chain. " +
+                    $"Target may have already returned.");
+            }
+
+            // Continue unwinding
+            _activeContextOOP = senderOOP;
+            return InterpreterStatus.Continue;
+        }
+
+        // Normal return (not NLR)
+        int normalSenderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        var normalSenderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, normalSenderIndex);
 
         // Clean up block context mapping if this was a block
         _blockContextMapping.Remove(_activeContextOOP);
@@ -456,7 +523,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _activeContextCount--;
 
         // Check if we're returning to the initial context
-        if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
+        if (normalSenderOOP == _initialContextOOP || normalSenderOOP == SpecialObjectsArray.Instance.Nil)
         {
             // Execution complete - return to caller
             _returnValue = returnValue;
@@ -465,7 +532,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Switch to sender context and push return value
-        _activeContextOOP = senderOOP;
+        _activeContextOOP = normalSenderOOP;
         Push(returnValue);
 
         // Continue execution in sender context
@@ -1014,11 +1081,12 @@ public partial class VirtualMachine : IPrimitiveContext
                         int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnSelfPopBlockOOP, returnContextIndex);
 
-                        // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value=self ({homeReceiverOOP})");
-
-                        // THROW NON-LOCAL RETURN EXCEPTION
-                        // This will unwind the call stack back to the target context
-                        throw new NonLocalReturnException(homeReceiverOOP, returnContextOOP);
+                        // TRAMPOLINE MODE: Set NLR state instead of throwing exception
+                        // HandleReturn will unwind contexts until reaching target
+                        _nonLocalReturnPending = true;
+                        _nlrValue = homeReceiverOOP;
+                        _nlrTargetContext = returnContextOOP;
+                        return false;  // Exit bytecode loop to trigger return handling
                     }
                     else
                     {
@@ -1053,11 +1121,12 @@ public partial class VirtualMachine : IPrimitiveContext
                         int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
                         var returnContextOOP = _heapManager.GetInstanceVariable(returnTopPopBlockOOP, returnContextIndex);
 
-                        // Console.WriteLine($"[NON-LOCAL RETURN] Throwing exception to unwind to context {returnContextOOP}, value={returnValue}");
-
-                        // THROW NON-LOCAL RETURN EXCEPTION
-                        // This will unwind the call stack back to the target context
-                        throw new NonLocalReturnException(returnValue, returnContextOOP);
+                        // TRAMPOLINE MODE: Set NLR state instead of throwing exception
+                        // HandleReturn will unwind contexts until reaching target
+                        _nonLocalReturnPending = true;
+                        _nlrValue = returnValue;
+                        _nlrTargetContext = returnContextOOP;
+                        return false;  // Exit bytecode loop to trigger return handling
                     }
                     else
                     {
@@ -2059,7 +2128,16 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
                 }
-                // Primitive succeeded - return result directly
+
+                // Check if primitive created a new context (e.g., block invocation via Primitive 207)
+                if (_contextSwitchedByPrimitive)
+                {
+                    _contextSwitchedByPrimitive = false;
+                    // Primitive created new context - signal context switch
+                    return CallOutcome.ContextSwitch();
+                }
+
+                // Normal primitive success - return result directly
                 return CallOutcome.Normal(primitiveResult);
             }
 
@@ -2484,30 +2562,18 @@ public partial class VirtualMachine : IPrimitiveContext
             _heapManager.SetIndexedOOP(executionContextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
-        // Step 8: Execute block with GC protection
-        // Root the BlockContext during execution to prevent GC
-        // Note: In a real implementation, we'd use proper GC rooting
-        
-        // Save current active context
-        var previousContextOOP = _activeContextOOP;
-
+        // Step 8: TRAMPOLINE MODE - Signal context switch instead of recursing
         // Set the block execution context as active
         _activeContextOOP = executionContextOOP;
-        // Console.WriteLine($"[DEBUG Primitive207] Set _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
 
-        // Execute the block bytecodes
-        var result = ExecuteBytecodeLoop();
-        // Console.WriteLine($"[DEBUG Primitive207] After ExecuteBytecodeLoop, _activeContextOOP = {_activeContextOOP} (format={_heapManager.GetObjectFormat(_activeContextOOP)}, class={GetClassName(GetClass(_activeContextOOP))})");
+        // Signal that primitive created a new context
+        // The InterpreterLoop will continue execution in the block context
+        // When the block returns, HandleReturn will push the result onto the sender's stack
+        _contextSwitchedByPrimitive = true;
 
-        // Clean up block context mapping
-        _blockContextMapping.Remove(executionContextOOP);
-
-        // Restore previous context and decrement depth
-        _activeContextOOP = previousContextOOP;
-        _activeContextCount--;
-        // Console.WriteLine($"[DEBUG Primitive207] Restored _activeContextOOP = {_activeContextOOP}");
-
-        return result;
+        // Return nil as sentinel (actual block result will be pushed onto sender's stack by HandleReturn)
+        // The primitive caller (SendMessage) will detect _contextSwitchedByPrimitive and return ContextSwitch
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     /// <summary>

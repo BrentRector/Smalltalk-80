@@ -961,12 +961,259 @@ public SmalltalkOOP GetMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
 
 ### Current Implementation Status
 
-✅ **Basic Bytecode Execution**: Variable access, literals, simple sends  
-✅ **Method Dispatch**: Inheritance-based lookup working  
-✅ **Primitive Integration**: 94/111 primitives implemented  
-✅ **Stack Management**: Proper frame handling  
-⚠️ **Block Execution**: BlockContext integration in progress  
-⚠️ **Exception Handling**: Not yet implemented  
+✅ **Basic Bytecode Execution**: Variable access, literals, simple sends
+✅ **Method Dispatch**: Inheritance-based lookup working
+✅ **Primitive Integration**: 94/111 primitives implemented
+✅ **Stack Management**: Proper frame handling
+✅ **Trampoline Interpreter**: Eliminates .NET stack overflow for deep Smalltalk recursion
+✅ **Block Execution**: Complete with trampoline-based invocation
+✅ **Non-Local Returns**: Trampoline-based unwinding without exceptions
+
+### Trampoline Interpreter Architecture
+
+**Purpose**: The trampoline interpreter eliminates .NET call stack overflow by implementing the Blue Book's single-loop interpreter design. Instead of recursively calling `ExecuteBytecodeLoop()` for each message send or block invocation, the interpreter uses a single top-level loop that switches between Smalltalk contexts via heap-allocated objects.
+
+**Problem Solved**: Classic Smalltalk control flow (e.g., `whileTrue:`) is naturally recursive. Without trampolining, executing `256 timesRepeat: [...]` creates 768+ .NET stack frames, causing stack overflow. Character initialize (creates 256 characters) would fail after ~100 iterations.
+
+#### Architecture Components
+
+**1. Interpreter Loop (Single Top-Level Loop)**
+```csharp
+private SmalltalkOOP InterpreterLoop()
+{
+    _initialContextOOP = _activeContextOOP;  // Save starting context
+
+    while (true)
+    {
+        InterpreterStatus status = ExecuteBytecodeStep();
+
+        switch (status)
+        {
+            case InterpreterStatus.Continue:
+                // Context switched - keep executing in new context
+                continue;
+
+            case InterpreterStatus.Return:
+                // Execution complete - return value
+                return _returnValue;
+
+            case InterpreterStatus.Yield:
+                // Future: cooperative multitasking
+                throw new NotImplementedException();
+        }
+    }
+}
+```
+
+**Key Insight**: Single loop eliminates recursive `ExecuteBytecodeLoop()` calls. .NET call stack stays flat while Smalltalk contexts switch via heap.
+
+**2. Bytecode Step Execution**
+```csharp
+private InterpreterStatus ExecuteBytecodeStep()
+{
+    // Execute bytecodes in current context until:
+    // 1. Message send (context switch)
+    // 2. Method/block return
+    // 3. Non-local return
+
+    while (ip < bytecodes.Length)
+    {
+        bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
+
+        if (!continueExecution)
+        {
+            // Check for context switch vs return
+            if (_contextSwitchPending)
+            {
+                _contextSwitchPending = false;
+                return InterpreterStatus.Continue;  // Switch to new context
+            }
+
+            // Handle return (normal or non-local)
+            return HandleReturn(returnValue);
+        }
+    }
+}
+```
+
+**3. Message Send (Context Switch Signal)**
+```csharp
+private CallOutcome SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+{
+    // Look up method, execute primitive if present
+    // ...
+
+    // TRAMPOLINE MODE: Create context and signal switch (don't recurse)
+    _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
+
+    // Signal context switch - InterpreterLoop will continue in new context
+    return CallOutcome.ContextSwitch();
+}
+```
+
+**Before (Recursive)**: `ExecuteBytecodeLoop()` → `SendMessage()` → `CreateContext()` → `ExecuteBytecodeLoop()` ← **RECURSIVE!**
+
+**After (Trampoline)**: `SendMessage()` → `CreateContext()` → `return ContextSwitch` → `InterpreterLoop` continues
+
+**4. Block Invocation (Primitive-Initiated Context Switch)**
+
+Primitives that invoke blocks (e.g., Primitive 207: `value/value:/value:value:`) create contexts during primitive execution. The trampoline handles this via a flag:
+
+```csharp
+private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP)
+{
+    // Create block execution context
+    _activeContextOOP = CreateBlockExecutionContext(...);
+
+    // Signal that primitive created new context
+    _contextSwitchedByPrimitive = true;
+
+    // Return nil sentinel (actual result pushed onto stack by HandleReturn)
+    return SpecialObjectsArray.Instance.Nil;
+}
+
+// In SendMessage after primitive execution:
+if (_primitiveSuccess && _contextSwitchedByPrimitive)
+{
+    _contextSwitchedByPrimitive = false;
+    return CallOutcome.ContextSwitch();  // Continue in block context
+}
+```
+
+**5. Return Handling (Context Unwinding)**
+```csharp
+private InterpreterStatus HandleReturn(SmalltalkOOP returnValue)
+{
+    // Handle non-local returns by unwinding contexts
+    if (_nonLocalReturnPending)
+    {
+        if (_activeContextOOP == _nlrTargetContext)
+        {
+            // Target reached - clear NLR, push value, continue
+            _nonLocalReturnPending = false;
+            _activeContextOOP = senderOOP;
+            Push(_nlrValue);
+            return InterpreterStatus.Continue;
+        }
+
+        // Not target - keep unwinding (don't push value)
+        _activeContextOOP = senderOOP;
+        return InterpreterStatus.Continue;
+    }
+
+    // Normal return - switch to sender and push result
+    _activeContextOOP = senderOOP;
+    Push(returnValue);
+    return InterpreterStatus.Continue;
+}
+```
+
+**6. Non-Local Returns (Trampoline-Based Unwinding)**
+
+Instead of throwing `NonLocalReturnException`, the RETURN_TOP_POP and RETURN_SELF_POP bytecodes set NLR state:
+
+```csharp
+case Bytecode.RETURN_TOP_POP:
+    if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOOP))
+    {
+        var returnValue = Pop();
+        var returnContextOOP = _heapManager.GetInstanceVariable(blockOOP, VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX);
+
+        // Set NLR state instead of throwing exception
+        _nonLocalReturnPending = true;
+        _nlrValue = returnValue;
+        _nlrTargetContext = returnContextOOP;
+        return false;  // Exit bytecode loop
+    }
+    break;
+```
+
+`HandleReturn()` checks `_nonLocalReturnPending` and unwinds contexts until reaching `_nlrTargetContext`, then clears flags and pushes the value.
+
+#### State Management
+
+**Trampoline State Fields**:
+```csharp
+private SmalltalkOOP _returnValue;               // Return value from execution
+private SmalltalkOOP _initialContextOOP;         // Starting context
+private bool _contextSwitchPending;              // Message send occurred
+private bool _contextSwitchedByPrimitive;        // Primitive created context
+
+// Non-local return state (replaces exceptions)
+private bool _nonLocalReturnPending;             // NLR in progress
+private SmalltalkOOP _nlrValue;                  // Value to return
+private SmalltalkOOP _nlrTargetContext;          // Context to unwind to
+```
+
+#### Execution Flow Examples
+
+**Example 1: whileTrue: Loop (256 iterations)**
+```
+InterpreterLoop (single .NET frame)
+  → ExecuteBytecodeStep (whileTrue:, iteration 1)
+     sends "value" → ContextSwitch
+  → ExecuteBytecodeStep (condition block)
+     returns true → Continue
+  → ExecuteBytecodeStep (whileTrue:, continues)
+     sends "ifTrue:" → ContextSwitch
+  → ExecuteBytecodeStep (body block)
+     sends "whileTrue:" → ContextSwitch
+  → ExecuteBytecodeStep (whileTrue:, iteration 2)
+  ... 256 iterations, all at SAME .NET call depth!
+```
+
+**Example 2: Non-Local Return**
+```
+InterpreterLoop
+  → ExecuteBytecodeStep (method A)
+     sends message to B → ContextSwitch
+  → ExecuteBytecodeStep (method B)
+     invokes block → ContextSwitch
+  → ExecuteBytecodeStep (block)
+     executes ^returnValue (RETURN_TOP_POP)
+     sets _nonLocalReturnPending, _nlrTargetContext = A
+     returns false
+  → HandleReturn (in block)
+     _activeContextOOP != _nlrTargetContext
+     unwinds to sender (method B)
+     returns Continue
+  → HandleReturn (in method B)
+     _activeContextOOP != _nlrTargetContext
+     unwinds to sender (method A)
+     returns Continue
+  → ExecuteBytecodeStep (method A)
+     _activeContextOOP == _nlrTargetContext
+     pushes _nlrValue onto stack
+     returns Continue
+```
+
+#### Benefits
+
+✅ **Eliminates Stack Overflow**: .NET call stack stays flat (single `InterpreterLoop` frame)
+✅ **Matches Blue Book**: Single-loop interpreter design per specification
+✅ **Deep Recursion Support**: Character initialize (256 iterations) completes successfully
+✅ **No Recursion Limits**: Smalltalk control flow depth limited only by heap (MethodContext allocation)
+✅ **Clean NLR Handling**: No exception overhead for non-local returns
+✅ **Maintainable**: Clear separation between context creation and execution
+
+#### Performance Characteristics
+
+- **Context Creation**: O(1) - allocate MethodContext object
+- **Context Switch**: O(1) - update `_activeContextOOP` field
+- **Return Handling**: O(1) normal returns, O(n) for NLR unwinding n contexts
+- **Memory**: Contexts allocated on Smalltalk heap, cleaned up by GC
+- **.NET Stack**: Constant depth (1 `InterpreterLoop` + 1 `ExecuteBytecodeStep`)
+
+#### Implementation Status
+
+✅ **InterpreterLoop**: Top-level trampoline loop
+✅ **ExecuteBytecodeStep**: Bytecode execution until context switch/return
+✅ **HandleReturn**: Normal and non-local return handling
+✅ **SendMessage**: Signals ContextSwitch instead of recursing
+✅ **SendSuperMessage**: Signals ContextSwitch instead of recursing
+✅ **InvokeBlockInternal**: Signals context switch via primitive flag
+✅ **NLR Bytecodes**: RETURN_TOP_POP, RETURN_SELF_POP use state fields
+✅ **Entry Points**: Execute(), ExecuteExistingContext() use InterpreterLoop
 
 ## Primitive Operations
 
