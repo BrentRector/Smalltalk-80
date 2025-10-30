@@ -429,11 +429,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Context switch - continue execution in new context
                     _contextSwitchPending = false;
+                    Console.WriteLine($"[ExecuteBytecodeStep] Context switch detected, continuing in {_activeContextOOP}");
                     return InterpreterStatus.Continue;
                 }
 
                 // Method returned - handle the return
                 var returnValue = Pop();
+                Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
                 return HandleReturn(returnValue);
             }
 
@@ -517,8 +519,16 @@ public partial class VirtualMachine : IPrimitiveContext
         // Normal return (not NLR)
         senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
+        Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
+        Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
+
         // Clean up block context mapping if this was a block
+        bool wasBlock = _blockContextMapping.ContainsKey(_activeContextOOP);
         _blockContextMapping.Remove(_activeContextOOP);
+        if (wasBlock)
+        {
+            Console.WriteLine($"  Was a block context");
+        }
 
         // Decrement context depth
         _activeContextCount--;
@@ -529,12 +539,14 @@ public partial class VirtualMachine : IPrimitiveContext
             // Execution complete - return to caller
             _returnValue = returnValue;
             _activeContextOOP = _initialContextOOP;
+            Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
         }
 
         // Switch to sender context and push return value
         _activeContextOOP = senderOOP;
         Push(returnValue);
+        Console.WriteLine($"  Pushed return value onto sender's stack");
 
         // Continue execution in sender context
         return InterpreterStatus.Continue;
@@ -2565,7 +2577,11 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Step 8: TRAMPOLINE MODE - Signal context switch instead of recursing
         // Set the block execution context as active
+        var previousContext = _activeContextOOP;
         _activeContextOOP = executionContextOOP;
+
+        Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {executionContextOOP}");
+        Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
 
         // Signal that primitive created a new context
         // The InterpreterLoop will continue execution in the block context
