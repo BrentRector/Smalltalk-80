@@ -37,8 +37,8 @@ public partial class VirtualMachine : IPrimitiveContext
     // Cursor creation loop diagnostics
     private int _cursorCreationCount = 0;
 
-    // Call outcome used for NLR propagation between SendMessage and bytecode loop
-    private enum CallOutcomeKind { Normal, NonLocalReturn, VMException }
+    // Call outcome used for NLR propagation and context switching in trampoline interpreter
+    private enum CallOutcomeKind { Normal, NonLocalReturn, VMException, ContextSwitch }
 
     private readonly struct CallOutcome
     {
@@ -58,7 +58,21 @@ public partial class VirtualMachine : IPrimitiveContext
         public static CallOutcome Normal(SmalltalkOOP value) => new(CallOutcomeKind.Normal, value, SmalltalkOOP.Null, null);
         public static CallOutcome NonLocalReturn(SmalltalkOOP target, SmalltalkOOP value) => new(CallOutcomeKind.NonLocalReturn, value, target, null);
         public static CallOutcome VMException(Exception ex) => new(CallOutcomeKind.VMException, SmalltalkOOP.Null, SmalltalkOOP.Null, ex);
+        public static CallOutcome ContextSwitch() => new(CallOutcomeKind.ContextSwitch, SmalltalkOOP.Null, SmalltalkOOP.Null, null);
     }
+
+    // Trampoline interpreter execution status
+    private enum InterpreterStatus
+    {
+        Continue,  // Context switched - keep executing
+        Return,    // Execution complete - return value
+        Yield      // Temporary pause (for future use)
+    }
+
+    // Trampoline state - used to avoid recursive ExecuteBytecodeLoop calls
+    private SmalltalkOOP _returnValue;  // Return value from execution
+    private SmalltalkOOP _initialContextOOP;  // Starting context for this execution
+    private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
 
     // Track block contexts: contextOOP -> blockContextOOP mapping - now using SmalltalkOOP
     private readonly Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping = new();
@@ -196,14 +210,14 @@ public partial class VirtualMachine : IPrimitiveContext
         // Create a MethodContext for this execution
         _activeContextOOP = CreateMethodContext(methodOOP, receiverOOP, arguments);
 
-        // Execute bytecodes until we return
-        return ExecuteBytecodeLoop();
+        // Execute bytecodes using trampoline pattern to prevent stack overflow
+        return InterpreterLoop();
     }
 
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
         _activeContextOOP = contextOOP;
-        var result = ExecuteBytecodeLoop();
+        var result = InterpreterLoop();
         return result;
     }
 
@@ -323,7 +337,144 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Main bytecode execution loop.
+    /// Top-level interpreter loop using trampoline pattern.
+    /// Prevents .NET stack overflow by avoiding recursive ExecuteBytecodeLoop calls.
+    /// This implements the Blue Book's single-loop interpreter design.
+    /// </summary>
+    private SmalltalkOOP InterpreterLoop()
+    {
+        // Save initial context - we return when we get back to this context
+        _initialContextOOP = _activeContextOOP;
+
+        while (true)
+        {
+            // Execute bytecodes in current context
+            InterpreterStatus status = ExecuteBytecodeStep();
+
+            switch (status)
+            {
+                case InterpreterStatus.Continue:
+                    // Context switched (message send or return) - keep executing
+                    continue;
+
+                case InterpreterStatus.Return:
+                    // Execution complete - return the value
+                    return _returnValue;
+
+                case InterpreterStatus.Yield:
+                    // Temporary pause (not currently used)
+                    throw new NotImplementedException("Yield not implemented");
+
+                default:
+                    throw new InvalidOperationException($"Unknown interpreter status: {status}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes bytecodes in the current context until a context switch or return.
+    /// Returns InterpreterStatus indicating whether to continue or return.
+    /// </summary>
+    private InterpreterStatus ExecuteBytecodeStep()
+    {
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+
+        var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+
+        // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
+        var methodFormat = _heapManager.GetObjectFormat(methodOOP);
+        if (methodFormat != ObjectFormat.PointerIndexed)
+        {
+            var className = GetClassName(GetClass(methodOOP));
+            var localId = GetLocalId(methodOOP);
+            var contextClass = GetClassName(GetClass(_activeContextOOP));
+            throw new InvalidOperationException(
+                $"ExecuteBytecodeStep: method field in context contains non-PointerIndexed object!\n" +
+                $"  Context: {_activeContextOOP}, contextClass={contextClass}\n" +
+                $"  Method field (index {methodIndex}): {methodOOP}\n" +
+                $"  Method format: {methodFormat} (expected PointerIndexed)\n" +
+                $"  Method class: {className}\n" +
+                $"  Method localId: {localId}\n" +
+                $"  This suggests the bytecode array was stored in the context instead of the CompiledMethod.");
+        }
+
+        byte[] bytecodes = GetMethodBytecodes(methodOOP);
+
+        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
+
+        while (ip < bytecodes.Length)
+        {
+            byte bytecode = bytecodes[ip++];
+
+            // Update IP
+            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+
+            // Execute the bytecode
+            bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
+
+            if (!continueExecution)
+            {
+                // Check if this was a context switch or a method return
+                if (_contextSwitchPending)
+                {
+                    // Context switch - continue execution in new context
+                    _contextSwitchPending = false;
+                    return InterpreterStatus.Continue;
+                }
+
+                // Method returned - handle the return
+                var returnValue = Pop();
+                return HandleReturn(returnValue);
+            }
+
+            // Re-read IP in case bytecode modified it (jumps)
+            ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            ip = ipOOP.AsSmallInteger();
+        }
+
+        // If we fall off the end, return self
+        return HandleReturn(receiverOOP);
+    }
+
+    /// <summary>
+    /// Handles a method/block return. Switches back to sender context.
+    /// Returns InterpreterStatus indicating whether to continue or complete.
+    /// </summary>
+    private InterpreterStatus HandleReturn(SmalltalkOOP returnValue)
+    {
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        var senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+
+        // Clean up block context mapping if this was a block
+        _blockContextMapping.Remove(_activeContextOOP);
+
+        // Decrement context depth
+        _activeContextCount--;
+
+        // Check if we're returning to the initial context
+        if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            // Execution complete - return to caller
+            _returnValue = returnValue;
+            _activeContextOOP = _initialContextOOP;
+            return InterpreterStatus.Return;
+        }
+
+        // Switch to sender context and push return value
+        _activeContextOOP = senderOOP;
+        Push(returnValue);
+
+        // Continue execution in sender context
+        return InterpreterStatus.Continue;
+    }
+
+    /// <summary>
+    /// Main bytecode execution loop (DEPRECATED - use InterpreterLoop instead).
+    /// This method is kept for compatibility but will be phased out.
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
@@ -1784,32 +1935,14 @@ public partial class VirtualMachine : IPrimitiveContext
             }
         }
 
-        // Execute the method with proper context chaining
-        var previousContextOOP = _activeContextOOP;
-        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, previousContextOOP);
+        // TRAMPOLINE MODE: Create context and signal context switch (don't recurse)
+        // The InterpreterLoop will continue execution in the new context
 
-        try
-        {
-            var result = ExecuteBytecodeLoop();
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-            return CallOutcome.Normal(result);
-        }
-        catch (NonLocalReturnException ex)
-        {
-            // Console.WriteLine($"[NLR CAUGHT] super method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}");
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-            // Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        }
-        catch (Exception ex)
-        {
-            DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, superclassOOP, selectorName!, ex);
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-            throw;
-        }
+        // Create new context with current context as sender
+        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
+
+        // Signal context switch - InterpreterLoop will continue in new context
+        return CallOutcome.ContextSwitch();
     }
 
     /// <summary>
@@ -1937,80 +2070,30 @@ public partial class VirtualMachine : IPrimitiveContext
             // Primitive failed - execute method bytecodes as fallback
         }
 
-        // Execute the method with proper context chaining
-        // Save current active context as the sender
-        var previousContextOOP = _activeContextOOP;
+        // TRAMPOLINE MODE: Create context and signal context switch (don't recurse)
+        // The InterpreterLoop will continue execution in the new context
 
         // Create new context with current context as sender
-        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, previousContextOOP);
+        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
 
-        try
+        // Verbose debug: log method entry
+        if (VerboseDebug)
         {
-            // Execute the new context
-            var result = ExecuteBytecodeLoop();
-
-            // Verbose debug: log method exit
-            if (VerboseDebug)
-            {
-                _callDepth--;
-                string indent = new string(' ', _callDepth * 2);
-                string resultStr = result.IsSmallInteger ? $"SmallInteger({result.AsSmallInteger()})" : $"OOP({result})";
-                Console.WriteLine($"{indent}<< {GetClassName(classOOP)}>>{selectorName} => {resultStr}");
-            }
-
-            // Restore previous context
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-
-            if (_activeContextCount % 50 == 0 && _activeContextCount > 0)
-            {
-                Console.WriteLine($"[CONTEXT EXIT] Normal return, depth now={_activeContextCount}");
-            }
-
-            return CallOutcome.Normal(result);
+            _callDepth++;
+            string indent = new string(' ', _callDepth * 2);
+            string argsStr = string.Join(", ", args.Select(a => a.IsSmallInteger ? $"{a.AsSmallInteger()}" : $"oop({a})"));
+            Console.WriteLine($"{indent}>> {GetClassName(classOOP)}>>{selectorName}({argsStr})");
         }
-        catch (NonLocalReturnException ex)
-        {
-            // Non-local return from a block - convert to CallOutcome
-            // DO NOT convert to normal return - let caller decide based on target
-            // Console.WriteLine($"[NLR CAUGHT] method={selectorName}, targetContext={ex.TargetContext}, value={ex.ReturnValue}, currentContext={_activeContextOOP}");
 
-            // Restore previous context BEFORE returning outcome
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-
-            // Console.WriteLine($"[NLR EXIT] depth now={_activeContextCount}, restored to context={_activeContextOOP}");
-
-            if (VerboseDebug)
-            {
-                _callDepth--;
-            }
-
-            // Return NonLocalReturn outcome - caller will check if target matches its context
-            return CallOutcome.NonLocalReturn(ex.TargetContext, ex.ReturnValue);
-        }
-        catch (Exception ex)
-        {
-            if (VerboseDebug)
-            {
-                _callDepth--;
-            }
-
-            // On error, dump detailed method state
-            DumpMethodStateOnError(methodInfo.MethodOOP, receiverOOP, args, classOOP, selectorName!, ex);
-
-            // Restore previous context
-            _activeContextOOP = previousContextOOP;
-            _activeContextCount--;
-
-            throw;
-        }
+        // Signal context switch - InterpreterLoop will continue in new context
+        return CallOutcome.ContextSwitch();
     }
 
     /// <summary>
     /// Consume a CallOutcome in the bytecode loop / caller.
     /// Returns true to continue execution (normal), false to indicate that the current method/context has returned (stop loop).
     /// If the outcome is a VMException, throws it. If the outcome is a NonLocalReturn targeted at another context, rethrows as NonLocalReturnException for propagation.
+    /// If the outcome is a ContextSwitch, sets _contextSwitchPending and returns false to exit the bytecode loop.
     /// </summary>
     private bool ConsumeCallOutcome(CallOutcome outcome)
     {
@@ -2023,6 +2106,13 @@ public partial class VirtualMachine : IPrimitiveContext
         if (outcome.Kind == CallOutcomeKind.VMException)
         {
             throw outcome.VMEx!;
+        }
+
+        if (outcome.Kind == CallOutcomeKind.ContextSwitch)
+        {
+            // Context switch occurred - signal to exit bytecode loop and continue in new context
+            _contextSwitchPending = true;
+            return false;
         }
 
         // Non-local return
