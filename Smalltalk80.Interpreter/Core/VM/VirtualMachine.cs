@@ -2040,6 +2040,17 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
 
+        // DEBUG: Log value sends to see what's receiving them
+        if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
+        {
+            var className = GetClassName(classOOP);
+            Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\" | args={args.Length}");
+            if (className != "BlockClosure")
+            {
+                Console.WriteLine($"  WARNING: value sent to {className}, not BlockClosure!");
+            }
+        }
+
         // DEBUG: Check if receiver is a class object
         if (selectorName == "new:")
         {
@@ -2145,6 +2156,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
                 if (_contextSwitchedByPrimitive)
                 {
+                    Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} switched context");
+                    Console.WriteLine($"  _activeContextOOP is now: {_activeContextOOP}");
                     _contextSwitchedByPrimitive = false;
                     // Primitive created new context - signal context switch
                     return CallOutcome.ContextSwitch();
