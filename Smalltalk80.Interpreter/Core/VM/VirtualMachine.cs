@@ -383,12 +383,17 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private InterpreterStatus ExecuteBytecodeStep()
     {
+        Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
+
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
         int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+
+        Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
+        Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}");
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
         var methodFormat = _heapManager.GetObjectFormat(methodOOP);
