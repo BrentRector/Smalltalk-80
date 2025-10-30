@@ -265,22 +265,39 @@ public partial class VirtualMachine : IPrimitiveContext
                 "MethodContext class not found - ensure cold start completed Phase 2");
         }
 
-        // Step 4: Try to reuse a pooled context, otherwise allocate new
+        // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
         SmalltalkOOP contextOOP;
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
+        // Try to find a pooled context with matching indexed size
+        bool foundMatchingContext = false;
         if (_contextPool.Count > 0)
         {
-            // Reuse a pooled context
-            contextOOP = _contextPool.Pop();
-            Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} (pool size now: {_contextPool.Count})");
+            var candidateOOP = _contextPool.Pop();
+            int candidateIndexedSize = _heapManager.GetIndexedSize(candidateOOP);
+
+            if (candidateIndexedSize == stackSize)
+            {
+                // Perfect match - reuse it
+                contextOOP = candidateOOP;
+                foundMatchingContext = true;
+                Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {_contextPool.Count})");
+            }
+            else
+            {
+                // Size mismatch - put it back and allocate new
+                _contextPool.Push(candidateOOP);
+                contextOOP = default;
+                Console.WriteLine($"[POOL] Context size mismatch (need {stackSize}, found {candidateIndexedSize}), allocating new");
+            }
         }
-        else
+
+        if (!foundMatchingContext)
         {
             // Allocate new context
             contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
-            Console.WriteLine($"[POOL] Allocated new context {contextOOP} (pool was empty)");
+            Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool was empty or no match)");
         }
 
         // Increment context depth and check limit
