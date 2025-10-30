@@ -77,8 +77,9 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
     // Context pooling - reuse recently returned contexts to reduce GC pressure
-    private Stack<SmalltalkOOP> _contextPool = new Stack<SmalltalkOOP>();
-    private const int MAX_POOLED_CONTEXTS = 50;
+    // Dictionary keyed by indexed size (stack size) for efficient matching
+    private Dictionary<int, Stack<SmalltalkOOP>> _contextPools = new Dictionary<int, Stack<SmalltalkOOP>>();
+    private const int MAX_POOLED_CONTEXTS_PER_SIZE = 20;
 
     // Non-local return state (replaces exception-based unwinding)
     private bool _nonLocalReturnPending;  // NLR in progress
@@ -266,38 +267,22 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
-        SmalltalkOOP contextOOP = default;
+        SmalltalkOOP contextOOP;
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
-        // Try to find a pooled context with matching indexed size
-        bool foundMatchingContext = false;
-        if (_contextPool.Count > 0)
+        // Check size-specific pool for matching context
+        if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
         {
-            var candidateOOP = _contextPool.Pop();
-            int candidateIndexedSize = _heapManager.GetIndexedSize(candidateOOP);
-
-            if (candidateIndexedSize == stackSize)
-            {
-                // Perfect match - reuse it
-                contextOOP = candidateOOP;
-                foundMatchingContext = true;
-                Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {_contextPool.Count})");
-            }
-            else
-            {
-                // Size mismatch - put it back and allocate new
-                _contextPool.Push(candidateOOP);
-                contextOOP = default;
-                Console.WriteLine($"[POOL] Context size mismatch (need {stackSize}, found {candidateIndexedSize}), allocating new");
-            }
+            // Reuse pooled context with exact size match
+            contextOOP = pool.Pop();
+            Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
         }
-
-        if (!foundMatchingContext)
+        else
         {
             // Allocate new context
             contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
-            Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool was empty or no match)");
+            Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
         }
 
         // Increment context depth and check limit
@@ -517,10 +502,16 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
-                // Add context to pool for reuse (if pool not full)
-                if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+                // Add context to size-specific pool for reuse (if pool not full)
+                int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
+                if (!_contextPools.TryGetValue(contextSize, out var pool))
                 {
-                    _contextPool.Push(_activeContextOOP);
+                    pool = new Stack<SmalltalkOOP>();
+                    _contextPools[contextSize] = pool;
+                }
+                if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
+                {
+                    pool.Push(_activeContextOOP);
                 }
 
                 // Decrement context depth
@@ -546,10 +537,16 @@ public partial class VirtualMachine : IPrimitiveContext
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
 
-            // Add context to pool for reuse (if pool not full)
-            if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+            // Add context to size-specific pool for reuse (if pool not full)
+            int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
+            if (!_contextPools.TryGetValue(contextSize, out var pool))
             {
-                _contextPool.Push(_activeContextOOP);
+                pool = new Stack<SmalltalkOOP>();
+                _contextPools[contextSize] = pool;
+            }
+            if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
+            {
+                pool.Push(_activeContextOOP);
             }
 
             // Decrement context depth
@@ -582,10 +579,16 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"  Was a block context");
         }
 
-        // Add context to pool for reuse (if pool not full)
-        if (_contextPool.Count < MAX_POOLED_CONTEXTS)
+        // Add context to size-specific pool for reuse (if pool not full)
+        int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
+        if (!_contextPools.TryGetValue(contextSize, out var pool))
         {
-            _contextPool.Push(_activeContextOOP);
+            pool = new Stack<SmalltalkOOP>();
+            _contextPools[contextSize] = pool;
+        }
+        if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
+        {
+            pool.Push(_activeContextOOP);
         }
 
         // Decrement context depth
@@ -2232,15 +2235,14 @@ public partial class VirtualMachine : IPrimitiveContext
         // TRAMPOLINE MODE: Create context and signal context switch (don't recurse)
         // The InterpreterLoop will continue execution in the new context
 
-        // TAIL CALL OPTIMIZATION: If next bytecode is a return, reuse current context
-        if (IsAtTailCallPosition())
-        {
-            Console.WriteLine($"[TAIL CALL] Reusing context for {selectorName}");
-            ReuseContextForTailCall(methodInfo.MethodOOP, receiverOOP, args);
-
-            // Signal context switch so ExecuteBytecodeStep restarts with new method
-            return CallOutcome.ContextSwitch();
-        }
+        // TAIL CALL OPTIMIZATION: DISABLED - caused stack underflow bugs
+        // TODO: Fix tail call optimization to properly handle stack management
+        // if (IsAtTailCallPosition())
+        // {
+        //     Console.WriteLine($"[TAIL CALL] Reusing context for {selectorName}");
+        //     ReuseContextForTailCall(methodInfo.MethodOOP, receiverOOP, args);
+        //     return CallOutcome.ContextSwitch();
+        // }
 
         // Create new context with current context as sender
         _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
