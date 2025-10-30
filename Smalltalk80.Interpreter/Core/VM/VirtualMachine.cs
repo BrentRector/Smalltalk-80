@@ -2206,9 +2206,12 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private bool ConsumeCallOutcome(CallOutcome outcome)
     {
+        Console.WriteLine($"[ConsumeCallOutcome] outcome.Kind={outcome.Kind}");
+
         if (outcome.Kind == CallOutcomeKind.Normal)
         {
             Push(outcome.Value);
+            Console.WriteLine($"  Normal: pushed {outcome.Value}");
             return true;
         }
 
@@ -2221,6 +2224,7 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             // Context switch occurred - signal to exit bytecode loop and continue in new context
             _contextSwitchPending = true;
+            Console.WriteLine($"  ContextSwitch: set _contextSwitchPending=true, returning false");
             return false;
         }
 
