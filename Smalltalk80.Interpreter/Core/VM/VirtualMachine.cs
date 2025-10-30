@@ -1222,15 +1222,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // Send arithmetic messages (0xB0-0xBF)
         if (BytecodeUtil.IsSendArithmetic(bytecode))
         {
-            ExecuteSendArithmetic(bytecode);
-            return true;
+            return ExecuteSendArithmetic(bytecode);
         }
 
         // Send special messages (0xC0-0xCF)
         if (BytecodeUtil.IsSendSpecial(bytecode))
         {
-            ExecuteSendSpecial(bytecode);
-            return true;
+            return ExecuteSendSpecial(bytecode);
         }
 
         // Send literal selector with 0 args (0xD0-0xDF)
@@ -1787,8 +1785,9 @@ public partial class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Executes arithmetic message send (0xB0-0xBF).
+    /// Returns true to continue execution, false if context switched or method returned.
     /// </summary>
-    private void ExecuteSendArithmetic(byte bytecode)
+    private bool ExecuteSendArithmetic(byte bytecode)
     {
         if (_arithmeticSelectorOOPs == null)
         {
@@ -1842,20 +1841,19 @@ public partial class VirtualMachine : IPrimitiveContext
                 selector == "<=" || selector == ">=")
             {
                 Push(resultOOP);
-                return;
+                return true;
             }
         }
 
         // Fall back to message send using cached selector OOP
         var outcome = SendMessage(receiverOOP, selectorOOP, new[] { argOOP });
-        if (!ConsumeCallOutcome(outcome))
-            return; // method returned via NLR targeting this context
+        return ConsumeCallOutcome(outcome);
     }
 
     /// <summary>
     /// Executes special message send (0xC0-0xCF).
     /// </summary>
-    private void ExecuteSendSpecial(byte bytecode)
+    private bool ExecuteSendSpecial(byte bytecode)
     {
         if (_specialSelectorOOPs == null)
         {
@@ -1901,20 +1899,19 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             bool isIdentical = receiverOOP == args[0];
             Push(isIdentical ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False);
-            return;
+            return true;
         }
 
         if (selectorIndex == 7) // class
         {
             var classOOP = GetClass(receiverOOP);
             Push(classOOP);
-            return;
+            return true;
         }
 
         // Fall back to message send using cached selector OOP
         var outcome = SendMessage(receiverOOP, selectorOOP, args);
-        if (!ConsumeCallOutcome(outcome))
-            return; // method returned via NLR targeting this context
+        return ConsumeCallOutcome(outcome);
     }
 
     /// <summary>
