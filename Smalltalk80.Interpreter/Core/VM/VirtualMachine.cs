@@ -474,6 +474,23 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
+    /// Adds a context to the size-specific pool for reuse.
+    /// </summary>
+    private void AddContextToPool(SmalltalkOOP contextOOP)
+    {
+        int size = _heapManager.GetIndexedSize(contextOOP);
+        if (!_contextPools.TryGetValue(size, out var poolForSize))
+        {
+            poolForSize = new Stack<SmalltalkOOP>();
+            _contextPools[size] = poolForSize;
+        }
+        if (poolForSize.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
+        {
+            poolForSize.Push(contextOOP);
+        }
+    }
+
+    /// <summary>
     /// Handles a method/block return. Switches back to sender context.
     /// Handles non-local returns by unwinding contexts until reaching target.
     /// Returns InterpreterStatus indicating whether to continue or complete.
@@ -502,17 +519,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
-                // Add context to size-specific pool for reuse (if pool not full)
-                int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
-                if (!_contextPools.TryGetValue(contextSize, out var pool))
-                {
-                    pool = new Stack<SmalltalkOOP>();
-                    _contextPools[contextSize] = pool;
-                }
-                if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
-                {
-                    pool.Push(_activeContextOOP);
-                }
+                // Add context to size-specific pool for reuse
+                AddContextToPool(_activeContextOOP);
 
                 // Decrement context depth
                 _activeContextCount--;
@@ -537,17 +545,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
 
-            // Add context to size-specific pool for reuse (if pool not full)
-            int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
-            if (!_contextPools.TryGetValue(contextSize, out var pool))
-            {
-                pool = new Stack<SmalltalkOOP>();
-                _contextPools[contextSize] = pool;
-            }
-            if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
-            {
-                pool.Push(_activeContextOOP);
-            }
+            // Add context to size-specific pool for reuse
+            AddContextToPool(_activeContextOOP);
 
             // Decrement context depth
             _activeContextCount--;
@@ -579,17 +578,8 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"  Was a block context");
         }
 
-        // Add context to size-specific pool for reuse (if pool not full)
-        int contextSize = _heapManager.GetIndexedSize(_activeContextOOP);
-        if (!_contextPools.TryGetValue(contextSize, out var pool))
-        {
-            pool = new Stack<SmalltalkOOP>();
-            _contextPools[contextSize] = pool;
-        }
-        if (pool.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
-        {
-            pool.Push(_activeContextOOP);
-        }
+        // Add context to size-specific pool for reuse
+        AddContextToPool(_activeContextOOP);
 
         // Decrement context depth
         _activeContextCount--;
