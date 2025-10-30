@@ -2466,15 +2466,15 @@ public partial class VirtualMachine : IPrimitiveContext
             var bytecodeArrayOOP = _heapManager.GetIndexedOOP(methodOOP, literalCount - 1);
 
             // Get bytecode array bytes
-            var bytecodes = _heapManager.GetByteArray(bytecodeArrayOOP);
-            if (bytecodes == null || bytecodes.Length == 0) return false;
+            int bytecodeLength = _heapManager.GetIndexedSize(bytecodeArrayOOP);
+            if (bytecodeLength == 0) return false;
 
             // Check if next bytecode (after current send completes) is a return
             // The send bytecode we just executed consumed some bytes, so we check currentPC+1
             int nextPC = currentPC + 1;
-            if (nextPC >= bytecodes.Length) return false;
+            if (nextPC >= bytecodeLength) return false;
 
-            byte nextBytecode = bytecodes[nextPC];
+            byte nextBytecode = _heapManager.GetIndexedByte(bytecodeArrayOOP, nextPC);
 
             // Check if it's a return bytecode
             return BytecodeUtil.IsReturn(nextBytecode);
