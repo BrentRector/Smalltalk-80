@@ -2693,20 +2693,32 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 // Get selector from method's literal[0] (stored at indexed slot 1 in our format)
                 // indexed slot 0 = header, indexed slot 1 = literal[0] (selector)
+                // Blocks don't have selectors, they have other literals at literal[0]
                 string selectorName = "<unknown>";
                 try
                 {
                     var selectorOOP = GetMethodLiteral(methodOOP, 1);
-                    selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
+                    var symbolName = GetSymbolName(selectorOOP);
 
-                    // If literal[0] is not a symbol, try to show what it is
-                    if (selectorName == "<nil>" || selectorOOP == SpecialObjectsArray.Instance.Nil)
+                    // Check if this is a selector (Symbol) or something else (likely a block)
+                    if (symbolName != null && selectorOOP != SpecialObjectsArray.Instance.Nil)
                     {
-                        selectorName = "<nil selector>";
+                        selectorName = symbolName;
+                    }
+                    else if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+                    {
+                        // No literal[0] - this is a block
+                        selectorName = "<block>";
                     }
                     else if (selectorOOP.IsSmallInteger)
                     {
-                        selectorName = $"<SmallInt:{selectorOOP.AsSmallInteger()}>";
+                        // Probably a block with SmallInt literal
+                        selectorName = "<block>";
+                    }
+                    else
+                    {
+                        // Has literal[0] but it's not a Symbol - likely a block
+                        selectorName = "<block>";
                     }
                 }
                 catch (Exception ex)
