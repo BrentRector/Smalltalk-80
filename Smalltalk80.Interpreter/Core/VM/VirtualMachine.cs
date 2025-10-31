@@ -698,7 +698,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Clean up block context mapping if this was a block
         bool wasBlock = _blockContextMapping.ContainsKey(_activeContextOOP);
         _blockContextMapping.Remove(_activeContextOOP);
-        if (wasBlock)
+        if (_verboseDebugMode && wasBlock)
         {
             Console.WriteLine($"  Was a block context");
         }
@@ -722,7 +722,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // Switch to sender context and push return value
         _activeContextOOP = senderOOP;
         Push(returnValue);
-        Console.WriteLine($"  Pushed return value onto sender's stack");
+        if (_verboseDebugMode)
+            Console.WriteLine($"  Pushed return value onto sender's stack");
 
         // Continue execution in sender context
         return InterpreterStatus.Continue;
@@ -2243,7 +2244,7 @@ public partial class VirtualMachine : IPrimitiveContext
         string? selectorName = GetSymbolName(selectorOOP);
 
         // DEBUG: Log value sends to see what's receiving them
-        if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
+        if (_verboseDebugMode && (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:"))
         {
             var className = GetClassName(classOOP);
             Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\" | args={args.Length}");
@@ -2358,8 +2359,11 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
                 if (_contextSwitchedByPrimitive)
                 {
-                    Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} switched context");
-                    Console.WriteLine($"  _activeContextOOP is now: {_activeContextOOP}");
+                    if (_verboseDebugMode)
+                    {
+                        Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} switched context");
+                        Console.WriteLine($"  _activeContextOOP is now: {_activeContextOOP}");
+                    }
                     _contextSwitchedByPrimitive = false;
                     // Primitive created new context - signal context switch
                     return CallOutcome.ContextSwitch();
@@ -2901,8 +2905,11 @@ public partial class VirtualMachine : IPrimitiveContext
         var previousContext = _activeContextOOP;
         _activeContextOOP = executionContextOOP;
 
-        Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {executionContextOOP}");
-        Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
+        if (_verboseDebugMode)
+        {
+            Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {executionContextOOP}");
+            Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
+        }
 
         // Signal that primitive created a new context
         // The InterpreterLoop will continue execution in the block context
