@@ -168,32 +168,43 @@ public partial class VirtualMachine : IPrimitiveContext
         // Convert search string to bytes (Latin-1 encoding)
         byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
 
-        // Search through USTable
+        // Search through USTable (Array-of-Arrays structure for collision chaining)
         for (int i = 0; i < ustableSize; i++)
         {
-            var symbolOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
+            var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
 
-            // Skip nil slots
-            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
+            // Skip nil buckets (empty slots)
+            if (bucketOOP == nilOOP)
                 continue;
 
-            // Compare Symbol bytes in heap
-            int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-            if (symbolLength == searchBytes.Length)
+            // Bucket is an Array of Symbols - iterate through it
+            int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
+            for (int k = 0; k < bucketSize; k++)
             {
-                bool match = true;
-                for (int j = 0; j < searchBytes.Length; j++)
-                {
-                    byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
-                    if (symbolByte != searchBytes[j])
-                    {
-                        match = false;
-                        break;
-                    }
-                }
+                var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, k);
 
-                if (match)
-                    return symbolOOP;
+                // Skip nil slots (shouldn't happen, but defensive)
+                if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
+                    continue;
+
+                // Compare Symbol bytes in heap
+                int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
+                if (symbolLength == searchBytes.Length)
+                {
+                    bool match = true;
+                    for (int j = 0; j < searchBytes.Length; j++)
+                    {
+                        byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
+                        if (symbolByte != searchBytes[j])
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (match)
+                        return symbolOOP;
+                }
             }
         }
 
