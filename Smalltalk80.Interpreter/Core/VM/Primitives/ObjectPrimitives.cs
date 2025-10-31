@@ -410,10 +410,10 @@ public static class ObjectPrimitives
     /// </summary>
     private static SmalltalkOOP GetCharacterForAscii(IPrimitiveContext ctx, byte asciiValue)
     {
-        // Get Character class from Smalltalk global dictionary
-        if (!GlobalRegistry.TryGet("Character", out var characterClassOOP))
+        // Get Character class from GlobalRegistry (using "class:ClassName" format)
+        if (!GlobalRegistry.TryGet("class:Character", out var characterClassOOP))
         {
-            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class not found in GlobalRegistry");
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: class:Character not found in GlobalRegistry");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
