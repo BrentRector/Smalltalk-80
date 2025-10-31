@@ -273,7 +273,9 @@ public class Phase5_GlobalsAndPatches
     private int ComputeUSTableSize(int count) => count * 2; // Load factor heuristic
 
     /// <summary>
-    /// Creates a USTable (Universal Symbol Table) as an Array.
+    /// Creates a USTable (Universal Symbol Table) as an Array of Arrays.
+    /// Each bucket is initialized to an empty Array to support collision handling via chaining.
+    /// This matches Symbol class>>rehash: USTable _ USTable collect: [:sym | Array new: 0].
     /// </summary>
     private SmalltalkOOP CreateUSTable(int size)
     {
@@ -290,38 +292,49 @@ public class Phase5_GlobalsAndPatches
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
-        // Initialize all slots to nil
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        // Initialize each bucket to an empty Array (not nil!)
+        // This matches Symbol class>>rehash which does: Array new: 0
         for (int i = 0; i < size; i++)
         {
-            _allocator.SetIndexedOOP(ustableOOP, i, nilOOP);
+            // Create empty Array for this bucket
+            var bucketArrayOOP = _allocator.AllocateArray("Array", 0);
+            _allocator.SetSlot(bucketArrayOOP, 0, arrayClassOOP);
+            _allocator.SetIndexedOOP(ustableOOP, i, bucketArrayOOP);
         }
 
         return ustableOOP;
     }
 
     /// <summary>
-    /// Inserts a symbol into the USTable using open addressing.
+    /// Inserts a symbol into the USTable by appending it to the bucket array.
+    /// This matches Symbol class>>intern: which does: USTable at: index put: ((USTable at: index) copyWith: sym)
     /// </summary>
     private void InsertIntoUSTable(SmalltalkOOP ustableOOP, SmalltalkOOP symbolOOP, int hash)
     {
         int size = _allocator.GetIndexedSize(ustableOOP);
         int index = hash % size;
 
-        // Find first empty slot using open addressing
-        while (true)
-        {
-            var slotOOP = _allocator.GetIndexedOOP(ustableOOP, index);
-            if (slotOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                // Found empty slot
-                _allocator.SetIndexedOOP(ustableOOP, index, symbolOOP);
-                break;
-            }
+        // Get the current bucket (an Array)
+        var bucketOOP = _allocator.GetIndexedOOP(ustableOOP, index);
+        int bucketSize = _allocator.GetIndexedSize(bucketOOP);
 
-            // Move to next slot (wrap around)
-            index = (index + 1) % size;
+        // Create new bucket with symbol appended (copyWith: semantics)
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var newBucketOOP = _allocator.AllocateArray("Array", bucketSize + 1);
+        _allocator.SetSlot(newBucketOOP, 0, arrayClassOOP);
+
+        // Copy existing symbols
+        for (int i = 0; i < bucketSize; i++)
+        {
+            var existingSymbol = _allocator.GetIndexedOOP(bucketOOP, i);
+            _allocator.SetIndexedOOP(newBucketOOP, i, existingSymbol);
         }
+
+        // Append new symbol
+        _allocator.SetIndexedOOP(newBucketOOP, bucketSize, symbolOOP);
+
+        // Store new bucket back in USTable
+        _allocator.SetIndexedOOP(ustableOOP, index, newBucketOOP);
     }
 
     // ================================================================================
