@@ -504,9 +504,42 @@ public static class ObjectPrimitives
     /// </summary>
     private static SmalltalkOOP LookupInDictionary(IPrimitiveContext ctx, SmalltalkOOP dictionaryOOP, string key)
     {
-        // Dictionary has 2 instance variables: tally (index 0), array (index 1)
-        var arrayOOP = ctx.HeapManager.GetInstanceVariable(dictionaryOOP, 1);
-        int arraySize = ctx.HeapManager.GetIndexedSize(arrayOOP);
+        // DIAGNOSTIC: Inspect the dictionary structure
+        var classOOP = ctx.HeapManager.GetClass(dictionaryOOP);
+        int instanceVarCount = ctx.HeapManager.GetInstanceVariableCount(dictionaryOOP);
+        int indexedSize = ctx.HeapManager.GetIndexedSize(dictionaryOOP);
+        var format = ctx.HeapManager.GetObjectFormat(dictionaryOOP);
+
+        Console.WriteLine($"[LookupInDictionary] Inspecting dictionary oop={dictionaryOOP}");
+        Console.WriteLine($"  Class: {classOOP}");
+        Console.WriteLine($"  Instance variable count: {instanceVarCount}");
+        Console.WriteLine($"  Indexed size: {indexedSize}");
+        Console.WriteLine($"  Object format: {format}");
+
+        // SystemDictionary might be indexed (the dictionary IS the array)
+        // rather than having instance variables pointing to an array
+        SmalltalkOOP arrayOOP;
+        int arraySize;
+
+        if (instanceVarCount == 0 && indexedSize > 0)
+        {
+            // Dictionary IS the array (indexed format)
+            Console.WriteLine($"  → Dictionary is indexed, using self as array");
+            arrayOOP = dictionaryOOP;
+            arraySize = indexedSize;
+        }
+        else if (instanceVarCount >= 2)
+        {
+            // Traditional Dictionary with instance variables: tally (0), array (1)
+            Console.WriteLine($"  → Dictionary has instance variables, reading array from index 1");
+            arrayOOP = ctx.HeapManager.GetInstanceVariable(dictionaryOOP, 1);
+            arraySize = ctx.HeapManager.GetIndexedSize(arrayOOP);
+        }
+        else
+        {
+            Console.WriteLine($"  → ERROR: Unexpected dictionary structure!");
+            return SpecialObjectsArray.Instance.Nil;
+        }
 
         // Walk the association array
         for (int i = 0; i < arraySize; i++)
