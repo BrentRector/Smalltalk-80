@@ -7570,8 +7570,17 @@ Character class
 
 !Character class methodsFor: 'class initialization'!
 initialize
-	"Create the table of unique Characters.  This code is not shown so that the
-	user can not destroy the system by trying to recreate the table."! !
+	"Create the table of unique Characters."
+	CharacterTable := Array new: 256.
+	0 to: 255 do: [:i | | char |
+		char := self basicNew setValue: i.
+		CharacterTable at: i + 1 put: char]! !
+
+!Character methodsFor: 'private'!
+setValue: anInteger
+	"Private - Set the receiver's value. Used only during Character table initialization."
+	value := anInteger.
+	^self! !
 
 !Character class methodsFor: 'instance creation'!
 digitValue: x 
