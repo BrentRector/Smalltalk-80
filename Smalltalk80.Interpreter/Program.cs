@@ -229,6 +229,10 @@ public static class Program
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
+                    // Enable verbose debug mode ONLY for the init expression we're debugging
+                    bool isDebugging = expr.Source?.Contains("ClassOrganizer initialize") == true;
+                    vm.SetVerboseDebugMode(isDebugging);
+
                     Console.WriteLine($"[{index}] {expr.Source}");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 

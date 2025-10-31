@@ -24,6 +24,9 @@ public partial class VirtualMachine : IPrimitiveContext
     private readonly IPlatformBridge? _platformBridge;
     private readonly DebugOptions _debugOptions;
 
+    // Verbose debug mode for current init expression (controlled by Program.cs)
+    private bool _verboseDebugMode = false;
+
     // Active context (current MethodContext being executed) - now using SmalltalkOOP
     private SmalltalkOOP _activeContextOOP;
 
@@ -198,6 +201,15 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
+    /// Enables or disables verbose debug output for the current init expression.
+    /// Used by Program.cs to reduce noise from successful init expressions.
+    /// </summary>
+    public void SetVerboseDebugMode(bool enabled)
+    {
+        _verboseDebugMode = enabled;
+    }
+
+    /// <summary>
     /// Executes a method with the given receiver and arguments.
     /// Returns the result of the execution.
     /// </summary>
@@ -280,7 +292,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Check if we accidentally picked the active context
             if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
             {
-                Console.WriteLine($"[POOL] WARNING: Attempted to reuse active/sender context {contextOOP}, allocating new instead");
+                if (_verboseDebugMode)
+                    Console.WriteLine($"[POOL] WARNING: Attempted to reuse active/sender context {contextOOP}, allocating new instead");
                 // Put it back and allocate a fresh one
                 pool.Push(contextOOP);
                 contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
@@ -288,7 +301,8 @@ public partial class VirtualMachine : IPrimitiveContext
             }
             else
             {
-                Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
+                if (_verboseDebugMode)
+                    Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
             }
         }
         else
@@ -296,7 +310,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Allocate new context
             contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
-            Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
         }
 
         // Increment context depth and check limit
@@ -417,12 +432,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private InterpreterStatus ExecuteBytecodeStep()
     {
-        Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
+        if (_verboseDebugMode)
+            Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
         if (_nonLocalReturnPending)
         {
-            Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
             return HandleReturn(_nlrValue);
         }
 
@@ -438,8 +455,11 @@ public partial class VirtualMachine : IPrimitiveContext
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
-        Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
-        Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}, sp={sp}");
+        if (_verboseDebugMode)
+        {
+            Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
+            Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}, sp={sp}");
+        }
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
         var methodFormat = _heapManager.GetObjectFormat(methodOOP);
@@ -470,18 +490,24 @@ public partial class VirtualMachine : IPrimitiveContext
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-            // DIAGNOSTIC: Show sp before executing bytecode
-            var spBeforeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-            int spBefore = spBeforeOOP.AsSmallInteger();
-            Console.WriteLine($"[ExecuteBytecode] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}, sp before={spBefore}");
+            // DIAGNOSTIC: Show sp before/after executing bytecode
+            int spBefore = 0, spAfter = 0;
+            if (_verboseDebugMode)
+            {
+                var spBeforeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+                spBefore = spBeforeOOP.AsSmallInteger();
+                Console.WriteLine($"[ExecuteBytecode] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}, sp before={spBefore}");
+            }
 
             // Execute the bytecode
             bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
 
-            // DIAGNOSTIC: Show sp after executing bytecode
-            var spAfterOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-            int spAfter = spAfterOOP.AsSmallInteger();
-            Console.WriteLine($"[ExecuteBytecode] sp after={spAfter}, delta={spAfter - spBefore}");
+            if (_verboseDebugMode)
+            {
+                var spAfterOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+                spAfter = spAfterOOP.AsSmallInteger();
+                Console.WriteLine($"[ExecuteBytecode] sp after={spAfter}, delta={spAfter - spBefore}");
+            }
 
             if (!continueExecution)
             {
@@ -518,14 +544,16 @@ public partial class VirtualMachine : IPrimitiveContext
         // NEVER pool the active context
         if (contextOOP == _activeContextOOP)
         {
-            Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
             return;
         }
 
         // NEVER pool a context that's in the active context's sender chain
         if (IsInSenderChain(contextOOP, _activeContextOOP))
         {
-            Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
             return;
         }
 
@@ -538,7 +566,8 @@ public partial class VirtualMachine : IPrimitiveContext
         if (poolForSize.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
         {
             poolForSize.Push(contextOOP);
-            Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
         }
     }
 
@@ -581,12 +610,14 @@ public partial class VirtualMachine : IPrimitiveContext
         // Handle non-local returns (NLR)
         if (_nonLocalReturnPending)
         {
-            Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
 
             // Check if current context is the NLR target
             if (_activeContextOOP == _nlrTargetContext)
             {
-                Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
+                if (_verboseDebugMode)
+                    Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
 
                 // Target reached - clear NLR state and push value
                 _nonLocalReturnPending = false;
@@ -611,20 +642,23 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     _returnValue = nlrValue;
                     _activeContextOOP = _initialContextOOP;
-                    Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
+                    if (_verboseDebugMode)
+                        Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
                 // Switch to sender and push NLR value
                 _activeContextOOP = senderOOP;
                 Push(nlrValue);
-                Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
+                if (_verboseDebugMode)
+                    Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
                 return InterpreterStatus.Continue;
             }
 
             // Not the target - continue unwinding (don't push value)
             senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
-            Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
 
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
@@ -645,7 +679,8 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Continue unwinding
             _activeContextOOP = senderOOP;
-            Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
             return InterpreterStatus.Continue;
         }
 
@@ -3233,10 +3268,14 @@ public partial class VirtualMachine : IPrimitiveContext
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
-        Console.WriteLine($"[Push] context={_activeContextOOP}, sp before={sp}, value={valueOOP}");
+        if (_verboseDebugMode)
+            Console.WriteLine($"[Push] context={_activeContextOOP}, sp before={sp}, value={valueOOP}");
+
         _heapManager.SetIndexedOOP(_activeContextOOP, sp, valueOOP);
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
-        Console.WriteLine($"[Push] sp after={sp + 1}");
+
+        if (_verboseDebugMode)
+            Console.WriteLine($"[Push] sp after={sp + 1}");
     }
 
     /// <summary>
@@ -3273,10 +3312,15 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         sp--;
-        Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
+        if (_verboseDebugMode)
+            Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
+
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
         var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp);
-        Console.WriteLine($"[Pop] popped value={value}");
+
+        if (_verboseDebugMode)
+            Console.WriteLine($"[Pop] popped value={value}");
+
         return value;
     }
 
