@@ -1437,7 +1437,9 @@ public partial class VirtualMachine : IPrimitiveContext
             if (_verboseDebugMode)
             {
                 string selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
-                Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
+                string methodLocalId = GetLocalId(methodOOP) ?? "<unknown>";
+                Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, methodLocalId={methodLocalId}");
+                Console.WriteLine($"  selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
                 Console.WriteLine($"  selectorOOP={selectorOOP}, selectorName='{selectorName}'");
             }
 
@@ -2335,6 +2337,15 @@ public partial class VirtualMachine : IPrimitiveContext
         if (methodInfo == null)
         {
             string? className = GetClassName(classOOP);
+            string receiverInfo = GetLocalId(receiverOOP) ?? receiverOOP.ToString();
+
+            Console.WriteLine($"\n❌ METHOD NOT FOUND ERROR");
+            Console.WriteLine($"   Selector: {selectorName ?? "<unknown>"}");
+            Console.WriteLine($"   Receiver: {receiverInfo}, Class: {className} (classOOP={classOOP})");
+            Console.WriteLine($"   Arguments: {args.Length}");
+            Console.WriteLine("\nSmalltalk Context Chain:");
+            DumpSenderChain(_activeContextOOP, 10);
+
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "<unknown>"} in class {className} (classOOP={classOOP})");
         }
@@ -2379,6 +2390,18 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
             }
+
+            // DIAGNOSTIC: Dump .NET stack trace and Smalltalk context chain on primitive failure
+            Console.WriteLine($"\n❌ PRIMITIVE FAILURE: Primitive {primitiveNumber} ({selectorName}) failed");
+            Console.WriteLine($"   Receiver: {receiverOOP}, Class: {GetClassName(classOOP)}");
+            Console.WriteLine($"   Arguments: {args.Length}");
+            Console.WriteLine("\n.NET Stack Trace:");
+            Console.WriteLine(Environment.StackTrace);
+            Console.WriteLine("\nSmalltalk Context Chain:");
+            DumpSenderChain(_activeContextOOP, 10);
+            Console.WriteLine("\n⚠️  TERMINATING due to primitive failure");
+            Environment.Exit(1);
+
             // Primitive failed - execute method bytecodes as fallback
         }
 
