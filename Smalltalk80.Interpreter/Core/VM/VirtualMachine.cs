@@ -3141,7 +3141,7 @@ public partial class VirtualMachine : IPrimitiveContext
         // Execution stack empty when sp == (numArgs + numTemps)
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-        var header = _methodHeaderCache.GetHeader(methodOOP);
+        var header = ParseMethodHeader(methodOOP);
         int initialSP = header.NumArgs + header.NumTemps;
 
         if (sp <= initialSP)
