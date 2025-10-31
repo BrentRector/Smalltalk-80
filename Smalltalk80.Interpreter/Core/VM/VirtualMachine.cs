@@ -412,8 +412,13 @@ public partial class VirtualMachine : IPrimitiveContext
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
+        // Diagnostic: show stack pointer
+        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+        int sp = spOOP.AsSmallInteger();
+
         Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
-        Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}");
+        Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}, sp={sp}");
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
         var methodFormat = _heapManager.GetObjectFormat(methodOOP);
@@ -3122,8 +3127,10 @@ public partial class VirtualMachine : IPrimitiveContext
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
+        Console.WriteLine($"[Push] context={_activeContextOOP}, sp before={sp}, value={valueOOP}");
         _heapManager.SetIndexedOOP(_activeContextOOP, sp, valueOOP);
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
+        Console.WriteLine($"[Push] sp after={sp + 1}");
     }
 
     /// <summary>
