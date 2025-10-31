@@ -319,7 +319,7 @@ public partial class VirtualMachine : IPrimitiveContext
         _activeContextCount++;
 
         // Diagnostic snapshots at key thresholds
-        if (_activeContextCount == 100 || _activeContextCount == 250 || _activeContextCount == 400)
+        if (_verboseDebugMode && (_activeContextCount == 100 || _activeContextCount == 250 || _activeContextCount == 400))
         {
             Console.WriteLine($"\n[DEPTH SNAPSHOT] Context depth reached {_activeContextCount}");
             DumpSenderChain(callerContextOOP, 20);
@@ -716,7 +716,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Execution complete - return to caller
             _returnValue = returnValue;
             _activeContextOOP = _initialContextOOP;
-            Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
+            if (_verboseDebugMode)
+                Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
         }
 

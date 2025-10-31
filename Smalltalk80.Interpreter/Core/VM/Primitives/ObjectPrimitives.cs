@@ -191,9 +191,9 @@ public static class ObjectPrimitives
     // Primitive 71: Object new:
     public static SmalltalkOOP NewWithSize(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // DEBUG: Log first 50 calls
+        // DEBUG: Log first 50 calls (only when verbose debug mode enabled)
         System.Threading.Interlocked.Increment(ref _prim71CallCount);
-        bool shouldLog = _prim71CallCount <= 50;
+        bool shouldLog = ctx.HeapManager.VerboseDebugMode && _prim71CallCount <= 50;
 
         if (args.Length != 1)
         {
