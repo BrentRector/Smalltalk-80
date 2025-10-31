@@ -3146,6 +3146,15 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (sp <= initialSP)
         {
+            // Diagnostic: show what method we tried to parse
+            var contextClass = GetClassName(GetClass(_activeContextOOP));
+            var methodClass = methodOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(methodOOP));
+            Console.WriteLine($"[Pop ERROR] Stack underflow diagnostics:");
+            Console.WriteLine($"  activeContext: {_activeContextOOP}, class: {contextClass}");
+            Console.WriteLine($"  methodOOP from slot {methodIndex}: {methodOOP}, class: {methodClass}");
+            Console.WriteLine($"  sp={sp}, initialSP={initialSP}");
+            Console.WriteLine($"  header: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
+
             throw new InvalidOperationException(
                 $"Stack underflow: sp={sp}, initialSP={initialSP} (numArgs={header.NumArgs}, numTemps={header.NumTemps})");
         }
