@@ -3135,9 +3135,19 @@ public partial class VirtualMachine : IPrimitiveContext
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
-        if (sp <= 0)
+        // Get method to determine where execution stack starts
+        // sp is absolute index: [0..numArgs-1][numArgs..numArgs+numTemps-1][numArgs+numTemps..stackSize-1]
+        //                        ^--arguments--^------temporaries--------^-------execution stack----------^
+        // Execution stack empty when sp == (numArgs + numTemps)
+        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var header = _methodHeaderCache.GetHeader(methodOOP);
+        int initialSP = header.NumArgs + header.NumTemps;
+
+        if (sp <= initialSP)
         {
-            throw new InvalidOperationException("Stack underflow");
+            throw new InvalidOperationException(
+                $"Stack underflow: sp={sp}, initialSP={initialSP} (numArgs={header.NumArgs}, numTemps={header.NumTemps})");
         }
 
         sp--;
