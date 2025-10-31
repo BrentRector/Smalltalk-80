@@ -669,7 +669,10 @@ The VM must provide these guarantees in the specified order:
 // WRONG - Never create hardcoded OOPs
 return new SmalltalkOOP(0);
 var nilOOP = new SmalltalkOOP(0);
-SmalltalkOOP emptyValue = default(SmalltalkOOP);
+
+// WRONG - Never use default(SmalltalkOOP) for initialization
+SmalltalkOOP emptyValue = default(SmalltalkOOP);  // This is OOP(0)!
+var slots = new SmalltalkOOP[10];  // All slots are OOP(0) - NOT nil!
 
 // WRONG - Never compare against hardcoded OOPs
 if (oop == new SmalltalkOOP(0)) { ... }
@@ -695,13 +698,24 @@ if (receiver == SpecialObjectsArray.Instance.Nil) { ... }
 var smalltalkDictOOP = GlobalRegistry.Get("Smalltalk");
 ```
 
-**Array Initialization Rule**: When allocating `new SmalltalkOOP[size]` arrays:
-- C# initializes to `default(SmalltalkOOP)` which is OOP(0) - NOT nil
-- MUST immediately fill array with valid OOPs before use
-- For object instance variables, use initialization loops to set nil
-- For temporary args/local arrays, fill from stack/parameters before passing to methods
+**Array Initialization Rule - CRITICAL**: When allocating `new SmalltalkOOP[size]` arrays:
+- **C# initializes to `default(SmalltalkOOP)` which is OOP(0) - NOT nil!**
+- **OOP(0) is a valid object table index** - it will reference whatever object happens to be at index 0
+- **MUST immediately fill array with valid OOPs before use**
+- **Before nil exists**: Cannot initialize to nil during early cold start phases (0-2)
+  - Solution: Allocate arrays only after nil is created (Phase 3+), or explicitly track uninitialized state
+- **After nil exists** (Phase 3+): Initialize all SmalltalkOOP arrays to nil immediately after allocation:
+  ```csharp
+  var slots = new SmalltalkOOP[size];
+  var nilOOP = SpecialObjectsArray.Instance.Nil;
+  for (int i = 0; i < size; i++) {
+      slots[i] = nilOOP;  // REQUIRED - do not rely on default(SmalltalkOOP)
+  }
+  ```
 
-**Recent Fix (2025-10-28)**: Fixed `Program.cs:368` which returned `new SmalltalkOOP(0)` instead of nil.
+**Recent Fixes**:
+- **2025-10-28**: Fixed `Program.cs:368` which returned `new SmalltalkOOP(0)` instead of nil
+- **2025-10-31**: Fixed USTable creation which relied on default(SmalltalkOOP) being nil - added explicit nil initialization loop
 
 ### Init Expression Execution Strategy - CRITICAL ORDERING REQUIREMENT
 
