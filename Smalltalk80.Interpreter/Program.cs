@@ -233,7 +233,10 @@ public static class Program
                     bool isDebugging = expr.Source?.Contains("ClassOrganizer initialize") == true;
                     vm.SetVerboseDebugMode(isDebugging);
 
+                    Console.WriteLine();
+                    Console.WriteLine("******************************************");
                     Console.WriteLine($"[{index}] {expr.Source}");
+                    Console.WriteLine("******************************************");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
                     // EXPERIMENT: Log successful completion to verify call stack unwound

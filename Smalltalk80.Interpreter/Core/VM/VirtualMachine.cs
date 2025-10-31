@@ -516,13 +516,15 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Context switch - continue execution in new context
                     _contextSwitchPending = false;
-                    Console.WriteLine($"[ExecuteBytecodeStep] Context switch detected, continuing in {_activeContextOOP}");
+                    if (_verboseDebugMode)
+                        Console.WriteLine($"[ExecuteBytecodeStep] Context switch detected, continuing in {_activeContextOOP}");
                     return InterpreterStatus.Continue;
                 }
 
                 // Method returned - handle the return
                 var returnValue = Pop();
-                Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
+                if (_verboseDebugMode)
+                    Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
                 return HandleReturn(returnValue);
             }
 
@@ -687,8 +689,11 @@ public partial class VirtualMachine : IPrimitiveContext
         // Normal return (not NLR)
         senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
-        Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
-        Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
+        if (_verboseDebugMode)
+        {
+            Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
+            Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
+        }
 
         // Clean up block context mapping if this was a block
         bool wasBlock = _blockContextMapping.ContainsKey(_activeContextOOP);
@@ -1426,9 +1431,12 @@ public partial class VirtualMachine : IPrimitiveContext
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
             // DIAGNOSTIC: Show what selector we retrieved
-            string selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
-            Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
-            Console.WriteLine($"  selectorOOP={selectorOOP}, selectorName='{selectorName}'");
+            if (_verboseDebugMode)
+            {
+                string selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
+                Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
+                Console.WriteLine($"  selectorOOP={selectorOOP}, selectorName='{selectorName}'");
+            }
 
             // Handle blocks with nil literals - resolve from home context
             if (selectorOOP == SpecialObjectsArray.Instance.Nil)
@@ -2246,7 +2254,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // DEBUG: Check if receiver is a class object
-        if (selectorName == "new:")
+        if (_verboseDebugMode && selectorName == "new:")
         {
             var className = GetClassName(classOOP);
             var classFormat = _heapManager.GetObjectFormat(classOOP);
@@ -2404,12 +2412,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private bool ConsumeCallOutcome(CallOutcome outcome)
     {
-        Console.WriteLine($"[ConsumeCallOutcome] outcome.Kind={outcome.Kind}");
+        if (_verboseDebugMode)
+            Console.WriteLine($"[ConsumeCallOutcome] outcome.Kind={outcome.Kind}");
 
         if (outcome.Kind == CallOutcomeKind.Normal)
         {
             Push(outcome.Value);
-            Console.WriteLine($"  Normal: pushed {outcome.Value}");
+            if (_verboseDebugMode)
+                Console.WriteLine($"  Normal: pushed {outcome.Value}");
             return true;
         }
 
@@ -2422,7 +2432,8 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             // Context switch occurred - signal to exit bytecode loop and continue in new context
             _contextSwitchPending = true;
-            Console.WriteLine($"  ContextSwitch: set _contextSwitchPending=true, returning false");
+            if (_verboseDebugMode)
+                Console.WriteLine($"  ContextSwitch: set _contextSwitchPending=true, returning false");
             return false;
         }
 
