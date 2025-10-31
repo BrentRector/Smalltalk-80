@@ -19,6 +19,8 @@ x86/
 [Aa][Rr][Mm]64/
 bld/
 [Bb]in/
+# Exception: Allow coldstart.json in bin folders (reference bundle for interpreter)
+!bin/Debug/net9.0/coldstart.json
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
