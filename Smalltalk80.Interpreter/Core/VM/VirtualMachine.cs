@@ -274,8 +274,22 @@ public partial class VirtualMachine : IPrimitiveContext
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
         {
             // Reuse pooled context with exact size match
+            // CRITICAL: Never reuse the active context or any context in the sender chain!
             contextOOP = pool.Pop();
-            Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
+
+            // Check if we accidentally picked the active context
+            if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
+            {
+                Console.WriteLine($"[POOL] WARNING: Attempted to reuse active/sender context {contextOOP}, allocating new instead");
+                // Put it back and allocate a fresh one
+                pool.Push(contextOOP);
+                contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+                _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+            }
+            else
+            {
+                Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
+            }
         }
         else
         {
@@ -480,9 +494,24 @@ public partial class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Adds a context to the size-specific pool for reuse.
+    /// CRITICAL: Only pool contexts that are truly dead (no longer referenced anywhere).
     /// </summary>
     private void AddContextToPool(SmalltalkOOP contextOOP)
     {
+        // NEVER pool the active context
+        if (contextOOP == _activeContextOOP)
+        {
+            Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
+            return;
+        }
+
+        // NEVER pool a context that's in the active context's sender chain
+        if (IsInSenderChain(contextOOP, _activeContextOOP))
+        {
+            Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
+            return;
+        }
+
         int size = _heapManager.GetIndexedSize(contextOOP);
         if (!_contextPools.TryGetValue(size, out var poolForSize))
         {
@@ -492,7 +521,33 @@ public partial class VirtualMachine : IPrimitiveContext
         if (poolForSize.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
         {
             poolForSize.Push(contextOOP);
+            Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
         }
+    }
+
+    /// <summary>
+    /// Checks if a context is in the sender chain of another context.
+    /// </summary>
+    private bool IsInSenderChain(SmalltalkOOP contextToFind, SmalltalkOOP startContext)
+    {
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        SmalltalkOOP current = startContext;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Walk up the sender chain looking for contextToFind
+        for (int i = 0; i < 100; i++) // Limit iterations to prevent infinite loops
+        {
+            if (current == nilOOP || current == default)
+                return false;
+
+            var senderOOP = _heapManager.GetInstanceVariable(current, senderIndex);
+            if (senderOOP == contextToFind)
+                return true;
+
+            current = senderOOP;
+        }
+
+        return false;
     }
 
     /// <summary>
