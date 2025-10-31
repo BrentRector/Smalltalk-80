@@ -167,10 +167,10 @@ public static class Program
                 {
                     var expr = bundle.InitExpressions[i];
 
-                    // TESTING MODE: Only run BlockContextTest
+                    // TESTING MODE: Only run test classes
                     if (onlyRunTests)
                     {
-                        if (expr.Source != null && expr.Source.Contains("BlockContextTest"))
+                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("IfTrueTest")))
                         {
                             Console.WriteLine($"  DEBUG: Found test expression [{i}]: {expr.Source}");
                             testIndices.Add(i);

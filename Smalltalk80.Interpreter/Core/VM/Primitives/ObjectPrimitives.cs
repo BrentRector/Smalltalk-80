@@ -1003,7 +1003,7 @@ public static class ObjectPrimitives
         return receiver;
     }
 
-    // Primitive 75 alternative: Object hash (for backward compatibility)
+    // Primitive 75: Object hash - Returns identity-based hash value
     public static SmalltalkOOP Hash(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)
@@ -1012,7 +1012,36 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // The OOP itself IS the hash - just return the receiver
-        return receiver;
+        // IMPLEMENTATION NOTE: Berkeley Smalltalk-80 never implemented primitive 75.
+        // It always failed, causing fallback code to execute.
+        //
+        // However, this is only safe for classes that override hash with a fallback:
+        //   - Symbol>>hash: <primitive: 75> ^self (returns Symbol OOP as hash)
+        //
+        // Most classes (String, Object, etc.) don't override hash, so they NEED
+        // primitive 75 to succeed, otherwise Object>>hash fallback calls primitiveFailed.
+        //
+        // SOLUTION: Implement primitive 75 correctly per Blue Book spec.
+        // "Answer a SmallInteger whose value is half of the receiver's object pointer"
+
+        // For SmallIntegers: fail the primitive so SmallInteger>>hash fallback executes
+        // SmallInteger>>hash returns ^self (the numeric value itself)
+        if (receiver.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // For objects: return half the object table index as a SmallInteger
+        // OOP format: object table index shifted left 1 bit (bit 0 = 0 for object pointers)
+        // Hash = (index >> 1) / 2 = index >> 2
+        int objectIndex = receiver.RawValue >> 1;  // Extract object table index
+        int hashValue = objectIndex / 2;           // Half of the index
+        var result = SmalltalkOOP.FromSmallInteger(hashValue);
+
+        // DIAGNOSTIC
+        Console.WriteLine($"[PRIM75] receiver={receiver} → hash={hashValue} result={result} (SmallInt={result.IsSmallInteger})");
+
+        return result;
     }
 }

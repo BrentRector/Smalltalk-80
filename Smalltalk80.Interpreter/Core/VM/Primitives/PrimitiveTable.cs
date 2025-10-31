@@ -118,7 +118,7 @@ public static class PrimitiveTable
         _primitives[72] = ObjectPrimitives.Become;  // Object identity swap (moved from 68)
         _primitives[73] = ObjectPrimitives.InstVarAt;
         _primitives[74] = ObjectPrimitives.InstVarAtPut;
-        _primitives[75] = ObjectPrimitives.AsOop;  // Changed from Hash to AsOop
+        _primitives[75] = ObjectPrimitives.Hash;  // Object>>hash - returns SmallInteger hash value
         _primitives[110] = ObjectPrimitives.IdentityEquals;
         _primitives[111] = ObjectPrimitives.Class;
 
