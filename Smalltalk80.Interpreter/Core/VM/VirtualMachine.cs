@@ -419,6 +419,13 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
 
+        // If NLR is pending, continue unwinding instead of executing bytecodes
+        if (_nonLocalReturnPending)
+        {
+            Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
+            return HandleReturn(_nlrValue);
+        }
+
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
         int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
@@ -574,9 +581,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // Handle non-local returns (NLR)
         if (_nonLocalReturnPending)
         {
+            Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
+
             // Check if current context is the NLR target
             if (_activeContextOOP == _nlrTargetContext)
             {
+                Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
+
                 // Target reached - clear NLR state and push value
                 _nonLocalReturnPending = false;
                 SmalltalkOOP nlrValue = _nlrValue;
@@ -600,17 +611,20 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     _returnValue = nlrValue;
                     _activeContextOOP = _initialContextOOP;
+                    Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
                 // Switch to sender and push NLR value
                 _activeContextOOP = senderOOP;
                 Push(nlrValue);
+                Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
                 return InterpreterStatus.Continue;
             }
 
             // Not the target - continue unwinding (don't push value)
             senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+            Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
 
             // Clean up block context mapping
             _blockContextMapping.Remove(_activeContextOOP);
@@ -631,6 +645,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Continue unwinding
             _activeContextOOP = senderOOP;
+            Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
             return InterpreterStatus.Continue;
         }
 
