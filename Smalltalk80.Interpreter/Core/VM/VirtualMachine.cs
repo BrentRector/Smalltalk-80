@@ -1026,6 +1026,23 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Association has layout: [key, value]
+            // DEFENSIVE: Check if this is actually an Association
+            var classOOP = _heapManager.GetClass(associationOOP);
+            int instVarCount = _heapManager.GetInstanceVariableCount(associationOOP);
+
+            if (instVarCount < 2)
+            {
+                Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: Expected Association, got object with {instVarCount} instance variables");
+                Console.WriteLine($"  associationOOP: {associationOOP}");
+                Console.WriteLine($"  classOOP: {classOOP}");
+                Console.WriteLine($"  methodOOP: {methodOOP}");
+                Console.WriteLine($"  literal index: {index}");
+
+                // This might be a Symbol or other object that should be pushed directly
+                Push(associationOOP);
+                return true;
+            }
+
             int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
             var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
 
