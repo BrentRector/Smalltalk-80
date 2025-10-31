@@ -391,6 +391,21 @@ public static class ObjectPrimitives
         int size = ctx.HeapManager.GetIndexedSize(receiver);
         if (index > size)
         {
+            Console.WriteLine($"\n❌ Primitive 63 (at:) BOUNDS ERROR:");
+            Console.WriteLine($"   Receiver: {receiver} (size={size})");
+            Console.WriteLine($"   Index: {index} (1-based)");
+            Console.WriteLine($"   Receiver format: {ctx.HeapManager.GetObjectFormat(receiver)}");
+            var receiverClass = ctx.HeapManager.GetClassOOP(receiver);
+            var className = GetClassName(ctx, receiverClass);
+            Console.WriteLine($"   Receiver class: {className}");
+
+            // Try to get symbol name if it's a Symbol
+            if (ctx.HeapManager.GetObjectFormat(receiver) == ObjectFormat.ByteIndexed)
+            {
+                var symbolName = GetSymbolName(ctx, receiver);
+                Console.WriteLine($"   Symbol name: '{symbolName}' (length={symbolName?.Length ?? 0})");
+            }
+
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }

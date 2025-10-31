@@ -2386,21 +2386,10 @@ public partial class VirtualMachine : IPrimitiveContext
                 return CallOutcome.Normal(primitiveResult);
             }
 
-            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
+            if (_verboseDebugMode || primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
             {
-                Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} failed, executing bytecode fallback");
+                Console.WriteLine($"[Primitive {primitiveNumber} ({selectorName}) failed → executing bytecode fallback]");
             }
-
-            // DIAGNOSTIC: Dump .NET stack trace and Smalltalk context chain on primitive failure
-            Console.WriteLine($"\n❌ PRIMITIVE FAILURE: Primitive {primitiveNumber} ({selectorName}) failed");
-            Console.WriteLine($"   Receiver: {receiverOOP}, Class: {GetClassName(classOOP)}");
-            Console.WriteLine($"   Arguments: {args.Length}");
-            Console.WriteLine("\n.NET Stack Trace:");
-            Console.WriteLine(Environment.StackTrace);
-            Console.WriteLine("\nSmalltalk Context Chain:");
-            DumpSenderChain(_activeContextOOP, 10);
-            Console.WriteLine("\n⚠️  TERMINATING due to primitive failure");
-            Environment.Exit(1);
 
             // Primitive failed - execute method bytecodes as fallback
         }
@@ -2702,16 +2691,26 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 var methodOOP = _heapManager.GetInstanceVariable(currentOOP, methodIndex);
 
-                // Get selector from method's second literal (index 1, after header at index 0)
+                // Get selector from method's literal[0] (stored at indexed slot 0 for our format)
                 string selectorName = "<unknown>";
                 try
                 {
-                    var selectorOOP = _heapManager.GetIndexedOOP(methodOOP, 1);
-                    selectorName = GetSymbolName(selectorOOP) ?? "<unknown>";
+                    var selectorOOP = GetMethodLiteral(methodOOP, 0);
+                    selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
+
+                    // If literal[0] is not a symbol, try to show what it is
+                    if (selectorName == "<nil>" || selectorOOP == SpecialObjectsArray.Instance.Nil)
+                    {
+                        selectorName = "<nil selector>";
+                    }
+                    else if (selectorOOP.IsSmallInteger)
+                    {
+                        selectorName = $"<SmallInt:{selectorOOP.AsSmallInteger()}>";
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // If we can't get the selector, just use unknown
+                    selectorName = $"<error: {ex.Message}>";
                 }
 
                 var classOOP = _heapManager.GetClassOOP(currentOOP);
