@@ -410,10 +410,20 @@ public static class ObjectPrimitives
     /// </summary>
     private static SmalltalkOOP GetCharacterForAscii(IPrimitiveContext ctx, byte asciiValue)
     {
-        // Get Character class from GlobalRegistry (using "class:ClassName" format)
-        if (!GlobalRegistry.TryGet("class:Character", out var characterClassOOP))
+        // Get Smalltalk dictionary from SpecialObjectsArray (heap-only access)
+        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        if (smalltalkDictOOP == SpecialObjectsArray.Instance.Nil)
         {
-            Console.WriteLine($"[GetCharacterForAscii] ERROR: class:Character not found in GlobalRegistry");
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Smalltalk dictionary is nil in SpecialObjectsArray");
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Look up Character class from Smalltalk dictionary
+        var characterClassOOP = LookupInDictionary(ctx, smalltalkDictOOP, "Character");
+        if (characterClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class not found in Smalltalk dictionary");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -485,6 +495,40 @@ public static class ObjectPrimitives
             bytes[i] = ctx.HeapManager.GetIndexedByte(symbolOOP, i);
         }
         return System.Text.Encoding.ASCII.GetString(bytes);
+    }
+
+    /// <summary>
+    /// Looks up a key in a Dictionary by walking the association array.
+    /// Returns the value OOP if found, nil otherwise.
+    /// RUNTIME SAFE: Only accesses heap data.
+    /// </summary>
+    private static SmalltalkOOP LookupInDictionary(IPrimitiveContext ctx, SmalltalkOOP dictionaryOOP, string key)
+    {
+        // Dictionary has 2 instance variables: tally (index 0), array (index 1)
+        var arrayOOP = ctx.HeapManager.GetInstanceVariable(dictionaryOOP, 1);
+        int arraySize = ctx.HeapManager.GetIndexedSize(arrayOOP);
+
+        // Walk the association array
+        for (int i = 0; i < arraySize; i++)
+        {
+            var associationOOP = ctx.HeapManager.GetIndexedOOP(arrayOOP, i);
+            if (associationOOP == SpecialObjectsArray.Instance.Nil)
+                continue;
+
+            // Association has 2 instance variables: key (index 0), value (index 1)
+            var keyOOP = ctx.HeapManager.GetInstanceVariable(associationOOP, 0);
+
+            // Get symbol name from key
+            string symbolName = GetSymbolName(ctx, keyOOP);
+            if (symbolName == key)
+            {
+                // Found it - return the value
+                return ctx.HeapManager.GetInstanceVariable(associationOOP, 1);
+            }
+        }
+
+        // Not found
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     // Primitive 64: String at:put: (character store for byte-indexed objects)
