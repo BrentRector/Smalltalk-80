@@ -24,10 +24,10 @@ public static class ObjectPrimitives
         if (!args[0].IsSmallInteger)
         {
             Console.WriteLine($"\n❌ Primitive 60 (at:) TYPE ERROR:");
-            Console.WriteLine($"   Receiver: {receiver}");
+            Console.WriteLine($"   Receiver: OOP({receiver.RawValue})");
             string? receiverClass = ctx.GetClassNameForObject(receiver);
             Console.WriteLine($"   Receiver class: {receiverClass}");
-            Console.WriteLine($"   Index argument: {args[0]}");
+            Console.WriteLine($"   Index argument: OOP({args[0].RawValue})");
             string? indexClass = ctx.GetClassNameForObject(args[0]);
             Console.WriteLine($"   Index class: {indexClass} (expected SmallInteger)");
 
@@ -385,10 +385,10 @@ public static class ObjectPrimitives
         if (!args[0].IsSmallInteger)
         {
             Console.WriteLine($"\n❌ Primitive 63 (at:) TYPE ERROR:");
-            Console.WriteLine($"   Receiver: {receiver}");
+            Console.WriteLine($"   Receiver: OOP({receiver.RawValue})");
             string? receiverClass = ctx.GetClassNameForObject(receiver);
             Console.WriteLine($"   Receiver class: {receiverClass}");
-            Console.WriteLine($"   Index argument: {args[0]}");
+            Console.WriteLine($"   Index argument: OOP({args[0].RawValue})");
             string? indexClass = ctx.GetClassNameForObject(args[0]);
             Console.WriteLine($"   Index class: {indexClass} (expected SmallInteger)");
 
@@ -422,7 +422,7 @@ public static class ObjectPrimitives
         if (index > size)
         {
             Console.WriteLine($"\n❌ Primitive 63 (at:) BOUNDS ERROR:");
-            Console.WriteLine($"   Receiver: {receiver} (size={size})");
+            Console.WriteLine($"   Receiver: OOP({receiver.RawValue}) (size={size})");
             Console.WriteLine($"   Index: {index} (1-based)");
             Console.WriteLine($"   Receiver format: {ctx.HeapManager.GetObjectFormat(receiver)}");
             string? className = ctx.GetClassNameForObject(receiver);

@@ -2337,17 +2337,21 @@ public partial class VirtualMachine : IPrimitiveContext
         if (methodInfo == null)
         {
             string? className = GetClassName(classOOP);
-            string receiverInfo = GetLocalId(receiverOOP) ?? receiverOOP.ToString();
+            string receiverLocalId = GetLocalId(receiverOOP) ?? "";
+            string receiverInfo = string.IsNullOrEmpty(receiverLocalId)
+                ? $"OOP({receiverOOP.RawValue})"
+                : $"{receiverLocalId} OOP({receiverOOP.RawValue})";
 
             Console.WriteLine($"\n❌ METHOD NOT FOUND ERROR");
             Console.WriteLine($"   Selector: {selectorName ?? "<unknown>"}");
-            Console.WriteLine($"   Receiver: {receiverInfo}, Class: {className} (classOOP={classOOP})");
+            Console.WriteLine($"   Receiver: {receiverInfo}");
+            Console.WriteLine($"   Receiver class: {className} OOP({classOOP.RawValue})");
             Console.WriteLine($"   Arguments: {args.Length}");
             Console.WriteLine("\nSmalltalk Context Chain:");
             DumpSenderChain(_activeContextOOP, 10);
 
             throw new InvalidOperationException(
-                $"Method not found: {selectorName ?? "<unknown>"} in class {className} (classOOP={classOOP})");
+                $"Method not found: {selectorName ?? "<unknown>"} in class {className} OOP({classOOP.RawValue})");
         }
 
         // Check if the method has a primitive
@@ -2729,7 +2733,21 @@ public partial class VirtualMachine : IPrimitiveContext
                 var classOOP = _heapManager.GetClassOOP(currentOOP);
                 var className = GetClassName(classOOP) ?? "?";
 
-                Console.WriteLine($"    [{depth}] {className}>>{selectorName} (context={currentOOP}, method={methodOOP})");
+                // Get symbolic names for context and method
+                string contextName = GetLocalId(currentOOP) ?? "";
+                string methodName = GetLocalId(methodOOP) ?? "";
+
+                // Format context info
+                string contextInfo = string.IsNullOrEmpty(contextName)
+                    ? $"context=OOP({currentOOP.RawValue})"
+                    : $"context={contextName} OOP({currentOOP.RawValue})";
+
+                // Format method info
+                string methodInfo = string.IsNullOrEmpty(methodName)
+                    ? $"method=OOP({methodOOP.RawValue})"
+                    : $"method={methodName} OOP({methodOOP.RawValue})";
+
+                Console.WriteLine($"    [{depth}] {className}>>{selectorName} ({contextInfo}, {methodInfo})");
 
                 var senderOOP = _heapManager.GetInstanceVariable(currentOOP, senderIndex);
                 currentOOP = senderOOP;
