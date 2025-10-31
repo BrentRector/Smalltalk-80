@@ -3232,8 +3232,11 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         sp--;
+        Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
-        return _heapManager.GetIndexedOOP(_activeContextOOP, sp);
+        var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp);
+        Console.WriteLine($"[Pop] popped value={value}");
+        return value;
     }
 
 
