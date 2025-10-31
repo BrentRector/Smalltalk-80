@@ -247,19 +247,39 @@ public class Phase5_GlobalsAndPatches
 
     /// <summary>
     /// Creates and populates the USTable with all interned symbols.
+    /// Uses two-pass approach to avoid creating temporary arrays:
+    /// Pass 1: Count symbols per bucket
+    /// Pass 2: Allocate buckets with correct capacity and insert symbols
     /// </summary>
     private void CreateAndPopulateUSTable()
     {
-        var symbolObjects = SymbolRegistry.AllSymbols();
-        int ustableSize = ComputeUSTableSize(symbolObjects.Count());
+        var symbolObjects = SymbolRegistry.AllSymbols().ToList();
+        int ustableSize = ComputeUSTableSize(symbolObjects.Count);
 
-        SmalltalkOOP ustableOOP = CreateUSTable(ustableSize);
+        // Pass 1: Count how many symbols will go in each bucket
+        var bucketCounts = new int[ustableSize];
+        foreach (var (index, _) in symbolObjects)
+        {
+            string symbolName = _bundle.Symbols[index];
+            int hash = SymbolHasher.ComputeHash(symbolName);
+            int bucketIndex = hash % ustableSize;
+            bucketCounts[bucketIndex]++;
+        }
 
+        // Create USTable with pre-sized buckets
+        SmalltalkOOP ustableOOP = CreateUSTableWithBuckets(ustableSize, bucketCounts);
+
+        // Pass 2: Insert symbols into their buckets (no array reallocation needed)
+        var bucketPositions = new int[ustableSize]; // Track next insertion index per bucket
         foreach (var (index, symbolOOP) in symbolObjects)
         {
             string symbolName = _bundle.Symbols[index];
             int hash = SymbolHasher.ComputeHash(symbolName);
-            InsertIntoUSTable(ustableOOP, symbolOOP, hash);
+            int bucketIndex = hash % ustableSize;
+
+            var bucketOOP = _allocator.GetIndexedOOP(ustableOOP, bucketIndex);
+            int position = bucketPositions[bucketIndex]++;
+            _allocator.SetIndexedOOP(bucketOOP, position, symbolOOP);
         }
 
         GlobalRegistry.Register("USTable", ustableOOP);
@@ -274,67 +294,37 @@ public class Phase5_GlobalsAndPatches
 
     /// <summary>
     /// Creates a USTable (Universal Symbol Table) as an Array of Arrays.
-    /// Each bucket is initialized to an empty Array to support collision handling via chaining.
-    /// This matches Symbol class>>rehash: USTable _ USTable collect: [:sym | Array new: 0].
+    /// Each bucket is pre-allocated with the exact capacity needed (from bucketCounts).
+    /// This avoids creating temporary arrays during insertion (zero garbage).
+    /// Final structure matches Symbol class>>rehash: Array of Arrays for collision chaining.
     /// </summary>
-    private SmalltalkOOP CreateUSTable(int size)
+    private SmalltalkOOP CreateUSTableWithBuckets(int size, int[] bucketCounts)
     {
-        // Look up Array class layout
-        var arrayClassDefinition = FindClassDefinition("Array");
-        if (arrayClassDefinition == null)
-        {
-            throw new InvalidOperationException("Array class not found in bundle");
-        }
-
         var ustableOOP = _allocator.AllocateArray("Array", size);
 
-        // Set class reference (Phase 11 runs after Phase X, so we must set it manually)
+        // Set class reference (Phase 5 runs after Phase 3, so class references are set)
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
-        // Initialize each bucket to an empty Array (not nil!)
-        // This matches Symbol class>>rehash which does: Array new: 0
+        // Create bucket arrays with exact capacity (no reallocation needed later)
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < size; i++)
         {
-            // Create empty Array for this bucket
-            var bucketArrayOOP = _allocator.AllocateArray("Array", 0);
-            _allocator.SetSlot(bucketArrayOOP, 0, arrayClassOOP);
-            _allocator.SetIndexedOOP(ustableOOP, i, bucketArrayOOP);
+            if (bucketCounts[i] == 0)
+            {
+                // Empty bucket - set to nil (matches Symbol class>>rehash: Array new: 0)
+                _allocator.SetIndexedOOP(ustableOOP, i, nilOOP);
+            }
+            else
+            {
+                // Pre-allocate bucket array with exact capacity
+                var bucketOOP = _allocator.AllocateArray("Array", bucketCounts[i]);
+                _allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
+                _allocator.SetIndexedOOP(ustableOOP, i, bucketOOP);
+            }
         }
 
         return ustableOOP;
-    }
-
-    /// <summary>
-    /// Inserts a symbol into the USTable by appending it to the bucket array.
-    /// This matches Symbol class>>intern: which does: USTable at: index put: ((USTable at: index) copyWith: sym)
-    /// </summary>
-    private void InsertIntoUSTable(SmalltalkOOP ustableOOP, SmalltalkOOP symbolOOP, int hash)
-    {
-        int size = _allocator.GetIndexedSize(ustableOOP);
-        int index = hash % size;
-
-        // Get the current bucket (an Array)
-        var bucketOOP = _allocator.GetIndexedOOP(ustableOOP, index);
-        int bucketSize = _allocator.GetIndexedSize(bucketOOP);
-
-        // Create new bucket with symbol appended (copyWith: semantics)
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var newBucketOOP = _allocator.AllocateArray("Array", bucketSize + 1);
-        _allocator.SetSlot(newBucketOOP, 0, arrayClassOOP);
-
-        // Copy existing symbols
-        for (int i = 0; i < bucketSize; i++)
-        {
-            var existingSymbol = _allocator.GetIndexedOOP(bucketOOP, i);
-            _allocator.SetIndexedOOP(newBucketOOP, i, existingSymbol);
-        }
-
-        // Append new symbol
-        _allocator.SetIndexedOOP(newBucketOOP, bucketSize, symbolOOP);
-
-        // Store new bucket back in USTable
-        _allocator.SetIndexedOOP(ustableOOP, index, newBucketOOP);
     }
 
     // ================================================================================
