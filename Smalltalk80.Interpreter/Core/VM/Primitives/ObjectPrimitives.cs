@@ -395,8 +395,7 @@ public static class ObjectPrimitives
             Console.WriteLine($"   Receiver: {receiver} (size={size})");
             Console.WriteLine($"   Index: {index} (1-based)");
             Console.WriteLine($"   Receiver format: {ctx.HeapManager.GetObjectFormat(receiver)}");
-            var receiverClass = ctx.HeapManager.GetClassOOP(receiver);
-            var className = GetClassName(ctx, receiverClass);
+            string? className = ctx.GetClassNameForObject(receiver);
             Console.WriteLine($"   Receiver class: {className}");
 
             // Try to get symbol name if it's a Symbol
