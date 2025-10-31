@@ -1248,8 +1248,12 @@ public partial class VirtualMachine : IPrimitiveContext
                     if (blockClass == "BlockClosure")
                     {
                         // Non-local return support for BlockClosure
-                        // Value already on stack
-                        var returnValue = Pop();
+                        // Value already on stack - will be popped by ExecuteBytecodeStep
+                        // DON'T pop here - that would cause double popping!
+                        var spIndex = VMConstants.CONTEXT_STACKP_INDEX;
+                        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+                        int sp = spOOP.AsSmallInteger();
+                        var returnValue = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
 
                         // Get return context
                         int returnContextIndex = VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX;
