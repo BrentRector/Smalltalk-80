@@ -29,29 +29,36 @@ public class ProcessPrimitives
 
         int activeProcessIndex = _layoutResolver.GetFieldIndex("class:ProcessorScheduler", "activeProcess");
         var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
-        
+
         if (currentActiveOOP != SpecialObjectsArray.Instance.Nil)
         {
             throw new InvalidOperationException("Process switching not yet implemented");
         }
-        
+
         _heapManager.SetInstanceVariable(
-            schedulerOOP, 
-            activeProcessIndex, 
+            schedulerOOP,
+            activeProcessIndex,
             processOOP
         );
-        
-        int suspendedContextIndex = _layoutResolver.GetFieldIndex("class:Process", "suspendedContext");
-        var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, suspendedContextIndex);
-        
-        var resultOOP = _vm.ExecuteExistingContext(suspendedContextOOP);
-        
-        _heapManager.SetInstanceVariable(
-            schedulerOOP, 
-            activeProcessIndex, 
-            SpecialObjectsArray.Instance.Nil
-        );
-        
-        return resultOOP;
+
+        try
+        {
+            int suspendedContextIndex = _layoutResolver.GetFieldIndex("class:Process", "suspendedContext");
+            var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, suspendedContextIndex);
+
+            var resultOOP = _vm.ExecuteExistingContext(suspendedContextOOP);
+
+            return resultOOP;
+        }
+        finally
+        {
+            // Always clear activeProcess, even if execution fails
+            // This ensures subsequent test expressions can run
+            _heapManager.SetInstanceVariable(
+                schedulerOOP,
+                activeProcessIndex,
+                SpecialObjectsArray.Instance.Nil
+            );
+        }
     }
 }

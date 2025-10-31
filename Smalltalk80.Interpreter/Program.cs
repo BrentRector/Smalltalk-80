@@ -170,7 +170,7 @@ public static class Program
                     // TESTING MODE: Only run test classes
                     if (onlyRunTests)
                     {
-                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("IfTrueTest")))
+                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("IfTrueTest") || expr.Source.Contains("PrimitiveTest")))
                         {
                             Console.WriteLine($"  DEBUG: Found test expression [{i}]: {expr.Source}");
                             testIndices.Add(i);
