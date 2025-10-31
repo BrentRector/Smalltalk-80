@@ -207,6 +207,7 @@ public partial class VirtualMachine : IPrimitiveContext
     public void SetVerboseDebugMode(bool enabled)
     {
         _verboseDebugMode = enabled;
+        _heapManager.VerboseDebugMode = enabled;
     }
 
     /// <summary>

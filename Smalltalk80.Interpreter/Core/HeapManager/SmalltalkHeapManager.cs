@@ -26,6 +26,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     // DEBUG: Runtime allocation counter
     private static int _runtimeAllocationCount = 0;
 
+    // Verbose debug mode control
+    public bool VerboseDebugMode { get; set; } = false;
+
     /// <summary>Represents a block of ObjectTable entries for scalable growth.</summary>
     private sealed class ObjectTableBlock
     {
@@ -145,11 +148,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         // DEBUG: Log allocations (limit output to first 50 runtime allocations)
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
-        if (_runtimeAllocationCount <= 50)
+        if (VerboseDebugMode && _runtimeAllocationCount <= 50)
         {
             Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
         }
-        else if (_runtimeAllocationCount == 51)
+        else if (VerboseDebugMode && _runtimeAllocationCount == 51)
         {
             Console.WriteLine($"[AllocateInstanceOf] (suppressing after 50 allocations)");
         }

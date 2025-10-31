@@ -226,4 +226,10 @@ public interface ISmalltalkHeapManager
     /// Useful for VM primitives like someInstance, nextObject, allInstances.
     /// </summary>
     IEnumerable<SmalltalkOOP> EnumerateObjectTable();
+
+    /// <summary>
+    /// Gets or sets verbose debug mode for allocation/primitive diagnostics.
+    /// When false, suppresses noisy debug output from successful operations.
+    /// </summary>
+    bool VerboseDebugMode { get; set; }
 }
