@@ -463,8 +463,18 @@ public partial class VirtualMachine : IPrimitiveContext
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
+            // DIAGNOSTIC: Show sp before executing bytecode
+            var spBeforeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+            int spBefore = spBeforeOOP.AsSmallInteger();
+            Console.WriteLine($"[ExecuteBytecode] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}, sp before={spBefore}");
+
             // Execute the bytecode
             bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
+
+            // DIAGNOSTIC: Show sp after executing bytecode
+            var spAfterOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+            int spAfter = spAfterOOP.AsSmallInteger();
+            Console.WriteLine($"[ExecuteBytecode] sp after={spAfter}, delta={spAfter - spBefore}");
 
             if (!continueExecution)
             {
