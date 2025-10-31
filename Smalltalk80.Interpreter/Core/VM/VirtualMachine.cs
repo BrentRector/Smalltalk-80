@@ -1027,7 +1027,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Association has layout: [key, value]
             // DEFENSIVE: Check if this is actually an Association
-            var classOOP = _heapManager.GetClass(associationOOP);
+            var classOOP = _heapManager.GetClassOOP(associationOOP);
             int instVarCount = _heapManager.GetInstanceVariableCount(associationOOP);
 
             if (instVarCount < 2)
