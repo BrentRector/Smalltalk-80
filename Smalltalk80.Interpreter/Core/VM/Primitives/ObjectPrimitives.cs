@@ -499,52 +499,26 @@ public static class ObjectPrimitives
 
     /// <summary>
     /// Looks up a key in a Dictionary by walking the association array.
+    /// Dictionary structure (from Smalltalk-80.st):
+    ///   Set variableSubclass: #Dictionary
+    ///   - Instance variable 0: 'tally' (inherited from Set)
+    ///   - Indexed slots: Association objects
     /// Returns the value OOP if found, nil otherwise.
     /// RUNTIME SAFE: Only accesses heap data.
     /// </summary>
     private static SmalltalkOOP LookupInDictionary(IPrimitiveContext ctx, SmalltalkOOP dictionaryOOP, string key)
     {
-        // DIAGNOSTIC: Inspect the dictionary structure
-        var classOOP = ctx.HeapManager.GetClass(dictionaryOOP);
-        int instanceVarCount = ctx.HeapManager.GetInstanceVariableCount(dictionaryOOP);
-        int indexedSize = ctx.HeapManager.GetIndexedSize(dictionaryOOP);
-        var format = ctx.HeapManager.GetObjectFormat(dictionaryOOP);
+        // Dictionary stores associations in indexed slots (variableSubclass)
+        // Instance variable 0 is 'tally', but we don't need it
+        int arraySize = ctx.HeapManager.GetIndexedSize(dictionaryOOP);
 
-        Console.WriteLine($"[LookupInDictionary] Inspecting dictionary oop={dictionaryOOP}");
-        Console.WriteLine($"  Class: {classOOP}");
-        Console.WriteLine($"  Instance variable count: {instanceVarCount}");
-        Console.WriteLine($"  Indexed size: {indexedSize}");
-        Console.WriteLine($"  Object format: {format}");
+        Console.WriteLine($"[LookupInDictionary] Searching dictionary oop={dictionaryOOP} for key '{key}'");
+        Console.WriteLine($"  Dictionary has {arraySize} indexed slots (associations)");
 
-        // SystemDictionary might be indexed (the dictionary IS the array)
-        // rather than having instance variables pointing to an array
-        SmalltalkOOP arrayOOP;
-        int arraySize;
-
-        if (instanceVarCount == 0 && indexedSize > 0)
-        {
-            // Dictionary IS the array (indexed format)
-            Console.WriteLine($"  → Dictionary is indexed, using self as array");
-            arrayOOP = dictionaryOOP;
-            arraySize = indexedSize;
-        }
-        else if (instanceVarCount >= 2)
-        {
-            // Traditional Dictionary with instance variables: tally (0), array (1)
-            Console.WriteLine($"  → Dictionary has instance variables, reading array from index 1");
-            arrayOOP = ctx.HeapManager.GetInstanceVariable(dictionaryOOP, 1);
-            arraySize = ctx.HeapManager.GetIndexedSize(arrayOOP);
-        }
-        else
-        {
-            Console.WriteLine($"  → ERROR: Unexpected dictionary structure!");
-            return SpecialObjectsArray.Instance.Nil;
-        }
-
-        // Walk the association array
+        // Walk the association array (indexed slots of the dictionary)
         for (int i = 0; i < arraySize; i++)
         {
-            var associationOOP = ctx.HeapManager.GetIndexedOOP(arrayOOP, i);
+            var associationOOP = ctx.HeapManager.GetIndexedOOP(dictionaryOOP, i);
             if (associationOOP == SpecialObjectsArray.Instance.Nil)
                 continue;
 
