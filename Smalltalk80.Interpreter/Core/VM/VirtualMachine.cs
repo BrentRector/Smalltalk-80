@@ -1390,6 +1390,11 @@ public partial class VirtualMachine : IPrimitiveContext
             int selectorIndex = BytecodeUtil.Send0Index(bytecode);
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
+            // DIAGNOSTIC: Show what selector we retrieved
+            string selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
+            Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
+            Console.WriteLine($"  selectorOOP={selectorOOP}, selectorName='{selectorName}'");
+
             // Handle blocks with nil literals - resolve from home context
             if (selectorOOP == SpecialObjectsArray.Instance.Nil)
             {
