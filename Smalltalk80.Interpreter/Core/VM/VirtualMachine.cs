@@ -295,6 +295,7 @@ public partial class VirtualMachine : IPrimitiveContext
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
         // Check size-specific pool for matching context
+        bool isPooledContext = false;
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
         {
             // Reuse pooled context with exact size match
@@ -310,11 +311,13 @@ public partial class VirtualMachine : IPrimitiveContext
                 pool.Push(contextOOP);
                 contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
                 _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+                isPooledContext = false;  // Allocated new, not pooled
             }
             else
             {
                 if (_verboseDebugMode)
                     Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
+                isPooledContext = true;  // Reused from pool
             }
         }
         else
@@ -324,6 +327,7 @@ public partial class VirtualMachine : IPrimitiveContext
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
             if (_verboseDebugMode)
                 Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
+            isPooledContext = false;  // Allocated new, not pooled
         }
 
         // Increment context depth and check limit
@@ -382,15 +386,24 @@ public partial class VirtualMachine : IPrimitiveContext
         for (int i = 0; i < header.NumArgs; i++)
         {
             _heapManager.SetIndexedOOP(contextOOP, i, arguments[i]);
+
+            // DIAGNOSTIC: Track arg initialization for Object>>at:
+            var methodLocalId = GetLocalId(methodOOP);
+            if (methodLocalId == "method:Object>>at:" && i == 0)
+            {
+                var argClass = arguments[i].IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(arguments[i]));
+                Console.WriteLine($"\n[ARG INIT] Object>>at: arg0 set to {arguments[i]}, class={argClass}, context={contextOOP}, pooled={isPooledContext}");
+            }
         }
 
-        // Initialize temps to nil
+        // CRITICAL: Initialize temps to nil for ALL contexts (both new and pooled)
+        // Previously, pooled contexts retained stale temp values from previous use!
         for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
             _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
         }
 
-        // Initialize execution stack slots to nil
+        // Initialize execution stack slots to nil (also for all contexts)
         for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
         {
             _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
@@ -707,6 +720,16 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
         }
 
+        // DIAGNOSTIC: Track return values from hash/stringhash methods
+        int methodIndex2 = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        var returningMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
+        string? methodLocalId = GetLocalId(returningMethodOOP);
+        if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
+        {
+            var className = returnValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(returnValue));
+            Console.WriteLine($"\n[RETURN from {methodLocalId}] value={returnValue}, class={className}, isSmallInt={returnValue.IsSmallInteger}");
+        }
+
         // Clean up block context mapping if this was a block
         bool wasBlock = _blockContextMapping.ContainsKey(_activeContextOOP);
         _blockContextMapping.Remove(_activeContextOOP);
@@ -927,6 +950,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // For block execution contexts, check if we need to access home context temps
             SmalltalkOOP contextToReadFrom = _activeContextOOP;
+            int actualIndex = index;  // The actual index to read from (may be adjusted for home context)
 
             // Check if current context is a block execution context
             if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockContextOOP))
@@ -946,24 +970,91 @@ public partial class VirtualMachine : IPrimitiveContext
                 // If accessing beyond block's local scope, read from home context
                 if (index >= blockLocalCount)
                 {
-                    // Check if blockContextOOP is a BlockClosure or BlockContext
-                    var blockClass = GetClassName(GetClass(blockContextOOP));
-                    if (blockClass == "BlockClosure")
+                    // CRITICAL: Follow the homeContext chain recursively until we find a context
+                    // that can provide the requested temp index.
+                    //
+                    // For deeply nested blocks like [[[homeTemp + 20] value] value]:
+                    //   - Innermost block: 0 args/temps, index=1 → check homeContext
+                    //   - Middle block: 0 args/temps, index=1 → check ITS homeContext
+                    //   - Method: has homeTemp at index 1 → found!
+                    //
+                    // For blocks accessing outer block args like [:x | [x + 10] value]:
+                    //   - Inner block: 0 args/temps, index=0 → check homeContext
+                    //   - Outer block: 1 arg, has x at index 0 → found!
+                    SmalltalkOOP currentContext = _activeContextOOP;
+
+                    while (true)
                     {
-                        var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                        contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
-                        if (_debugOptions.ShouldDebugBytecode)
+                        // Get the BlockClosure/BlockContext object for current context
+                        if (!_blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP))
                         {
-                            Console.WriteLine($"[DEBUG pushTemp] BlockClosure: Reading from home context: {contextToReadFrom}");
+                            // Current context is a MethodContext - use it directly
+                            contextToReadFrom = currentContext;
+                            actualIndex = index;
+
+                            if (_debugOptions.ShouldDebugBytecode)
+                            {
+                                Console.WriteLine($"[DEBUG pushTemp] Reached MethodContext: {contextToReadFrom}, index: {actualIndex}");
+                            }
+                            break;
                         }
-                    }
-                    else
-                    {
-                        var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                        contextToReadFrom = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
-                        if (_debugOptions.ShouldDebugBytecode)
+
+                        // Get homeContext from BlockClosure/BlockContext
+                        var blockClass = GetClassName(GetClass(currentBlockOOP));
+                        SmalltalkOOP homeContext;
+
+                        if (blockClass == "BlockClosure")
                         {
-                            Console.WriteLine($"[DEBUG pushTemp] BlockContext: Reading from home context: {contextToReadFrom}");
+                            var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                        }
+                        else if (blockClass == "BlockContext")
+                        {
+                            var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Unexpected class in homeContext chain: {blockClass}");
+                        }
+
+                        // Check if homeContext has enough slots for the index
+                        // If homeContext is also a block, check its arg+temp count
+                        if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
+                        {
+                            // HomeContext is a block - check if it has the index
+                            var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                            var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
+                            var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
+                            int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
+
+                            if (index < homeLocalCount)
+                            {
+                                // Home block has this index - use it
+                                contextToReadFrom = homeContext;
+                                actualIndex = index;
+
+                                if (_debugOptions.ShouldDebugBytecode)
+                                {
+                                    Console.WriteLine($"[DEBUG pushTemp] Found in block homeContext: {contextToReadFrom}, index: {actualIndex}");
+                                }
+                                break;
+                            }
+
+                            // Home block doesn't have it either - continue up the chain
+                            currentContext = homeContext;
+                        }
+                        else
+                        {
+                            // HomeContext is a MethodContext - use it
+                            contextToReadFrom = homeContext;
+                            actualIndex = index;
+
+                            if (_debugOptions.ShouldDebugBytecode)
+                            {
+                                Console.WriteLine($"[DEBUG pushTemp] Found in method homeContext: {contextToReadFrom}, index: {actualIndex}");
+                            }
+                            break;
                         }
                     }
                 }
@@ -976,10 +1067,100 @@ public partial class VirtualMachine : IPrimitiveContext
                 }
             }
 
-            var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
+            // Validate index is within bounds before accessing
+            var contextClass = GetClassName(GetClass(contextToReadFrom));
+            int slotCount = _heapManager.GetIndexedSize(contextToReadFrom);
+
+            if (actualIndex >= slotCount)
+            {
+                throw new InvalidOperationException(
+                    $"Temp index {actualIndex} out of bounds for context {contextToReadFrom} " +
+                    $"(class={contextClass}, slotCount={slotCount}). " +
+                    $"Original index={index}.");
+            }
+
+            var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, actualIndex);
             if (_debugOptions.ShouldDebugBytecode)
             {
                 Console.WriteLine($"[DEBUG pushTemp] Retrieved temp[{index}] = {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
+            }
+
+            // DIAGNOSTIC: Track temp reads in problematic blocks
+            int methodIndex2 = VMConstants.METHODCONTEXT_METHOD_INDEX;
+            var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
+            string? methodLocalId = GetLocalId(currentMethodOOP);
+
+            // Original problem block from Symbol>>hasInterned:ifTrue:
+            if (methodLocalId == "block:b1a005158e924ea3b0561169ddf02b39")
+            {
+                var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
+                Console.WriteLine($"\n[PUSHTEMP in block b1a005...] index={index}, actualIndex={actualIndex}, value={valueOOP}, class={valueClass}");
+                Console.WriteLine($"  Context to read from: {contextToReadFrom}");
+                Console.WriteLine($"  Active context: {_activeContextOOP}");
+
+                // Show what method/block the home context is
+                if (contextToReadFrom != _activeContextOOP)
+                {
+                    var homeMethodOOP = _heapManager.GetInstanceVariable(contextToReadFrom, methodIndex2);
+                    string? homeLocalId = GetLocalId(homeMethodOOP);
+                    Console.WriteLine($"  Home context method: {homeLocalId}");
+
+                    // Show all args/temps in home context
+                    Console.WriteLine($"  Home context contents (first 10 slots):");
+                    for (int i = 0; i < 10; i++)
+                    {
+                        var oop = _heapManager.GetIndexedOOP(contextToReadFrom, i);
+                        var cls = oop.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(oop));
+                        Console.WriteLine($"    [{i}] = {oop}, class={cls}");
+                    }
+                }
+            }
+
+            // Block from Object>>at: that sends truncated
+            if (methodLocalId == "block:fb356e6631ec441f99ecd9852bdd2ec0")
+            {
+                var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
+                Console.WriteLine($"\n[PUSHTEMP in Object>>at: block] index={index}, actualIndex={actualIndex}, value={valueOOP}, class={valueClass}");
+                Console.WriteLine($"  Context to read from: {contextToReadFrom}");
+                Console.WriteLine($"  Active context: {_activeContextOOP}");
+
+                // Show home context
+                if (contextToReadFrom != _activeContextOOP)
+                {
+                    var homeMethodOOP = _heapManager.GetInstanceVariable(contextToReadFrom, methodIndex2);
+                    string? homeLocalId = GetLocalId(homeMethodOOP);
+                    Console.WriteLine($"  Home context method: {homeLocalId}");
+
+                    // Show first 3 args/temps in home
+                    Console.WriteLine($"  Home context first 3 slots:");
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var oop = _heapManager.GetIndexedOOP(contextToReadFrom, i);
+                        var cls = oop.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(oop));
+                        Console.WriteLine($"    [{i}] = {oop}, class={cls}");
+                    }
+                }
+            }
+
+            // New problem block from Number>>to:do:
+            if (methodLocalId == "block:62b671c3447a46b6a5f092eaf99c5fa2")
+            {
+                var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
+                Console.WriteLine($"\n[PUSHTEMP in to:do: block] index={index}, actualIndex={actualIndex}, value={valueOOP}, class={valueClass}");
+                Console.WriteLine($"  Context to read from: {contextToReadFrom}");
+                Console.WriteLine($"  Active context: {_activeContextOOP}");
+
+                // Also show what's at the expected indices in the home context
+                if (contextToReadFrom != _activeContextOOP)
+                {
+                    Console.WriteLine($"  Home context contents:");
+                    for (int i = 0; i < 5; i++)
+                    {
+                        var oop = _heapManager.GetIndexedOOP(contextToReadFrom, i);
+                        var cls = oop.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(oop));
+                        Console.WriteLine($"    index[{i}] = {oop}, class={cls}");
+                    }
+                }
             }
 
             Push(valueOOP);
@@ -996,26 +1177,15 @@ public partial class VirtualMachine : IPrimitiveContext
             // Check if this literal is a block - wrap in BlockClosure
             if (IsBlockLiteral(literal))
             {
-                // Determine the home context for this block
+                // CRITICAL: The homeContext should be the CURRENTLY EXECUTING context,
+                // whether that's a method or a block. This allows nested blocks to access
+                // the outer block's arguments and temps through the homeContext chain.
+                //
+                // For example:
+                //   [:x | [x + 10] value]
+                // The inner block's homeContext should be the OUTER BLOCK's context (so it can access x),
+                // NOT the method context. The compiler encodes temp indices to walk the chain properly.
                 SmalltalkOOP homeContextOOP = _activeContextOOP;
-
-                // If we're currently executing inside a block, use that block's homeContext
-                // instead of the block's own execution context. This ensures nested blocks
-                // share the same home context as their parent.
-                if (_blockContextMapping.TryGetValue(_activeContextOOP, out var parentBlockClosureOOP))
-                {
-                    var parentClass = GetClassName(GetClass(parentBlockClosureOOP));
-                    // Console.WriteLine($"[DEBUG CreateBlock] Found parent object: {parentBlockClosureOOP}, class={parentClass}");
-                    int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                    // Console.WriteLine($"[DEBUG CreateBlock] homeContext field index: {homeIndex}");
-                    var parentHomeContextOOP = _heapManager.GetInstanceVariable(parentBlockClosureOOP, homeIndex);
-                    // Console.WriteLine($"[DEBUG CreateBlock] Active context is block - using parent's home: {_activeContextOOP} -> {parentHomeContextOOP}");
-                    homeContextOOP = parentHomeContextOOP;
-                }
-                else
-                {
-                    // Console.WriteLine($"[DEBUG CreateBlock] Active context is method - using directly: {homeContextOOP}");
-                }
 
                 var closureOOP = CreateBlockClosure(literal, homeContextOOP);
                 Push(closureOOP);
@@ -1171,6 +1341,23 @@ public partial class VirtualMachine : IPrimitiveContext
                         var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
                         contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
                     }
+                }
+            }
+
+            // DIAGNOSTIC: Track when temp 'v' (index 2) is stored in hasInterned:ifTrue: method
+            // hasInterned: has 2 args (aString, symBlock) + 3 temps (v, i, ascii)
+            // So 'v' is at index 2 (args 0-1, then temp 0)
+            if (index == 2)
+            {
+                int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                var targetMethodOOP = _heapManager.GetInstanceVariable(contextToStoreTo, methodIndex);
+                string? methodLocalId = GetLocalId(targetMethodOOP);
+                if (methodLocalId != null && methodLocalId.Contains("hasInterned"))
+                {
+                    var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
+                    Console.WriteLine($"\n[STORETEMP 'v' (index 2) in hasInterned] value={valueOOP}, class={valueClass}");
+                    Console.WriteLine($"  Active context: {_activeContextOOP}");
+                    Console.WriteLine($"  Target context: {contextToStoreTo}");
                 }
             }
 
@@ -2258,6 +2445,54 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
 
+        // DIAGNOSTIC: Track hash method sends to debug Primitive 75 issue
+        if (selectorName == "hash" || selectorName == "stringhash")
+        {
+            var className = GetClassName(classOOP);
+            Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\"");
+        }
+
+        // DIAGNOSTIC: Track '=' sends to see what's being compared
+        if (selectorName == "=" && args.Length > 0)
+        {
+            var receiverClass = GetClassName(classOOP);
+            var argOOP = args[0];
+            var argClass = argOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(argOOP));
+            Console.WriteLine($"\n[=] receiver={receiverOOP} class=\"{receiverClass}\" | arg={argOOP} class=\"{argClass}\"");
+        }
+
+        // DIAGNOSTIC: Track 'to:do:' sends to see loop setup
+        if (selectorName == "to:do:" && args.Length == 2)
+        {
+            var receiverClass = GetClassName(classOOP);
+            var endOOP = args[0];
+            var blockOOP = args[1];
+            var endClass = endOOP.IsSmallInteger ? $"SmallInteger({endOOP.AsSmallInteger()})" : $"Object class={GetClassName(GetClass(endOOP))}";
+            var blockClass = GetClassName(GetClass(blockOOP));
+            Console.WriteLine($"\n[to:do:] receiver={receiverOOP} class=\"{receiverClass}\" | end={endClass} | block class=\"{blockClass}\"");
+        }
+
+        // DIAGNOSTIC: Track 'at:' sends to see what indices are being used
+        if (selectorName == "at:" && args.Length > 0)
+        {
+            var className = GetClassName(classOOP);
+            var indexArg = args[0];
+            var indexInfo = indexArg.IsSmallInteger ? $"SmallInteger({indexArg.AsSmallInteger()})" : $"NOT SmallInteger! OOP({indexArg.RawValue}), class={GetClassName(GetClass(indexArg))}";
+            Console.WriteLine($"\n[at:] receiver={receiverOOP} class=\"{className}\" | index={indexInfo}");
+
+            // Extra diagnostic for non-SmallInteger indices
+            if (!indexArg.IsSmallInteger)
+            {
+                Console.WriteLine($"  PROBLEM: Non-SmallInteger index detected!");
+                Console.WriteLine($"  Active context: {_activeContextOOP}");
+                int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                string? methodLocalId = GetLocalId(methodOOP);
+                Console.WriteLine($"  Method: {methodLocalId}");
+                DumpSenderChain(_activeContextOOP, 5);
+            }
+        }
+
         // DEBUG: Log value sends to see what's receiving them
         if (_verboseDebugMode && (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:"))
         {
@@ -2303,17 +2538,17 @@ public partial class VirtualMachine : IPrimitiveContext
             }
         }
 
-        // DIAGNOSTIC: Track > and max: message sends
-        if (selectorName == ">")
-        {
-            var argInfo = args.Length > 0 ? $"{args[0]} (SmallInt={args[0].IsSmallInteger})" : "none";
-            Console.WriteLine($"\n[>] receiver {receiverOOP} (SmallInt={receiverOOP.IsSmallInteger}, class=\"{GetClassName(classOOP)}\") | arg={argInfo}");
-        }
-        if (selectorName == "max:")
-        {
-            var argInfo = args.Length > 0 ? $"{args[0]}" : "none";
-            Console.WriteLine($"\n[max:] receiver {receiverOOP} | arg={argInfo} | class=\"{GetClassName(classOOP)}\"");
-        }
+        // DIAGNOSTIC: Track > and max: message sends (DISABLED - causes issues with SmallInteger diagnostic output)
+        // if (selectorName == ">")
+        // {
+        //     var argInfo = args.Length > 0 ? $"{args[0]} (SmallInt={args[0].IsSmallInteger})" : "none";
+        //     Console.WriteLine($"\n[>] receiver {receiverOOP} (SmallInt={receiverOOP.IsSmallInteger}, class=\"{GetClassName(classOOP)}\") | arg={argInfo}");
+        // }
+        // if (selectorName == "max:")
+        // {
+        //     var argInfo = args.Length > 0 ? $"{args[0]}" : "none";
+        //     Console.WriteLine($"\n[max:] receiver {receiverOOP} | arg={argInfo} | class=\"{GetClassName(classOOP)}\"");
+        // }
 
         // Verbose debug: log method entry
         if (VerboseDebug)
@@ -2344,6 +2579,14 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         var methodInfo = GetMethod(classOOP, selectorName!);
+
+        // DIAGNOSTIC: Show what method was found for hash/stringhash
+        if ((selectorName == "hash" || selectorName == "stringhash") && methodInfo != null)
+        {
+            int primNum = GetPrimitiveNumber(methodInfo.MethodOOP);
+            string methodLocalId = GetLocalId(methodInfo.MethodOOP) ?? "unknown";
+            Console.WriteLine($"  Found method: {methodLocalId}, primitiveNumber={primNum}");
+        }
 
         if (methodInfo == null)
         {
@@ -3952,10 +4195,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
     {
+        // SmallIntegers don't have class pools - skip
+        if (classOOP.IsSmallInteger)
+            return;
+
         // For metaclasses, class variables are stored in the non-meta class's classPool
         // e.g., Float class (metaclass) shares class variables with Float (regular class)
         var actualClassOOP = classOOP;
-        
+
         // Check if this is a metaclass by checking if it's an instance of Metaclass
         var classOfClassOOP = _heapManager.GetClassOOP(classOOP);
         

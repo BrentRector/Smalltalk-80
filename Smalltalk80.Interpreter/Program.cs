@@ -92,11 +92,13 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
-            // Execute init expressions
-            if (bundle.InitExpressions.Length > 0)
+            // Execute init expressions - ONLY BlockContextTest for nested block context testing
+            bool executeInitExpressions = true; // Run only the test expression
+            bool onlyRunTests = true; // Run only test expressions (BlockContextTest)
+            if (executeInitExpressions && bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
-                Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle");
+                Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle (DISABLED)");
 
                 if (layoutResolver == null)
                 {
@@ -154,12 +156,31 @@ public static class Program
                 var phase1Indices = new List<int>(); // initialize! expressions
                 var phase2Indices = new List<int>(); // comment: expressions
                 var skippedIndices = new List<int>(); // skipped expressions
+                var testIndices = new List<int>(); // test expressions
+
+                if (onlyRunTests)
+                {
+                    Console.WriteLine($"  DEBUG: Test mode enabled, scanning {totalExpressions} expressions...");
+                }
 
                 for (int i = 0; i < totalExpressions; i++)
                 {
                     var expr = bundle.InitExpressions[i];
+
+                    // TESTING MODE: Only run BlockContextTest
+                    if (onlyRunTests)
+                    {
+                        if (expr.Source != null && expr.Source.Contains("BlockContextTest"))
+                        {
+                            Console.WriteLine($"  DEBUG: Found test expression [{i}]: {expr.Source}");
+                            testIndices.Add(i);
+                        }
+                        continue;
+                    }
+
                     if (expr.Source != null)
                     {
+
                         // Check if this expression should be skipped
                         if (skipList.Contains(expr.Source))
                         {
@@ -180,48 +201,99 @@ public static class Program
                     }
                 }
 
-                // EXPERIMENT: Reorder to test call stack unwinding
-                // Run fundamental infrastructure first: Float, Character, then WindowsFileSystem
-                // Character must run early because String/Symbol operations need CharacterTable
-                var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
-                var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
-                var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
-
-                if (floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
+                // Skip phase reordering when in test mode
+                if (!onlyRunTests)
                 {
-                    phase1Indices.Remove(floatInitIndex);
-                    phase1Indices.Remove(characterInitIndex);
-                    phase1Indices.Remove(windowsInitIndex);
+                    // EXPERIMENT: Reorder to test call stack unwinding
+                    // Run fundamental infrastructure first: Float, Character, then WindowsFileSystem
+                    // Character must run early because String/Symbol operations need CharacterTable
+                    var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
+                    var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
+                    var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
 
-                    // Insert at beginning: Float, Character, WindowsFileSystem, then rest
-                    phase1Indices.Insert(0, windowsInitIndex);
-                    phase1Indices.Insert(0, characterInitIndex);
-                    phase1Indices.Insert(0, floatInitIndex);
+                    if (floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
+                    {
+                        phase1Indices.Remove(floatInitIndex);
+                        phase1Indices.Remove(characterInitIndex);
+                        phase1Indices.Remove(windowsInitIndex);
 
-                    Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
-                    Console.WriteLine($"  Running: Float → Character → WindowsFileSystem");
-                    Console.WriteLine($"  Character must run early (CharacterTable needed by String/Symbol)");
-                    Console.WriteLine();
+                        // Insert at beginning: Float, Character, WindowsFileSystem, then rest
+                        phase1Indices.Insert(0, windowsInitIndex);
+                        phase1Indices.Insert(0, characterInitIndex);
+                        phase1Indices.Insert(0, floatInitIndex);
+
+                        Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
+                        Console.WriteLine($"  Running: Float → Character → WindowsFileSystem");
+                        Console.WriteLine($"  Character must run early (CharacterTable needed by String/Symbol)");
+                        Console.WriteLine();
+                    }
+
+                    // Report skipped expressions
+                    if (skippedIndices.Count > 0)
+                    {
+                        Console.WriteLine($"\n=== Skipped Init Expressions (Bootstrap Issues) ===");
+                        Console.WriteLine($"  {skippedIndices.Count} expression(s) skipped due to missing dependencies:");
+                        foreach (int index in skippedIndices)
+                        {
+                            Console.WriteLine($"    [{index}] {bundle.InitExpressions[index].Source}");
+                        }
+                        Console.WriteLine();
+                    }
                 }
 
-                // Report skipped expressions
-                if (skippedIndices.Count > 0)
+                int succeeded = 0;
+                int failed = 0;
+
+                // TEST MODE: Only run test expressions
+                if (onlyRunTests && testIndices.Count > 0)
                 {
-                    Console.WriteLine($"\n=== Skipped Init Expressions (Bootstrap Issues) ===");
-                    Console.WriteLine($"  {skippedIndices.Count} expression(s) skipped due to missing dependencies:");
-                    foreach (int index in skippedIndices)
-                    {
-                        Console.WriteLine($"    [{index}] {bundle.InitExpressions[index].Source}");
-                    }
+                    Console.WriteLine($"\n=== TEST MODE: Running Block Context Tests ===");
+                    Console.WriteLine($"  Executing {testIndices.Count} test expression(s)");
                     Console.WriteLine();
+
+                    foreach (int index in testIndices)
+                    {
+                        var expr = bundle.InitExpressions[index];
+                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+
+                        Console.WriteLine();
+                        Console.WriteLine("******************************************");
+                        Console.WriteLine($"[{index}] {expr.Source}");
+                        Console.WriteLine("******************************************");
+                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                        if (result.Status == InitStatus.Success)
+                        {
+                            Console.WriteLine($"  ✓ Test completed successfully");
+                            succeeded++;
+                        }
+                        else
+                        {
+                            failed++;
+                            Console.WriteLine($"\n❌ TEST FAILED: {expr.Source}");
+                            Console.WriteLine($"   Status: {result.Status}");
+                            if (result.Diagnostic?.Message != null)
+                            {
+                                Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                            }
+                            if (result.Diagnostic?.StackTrace != null)
+                            {
+                                Console.WriteLine($"\n   Stack Trace:");
+                                Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                            }
+                        }
+                    }
+
+                    Console.WriteLine($"\n=== Test Execution Complete ===");
+                    Console.WriteLine($"  Tests run: {testIndices.Count}");
+                    Console.WriteLine($"  Succeeded: {succeeded}");
+                    Console.WriteLine($"  Failed: {failed}");
+                    return;
                 }
 
                 Console.WriteLine($"\n=== Phase 1: Infrastructure Initialization ===");
                 Console.WriteLine($"  Executing {phase1Indices.Count} initialize! expression(s) in source file order");
                 Console.WriteLine();
-
-                int succeeded = 0;
-                int failed = 0;
 
                 // Phase 1: Execute all initialize! expressions
                 foreach (int index in phase1Indices)

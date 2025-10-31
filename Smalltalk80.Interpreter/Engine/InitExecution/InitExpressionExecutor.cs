@@ -167,7 +167,7 @@ public class InitExpressionExecutor
         catch (Exception ex)
         {
             stopwatch.Stop();
-            return InitResult.FatalError(initLocalId, $"{ex.GetType().Name}: {ex.Message}");
+            return InitResult.FatalError(initLocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
         }
     }
 

@@ -14,9 +14,9 @@ namespace Smalltalk80.Compiler.CodeGen;
 /// Generates a JSON cold-start bundle from a compiled Smalltalk AST.
 /// Converts the ANTLR4 AST format to the schema-compliant cold-start format.
 /// </summary>
-public sealed class ColdStartJsonGenerator(string sourceFilePath)
+public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 {
-    private readonly string _sourceFilePath = sourceFilePath;
+    private readonly string _sourceFileDescription = sourceFileDescription;
     private readonly Dictionary<string, int> _symbolTable = new();
     private readonly List<string> _symbols = [];
     private readonly Dictionary<string, int> _stringTable = new();
@@ -1521,9 +1521,9 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
     /// </summary>
     private Metadata GenerateMetadata()
     {
-        byte[] sourceBytes = File.ReadAllBytes(_sourceFilePath);
-        byte[] hash = SHA256.HashData(sourceBytes);
-        string checksum = $"sha256:{Convert.ToHexString(hash).ToLowerInvariant()}";
+        // For multi-file bundles, skip checksum calculation
+        // (would need to combine checksums from all source files)
+        string checksum = "multi-file-bundle";
 
         var version = GetType().Assembly.GetName().Version;
 
@@ -1535,7 +1535,7 @@ public sealed class ColdStartJsonGenerator(string sourceFilePath)
             Version = "1.0.6",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
-            SourceFile = Path.GetFileName(_sourceFilePath),
+            SourceFile = _sourceFileDescription,
             SourceChecksum = checksum,
             SymbolCount = _symbols.Count,
             StringCount = _strings.Count,

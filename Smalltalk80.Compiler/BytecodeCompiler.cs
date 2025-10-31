@@ -15,15 +15,21 @@ namespace Smalltalk80.Compiler
     public class CompilationEnvironment
     {
         /// <summary>
+        /// Parent environment for lexical scope chain (null for method scope).
+        /// Used to resolve free variables in nested blocks.
+        /// </summary>
+        public CompilationEnvironment? Parent { get; set; }
+
+        /// <summary>
         /// Current scope depth (0 for method, 1+ for nested blocks).
         /// </summary>
         public int ScopeDepth { get; set; }
-        
+
         /// <summary>
         /// Map of argument names to their indices.
         /// </summary>
         public Dictionary<string, int> Arguments { get; } = new();
-        
+
         /// <summary>
         /// Map of temporary variable names to their indices.
         /// </summary>
@@ -1815,27 +1821,26 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 environment.PoolVariables[kvp.Key] = kvp.Value;
             }
 
-            // Copy parent's arguments and temporaries so blocks can access them
-            // In Smalltalk-80, blocks can access their enclosing method's variables.
-            // We copy these to the block's environment so the compiler generates correct
-            // bytecodes (PUSH_TEMP instead of PUSH_LIT_VAR for parent scope variables).
-            foreach (var kvp in savedEnvironment.Arguments)
-            {
-                // Only add if block doesn't shadow this variable with its own argument
-                if (!environment.Arguments.ContainsKey(kvp.Key))
-                {
-                    environment.Arguments[kvp.Key] = kvp.Value;
-                }
-            }
+            // CRITICAL: Do NOT copy parent's arguments and temporaries into the block's environment.
+            //
+            // In Smalltalk-80, blocks capture their lexical environment through the homeContext pointer,
+            // and the VM walks this chain at runtime to resolve free variables. The compiler should NOT
+            // duplicate parent variables with the same indices in nested blocks.
+            //
+            // Instead, when the compiler encounters a free variable (not in block's own args/temps),
+            // it will search the parent scope chain and generate the temp index from the DEFINING scope.
+            // The VM's homeContext chain walking will then correctly resolve the variable at runtime.
+            //
+            // Example: [:x | [x + 10] value]
+            //   - Outer block: x is arg at index 0
+            //   - Inner block: When accessing x, compiler searches parent and finds x at index 0 in outer block
+            //   - Compiler generates pushTemp 0 (meaning index 0 in homeContext)
+            //   - VM executes: index 0 >= blockLocalCount (0), so walks to homeContext (outer block), reads index 0
+            //
+            // This approach maintains proper lexical scoping without index conflicts in nested blocks.
 
-            foreach (var kvp in savedEnvironment.Temporaries)
-            {
-                // Only add if block doesn't shadow this variable with its own temp
-                if (!environment.Temporaries.ContainsKey(kvp.Key))
-                {
-                    environment.Temporaries[kvp.Key] = kvp.Value;
-                }
-            }
+            // Link parent environment for lexical scope chain
+            environment.Parent = savedEnvironment;
 
             // Set scope depth to indicate we're in a block
             environment.ScopeDepth = savedEnvironment.ScopeDepth + 1;
@@ -2238,7 +2243,44 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter.PushTemporary(hiddenIndex);
                 return;
             }
-            
+
+            // CRITICAL: Check parent scopes for free variables (lexical scoping in nested blocks)
+            // If we're in a block (ScopeDepth > 0) and the variable isn't in the block's own scope,
+            // search up the parent environment chain to find where it's defined.
+            if (environment.ScopeDepth > 0)
+            {
+                var parentEnv = environment.Parent;
+                while (parentEnv != null)
+                {
+                    // Check parent's arguments
+                    if (parentEnv.Arguments.TryGetValue(name, out var parentArgIndex))
+                    {
+                        // Found in parent scope - generate pushTemp with parent's index
+                        // The VM will resolve this through the homeContext chain at runtime
+                        emitter.PushTemporary(parentArgIndex);
+                        return;
+                    }
+
+                    // Check parent's temporaries
+                    if (parentEnv.Temporaries.TryGetValue(name, out var parentTempIndex))
+                    {
+                        // Found in parent scope - generate pushTemp with parent's index
+                        emitter.PushTemporary(parentTempIndex);
+                        return;
+                    }
+
+                    // Check parent's hidden temporaries
+                    if (parentEnv.HiddenTemporaries.TryGetValue(name, out var parentHiddenIndex))
+                    {
+                        emitter.PushTemporary(parentHiddenIndex);
+                        return;
+                    }
+
+                    // Continue up the scope chain
+                    parentEnv = parentEnv.Parent;
+                }
+            }
+
             // Check instance variables
             if (environment.InstanceVariables.TryGetValue(name, out var instIndex))
             {

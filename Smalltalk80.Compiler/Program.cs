@@ -29,39 +29,104 @@ file sealed class Program
         string solutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
         string defaultInputFile = Path.Combine(solutionRoot, "Smalltalk-80 Source", "Smalltalk-80.st");
 
-        // Parse arguments
-        string inputFile = args.Length > 0 ? args[0] : defaultInputFile;
+        // Parse arguments - support multiple input files
+        List<string> inputFiles = new List<string>();
+        string? outputFile = null;
+
+        if (args.Length == 0)
+        {
+            // No args: use default input file
+            inputFiles.Add(defaultInputFile);
+        }
+        else
+        {
+            // Parse args: all .st files are inputs, first .json file is output
+            foreach (var arg in args)
+            {
+                if (arg.EndsWith(".st", StringComparison.OrdinalIgnoreCase))
+                {
+                    inputFiles.Add(arg);
+                }
+                else if (arg.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && outputFile == null)
+                {
+                    outputFile = arg;
+                }
+            }
+
+            // If no input files specified, use default
+            if (inputFiles.Count == 0)
+            {
+                inputFiles.Add(defaultInputFile);
+            }
+        }
 
         // Default output: coldstart.json in the executable's output directory
-        string outputFile = args.Length > 1
-            ? args[1]
-            : Path.Combine(AppContext.BaseDirectory, "coldstart.json");
+        outputFile ??= Path.Combine(AppContext.BaseDirectory, "coldstart.json");
 
-        if (!File.Exists(inputFile))
+        // Verify all input files exist
+        foreach (var inputFile in inputFiles)
         {
-            Console.Error.WriteLine($"Error: Input file not found: {inputFile}");
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("Usage: Smalltalk80.Compiler [input.st] [output.json]");
-            Console.Error.WriteLine("  Compiles Smalltalk file-out format to JSON cold-start image.");
-            Console.Error.WriteLine($"  Default input:  {defaultInputFile}");
-            Console.Error.WriteLine($"  Default output: coldstart.json in executable directory");
-            return 1;
+            if (!File.Exists(inputFile))
+            {
+                Console.Error.WriteLine($"Error: Input file not found: {inputFile}");
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("Usage: Smalltalk80.Compiler [input1.st] [input2.st] ... [output.json]");
+                Console.Error.WriteLine("  Compiles Smalltalk file-out format to JSON cold-start image.");
+                Console.Error.WriteLine("  Supports multiple input .st files (merged into single bundle).");
+                Console.Error.WriteLine($"  Default input:  {defaultInputFile}");
+                Console.Error.WriteLine($"  Default output: coldstart.json in executable directory");
+                return 1;
+            }
         }
 
         try
         {
             Console.WriteLine("Smalltalk-80 Compiler");
             Console.WriteLine("====================");
-            Console.WriteLine($"Input:  {inputFile}");
+            Console.WriteLine($"Input files ({inputFiles.Count}):");
+            foreach (var file in inputFiles)
+            {
+                Console.WriteLine($"  - {file}");
+            }
             Console.WriteLine($"Output: {outputFile}");
             Console.WriteLine();
 
-            Console.WriteLine("Parsing Smalltalk source...");
-            var result = ParseSmalltalkSource(inputFile);
+            // Parse all input files and merge the ASTs
+            Console.WriteLine("Parsing Smalltalk source files...");
+            CompilationResult mergedResult = null!;
+
+            for (int i = 0; i < inputFiles.Count; i++)
+            {
+                var inputFile = inputFiles[i];
+                Console.WriteLine($"  Parsing {Path.GetFileName(inputFile)}...");
+                var result = ParseSmalltalkSource(inputFile);
+
+                if (i == 0)
+                {
+                    // First file: use as base
+                    mergedResult = result;
+                }
+                else
+                {
+                    // Subsequent files: merge classes and init expressions
+                    foreach (var classNode in result.Classes)
+                    {
+                        mergedResult.Classes.Add(classNode);
+                    }
+                    foreach (var initExpr in result.InitializationExpressions)
+                    {
+                        mergedResult.InitializationExpressions.Add(initExpr);
+                    }
+                }
+            }
+
+            Console.WriteLine($"  Total classes: {mergedResult.Classes.Count}");
+            Console.WriteLine($"  Total init expressions: {mergedResult.InitializationExpressions.Count}");
+            Console.WriteLine();
 
             Console.WriteLine("Generating cold start JSON...");
-            var generator = new ColdStartJsonGenerator(inputFile);
-            string json = generator.Generate(result);
+            var generator = new ColdStartJsonGenerator(string.Join(", ", inputFiles.Select(Path.GetFileName)));
+            string json = generator.Generate(mergedResult);
 
             // Ensure output directory exists
             string? outputDir = Path.GetDirectoryName(outputFile);
