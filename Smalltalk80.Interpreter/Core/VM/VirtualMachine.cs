@@ -2691,11 +2691,12 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 var methodOOP = _heapManager.GetInstanceVariable(currentOOP, methodIndex);
 
-                // Get selector from method's literal[0] (stored at indexed slot 0 for our format)
+                // Get selector from method's literal[0] (stored at indexed slot 1 in our format)
+                // indexed slot 0 = header, indexed slot 1 = literal[0] (selector)
                 string selectorName = "<unknown>";
                 try
                 {
-                    var selectorOOP = GetMethodLiteral(methodOOP, 0);
+                    var selectorOOP = GetMethodLiteral(methodOOP, 1);
                     selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
 
                     // If literal[0] is not a symbol, try to show what it is
