@@ -23,6 +23,21 @@ public static class ObjectPrimitives
 
         if (!args[0].IsSmallInteger)
         {
+            Console.WriteLine($"\n❌ Primitive 60 (at:) TYPE ERROR:");
+            Console.WriteLine($"   Receiver: {receiver}");
+            string? receiverClass = ctx.GetClassNameForObject(receiver);
+            Console.WriteLine($"   Receiver class: {receiverClass}");
+            Console.WriteLine($"   Index argument: {args[0]}");
+            string? indexClass = ctx.GetClassNameForObject(args[0]);
+            Console.WriteLine($"   Index class: {indexClass} (expected SmallInteger)");
+
+            // If index is a String, show its contents
+            if (indexClass == "String" && ctx.HeapManager.GetObjectFormat(args[0]) == ObjectFormat.ByteIndexed)
+            {
+                var stringValue = GetSymbolName(ctx, args[0]); // Works for Strings too
+                Console.WriteLine($"   String value: '{stringValue}'");
+            }
+
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
