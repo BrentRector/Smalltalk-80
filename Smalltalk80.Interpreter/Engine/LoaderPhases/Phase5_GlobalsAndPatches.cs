@@ -310,29 +310,24 @@ public class Phase5_GlobalsAndPatches
         _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
         // Create bucket arrays with exact capacity (no reallocation needed later)
+        // CRITICAL: ALL buckets must be Arrays, even empty ones (not nil!)
+        // Symbol class>>rehash uses: USTable _ USTable collect: [:sym | Array new: 0]
+        // Symbol>>intern: does: USTable at: index put: ((USTable at: index) copyWith: sym)
+        // If bucket is nil, copyWith: fails → infinite recursion in error handling
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < size; i++)
         {
-            if (bucketCounts[i] == 0)
-            {
-                // Empty bucket - set to nil (matches Symbol class>>rehash: Array new: 0)
-                _allocator.SetIndexedOOP(ustableOOP, i, nilOOP);
-            }
-            else
-            {
-                // Pre-allocate bucket array with exact capacity
-                var bucketOOP = _allocator.AllocateArray("Array", bucketCounts[i]);
-                _allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
+            // Allocate array for this bucket (size 0 for empty buckets)
+            var bucketOOP = _allocator.AllocateArray("Array", bucketCounts[i]);
+            _allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
 
-                // CRITICAL: Initialize all indexed slots to nil
-                // C# arrays default to OOP(0), but Smalltalk expects nil
-                for (int j = 0; j < bucketCounts[i]; j++)
-                {
-                    _allocator.SetIndexedOOP(bucketOOP, j, nilOOP);
-                }
-
-                _allocator.SetIndexedOOP(ustableOOP, i, bucketOOP);
+            // Initialize all indexed slots to nil (C# arrays default to OOP(0))
+            for (int j = 0; j < bucketCounts[i]; j++)
+            {
+                _allocator.SetIndexedOOP(bucketOOP, j, nilOOP);
             }
+
+            _allocator.SetIndexedOOP(ustableOOP, i, bucketOOP);
         }
 
         return ustableOOP;
