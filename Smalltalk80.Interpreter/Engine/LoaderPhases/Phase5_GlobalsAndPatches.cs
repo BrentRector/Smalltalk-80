@@ -323,6 +323,14 @@ public class Phase5_GlobalsAndPatches
                 // Pre-allocate bucket array with exact capacity
                 var bucketOOP = _allocator.AllocateArray("Array", bucketCounts[i]);
                 _allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
+
+                // CRITICAL: Initialize all indexed slots to nil
+                // C# arrays default to OOP(0), but Smalltalk expects nil
+                for (int j = 0; j < bucketCounts[i]; j++)
+                {
+                    _allocator.SetIndexedOOP(bucketOOP, j, nilOOP);
+                }
+
                 _allocator.SetIndexedOOP(ustableOOP, i, bucketOOP);
             }
         }

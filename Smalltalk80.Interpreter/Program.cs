@@ -143,10 +143,17 @@ public static class Program
                 var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                 int totalExpressions = bundle.InitExpressions.Length;
 
+                // Skip list for init expressions requiring runtime features not available during bootstrap
+                var skipList = new HashSet<string>
+                {
+                    "Delay initialize",      // Requires process/threading primitives (forkAt:)
+                };
+
                 // Build index lists for each phase (preserving source file order)
                 var phase1Indices = new List<int>(); // initialize! expressions
                 var phase2Indices = new List<int>(); // comment: expressions
                 var testIndices = new List<int>(); // test expressions
+                var skippedIndices = new List<(int index, string reason)>();
 
                 if (onlyRunTests)
                 {
@@ -170,6 +177,13 @@ public static class Program
 
                     if (expr.Source != null)
                     {
+                        // Check skip list first
+                        if (skipList.Contains(expr.Source))
+                        {
+                            skippedIndices.Add((i, "Requires runtime features not available during bootstrap"));
+                            continue;
+                        }
+
                         // Phase-based execution: ALL initialize expressions, then ALL comments
                         if (expr.Source.EndsWith(" initialize"))
                         {
@@ -431,6 +445,14 @@ public static class Program
                 Console.WriteLine($"\n=== Init Expression Execution Summary ===");
                 Console.WriteLine($"  Phase 1 (initialize!): {phase1Indices.Count} succeeded");
                 Console.WriteLine($"  Phase 2 (comment:): {phase2Indices.Count} succeeded");
+                if (skippedIndices.Count > 0)
+                {
+                    Console.WriteLine($"  Skipped: {skippedIndices.Count} (require runtime features not available during bootstrap)");
+                    foreach (var (index, reason) in skippedIndices)
+                    {
+                        Console.WriteLine($"    [{index}] {bundle.InitExpressions[index].Source}");
+                    }
+                }
                 Console.WriteLine($"  Total: {succeeded}/{totalExpressions} succeeded, {failed} failed");
                 Console.WriteLine($"\n✓ All init expressions executed successfully!");
             }
