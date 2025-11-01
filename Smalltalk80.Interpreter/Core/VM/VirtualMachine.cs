@@ -36,7 +36,7 @@ public partial class VirtualMachine : IPrimitiveContext
     // Context depth tracking to detect infinite recursion
     // (Trampoline architecture prevents CLR stack overflow, so this limit is only for detecting logic errors)
     private int _activeContextCount = 0;
-    private const int MAX_CONTEXT_DEPTH = 2000;  // Sufficient for Character initialize (needs ~512 contexts)
+    private const int MAX_CONTEXT_DEPTH = 5000;  // Increased for init expressions with deep dependencies
 
     // Cursor creation loop diagnostics
     private int _cursorCreationCount = 0;
@@ -252,6 +252,10 @@ public partial class VirtualMachine : IPrimitiveContext
 
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
+        // Reset context depth counter for fresh execution
+        // Each init expression should start with depth=0
+        _activeContextCount = 0;
+
         _activeContextOOP = contextOOP;
         var result = InterpreterLoop();
         return result;
