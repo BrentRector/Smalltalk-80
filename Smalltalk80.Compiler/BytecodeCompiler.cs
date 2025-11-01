@@ -69,15 +69,30 @@ namespace Smalltalk80.Compiler
         
         /// <summary>
         /// Gets the index for a variable name.
+        /// Searches current scope, then walks up parent scopes to find the variable.
         /// </summary>
         public int? GetVariableIndex(string name)
         {
+            // Check current scope
             if (Arguments.TryGetValue(name, out var argIndex))
                 return argIndex;
             if (Temporaries.TryGetValue(name, out var tempIndex))
                 return tempIndex;
             if (HiddenTemporaries.TryGetValue(name, out var hiddenIndex))
                 return hiddenIndex;
+
+            // Check parent scopes (for block closures accessing outer temporaries)
+            if (Parent != null)
+            {
+                var parentIndex = Parent.GetVariableIndex(name);
+                if (parentIndex.HasValue)
+                {
+                    // Variable found in parent scope
+                    // Return the index from the parent (will be used with home context)
+                    return parentIndex.Value;
+                }
+            }
+
             return null;
         }
         
@@ -537,6 +552,11 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.PUSH_FALSE); // 0x72
         }
 
+        public void PushActiveContext()
+        {
+            Emit(0x89); // PUSH_ACTIVE_CONTEXT - pushes thisContext
+        }
+
         public void PushMinusOne()
         {
             Emit(Bytecode.PUSH_MINUS_ONE); // 0x74
@@ -852,6 +872,36 @@ namespace Smalltalk80.Compiler
         private string selector = "";
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
+        private string currentMethodIdentifier = "";  // For tracking undeclared variables
+
+        /// <summary>
+        /// Static registry of undeclared variables (global name -> list of methods that reference it).
+        /// This tracks variables that couldn't be resolved during compilation.
+        /// </summary>
+        private static readonly Dictionary<string, List<string>> _undeclaredVariables = new();
+
+        /// <summary>
+        /// Get read-only view of undeclared variables.
+        /// Returns dictionary of variable name -> list of method identifiers.
+        /// </summary>
+        public static IReadOnlyDictionary<string, List<string>> GetUndeclaredVariables() => _undeclaredVariables;
+
+        /// <summary>
+        /// Clear undeclared variables registry (call before starting new compilation).
+        /// </summary>
+        public static void ClearUndeclaredVariables() => _undeclaredVariables.Clear();
+
+        /// <summary>
+        /// Record that a variable was undeclared in a method.
+        /// </summary>
+        private void RecordUndeclaredVariable(string varName, string methodIdentifier)
+        {
+            if (!_undeclaredVariables.ContainsKey(varName))
+            {
+                _undeclaredVariables[varName] = new List<string>();
+            }
+            _undeclaredVariables[varName].Add(methodIdentifier);
+        }
 
         /// <summary>
         /// Compiles a file-scope expression to bytecode.
@@ -961,6 +1011,9 @@ namespace Smalltalk80.Compiler
             {
                 // Process method header
                 ProcessMethodHeader(methodDef.methodHeader());
+
+                // Set method identifier for undeclared tracking (just selector for now)
+                currentMethodIdentifier = selector;
 
                 // Process temporaries
                 if (methodDef.temporaries() != null)
@@ -1742,12 +1795,23 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         /// </summary>
         private CompiledMethodData CompileBlockAsLiteral(Smalltalk80Parser.BlockContext block)
         {
+            // DIAGNOSTIC: Log every block compilation
+            var blockText = block.GetText();
+            if (blockText.Contains("char"))
+            {
+                File.AppendAllText("compiler_debug.log", $"[CompileBlockAsLiteral] Compiling block containing 'char': {blockText.Substring(0, Math.Min(80, blockText.Length))}\n");
+            }
+
             // Create a new compilation environment for the block
             var savedEnvironment = environment;
             var savedEmitter = emitter;
 
             // Create new environment and emitter for the block
-            environment = new CompilationEnvironment();
+            environment = new CompilationEnvironment
+            {
+                Parent = savedEnvironment,  // Link to parent for lexical scoping
+                ScopeDepth = savedEnvironment.ScopeDepth + 1
+            };
             emitter = new BytecodeEmitter();
 
             // Process block arguments
@@ -1773,12 +1837,36 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             // Process block temporaries
             var blockTemps = block.blockTemps();
             var temporaryNames = new List<string>();
+
+            // DIAGNOSTIC: Log block temp processing
+            if (blockText.Contains("char"))
+            {
+                File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps = {(blockTemps == null ? "NULL" : "exists")}\n");
+            }
+
             if (blockTemps != null)
             {
-                var tempNodes = blockTemps.children
-                    .Where(c => c is ITerminalNode term && term.Symbol.Type == Smalltalk80Lexer.IDENTIFIER)
-                    .Cast<ITerminalNode>()
+                if (blockText.Contains("char"))
+                {
+                    File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps.children.Count = {blockTemps.children?.Count ?? 0}\n");
+                    if (blockTemps.children != null)
+                    {
+                        foreach (var child in blockTemps.children)
+                        {
+                            File.AppendAllText("compiler_debug.log", $"[CompileBlock]   child: {child.GetType().Name} = '{child.GetText()}'\n");
+                        }
+                    }
+                }
+
+                // Extract TemporaryNameContext nodes (not raw IDENTIFIER terminals!)
+                var tempNodes = (blockTemps.children ?? Enumerable.Empty<IParseTree>())
+                    .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .ToList();
+
+                if (blockText.Contains("char"))
+                {
+                    File.AppendAllText("compiler_debug.log", $"[CompileBlock] Found {tempNodes.Count} IDENTIFIER nodes for block temps\n");
+                }
 
                 int tempBase = environment.ArgumentCount;
                 for (int i = 0; i < tempNodes.Count; i++)
@@ -1786,8 +1874,17 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     var tempName = tempNodes[i].GetText();
                     temporaryNames.Add(tempName);
                     environment.Temporaries[tempName] = tempBase + i;
+                    if (blockText.Contains("char"))
+                    {
+                        File.AppendAllText("compiler_debug.log", $"[CompileBlock]   Added temp '{tempName}' at index {tempBase + i}\n");
+                    }
                 }
                 environment.TemporaryCount = tempNodes.Count;
+            }
+
+            if (blockText.Contains("char"))
+            {
+                File.AppendAllText("compiler_debug.log", $"[CompileBlock] Final temporaryNames.Count = {temporaryNames.Count}, environment.TemporaryCount = {environment.TemporaryCount}\n");
             }
 
             // IMPORTANT: Block variable access in Blue Book specification:
@@ -2219,7 +2316,12 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter.PushNil();
                 return;
             }
-            
+            if (name == "thisContext")
+            {
+                emitter.PushActiveContext();
+                return;
+            }
+
             // Check if it's an argument FIRST
             // Arguments are stored in temporary locations starting at index 0
             if (environment.Arguments.TryGetValue(name, out var argIndex))
@@ -2301,8 +2403,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter.PushLiteralVariable(name);
                 return;
             }
-            
+
             // Global variable (also uses PushLiteralVariable with Association)
+            // This is an undeclared variable - record it for reporting
+            RecordUndeclaredVariable(name, currentMethodIdentifier);
             emitter.PushLiteralVariable(name);
         }
         
@@ -2352,8 +2456,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 emitter.StoreLiteralVariable(name);
                 return;
             }
-            
+
             // Global variable (also uses StoreLiteralVariable with Association)
+            // This is an undeclared variable - record it for reporting
+            RecordUndeclaredVariable(name, currentMethodIdentifier);
             if (leaveOnStack)
             {
                 emitter.Dup();
@@ -2789,8 +2895,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 var name = context.GetText();
                 
                 // Skip special variables
-                if (name == "self" || name == "super" || name == "true" || 
-                    name == "false" || name == "nil")
+                if (name == "self" || name == "super" || name == "true" ||
+                    name == "false" || name == "nil" || name == "thisContext")
                 {
                     return base.VisitVariable(context);
                 }

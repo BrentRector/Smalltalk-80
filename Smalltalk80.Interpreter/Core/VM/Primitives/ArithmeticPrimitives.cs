@@ -14,16 +14,28 @@ public static class ArithmeticPrimitives
     private const int SmallIntegerMax = (1 << 30) - 1;
 
     // Primitive 1: SmallInteger +
+    // DEBUG: Primitive 1 call counter
+    private static int _prim1CallCount = 0;
+    private static int _prim1LastA = -999;
+    private static int _prim1LastB = -999;
+
     public static SmalltalkOOP Add(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DEBUG: Log for Character.initialize debugging
+        System.Threading.Interlocked.Increment(ref _prim1CallCount);
+
         if (args.Length != 1)
         {
+            if (_prim1CallCount <= 10)
+                Console.WriteLine($"[Prim1 #{_prim1CallCount}] FAIL: args.Length={args.Length}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
+            if (_prim1CallCount <= 10)
+                Console.WriteLine($"[Prim1 #{_prim1CallCount}] FAIL: not SmallIntegers");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -38,9 +50,19 @@ public static class ArithmeticPrimitives
             // Check if result is within SmallInteger range (30-bit signed)
             if (result < SmallIntegerMin || result > SmallIntegerMax)
             {
+                if (_prim1CallCount <= 10)
+                    Console.WriteLine($"[Prim1 #{_prim1CallCount}] OVERFLOW: {a} + {b} = {result}");
                 // Overflow SmallInteger range - let Smalltalk fall back to LargeInteger method
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
+            }
+
+            // Log if values changed or first 10 calls
+            if (_prim1CallCount <= 10 || a != _prim1LastA || b != _prim1LastB)
+            {
+                Console.WriteLine($"[Prim1 #{_prim1CallCount}] {a} + {b} = {result}");
+                _prim1LastA = a;
+                _prim1LastB = b;
             }
 
             return SmalltalkOOP.FromSmallInteger(result);
@@ -155,16 +177,28 @@ public static class ArithmeticPrimitives
     }
 
     // Primitive 5: SmallInteger <=
+    // DEBUG: Primitive 5 call counter
+    private static int _prim5CallCount = 0;
+    private static int _prim5LastA = -1;
+    private static int _prim5LastB = -1;
+
     public static SmalltalkOOP LessOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // DEBUG: Log first 300 calls and every time values change
+        System.Threading.Interlocked.Increment(ref _prim5CallCount);
+
         if (args.Length != 1)
         {
+            if (_prim5CallCount <= 10)
+                Console.WriteLine($"[Prim5 #{_prim5CallCount}] FAIL: args.Length={args.Length}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
+            if (_prim5CallCount <= 10)
+                Console.WriteLine($"[Prim5 #{_prim5CallCount}] FAIL: not SmallIntegers");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -172,7 +206,17 @@ public static class ArithmeticPrimitives
         int a = receiver.AsSmallInteger();
         int b = args[0].AsSmallInteger();
 
-        return a <= b
+        bool result = a <= b;
+
+        // Log if values changed or first 10 calls
+        if (_prim5CallCount <= 10 || a != _prim5LastA || b != _prim5LastB)
+        {
+            Console.WriteLine($"[Prim5 #{_prim5CallCount}] {a} <= {b} = {result}");
+            _prim5LastA = a;
+            _prim5LastB = b;
+        }
+
+        return result
             ? SpecialObjectsArray.Instance.True
             : SpecialObjectsArray.Instance.False;
     }

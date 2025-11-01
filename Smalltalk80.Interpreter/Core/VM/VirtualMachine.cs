@@ -98,6 +98,9 @@ public partial class VirtualMachine : IPrimitiveContext
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
+    // DEBUG: Context creation counter for diagnostic output
+    private static int _createContextCallCount = 0;
+
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context and BlockClosure field indices are now static constants shared across the VM
 
@@ -256,8 +259,10 @@ public partial class VirtualMachine : IPrimitiveContext
         // Each init expression should start with depth=0
         _activeContextCount = 0;
 
+        Console.WriteLine($"[ExecuteExistingContext] Starting execution of context {contextOOP}");
         _activeContextOOP = contextOOP;
         var result = InterpreterLoop();
+        Console.WriteLine($"[ExecuteExistingContext] Finished with result {result}");
         return result;
     }
 
@@ -272,6 +277,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// <returns>Allocated and initialized MethodContext OOP</returns>
     private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
     {
+        // DEBUG: Log first 20 context creations
+        System.Threading.Interlocked.Increment(ref _createContextCallCount);
+        if (_createContextCallCount <= 20)
+        {
+            string? methodLocalId = GetLocalId(methodOOP);
+            Console.WriteLine($"[CreateMethodContext #{_createContextCallCount}] method={methodLocalId}, receiver={receiverOOP}");
+        }
+
         // Step 1: Validate CompiledMethod exists and parse header
         var header = ParseMethodHeader(methodOOP);
 
@@ -1930,6 +1943,16 @@ public partial class VirtualMachine : IPrimitiveContext
                         }
                     }
 
+                    // DIAGNOSTIC: Validate index is within bounds
+                    int contextSize = _heapManager.GetIndexedSize(contextToStoreTo);
+                    if (index >= contextSize)
+                    {
+                        string? methodLocalId = GetLocalId(methodOOP);
+                        throw new InvalidOperationException(
+                            $"POP_STORE_TEMP: index {index} out of bounds (context size={contextSize}). " +
+                            $"Method: {methodLocalId}, PC: {ip - 2}, activeContext={_activeContextOOP}, targetContext={contextToStoreTo}");
+                    }
+
                     _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
                     return true;
                 }
@@ -1948,6 +1971,17 @@ public partial class VirtualMachine : IPrimitiveContext
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+
+                    // DIAGNOSTIC: Log Association key for debugging
+                    if (_createContextCallCount <= 20)
+                    {
+                        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+                        string? keyName = GetSymbolName(keyOOP);
+                        string? methodLocalId = GetLocalId(methodOOP);
+                        Console.WriteLine($"[PUSH_LITERAL_VAR] Reading Association key='{keyName}', method={methodLocalId}");
+                    }
+
                     int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
                     var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
                     Push(valueOOP);
@@ -1972,14 +2006,49 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-                    
+
+                    // DIAGNOSTIC: Validate this is actually an Association
+                    if (associationOOP.IsSmallInteger)
+                    {
+                        string? methodLocalId = GetLocalId(methodOOP);
+                        throw new InvalidOperationException(
+                            $"POP_STORE_LITERAL_VAR: literal[{index}] is SmallInteger({associationOOP.AsSmallInteger()}), expected Association. " +
+                            $"Method: {methodLocalId}, PC: {ip - 2}");
+                    }
+
+                    var literalClass = _heapManager.GetSlot(associationOOP, 0);
+                    string? literalClassName = GetClassName(literalClass);
+
+                    // Allow "Association" or "class:Association" as valid class names
+                    bool isAssociation = literalClassName == "class:Association" || literalClassName == "Association";
+
+                    if (!isAssociation)
+                    {
+                        string? methodLocalId = GetLocalId(methodOOP);
+                        throw new InvalidOperationException(
+                            $"POP_STORE_LITERAL_VAR: literal[{index}] is {literalClassName} (oop={associationOOP}), expected Association. " +
+                            $"Method: {methodLocalId}, PC: {ip - 2}. " +
+                            $"This likely means the compiler generated wrong bytecode (should be POP_STORE_TEMP for temp variable).");
+                    }
+
+                    // DIAGNOSTIC: Log Association key for debugging
+                    if (_createContextCallCount <= 20)
+                    {
+                        string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
+                        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+                        string? keyName = GetSymbolName(keyOOP);
+                        string? methodLocalId = GetLocalId(methodOOP);
+                        Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to Association key='{keyName}', value={valStr}, method={methodLocalId}");
+                    }
+
                     // Store the value in the Association using write-barrier (runtime mode)
                     SetAssociationValue(associationOOP, valueOOP, loaderMode: false);
-                    
+
                     // Add Association to classPool if it's a class variable (lazy initialization)
                     // For class-side methods, receiver IS the class object which has the classPool
                     AddAssociationToClassPoolIfNeeded(receiverOOP, associationOOP);
-                    
+
                     return true;
                 }
 
@@ -2614,6 +2683,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Check if the method has a primitive
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
+
+        // DEBUG: Log primitive lookups for + and <= during Character.initialize
+        if (selectorName == "+" || selectorName == "<=")
+        {
+            Console.WriteLine($"[SendMessage] Selector '{selectorName}' → primitiveNumber={primitiveNumber}, methodOOP={methodInfo.MethodOOP}");
+        }
+
         if (primitiveNumber > 0)
         {
             // DEBUG: Always log primitive 4 (>) to diagnose why it's not being called
@@ -3122,6 +3198,13 @@ public partial class VirtualMachine : IPrimitiveContext
         if (blockLocalId == null || !blockOwnerMap.TryGetValue(blockLocalId, out string? ownerLocalId))
         {
             throw new InvalidOperationException($"Block method {blockMethodOOP} not found in blockOwnerMap");
+        }
+
+        // DEBUG: Dump bytecodes for blocks inside to:do: method
+        if (_createContextCallCount <= 20 && ownerLocalId == "method:Number>>to:do:")
+        {
+            Console.WriteLine($"[BLOCK BYTECODES] Block {blockLocalId} (owner: {ownerLocalId}):");
+            DumpBytecodes(blockMethodOOP, "  ");
         }
 
         // Step 2: Determine contexts
@@ -4734,5 +4817,43 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Use the private GetClassName method to get the class name
         return GetClassName(classOOP);
+    }
+
+    private void DumpBytecodes(SmalltalkOOP methodOOP, string prefix)
+    {
+        var bytecodes = GetMethodBytecodes(methodOOP);
+        Console.WriteLine($"{prefix}Bytecode dump ({bytecodes.Length} bytes):");
+
+        int i = 0;
+        while (i < bytecodes.Length && i < 50)
+        {
+            byte b = bytecodes[i];
+            int offset = i;
+            string desc = b switch
+            {
+                0x00 => "PUSH_RECEIVER",
+                0x01 => "PUSH_TRUE",
+                0x02 => "PUSH_FALSE",
+                0x03 => "PUSH_NIL",
+                0x04 => $"STORE_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x05 => $"POP_STORE_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x06 => $"PUSH_LITERAL {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x10 => $"PUSH_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x11 => $"PUSH_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x20 => $"PUSH_LITERAL {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
+                0x5C => "RETURN_STACK_TOP",
+                0x5D => "RETURN_NIL",
+                0x5E => "RETURN_TRUE",
+                0x5F => "RETURN_FALSE",
+                0x87 => "POP_STACK_TOP",
+                >= 0xB0 and <= 0xBF => $"SEND_ARITH (selector={(b - 0xB0)})",
+                >= 0xD0 and <= 0xDF => $"SEND1 (selector={(b - 0xD0)})",
+                >= 0xF0 and <= 0xFF => $"SEND2 (selector={(b - 0xF0)})",
+                _ => $"0x{b:X2}"
+            };
+
+            Console.WriteLine($"{prefix}  [{offset}] {desc}");
+            i++;
+        }
     }
 }

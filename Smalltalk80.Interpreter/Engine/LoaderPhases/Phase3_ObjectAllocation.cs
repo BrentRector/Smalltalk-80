@@ -139,6 +139,12 @@ public class Phase3_ObjectAllocation
 
         // Initialize ProcessorScheduler fields that should NOT be nil
         InitializeProcessorSchedulerFields(processorSchedulerOOP, nilOOP);
+
+        // Create Undeclared Dictionary (v1.0.7)
+        // The Undeclared dictionary holds Association objects for variables that were referenced
+        // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
+        // Associations when the variables become defined.
+        CreateUndeclaredDictionary(nilOOP);
     }
 
     /// <summary>
@@ -171,6 +177,53 @@ public class Phase3_ObjectAllocation
             _allocator.SetInstanceVariable(processorSchedulerOOP, i, nilOOP);
             _initializedFields.Add((processorSchedulerOOP, i));
         }
+    }
+
+    /// <summary>
+    /// Creates the Undeclared Dictionary and registers it as a global (v1.0.7).
+    /// The Undeclared dictionary is initially empty - it will be populated during Phase 5
+    /// with Association objects for each variable found in bundle.Undeclared[].
+    /// </summary>
+    private void CreateUndeclaredDictionary(SmalltalkOOP nilOOP)
+    {
+        // Determine initial capacity based on bundle undeclared count
+        int undeclaredCount = _bundle.Undeclared?.Length ?? 0;
+        int initialCapacity = Math.Max(16, undeclaredCount * 2); // Double capacity for hash table efficiency
+
+        // Allocate Dictionary with appropriate capacity
+        var undeclaredOOP = _allocator.AllocateArray("Dictionary", initialCapacity);
+
+        // Initialize all indexed slots to nil
+        for (int i = 0; i < initialCapacity; i++)
+        {
+            _allocator.SetIndexedOOP(undeclaredOOP, i, nilOOP);
+        }
+
+        // Initialize Dictionary instance variables (tally = 0)
+        int dictInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
+        for (int i = 0; i < dictInstVarCount; i++)
+        {
+            _allocator.SetInstanceVariable(undeclaredOOP, i, nilOOP);
+            _initializedFields.Add((undeclaredOOP, i));
+        }
+
+        // Set tally to 0 (will be incremented as Associations are added in Phase 5)
+        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        if (tallyIndex >= 0)
+        {
+            var zeroOOP = SmalltalkOOP.FromSmallInteger(0);
+            _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, zeroOOP);
+        }
+
+        // Register in GlobalRegistry
+        GlobalRegistry.Register("Undeclared", undeclaredOOP);
+
+        // Add to Smalltalk dictionary
+        var undeclaredSymbol = InternSymbol("Undeclared");
+        var undeclaredAssoc = AllocateAssociationWithSemanticAllocator(undeclaredSymbol, undeclaredOOP);
+        InstallAssociationInSystemDictionary(undeclaredAssoc, "Undeclared");
+
+        Console.WriteLine($"  Created Undeclared dictionary (capacity={initialCapacity}, undeclared count={undeclaredCount})");
     }
 
     #endregion

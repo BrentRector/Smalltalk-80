@@ -57,6 +57,9 @@ public class Phase5_GlobalsAndPatches
         // Step 2: Create and populate USTable (from Phase11)
         CreateAndPopulateUSTable();
 
+        // Step 2b: Populate Undeclared dictionary (v1.0.7)
+        PopulateUndeclaredDictionary();
+
         // Step 3: Create and populate SystemDictionary (from Phase12)
         CreateAndPopulateSystemDictionary();
 
@@ -539,6 +542,96 @@ public class Phase5_GlobalsAndPatches
         }
 
         return totalCount;
+    }
+
+    // ================================================================================
+    // SECTION 2b: UNDECLARED DICTIONARY POPULATION (v1.0.7)
+    // ================================================================================
+
+    /// <summary>
+    /// Populates the Undeclared dictionary with Association objects for each variable
+    /// found in bundle.Undeclared[]. Each Association is created with key=variableName
+    /// and value=nil. When the variable becomes defined (via init expressions or runtime),
+    /// SystemDictionary>>at:put: will migrate the Association to Smalltalk dictionary.
+    /// </summary>
+    private void PopulateUndeclaredDictionary()
+    {
+        if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
+        {
+            Console.WriteLine("[Phase5] No undeclared variables in bundle - skipping Undeclared population");
+            return;
+        }
+
+        Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
+
+        var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int addedCount = 0;
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
+        {
+            // Get or create canonical Association for this variable
+            var association = GetOrCreateCanonicalAssociation(undeclaredVar.Key);
+
+            // Add Association to Undeclared dictionary using Dictionary>>at:put: semantics
+            AddAssociationToUndeclaredDictionary(undeclaredOOP, association);
+            addedCount++;
+        }
+
+        // Update tally
+        int tallyIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "tally");
+        if (tallyIndex >= 0)
+        {
+            var tallyOOP = SmalltalkOOP.FromSmallInteger(addedCount);
+            _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, tallyOOP);
+        }
+
+        Console.WriteLine($"  ✓ Added {addedCount} Associations to Undeclared dictionary");
+
+        // Show sample of undeclared variables
+        if (addedCount > 0)
+        {
+            var sampleCount = Math.Min(5, _bundle.Undeclared.Length);
+            Console.WriteLine($"  Sample undeclared variables:");
+            for (int i = 0; i < sampleCount; i++)
+            {
+                var varName = _bundle.Undeclared[i].Key;
+                var refCount = _bundle.Undeclared[i].References.Length;
+                Console.WriteLine($"    - {varName} ({refCount} reference(s))");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds an Association to the Undeclared dictionary using open-addressing hash table.
+    /// This matches the Dictionary>>at:put: implementation in Smalltalk-80.
+    /// </summary>
+    private void AddAssociationToUndeclaredDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP)
+    {
+        int capacity = _allocator.GetIndexedSize(dictionaryOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Get the key from the Association (slot 0 = key, slot 1 = value)
+        var keyOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Compute hash for the key (simple identity hash using OOP value)
+        int hash = Math.Abs(keyOOP.RawValue) % capacity;
+
+        // Linear probe to find empty slot
+        for (int probe = 0; probe < capacity; probe++)
+        {
+            int slotIndex = (hash + probe) % capacity;
+            var slotOOP = _allocator.GetIndexedOOP(dictionaryOOP, slotIndex);
+
+            if (slotOOP == nilOOP)
+            {
+                // Found empty slot - install Association
+                _allocator.SetIndexedOOP(dictionaryOOP, slotIndex, associationOOP);
+                return;
+            }
+        }
+
+        throw new InvalidOperationException("Undeclared dictionary is full - cannot add Association");
     }
 
     /// <summary>

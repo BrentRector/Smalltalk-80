@@ -4,8 +4,9 @@ namespace Smalltalk80.Interpreter.Core.Schema;
 
 /// <summary>
 /// Root cold start bundle structure.
-/// Matches coldstart-v1.0.4.schema.json root schema.
+/// Matches coldstart-v1.0.7.schema.json root schema.
 /// v1.0.4: BlockContext objects moved to metadata.blockContexts[] (tooling-only, not runtime objects).
+/// v1.0.7: Added Undeclared array - compiler-generated list of unresolved variable references.
 /// </summary>
 public class ColdStartBundle
 {
@@ -20,6 +21,7 @@ public class ColdStartBundle
     public InstallOrder? InstallOrder { get; init; }
     public PatchDescriptor[]? Patches { get; init; }  // Optional for backward compatibility
     public SourceFile[]? SourceFiles { get; init; }
+    public UndeclaredVariable[]? Undeclared { get; init; }  // v1.0.7: Compiler-tracked undeclared variables
 
     /// <summary>
     /// Loads a cold start bundle from a JSON file.

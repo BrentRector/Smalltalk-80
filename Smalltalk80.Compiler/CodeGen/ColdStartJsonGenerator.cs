@@ -1501,6 +1501,16 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private ColdStartBundle BuildColdStartBundle(List<int> optimizedSelectors)
     {
+        // Collect undeclared variables from compiler
+        var undeclaredVars = BytecodeCompiler.GetUndeclaredVariables()
+            .Select(kvp => new UndeclaredVariable
+            {
+                Key = kvp.Key,
+                References = kvp.Value.ToList()
+            })
+            .OrderBy(x => x.Key)
+            .ToList();
+
         return new ColdStartBundle
         {
             Metadata = GenerateMetadata(),
@@ -1512,7 +1522,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             Methods = _methods,
             InitExpressions = _initExprs,
             InstallOrder = new InstallOrder { Phases = _installPhases },
-            Patches = _patches
+            Patches = _patches,
+            Undeclared = undeclaredVars
         };
     }
 
@@ -1532,7 +1543,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
         return new Metadata
         {
-            Version = "1.0.6",
+            Version = "1.0.7",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = _sourceFileDescription,
@@ -1544,6 +1555,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             ObjectCount = _objects.Count,
             InitExpressionCount = _initExprs.Count,
             BlockContextCount = blockContexts.Count,
+            UndeclaredCount = BytecodeCompiler.GetUndeclaredVariables().Count,
             BlockContexts = blockContexts
         };
     }
@@ -1563,6 +1575,7 @@ internal sealed record ColdStartBundle
     public required List<JsonInitExpr> InitExpressions { get; init; }
     public required InstallOrder InstallOrder { get; init; }
     public required List<PatchDescriptor> Patches { get; init; }
+    public List<UndeclaredVariable>? Undeclared { get; init; }  // v1.0.7: Compiler-tracked undeclared variables
 }
 
 internal sealed record Metadata
@@ -1579,6 +1592,7 @@ internal sealed record Metadata
     public required int ObjectCount { get; init; }
     public required int InitExpressionCount { get; init; }
     public int? BlockContextCount { get; init; }
+    public int? UndeclaredCount { get; init; }  // v1.0.7: Count of undeclared variables
     public List<BlockContextMetadata>? BlockContexts { get; init; }
 }
 
@@ -1674,6 +1688,20 @@ internal sealed record InstallPhase
     public required string Name { get; init; }
     public required string Kind { get; init; }
     public required List<string> LocalIds { get; init; }
+}
+
+/// <summary>
+/// Represents an undeclared variable found during compilation (v1.0.7).
+/// The compiler tracks all references to variables that couldn't be resolved.
+/// These will be added to the Undeclared dictionary during cold start.
+/// </summary>
+internal sealed record UndeclaredVariable
+{
+    [JsonPropertyName("key")]
+    public required string Key { get; init; }
+
+    [JsonPropertyName("references")]
+    public required List<string> References { get; init; }
 }
 
 /// <summary>

@@ -94,7 +94,7 @@ public static class Program
 
             // Execute init expressions - ONLY BlockContextTest for nested block context testing
             bool executeInitExpressions = true; // Run only the test expression
-            bool onlyRunTests = true; // Run only test expressions (BlockContextTest)
+            bool onlyRunTests = false; // DISABLED - Debug Character initialization only
             if (executeInitExpressions && bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
@@ -143,19 +143,9 @@ public static class Program
                 var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                 int totalExpressions = bundle.InitExpressions.Length;
 
-                // Skip list for problematic init expressions during bootstrap
-                // These expressions require infrastructure that isn't ready during cold start
-                var skipList = new HashSet<string>
-                {
-                    "BitEditor initialize",              // Requires TextStyle/DefaultTextStyle (not created yet)
-                    "ChangeListController initialize",   // Requires TextStyle (calls TextStyle fontAt:)
-                    // Add more problematic expressions here as discovered
-                };
-
                 // Build index lists for each phase (preserving source file order)
                 var phase1Indices = new List<int>(); // initialize! expressions
                 var phase2Indices = new List<int>(); // comment: expressions
-                var skippedIndices = new List<int>(); // skipped expressions
                 var testIndices = new List<int>(); // test expressions
 
                 if (onlyRunTests)
@@ -180,24 +170,16 @@ public static class Program
 
                     if (expr.Source != null)
                     {
-
-                        // Check if this expression should be skipped
-                        if (skipList.Contains(expr.Source))
-                        {
-                            skippedIndices.Add(i);
-                            continue;
-                        }
-
-                        // Match "ClassName initialize" (no exclamation mark in bundle)
+                        // Phase-based execution: ALL initialize expressions, then ALL comments
                         if (expr.Source.EndsWith(" initialize"))
                         {
                             phase1Indices.Add(i);
                         }
-                        // Match "ClassName comment:'...'"
                         else if (expr.Source.Contains(" comment:"))
                         {
                             phase2Indices.Add(i);
                         }
+                        // Skip test expressions (run! messages) in normal mode
                     }
                 }
 
@@ -228,17 +210,6 @@ public static class Program
                         Console.WriteLine();
                     }
 
-                    // Report skipped expressions
-                    if (skippedIndices.Count > 0)
-                    {
-                        Console.WriteLine($"\n=== Skipped Init Expressions (Bootstrap Issues) ===");
-                        Console.WriteLine($"  {skippedIndices.Count} expression(s) skipped due to missing dependencies:");
-                        foreach (int index in skippedIndices)
-                        {
-                            Console.WriteLine($"    [{index}] {bundle.InitExpressions[index].Source}");
-                        }
-                        Console.WriteLine();
-                    }
                 }
 
                 int succeeded = 0;
@@ -291,19 +262,85 @@ public static class Program
                     return;
                 }
 
-                Console.WriteLine($"\n=== Phase 1: Infrastructure Initialization ===");
-                Console.WriteLine($"  Executing {phase1Indices.Count} initialize! expression(s) in source file order");
+                // PASS 1: Run ALL init expressions to collect success/failure data
+                Console.WriteLine($"\n=== Pass 1: Collecting Success/Failure Data ===");
+                Console.WriteLine($"  Running all {phase1Indices.Count} initialize expressions...");
                 Console.WriteLine();
 
-                // Phase 1: Execute all initialize! expressions
+                var successIndices = new List<int>();
+                var failureIndices = new List<int>();
+                var failureMessages = new Dictionary<int, string>();
+
                 foreach (int index in phase1Indices)
                 {
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
-                    // Enable verbose debug mode ONLY for the init expression we're debugging
-                    bool isDebugging = expr.Source?.Contains("ClassOrganizer initialize") == true;
-                    vm.SetVerboseDebugMode(isDebugging);
+                    Console.Write($"[{index}] {expr.Source}... ");
+                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                    if (result.Status == InitStatus.Success)
+                    {
+                        Console.WriteLine("✓");
+                        successIndices.Add(index);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"✗ ({result.Status})");
+                        failureIndices.Add(index);
+                        failureMessages[index] = result.Diagnostic?.Message ?? "Unknown error";
+                    }
+                }
+
+                Console.WriteLine($"\n=== Pass 1 Results ===");
+                Console.WriteLine($"  Successful: {successIndices.Count}");
+                Console.WriteLine($"  Failed: {failureIndices.Count}");
+
+                if (failureIndices.Count > 0)
+                {
+                    Console.WriteLine($"\n  Failed expressions:");
+                    foreach (int index in failureIndices)
+                    {
+                        var expr = bundle.InitExpressions[index];
+                        Console.WriteLine($"    [{index}] {expr.Source}");
+                        Console.WriteLine($"        {failureMessages[index]}");
+                    }
+                }
+
+                // Reorder: successful first, then prioritize ClassOrganizer among failures
+                var reorderedIndices = new List<int>();
+                reorderedIndices.AddRange(successIndices);
+
+                // Find ClassOrganizer initialize and put it first among failures
+                int classOrganizerIndex = failureIndices.FirstOrDefault(i =>
+                    bundle.InitExpressions[i].Source?.Contains("ClassOrganizer initialize") == true);
+
+                if (classOrganizerIndex > 0)
+                {
+                    reorderedIndices.Add(classOrganizerIndex);
+                    failureIndices.Remove(classOrganizerIndex);
+                    Console.WriteLine($"\n=== Pass 2: Executing with Optimized Order ===");
+                    Console.WriteLine($"  Running {successIndices.Count} successful expressions");
+                    Console.WriteLine($"  Then ClassOrganizer initialize (debugging infinite recursion)");
+                    Console.WriteLine($"  Then {failureIndices.Count} remaining failures");
+                }
+                else
+                {
+                    Console.WriteLine($"\n=== Pass 2: Executing with Optimized Order ===");
+                    Console.WriteLine($"  Running {successIndices.Count} successful expressions, then stopping at first failure");
+                }
+
+                reorderedIndices.AddRange(failureIndices);
+                Console.WriteLine();
+
+                succeeded = 0;
+                failed = 0;
+
+                // Phase 1: Execute with reordered list
+                foreach (int index in reorderedIndices)
+                {
+                    var expr = bundle.InitExpressions[index];
+                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
                     Console.WriteLine();
                     Console.WriteLine("******************************************");
@@ -311,13 +348,12 @@ public static class Program
                     Console.WriteLine("******************************************");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
-                    // EXPERIMENT: Log successful completion to verify call stack unwound
                     if (result.Status == InitStatus.Success)
                     {
-                        Console.WriteLine($"  ✓ Completed successfully - .NET call stack should be unwound");
+                        Console.WriteLine($"  ✓ Completed successfully");
+                        succeeded++;
                     }
-
-                    if (result.Status != InitStatus.Success)
+                    else
                     {
                         failed++;
                         Console.WriteLine($"\n❌ FAILED: {expr.Source}");
@@ -337,8 +373,6 @@ public static class Program
                         Console.WriteLine($"  Fast-fail: Stopping execution");
                         return;
                     }
-
-                    succeeded++;
                 }
 
                 Console.WriteLine($"\n✓ Phase 1 Complete: {succeeded} initialize! expression(s) executed successfully");

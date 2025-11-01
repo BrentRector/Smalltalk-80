@@ -197,7 +197,16 @@ public static class ObjectPrimitives
         // Allocate a new instance of the receiver class with no indexed fields
         // Uses heap data only - reads the class's format and instance variable count
         // AllocateInstanceOf handles validation internally, let any real errors propagate
-        return ctx.HeapManager.AllocateInstanceOf(receiver, 0);
+        try
+        {
+            var result = ctx.HeapManager.AllocateInstanceOf(receiver, 0);
+            return result;
+        }
+        catch
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
     }
 
     // DEBUG: Primitive 71 call counter

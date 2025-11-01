@@ -2,8 +2,9 @@ namespace Smalltalk80.Interpreter.Core.Schema;
 
 /// <summary>
 /// Cold start bundle metadata.
-/// Matches coldstart-v1.0.5.schema.json metadata structure.
+/// Matches coldstart-v1.0.7.schema.json metadata structure.
 /// v1.0.5: Changed BlockContext metadata from dual-ID to single blockMethodId.
+/// v1.0.7: Added UndeclaredCount for compiler-tracked undeclared variables.
 /// </summary>
 public class Metadata
 {
@@ -19,6 +20,7 @@ public class Metadata
     public int? ObjectCount { get; init; }
     public int? InitExpressionCount { get; init; }
     public int? BlockContextCount { get; init; }
+    public int? UndeclaredCount { get; init; }
     public BlockContextMetadata[]? BlockContexts { get; init; }
     public string? Notes { get; init; }
 }

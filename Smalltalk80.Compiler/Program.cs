@@ -91,6 +91,9 @@ file sealed class Program
             Console.WriteLine($"Output: {outputFile}");
             Console.WriteLine();
 
+            // Clear undeclared variables registry before compilation
+            BytecodeCompiler.ClearUndeclaredVariables();
+
             // Parse all input files and merge the ASTs
             Console.WriteLine("Parsing Smalltalk source files...");
             CompilationResult mergedResult = null!;
@@ -145,6 +148,18 @@ file sealed class Program
             Console.WriteLine($"  Classes: {stats.ClassCount}");
             Console.WriteLine($"  Methods: {stats.MethodCount}");
             Console.WriteLine($"  Init expressions: {stats.InitExpressionCount}");
+
+            // Report undeclared variables
+            var undeclared = BytecodeCompiler.GetUndeclaredVariables();
+            if (undeclared.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Warning: {undeclared.Count} undeclared variable(s) found during compilation:");
+                foreach (var kvp in undeclared.OrderBy(x => x.Key))
+                {
+                    Console.WriteLine($"  - {kvp.Key} (referenced in {kvp.Value.Count} method(s))");
+                }
+            }
 
             return 0;
         }
