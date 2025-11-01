@@ -247,11 +247,12 @@ public static class Program
                             {
                                 Console.WriteLine($"   Error: {result.Diagnostic.Message}");
                             }
-                            if (result.Diagnostic?.StackTrace != null)
-                            {
-                                Console.WriteLine($"\n   Stack Trace:");
-                                Console.WriteLine($"   {result.Diagnostic.StackTrace}");
-                            }
+                            // Stack trace suppressed for cleaner output
+                            // if (result.Diagnostic?.StackTrace != null)
+                            // {
+                            //     Console.WriteLine($"\n   Stack Trace:");
+                            //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                            // }
                         }
                     }
 
@@ -362,11 +363,12 @@ public static class Program
                         {
                             Console.WriteLine($"   Error: {result.Diagnostic.Message}");
                         }
-                        if (result.Diagnostic?.StackTrace != null)
-                        {
-                            Console.WriteLine($"\n   Stack Trace:");
-                            Console.WriteLine($"   {result.Diagnostic.StackTrace}");
-                        }
+                        // Stack trace suppressed for cleaner output
+                        // if (result.Diagnostic?.StackTrace != null)
+                        // {
+                        //     Console.WriteLine($"\n   Stack Trace:");
+                        //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                        // }
 
                         Console.WriteLine($"\n=== Execution Failed ===");
                         Console.WriteLine($"  Phase 1: {succeeded} succeeded, {failed} failed");
@@ -406,11 +408,12 @@ public static class Program
                         {
                             Console.WriteLine($"   Error: {result.Diagnostic.Message}");
                         }
-                        if (result.Diagnostic?.StackTrace != null)
-                        {
-                            Console.WriteLine($"\n   Stack Trace:");
-                            Console.WriteLine($"   {result.Diagnostic.StackTrace}");
-                        }
+                        // Stack trace suppressed for cleaner output
+                        // if (result.Diagnostic?.StackTrace != null)
+                        // {
+                        //     Console.WriteLine($"\n   Stack Trace:");
+                        //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                        // }
 
                         Console.WriteLine($"\n=== Execution Failed ===");
                         Console.WriteLine($"  Phase 1: {phase1Indices.Count} succeeded");
