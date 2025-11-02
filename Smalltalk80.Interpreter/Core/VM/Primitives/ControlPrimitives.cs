@@ -884,8 +884,10 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Clear the method lookup cache
+        // Clear ALL caches: method cache + runtime heap caches (class, field layout)
+        // This ensures correct behavior when class definitions change at runtime
         ctx.ClearMethodCache();
+        ctx.InvalidateAllRuntimeCaches();
 
         // Return receiver
         return receiver;

@@ -210,4 +210,11 @@ public interface IPrimitiveContext
     /// Implementations without a method cache can make this a no-op.
     /// </summary>
     void ClearMethodCache();
+
+    /// <summary>
+    /// Invalidates all runtime caches (method cache, class cache, field layout cache).
+    /// Called by primitive 89 (Behavior flushCache) when class definitions change.
+    /// This ensures runtime heap access uses updated class structures.
+    /// </summary>
+    void InvalidateAllRuntimeCaches();
 }
