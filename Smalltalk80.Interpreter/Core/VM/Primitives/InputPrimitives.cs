@@ -9,14 +9,52 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// Based on Blue Book specification for user input and event sampling.
 /// Uses IPlatformBridge for platform-specific input operations (heap-only architecture).
 /// </summary>
+/// <remarks>
+/// <para><b>Blue Book Specification:</b></para>
+/// <para>"The input/output primitive routines provide Smalltalk with access to the state of the
+/// hardware devices. Since the implementation of these routines will be dependent on the structure
+/// of the implementing machine, no routines will be given, just a specification of the behavior"
+/// (Blue Book page 587, Chapter 29)</para>
+///
+/// <para><b>Implementation Architecture:</b></para>
+/// <list type="bullet">
+/// <item>Platform-agnostic design using IPlatformBridge interface</item>
+/// <item>Headless mode support - returns sensible defaults when no platform bridge available</item>
+/// <item>All heap operations use heap-only access pattern (no cold start data)</item>
+/// <item>Mouse, keyboard, and event handling through abstracted platform layer</item>
+/// </list>
+///
+/// <para><b>Primitives Implemented:</b></para>
+/// <list type="bullet">
+/// <item>90: mousePoint - Get current mouse position</item>
+/// <item>91: cursorLocPut: - Set cursor position</item>
+/// <item>92: cursorLink: - Link cursor to Form</item>
+/// <item>93: inputSemaphore: - Set input event semaphore</item>
+/// <item>94: sampleInterval: - Set input sampling interval</item>
+/// <item>95: inputWord - Read raw input event word</item>
+/// </list>
+///
+/// <para><b>Conformance:</b> Platform-specific implementation following Blue Book behavioral specification</para>
+/// </remarks>
 public static class InputPrimitives
 {
     /// <summary>
-    /// Primitive 90: mousePoint - Get current mouse position as Point.
-    /// Returns a Point object with x and y coordinates.
-    /// Per Blue Book: Returns Point with current mouse coordinates in display space.
-    /// Uses IPlatformBridge if available, returns (0, 0) otherwise (headless mode).
+    /// Primitive 90: mousePoint - Get current mouse position as Point
+    /// Blue Book: Page 587, Chapter 29
     /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Behavior:</b></para>
+    /// <para>Returns a Point object containing the current mouse position in display coordinates.</para>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Queries platform bridge for current mouse position</item>
+    /// <item>Creates Point object with x and y coordinates as SmallIntegers</item>
+    /// <item>Returns (0, 0) in headless mode (no platform bridge)</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> Behavioral specification implemented via platform abstraction</para>
+    /// </remarks>
     public static SmalltalkOOP MousePoint(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 0)

@@ -1,0 +1,536 @@
+// DOCUMENTATION FOR PRIMITIVES 5-8 (TO BE INSERTED)
+
+    /// <summary>
+    /// Primitive 5: SmallInteger &lt;= - Integer less-than-or-equal comparison
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveLessOrEqual
+    ///     | integerReceiver integerArgument |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerReceiver &lt;= integerArgument
+    ///             ifTrue: [self push: TruePointer]
+    ///             ifFalse: [self push: FalsePointer]]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs direct integer comparison</item>
+    /// <item>Returns proper Boolean objects (True or False singletons)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly returns Boolean objects. All comparison operators handle full SmallInteger range correctly.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// <item>Includes debug logging for troubleshooting</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 6: SmallInteger &gt;= - Integer greater-than-or-equal comparison
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveGreaterOrEqual
+    ///     | integerReceiver integerArgument |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerReceiver &gt;= integerArgument
+    ///             ifTrue: [self push: TruePointer]
+    ///             ifFalse: [self push: FalsePointer]]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs direct integer comparison</item>
+    /// <item>Returns proper Boolean objects (True or False singletons)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly returns Boolean objects. All comparison operators handle full SmallInteger range correctly.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 7: SmallInteger = - Integer equality comparison
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveEqual
+    ///     | integerReceiver integerArgument |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerReceiver = integerArgument
+    ///             ifTrue: [self push: TruePointer]
+    ///             ifFalse: [self push: FalsePointer]]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs direct integer equality test</item>
+    /// <item>Returns proper Boolean objects (True or False singletons)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly returns Boolean objects. All comparison operators handle full SmallInteger range correctly.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 8: SmallInteger ~= - Integer inequality comparison
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveNotEqual
+    ///     | integerReceiver integerArgument |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerReceiver ~= integerArgument
+    ///             ifTrue: [self push: TruePointer]
+    ///             ifFalse: [self push: FalsePointer]]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs direct integer inequality test</item>
+    /// <item>Returns proper Boolean objects (True or False singletons)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly returns Boolean objects. All comparison operators handle full SmallInteger range correctly.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+// DOCUMENTATION FOR PRIMITIVES 9-17 (TO BE INSERTED)
+
+    /// <summary>
+    /// Primitive 9: SmallInteger * - Integer multiplication with overflow detection
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveMultiply
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver * integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Uses checked arithmetic to detect Int32 overflow</item>
+    /// <item>Validates result is within SmallInteger range [-2^30, 2^30-1]</item>
+    /// <item>Returns SmallInteger OOP on success; sets PrimitiveSuccess=false on failure</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correct overflow detection for multiplication. The primitive fails appropriately when the result exceeds SmallInteger range.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Uses C# exception handling for overflow detection</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 10: SmallInteger / - Exact integer division
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveDivide
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success: integerArgument ~= 0.
+    ///     self success: integerReceiver \\ integerArgument = 0.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver // integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self push: (memory integerObjectOf: integerResult)]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates divisor is not zero</item>
+    /// <item>Checks for exactness - fails if remainder exists (a % b != 0)</item>
+    /// <item>Handles special overflow case: SmallIntegerMin / -1</item>
+    /// <item>Returns result only for exact divisions</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly implements exact division semantics. The primitive fails for inexact divisions, allowing Smalltalk to fall back to fraction creation.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Explicitly handles SmallIntegerMin / -1 overflow case (enhancement)</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE WITH ENHANCEMENT</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 11: SmallInteger \\ - Modulo operation (remainder follows divisor sign)
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveMod
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success: integerArgument ~= 0.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver \\ integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates divisor is not zero</item>
+    /// <item>Computes remainder using C# % operator (sign follows dividend)</item>
+    /// <item>Adjusts result to follow Smalltalk semantics (sign follows divisor)</item>
+    /// <item>When signs differ and remainder is non-zero, adds divisor to adjust</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>CRITICAL - Correctly implements Smalltalk modulo semantics where remainder sign follows divisor, not dividend. Example: -7 \\ 3 = 2 (not -1).</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Must adjust C# % result to match Smalltalk semantics</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE WITH CRITICAL CORRECTION</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 12: SmallInteger // - Floor division (rounds toward negative infinity)
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveDiv
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success: integerArgument ~= 0.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver // integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates divisor is not zero</item>
+    /// <item>Handles overflow case: Int32.MinValue / -1</item>
+    /// <item>Computes quotient using C# / operator (truncates toward zero)</item>
+    /// <item>Adjusts result to floor division (rounds toward negative infinity)</item>
+    /// <item>When signs differ and remainder is non-zero, decrements quotient</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>CRITICAL - Correctly implements floor division semantics. C# truncates toward zero, but Smalltalk rounds toward negative infinity. Example: -7 // 3 = -3 (not -2).</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Must adjust C# / result to implement floor division</item>
+    /// <item>Explicitly handles overflow case (enhancement)</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE WITH CRITICAL CORRECTION</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 13: SmallInteger quo: - Truncated division (rounds toward zero)
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveQuo
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success: integerArgument ~= 0.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver quo: integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates divisor is not zero</item>
+    /// <item>Handles overflow case: Int32.MinValue / -1</item>
+    /// <item>Uses C# / operator which naturally truncates toward zero</item>
+    /// <item>No adjustment needed - C# semantics match quo: semantics</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>C# / operator naturally implements quo: semantics (truncation toward zero). Correctly distinguishes between quo: (truncate) and // (floor).</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Explicitly handles overflow case (enhancement)</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 14: SmallInteger bitAnd: - Bitwise AND operation
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveBitAnd
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver bitAnd: integerArgument].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs bitwise AND using C# &amp; operator</item>
+    /// <item>Result always fits in SmallInteger range (no overflow possible)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Straightforward implementation. SmallInteger range guaranteed to fit in 30 bits, so no overflow concerns.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 15: SmallInteger bitOr: - Bitwise OR operation
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveBitOr
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver bitOr: integerArgument].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs bitwise OR using C# | operator</item>
+    /// <item>Result always fits in SmallInteger range (no overflow possible)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Straightforward implementation. SmallInteger range guaranteed to fit in 30 bits, so no overflow concerns.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 16: SmallInteger bitXor: - Bitwise XOR operation
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveBitXor
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver bitXor: integerArgument].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are SmallIntegers</item>
+    /// <item>Performs bitwise XOR using C# ^ operator</item>
+    /// <item>Result always fits in SmallInteger range (no overflow possible)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Straightforward implementation. SmallInteger range guaranteed to fit in 30 bits, so no overflow concerns.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 17: SmallInteger bitShift: - Bit shift operation
+    /// Blue Book: Page 636, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveBitShift
+    ///     | integerReceiver integerArgument integerResult |
+    ///     integerArgument ← self popInteger.
+    ///     integerReceiver ← self popInteger.
+    ///     self success ifTrue:
+    ///         [integerResult ← integerReceiver bitShift: integerArgument.
+    ///         self success: (memory isIntegerValue: integerResult)].
+    ///     self success
+    ///         ifTrue: [self pushInteger: integerResult]
+    ///         ifFalse: [self unPop: 2]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and shift count are SmallIntegers</item>
+    /// <item>Limits shift range to ±30 bits (SmallInteger width)</item>
+    /// <item>For left shifts (positive): Uses long to detect overflow before it happens</item>
+    /// <item>For right shifts (negative): Uses arithmetic shift (sign extension)</item>
+    /// <item>Zero shift returns value unchanged</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Excellent implementation with enhancements. Explicitly limits shifts to ±30 bits, preventing undefined behavior. Uses long for overflow detection on left shifts.</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Explicitly limits shifts to ±30 bits (enhancement - prevents undefined behavior)</item>
+    /// <item>Uses long for overflow detection (implementation detail)</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> EXCELLENT WITH ENHANCEMENTS</para>
+    /// </remarks>
+
+    /// <summary>
+    /// Primitive 76: SmallInteger asObject - Convert SmallInteger to object pointer
+    /// Blue Book: Page 641, Chapter 29, Formal Specification
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <code>
+    /// primitiveAsObject
+    ///     | thisReceiver newOop |
+    ///     thisReceiver ← self popStack.
+    ///     newOop ← thisReceiver bitAnd: 16rFFFE.
+    ///     self success: (memory hasObject: newOop).
+    ///     self success
+    ///         ifTrue: [self push: newOop]
+    ///         ifFalse: [self unPop: 1]
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates receiver is a SmallInteger</item>
+    /// <item>Doubles the SmallInteger value to get object pointer</item>
+    /// <item>Verifies the resulting OOP exists in the heap</item>
+    /// <item>Returns the object if valid, fails otherwise</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Correctly converts SmallInteger value to object pointer by doubling. SmallIntegers are tagged with low bit set (odd), objects have low bit clear (even).</para>
+    ///
+    /// <para><b>Differences from Specification:</b></para>
+    /// <list type="bullet">
+    /// <item>Uses multiplication by 2 instead of bitAnd (equivalent result)</item>
+    /// <item>Returns nil on failure instead of unpop</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> PERFECT CONFORMANCE</para>
+    /// </remarks>

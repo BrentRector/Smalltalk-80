@@ -8,6 +8,37 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// System primitives for memory, GC, debugging, and object enumeration (primitives 112-139).
 /// Provides heap queries, garbage collection, object enumeration, and debugging support.
 /// </summary>
+/// <remarks>
+/// <para><b>Blue Book Specification:</b></para>
+/// <para>System primitives provide access to VM internals, memory management, and debugging facilities.
+/// Chapter 29 specifies primitives 110-116, while 128-139 are extensions for advanced system operations.</para>
+///
+/// <para><b>Implementation Architecture:</b></para>
+/// <list type="bullet">
+/// <item>Memory management primitives (112, 115) query heap statistics</item>
+/// <item>System control primitives (113, 114) manage VM lifecycle</item>
+/// <item>Object enumeration primitives (128, 129, 139) walk the heap</item>
+/// <item>Identity mutation primitive (130) performs become: operation</item>
+/// <item>Debugging support (114) integrates with .NET debugger</item>
+/// </list>
+///
+/// <para><b>Primitives Implemented:</b></para>
+/// <list type="bullet">
+/// <item>112: coreLeft - Available memory in bytes</item>
+/// <item>113: quit - Exit the VM</item>
+/// <item>114: exitToDebugger - Break to debugger</item>
+/// <item>115: oopsLeft - Available object table slots</item>
+/// <item>116: signalAtOopsLeftWordsLeft - Low memory threshold (stub)</item>
+/// <item>128: someInstance - Get arbitrary instance of class</item>
+/// <item>129: nextInstance - Get next instance of same class</item>
+/// <item>130: becomeForward: - One-way become operation</item>
+/// <item>131: instanceCount - Count instances of class</item>
+/// <item>133: forceGC - Force garbage collection</item>
+/// <item>139: nextObject - Enumerate all objects</item>
+/// </list>
+///
+/// <para><b>Conformance:</b> Good conformance with Blue Book, primitive 116 is stub implementation</para>
+/// </remarks>
 public static class SystemPrimitives
 {
     /// <summary>
@@ -123,12 +154,29 @@ public static class SystemPrimitives
     }
 
     /// <summary>
-    /// Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold.
-    /// Receiver is a Semaphore to signal when memory drops below threshold.
-    /// Args: minimum OOPs remaining, minimum words remaining.
-    /// NOTE: This is a stub implementation - full implementation would require GC integration
-    /// to check thresholds and signal the semaphore during allocation/collection.
+    /// Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold
+    /// Blue Book: Page 587, Chapter 29
     /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <para>Sets up monitoring for low-memory conditions. When available memory drops below
+    /// the specified thresholds, the receiver Semaphore is signaled to allow graceful handling
+    /// of low-memory situations.</para>
+    ///
+    /// <para><b>Arguments:</b></para>
+    /// <list type="bullet">
+    /// <item>Receiver: Semaphore to signal (or nil to disable monitoring)</item>
+    /// <item>args[0]: Minimum OOPs threshold (SmallInteger)</item>
+    /// <item>args[1]: Minimum words threshold (SmallInteger)</item>
+    /// </list>
+    ///
+    /// <para><b>Implementation Status:</b></para>
+    /// <para>⚠️ STUB IMPLEMENTATION - Accepts arguments but does not implement monitoring.
+    /// Full implementation would require GC integration to check thresholds during allocation
+    /// and collection cycles, signaling the semaphore when either threshold is crossed.</para>
+    ///
+    /// <para><b>Conformance:</b> STUB - Interface correct, monitoring not implemented</para>
+    /// </remarks>
     public static SmalltalkOOP SignalAtOopsLeftWordsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 2)

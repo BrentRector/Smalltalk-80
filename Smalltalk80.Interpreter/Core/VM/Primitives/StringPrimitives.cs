@@ -9,13 +9,59 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// Handles character-based operations and string comparisons.
 /// Based on Smalltalk-80 specification for String and ByteArray operations.
 /// </summary>
+/// <remarks>
+/// <para><b>Blue Book Context:</b></para>
+/// <para>Primitives 105-109 are marked as implementation-specific in the Blue Book.
+/// These primitives provide optimized operations for String and ByteArray manipulation
+/// that would be inefficient in pure Smalltalk.</para>
+///
+/// <para><b>Implementation Architecture:</b></para>
+/// <list type="bullet">
+/// <item>All operations use heap-only access pattern</item>
+/// <item>Handles both String and ByteArray objects uniformly</item>
+/// <item>Overlap-safe copying for replaceFrom:to:with:startingAt:</item>
+/// <item>Symbol interning through USTable access</item>
+/// </list>
+///
+/// <para><b>Primitives Implemented:</b></para>
+/// <list type="bullet">
+/// <item>105: replaceFrom:to:with:startingAt: - Bulk element copy operation</item>
+/// <item>104 (StringHash): String hash - Hash value computation</item>
+/// <item>105 (StringCompare): String compare - Lexicographic comparison</item>
+/// <item>106: asSymbol - Convert String to unique Symbol</item>
+/// </list>
+///
+/// <para><b>Conformance:</b> Implementation-specific primitives following Smalltalk semantics</para>
+/// </remarks>
 public static class StringPrimitives
 {
     /// <summary>
-    /// Primitive 105: replaceFrom:to:with:startingAt:
-    /// Efficiently copies a range of elements from one collection to another.
-    /// Uses heap-only operations with overlap-safe copying.
+    /// Primitive 105: replaceFrom:to:with:startingAt: - Bulk element copy
+    /// Blue Book: Implementation-specific, not formally specified
     /// </summary>
+    /// <remarks>
+    /// <para><b>Semantics:</b></para>
+    /// <para>Copies elements from source collection to receiver, handling overlapping regions correctly.
+    /// This primitive is critical for efficient collection manipulation.</para>
+    ///
+    /// <para><b>Arguments:</b></para>
+    /// <list type="bullet">
+    /// <item>args[0]: startIndex - First index to replace (1-based)</item>
+    /// <item>args[1]: stopIndex - Last index to replace (1-based)</item>
+    /// <item>args[2]: sourceCollection - Source of elements</item>
+    /// <item>args[3]: sourceStartIndex - Starting position in source (1-based)</item>
+    /// </list>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Converts 1-based Smalltalk indices to 0-based C# indices</item>
+    /// <item>Validates all bounds before copying</item>
+    /// <item>Handles overlapping regions by choosing appropriate copy direction</item>
+    /// <item>Works for both ByteIndexed objects (String, ByteArray)</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> Semantically correct implementation with overlap handling</para>
+    /// </remarks>
     public static SmalltalkOOP StringReplace(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 4)

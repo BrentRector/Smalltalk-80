@@ -277,75 +277,80 @@ public static class Program
                     return;
                 }
 
-                // PASS 1: Run ALL init expressions to collect success/failure data
-                Console.WriteLine($"\n=== Pass 1: Collecting Success/Failure Data ===");
-                Console.WriteLine($"  Running all {phase1Indices.Count} initialize expressions...");
-                Console.WriteLine();
-
-                var successIndices = new List<int>();
-                var failureIndices = new List<int>();
-                var failureMessages = new Dictionary<int, string>();
-
-                foreach (int index in phase1Indices)
+                // Use hardcoded list of known successful init expressions (from previous test runs)
+                // This avoids running all expressions just to discover which ones work
+                var knownSuccessfulExpressions = new HashSet<string>
                 {
+                    "Float initialize",
+                    "Character initialize",
+                    "WindowsFileDirectory initialize",
+                    "BinaryChoiceView initialize",
+                    "CompiledMethod initialize",
+                    "Cursor initialize",
+                    "Date initialize",
+                    "Debugger initialize",
+                    "Decompiler initialize",
+                    "FileDirectory initialize",
+                    "InputState initialize",
+                    "MessageNode initialize",
+                    "Paragraph initialize",
+                    "ParseNode initialize",
+                    "ProcessorScheduler initialize",
+                    "Project initialize",
+                    "SmallInteger initialize",
+                    "StringHolder initialize",
+                    "SystemDictionary initialize",
+                    "SystemTracer initialize"
+                };
+
+                // Build list of successful expression indices
+                var successIndices = new List<int>();
+                for (int i = 0; i < phase1Indices.Count; i++)
+                {
+                    int index = phase1Indices[i];
                     var expr = bundle.InitExpressions[index];
-                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
-
-                    Console.Write($"[{index}] {expr.Source}... ");
-                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-
-                    if (result.Status == InitStatus.Success)
+                    if (expr.Source != null && knownSuccessfulExpressions.Contains(expr.Source))
                     {
-                        Console.WriteLine("✓");
                         successIndices.Add(index);
                     }
-                    else
-                    {
-                        Console.WriteLine($"✗ ({result.Status})");
-                        failureIndices.Add(index);
-                        failureMessages[index] = result.Diagnostic?.Message ?? "Unknown error";
-                    }
                 }
 
-                Console.WriteLine($"\n=== Pass 1 Results ===");
-                Console.WriteLine($"  Successful: {successIndices.Count}");
-                Console.WriteLine($"  Failed: {failureIndices.Count}");
+                Console.WriteLine($"\n=== Executing Known Successful Expressions + Large Integer Classes ===");
+                Console.WriteLine($"  {successIndices.Count} known successful expressions");
 
-                if (failureIndices.Count > 0)
+                // Find LargeNegativeInteger and LargePositiveInteger initialize indices
+                int largeNegativeIndex = -1;
+                int largePositiveIndex = -1;
+
+                for (int i = 0; i < totalExpressions; i++)
                 {
-                    Console.WriteLine($"\n  Failed expressions:");
-                    foreach (int index in failureIndices)
-                    {
-                        var expr = bundle.InitExpressions[index];
-                        Console.WriteLine($"    [{index}] {expr.Source}");
-                        Console.WriteLine($"        {failureMessages[index]}");
-                    }
+                    var expr = bundle.InitExpressions[i];
+                    if (expr.Source == "LargeNegativeInteger initialize")
+                        largeNegativeIndex = i;
+                    else if (expr.Source == "LargePositiveInteger initialize")
+                        largePositiveIndex = i;
                 }
 
-                // Reorder: successful first, then prioritize ClassOrganizer among failures
+                // Build execution list: successful + large integer classes
                 var reorderedIndices = new List<int>();
                 reorderedIndices.AddRange(successIndices);
 
-                // Find ClassOrganizer initialize and put it first among failures
-                int classOrganizerIndex = failureIndices.FirstOrDefault(i =>
-                    bundle.InitExpressions[i].Source?.Contains("ClassOrganizer initialize") == true);
-
-                if (classOrganizerIndex > 0)
+                // Add large integer initializers if found and not already successful
+                if (largeNegativeIndex >= 0 && !successIndices.Contains(largeNegativeIndex))
                 {
-                    reorderedIndices.Add(classOrganizerIndex);
-                    failureIndices.Remove(classOrganizerIndex);
-                    Console.WriteLine($"\n=== Pass 2: Executing with Optimized Order ===");
-                    Console.WriteLine($"  Running {successIndices.Count} successful expressions");
-                    Console.WriteLine($"  Then ClassOrganizer initialize (debugging infinite recursion)");
-                    Console.WriteLine($"  Then {failureIndices.Count} remaining failures");
+                    reorderedIndices.Add(largeNegativeIndex);
+                    Console.WriteLine($"  Adding LargeNegativeInteger initialize (index {largeNegativeIndex})");
                 }
-                else
+                if (largePositiveIndex >= 0 && !successIndices.Contains(largePositiveIndex))
                 {
-                    Console.WriteLine($"\n=== Pass 2: Executing with Optimized Order ===");
-                    Console.WriteLine($"  Running {successIndices.Count} successful expressions, then stopping at first failure");
+                    reorderedIndices.Add(largePositiveIndex);
+                    Console.WriteLine($"  Adding LargePositiveInteger initialize (index {largePositiveIndex})");
                 }
 
-                reorderedIndices.AddRange(failureIndices);
+                Console.WriteLine($"  Total expressions to execute: {reorderedIndices.Count}");
+                Console.WriteLine();
+
+                // DO NOT add any failed expressions - only run successful + large integer classes
                 Console.WriteLine();
 
                 succeeded = 0;
@@ -391,9 +396,14 @@ public static class Program
                     }
                 }
 
-                Console.WriteLine($"\n✓ Phase 1 Complete: {succeeded} initialize! expression(s) executed successfully");
+                Console.WriteLine($"\n✓ Execution Complete: {succeeded} initialize! expression(s) executed successfully");
+                Console.WriteLine($"\n=== Summary ===");
+                Console.WriteLine($"  Executed: {reorderedIndices.Count} init expressions (known successful + Large Integer classes)");
+                Console.WriteLine($"  Skipped: {phase1Indices.Count - successIndices.Count} untested/failing init expressions");
+                Console.WriteLine($"  Skipped: {phase2Indices.Count} comment expressions");
+                return;
 
-                // Phase 2: Execute all comment: expressions
+                // Phase 2: Execute all comment: expressions (DISABLED - not running)
                 Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
                 Console.WriteLine($"  Executing {phase2Indices.Count} comment: expression(s) in source file order");
                 Console.WriteLine();

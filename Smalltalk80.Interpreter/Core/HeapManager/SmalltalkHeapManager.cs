@@ -507,17 +507,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 $"    - Field layout error causing wrong object to be accessed");
         }
 
-        // DIAGNOSTIC: Track SmallInteger(1) being stored
-        if (value.IsSmallInteger && value.AsSmallInteger() == 1)
-        {
-            Console.WriteLine($"[SetIndexedOOP] Storing SmallInteger(1) in object {objectOOP} at index {index}");
-        }
-
-        // DIAGNOSTIC: Track ALL writes to bucket 68364
-        if (objectOOP.RawValue == 68364)
-        {
-            Console.WriteLine($"[SetIndexedOOP] Writing to bucket 68364 at index {index}: value={value}");
-        }
 
         WriteIndexedOop(entry, index, value);
     }
@@ -1365,7 +1354,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             return true;
 
         // Check if object ID is in valid range
-        int objectId = oop.AsObjectTableIndex();
+        int objectId = oop.ToObjectTableIndex();
         if (objectId <= 0)
             return false;
 
@@ -1397,7 +1386,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 continue;
 
             // Check if this object's class matches
-            var objectClass = GetClass(oop);
+            var objectClass = GetClassOOP(oop);
             if (objectClass == classOOP)
                 return oop;
         }
@@ -1431,7 +1420,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             }
 
             // After finding the 'after' object, find next instance of same class
-            var objectClass = GetClass(oop);
+            var objectClass = GetClassOOP(oop);
             if (objectClass == classOOP)
                 return oop;
         }

@@ -9,13 +9,88 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// Graphics primitives for BitBlt, display, and time (primitives 96-104).
 /// Based on Blue Book specification for Smalltalk-80 graphics.
 /// </summary>
+/// <remarks>
+/// <para><b>Blue Book Specification:</b></para>
+/// <para>"The graphics primitive routines provide Smalltalk with access to BitBlt operations
+/// and display management. Since the implementation of these routines will be dependent on the
+/// structure of the implementing machine, behavioral specifications are provided."
+/// (Blue Book Chapter 29, Graphics Primitives)</para>
+///
+/// <para><b>Implementation Architecture:</b></para>
+/// <list type="bullet">
+/// <item>BitBlt engine for raster operations (primitive 96)</item>
+/// <item>Platform bridge abstraction for display operations</item>
+/// <item>Form and bitmap manipulation support</item>
+/// <item>Memory and time management primitives</item>
+/// </list>
+///
+/// <para><b>Primitives Implemented:</b></para>
+/// <list type="bullet">
+/// <item>96: copyBits - Core BitBlt raster operation</item>
+/// <item>97: snapshot - Save image to disk</item>
+/// <item>98: oopsLeft - Available object pointers</item>
+/// <item>99: coreLeft - Available memory in bytes</item>
+/// <item>100: timeWords - Current time in seconds</item>
+/// <item>101: beDisplay - Make Form the active display</item>
+/// <item>102: beCursor - Set hardware cursor</item>
+/// <item>103: beDisplayDepth - Set display color depth</item>
+/// <item>104: force:displayUpdate - Force screen refresh</item>
+/// </list>
+///
+/// <para><b>BitBlt Combination Rules:</b></para>
+/// <list type="bullet">
+/// <item>0: clear (0)</item>
+/// <item>1: source AND dest</item>
+/// <item>2: source AND NOT dest</item>
+/// <item>3: source</item>
+/// <item>4: NOT source AND dest</item>
+/// <item>5: dest (no-op)</item>
+/// <item>6: source XOR dest</item>
+/// <item>7: source OR dest</item>
+/// <item>8: NOT source AND NOT dest</item>
+/// <item>9: NOT source XOR dest</item>
+/// <item>10: NOT dest</item>
+/// <item>11: source OR NOT dest</item>
+/// <item>12: NOT source</item>
+/// <item>13: NOT source OR dest</item>
+/// <item>14: NOT source OR NOT dest</item>
+/// <item>15: all ones (1)</item>
+/// </list>
+///
+/// <para><b>Conformance:</b> Platform-specific implementation with BitBlt engine matching Blue Book specification</para>
+/// </remarks>
 public static class GraphicsPrimitives
 {
     /// <summary>
-    /// Primitive 96: copyBits - Core BitBlt operation.
-    /// Receiver is a BitBlt object with instance variables describing the operation.
-    /// Per Blue Book page 346: BitBlt has 14 instance variables defining the operation.
+    /// Primitive 96: copyBits - Core BitBlt raster operation
+    /// Blue Book: Page 346, Chapter 18 (BitBlt class)
     /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification:</b></para>
+    /// <para>BitBlt (bit block transfer) performs raster operations between Forms.
+    /// The receiver is a BitBlt instance with 14 instance variables:</para>
+    /// <list type="bullet">
+    /// <item>destForm - destination Form</item>
+    /// <item>sourceForm - source Form (or nil)</item>
+    /// <item>halftoneForm - halftone pattern (or nil)</item>
+    /// <item>combinationRule - logical operation (0-15)</item>
+    /// <item>destX, destY - destination origin</item>
+    /// <item>width, height - operation dimensions</item>
+    /// <item>sourceX, sourceY - source origin</item>
+    /// <item>clipX, clipY, clipWidth, clipHeight - clipping rectangle</item>
+    /// </list>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Extracts all 14 fields from BitBlt object</item>
+    /// <item>Validates all numeric fields are SmallIntegers</item>
+    /// <item>Extracts bitmap data from Form objects</item>
+    /// <item>Delegates to BitBltEngine for actual raster operation</item>
+    /// <item>Supports platform bridge for hardware acceleration</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> Full Blue Book BitBlt specification implemented</para>
+    /// </remarks>
     public static SmalltalkOOP CopyBits(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         // Validate arguments

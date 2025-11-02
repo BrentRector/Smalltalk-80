@@ -9,6 +9,30 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// LargeInteger primitives for arbitrary precision arithmetic operations (primitives 21-37).
 /// Based on Blue Book specification. LargeInteger is stored as byte array in little-endian format.
 /// </summary>
+/// <remarks>
+/// <para><b>Blue Book Note:</b></para>
+/// <para>"There are adequate Smalltalk implementations for all of these operations so the
+/// primitive routines are optional" (Blue Book page 568, Chapter 29)</para>
+///
+/// <para><b>Implementation Details:</b></para>
+/// <list type="bullet">
+/// <item>All 17 LargeInteger primitives (21-37) are implemented using System.Numerics.BigInteger</item>
+/// <item>Arithmetic operations: +, -, *, /, \, //, quo:</item>
+/// <item>Comparison operations: &lt;, &gt;, &lt;=, &gt;=, =, ~=</item>
+/// <item>Bitwise operations: bitAnd:, bitOr:, bitXor:, bitShift:</item>
+/// </list>
+///
+/// <para><b>Key Features:</b></para>
+/// <list type="bullet">
+/// <item>Automatic conversion between SmallInteger and LargeInteger</item>
+/// <item>Proper sign handling for LargePositiveInteger vs LargeNegativeInteger</item>
+/// <item>Optimization: FromBigInteger automatically returns SmallInteger when result fits in 30-bit range</item>
+/// <item>All operations correctly delegate to .NET BigInteger for unlimited precision</item>
+/// </list>
+///
+/// <para><b>Conformance:</b> EXCEEDS SPECIFICATION - These primitives are optional per Blue Book,
+/// but we provide full implementation for performance and enhanced arithmetic capabilities.</para>
+/// </remarks>
 public static class LargeIntegerPrimitives
 {
     /// <summary>
@@ -129,7 +153,24 @@ public static class LargeIntegerPrimitives
             "installed during cold start process.");
     }
 
-    // Primitive 21: LargeInteger + (addition)
+    /// <summary>
+    /// Primitive 21: LargeInteger + - Arbitrary precision addition
+    /// Blue Book: Page 568, Chapter 29 (Optional primitive)
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Note:</b></para>
+    /// <para>"There are adequate Smalltalk implementations for all of these operations so the
+    /// primitive routines are optional."</para>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Validates both receiver and argument are LargeInteger instances</item>
+    /// <item>Converts both to BigInteger for computation</item>
+    /// <item>Returns result as SmallInteger if fits in 30-bit range, otherwise LargeInteger</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> EXCEEDS SPECIFICATION - Optional primitive implemented for performance</para>
+    /// </remarks>
     public static SmalltalkOOP Add(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
@@ -333,7 +374,24 @@ public static class LargeIntegerPrimitives
         return FromBigInteger(ctx, result);
     }
 
-    // Primitive 30: LargeInteger / (division - fails if not exact)
+    /// <summary>
+    /// Primitive 30: LargeInteger / - Exact division (fails if not exact)
+    /// Blue Book: Page 568, Chapter 29 (Optional primitive)
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Semantics:</b></para>
+    /// <para>Returns quotient only if division is exact (no remainder). This matches
+    /// Smalltalk's / operator which expects exact division for integers.</para>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Fails primitive if divisor is zero</item>
+    /// <item>Fails primitive if division has remainder (not exact)</item>
+    /// <item>Returns quotient as SmallInteger if fits, otherwise LargeInteger</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> EXCEEDS SPECIFICATION - Optional primitive implemented</para>
+    /// </remarks>
     public static SmalltalkOOP Divide(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)
@@ -525,7 +583,25 @@ public static class LargeIntegerPrimitives
         return FromBigInteger(ctx, result);
     }
 
-    // Primitive 37: LargeInteger bitShift:
+    /// <summary>
+    /// Primitive 37: LargeInteger bitShift: - Logical shift operation
+    /// Blue Book: Page 568, Chapter 29 (Optional primitive)
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Semantics:</b></para>
+    /// <para>Shifts bits left (positive argument) or right (negative argument).
+    /// Right shift is arithmetic (sign-preserving) for negative numbers.</para>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Argument must be SmallInteger specifying shift amount</item>
+    /// <item>Positive shifts left (multiply by 2^n)</item>
+    /// <item>Negative shifts right (divide by 2^n)</item>
+    /// <item>Handles arbitrary precision shifts via BigInteger</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> EXCEEDS SPECIFICATION - Optional primitive with full implementation</para>
+    /// </remarks>
     public static SmalltalkOOP BitShift(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         if (args.Length != 1)

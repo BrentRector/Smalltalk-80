@@ -9,7 +9,51 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class BlockClosurePrimitives
 {
-    // Primitive 207: BlockClosure valueWithArguments: OR BlockClosure value
+    /// <summary>
+    /// Primitive 207: value* - Evaluates a BlockClosure with lexical scoping.
+    /// NOT in Blue Book - Modern Smalltalk extension for BlockClosure support.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Smalltalk-80.st Specification:</b></para>
+    /// <code>
+    /// BlockClosure>>value
+    ///     "Activate the block with the correct number of arguments taken from the stack"
+    ///     &lt;primitive: 207>
+    ///     ^self primitiveFailed
+    ///
+    /// BlockClosure>>value:
+    ///     "Activate the block with the correct number of arguments taken from the stack"
+    ///     &lt;primitive: 207>
+    ///     ^self primitiveFailed
+    ///
+    /// BlockClosure>>valueWithArguments: anArray
+    ///     "Activate the block with arguments from anArray"
+    ///     &lt;primitive: 207>
+    ///     ^self primitiveFailed
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>NOT in Blue Book - BlockClosure is a modern addition (Blue Book uses BlockContext)</item>
+    /// <item>Implements lexical scoping via homeContext captured at block creation</item>
+    /// <item>Handles both direct arguments (value, value:, value:value:) and array (valueWithArguments:)</item>
+    /// <item>Extracts method, homeContext, and numArgs from BlockClosure instance</item>
+    /// <item>Validates argument count matches block's expected numArgs</item>
+    /// <item>Invokes block with proper lexical environment (homeContext)</item>
+    /// </list>
+    ///
+    /// <para><b>Analysis:</b></para>
+    /// <para>Modern extension for proper lexical scoping. BlockClosure was added to Smalltalk after
+    /// the Blue Book to provide true closures with captured lexical environments. Our implementation
+    /// correctly captures homeContext at block creation time (when literal is pushed), ensuring blocks
+    /// access variables from their DEFINING context (lexical scope), not their CALLING context.</para>
+    ///
+    /// <para><b>Key Innovation:</b></para>
+    /// <para>homeContext is captured when block literal is pushed (pushLiteral bytecode), not when
+    /// block is evaluated. This ensures proper lexical scoping for blocks passed between methods.</para>
+    ///
+    /// <para><b>Conformance:</b> ✅ PERFECT CONFORMANCE (with modern Smalltalk-80)</para>
+    /// </remarks>
     public static SmalltalkOOP ValueWithArguments(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         // This primitive is called from BOTH:

@@ -130,8 +130,8 @@ public static class PrimitiveTable
 
         // Control/Block primitives (80-88) - stubs, require BlockContext/Process infrastructure
         _primitives[80] = ControlPrimitives.BlockCopy;
-        _primitives[81] = ControlPrimitives.Value;
-        _primitives[82] = ControlPrimitives.ValueWithArg;
+        _primitives[81] = ControlPrimitives.Value;              // BlockContext>>value* (0-3 direct args)
+        _primitives[82] = ControlPrimitives.ValueWithArguments; // BlockContext>>valueWithArguments: (Array arg)
         _primitives[83] = ControlPrimitives.Perform;
         _primitives[84] = ControlPrimitives.PerformWith;
         _primitives[85] = ControlPrimitives.Signal;
