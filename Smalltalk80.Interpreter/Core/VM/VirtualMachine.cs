@@ -19,7 +19,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public partial class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly LayoutResolver _layoutResolver;
+    private readonly RuntimeHeapAccess _runtimeHeapAccess;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
     private readonly DebugOptions _debugOptions;
@@ -108,10 +108,11 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
     {
         _heapManager = heapManager;
-        _layoutResolver = layoutResolver;
+        _runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
+        RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
         _debugOptions = debugOptions ?? DebugOptions.Default;
@@ -157,10 +158,17 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP LookupSymbolInHeap(string symbolName)
     {
-        // Get USTable from GlobalRegistry (points to Smalltalk heap)
-        if (!GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
+        // Get USTable from the Smalltalk heap (via the global dictionary)
+        var ustableOOP = _runtimeHeapAccess.InternSymbol("USTable");
+        if (ustableOOP == SpecialObjectsArray.Instance.Nil)
         {
-            throw new InvalidOperationException("USTable not found - cannot initialize selector caches");
+            // USTable is a special case - it's needed to intern symbols, so we need direct heap lookup
+            var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+            ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
+            if (ustableOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                throw new InvalidOperationException("USTable not found - cannot initialize selector caches");
+            }
         }
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs
@@ -299,16 +307,12 @@ public partial class VirtualMachine : IPrimitiveContext
         int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
         int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
 
-        // Step 3: Get MethodContext class from GlobalRegistry
-        if (!GlobalRegistry.TryGet("class:MethodContext", out SmalltalkOOP methodContextClassOOP))
-        {
-            throw new InvalidOperationException(
-                "MethodContext class not found - ensure cold start completed Phase 2");
-        }
+        // Step 3: Get MethodContext class from RuntimeSpecialObjects
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
 
         // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
         SmalltalkOOP contextOOP;
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
 
         // Check size-specific pool for matching context
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
@@ -1262,7 +1266,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 return true;
             }
 
-            int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+            var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+            int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
             var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
 
             Push(valueOOP);
@@ -1828,7 +1833,8 @@ public partial class VirtualMachine : IPrimitiveContext
                         {
                             // Check if it's a BlockClosure or BlockContext
                             var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                            if (objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
                                 var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
@@ -1867,7 +1873,8 @@ public partial class VirtualMachine : IPrimitiveContext
                         {
                             // Check if it's a BlockClosure or BlockContext
                             var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                            if (objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
                                 var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
@@ -1906,7 +1913,8 @@ public partial class VirtualMachine : IPrimitiveContext
                         {
                             // Check if it's a BlockClosure or BlockContext
                             var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            if (GlobalRegistry.TryGet("class:BlockClosure", out var blockClosureClassOOP) && objClass == blockClosureClassOOP)
+                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                            if (objClass == blockClosureClassOOP)
                             {
                                 // It's a BlockClosure - get homeContext field
                                 var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
@@ -1950,17 +1958,19 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
+                    var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+
                     // DIAGNOSTIC: Log Association key for debugging
                     if (_createContextCallCount <= 20)
                     {
-                        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+                        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
                         var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
                         string? keyName = GetSymbolName(keyOOP);
                         string? methodLocalId = GetLocalId(methodOOP);
                         Console.WriteLine($"[PUSH_LITERAL_VAR] Reading Association key='{keyName}', method={methodLocalId}");
                     }
 
-                    int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+                    int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
                     var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
                     Push(valueOOP);
                     return true;
@@ -1972,7 +1982,8 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-                    int valueIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+                    var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+            int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
                     _heapManager.SetInstanceVariable(associationOOP, valueIndex, valueOOP);
                     Push(valueOOP); // Leave value on stack
                     return true;
@@ -2013,7 +2024,8 @@ public partial class VirtualMachine : IPrimitiveContext
                     if (_createContextCallCount <= 20)
                     {
                         string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+                        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+                        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
                         var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
                         string? keyName = GetSymbolName(keyOOP);
                         string? methodLocalId = GetLocalId(methodOOP);
@@ -2558,8 +2570,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // SPECIAL CASE: Block CompiledMethods responding to value/value:/value:value:
         // In v1.0.3, blocks are separate CompiledMethod objects that respond to value messages
         // by creating proper BlockContext and executing with closure semantics
-        if (GlobalRegistry.TryGet("class:CompiledMethod", out SmalltalkOOP compiledMethodClassId) &&
-            classOOP == compiledMethodClassId)
+        var compiledMethodClassId = RuntimeSpecialObjects.Instance.CompiledMethodClass;
+        if (classOOP == compiledMethodClassId)
         {
             if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
             {
@@ -3041,7 +3053,8 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (className == "Association")
         {
-            int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+            var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+            int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
             var keyOOP = _heapManager.GetInstanceVariable(oop, keyIndex);
             string? keyName = GetSymbolName(keyOOP);
             return $"Association(#{keyName})";
@@ -3111,6 +3124,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
     {
         // Step 1: Resolve block ownership from blockOwnerMap
+        // NOTE: blockOwnerMap is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
         var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
         if (blockOwnerMap == null)
         {
@@ -3147,14 +3161,11 @@ public partial class VirtualMachine : IPrimitiveContext
         int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
         
         // Call heap manager to create BlockContext with resolved field indices (proper architectural boundaries)
-        // Get BlockContext class from GlobalRegistry
-        if (!GlobalRegistry.TryGet("class:BlockContext", out SmalltalkOOP blockContextClassOOP))
-        {
-            throw new InvalidOperationException("BlockContext class not found");
-        }
+        // Get BlockContext class from RuntimeSpecialObjects
+        var blockContextClassOOP = RuntimeSpecialObjects.Instance.BlockContextClass;
 
         // Allocate BlockContext
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockContext");
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(blockContextClassOOP);
         var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, argCount + tempCount);
         _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
         
@@ -3247,13 +3258,11 @@ public partial class VirtualMachine : IPrimitiveContext
         int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
 
         // Get MethodContext class ID
-        if (!GlobalRegistry.TryGet("class:MethodContext", out SmalltalkOOP methodContextClassOOP))
-        {
-            throw new InvalidOperationException("MethodContext class not found");
-        }
+        // Get MethodContext class from RuntimeSpecialObjects
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
 
         // Allocate MethodContext
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
@@ -3341,8 +3350,9 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP GetBlockHomeReceiver(SmalltalkOOP blockMethodOOP, string ownerLocalId)
     {
-        
+
         // Walk the blockOwnerMap to find the root method (not another block)
+        // NOTE: blockOwnerMap is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
         var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
         if (blockOwnerMap == null)
         {
@@ -3444,6 +3454,7 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private string? GetLocalId(SmalltalkOOP objectOOP)
     {
+        // NOTE: objectIdToLocalId is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
         var objectIdToLocalId = GlobalRegistry.GetObject<Dictionary<SmalltalkOOP, string>>("objectIdToLocalId");
         if (objectIdToLocalId?.TryGetValue(objectOOP, out string? localId) == true)
         {
@@ -3843,7 +3854,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 Console.WriteLine($"  Checking class instance variables:");
                 try
                 {
-                    int instanceVarCount = _layoutResolver.GetInstanceVariableCount(GetClassName(currentClassOOP));
+                    int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(currentClassOOP);
                     Console.WriteLine($"    Instance variable count: {instanceVarCount}");
                     for (int slot = 0; slot < instanceVarCount; slot++)
                     {
@@ -3990,29 +4001,28 @@ public partial class VirtualMachine : IPrimitiveContext
 
     // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
     ISmalltalkHeapManager IPrimitiveContext.HeapManager => _heapManager;
-    LayoutResolver IPrimitiveContext.LayoutResolver => _layoutResolver;
+    void IPrimitiveContext.InvalidateAllRuntimeCaches()
+    {
+        _runtimeHeapAccess.InvalidateAllCaches();
+    }
     IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
     SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {
-        // Ensure className has "class:" prefix for LayoutResolver lookup
-        string classKey = className.StartsWith("class:") || className.StartsWith("meta:")
-            ? className
-            : $"class:{className}";
+        // Get the class OOP from the object
+        var classOOP = _heapManager.GetSlot(oop, 0);
 
-        int fieldIndex = _layoutResolver.GetFieldIndex(classKey, fieldName);
+        int fieldIndex = _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
         return _heapManager.GetInstanceVariable(oop, fieldIndex);
     }
 
     void IPrimitiveContext.SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
     {
-        // Ensure className has "class:" prefix for LayoutResolver lookup
-        string classKey = className.StartsWith("class:") || className.StartsWith("meta:")
-            ? className
-            : $"class:{className}";
+        // Get the class OOP from the object
+        var classOOP = _heapManager.GetSlot(oop, 0);
 
-        int fieldIndex = _layoutResolver.GetFieldIndex(classKey, fieldName);
+        int fieldIndex = _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
         _heapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 
@@ -4032,11 +4042,12 @@ public partial class VirtualMachine : IPrimitiveContext
 
     SmalltalkOOP IPrimitiveContext.AllocateObject(string className, int indexedSize)
     {
-        // Look up class ID from GlobalRegistry - className might already have "class:" prefix
-        string classKey = className.StartsWith("class:") ? className : $"class:{className}";
-        if (!GlobalRegistry.TryGet(classKey, out SmalltalkOOP classOOP))
+        // Look up class OOP from heap - className might already have "class:" prefix
+        string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
+        var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
+        if (classOOP == SpecialObjectsArray.Instance.Nil)
         {
-            throw new InvalidOperationException($"Class {classKey} not found in GlobalRegistry");
+            throw new InvalidOperationException($"Class {classNameClean} not found in heap");
         }
 
         // Get format based on whether object has indexed fields
@@ -4110,11 +4121,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // Calculate stack size (args + some execution stack space)
         int stackSize = argCount + 16; // 16 slots for execution stack
 
-        // Get BlockContext class
-        if (!GlobalRegistry.TryGet("class:BlockContext", out SmalltalkOOP blockContextClassOOP))
-        {
-            throw new InvalidOperationException("BlockContext class not found");
-        }
+        // Get BlockContext class from RuntimeSpecialObjects
+        var blockContextClassOOP = RuntimeSpecialObjects.Instance.BlockContextClass;
 
         // Allocate BlockContext with indexed fields for stack
         var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 3, stackSize);
@@ -4214,7 +4222,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // Check if this is a metaclass by checking if it's an instance of Metaclass
         var classOfClassOOP = _heapManager.GetClassOOP(classOOP);
         
-        if (GlobalRegistry.TryGet("class:Metaclass", out SmalltalkOOP metaclassOOP))
+        var metaclassOOP = _runtimeHeapAccess.GetClass("Metaclass");
+        if (metaclassOOP != SpecialObjectsArray.Instance.Nil)
         {
             if (classOfClassOOP == metaclassOOP)
             {
@@ -4222,7 +4231,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 // Metaclass has instance variable 'thisClass' pointing to the regular class
                 try
                 {
-                    int thisClassIndex = _layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
+                    int thisClassIndex = _runtimeHeapAccess.GetFieldIndex(metaclassOOP, "thisClass");
                     actualClassOOP = _heapManager.GetInstanceVariable(classOOP, thisClassIndex);
                     
                     // Check actualClassOOP's instance variable count
@@ -4240,7 +4249,8 @@ public partial class VirtualMachine : IPrimitiveContext
         int classPoolIndex;
         try
         {
-            classPoolIndex = _layoutResolver.GetFieldIndex("class:Class", "classPool");
+            var classClassOOP = _runtimeHeapAccess.GetClass("Class");
+            classPoolIndex = _runtimeHeapAccess.GetFieldIndex(classClassOOP, "classPool");
         }
         catch (Exception)
         {
@@ -4276,7 +4286,8 @@ public partial class VirtualMachine : IPrimitiveContext
         }
         
         // Get the Association's key (variable name Symbol)
-        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
         var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
         
         // Use atomic insert-if-absent to add Association to classPool
@@ -4320,7 +4331,8 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void SetAssociationValue(SmalltalkOOP associationOOP, SmalltalkOOP valueOOP, bool loaderMode)
     {
-        int valueSlotIndex = _layoutResolver.GetFieldIndex("class:Association", "value");
+        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+        int valueSlotIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
         
         if (loaderMode)
         {
@@ -4343,12 +4355,13 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         const int initialSize = 8;
         
-        if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictClassOOP))
+        var dictClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
+        if (dictClassOOP == SpecialObjectsArray.Instance.Nil)
         {
             throw new InvalidOperationException("Dictionary class not found - needed for classPool lazy initialization");
         }
-        
-        int instVarCount = _layoutResolver.GetInstanceVariableCount("class:Dictionary");
+
+        int instVarCount = _runtimeHeapAccess.GetInstanceVariableCount(dictClassOOP);
         
         var dictOOP = _heapManager.AllocateObject(
             Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed,
@@ -4357,8 +4370,8 @@ public partial class VirtualMachine : IPrimitiveContext
         );
         
         _heapManager.SetSlot(dictOOP, 0, dictClassOOP);
-        
-        int tallyIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "tally");
+
+        int tallyIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "tally");
         if (tallyIndex >= 0)
         {
             _heapManager.SetInstanceVariable(dictOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
@@ -4390,7 +4403,8 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP DictionaryAtomicInsertIfAbsent(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP associationOOP)
     {
-        int keyIndex = _layoutResolver.GetFieldIndex("class:Association", "key");
+        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
+        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
         int size = _heapManager.GetIndexedSize(dictionaryOOP);
         
         // NOTE: Smalltalk-80 VM is single-threaded, so we don't need actual atomics.
@@ -4421,7 +4435,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 _heapManager.SetIndexedOOP(dictionaryOOP, i, associationOOP);
                 
                 // Increment tally
-                int tallyIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "tally");
+                var dictClassOOP = _heapManager.GetSlot(dictionaryOOP, 0);
+                int tallyIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "tally");
                 var tallyOOP = _heapManager.GetInstanceVariable(dictionaryOOP, tallyIndex);
                 int tally = tallyOOP.AsSmallInteger();
                 _heapManager.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(tally + 1));
@@ -4462,18 +4477,15 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
     {
         // Get BlockClosure class
-        if (!GlobalRegistry.TryGet("class:BlockClosure", out SmalltalkOOP blockClosureClassOOP))
-        {
-            throw new InvalidOperationException("BlockClosure class not found in GlobalRegistry");
-        }
+        var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
 
         // Get argument count from block method header
         int numArgs = GetBlockArgCount(blockMethodOOP);
 
         // Allocate BlockClosure instance with instance variable count from layout
-        // IMPORTANT: Do NOT hardcode instance variable count - query from LayoutResolver
-        // to match the precomputed layout in the JSON bundle
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockClosure");
+        // IMPORTANT: Do NOT hardcode instance variable count - query from RuntimeHeapAccess
+        // to match the actual layout in the heap
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(blockClosureClassOOP);
         var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, instanceVarCount, 0);
         _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
 
@@ -4588,7 +4600,14 @@ public partial class VirtualMachine : IPrimitiveContext
 
     int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
     {
-        return _layoutResolver.GetFieldIndex(className, fieldName);
+        // Get the class OOP from the heap
+        string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
+        var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
+        if (classOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException($"Class {classNameClean} not found in heap");
+        }
+        return _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
     }
 
     SmalltalkOOP IPrimitiveContext.GetInstanceVariable(SmalltalkOOP objectOOP, int index)
@@ -4613,7 +4632,10 @@ public partial class VirtualMachine : IPrimitiveContext
         // stale as soon as the Smalltalk interpreter begins running and creates new symbols.
 
         // Get USTable (Universal Symbol Table) from GlobalRegistry
-        if (!GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
+        // Get USTable from heap (via the Smalltalk global dictionary)
+        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
+        if (ustableOOP == SpecialObjectsArray.Instance.Nil)
         {
             // USTable not yet created (shouldn't happen after cold start)
             return SpecialObjectsArray.Instance.Nil;
@@ -4709,7 +4731,8 @@ public partial class VirtualMachine : IPrimitiveContext
         //   0: tally (SmallInteger count of entries)
         //   1: array (PointerIndexed Array of Association objects)
 
-        int arrayIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "array");
+        var dictClassOOP = _heapManager.GetSlot(smalltalkOOP, 0);
+        int arrayIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "array");
         var associationArrayOOP = _heapManager.GetInstanceVariable(smalltalkOOP, arrayIndex);
 
         if (associationArrayOOP == SpecialObjectsArray.Instance.Nil)

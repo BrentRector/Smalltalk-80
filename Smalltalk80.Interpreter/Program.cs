@@ -116,7 +116,7 @@ public static class Program
                     ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages // Method lookup is part of message debugging
                 };
 
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                var vm = new VirtualMachine(heapManager, vmMetadata, debugOptions: vmDebugOptions);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -127,7 +127,6 @@ public static class Program
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
-                    layoutResolver,
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
                     defaultTimeoutMs: 5000
                 );

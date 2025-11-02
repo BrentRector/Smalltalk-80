@@ -147,7 +147,7 @@ public class RuntimeHeapAccess
     /// Looks up a global variable by name using byte comparison (no symbol interning needed).
     /// Used to break the circular dependency when looking up USTable.
     /// </summary>
-    private SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
+    public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
 
@@ -395,6 +395,7 @@ public class RuntimeSpecialObjects
     private SmalltalkOOP? _arrayClass;
     private SmalltalkOOP? _stringClass;
     private SmalltalkOOP? _symbolClass;
+    private SmalltalkOOP? _associationClass;
 
     // Reference to heap access for lookups
     private RuntimeHeapAccess? _heapAccess;
@@ -438,6 +439,9 @@ public class RuntimeSpecialObjects
     public SmalltalkOOP SymbolClass =>
         _symbolClass ??= LookupClass("Symbol");
 
+    public SmalltalkOOP AssociationClass =>
+        _associationClass ??= LookupClass("Association");
+
     public void InvalidateCache()
     {
         _compiledMethodClass = null;
@@ -449,5 +453,6 @@ public class RuntimeSpecialObjects
         _arrayClass = null;
         _stringClass = null;
         _symbolClass = null;
+        _associationClass = null;
     }
 }

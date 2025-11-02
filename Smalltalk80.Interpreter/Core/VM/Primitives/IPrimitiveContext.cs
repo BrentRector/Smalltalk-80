@@ -13,10 +13,6 @@ public interface IPrimitiveContext
     /// </summary>
     ISmalltalkHeapManager HeapManager { get; }
 
-    /// <summary>
-    /// Gets the layout resolver for field lookups.
-    /// </summary>
-    LayoutResolver LayoutResolver { get; }
 
     /// <summary>
     /// Gets the platform bridge for platform-exempt primitives (graphics, input, clipboard, etc.).

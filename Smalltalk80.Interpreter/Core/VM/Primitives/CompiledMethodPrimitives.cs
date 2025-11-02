@@ -153,15 +153,9 @@ public static class CompiledMethodPrimitives
         }
 
         // Blue Book: class ← self popStack
-        // Get class OOPs from global registry
-        // Note: Receiver is the class (CompiledMethod class), but we look up from registry
-        // This ensures we get the correct OOPs even if class objects move
-        if (!GlobalRegistry.TryGet("class:CompiledMethod", out var compiledMethodClassOOP) ||
-            !GlobalRegistry.TryGet("class:ByteArray", out var byteArrayClassOOP))
-        {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
-        }
+        // Get class OOPs from RuntimeSpecialObjects
+        var compiledMethodClassOOP = RuntimeSpecialObjects.Instance.CompiledMethodClass;
+        var byteArrayClassOOP = RuntimeSpecialObjects.Instance.ByteArrayClass;
 
         // Create bytecode array (initialized to zeros)
         // These will be filled in later by the compiler

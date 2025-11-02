@@ -557,7 +557,6 @@ internal class TestPrimitiveContext : IPrimitiveContext
     public bool PrimitiveSuccess { get; set; } = true;
     public ISmalltalkHeapManager HeapManager => throw new NotImplementedException("HeapManager not needed for arithmetic tests");
     public IPlatformBridge? PlatformBridge => null;
-    public LayoutResolver LayoutResolver => throw new NotImplementedException();
 
     // Not needed for arithmetic primitives - throw NotImplementedException
     public SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName) => throw new NotImplementedException();
@@ -583,4 +582,5 @@ internal class TestPrimitiveContext : IPrimitiveContext
     public SmalltalkOOP InternSymbol(string symbolName) => throw new NotImplementedException();
     public string GetClassNameForObject(SmalltalkOOP oop) => throw new NotImplementedException();
     public void ClearMethodCache() => throw new NotImplementedException();
+    public void InvalidateAllRuntimeCaches() => throw new NotImplementedException();
 }

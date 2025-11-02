@@ -31,16 +31,16 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public class ProcessPrimitives
 {
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly LayoutResolver _layoutResolver;
+    private readonly RuntimeHeapAccess _runtimeHeapAccess;
     private readonly VirtualMachine _vm;
-    
+
     public ProcessPrimitives(
-        ISmalltalkHeapManager heapManager, 
-        LayoutResolver layoutResolver,
+        ISmalltalkHeapManager heapManager,
+        RuntimeHeapAccess runtimeHeapAccess,
         VirtualMachine vm)
     {
         _heapManager = heapManager;
-        _layoutResolver = layoutResolver;
+        _runtimeHeapAccess = runtimeHeapAccess;
         _vm = vm;
     }
     
@@ -63,7 +63,7 @@ public class ProcessPrimitives
     //
     // <para><b>Heap-Only Access:</b></para>
     // <para>All operations use heap-only access pattern, retrieving ProcessorScheduler
-    // from SpecialObjectsArray and accessing Process fields via LayoutResolver.</para>
+    // from SpecialObjectsArray and accessing Process fields via RuntimeHeapAccess.</para>
     // </remarks>
     // <param name="processOOP">The Process object to resume</param>
     // <returns>The result of executing the process's suspended context</returns>
@@ -75,7 +75,8 @@ public class ProcessPrimitives
         if (schedulerOOP == SpecialObjectsArray.Instance.Nil)
             throw new InvalidOperationException("ProcessorScheduler not found in SpecialObjectsArray");
 
-        int activeProcessIndex = _layoutResolver.GetFieldIndex("class:ProcessorScheduler", "activeProcess");
+        var schedulerClassOOP = _heapManager.GetSlot(schedulerOOP, 0);
+        int activeProcessIndex = _runtimeHeapAccess.GetFieldIndex(schedulerClassOOP, "activeProcess");
         var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
 
         if (currentActiveOOP != SpecialObjectsArray.Instance.Nil)
@@ -91,7 +92,8 @@ public class ProcessPrimitives
 
         try
         {
-            int suspendedContextIndex = _layoutResolver.GetFieldIndex("class:Process", "suspendedContext");
+            var processClassOOP = _heapManager.GetSlot(processOOP, 0);
+            int suspendedContextIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "suspendedContext");
             var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, suspendedContextIndex);
 
             var resultOOP = _vm.ExecuteExistingContext(suspendedContextOOP);

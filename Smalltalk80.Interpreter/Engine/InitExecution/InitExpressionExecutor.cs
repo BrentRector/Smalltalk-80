@@ -27,7 +27,7 @@ public class InitExpressionExecutor
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly VirtualMachine _vm;
-    private readonly LayoutResolver _layoutResolver;
+    private readonly RuntimeHeapAccess _runtimeHeapAccess;
     private readonly ProcessPrimitives _processPrimitives;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
@@ -35,16 +35,15 @@ public class InitExpressionExecutor
     public InitExpressionExecutor(
         ISmalltalkHeapManager heapManager,
         VirtualMachine vm,
-        LayoutResolver layoutResolver,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
         int defaultTimeoutMs = 5000)
     {
         _heapManager = heapManager;
         _vm = vm;
-        _layoutResolver = layoutResolver;
+        _runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
-        _processPrimitives = new ProcessPrimitives(heapManager, layoutResolver, vm);
+        _processPrimitives = new ProcessPrimitives(heapManager, _runtimeHeapAccess, vm);
     }
 
 
@@ -215,7 +214,7 @@ public class InitExpressionExecutor
         }
 
         // Get instance variable count from class
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
 
         // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 12);
@@ -328,16 +327,16 @@ public class InitExpressionExecutor
         }
 
         // Get instance variable count from class
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:Process");
+        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(processClassOOP);
 
         // Allocate Process object
         var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 0);
         _heapManager.SetSlot(processOOP, 0, processClassOOP);
 
-        // Set instance variables using LayoutResolver indices
-        int suspendedContextIndex = _layoutResolver.GetFieldIndex("class:Process", "suspendedContext");
-        int priorityIndex = _layoutResolver.GetFieldIndex("class:Process", "priority");
-        int myListIndex = _layoutResolver.GetFieldIndex("class:Process", "myList");
+        // Set instance variables using RuntimeHeapAccess indices
+        int suspendedContextIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "suspendedContext");
+        int priorityIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "priority");
+        int myListIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "myList");
 
         _heapManager.SetSlot(processOOP, suspendedContextIndex + 1, suspendedContextOOP);
         _heapManager.SetSlot(processOOP, priorityIndex + 1, SmalltalkOOP.FromSmallInteger(priority));
