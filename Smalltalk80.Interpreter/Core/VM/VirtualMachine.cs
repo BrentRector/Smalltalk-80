@@ -4897,4 +4897,16 @@ public partial class VirtualMachine : IPrimitiveContext
             i++;
         }
     }
+
+    /// <summary>
+    /// Clears the method lookup cache.
+    /// Currently a no-op since this implementation doesn't have a method cache.
+    /// The selector caches are static and don't need clearing.
+    /// </summary>
+    public void ClearMethodCache()
+    {
+        // No-op: This implementation doesn't have a dynamic method cache
+        // The selector caches (_arithmeticSelectorCache, _specialSelectorCache) are
+        // static lookup tables initialized once at startup and never modified.
+    }
 }

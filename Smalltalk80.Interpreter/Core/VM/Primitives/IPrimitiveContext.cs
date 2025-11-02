@@ -203,4 +203,11 @@ public interface IPrimitiveContext
     /// <param name="objectOOP">Object pointer.</param>
     /// <returns>Class name string, or null if object is invalid.</returns>
     string? GetClassNameForObject(SmalltalkOOP objectOOP);
+
+    /// <summary>
+    /// Clears the method lookup cache.
+    /// Used by primitive 89 (Behavior flushCache).
+    /// Implementations without a method cache can make this a no-op.
+    /// </summary>
+    void ClearMethodCache();
 }

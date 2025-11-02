@@ -1353,4 +1353,90 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             }
         }
     }
+
+    /// <summary>
+    /// Validates that an OOP refers to a valid object in the heap.
+    /// Used by primitive 76 (SmallInteger asObject).
+    /// </summary>
+    public bool IsValidOOP(SmalltalkOOP oop)
+    {
+        // SmallIntegers are always valid
+        if (oop.IsSmallInteger)
+            return true;
+
+        // Check if object ID is in valid range
+        int objectId = oop.AsObjectTableIndex();
+        if (objectId <= 0)
+            return false;
+
+        // Calculate block and index
+        int blockIndex = (objectId - 1) / ObjectTableBlockSize;
+        int index = (objectId - 1) % ObjectTableBlockSize;
+
+        // Check bounds
+        if (blockIndex >= _objectTableBlocks.Count)
+            return false;
+
+        // Check if entry exists
+        var block = _objectTableBlocks[blockIndex];
+        return block.Entries[index] != null;
+    }
+
+    /// <summary>
+    /// Finds the first instance of a given class.
+    /// Used by primitive 77 (Behavior someInstance).
+    /// Returns nil if no instances exist.
+    /// </summary>
+    public SmalltalkOOP FindInstanceOf(SmalltalkOOP classOOP)
+    {
+        // Enumerate all objects and find first instance of the class
+        foreach (var oop in EnumerateObjectTable())
+        {
+            // Skip SmallIntegers (they have no class object)
+            if (oop.IsSmallInteger)
+                continue;
+
+            // Check if this object's class matches
+            var objectClass = GetClass(oop);
+            if (objectClass == classOOP)
+                return oop;
+        }
+
+        // No instances found
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Finds the next instance of the same class as the given object.
+    /// Used by primitive 78 (Object nextInstance).
+    /// Returns nil if the object is the last instance of its class.
+    /// </summary>
+    public SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP)
+    {
+        bool foundCurrent = false;
+
+        // Enumerate all objects and find next instance after the given object
+        foreach (var oop in EnumerateObjectTable())
+        {
+            // Skip SmallIntegers
+            if (oop.IsSmallInteger)
+                continue;
+
+            // Skip until we find the 'after' object
+            if (!foundCurrent)
+            {
+                if (oop == afterOOP)
+                    foundCurrent = true;
+                continue;
+            }
+
+            // After finding the 'after' object, find next instance of same class
+            var objectClass = GetClass(oop);
+            if (objectClass == classOOP)
+                return oop;
+        }
+
+        // No more instances found
+        return SpecialObjectsArray.Instance.Nil;
+    }
 }

@@ -119,6 +119,9 @@ public static class PrimitiveTable
         _primitives[73] = ObjectPrimitives.InstVarAt;
         _primitives[74] = ObjectPrimitives.InstVarAtPut;
         _primitives[75] = ObjectPrimitives.Hash;  // Object>>hash - returns SmallInteger hash value
+        _primitives[76] = ArithmeticPrimitives.AsObject;  // SmallInteger asObject / asObjectNoFail
+        _primitives[77] = ObjectPrimitives.SomeInstance;  // Behavior someInstance
+        _primitives[78] = ObjectPrimitives.NextInstance;  // Object nextInstance
         _primitives[110] = ObjectPrimitives.IdentityEquals;
         _primitives[111] = ObjectPrimitives.Class;
 
@@ -135,6 +138,7 @@ public static class PrimitiveTable
         _primitives[86] = ControlPrimitives.Wait;
         _primitives[87] = ControlPrimitives.Resume;
         _primitives[88] = ControlPrimitives.Suspend;
+        _primitives[89] = ControlPrimitives.FlushCache;  // Behavior flushCache
 
         // Input primitives (90-95) - stubs, require IDisplayProvider
         _primitives[90] = InputPrimitives.MousePoint;
