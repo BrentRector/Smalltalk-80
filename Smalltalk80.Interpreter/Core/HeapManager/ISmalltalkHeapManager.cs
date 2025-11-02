@@ -232,4 +232,24 @@ public interface ISmalltalkHeapManager
     /// When false, suppresses noisy debug output from successful operations.
     /// </summary>
     bool VerboseDebugMode { get; set; }
+
+    /// <summary>
+    /// Validates that an OOP refers to a valid object in the heap.
+    /// Used by primitive 76 (SmallInteger asObject) to verify object existence.
+    /// </summary>
+    bool IsValidOOP(SmalltalkOOP oop);
+
+    /// <summary>
+    /// Finds the first instance of a given class.
+    /// Used by primitive 77 (Behavior someInstance).
+    /// Returns nil if no instances exist.
+    /// </summary>
+    SmalltalkOOP FindInstanceOf(SmalltalkOOP classOOP);
+
+    /// <summary>
+    /// Finds the next instance of the same class as the given object.
+    /// Used by primitive 78 (Object nextInstance).
+    /// Returns nil if the object is the last instance of its class.
+    /// </summary>
+    SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP);
 }

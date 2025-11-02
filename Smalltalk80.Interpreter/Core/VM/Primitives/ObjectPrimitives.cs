@@ -1061,4 +1061,53 @@ public static class ObjectPrimitives
 
         return result;
     }
+
+    // Primitive 77: Behavior someInstance
+    // Blue Book page 641: "Returns an instance of the receiver class. Fails if no instances exist."
+    public static SmalltalkOOP SomeInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+    {
+        if (args.Length != 0)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // receiver is the class, find an instance of it
+        var instance = ctx.HeapManager.FindInstanceOf(receiver);
+
+        if (instance == SpecialObjectsArray.Instance.Nil)
+        {
+            // No instances found - fail the primitive
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        return instance;
+    }
+
+    // Primitive 78: Object nextInstance
+    // Blue Book page 641: "Returns the next instance of the same class as the receiver"
+    public static SmalltalkOOP NextInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+    {
+        if (args.Length != 0)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Get receiver's class
+        var classOOP = ctx.HeapManager.GetClass(receiver);
+
+        // Find next instance after receiver
+        var nextInstance = ctx.HeapManager.FindNextInstanceOf(classOOP, receiver);
+
+        if (nextInstance == SpecialObjectsArray.Instance.Nil)
+        {
+            // No more instances - fail the primitive
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        return nextInstance;
+    }
 }

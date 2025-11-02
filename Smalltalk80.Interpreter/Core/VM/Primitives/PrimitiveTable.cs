@@ -56,12 +56,12 @@ public static class PrimitiveTable
         _primitives[9] = ArithmeticPrimitives.Multiply;
         _primitives[10] = ArithmeticPrimitives.Divide;
         _primitives[11] = ArithmeticPrimitives.Mod;
-        _primitives[12] = ArithmeticPrimitives.Quo;
-        _primitives[13] = ArithmeticPrimitives.BitAnd;
-        _primitives[14] = ArithmeticPrimitives.BitOr;
-        _primitives[15] = ArithmeticPrimitives.BitXor;
-        _primitives[16] = ArithmeticPrimitives.BitShift;
-        _primitives[17] = ArithmeticPrimitives.Div;
+        _primitives[12] = ArithmeticPrimitives.Div;        // SmallInteger // (rounds down toward negative infinity)
+        _primitives[13] = ArithmeticPrimitives.Quo;        // SmallInteger quo: (truncates toward zero)
+        _primitives[14] = ArithmeticPrimitives.BitAnd;     // SmallInteger bitAnd:
+        _primitives[15] = ArithmeticPrimitives.BitOr;      // SmallInteger bitOr:
+        _primitives[16] = ArithmeticPrimitives.BitXor;     // SmallInteger bitXor:
+        _primitives[17] = ArithmeticPrimitives.BitShift;   // SmallInteger bitShift:
 
         // Point primitives (18)
         _primitives[18] = PointPrimitives.MakePoint;
@@ -119,6 +119,9 @@ public static class PrimitiveTable
         _primitives[73] = ObjectPrimitives.InstVarAt;
         _primitives[74] = ObjectPrimitives.InstVarAtPut;
         _primitives[75] = ObjectPrimitives.Hash;  // Object>>hash - returns SmallInteger hash value
+        _primitives[76] = ArithmeticPrimitives.AsObject;  // SmallInteger asObject / asObjectNoFail
+        _primitives[77] = ObjectPrimitives.SomeInstance;  // Behavior someInstance
+        _primitives[78] = ObjectPrimitives.NextInstance;  // Object nextInstance
         _primitives[110] = ObjectPrimitives.IdentityEquals;
         _primitives[111] = ObjectPrimitives.Class;
 
@@ -135,6 +138,7 @@ public static class PrimitiveTable
         _primitives[86] = ControlPrimitives.Wait;
         _primitives[87] = ControlPrimitives.Resume;
         _primitives[88] = ControlPrimitives.Suspend;
+        _primitives[89] = ControlPrimitives.FlushCache;  // Behavior flushCache
 
         // Input primitives (90-95) - stubs, require IDisplayProvider
         _primitives[90] = InputPrimitives.MousePoint;

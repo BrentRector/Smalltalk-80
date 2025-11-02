@@ -618,4 +618,38 @@ public static class ArithmeticPrimitives
 
         return SmalltalkOOP.FromSmallInteger(quot);
     }
+
+    // Primitive 76: SmallInteger asObject / asObjectNoFail
+    // Blue Book page 641: "Returns the object whose object pointer is twice the receiver's value"
+    public static SmalltalkOOP AsObject(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+    {
+        if (args.Length != 0)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        if (!receiver.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        int value = receiver.AsSmallInteger();
+
+        // Object pointer is twice the SmallInteger value
+        // SmallIntegers are tagged with low bit set (odd), objects have low bit clear (even)
+        // So doubling the SmallInteger value gives an object pointer
+        uint objectPointer = (uint)(value * 2);
+        var oop = new SmalltalkOOP(objectPointer);
+
+        // Verify object exists in heap
+        if (!ctx.HeapManager.IsValidOOP(oop))
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        return oop;
+    }
 }

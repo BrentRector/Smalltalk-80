@@ -612,5 +612,22 @@ public static class ControlPrimitives
         return false;
     }
 
+    // Primitive 89: Behavior flushCache
+    // Blue Book page 650: "Removes all entries from the method lookup cache"
+    public static SmalltalkOOP FlushCache(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+    {
+        if (args.Length != 0)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        // Clear the method lookup cache
+        ctx.ClearMethodCache();
+
+        // Return receiver
+        return receiver;
+    }
+
     #endregion
 }
