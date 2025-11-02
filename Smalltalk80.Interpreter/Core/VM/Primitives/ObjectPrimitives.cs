@@ -65,7 +65,15 @@ public static class ObjectPrimitives
 
         // Convert to 0-based index and access
         // Arrays use PointerIndexed format - get OOP directly
-        return ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
+        var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
+
+        // DIAGNOSTIC: Track reads from bucket 68364
+        if (receiver.RawValue == 68364)
+        {
+            Console.WriteLine($"[Primitive 60] Reading bucket 68364 at Smalltalk index {index}: result={result}");
+        }
+
+        return result;
     }
 
     // Primitive 61: Array at:put:
