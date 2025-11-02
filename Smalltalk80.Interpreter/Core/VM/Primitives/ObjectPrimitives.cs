@@ -447,15 +447,8 @@ public static class ObjectPrimitives
         // Uses heap data only - reads the class's format and instance variable count
         // Used for Array new: n, ByteArray new: n, etc.
         // AllocateInstanceOf handles validation internally, let any real errors propagate
-        try
-        {
-            var result = ctx.HeapManager.AllocateInstanceOf(receiver, size);
-            return result;
-        }
-        catch
-        {
-            throw;
-        }
+        var result = ctx.HeapManager.AllocateInstanceOf(receiver, size);
+        return result;
     }
 
     /// <summary>
