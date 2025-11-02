@@ -66,21 +66,6 @@ public static class ObjectPrimitives
 
         if (!args[0].IsSmallInteger)
         {
-            Console.WriteLine($"\n❌ Primitive 60 (at:) TYPE ERROR:");
-            Console.WriteLine($"   Receiver: OOP({receiver.RawValue})");
-            string? receiverClass = ctx.GetClassNameForObject(receiver);
-            Console.WriteLine($"   Receiver class: {receiverClass}");
-            Console.WriteLine($"   Index argument: OOP({args[0].RawValue})");
-            string? indexClass = ctx.GetClassNameForObject(args[0]);
-            Console.WriteLine($"   Index class: {indexClass} (expected SmallInteger)");
-
-            // If index is a String, show its contents
-            if (indexClass == "String" && ctx.HeapManager.GetObjectFormat(args[0]) == ObjectFormat.ByteIndexed)
-            {
-                var stringValue = GetSymbolName(ctx, args[0]); // Works for Strings too
-                Console.WriteLine($"   String value: '{stringValue}'");
-            }
-
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -109,12 +94,6 @@ public static class ObjectPrimitives
         // Convert to 0-based index and access
         // Arrays use PointerIndexed format - get OOP directly
         var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
-
-        // DIAGNOSTIC: Track reads from bucket 68364
-        if (receiver.RawValue == 68364)
-        {
-            Console.WriteLine($"[Primitive 60] Reading bucket 68364 at Smalltalk index {index}: result={result}");
-        }
 
         return result;
     }
@@ -389,9 +368,6 @@ public static class ObjectPrimitives
         }
     }
 
-    // DEBUG: Primitive 71 call counter
-    private static int _prim71CallCount = 0;
-
     /// <summary>
     /// Primitive 71: Behavior new: - Create new instance with indexed fields
     /// Blue Book: Page 642, Chapter 29, Formal Specification
@@ -441,19 +417,13 @@ public static class ObjectPrimitives
     /// </remarks>
     public static SmalltalkOOP NewWithSize(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // DEBUG: Log first 50 calls (only when verbose debug mode enabled)
-        System.Threading.Interlocked.Increment(ref _prim71CallCount);
-        bool shouldLog = ctx.HeapManager.VerboseDebugMode && _prim71CallCount <= 50;
-
         if (args.Length != 1)
         {
-            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: args.Length != 1");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
         if (!args[0].IsSmallInteger)
         {
-            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: arg not SmallInteger, arg={args[0]}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -462,7 +432,6 @@ public static class ObjectPrimitives
 
         if (size < 0)
         {
-            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: size < 0");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -470,7 +439,6 @@ public static class ObjectPrimitives
         // Receiver must be a Class (not SmallInteger)
         if (receiver.IsSmallInteger)
         {
-            if (shouldLog) Console.WriteLine($"[Prim71 #{_prim71CallCount}] FAIL: receiver is SmallInteger");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -482,14 +450,10 @@ public static class ObjectPrimitives
         try
         {
             var result = ctx.HeapManager.AllocateInstanceOf(receiver, size);
-            if (shouldLog)
-                Console.WriteLine($"[Prim71 #{_prim71CallCount}] {receiver} new: {size} → {result}");
             return result;
         }
-        catch (Exception ex)
+        catch
         {
-            if (shouldLog)
-                Console.WriteLine($"[Prim71 #{_prim71CallCount}] EXCEPTION: {ex.Message}");
             throw;
         }
     }
@@ -809,21 +773,6 @@ public static class ObjectPrimitives
         }
         if (!args[0].IsSmallInteger)
         {
-            Console.WriteLine($"\n❌ Primitive 63 (at:) TYPE ERROR:");
-            Console.WriteLine($"   Receiver: OOP({receiver.RawValue})");
-            string? receiverClass = ctx.GetClassNameForObject(receiver);
-            Console.WriteLine($"   Receiver class: {receiverClass}");
-            Console.WriteLine($"   Index argument: OOP({args[0].RawValue})");
-            string? indexClass = ctx.GetClassNameForObject(args[0]);
-            Console.WriteLine($"   Index class: {indexClass} (expected SmallInteger)");
-
-            // If index is a String, show its contents
-            if (indexClass == "String" && ctx.HeapManager.GetObjectFormat(args[0]) == ObjectFormat.ByteIndexed)
-            {
-                var stringValue = GetSymbolName(ctx, args[0]); // Works for Strings too
-                Console.WriteLine($"   String value: '{stringValue}'");
-            }
-
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -846,20 +795,6 @@ public static class ObjectPrimitives
         int size = ctx.HeapManager.GetIndexedSize(receiver);
         if (index > size)
         {
-            Console.WriteLine($"\n❌ Primitive 63 (at:) BOUNDS ERROR:");
-            Console.WriteLine($"   Receiver: OOP({receiver.RawValue}) (size={size})");
-            Console.WriteLine($"   Index: {index} (1-based)");
-            Console.WriteLine($"   Receiver format: {ctx.HeapManager.GetObjectFormat(receiver)}");
-            string? className = ctx.GetClassNameForObject(receiver);
-            Console.WriteLine($"   Receiver class: {className}");
-
-            // Try to get symbol name if it's a Symbol
-            if (ctx.HeapManager.GetObjectFormat(receiver) == ObjectFormat.ByteIndexed)
-            {
-                var symbolName = GetSymbolName(ctx, receiver);
-                Console.WriteLine($"   Symbol name: '{symbolName}' (length={symbolName?.Length ?? 0})");
-            }
-
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -883,7 +818,6 @@ public static class ObjectPrimitives
         var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
         if (smalltalkDictOOP == SpecialObjectsArray.Instance.Nil)
         {
-            Console.WriteLine($"[GetCharacterForAscii] ERROR: Smalltalk dictionary is nil in SpecialObjectsArray");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -892,7 +826,6 @@ public static class ObjectPrimitives
         var characterClassOOP = LookupInDictionary(ctx, smalltalkDictOOP, "Character");
         if (characterClassOOP == SpecialObjectsArray.Instance.Nil)
         {
-            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class not found in Smalltalk dictionary");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -903,11 +836,6 @@ public static class ObjectPrimitives
         // DEFENSIVE: Check if classPool is nil
         if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
         {
-            Console.WriteLine($"[GetCharacterForAscii] ERROR: Character class classPool is nil!");
-            Console.WriteLine($"  Character class oop={characterClassOOP}");
-            Console.WriteLine($"  Character initialize must run BEFORE ClassOrganizer initialize");
-            Console.WriteLine($"  But Character initialize ran at [52] and completed successfully!");
-            Console.WriteLine($"  This suggests classPool was never populated or index 7 is wrong");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -915,9 +843,6 @@ public static class ObjectPrimitives
         // classPool is a Dictionary, which stores associations in indexed slots
         // (same structure as SystemDictionary - variableSubclass with 'tally' instance var)
         int dictSize = ctx.HeapManager.GetIndexedSize(classPoolOOP);
-
-        Console.WriteLine($"[GetCharacterForAscii] Searching classPool oop={classPoolOOP} for CharacterTable");
-        Console.WriteLine($"  classPool has {dictSize} indexed slots (associations)");
 
         for (int i = 0; i < dictSize; i++)
         {
@@ -929,7 +854,6 @@ public static class ObjectPrimitives
             string symbolName = GetSymbolName(ctx, keyOOP);
             if (symbolName == "CharacterTable")
             {
-                Console.WriteLine($"  Found CharacterTable at index {i}");
                 var characterTableOOP = ctx.HeapManager.GetInstanceVariable(entryOOP, 1);
                 if (asciiValue < 0 || asciiValue > 255)
                 {
@@ -940,7 +864,6 @@ public static class ObjectPrimitives
             }
         }
 
-        Console.WriteLine($"[GetCharacterForAscii] ERROR: CharacterTable not found in Character classPool");
         ctx.PrimitiveSuccess = false;
         return SpecialObjectsArray.Instance.Nil;
     }
@@ -973,9 +896,6 @@ public static class ObjectPrimitives
         // Dictionary stores associations in indexed slots (variableSubclass)
         // Instance variable 0 is 'tally', but we don't need it
         int arraySize = ctx.HeapManager.GetIndexedSize(dictionaryOOP);
-
-        Console.WriteLine($"[LookupInDictionary] Searching dictionary oop={dictionaryOOP} for key '{key}'");
-        Console.WriteLine($"  Dictionary has {arraySize} indexed slots (associations)");
 
         // Walk the association array (indexed slots of the dictionary)
         for (int i = 0; i < arraySize; i++)
@@ -1857,9 +1777,6 @@ public static class ObjectPrimitives
         int objectIndex = receiver.RawValue >> 1;  // Extract object table index
         int hashValue = objectIndex / 2;           // Half of the index
         var result = SmalltalkOOP.FromSmallInteger(hashValue);
-
-        // DIAGNOSTIC
-        Console.WriteLine($"[PRIM75] receiver={receiver} → hash={hashValue} result={result} (SmallInt={result.IsSmallInteger})");
 
         return result;
     }

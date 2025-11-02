@@ -13,12 +13,6 @@ public static class ArithmeticPrimitives
     private const int SmallIntegerMin = -(1 << 30);
     private const int SmallIntegerMax = (1 << 30) - 1;
 
-    // Primitive 1: SmallInteger +
-    // DEBUG: Primitive 1 call counter
-    private static int _prim1CallCount = 0;
-    private static int _prim1LastA = -999;
-    private static int _prim1LastB = -999;
-
     /// <summary>
     /// Primitive 1: SmallInteger + - Integer addition with overflow detection
     /// Blue Book: Page 636, Chapter 29, Formal Specification
@@ -67,21 +61,14 @@ public static class ArithmeticPrimitives
     /// <returns>Sum as SmallInteger, or nil if overflow/type error</returns>
     public static SmalltalkOOP Add(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // DEBUG: Log for Character.initialize debugging
-        System.Threading.Interlocked.Increment(ref _prim1CallCount);
-
         if (args.Length != 1)
         {
-            if (_prim1CallCount <= 10)
-                Console.WriteLine($"[Prim1 #{_prim1CallCount}] FAIL: args.Length={args.Length}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
-            if (_prim1CallCount <= 10)
-                Console.WriteLine($"[Prim1 #{_prim1CallCount}] FAIL: not SmallIntegers");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -96,19 +83,9 @@ public static class ArithmeticPrimitives
             // Check if result is within SmallInteger range (30-bit signed)
             if (result < SmallIntegerMin || result > SmallIntegerMax)
             {
-                if (_prim1CallCount <= 10)
-                    Console.WriteLine($"[Prim1 #{_prim1CallCount}] OVERFLOW: {a} + {b} = {result}");
                 // Overflow SmallInteger range - let Smalltalk fall back to LargeInteger method
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
-            }
-
-            // Log if values changed or first 10 calls
-            if (_prim1CallCount <= 10 || a != _prim1LastA || b != _prim1LastB)
-            {
-                Console.WriteLine($"[Prim1 #{_prim1CallCount}] {a} + {b} = {result}");
-                _prim1LastA = a;
-                _prim1LastB = b;
             }
 
             return SmalltalkOOP.FromSmallInteger(result);
@@ -263,9 +240,6 @@ public static class ArithmeticPrimitives
             : SpecialObjectsArray.Instance.False;
     }
 
-    // DEBUG: Primitive 4 call counter
-    private static int _prim4CallCount = 0;
-
     /// <summary>
     /// Primitive 4: SmallInteger &gt; - Integer greater-than comparison
     /// Blue Book: Page 636, Chapter 29, Formal Specification
@@ -309,22 +283,14 @@ public static class ArithmeticPrimitives
     /// <returns>Boolean True or False singleton</returns>
     public static SmalltalkOOP GreaterThan(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // DEBUG: Log first 20 calls to see what's failing
-        System.Threading.Interlocked.Increment(ref _prim4CallCount);
-        bool shouldLog = _prim4CallCount <= 20;
-
         if (args.Length != 1)
         {
-            if (shouldLog)
-                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: wrong arg count");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
-            if (shouldLog)
-                Console.WriteLine($"[Prim4 #{_prim4CallCount}] FAIL: not SmallIntegers (receiver={receiver}, arg={args[0]})");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -332,19 +298,10 @@ public static class ArithmeticPrimitives
         int a = receiver.AsSmallInteger();
         int b = args[0].AsSmallInteger();
 
-        bool result = a > b;
-        if (shouldLog)
-            Console.WriteLine($"[Prim4 #{_prim4CallCount}] {a} > {b} = {result}");
-
-        return result
+        return a > b
             ? SpecialObjectsArray.Instance.True
             : SpecialObjectsArray.Instance.False;
     }
-
-    // DEBUG: Primitive 5 call counter
-    private static int _prim5CallCount = 0;
-    private static int _prim5LastA = -1;
-    private static int _prim5LastB = -1;
 
     /// <summary>
     /// Primitive 5: SmallInteger &lt;= - Integer less-than-or-equal comparison
@@ -388,21 +345,14 @@ public static class ArithmeticPrimitives
     /// <returns>Boolean True or False singleton</returns>
     public static SmalltalkOOP LessOrEqual(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // DEBUG: Log first 300 calls and every time values change
-        System.Threading.Interlocked.Increment(ref _prim5CallCount);
-
         if (args.Length != 1)
         {
-            if (_prim5CallCount <= 10)
-                Console.WriteLine($"[Prim5 #{_prim5CallCount}] FAIL: args.Length={args.Length}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
-            if (_prim5CallCount <= 10)
-                Console.WriteLine($"[Prim5 #{_prim5CallCount}] FAIL: not SmallIntegers");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -410,17 +360,7 @@ public static class ArithmeticPrimitives
         int a = receiver.AsSmallInteger();
         int b = args[0].AsSmallInteger();
 
-        bool result = a <= b;
-
-        // Log if values changed or first 10 calls
-        if (_prim5CallCount <= 10 || a != _prim5LastA || b != _prim5LastB)
-        {
-            Console.WriteLine($"[Prim5 #{_prim5CallCount}] {a} <= {b} = {result}");
-            _prim5LastA = a;
-            _prim5LastB = b;
-        }
-
-        return result
+        return a <= b
             ? SpecialObjectsArray.Instance.True
             : SpecialObjectsArray.Instance.False;
     }
