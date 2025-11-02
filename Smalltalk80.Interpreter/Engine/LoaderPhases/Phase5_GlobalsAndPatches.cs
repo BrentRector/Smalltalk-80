@@ -282,6 +282,20 @@ public class Phase5_GlobalsAndPatches
 
             var bucketOOP = _allocator.GetIndexedOOP(ustableOOP, bucketIndex);
             int position = bucketPositions[bucketIndex]++;
+
+            // DIAGNOSTIC: Verify we're inserting Symbol OOPs, not SmallIntegers
+            if (symbolOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"  ERROR: Inserting SmallInteger {symbolOOP.AsSmallInteger()} into USTable bucket {bucketIndex} position {position}!");
+                Console.WriteLine($"    Symbol name: \"{symbolName}\"");
+            }
+
+            // DIAGNOSTIC: Log bucket 3240 population
+            if (bucketIndex == 3240)
+            {
+                Console.WriteLine($"  [Phase5] Inserting symbol \"{symbolName}\" ({symbolOOP}) into bucket 3240 position {position}");
+            }
+
             _allocator.SetIndexedOOP(bucketOOP, position, symbolOOP);
         }
 
@@ -320,6 +334,12 @@ public class Phase5_GlobalsAndPatches
             // Allocate array for this bucket (size 0 for empty buckets)
             var bucketOOP = _allocator.AllocateArray("Array", bucketCounts[i]);
             _allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
+
+            // DIAGNOSTIC: Log bucket 68364 creation
+            if (bucketOOP.RawValue == 68364)
+            {
+                Console.WriteLine($"  [Phase5] Created USTable bucket {bucketOOP} (index {i}, size {bucketCounts[i]})");
+            }
 
             // Initialize all indexed slots to nil (C# arrays default to OOP(0))
             for (int j = 0; j < bucketCounts[i]; j++)

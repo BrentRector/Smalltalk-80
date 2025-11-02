@@ -148,7 +148,20 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         // DEBUG: Log allocations (limit output to first 50 runtime allocations)
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
-        if (VerboseDebugMode && _runtimeAllocationCount <= 50)
+
+        // DIAGNOSTIC: Always log Array allocations to debug USTable bucket issue
+        string? className = null;
+        try
+        {
+            className = GetClassName(classOOP);
+        }
+        catch { /* Ignore - early in initialization */ }
+
+        if (className == "Array" && indexedSize > 0)
+        {
+            Console.WriteLine($"[AllocateInstanceOf ARRAY] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
+        }
+        else if (VerboseDebugMode && _runtimeAllocationCount <= 50)
         {
             Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
         }
@@ -178,6 +191,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             for (int i = 0; i < indexedSize; i++)
             {
                 SetIndexedOOP(newInstanceOOP, i, nilOOP);
+            }
+
+            // DIAGNOSTIC: Verify Array initialization worked correctly
+            if (className == "Array" && indexedSize > 0)
+            {
+                var slot0 = GetIndexedOOP(newInstanceOOP, 0);
+                Console.WriteLine($"  [VERIFY] Array {newInstanceOOP} slot[0] = {slot0} (should be nil={nilOOP})");
+                if (slot0 != nilOOP)
+                {
+                    Console.WriteLine($"    ERROR: Array slot[0] is NOT nil! It's {slot0}");
+                }
             }
         }
 
@@ -481,6 +505,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 $"    - Context object has wrong format (should be PointerIndexed)\n" +
                 $"    - Wrong object being used as a context or array\n" +
                 $"    - Field layout error causing wrong object to be accessed");
+        }
+
+        // DIAGNOSTIC: Track SmallInteger(1) being stored
+        if (value.IsSmallInteger && value.AsSmallInteger() == 1)
+        {
+            Console.WriteLine($"[SetIndexedOOP] Storing SmallInteger(1) in object {objectOOP} at index {index}");
+        }
+
+        // DIAGNOSTIC: Track ALL writes to bucket 68364
+        if (objectOOP.RawValue == 68364)
+        {
+            Console.WriteLine($"[SetIndexedOOP] Writing to bucket 68364 at index {index}: value={value}");
         }
 
         WriteIndexedOop(entry, index, value);

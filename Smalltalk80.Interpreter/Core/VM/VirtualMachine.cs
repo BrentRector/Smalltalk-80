@@ -2587,6 +2587,47 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"\n[new:] receiver \"{className}\" {receiverOOP} | class \"{classOfClassName}\" {classOOP} | format={classFormat}, iVars={_heapManager.GetInstanceVariableCount(classOOP)}");
         }
 
+        // DIAGNOSTIC: Track asSymbol and intern: to debug ClassOrganizer initialize
+        if (selectorName == "asSymbol")
+        {
+            var className = GetClassName(classOOP);
+            Console.WriteLine($"\n[asSymbol] receiver={receiverOOP} class=\"{className}\"");
+        }
+
+        if (selectorName == "intern:")
+        {
+            var className = GetClassName(classOOP);
+            var argInfo = args.Length > 0 ? args[0].ToString() : "NONE";
+            Console.WriteLine($"\n[intern:] receiver class=\"{className}\" | arg={argInfo}");
+            if (args.Length > 0)
+            {
+                var argOOP = args[0];
+                var argClass = argOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(argOOP));
+                Console.WriteLine($"  Arg class=\"{argClass}\"");
+            }
+        }
+
+        // DIAGNOSTIC: Track at:put: on Array to see what's being stored
+        if (selectorName == "at:put:" && args.Length == 2)
+        {
+            var className = GetClassName(classOOP);
+            if (className == "Array")
+            {
+                var indexArg = args[0];
+                var valueArg = args[1];
+                var indexInfo = indexArg.IsSmallInteger ? $"SmallInteger({indexArg.AsSmallInteger()})" : $"NOT SmallInteger! {indexArg}";
+                var valueClass = valueArg.IsSmallInteger ? $"SmallInteger({valueArg.AsSmallInteger()})" : GetClassName(GetClass(valueArg));
+                Console.WriteLine($"\n[at:put:] Array receiver={receiverOOP} | index={indexInfo} | value={valueArg} class=\"{valueClass}\"");
+
+                // Extra diagnostic for storing SmallInteger values
+                if (valueArg.IsSmallInteger)
+                {
+                    Console.WriteLine($"  WARNING: Storing SmallInteger into Array!");
+                    DumpSenderChain(_activeContextOOP, 3);
+                }
+            }
+        }
+
         // DEBUG: Log when selector is <unknown>
         if (selectorName == null)
         {
