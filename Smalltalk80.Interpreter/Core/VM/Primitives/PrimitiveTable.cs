@@ -56,12 +56,12 @@ public static class PrimitiveTable
         _primitives[9] = ArithmeticPrimitives.Multiply;
         _primitives[10] = ArithmeticPrimitives.Divide;
         _primitives[11] = ArithmeticPrimitives.Mod;
-        _primitives[12] = ArithmeticPrimitives.Quo;
-        _primitives[13] = ArithmeticPrimitives.BitAnd;
-        _primitives[14] = ArithmeticPrimitives.BitOr;
-        _primitives[15] = ArithmeticPrimitives.BitXor;
-        _primitives[16] = ArithmeticPrimitives.BitShift;
-        _primitives[17] = ArithmeticPrimitives.Div;
+        _primitives[12] = ArithmeticPrimitives.Div;        // SmallInteger // (rounds down toward negative infinity)
+        _primitives[13] = ArithmeticPrimitives.Quo;        // SmallInteger quo: (truncates toward zero)
+        _primitives[14] = ArithmeticPrimitives.BitAnd;     // SmallInteger bitAnd:
+        _primitives[15] = ArithmeticPrimitives.BitOr;      // SmallInteger bitOr:
+        _primitives[16] = ArithmeticPrimitives.BitXor;     // SmallInteger bitXor:
+        _primitives[17] = ArithmeticPrimitives.BitShift;   // SmallInteger bitShift:
 
         // Point primitives (18)
         _primitives[18] = PointPrimitives.MakePoint;
