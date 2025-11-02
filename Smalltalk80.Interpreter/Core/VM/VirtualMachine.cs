@@ -39,7 +39,6 @@ public partial class VirtualMachine : IPrimitiveContext
     private const int MAX_CONTEXT_DEPTH = 5000;  // Increased for init expressions with deep dependencies
 
     // Cursor creation loop diagnostics
-    private int _cursorCreationCount = 0;
 
     // Call outcome used for NLR propagation and context switching in trampoline interpreter
     private enum CallOutcomeKind { Normal, NonLocalReturn, VMException, ContextSwitch }
@@ -312,7 +311,6 @@ public partial class VirtualMachine : IPrimitiveContext
         int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
         // Check size-specific pool for matching context
-        bool isPooledContext = false;
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
         {
             // Reuse pooled context with exact size match
@@ -322,19 +320,15 @@ public partial class VirtualMachine : IPrimitiveContext
             // Check if we accidentally picked the active context
             if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
             {
-                if (_verboseDebugMode)
-                    Console.WriteLine($"[POOL] WARNING: Attempted to reuse active/sender context {contextOOP}, allocating new instead");
                 // Put it back and allocate a fresh one
                 pool.Push(contextOOP);
                 contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
                 _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
-                isPooledContext = false;  // Allocated new, not pooled
             }
             else
             {
                 if (_verboseDebugMode)
                     Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
-                isPooledContext = true;  // Reused from pool
             }
         }
         else
@@ -344,7 +338,6 @@ public partial class VirtualMachine : IPrimitiveContext
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
             if (_verboseDebugMode)
                 Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
-            isPooledContext = false;  // Allocated new, not pooled
         }
 
         // Increment context depth and check limit
@@ -403,14 +396,6 @@ public partial class VirtualMachine : IPrimitiveContext
         for (int i = 0; i < header.NumArgs; i++)
         {
             _heapManager.SetIndexedOOP(contextOOP, i, arguments[i]);
-
-            // DIAGNOSTIC: Track arg initialization for Object>>at:
-            var methodLocalId = GetLocalId(methodOOP);
-            if (methodLocalId == "method:Object>>at:" && i == 0)
-            {
-                var argClass = arguments[i].IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(arguments[i]));
-                Console.WriteLine($"\n[ARG INIT] Object>>at: arg0 set to {arguments[i]}, class={argClass}, context={contextOOP}, pooled={isPooledContext}");
-            }
         }
 
         // CRITICAL: Initialize temps to nil for ALL contexts (both new and pooled)
@@ -907,13 +892,6 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
         // DEBUG: Track bytecode execution for debugging
-        if (bytecode == 0x10)
-        {
-            if (_debugOptions.ShouldDebugBytecode)
-            {
-                Console.WriteLine($"[DEBUG ExecuteBytecode] bytecode=0x{bytecode:X2}, IsPushIvar={BytecodeUtil.IsPushIvar(bytecode)}, IsPushTemp={BytecodeUtil.IsPushTemp(bytecode)}");
-            }
-        }
 
         int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
@@ -2518,53 +2496,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
 
-        // DIAGNOSTIC: Track hash method sends to debug Primitive 75 issue
-        if (selectorName == "hash" || selectorName == "stringhash")
-        {
-            var className = GetClassName(classOOP);
-            Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\"");
-        }
 
-        // DIAGNOSTIC: Track '=' sends to see what's being compared
-        if (selectorName == "=" && args.Length > 0)
-        {
-            var receiverClass = GetClassName(classOOP);
-            var argOOP = args[0];
-            var argClass = argOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(argOOP));
-            Console.WriteLine($"\n[=] receiver={receiverOOP} class=\"{receiverClass}\" | arg={argOOP} class=\"{argClass}\"");
-        }
 
-        // DIAGNOSTIC: Track 'to:do:' sends to see loop setup
-        if (selectorName == "to:do:" && args.Length == 2)
-        {
-            var receiverClass = GetClassName(classOOP);
-            var endOOP = args[0];
-            var blockOOP = args[1];
-            var endClass = endOOP.IsSmallInteger ? $"SmallInteger({endOOP.AsSmallInteger()})" : $"Object class={GetClassName(GetClass(endOOP))}";
-            var blockClass = GetClassName(GetClass(blockOOP));
-            Console.WriteLine($"\n[to:do:] receiver={receiverOOP} class=\"{receiverClass}\" | end={endClass} | block class=\"{blockClass}\"");
-        }
 
-        // DIAGNOSTIC: Track 'at:' sends to see what indices are being used
-        if (selectorName == "at:" && args.Length > 0)
-        {
-            var className = GetClassName(classOOP);
-            var indexArg = args[0];
-            var indexInfo = indexArg.IsSmallInteger ? $"SmallInteger({indexArg.AsSmallInteger()})" : $"NOT SmallInteger! OOP({indexArg.RawValue}), class={GetClassName(GetClass(indexArg))}";
-            Console.WriteLine($"\n[at:] receiver={receiverOOP} class=\"{className}\" | index={indexInfo}");
-
-            // Extra diagnostic for non-SmallInteger indices
-            if (!indexArg.IsSmallInteger)
-            {
-                Console.WriteLine($"  PROBLEM: Non-SmallInteger index detected!");
-                Console.WriteLine($"  Active context: {_activeContextOOP}");
-                int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-                var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-                string? methodLocalId = GetLocalId(methodOOP);
-                Console.WriteLine($"  Method: {methodLocalId}");
-                DumpSenderChain(_activeContextOOP, 5);
-            }
-        }
 
         // DEBUG: Log value sends to see what's receiving them
         if (_verboseDebugMode && (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:"))
@@ -2587,46 +2521,7 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"\n[new:] receiver \"{className}\" {receiverOOP} | class \"{classOfClassName}\" {classOOP} | format={classFormat}, iVars={_heapManager.GetInstanceVariableCount(classOOP)}");
         }
 
-        // DIAGNOSTIC: Track asSymbol and intern: to debug ClassOrganizer initialize
-        if (selectorName == "asSymbol")
-        {
-            var className = GetClassName(classOOP);
-            Console.WriteLine($"\n[asSymbol] receiver={receiverOOP} class=\"{className}\"");
-        }
 
-        if (selectorName == "intern:")
-        {
-            var className = GetClassName(classOOP);
-            var argInfo = args.Length > 0 ? args[0].ToString() : "NONE";
-            Console.WriteLine($"\n[intern:] receiver class=\"{className}\" | arg={argInfo}");
-            if (args.Length > 0)
-            {
-                var argOOP = args[0];
-                var argClass = argOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(argOOP));
-                Console.WriteLine($"  Arg class=\"{argClass}\"");
-            }
-        }
-
-        // DIAGNOSTIC: Track at:put: on Array to see what's being stored
-        if (selectorName == "at:put:" && args.Length == 2)
-        {
-            var className = GetClassName(classOOP);
-            if (className == "Array")
-            {
-                var indexArg = args[0];
-                var valueArg = args[1];
-                var indexInfo = indexArg.IsSmallInteger ? $"SmallInteger({indexArg.AsSmallInteger()})" : $"NOT SmallInteger! {indexArg}";
-                var valueClass = valueArg.IsSmallInteger ? $"SmallInteger({valueArg.AsSmallInteger()})" : GetClassName(GetClass(valueArg));
-                Console.WriteLine($"\n[at:put:] Array receiver={receiverOOP} | index={indexInfo} | value={valueArg} class=\"{valueClass}\"");
-
-                // Extra diagnostic for storing SmallInteger values
-                if (valueArg.IsSmallInteger)
-                {
-                    Console.WriteLine($"  WARNING: Storing SmallInteger into Array!");
-                    DumpSenderChain(_activeContextOOP, 3);
-                }
-            }
-        }
 
         // DEBUG: Log when selector is <unknown>
         if (selectorName == null)
@@ -2634,23 +2529,11 @@ public partial class VirtualMachine : IPrimitiveContext
             if (_debugOptions.ShouldDebugMessages)
             {
                 Console.WriteLine($"[SendMessage] WARNING: selectorOOP={selectorOOP} does not resolve to a Symbol!");
-            }
-            Console.WriteLine($"  receiverOOP={receiverOOP}, classOOP={classOOP}, className={GetClassName(classOOP)}");
-            Console.WriteLine($"  selectorOOP.IsSmallInteger={selectorOOP.IsSmallInteger}, selectorOOP.RawValue=0x{selectorOOP.RawValue:X}");
-        }
-
-        // DIAGNOSTIC: Track repeated Cursor creation to diagnose loop
-        if (selectorName == "extent:fromArray:offset:")
-        {
-            _cursorCreationCount++;
-            Console.WriteLine($"\n[CURSOR #{_cursorCreationCount}] depth={_activeContextCount}, receiver \"{GetClassName(classOOP)}\" {receiverOOP}");
-
-            // Show sender chain for first 10 calls
-            if (_cursorCreationCount <= 10)
-            {
-                DumpSenderChain(_activeContextOOP, 6);
+                Console.WriteLine($"  receiverOOP={receiverOOP}, classOOP={classOOP}, className={GetClassName(classOOP)}");
+                Console.WriteLine($"  selectorOOP.IsSmallInteger={selectorOOP.IsSmallInteger}, selectorOOP.RawValue=0x{selectorOOP.RawValue:X}");
             }
         }
+
 
         // DIAGNOSTIC: Track > and max: message sends (DISABLED - causes issues with SmallInteger diagnostic output)
         // if (selectorName == ">")
@@ -3239,13 +3122,6 @@ public partial class VirtualMachine : IPrimitiveContext
         if (blockLocalId == null || !blockOwnerMap.TryGetValue(blockLocalId, out string? ownerLocalId))
         {
             throw new InvalidOperationException($"Block method {blockMethodOOP} not found in blockOwnerMap");
-        }
-
-        // DEBUG: Dump bytecodes for blocks inside to:do: method
-        if (_createContextCallCount <= 20 && ownerLocalId == "method:Number>>to:do:")
-        {
-            Console.WriteLine($"[BLOCK BYTECODES] Block {blockLocalId} (owner: {ownerLocalId}):");
-            DumpBytecodes(blockMethodOOP, "  ");
         }
 
         // Step 2: Determine contexts
@@ -4320,6 +4196,10 @@ public partial class VirtualMachine : IPrimitiveContext
     /// <summary>
     /// Adds an Association to a class's classPool Dictionary if it doesn't already exist.
     /// Implements lazy class variable initialization: on first store, add the Association to classPool.
+    ///
+    /// If the classPool dictionary is full, this method returns without throwing an exception,
+    /// allowing the Smalltalk code to handle dictionary growth through its normal
+    /// fullCheck → grow → become: mechanism.
     /// </summary>
     private void AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
     {
@@ -4402,7 +4282,20 @@ public partial class VirtualMachine : IPrimitiveContext
         // Use atomic insert-if-absent to add Association to classPool
         // This handles both first-time insertion and idempotent re-insertion
         var winnerAssocOOP = DictionaryAtomicInsertIfAbsent(classPoolOOP, keyOOP, associationOOP);
-        
+
+        // Check if the dictionary was full (reuse nilOOP from above)
+        if (winnerAssocOOP == nilOOP)
+        {
+            // Dictionary is full - let Smalltalk handle the growth
+            // The Smalltalk at:put: method will be executed, which will:
+            // 1. Call atNewIndex:put: to add the new association
+            // 2. Call fullCheck to detect that the dictionary is full
+            // 3. Call grow to create a larger dictionary
+            // 4. Use become: to swap the old and new dictionaries
+            // We simply return here and let the normal bytecode execution continue
+            return;
+        }
+
         // Validate canonicalization: winner should be same as our Association
         // With Phase8 canonicalization, all methods share the same Association OOP
         if (winnerAssocOOP != associationOOP)
@@ -4411,7 +4304,7 @@ public partial class VirtualMachine : IPrimitiveContext
             // This means either:
             // 1. Phase8 canonicalization failed (bug in loader)
             // 2. Someone created a non-canonical Association at runtime (illegal)
-            // 
+            //
             // We keep the existing winner (first-writer-wins) but this indicates a serious bug
         }
     }
@@ -4483,11 +4376,17 @@ public partial class VirtualMachine : IPrimitiveContext
     /// <summary>
     /// Atomically inserts Association into Dictionary if key doesn't exist.
     /// Returns the winning Association OOP (either newly inserted or existing).
-    /// 
+    ///
     /// Provides insert-if-absent semantics with proper synchronization:
     /// - If key exists, returns existing Association OOP (no modification)
-    /// - If key doesn't exist, inserts Association and returns it
+    /// - If key doesn't exist and space available, inserts Association and returns it
+    /// - If dictionary is full, returns nil to signal that Smalltalk should handle growth
     /// - Thread-safe for Smalltalk-80 single-threaded VM (synchronization ready for future)
+    ///
+    /// Return values:
+    /// - Existing Association OOP if key already exists (winner)
+    /// - Newly inserted Association OOP if insertion successful (winner)
+    /// - nil if dictionary is full (caller should let Smalltalk handle growth via fullCheck → grow → become:)
     /// </summary>
     private SmalltalkOOP DictionaryAtomicInsertIfAbsent(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP associationOOP)
     {
@@ -4531,10 +4430,16 @@ public partial class VirtualMachine : IPrimitiveContext
                 return associationOOP;
             }
         }
-        
-        // No space - Dictionary needs rehashing
-        throw new InvalidOperationException(
-            $"Dictionary {dictionaryOOP} is full (size={size}). Rehashing not yet implemented.");
+
+        // No space - Dictionary is full
+        // Return nil to signal that the dictionary is full.
+        // The calling Smalltalk code will handle this by:
+        // 1. Falling back to the Smalltalk at:put: method
+        // 2. Which calls atNewIndex:put: that increments tally
+        // 3. Which calls fullCheck that detects fullness
+        // 4. Which calls grow to create a larger dictionary
+        // 5. Which uses become: to swap the old and new dictionaries
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     /// <summary>
