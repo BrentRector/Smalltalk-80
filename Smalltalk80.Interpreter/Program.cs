@@ -403,6 +403,7 @@ public static class Program
                 Console.WriteLine($"  Skipped: {phase2Indices.Count} comment expressions");
                 return;
 
+                #if false  // Phase 2 disabled - unreachable code preserved for reference
                 // Phase 2: Execute all comment: expressions (DISABLED - not running)
                 Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
                 Console.WriteLine($"  Executing {phase2Indices.Count} comment: expression(s) in source file order");
@@ -465,6 +466,7 @@ public static class Program
                 }
                 Console.WriteLine($"  Total: {succeeded}/{totalExpressions} succeeded, {failed} failed");
                 Console.WriteLine($"\n✓ All init expressions executed successfully!");
+                #endif  // End of disabled Phase 2 code
             }
 
             Console.WriteLine("\n✓ All systems ready!");
