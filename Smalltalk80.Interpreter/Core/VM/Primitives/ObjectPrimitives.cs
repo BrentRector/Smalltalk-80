@@ -1024,7 +1024,7 @@ public static class ObjectPrimitives
     ///                  ofObject: stream.
     ///     limit ← self fetchInteger: StreamReadLimitIndex
     ///                  ofObject: stream.
-    ///     self success: index < limit.
+    ///     self success: index &lt; limit.
     ///     self success:
     ///         (arrayClass = ClassArrayPointer) | (arrayClass = ClassStringPointer).
     ///     self checkIndexableBoundsOf: index + 1
@@ -1172,7 +1172,7 @@ public static class ObjectPrimitives
     ///                  ofObject: stream.
     ///     limit ← self fetchInteger: StreamWriteLimitIndex
     ///                  ofObject: stream.
-    ///     self success: index < limit.
+    ///     self success: index &lt; limit.
     ///     self success:
     ///         (arrayClass = ClassArrayPointer) | (arrayClass = ClassStringPointer).
     ///     self checkIndexableBoundsOf: index + 1
@@ -1332,7 +1332,7 @@ public static class ObjectPrimitives
     ///                  ofObject: stream.
     ///     limit ← self fetchInteger: StreamReadLimitIndex
     ///                  ofObject: stream.
-    ///     index >= limit
+    ///     index &gt;= limit
     ///         ifTrue: [self push: TruePointer]
     ///         ifFalse: [self push: FalsePointer]
     /// </code>
@@ -1341,19 +1341,19 @@ public static class ObjectPrimitives
     /// <list type="bullet">
     /// <item>Tests if stream position is past readLimit</item>
     /// <item>Position and readLimit are both 1-based</item>
-    /// <item>Returns true when position > readLimit</item>
-    /// <item>Returns false when position <= readLimit</item>
+    /// <item>Returns true when position &gt; readLimit</item>
+    /// <item>Returns false when position &lt;= readLimit</item>
     /// <item>Never fails (always returns a boolean)</item>
     /// </list>
     ///
     /// <para><b>Analysis:</b></para>
-    /// <para>Implementation correctly uses > comparison since position == readLimit means
+    /// <para>Implementation correctly uses &gt; comparison since position == readLimit means
     /// there's still one element to read (the element at position readLimit).</para>
     ///
     /// <para><b>Differences from Specification:</b></para>
     /// <list type="bullet">
-    /// <item>Blue Book uses >= which would incorrectly report atEnd when one element remains</item>
-    /// <item>Our implementation uses > which correctly handles the last element</item>
+    /// <item>Blue Book uses &gt;= which would incorrectly report atEnd when one element remains</item>
+    /// <item>Our implementation uses &gt; which correctly handles the last element</item>
     /// <item>This matches actual Smalltalk stream behavior</item>
     /// </list>
     ///
@@ -1477,8 +1477,8 @@ public static class ObjectPrimitives
     ///     | thisReceiver index |
     ///     index ← self popInteger.
     ///     thisReceiver ← self popStack.
-    ///     self success: index >= 1.
-    ///     self success: index <= (self objectPointerCountOf: thisReceiver).
+    ///     self success: index &gt;= 1.
+    ///     self success: index &lt;= (self objectPointerCountOf: thisReceiver).
     ///     self success
     ///         ifTrue: [self push: (memory fetchPointer: index - 1
     ///                                    ofObject: thisReceiver)]
@@ -1562,8 +1562,8 @@ public static class ObjectPrimitives
     ///     newValue ← self popStack.
     ///     index ← self popInteger.
     ///     thisReceiver ← self popStack.
-    ///     self success: index >= 1.
-    ///     self success: index <= (self objectPointerCountOf: thisReceiver).
+    ///     self success: index &gt;= 1.
+    ///     self success: index &lt;= (self objectPointerCountOf: thisReceiver).
     ///     self success
     ///         ifTrue: [memory storePointer: index - 1
     ///                        ofObject: thisReceiver
