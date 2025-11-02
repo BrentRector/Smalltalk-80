@@ -146,20 +146,23 @@ public class RuntimeHeapAccess
     /// <summary>
     /// Looks up a global variable by name using byte comparison (no symbol interning needed).
     /// Used to break the circular dependency when looking up USTable.
+    /// CRITICAL: SystemDictionary is an Array of Associations, NOT a Dictionary with keys/values arrays!
     /// </summary>
     public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
 
-        // Get the keys and values arrays
-        var keysArrayOOP = _heapManager.GetIndexedOOP(dictOOP, 0);
-        var valuesArrayOOP = _heapManager.GetIndexedOOP(dictOOP, 1);
-
-        // Linear search through keys, comparing symbol bytes
-        int size = _heapManager.GetIndexedSize(keysArrayOOP);
+        // SystemDictionary structure: Array of Association objects
+        // Each Association has: slot 0 = key (Symbol), slot 1 = value (Object)
+        int size = _heapManager.GetIndexedSize(dictOOP);
         for (int i = 0; i < size; i++)
         {
-            var keyOOP = _heapManager.GetIndexedOOP(keysArrayOOP, i);
+            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
+            if (associationOOP == SpecialObjectsArray.Instance.Nil || associationOOP.IsSmallInteger)
+                continue;
+
+            // Get the key from the Association (slot 0)
+            var keyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
             if (keyOOP == SpecialObjectsArray.Instance.Nil || keyOOP.IsSmallInteger)
                 continue;
 
@@ -179,7 +182,10 @@ public class RuntimeHeapAccess
                 }
 
                 if (match)
-                    return _heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                {
+                    // Return the value from the Association (slot 1)
+                    return _heapManager.GetInstanceVariable(associationOOP, 1);
+                }
             }
         }
 

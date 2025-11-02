@@ -158,17 +158,13 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP LookupSymbolInHeap(string symbolName)
     {
-        // Get USTable from the Smalltalk heap (via the global dictionary)
-        var ustableOOP = _runtimeHeapAccess.InternSymbol("USTable");
-        if (ustableOOP == SpecialObjectsArray.Instance.Nil)
+        // Get USTable OOP
+        // NOTE: During VM initialization (cold start), GlobalRegistry is valid and contains USTable
+        // This is acceptable because VM initialization happens during cold start, not runtime
+        if (!GlobalRegistry.TryGet("USTable", out var ustableOOP))
         {
-            // USTable is a special case - it's needed to intern symbols, so we need direct heap lookup
-            var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
-            ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
-            if (ustableOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                throw new InvalidOperationException("USTable not found - cannot initialize selector caches");
-            }
+            throw new InvalidOperationException("USTable not found - cannot initialize selector caches. " +
+                "This method should only be called during cold start initialization.");
         }
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs
